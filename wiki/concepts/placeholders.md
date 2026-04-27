@@ -1,8 +1,9 @@
 # Placeholders — Fixed Catalog Model
 
 > _Changelog: 2026-04-26 — rewritten for fixed-catalog model (ADR 0008); dropped legacy fill-in workflow content._
+> _Changelog: 2026-04-27 — composition system deprecated, UI removed (Phase 1)._
 >
-> **Last verified:** 2026-04-26
+> **Last verified:** 2026-04-27
 > **Scope:** What a placeholder is, the fixed 7-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -98,3 +99,27 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - [modules/render-fanout.md](../modules/render-fanout.md) — server substitution code
 - [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
+
+## Composition system (deprecated 2026-04-27)
+
+The MetalDocs custom composition concept (header/footer sub-blocks toggleable per template) was removed from the UI on 2026-04-27. Reasons:
+
+- Two parallel mental models for the same job (placeholders vs composition checkboxes) — UX tax with no benefit
+- Static OOXML fragments hardcoded in `apps/docgen-v2/src/render/subblocks/` — couldn't be customized per template, defeated the template purpose
+- UI catalogue keys (`doc-header`, `approval-footer`, `revision-history`) didn't match registry keys (`doc_header_standard`, `approval_signatures_block`) — silently broken
+- Eigenpal `templatePlugin` already handles all placeholder mechanics — composition reinvented substitution badly
+
+Removed:
+- `frontend/apps/web/src/features/templates/composition-config-panel.tsx`
+- `frontend/apps/web/src/features/templates/__tests__/composition-config-panel.test.tsx`
+- Right rail + right panel from template editor UI
+- All `composition` state/handlers from `TemplateAuthorPage.tsx`
+
+Backend untouched:
+- `documents.composition_config_snapshot` column still receives `{}` — zero data risk
+- `FanoutRequest.Composition` field still passed (empty) — fanout pipeline happy
+- `apps/docgen-v2/src/render/subblocks/` registry remains — no behavior change
+
+Future: when standardized blocks (revision history table, approval signatures) genuinely need to return, implement as **rich-content resolvers** — `{revision_history_table}` resolver returns OOXML table. User drops the placeholder where they want it in the eigenpal editor. One mental model: everything is a placeholder.
+
+Last verified: 2026-04-27

@@ -69,7 +69,7 @@
 
 **Search module** - `internal/modules/search/` — aggregates documents across sources for the hub list. The v2 reader (`infrastructure/v2documents/reader.go`) queries `public.documents LEFT JOIN controlled_documents cd` to return the real document code and sequence number. Bug fixed 2026-04-27: prior to the fix, `d.code` was always empty for v2 docs; the reader now uses `COALESCE(cd.code, '')` and `COALESCE(cd.sequence_num, d.revision_number, 0)`.
 
-**Snapshot** - Immutable copy captured when a document is created, not when it is submitted. `application.SnapshotService` is wired through `documents_v2.Dependencies.SnapshotReader`/`SnapshotWriter` and populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`; catalog-only templates use `{}` for `composition_config_snapshot`. The `enforce_snapshot_on_submit_trg` trigger enforces these six columns before draft -> under_review.
+**Snapshot** - Immutable copy captured when a document is created, not when it is submitted. `application.SnapshotService` is wired through `documents_v2.Dependencies.SnapshotReader`/`SnapshotWriter` and populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`; catalog-only templates use `{}` for `composition_config_snapshot` (composition deprecated 2026-04-27 — see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27 — every doc now writes `{}`). The `enforce_snapshot_on_submit_trg` trigger enforces these six columns before draft -> under_review.
 
 ## T
 
