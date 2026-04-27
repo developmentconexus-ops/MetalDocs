@@ -4,13 +4,18 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@eigenpal/docx-js-editor@0.0.34':
+    hash: 81d15d55b1bab18c5f1bd6692421d94fc80c2b21104c79f65fc71172fdec3d01
+    path: patches/@eigenpal__docx-js-editor@0.0.34.patch
+
 importers:
 
   .:
     dependencies:
       '@eigenpal/docx-js-editor':
         specifier: 0.0.34
-        version: 0.0.34(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 0.0.34(patch_hash=81d15d55b1bab18c5f1bd6692421d94fc80c2b21104c79f65fc71172fdec3d01)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@fontsource/dm-mono':
         specifier: ^5.2.7
         version: 5.2.7
@@ -2923,7 +2928,7 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@eigenpal/docx-js-editor@0.0.34(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@eigenpal/docx-js-editor@0.0.34(patch_hash=81d15d55b1bab18c5f1bd6692421d94fc80c2b21104c79f65fc71172fdec3d01)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@radix-ui/react-select': 2.2.6(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       clsx: 2.1.1
@@ -3082,7 +3087,7 @@ snapshots:
 
   '@metaldocs/editor-ui@file:../../../packages/editor-ui(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@eigenpal/docx-js-editor': 0.0.34(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@eigenpal/docx-js-editor': 0.0.34(patch_hash=81d15d55b1bab18c5f1bd6692421d94fc80c2b21104c79f65fc71172fdec3d01)(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@metaldocs/shared-tokens': file:../../../packages/shared-tokens
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
