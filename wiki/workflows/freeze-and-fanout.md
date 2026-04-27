@@ -109,7 +109,7 @@ This is a **raw JSON array** — NOT wrapped as `{"placeholders": [...]}`. `pars
 ## Gotchas
 
 - **Wrong S3 bucket in local dev:** docgen-v2 reads template DOCX from `metaldocs-docx-v2`, not `metaldocs-attachments`. Template DOCX must exist in `metaldocs-docx-v2` in the local MinIO instance.
-- **`composition_config` defaults:** `header_sub_blocks`, `footer_sub_blocks`, and `sub_block_params` default to empty — templates without sub-blocks work fine without explicit values.
+- **`composition_config` defaults:** `header_sub_blocks`, `footer_sub_blocks`, and `sub_block_params` default to empty — templates without sub-blocks work fine without explicit values. (composition deprecated 2026-04-27 — see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27 — UI no longer sets any sub-blocks; field is always empty in practice)
 - **Freeze is idempotent:** `values_frozen_at` already set → early return, no duplicate writes, no error.
 - **Freeze runs inside signoff transaction:** if the freeze step fails, the entire signoff is rolled back.
 

@@ -38,7 +38,7 @@
 Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document creation by `application.SnapshotService`, wired via `documents_v2.Dependencies.SnapshotReader`/`SnapshotWriter`. The `enforce_snapshot_on_submit_trg` trigger enforces these are non-NULL before draft -> under_review.
 
 ### Concepts (cross-cutting)
-- [concepts/placeholders.md](concepts/placeholders.md) - **CRITICAL:** fixed 7-token catalog, substitution at freeze (Last verified: 2026-04-26)
+- [concepts/placeholders.md](concepts/placeholders.md) - **CRITICAL:** fixed 7-token catalog, substitution at freeze; composition system deprecated 2026-04-27 (Last verified: 2026-04-27)
 - [concepts/token-syntax.md](concepts/token-syntax.md) - `{name}` vs `{{uuid}}` - why it matters
 - [concepts/controlled-documents.md](concepts/controlled-documents.md) - code generation, profile binding, sequence counters
 - [concepts/iso-segregation.md](concepts/iso-segregation.md) - why submitter cannot approve own submit
