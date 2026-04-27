@@ -182,10 +182,9 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             </div>
 
             <div className={styles.overlayTitle}>
-              <span className={styles.docTitle}>{displayName || 'Documento'}</span>
-              <span className={styles.docSep}>·</span>
               <span className={styles.docMeta}>Documento</span>
-              {docCode && <span className={styles.versionBadge}>{docCode}</span>}
+              <span className={styles.docSep}>·</span>
+              <span className={styles.docTitle}>{docCode ? `${docCode}-${displayName}` : (displayName || 'Documento')}</span>
               {doc && <span className={styles.versionBadge}>REV{String(revNum).padStart(2, '0')}</span>}
               {docStatus && (
                 <span className={`${styles.statusPill} ${statusPillClass}`}>
