@@ -550,6 +550,9 @@
 }
 .editorWrapper :global(.ep-root) { scrollbar-width: thin; scrollbar-color: var(--brand) transparent; }
 
+/* Shift eigenpal title bar right so back button doesn't cover doc symbol */
+.editorWrapper :global(.ep-root [data-testid="title-bar"]) { padding-left: 40px; }
+
 /* Hide template annotation chips — plugin still active for substitution */
 .editorWrapper :global(.plugin-panels-left),
 .editorWrapper :global(.plugin-panels-right),
