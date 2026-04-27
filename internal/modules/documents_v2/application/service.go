@@ -209,6 +209,7 @@ func buildDocumentForCreate(cmd CreateDocumentInput, cd *registrydomain.Controll
 		ControlledDocumentID:    &cmd.ControlledDocumentID,
 		ProfileCodeSnapshot:     &cd.ProfileCode,
 		ProcessAreaCodeSnapshot: &cd.ProcessAreaCode,
+		Code:                    cd.Code,
 	}
 }
 
