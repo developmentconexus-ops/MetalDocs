@@ -27,6 +27,7 @@ type RailItem = {
   tip: string;
   kbd?: string;
   icon: JSX.Element;
+  soon?: boolean;
 };
 
 const SUB_BLOCK_CATALOGUE: SubBlockDef[] = [
@@ -204,7 +205,11 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     '';
 
   const leftRailItems: (RailItem | { divider: true })[] = [
-    { key: 'variables', tip: 'Variables', icon: IconBraces },
+    { key: 'variables', tip: 'Variables',       icon: IconBraces },
+    { divider: true },
+    { key: 'layout',    tip: 'Layout',           icon: IconLayout, soon: true },
+    { key: 'media',     tip: 'Media',            icon: IconImage,  soon: true },
+    { key: 'search',    tip: 'Find',  kbd: '⌘F', icon: IconSearch, soon: true },
   ];
   const rightRailItems: (RailItem | { divider: true })[] = [
     { key: 'composition', tip: 'Composition', icon: IconBlocks },
@@ -244,11 +249,12 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
                 key={it.key}
                 type="button"
                 aria-label={it.tip}
+                disabled={it.soon}
                 className={`${styles.railBtn} ${leftActive === it.key ? styles.isActive : ''}`}
                 onClick={() => setLeftActive(leftActive === it.key ? null : it.key)}
               >
                 {it.icon}
-                <span className={styles.railTip}>{it.tip}{it.kbd ? `  ${it.kbd}` : ''}</span>
+                <span className={styles.railTip}>{it.tip}{it.kbd ? `  ${it.kbd}` : ''}{it.soon ? ' (soon)' : ''}</span>
               </button>
             )
           )}
