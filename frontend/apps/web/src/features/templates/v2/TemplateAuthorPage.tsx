@@ -53,8 +53,8 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
   const [importing, setImporting] = React.useState(false);
   const [importErr, setImportErr] = React.useState<string | null>(null);
   const [liveVersion, setLiveVersion] = useState<VersionDTO | null>(null);
-  const [leftActive, setLeftActive] = useState<string>('variables');
-  const [rightActive, setRightActive] = useState<string>('inspector');
+  const [leftActive, setLeftActive] = useState<string | null>('variables');
+  const [rightActive, setRightActive] = useState<string | null>('composition');
   const [localSchemas, setLocalSchemas] = useState<TemplateSchemas | null>(null);
   const [catalog, setCatalog] = useState<PlaceholderCatalogEntry[]>([]);
   useEffect(() => { void fetchPlaceholderCatalog().then(setCatalog); }, []);
@@ -204,20 +204,10 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     '';
 
   const leftRailItems: (RailItem | { divider: true })[] = [
-    { key: 'variables', tip: 'Variables',                icon: IconBraces },
-    { key: 'layout',  tip: 'Layout (soon)',              icon: IconLayout },
-    { key: 'media',   tip: 'Media (soon)',               icon: IconImage },
-    { divider: true },
-    { key: 'outline', tip: 'Outline',                    icon: IconOutline },
-    { key: 'search',  tip: 'Find',           kbd: '⌘F', icon: IconSearch },
+    { key: 'variables', tip: 'Variables', icon: IconBraces },
   ];
   const rightRailItems: (RailItem | { divider: true })[] = [
-    { key: 'inspector', tip: 'Inspector',        icon: IconInspector },
-    { key: 'composition', tip: 'Composition',    icon: IconBlocks },
-    { key: 'variables', tip: 'Variables',        icon: IconBraces },
-    { key: 'comments',  tip: 'Comments',         icon: IconComment },
-    { divider: true },
-    { key: 'versions',  tip: 'Versions',         icon: IconGitBranch },
+    { key: 'composition', tip: 'Composition', icon: IconBlocks },
   ];
 
   const autosaveNode = (() => {
@@ -255,7 +245,7 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
                 type="button"
                 aria-label={it.tip}
                 className={`${styles.railBtn} ${leftActive === it.key ? styles.isActive : ''}`}
-                onClick={() => setLeftActive(it.key)}
+                onClick={() => setLeftActive(leftActive === it.key ? null : it.key)}
               >
                 {it.icon}
                 <span className={styles.railTip}>{it.tip}{it.kbd ? `  ${it.kbd}` : ''}</span>
@@ -334,15 +324,14 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
               readOnly={!isDraft}
               onChange={handleEditorChange}
               externalPlugins={editorPlugins}
+              showRuler
+              showMarginGuides
             />
           </div>
         </main>
 
-        <aside className={styles.rightPanel}>
-          {rightActive === 'inspector' && (
-            <div className={styles.panelHeader} />
-          )}
-          {rightActive === 'composition' && (
+        {rightActive === 'composition' && (
+          <aside className={styles.rightPanel}>
             <fieldset className={styles.inspectorFieldset} disabled={!isDraft}>
               <CompositionConfigPanel
                 value={localSchemas?.composition ?? EMPTY_COMPOSITION}
@@ -353,11 +342,8 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
                 }}
               />
             </fieldset>
-          )}
-          {rightActive !== 'inspector' && rightActive !== 'composition' && (
-            <div className={styles.panelHeader} />
-          )}
-        </aside>
+          </aside>
+        )}
 
         <aside className={`${styles.rail} ${styles.railRight}`}>
           {rightRailItems.map((it, i) =>
@@ -369,7 +355,7 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
                 type="button"
                 aria-label={it.tip}
                 className={`${styles.railBtn} ${rightActive === it.key ? styles.isActive : ''}`}
-                onClick={() => setRightActive(it.key)}
+                onClick={() => setRightActive(rightActive === it.key ? null : it.key)}
               >
                 {it.icon}
                 <span className={styles.railTip}>{it.tip}</span>
