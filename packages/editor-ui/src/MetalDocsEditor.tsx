@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { DocxEditor, PluginHost, templatePlugin, type DocxEditorRef, type ReactEditorPlugin } from '@eigenpal/docx-js-editor';
+import { DocxEditor, PluginHost, templatePlugin, type DocxEditorRef, type EditorPlugin } from '@eigenpal/docx-js-editor';
 import '@eigenpal/docx-js-editor/styles.css';
 import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
 import { buildSidebarModelPlugin } from './plugins/sidebarModelBridge';
@@ -47,7 +47,7 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
     };
 
     const libMode = props.mode === 'readonly' ? 'viewing' : 'editing';
-    const plugins: ReactEditorPlugin[] = [
+    const plugins: EditorPlugin[] = [
       templatePlugin,
       ...(props.sidebarModel ? [buildSidebarModelPlugin(props.sidebarModel)] : []),
       ...(props.externalPlugins ?? []),

@@ -1,4 +1,4 @@
-import type { BlockContent, Paragraph } from "@eigenpal/docx-js-editor/core";
+import type { BlockContent, Paragraph, Table } from "@eigenpal/docx-js-editor/core";
 
 export type PlaceholderRun = {
   type: "placeholder";
@@ -46,7 +46,7 @@ export function placeholderToRun(p: PlaceholderRun): EigenpalInlineSdtNode {
   };
 }
 
-export function wrapFrozenContent(blocks: BlockNode[]): EigenpalBlockSdtNode {
+export function wrapFrozenContent(blocks: Array<Paragraph | Table>): EigenpalBlockSdtNode {
   return {
     type: "blockSdt",
     properties: {

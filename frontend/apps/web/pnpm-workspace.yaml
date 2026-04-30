@@ -1,2 +1,0 @@
-patchedDependencies:
-  '@eigenpal/docx-js-editor@0.0.34': patches/@eigenpal__docx-js-editor@0.0.34.patch
