@@ -1,4 +1,4 @@
-import type { ReactEditorPlugin, ReactSidebarItem } from '@eigenpal/docx-js-editor';
+import type { EditorPlugin, ReactSidebarItem } from '@eigenpal/docx-js-editor';
 import { createElement } from 'react';
 import type { SidebarModel } from './mergefieldPlugin';
 
@@ -23,7 +23,7 @@ function buildItem(id: string, title: string, values: string[]): ReactSidebarIte
   };
 }
 
-export function buildSidebarModelPlugin(model: SidebarModel): ReactEditorPlugin {
+export function buildSidebarModelPlugin(model: SidebarModel): EditorPlugin {
   return {
     id: SIDEBAR_PLUGIN_ID,
     name: SIDEBAR_PLUGIN_NAME,
