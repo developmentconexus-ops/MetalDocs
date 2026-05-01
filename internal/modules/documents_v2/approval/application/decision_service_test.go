@@ -81,6 +81,7 @@ type decisionTestConn struct {
 	authzSet      bool
 	areaCode      string
 	actorID       string
+	execQueries   []string // SQL passed to Exec calls, for assertion
 }
 
 type decisionNoopResult struct{}
@@ -148,6 +149,7 @@ type decisionTestStmt struct {
 func (s *decisionTestStmt) Close() error  { return nil }
 func (s *decisionTestStmt) NumInput() int { return -1 }
 func (s *decisionTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
+	s.conn.execQueries = append(s.conn.execQueries, s.query)
 	return decisionNoopResult{}, nil
 }
 func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
@@ -490,6 +492,17 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 	}
 	if emitter.Events[0].EventType != "signoff_recorded" {
 		t.Errorf("event type = %q; want %q", emitter.Events[0].EventType, "signoff_recorded")
+	}
+	docRejected := false
+	for _, q := range conn.execQueries {
+		ql := strings.ToLower(q)
+		if strings.Contains(ql, "update documents") && strings.Contains(ql, "'rejected'") {
+			docRejected = true
+			break
+		}
+	}
+	if !docRejected {
+		t.Error("expected UPDATE documents SET status='rejected' on rejection path")
 	}
 }
 

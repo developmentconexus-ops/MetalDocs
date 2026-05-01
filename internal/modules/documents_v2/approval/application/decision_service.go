@@ -294,6 +294,20 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		}
 		result.InstanceRejected = true
 
+		// Transition document under_review -> rejected (trigger permits without GUC, same as approved path).
+		if _, err := tx.ExecContext(ctx, `
+        UPDATE documents
+           SET status           = 'rejected',
+               revision_version = revision_version + 1
+         WHERE id        = $1
+           AND tenant_id = $2
+           AND status    = 'under_review'`,
+			instance.DocumentID, req.TenantID,
+		); err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: reject document: %w", err)
+		}
+
 	default:
 		// QuorumPending — no stage transition needed.
 	}
