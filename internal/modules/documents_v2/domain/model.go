@@ -9,7 +9,7 @@ type DocumentStatus string
 
 const (
 	DocStatusDraft     DocumentStatus = "draft"
-	DocStatusFinalized DocumentStatus = "finalized"
+	DocStatusFinalized DocumentStatus = "under_review" // migration 0142 removed draft→finalized; submit = under_review
 	DocStatusArchived  DocumentStatus = "archived"
 )
 
