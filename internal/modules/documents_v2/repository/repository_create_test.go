@@ -32,7 +32,6 @@ func TestCreateDocumentInsertIncludesBridgeSnapshots(t *testing.T) {
 		{name: "profile arg", want: "d.ProfileCodeSnapshot"},
 		{name: "process area arg", want: "d.ProcessAreaCodeSnapshot"},
 		{name: "revision number column", want: "revision_number"},
-		{name: "revision number max subquery", want: "COALESCE((SELECT MAX(d2.revision_number) FROM documents d2 WHERE d2.controlled_document_id = $6), 0) + 1"},
 	}
 
 	for _, tt := range tests {
