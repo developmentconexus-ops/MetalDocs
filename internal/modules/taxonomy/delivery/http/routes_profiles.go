@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -188,6 +187,8 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusBadRequest, "PROFILE_CODE_IMMUTABLE", "profile code is immutable")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", pgErr.Message)
+	case errors.As(err, &pgErr) && pgErr.Code == "23503":
+		httpresponse.WriteError(w, http.StatusConflict, "FAMILY_NOT_FOUND", "referenced family does not exist")
 	default:
 		slog.Error("taxonomy profile error", "err", err)
 		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
@@ -203,9 +204,5 @@ func tenantIDFromRequest(r *http.Request) string {
 }
 
 func parseIncludeArchived(r *http.Request) (bool, error) {
-	raw := strings.TrimSpace(r.URL.Query().Get("includeArchived"))
-	if raw == "" {
-		return false, nil
-	}
-	return strconv.ParseBool(raw)
+	return parseBool(r.URL.Query().Get("includeArchived"))
 }
