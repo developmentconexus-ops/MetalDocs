@@ -137,6 +137,11 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 			status = domain.StageActive
 			openedAt = &now
 		}
+		eligibleIDs, err := resolveEligibleActors(ctx, tx, req.TenantID, stage.AreaCode, stage.RequiredRole)
+		if err != nil {
+			_ = tx.Rollback()
+			return SubmitResult{}, fmt.Errorf("submit: resolve eligible actors for stage %d: %w", stage.Order, err)
+		}
 		stageInstances[i] = domain.StageInstance{
 			ID:                         uuid.New().String(),
 			ApprovalInstanceID:         instanceID,
@@ -148,7 +153,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 			QuorumSnapshot:             stage.Quorum,
 			QuorumMSnapshot:            stage.QuorumM,
 			OnEligibilityDriftSnapshot: stage.OnEligibilityDrift,
-			EligibleActorIDs:           []string{}, // Phase 6 wires real IAM lookup
+			EligibleActorIDs:           eligibleIDs,
 			Status:                     status,
 			OpenedAt:                   openedAt,
 		}
@@ -287,4 +292,39 @@ func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID 
 		return "tenant", nil
 	}
 	return areaCode, nil
+}
+
+// resolveEligibleActors returns the user_ids of all users who hold required_role
+// in area_code for the given tenant as of now. Returns empty slice (never nil).
+func resolveEligibleActors(ctx context.Context, tx *sql.Tx, tenantID, areaCode, requiredRole string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT user_id
+		   FROM metaldocs.user_process_areas
+		  WHERE tenant_id = $1::uuid
+		    AND area_code = $2
+		    AND role      = $3
+		    AND effective_from <= now()
+		    AND (effective_to IS NULL OR effective_to > now())`,
+		tenantID, areaCode, requiredRole,
+	)
+	if err != nil {
+		return []string{}, fmt.Errorf("resolveEligibleActors: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var uid string
+		if err := rows.Scan(&uid); err != nil {
+			return []string{}, fmt.Errorf("resolveEligibleActors: scan: %w", err)
+		}
+		ids = append(ids, uid)
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	if err := rows.Err(); err != nil {
+		return []string{}, fmt.Errorf("resolveEligibleActors: rows: %w", err)
+	}
+	return ids, nil
 }
