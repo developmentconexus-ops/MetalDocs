@@ -104,7 +104,7 @@ func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 	repo.families["policy"] = &domain.DocumentFamily{Code: "policy", Name: "Old", IsActive: false}
 	svc := NewFamilyService(repo)
 
-	if err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "policy", Name: "New"}); err != nil {
+	if _, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "policy", Name: "New"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got, _ := repo.GetByCode(context.Background(), "policy")
@@ -119,7 +119,7 @@ func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 func TestFamilyService_Update_NotFound(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	svc := NewFamilyService(repo)
-	err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "missing", Name: "X"})
+	_, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "missing", Name: "X"})
 	if err != domain.ErrFamilyNotFound {
 		t.Fatalf("want ErrFamilyNotFound, got %v", err)
 	}

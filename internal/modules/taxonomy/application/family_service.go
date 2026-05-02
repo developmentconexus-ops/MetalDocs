@@ -29,17 +29,20 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 	return s.families.Create(ctx, f)
 }
 
-func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) error {
+func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*domain.DocumentFamily, error) {
 	if strings.TrimSpace(f.Name) == "" {
-		return errors.New("family name must not be empty")
+		return nil, errors.New("family name must not be empty")
 	}
 	existing, err := s.families.GetByCode(ctx, f.Code)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	existing.Name = f.Name
 	existing.Description = f.Description
-	return s.families.Update(ctx, existing)
+	if err := s.families.Update(ctx, existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
 }
 
 func (s *FamilyService) Deactivate(ctx context.Context, code string) error {

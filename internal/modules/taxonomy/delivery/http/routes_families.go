@@ -79,11 +79,12 @@ func (h *Handler) updateFamily(w http.ResponseWriter, r *http.Request) {
 		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
 	}
-	if err := h.families.Update(r.Context(), f); err != nil {
+	updated, err := h.families.Update(r.Context(), f)
+	if err != nil {
 		h.writeFamilyError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, f)
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func (h *Handler) deactivateFamily(w http.ResponseWriter, r *http.Request) {

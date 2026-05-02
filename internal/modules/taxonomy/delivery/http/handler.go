@@ -29,7 +29,7 @@ type familyService interface {
 	List(ctx context.Context, includeInactive bool) ([]domain.DocumentFamily, error)
 	Get(ctx context.Context, code string) (*domain.DocumentFamily, error)
 	Create(ctx context.Context, f *domain.DocumentFamily) error
-	Update(ctx context.Context, f *domain.DocumentFamily) error
+	Update(ctx context.Context, f *domain.DocumentFamily) (*domain.DocumentFamily, error)
 	Deactivate(ctx context.Context, code string) error
 }
 
