@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -37,8 +38,13 @@ func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Code = strings.TrimSpace(req.Code)
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Code == "" {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "code is required")
+		return
+	}
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "name is required")
 		return
 	}
 	f := &domain.DocumentFamily{
@@ -102,6 +108,7 @@ func (h *Handler) writeFamilyError(w http.ResponseWriter, err error) {
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", pgErr.Message)
 	default:
+		slog.Error("taxonomy family error", "err", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 	}
 }
