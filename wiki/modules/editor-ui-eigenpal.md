@@ -2,9 +2,9 @@
 
 > _Changelog: 2026-04-26 — added note that `applyVariables` is NOT used in writer mode (ADR 0008)._
 >
-> **Last verified:** 2026-04-26
+> **Last verified:** 2026-05-01
 > **Scope:** How MetalDocs wraps `@eigenpal/docx-js-editor`, what plugins are registered, autosave wiring, ProseMirror access patterns.
-> **Out of scope:** Placeholder semantics (see `concepts/placeholders.md`), template authoring page UX (see `modules/templates-v2.md`).
+> **Out of scope:** EigenPal fork internals (see `vendor/eigenpal/README.md` and the fork docs), placeholder semantics (see `concepts/placeholders.md`), template authoring page UX (see `modules/templates-v2.md`).
 > **Key files:**
 > - `packages/editor-ui/src/MetalDocsEditor.tsx` — main wrapper component
 > - `packages/editor-ui/src/types.ts` — props, ref interface
@@ -12,12 +12,15 @@
 > - `packages/editor-ui/src/plugins/OutlinePlugin.tsx` — heading nav (custom MetalDocs plugin)
 > - `packages/editor-ui/src/plugins/sidebarModelBridge.ts` — sidebar item bridge for placeholders/etc
 > - `packages/editor-ui/src/plugins/mergefieldPlugin.ts` — (legacy? verify)
+> - `vendor/eigenpal/README.md` - controlled EigenPal package artifact and refresh command
+> - `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` - package artifact consumed by MetalDocs
 
 ---
 
 ## Stack
 
 - **Eigenpal:** `@eigenpal/docx-js-editor` — DOCX WYSIWYG editor, ProseMirror under the hood.
+- **Current package source:** controlled fork artifact vendored at `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`.
 - **MetalDocsEditor:** thin React wrapper at `packages/editor-ui/src/MetalDocsEditor.tsx`. Adds:
   - Debounced autosave (1500ms)
   - Plugin registration order
@@ -25,6 +28,18 @@
 - **Consumers:**
   - `frontend/apps/web/src/features/templates/v2/TemplateAuthorPage.tsx` (template authoring, mode=editing)
   - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx` (document fill-in/view, mode=editing or readonly)
+
+## Package contract
+
+MetalDocs intentionally treats EigenPal as a package dependency, not as application code.
+
+- MetalDocs consumes `@eigenpal/docx-js-editor` from `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`.
+- The source for that artifact is the controlled fork documented in `vendor/eigenpal/README.md`.
+- Deep implementation details for header/footer tables, body pagination, template overlays, table selection, and DOCX round-trip behavior live in the EigenPal fork docs and local lab dossier.
+- The MetalDocs Wiki should only document how the editor is consumed, where it is wired, how to refresh the artifact, and how to validate the integration.
+- Do not patch `node_modules`, reintroduce frontend-only `pnpm patch` files, or duplicate EigenPal fork internals here.
+
+The practical rule: if the question is "how does MetalDocs use the editor?", document it here. If the question is "how does EigenPal render or serialize DOCX internals?", document it in the fork.
 
 ## Plugin registration
 
@@ -146,6 +161,18 @@ Eigenpal's headless substitution API is **not** called in the editor (writer mod
 3. docgen-v2 calls eigenpal headless substitution on the stored template DOCX and uploads the result as `frozen.docx`.
 
 For the full pipeline, see [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md).
+
+## Validation checklist
+
+Use this when refreshing the vendored EigenPal artifact or checking that MetalDocs still consumes it correctly.
+
+1. Run `npm run typecheck -w packages/editor-ui`.
+2. Run `npm run test -w packages/editor-ui -- --run`.
+3. Run `npm run typecheck -w apps/docgen-v2`.
+4. Build the web app from `frontend/apps/web` with `npx vite build`.
+5. Browser smoke: open template authoring and a DOCX template that uses headers, tables, and placeholders; confirm the editor loads without console errors.
+
+This checklist validates MetalDocs integration only. EigenPal rendering fidelity tests belong in the fork.
 
 ## Cross-refs
 
