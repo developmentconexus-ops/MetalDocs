@@ -19,7 +19,9 @@ func (f fakeFamilyService) Get(_ context.Context, code string) (*domain.Document
 	return nil, domain.ErrFamilyNotFound
 }
 func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily) error { return nil }
-func (f fakeFamilyService) Update(_ context.Context, fam *domain.DocumentFamily) error { return nil }
+func (f fakeFamilyService) Update(_ context.Context, fam *domain.DocumentFamily) (*domain.DocumentFamily, error) {
+	return fam, nil
+}
 func (f fakeFamilyService) Deactivate(_ context.Context, code string) error            { return nil }
 
 func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
