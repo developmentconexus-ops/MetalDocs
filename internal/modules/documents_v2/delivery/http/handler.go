@@ -2,14 +2,17 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"metaldocs/internal/modules/documents_v2/application"
+	approvalapp "metaldocs/internal/modules/documents_v2/approval/application"
 	"metaldocs/internal/modules/documents_v2/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -50,11 +53,26 @@ type Service interface {
 	DeleteDocumentComment(ctx context.Context, tenantID, userID, documentID string, libraryID int) error
 }
 
-type Handler struct{ svc Service }
+// approvalSubmitter is the subset of the approval submit service used by finalizeDocument.
+type approvalSubmitter interface {
+	SubmitRevisionForReview(ctx context.Context, db *sql.DB, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
+}
+
+type Handler struct {
+	svc       Service
+	db        *sql.DB
+	submitSvc approvalSubmitter
+}
 
 var writeJSON = httpresponse.WriteJSON
 
 func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
+
+// NewHandlerWithSubmit constructs a Handler with direct DB access and approval
+// submit service — required for the finalize→submit flow.
+func NewHandlerWithSubmit(svc Service, db *sql.DB, submitSvc approvalSubmitter) *Handler {
+	return &Handler{svc: svc, db: db, submitSvc: submitSvc}
+}
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v2/documents", h.listDocuments)
@@ -239,19 +257,110 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
+	if h.submitSvc == nil || h.db == nil {
+		// Fallback: legacy status-only transition when submit service not wired.
+		r = withAdminCtx(r)
+		docID := r.PathValue("id")
+		tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+		if !ok {
+			return
+		}
+		if err := h.svc.Finalize(r.Context(), tenantID, docID, userID); err != nil {
+			status, msg := mapErr(err)
+			httpErr(w, status, msg)
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
+		return
+	}
+
 	r = withAdminCtx(r)
 	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	tenantID, actorID, ok := h.authorizeDocumentScope(w, r, docID)
 	if !ok {
 		return
 	}
 
-	if err := h.svc.Finalize(r.Context(), tenantID, docID, userID); err != nil {
+	// Load document revision version and controlled document ID.
+	var revisionVersion int64
+	var cdID sql.NullString
+	if err := h.db.QueryRowContext(r.Context(),
+		`SELECT revision_version, controlled_document_id::text
+		   FROM documents
+		  WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`,
+		docID, tenantID,
+	).Scan(&revisionVersion, &cdID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			httpErr(w, http.StatusConflict, "document not in draft state")
+		} else {
+			httpErr(w, http.StatusInternalServerError, "internal error")
+		}
+		return
+	}
+
+	// Load profile code from controlled document.
+	var profileCode string
+	if cdID.Valid && cdID.String != "" {
+		if err := h.db.QueryRowContext(r.Context(),
+			`SELECT profile_code FROM controlled_documents WHERE id = $1 AND tenant_id = $2`,
+			cdID.String, tenantID,
+		).Scan(&profileCode); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			httpErr(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+	}
+	if profileCode == "" {
+		http.Error(w, `{"error":"profile not found"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Find the most recent active approval route for this profile.
+	// Column name is `active` (migration 0146), not `is_active`.
+	var routeID string
+	if err := h.db.QueryRowContext(r.Context(),
+		`SELECT id FROM approval_routes
+		  WHERE tenant_id    = $1
+		    AND profile_code = $2
+		    AND active       = true
+		  ORDER BY version DESC
+		  LIMIT 1`,
+		tenantID, profileCode,
+	).Scan(&routeID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			httpErr(w, http.StatusConflict, "no active approval route for profile "+profileCode)
+		} else {
+			httpErr(w, http.StatusInternalServerError, "internal error")
+		}
+		return
+	}
+
+	// Retrieve the latest content hash from the most recent autosaved revision.
+	var contentHash string
+	_ = h.db.QueryRowContext(r.Context(),
+		`SELECT COALESCE(content_hash, '') FROM document_revisions
+		  WHERE document_id = $1
+		  ORDER BY created_at DESC LIMIT 1`,
+		docID,
+	).Scan(&contentHash)
+
+	result, err := h.submitSvc.SubmitRevisionForReview(r.Context(), h.db, approvalapp.SubmitRequest{
+		TenantID:        tenantID,
+		DocumentID:      docID,
+		RouteID:         routeID,
+		SubmittedBy:     actorID,
+		ContentFormData: map[string]any{"_content_hash": contentHash},
+		RevisionVersion: int(revisionVersion),
+	})
+	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	if err := h.svc.Finalize(r.Context(), tenantID, docID, actorID); err != nil {
+		log.Printf("documents_v2 finalize audit-only error: %v", err)
+	}
+
+	httpresponse.WriteJSON(w, http.StatusCreated, map[string]string{"instanceId": result.InstanceID})
 }
 
 func (h *Handler) archiveDocument(w http.ResponseWriter, r *http.Request) {
