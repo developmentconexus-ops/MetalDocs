@@ -1,10 +1,13 @@
 import type {
   CreateAreaRequest,
+  CreateFamilyRequest,
   CreateProfileRequest,
+  DocumentFamily,
   DocumentProfile,
   ProcessArea,
   SetDefaultTemplateRequest,
   UpdateAreaRequest,
+  UpdateFamilyRequest,
   UpdateProfileRequest,
 } from "./types";
 
@@ -89,5 +92,31 @@ export async function updateArea(code: string, req: UpdateAreaRequest): Promise<
 export async function archiveArea(code: string): Promise<void> {
   return request<void>(`/areas/${encodeURIComponent(code)}/archive`, {
     method: "POST",
+  });
+}
+
+export async function fetchFamilies(includeInactive?: boolean): Promise<DocumentFamily[]> {
+  const qs = includeInactive ? "?includeInactive=true" : "";
+  const res = await request<{ items: DocumentFamily[] }>(`/families${qs}`);
+  return res.items;
+}
+
+export async function createFamily(req: CreateFamilyRequest): Promise<DocumentFamily> {
+  return request<DocumentFamily>("/families", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export async function updateFamily(code: string, req: UpdateFamilyRequest): Promise<DocumentFamily> {
+  return request<DocumentFamily>(`/families/${encodeURIComponent(code)}`, {
+    method: "PATCH",
+    body: JSON.stringify(req),
+  });
+}
+
+export async function deactivateFamily(code: string): Promise<void> {
+  return request<void>(`/families/${encodeURIComponent(code)}`, {
+    method: "DELETE",
   });
 }
