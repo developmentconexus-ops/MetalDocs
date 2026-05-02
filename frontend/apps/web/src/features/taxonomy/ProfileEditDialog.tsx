@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import type { DocumentProfile, CreateProfileRequest, UpdateProfileRequest } from "./types";
-import { createProfile, updateProfile, setDefaultTemplate } from "./api";
+import type { DocumentFamily, DocumentProfile, CreateProfileRequest, UpdateProfileRequest } from "./types";
+import { createProfile, updateProfile, setDefaultTemplate, fetchFamilies } from "./api";
 import { listTemplates, type TemplateListRow } from "../templates/v2/api/templatesV2";
 
 type Props = {
@@ -23,8 +23,10 @@ export function ProfileEditDialog({ mode, profile, onClose, onSaved }: Props) {
   const [templateError, setTemplateError] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
   const [publishedTemplates, setPublishedTemplates] = useState<TemplateListRow[]>([]);
+  const [families, setFamilies] = useState<DocumentFamily[]>([]);
 
   useEffect(() => {
+    fetchFamilies().then(setFamilies).catch(() => {/* non-critical */});
     if (mode !== "edit") return;
     listTemplates().then(({ templates }) =>
       setPublishedTemplates(templates.filter((t) => t.published_version_id != null))
@@ -119,16 +121,9 @@ export function ProfileEditDialog({ mode, profile, onClose, onSaved }: Props) {
                 style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box" }}
               >
                 <option value="" disabled>Selecione a família</option>
-                <option value="policy">Política</option>
-                <option value="procedure">Procedimento</option>
-                <option value="work_instruction">Instrução de Trabalho</option>
-                <option value="form">Formulário</option>
-                <option value="manual">Manual</option>
-                <option value="report">Relatório</option>
-                <option value="certificate">Certificado</option>
-                <option value="contract">Contrato</option>
-                <option value="technical_drawing">Desenho Técnico</option>
-                <option value="supplier_document">Documento de Fornecedor</option>
+                {families.map((f) => (
+                  <option key={f.code} value={f.code}>{f.name}</option>
+                ))}
               </select>
             ) : (
               <input value={profile?.familyCode ?? ""} readOnly style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box", background: "#f5f5f5" }} />
