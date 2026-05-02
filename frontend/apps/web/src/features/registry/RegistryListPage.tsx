@@ -5,7 +5,11 @@ import type { ControlledDocument } from "./types";
 import { RegistryCreateDialog } from "./RegistryCreateDialog";
 import { RegistryDetailPage } from "./RegistryDetailPage";
 
-export function RegistryListPage() {
+type Props = {
+  onOpenDocumentEditor?: (docId: string) => void;
+};
+
+export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
   const [docs, setDocs] = useState<ControlledDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -44,6 +48,7 @@ export function RegistryListPage() {
           setDetailId(null);
           void load();
         }}
+        onOpenDocumentEditor={onOpenDocumentEditor}
       />
     );
   }

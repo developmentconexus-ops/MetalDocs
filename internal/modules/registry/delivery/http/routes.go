@@ -30,10 +30,11 @@ type createDocRequest struct {
 }
 
 type activeDocumentResponse struct {
-	DocumentID      string `json:"documentId"`
-	ApprovalState   string `json:"approvalState"`
-	ContentHash     string `json:"contentHash"`
-	RevisionVersion int    `json:"revisionVersion"`
+	DocumentID          string  `json:"documentId"`
+	ApprovalState       string  `json:"approvalState"`
+	ContentHash         string  `json:"contentHash"`
+	RevisionVersion     int     `json:"revisionVersion"`
+	PublishedDocumentID *string `json:"publishedDocumentId,omitempty"`
 }
 
 func (h *Handler) listDocs(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +93,7 @@ func (h *Handler) getActiveDocument(w http.ResponseWriter, r *http.Request) {
 	cdID := r.PathValue("id")
 
 	var resp activeDocumentResponse
+	var publishedDocID sql.NullString
 	err := h.db.QueryRowContext(r.Context(), `
 		SELECT d.id,
 		       COALESCE(d.content_hash_at_submit,
@@ -113,14 +115,20 @@ func (h *Handler) getActiveDocument(w http.ResponseWriter, r *http.Request) {
 		          ORDER BY ai.submitted_at DESC
 		          LIMIT 1),
 		         'draft'
-		       )
+		       ),
+		       (SELECT pd.id::text FROM documents pd
+		         WHERE pd.controlled_document_id = $2::uuid
+		           AND pd.tenant_id = $1::uuid
+		           AND pd.status = 'published'
+		         ORDER BY pd.revision_number DESC
+		         LIMIT 1)
 		  FROM documents d
 		 WHERE d.tenant_id = $1::uuid
 		   AND d.controlled_document_id = $2::uuid
 		   AND d.status IN ('draft','under_review','approved','rejected','scheduled')
 		 LIMIT 1`,
 		tenantID, cdID,
-	).Scan(&resp.DocumentID, &resp.ContentHash, &resp.RevisionVersion, &resp.ApprovalState)
+	).Scan(&resp.DocumentID, &resp.ContentHash, &resp.RevisionVersion, &resp.ApprovalState, &publishedDocID)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -131,6 +139,9 @@ func (h *Handler) getActiveDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if publishedDocID.Valid {
+		resp.PublishedDocumentID = &publishedDocID.String
+	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
