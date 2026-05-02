@@ -1,16 +1,18 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-04-27
+**Last verified:** 2026-05-01
 
 ## API login
 
 Login endpoint: `POST /api/v1/auth/login`
 Body field is `identifier` (not `username`).
 
-| identifier | password | role | notes |
+| identifier | password | IAM role | notes |
 |---|---|---|---|
 | `admin` | `AdminMetalDocs123!` | admin | bootstrapped on first start; use to author documents/templates |
 | `approver` | `ApproverMetalDocs123!` | admin | seeded by migration 0159; use to approve templates authored by `admin` (domain enforces actorID != authorID) |
+| `author-test` | `AuthorTest123!` | admin | smoke-test author: creates templates + docs + submits for approval |
+| `approver-test` | `ApproverMetalDocs456!@` | reviewer | smoke-test approver: signs off docs submitted by `author-test` (ISO seg test requires distinct userIds); password reset 2026-05-01 |
 
 Bootstrap triggers when: API starts and `metaldocs.iam_user_roles` has no `admin` role.
 To re-bootstrap: truncate `metaldocs.auth_identities`, `metaldocs.iam_user_roles`, `metaldocs.iam_users` and restart API.
@@ -30,6 +32,14 @@ PGPASSWORD=***REDACTED***   ← set via $env:PGPASSWORD in PowerShell, never via
 ```
 
 See `.env` for full var list. Use `scripts/start-api-ps.ps1` if it exists, otherwise set manually.
+
+**CRITICAL:** `docgen-v2` (port 3001) must be running before starting the API. The approval/signoff transaction calls docgen-v2 synchronously — if it's down, signoffs fail and roll back. Start it with:
+```powershell
+cd apps/docgen-v2
+$env:METALDOCS_STORAGE_PROVIDER="minio"; $env:MINIO_ENDPOINT="localhost:9000"; ...  # see .env.docgen-v2
+npx tsx src/index.ts
+```
+Or use `scripts/dev-docgen.ps1` if available.
 
 ## DB access
 

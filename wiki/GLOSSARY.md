@@ -1,6 +1,6 @@
 # Glossary
 
-> **Last verified:** 2026-04-27
+> **Last verified:** 2026-05-02
 > **Scope:** Terms used across MetalDocs codebase, docs, and PRs.
 
 ## A
@@ -37,6 +37,8 @@
 
 ## F
 
+**Family / DocumentFamily** - Broad grouping of document types (e.g. "Qualidade", "Recursos Humanos"). Globally scoped — no `tenant_id`. All tenants share the same family catalog. Profiles belong to a family via `family_code` FK. Deactivation uses `is_active` (not `archived_at`). Deactivation blocked if active profiles reference the family. See `modules/taxonomy.md`.
+
 **Fanout** - Server-side service that takes a frozen template + placeholder values and renders the final DOCX + PDF. Lives in `internal/modules/render/fanout/`.
 
 **Fill-in** - Process of supplying placeholder values to a document instance during draft state.
@@ -61,7 +63,7 @@
 
 **ProseMirror** - Rich-text editor framework eigenpal is built on. We rarely interact with it directly - eigenpal abstracts it.
 
-**Profile / Document Profile** - Type of controlled document (e.g., "Quality Manual", "SOP"). Binds to a default template version + sequence counter for code generation.
+**Profile / Document Profile** - Type of controlled document (e.g., "Quality Manual", "SOP"). Tenant-scoped. Belongs to a DocumentFamily via `family_code` FK. Binds to a default template version + sequence counter for code generation. Archived via `archived_at` (not `is_active`). See `modules/taxonomy.md`.
 
 ## S
 
