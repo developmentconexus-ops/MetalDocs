@@ -20,7 +20,7 @@ var (
 	ErrFamilyHasProfiles     = errors.New("family has active profiles and cannot be deactivated")
 )
 
-func (f *DocumentFamily) Deactivate(_ time.Time) error {
+func (f *DocumentFamily) Deactivate() error {
 	if !f.IsActive {
 		return ErrFamilyAlreadyInactive
 	}
