@@ -491,7 +491,11 @@ function AppContent() {
     }
 
     if (activeView === "registry-v2") {
-      return <RegistryListPage />;
+      return (
+        <RegistryListPage
+          onOpenDocumentEditor={(docId) => navigate(docsPathFromRoute({ kind: 'editor', documentID: docId }))}
+        />
+      );
     }
 
     if (activeView === "iam-memberships" && isAdmin) {
