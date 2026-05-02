@@ -116,11 +116,18 @@ export function AreaEditDialog({ mode, area, areas, onClose, onSaved }: Props) {
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>Role de aprovador padrao</label>
-            <input
+            <select
               value={defaultApproverRole}
               onChange={(e) => setDefaultApproverRole(e.target.value)}
               style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box" }}
-            />
+            >
+              <option value="">— Nenhuma —</option>
+              <option value="admin">admin</option>
+              <option value="approver">approver</option>
+              <option value="editor">editor</option>
+              <option value="reviewer">reviewer</option>
+              <option value="viewer">viewer</option>
+            </select>
           </div>
           {error && <p style={{ color: "#c00", fontSize: 12, marginBottom: 8 }}>{error}</p>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
