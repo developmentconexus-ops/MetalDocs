@@ -60,10 +60,11 @@ type Handler struct {
 	idempStore  signoffIdempStore
 }
 
-func NewHandler(services *application.Services, db *sql.DB) *Handler {
+func NewHandler(services *application.Services, db *sql.DB, idempStore signoffIdempStore) *Handler {
 	h := &Handler{
-		services: services,
-		db:       db,
+		services:   services,
+		db:         db,
+		idempStore: idempStore,
 	}
 	if services != nil {
 		h.submitSvc = services.Submit
