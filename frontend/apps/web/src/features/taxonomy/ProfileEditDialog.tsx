@@ -97,7 +97,7 @@ export function ProfileEditDialog({ mode, profile, onClose, onSaved }: Props) {
               <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>Codigo *</label>
               <input
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => setCode(e.target.value.toLowerCase())}
                 required
                 style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box" }}
               />
