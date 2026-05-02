@@ -283,13 +283,9 @@ func main() {
 			nil,
 		)
 	}
-	docMod := documents_v2.New(docDeps)
-	docMod.RegisterRoutes(mux)
 
-	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
-	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})
-	tv2http.New(tv2Svc, nil).Register(mux)
-
+	// Approval services must be constructed before docMod so that
+	// SubmitSvc can be wired into the finalize→submit flow.
 	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB)
 	approvalEmitter := approvalapp.NewSQLEmitter()
 	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{})
@@ -300,6 +296,14 @@ func main() {
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, effectiveFreezeInvoker, pdfDispatchAdapter,
 	)
+	docDeps.SubmitSvc = approvalServices.Submit
+
+	docMod := documents_v2.New(docDeps)
+	docMod.RegisterRoutes(mux)
+
+	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
+	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})
+	tv2http.New(tv2Svc, nil).Register(mux)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB)
 	approvalHandler.RegisterRoutes(mux)
 	e2etest.RegisterE2EHandlers(mux, deps.SQLDB, func(ctx context.Context) error {

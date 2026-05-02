@@ -1,15 +1,21 @@
 package documents_v2
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 
 	"metaldocs/internal/modules/documents_v2/application"
+	approvalapp "metaldocs/internal/modules/documents_v2/approval/application"
 	dhttp "metaldocs/internal/modules/documents_v2/delivery/http"
 	documentshttp "metaldocs/internal/modules/documents_v2/http"
 	"metaldocs/internal/modules/documents_v2/repository"
 	"metaldocs/internal/platform/ratelimit"
 )
+
+type approvalSubmitter interface {
+	SubmitRevisionForReview(ctx context.Context, db *sql.DB, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
+}
 
 type Module struct {
 	Handler            *dhttp.Handler
@@ -39,6 +45,7 @@ type Dependencies struct {
 	DocgenVer          string
 	GrammarVer         string
 	ReconstructRunner  application.ReconstructionRunner
+	SubmitSvc          approvalSubmitter
 }
 
 func New(deps Dependencies) *Module {
@@ -51,7 +58,7 @@ func New(deps Dependencies) *Module {
 		svc = application.NewService(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.RegistryReader, deps.AuthzChecker, deps.ProfileDefaults)
 	}
 	svc.WithRegistryDuplicator(deps.RegistryDuplicator)
-	h := dhttp.NewHandler(svc)
+	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc)
 
 	var exportHandler *dhttp.ExportHandler
 	if deps.ExportPresign != nil && deps.ExportDocgen != nil {
