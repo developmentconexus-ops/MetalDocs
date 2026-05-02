@@ -2,6 +2,8 @@ package application
 
 import (
 	"context"
+	"errors"
+	"strings"
 
 	"metaldocs/internal/modules/taxonomy/domain"
 )
@@ -28,6 +30,9 @@ func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) er
 }
 
 func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) error {
+	if strings.TrimSpace(f.Name) == "" {
+		return errors.New("family name must not be empty")
+	}
 	existing, err := s.families.GetByCode(ctx, f.Code)
 	if err != nil {
 		return err
