@@ -73,6 +73,8 @@ editor         Can edit documents and templates. Cannot submit.
 viewer         Read-only. Can view documents and templates.
 ```
 
+**`reviewer` role is retired.** Existing `reviewer` users are migrated to `approver` (see migration 0166). `reviewer` capabilities (doc.view, doc.edit, workflow.review) are a subset of `approver` — no capability is lost.
+
 One user has exactly one global role (stored in `metaldocs.iam_user_roles`).
 
 ### Capability matrix
@@ -96,29 +98,56 @@ One user has exactly one global role (stored in `metaldocs.iam_user_roles`).
 | `route.manage` | | | | | ✓ |
 | `user.manage` | | | | | ✓ |
 
-**ISO segregation note:** `doc.submit` and `doc.signoff` are held by different roles intentionally. The existing domain-layer SoD enforcement (submitter ≠ signoff actor on same document) is unchanged.
+**ISO segregation note:** `doc.submit` and `doc.signoff` are held by different roles intentionally. The existing domain-layer SoD enforcement (submitter ≠ signoff actor on same document) is unchanged. `system_admin` can hold both capabilities but is still blocked by SoD at the domain layer.
 
 ### Document visibility
 
 Set once at document creation. Controls who can see the document at all.
 
-| Value | Who can see |
-|---|---|
-| `public` | All authenticated users in the tenant |
-| `area` | Users whose area assignment matches the document's area (default) |
-| `restricted` | Only explicitly named users or groups (Phase 2+) |
+| Value | Who can see | Phase 1 enforcement |
+|---|---|---|
+| `public` | All authenticated users in the tenant | ✓ enforced |
+| `area` | Users with any active row in `user_process_areas` for the document's area (default) | ✓ enforced via `user_process_areas` |
+| `restricted` | Only explicitly named users or groups | stored, treated as `area` until Phase 2 |
 
 Visibility is stored as a column on `documents_v2`. Existing documents default to `area`.
 
-**Phase 1 enforcement:** `public` and `area` are enforced. `restricted` is stored but treated as `area` until Phase 2 implements explicit user/group lists.
+**`area` enforcement in Phase 1** reads `public.user_process_areas` directly — the same table used by Phase 3 for area-scoped roles. It is NOT unused in Phase 1. Admins must grant users area memberships (via the existing membership API, `POST /api/v2/iam/area-memberships`) for users to see area-restricted documents. `system_admin` always bypasses visibility checks.
 
-**`area` enforcement in Phase 1:** A user can see an `area` document if they have any active row in `user_process_areas` for that area OR if they are `system_admin`. Since `user_process_areas` is currently empty for most users, admins must grant area memberships (via the existing membership API) for users to access area-restricted documents. This is intentional — documents should not be globally visible by default.
+**Visibility SQL for document list / detail access check:**
+
+```sql
+-- Returns true if actor can see the document
+SELECT CASE d.visibility
+  WHEN 'public' THEN true
+  WHEN 'area'   THEN (
+    -- system_admin bypass
+    EXISTS (
+      SELECT 1 FROM metaldocs.iam_user_roles
+       WHERE user_id = $actor_id AND role_code = 'system_admin'
+    )
+    OR
+    -- has any active membership in the document's area
+    EXISTS (
+      SELECT 1 FROM public.user_process_areas upa
+       WHERE upa.user_id  = $actor_id
+         AND upa.area_code = d.process_area_code
+         AND upa.effective_to IS NULL
+    )
+  )
+  ELSE false  -- 'restricted': denied until Phase 2
+END
+FROM public.documents_v2 d
+WHERE d.id = $doc_id
+```
+
+Add index: `CREATE INDEX ix_upa_user_area ON public.user_process_areas(user_id, area_code) WHERE effective_to IS NULL;`
 
 **Visibility check is separate from capability check.** A user can have `doc.view` capability but still be blocked from a specific document by its visibility setting.
 
 ### Groups (data model only — UI in Phase 2)
 
-Groups are tenant-scoped collections of users that share a role assignment. Adding a user to a group grants them the group's role automatically.
+Groups are tenant-scoped collections of users that share a role. Adding a user to a group grants them the group's role capabilities in addition to their direct role.
 
 ```
 iam_groups        id, tenant_id, name, description
@@ -126,16 +155,31 @@ iam_group_members group_id, user_id, tenant_id
 iam_group_roles   group_id, role
 ```
 
-A user's effective capabilities = union of direct role capabilities + all group role capabilities. Groups only add capabilities, never restrict. A viewer assigned directly who belongs to an "editors" group gets editor capabilities.
+A user's effective capabilities = union of direct role capabilities + all group role capabilities. Groups only ADD capabilities, never restrict. No FK from `iam_group_members.user_id` to `iam_users` — intentional, keeps the constraint light and avoids cascade complexity. Both tables live in `metaldocs` schema.
 
 ---
 
 ## Data Model Changes
 
-### New tables
+### Migration 0162 — Add `tenant_id` to `iam_user_roles`
+
+`metaldocs.iam_user_roles` currently has no `tenant_id` column. Required for multi-tenant-ready design and for the `CanDo` query. This migration must run before 0163–0166.
 
 ```sql
-CREATE TABLE metaldocs.iam_groups (
+ALTER TABLE metaldocs.iam_user_roles
+  ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL
+    DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+
+-- Backfill existing rows (all are dev tenant)
+UPDATE metaldocs.iam_user_roles
+   SET tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+ WHERE tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'; -- no-op but explicit
+```
+
+### Migration 0163 — Create groups tables
+
+```sql
+CREATE TABLE IF NOT EXISTS metaldocs.iam_groups (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   UUID NOT NULL DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff',
   name        TEXT NOT NULL,
@@ -144,7 +188,7 @@ CREATE TABLE metaldocs.iam_groups (
   UNIQUE (tenant_id, name)
 );
 
-CREATE TABLE metaldocs.iam_group_members (
+CREATE TABLE IF NOT EXISTS metaldocs.iam_group_members (
   group_id   UUID NOT NULL REFERENCES metaldocs.iam_groups(id) ON DELETE CASCADE,
   user_id    TEXT NOT NULL,
   tenant_id  UUID NOT NULL,
@@ -153,54 +197,119 @@ CREATE TABLE metaldocs.iam_group_members (
   PRIMARY KEY (group_id, user_id)
 );
 
-CREATE TABLE metaldocs.iam_group_roles (
+CREATE TABLE IF NOT EXISTS metaldocs.iam_group_roles (
   group_id UUID NOT NULL REFERENCES metaldocs.iam_groups(id) ON DELETE CASCADE,
   role     TEXT NOT NULL,
   PRIMARY KEY (group_id, role)
 );
 ```
 
-### Modified tables
+### Migration 0164 — Add `visibility` to `documents_v2`
 
 ```sql
--- Document visibility
 ALTER TABLE public.documents_v2
-  ADD COLUMN visibility TEXT NOT NULL DEFAULT 'area'
-  CHECK (visibility IN ('public', 'area', 'restricted'));
-
--- Existing rows get 'area' via DEFAULT
+  ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'area'
+  CONSTRAINT documents_v2_visibility_check
+    CHECK (visibility IN ('public', 'area', 'restricted'));
 ```
 
-### Seeded data (migration)
+### Migration 0165 — Re-seed `role_capabilities`
 
-Truncate and re-seed `metaldocs.role_capabilities` with the capability matrix above.
-Re-seed `metaldocs.role_capabilities` roles: `viewer`, `editor`, `author`, `approver`, `system_admin`.
+```sql
+TRUNCATE metaldocs.role_capabilities;
 
-Rename existing `admin` role in `iam_user_roles` to `system_admin` for `admin-local`.
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES
+  ('viewer',       'doc.view',           'View documents'),
+  ('viewer',       'template.view',      'View templates'),
+  ('editor',       'doc.view',           'View documents'),
+  ('editor',       'doc.create',         'Create document versions'),
+  ('editor',       'doc.edit',           'Edit document drafts'),
+  ('editor',       'template.view',      'View templates'),
+  ('editor',       'template.edit',      'Edit template drafts'),
+  ('editor',       'registry.create',    'Register controlled documents'),
+  ('author',       'doc.view',           'View documents'),
+  ('author',       'doc.create',         'Create document versions'),
+  ('author',       'doc.edit',           'Edit document drafts'),
+  ('author',       'doc.submit',         'Submit documents for approval'),
+  ('author',       'template.view',      'View templates'),
+  ('author',       'template.create',    'Create templates'),
+  ('author',       'template.edit',      'Edit template drafts'),
+  ('author',       'template.submit',    'Submit templates for approval'),
+  ('author',       'registry.create',    'Register controlled documents'),
+  ('approver',     'doc.view',           'View documents'),
+  ('approver',     'doc.create',         'Create document versions'),
+  ('approver',     'doc.edit',           'Edit document drafts'),
+  ('approver',     'doc.submit',         'Submit documents for approval'),
+  ('approver',     'doc.signoff',        'Sign off document approvals'),
+  ('approver',     'template.view',      'View templates'),
+  ('approver',     'template.approve',   'Approve template versions'),
+  ('system_admin', 'doc.view',           'View documents'),
+  ('system_admin', 'doc.create',         'Create document versions'),
+  ('system_admin', 'doc.edit',           'Edit document drafts'),
+  ('system_admin', 'doc.submit',         'Submit documents for approval'),
+  ('system_admin', 'doc.signoff',        'Sign off document approvals'),
+  ('system_admin', 'template.view',      'View templates'),
+  ('system_admin', 'template.create',    'Create templates'),
+  ('system_admin', 'template.edit',      'Edit template drafts'),
+  ('system_admin', 'template.submit',    'Submit templates for approval'),
+  ('system_admin', 'template.approve',   'Approve template versions'),
+  ('system_admin', 'template.publish',   'Publish template versions'),
+  ('system_admin', 'registry.create',    'Register controlled documents'),
+  ('system_admin', 'taxonomy.manage',    'Manage taxonomy'),
+  ('system_admin', 'membership.manage',  'Manage memberships'),
+  ('system_admin', 'route.manage',       'Manage approval routes'),
+  ('system_admin', 'user.manage',        'Manage users');
+```
+
+### Migration 0166 — Role rename + reviewer migration
+
+```sql
+BEGIN;
+
+-- 1. Widen CHECK constraint to allow system_admin; remove reviewer and admin
+ALTER TABLE metaldocs.iam_user_roles
+  DROP CONSTRAINT IF EXISTS chk_iam_user_roles_role_code;
+
+ALTER TABLE metaldocs.iam_user_roles
+  ADD CONSTRAINT chk_iam_user_roles_role_code
+    CHECK (role_code IN ('system_admin', 'approver', 'author', 'editor', 'viewer'));
+
+-- 2. Rename admin → system_admin
+UPDATE metaldocs.iam_user_roles SET role_code = 'system_admin' WHERE role_code = 'admin';
+
+-- 3. Migrate reviewer → approver (reviewer capabilities ⊆ approver)
+UPDATE metaldocs.iam_user_roles SET role_code = 'approver' WHERE role_code = 'reviewer';
+
+COMMIT;
+```
 
 ---
 
 ## Go Code Changes
 
-### Deleted
+### Deleted files / symbols
 
-- `internal/modules/iam/application/authorizer.go` — `StaticAuthorizer`, `NewStaticAuthorizer`
-- `internal/modules/iam/domain/model.go` — `Permission` type and all `Perm*` constants
-- Static permission map in `internal/modules/iam/delivery/http/middleware.go`
+| File | What is removed |
+|---|---|
+| `internal/modules/iam/application/authorizer.go` | `StaticAuthorizer`, `NewStaticAuthorizer` |
+| `internal/modules/iam/application/authorizer_test.go` | entire file (5 tests for StaticAuthorizer) |
+| `internal/modules/iam/domain/model.go` | `Permission` type + all `Perm*` constants (keep `Role`, `Capability`, `UserProcessArea`) |
 
-### New: unified authz service
+### New: unified capability service
 
 **File:** `internal/modules/iam/application/capability_service.go`
 
 ```go
 type CapabilityService struct { db *sql.DB }
 
-// CanDo returns nil if userID has capability in tenantID, ErrCapabilityDenied otherwise.
-// system_admin bypasses all checks.
+func NewCapabilityService(db *sql.DB) *CapabilityService
+
+// CanDo returns nil if userID has capability, ErrCapabilityDenied otherwise.
+// system_admin role bypasses capability check unconditionally.
 func (s *CapabilityService) CanDo(ctx context.Context, userID, tenantID, capability string) error
 ```
 
-Query:
+**Direct role query:**
 ```sql
 SELECT EXISTS (
   SELECT 1 FROM metaldocs.iam_user_roles ur
@@ -211,100 +320,163 @@ SELECT EXISTS (
 )
 ```
 
-Groups path (also checked):
+**Group membership query (OR'd with above):**
 ```sql
 SELECT EXISTS (
   SELECT 1 FROM metaldocs.iam_group_members gm
   JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
   JOIN metaldocs.role_capabilities rc ON rc.role = gr.role
-  WHERE gm.user_id  = $1
+  WHERE gm.user_id   = $1
     AND gm.tenant_id = $2
     AND rc.capability = $3
 )
 ```
 
-### Updated: `authz.Require`
+If either query returns true → allowed. If both false → `ErrCapabilityDenied`.
 
-**File:** `internal/modules/iam/authz/authz.go`
+### Updated: IAM Middleware
 
-Add system_admin bypass at the top of `Require`:
+**File:** `internal/modules/iam/delivery/http/middleware.go`
 
+Remove the `Authorizer` interface field from `Middleware` struct. Replace with `*CapabilityService`. Update `NewMiddleware` signature accordingly.
+
+Old:
 ```go
-// Short-circuit for system_admin — bypass area + capability check entirely.
-var isAdmin bool
-_ = tx.QueryRowContext(ctx, `
-  SELECT EXISTS (
-    SELECT 1 FROM metaldocs.iam_user_roles
-    WHERE user_id    = current_setting('metaldocs.actor_id', false)
-      AND tenant_id  = current_setting('metaldocs.tenant_id', false)::uuid
-      AND role_code  = 'system_admin'
-  )
-`).Scan(&isAdmin)
-if isAdmin {
-  return appendAssertedCap(ctx, tx, capability, areaCode)
+type Middleware struct {
+    authorizer iamdomain.Authorizer
+    ...
+}
+func NewMiddleware(authorizer iamdomain.Authorizer, ...) *Middleware
+```
+
+New:
+```go
+type Middleware struct {
+    caps *application.CapabilityService
+    ...
+}
+func NewMiddleware(caps *application.CapabilityService, ...) *Middleware
+```
+
+Replace `hasPermission(authorizer, roles, permission)` call with:
+```go
+if err := caps.CanDo(r.Context(), userID, tenantID, capability); err != nil {
+    writeAPIError(w, http.StatusForbidden, ...)
+    return
 }
 ```
 
-### Updated: IAM middleware
+**File:** `internal/modules/iam/delivery/http/middleware_test.go`
 
-Replace `StaticAuthorizer.Can(role, permission)` call with `CapabilityService.CanDo(userID, tenantID, capability)`. Map old `Permission` constants to new `Capability` strings in `permissions.go`.
+Update test setup: replace `iamapp.NewStaticAuthorizer()` with `iamapp.NewCapabilityService(testDB)` or a mock. All 5 test functions need updating.
 
 ### Updated: `permissions.go`
 
-Replace `iamdomain.PermDocumentCreate` etc. with string capability constants:
+**File:** `apps/api/cmd/metaldocs-api/permissions.go`
+
+Replace all `iamdomain.Perm*` constants with string capability constants. Define them in a new file `internal/modules/iam/domain/capabilities.go`:
+
 ```go
 const (
-  CapDocView        = "doc.view"
-  CapDocCreate      = "doc.create"
-  CapDocEdit        = "doc.edit"
-  CapDocSubmit      = "doc.submit"
-  CapDocSignoff     = "doc.signoff"
-  CapTemplateView   = "template.view"
-  CapTemplateCreate = "template.create"
-  CapTemplateEdit   = "template.edit"
-  CapTemplateSubmit = "template.submit"
-  CapTemplateApprove = "template.approve"
-  CapTemplatePublish = "template.publish"
-  CapRegistryCreate = "registry.create"
-  CapTaxonomyManage = "taxonomy.manage"
+  CapDocView          = "doc.view"
+  CapDocCreate        = "doc.create"
+  CapDocEdit          = "doc.edit"
+  CapDocSubmit        = "doc.submit"
+  CapDocSignoff       = "doc.signoff"
+  CapTemplateView     = "template.view"
+  CapTemplateCreate   = "template.create"
+  CapTemplateEdit     = "template.edit"
+  CapTemplateSubmit   = "template.submit"
+  CapTemplateApprove  = "template.approve"
+  CapTemplatePublish  = "template.publish"
+  CapRegistryCreate   = "registry.create"
+  CapTaxonomyManage   = "taxonomy.manage"
   CapMembershipManage = "membership.manage"
-  CapRouteManage    = "route.manage"
-  CapUserManage     = "user.manage"
+  CapRouteManage      = "route.manage"
+  CapUserManage       = "user.manage"
 )
+```
+
+### Updated: `main.go` wiring
+
+**File:** `apps/api/cmd/metaldocs-api/main.go`
+
+Replace:
+```go
+authorizer := iamapp.NewStaticAuthorizer()
+...
+iamMiddleware := iamdelivery.NewMiddleware(authorizer, cachedProvider, ...)
+```
+
+With:
+```go
+capService := iamapp.NewCapabilityService(deps.SQLDB)
+...
+iamMiddleware := iamdelivery.NewMiddleware(capService, cachedProvider, ...)
+```
+
+### Updated: `admin_handler.go` role allowlist
+
+**File:** `internal/modules/iam/delivery/http/admin_handler.go`
+
+Remove `reviewer` and `admin` from the role allowlist. New allowed values: `system_admin`, `approver`, `author`, `editor`, `viewer`.
+
+### Updated: `authz.Require` — system_admin bypass
+
+**File:** `internal/modules/iam/authz/authz.go`
+
+Insert at top of `Require` function, BEFORE the existing capability query. Propagate error instead of discarding:
+
+```go
+var isAdmin bool
+if err := tx.QueryRowContext(ctx, `
+    SELECT EXISTS (
+      SELECT 1 FROM metaldocs.iam_user_roles
+       WHERE user_id   = current_setting('metaldocs.actor_id', false)
+         AND tenant_id = current_setting('metaldocs.tenant_id', false)::uuid
+         AND role_code = 'system_admin'
+    )
+`).Scan(&isAdmin); err != nil {
+    return fmt.Errorf("authz: system_admin check: %w", err)
+}
+if isAdmin {
+    return appendAssertedCap(ctx, tx, capability, areaCode)
+}
 ```
 
 ---
 
-## Migrations
+## Migration Order
 
-| Migration | Description |
-|---|---|
-| `0162` | Create `iam_groups`, `iam_group_members`, `iam_group_roles` tables |
-| `0163` | Add `visibility` column to `documents_v2` (default `'area'`) |
-| `0164` | Truncate + re-seed `role_capabilities` with correct matrix |
-| `0165` | Rename `admin` → `system_admin` in `iam_user_roles` for existing rows |
+| Migration | Description | Dependency |
+|---|---|---|
+| `0162` | Add `tenant_id` to `metaldocs.iam_user_roles` | Must run before 0163–0166 |
+| `0163` | Create `iam_groups`, `iam_group_members`, `iam_group_roles` | After 0162 |
+| `0164` | Add `visibility` column to `documents_v2` | None |
+| `0165` | Truncate + re-seed `role_capabilities` | After 0162 |
+| `0166` | Widen CHECK constraint, rename `admin` → `system_admin`, migrate `reviewer` → `approver` | After 0162 |
 
-All idempotent. Safe to re-run.
+All idempotent. Safe to re-run via `dev-migrate.ps1`.
 
 ---
 
 ## Invariants
 
-- One user = one direct role. Group membership can add capabilities but not override direct role.
-- `doc.submit` and `doc.signoff` on same document by same user: blocked at domain layer (ISO SoD, unchanged).
-- `system_admin` bypass applies to capability checks only — SoD still enforced for system_admin.
+- One user = one direct role. Group membership adds capabilities but cannot exceed `system_admin`.
+- `doc.submit` and `doc.signoff` on same document by same user: blocked at domain layer (ISO SoD, unchanged). Applies to `system_admin` too.
 - Document visibility defaults to `area` — documents are NOT public by default.
-- `user_process_areas` table is preserved but not used by this system. Phase 3 will layer area-scoped roles on top without breaking this design.
+- `user_process_areas` IS used for `area` visibility enforcement in Phase 1. It is NOT used for capability checks (that is `iam_user_roles` + `role_capabilities`). Phase 3 adds area-scoped capability checks on top.
+- `restricted` visibility stores the value but grants no access until Phase 2.
 
 ---
 
 ## What Is NOT Changed
 
 - Authentication (sessions, login, password) — unchanged
-- `user_process_areas` table — preserved for Phase 3
-- Approval routing logic — unchanged (routes still tied to profile/area)
+- `user_process_areas` table structure — unchanged
+- Approval routing logic — unchanged
 - ISO SoD enforcement in domain layer — unchanged
-- Frontend routing / page access control — updated to use new capability strings, logic unchanged
+- Frontend page routing / sidebar visibility — updated to use new capability strings, logic unchanged
 
 ---
 
@@ -314,4 +486,4 @@ All idempotent. Safe to re-run.
 |---|---|---|
 | **1 (this spec)** | Unified IAM backend + document visibility field | This document |
 | **2** | Groups UI: create groups, add members, assign roles | Separate spec |
-| **3** | Area-scoped roles: scope a role to specific areas via `user_process_areas` | Separate spec |
+| **3** | Area-scoped roles: scope capabilities to specific areas via `user_process_areas` | Separate spec |
