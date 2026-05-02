@@ -23,6 +23,7 @@ import (
 	docapp "metaldocs/internal/modules/documents_v2/application"
 	approvalapp "metaldocs/internal/modules/documents_v2/approval/application"
 	approvalhttp "metaldocs/internal/modules/documents_v2/approval/http"
+	approvalinfra "metaldocs/internal/modules/documents_v2/approval/infrastructure"
 	approvalrepo "metaldocs/internal/modules/documents_v2/approval/repository"
 	"metaldocs/internal/modules/documents_v2/jobs"
 	docrepo "metaldocs/internal/modules/documents_v2/repository"
@@ -304,7 +305,8 @@ func main() {
 	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
 	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})
 	tv2http.New(tv2Svc, nil).Register(mux)
-	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB)
+	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
+	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
 	e2etest.RegisterE2EHandlers(mux, deps.SQLDB, func(ctx context.Context) error {
 		_, err := approvalServices.Scheduler.RunDuePublishes(ctx, deps.SQLDB)

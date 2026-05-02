@@ -2,6 +2,7 @@ package approvalhttp
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -129,7 +130,9 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 
 	outcome := signoffOutcome(result)
 	if h.idempStore != nil {
-		_ = h.idempStore.RecordReplay(r.Context(), tenantID, actorID, idempKey, outcome)
+		if err := h.idempStore.RecordReplay(r.Context(), tenantID, actorID, idempKey, outcome); err != nil {
+			log.Printf("WARN signoff idempotency record failed (non-fatal): %v", err)
+		}
 	}
 	WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
 		SignoffID: "",
