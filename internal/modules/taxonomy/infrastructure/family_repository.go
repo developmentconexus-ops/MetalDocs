@@ -58,7 +58,10 @@ FROM metaldocs.document_families`
 		}
 		out = append(out, f)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *FamilyRepository) Create(ctx context.Context, f *domain.DocumentFamily) error {
