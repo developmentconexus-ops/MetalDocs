@@ -30,3 +30,11 @@ type GovernanceEvent struct {
 	Reason       string
 	PayloadJSON  []byte
 }
+
+type FamilyRepository interface {
+	GetByCode(ctx context.Context, code string) (*DocumentFamily, error)
+	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)
+	Create(ctx context.Context, f *DocumentFamily) error
+	Update(ctx context.Context, f *DocumentFamily) error
+	HasActiveProfiles(ctx context.Context, familyCode string) (bool, error)
+}
