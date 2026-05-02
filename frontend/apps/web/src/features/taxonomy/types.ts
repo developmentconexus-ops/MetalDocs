@@ -59,3 +59,22 @@ export interface UpdateAreaRequest {
   parentCode?: string | null;
   defaultApproverRole?: string | null;
 }
+
+export interface DocumentFamily {
+  code: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface CreateFamilyRequest {
+  code: string;
+  name: string;
+  description?: string;
+}
+
+export interface UpdateFamilyRequest {
+  name: string;
+  description?: string;
+}
