@@ -43,6 +43,13 @@ var (
 	errIfMatchMalformed = ErrIfMatchMalformed
 )
 
+// signoffIdempStore backs idempotent replay for SignoffByDocumentHandler.
+// Keyed by (tenantID, actorID, idempotency key); outcome is the signoff outcome string.
+type signoffIdempStore interface {
+	CheckReplay(ctx context.Context, tenantID, actorID, idempKey string) (found bool, outcome string, err error)
+	RecordReplay(ctx context.Context, tenantID, actorID, idempKey string, outcome string) error
+}
+
 type Handler struct {
 	services    *application.Services
 	db          *sql.DB
@@ -50,6 +57,7 @@ type Handler struct {
 	decisionSvc decisionService
 	readSvc     readService
 	routeAdmin  routeAdminService
+	idempStore  signoffIdempStore
 }
 
 func NewHandler(services *application.Services, db *sql.DB) *Handler {

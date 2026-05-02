@@ -13,6 +13,7 @@ import (
 	"metaldocs/internal/modules/documents_v2/approval/domain"
 	"metaldocs/internal/modules/documents_v2/approval/http/contracts"
 	approvalsignature "metaldocs/internal/modules/documents_v2/approval/infra/signature"
+	"metaldocs/internal/modules/documents_v2/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
@@ -216,5 +217,88 @@ func TestSignoffHandler_MalformedIfMatch(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+// --- fakes for SignoffByDocumentHandler tests ---
+
+type fakeReadService struct {
+	inst *domain.Instance
+	err  error
+}
+
+func (f *fakeReadService) LoadInstance(_ context.Context, _ *sql.DB, _, _, _ string) (*domain.Instance, error) {
+	return f.inst, f.err
+}
+
+func (f *fakeReadService) LoadActiveInstanceByDocument(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
+	return f.inst, f.err
+}
+
+func (f *fakeReadService) ListPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]domain.Instance, error) {
+	return nil, nil
+}
+
+type fakeIdempStore struct {
+	entries map[string]string // composite key → outcome
+}
+
+func (f *fakeIdempStore) CheckReplay(_ context.Context, tenantID, actorID, key string) (bool, string, error) {
+	k := tenantID + ":" + actorID + ":" + key
+	v, ok := f.entries[k]
+	return ok, v, nil
+}
+
+func (f *fakeIdempStore) RecordReplay(_ context.Context, tenantID, actorID, key, outcome string) error {
+	k := tenantID + ":" + actorID + ":" + key
+	if f.entries == nil {
+		f.entries = make(map[string]string)
+	}
+	f.entries[k] = outcome
+	return nil
+}
+
+func docSignoffTestMux(h *Handler) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v2/documents/{id}/signoff", h.SignoffByDocumentHandler)
+	return mux
+}
+
+// TestSignoffByDocumentHandler_ReplayAfterClose verifies that replaying the same
+// Idempotency-Key after the approval instance is already closed returns 200 with
+// was_replay:true instead of 404/500.
+func TestSignoffByDocumentHandler_ReplayAfterClose(t *testing.T) {
+	store := &fakeIdempStore{entries: map[string]string{
+		"tenant-1:actor-1:idem-replay": "approved",
+	}}
+	h := &Handler{
+		decisionSvc: &fakeDecisionService{},
+		readSvc:     &fakeReadService{err: repository.ErrNoActiveInstance},
+		idempStore:  store,
+	}
+	mux := docSignoffTestMux(h)
+
+	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/signoff", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Idempotency-Key", "idem-replay")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	var out contracts.SignoffResponse
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !out.WasReplay {
+		t.Fatalf("was_replay = %v, want true", out.WasReplay)
+	}
+	if out.Outcome != "approved" {
+		t.Fatalf("outcome = %q, want %q", out.Outcome, "approved")
 	}
 }
