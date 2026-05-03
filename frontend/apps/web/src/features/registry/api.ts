@@ -64,6 +64,7 @@ export interface ActiveDocumentInstance {
   contentHash: string;
   revisionVersion: number;
   publishedDocumentId?: string;
+  approvalInstanceId?: string;
 }
 
 export async function fetchActiveDocumentInstance(

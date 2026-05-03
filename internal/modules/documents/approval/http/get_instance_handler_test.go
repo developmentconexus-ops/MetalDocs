@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -40,6 +41,14 @@ func (f *fakeReadServiceGetInstance) LoadActiveInstanceByDocument(_ context.Cont
 
 func (f *fakeReadServiceGetInstance) ListPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]domain.Instance, error) {
 	return nil, nil
+}
+
+func (f *fakeReadServiceGetInstance) ListInboxItems(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]application.InboxView, error) {
+	return nil, nil
+}
+
+func (f *fakeReadServiceGetInstance) CountPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string) (int, error) {
+	return 0, nil
 }
 
 func getInstanceTestMux(h *Handler) *http.ServeMux {

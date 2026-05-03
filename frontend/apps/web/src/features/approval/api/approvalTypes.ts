@@ -16,6 +16,9 @@ export type DriftPolicy = 'auto_cancel' | 'alert_only' | 'none';
 export interface RouteStage {
   label: string;
   members: string[];
+  required_role: string;
+  required_capability: string;
+  area_code: string;
   quorum_kind: QuorumKind;
   m?: number;
   drift_policy: DriftPolicy;

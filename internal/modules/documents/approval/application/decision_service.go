@@ -294,10 +294,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		}
 		result.InstanceRejected = true
 
-		// Transition document under_review -> rejected (trigger permits without GUC, same as approved path).
+		// SET LOCAL cancel GUC authorises under_review -> draft transition in trigger.
+		if _, err := tx.ExecContext(ctx,
+			`SELECT set_config('metaldocs.cancel_in_progress', $1, true)`,
+			instance.ID,
+		); err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: set cancel GUC: %w", err)
+		}
+
+		// Transition document under_review -> draft so the author can edit and resubmit.
 		if _, err := tx.ExecContext(ctx, `
         UPDATE documents
-           SET status           = 'rejected',
+           SET status           = 'draft',
                revision_version = revision_version + 1
          WHERE id        = $1
            AND tenant_id = $2

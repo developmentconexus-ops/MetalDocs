@@ -239,6 +239,14 @@ func (f *fakeReadService) ListPendingForActor(_ context.Context, _ *sql.DB, _, _
 	return nil, nil
 }
 
+func (f *fakeReadService) ListInboxItems(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]application.InboxView, error) {
+	return nil, nil
+}
+
+func (f *fakeReadService) CountPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string) (int, error) {
+	return 0, nil
+}
+
 type fakeIdempStore struct {
 	entries map[string]string // composite key → outcome
 }

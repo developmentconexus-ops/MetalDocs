@@ -24,12 +24,14 @@ type fakeDecisionRepo struct {
 	// Embed no-op to satisfy interface; listed methods are real overrides.
 	repository.ApprovalRepository
 
-	instance          *domain.Instance
-	loadInstanceErr   error
-	insertSignoffRes  repository.SignoffInsertResult
-	insertSignoffErr  error
-	updateStageErr    error
-	updateInstanceErr error
+	instance           *domain.Instance
+	loadInstanceErr    error
+	insertSignoffRes   repository.SignoffInsertResult
+	insertSignoffErr   error
+	updateStageErr     error
+	updateInstanceErr  error
+	instanceStatusTo   domain.InstanceStatus
+	instanceStatusFrom domain.InstanceStatus
 }
 
 func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
@@ -44,7 +46,9 @@ func (r *fakeDecisionRepo) UpdateStageStatus(_ context.Context, _ *sql.Tx, _, _ 
 	return r.updateStageErr
 }
 
-func (r *fakeDecisionRepo) UpdateInstanceStatus(_ context.Context, _ *sql.Tx, _, _ string, _ domain.InstanceStatus, _ domain.InstanceStatus, _ *time.Time) error {
+func (r *fakeDecisionRepo) UpdateInstanceStatus(_ context.Context, _ *sql.Tx, _, _ string, to domain.InstanceStatus, from domain.InstanceStatus, _ *time.Time) error {
+	r.instanceStatusTo = to
+	r.instanceStatusFrom = from
 	return r.updateInstanceErr
 }
 
@@ -496,16 +500,35 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 	if emitter.Events[0].EventType != "signoff_recorded" {
 		t.Errorf("event type = %q; want %q", emitter.Events[0].EventType, "signoff_recorded")
 	}
+	cancelGUCSet := false
+	docDrafted := false
 	docRejected := false
 	for _, q := range conn.execQueries {
 		ql := strings.ToLower(q)
+		if strings.Contains(ql, "set_config('metaldocs.cancel_in_progress'") {
+			cancelGUCSet = true
+		}
+		if strings.Contains(ql, "update documents") && strings.Contains(ql, "'draft'") {
+			docDrafted = true
+		}
 		if strings.Contains(ql, "update documents") && strings.Contains(ql, "'rejected'") {
 			docRejected = true
-			break
 		}
 	}
-	if !docRejected {
-		t.Error("expected UPDATE documents SET status='rejected' on rejection path")
+	if !cancelGUCSet {
+		t.Error("expected set_config('metaldocs.cancel_in_progress', ...) on rejection path")
+	}
+	if !docDrafted {
+		t.Error("expected UPDATE documents SET status='draft' on rejection path")
+	}
+	if docRejected {
+		t.Error("did not expect UPDATE documents SET status='rejected' on rejection path")
+	}
+	if repo.instanceStatusTo != domain.InstanceRejected {
+		t.Errorf("approval instance status = %q; want %q", repo.instanceStatusTo, domain.InstanceRejected)
+	}
+	if repo.instanceStatusFrom != domain.InstanceInProgress {
+		t.Errorf("approval instance previous status = %q; want %q", repo.instanceStatusFrom, domain.InstanceInProgress)
 	}
 }
 

@@ -231,7 +231,7 @@ func main() {
 		revReader := docrepo.NewRevisionReader(deps.SQLDB)
 		wfReader := docrepo.NewWorkflowReader(deps.SQLDB)
 		ctxBuilder := docapp.NewDocumentContextBuilder(deps.SQLDB, revReader, wfReader,
-			cdRegistryAdapter{cdRepo})
+			cdRegistryAdapter{cdRepo}, revReader)
 		resolverReg := resolvers.NewRegistry()
 		resolvers.RegisterBuiltins(resolverReg)
 		freezeSvc = docapp.NewFreezeService(

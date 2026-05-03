@@ -5,15 +5,22 @@
 > **Out of scope:** Freeze pipeline mechanics (see `workflows/freeze-and-fanout.md`).
 > **Key files:**
 > - `internal/modules/documents/approval/` — backend approval logic
-> - `internal/modules/documents/approval/application/decision_service.go:285` — RecordSignoff reject path (D4 gap)
+> - `internal/modules/documents/approval/application/decision_service.go:284` — RecordSignoff QuorumRejectedStage branch (sets cancel GUC + transitions doc to draft)
+> - `internal/modules/documents/approval/application/read_service.go:152` — ListInboxItems (JOIN against documents + signoff-count subquery)
+> - `internal/modules/documents/approval/application/read_service.go:222` — CountPendingForActor (global count for pagination)
+> - `internal/modules/documents/approval/http/inbox_handler.go:15` — InboxHandler (calls ListInboxItems + CountPendingForActor)
+> - `internal/modules/documents/approval/http/handler.go:26` — readService interface (widened to include ListInboxItems + CountPendingForActor)
 > - `internal/modules/documents/approval/http/errors.go:174` — looksLikeValidationError (E4 gap)
 > - `internal/modules/render/fanout/pdf_dispatcher.go:27` — PDFDispatcher.Dispatch (outbox idempotency_key bug)
 > - `internal/modules/documents/repository/repository.go:35` — CreateDocument INSERT with MAX(revision_number)+1
-> - `internal/modules/documents/approval/http/handler.go:63` — `NewHandler` — accepts `signoffIdempStore` positional param
+> - `internal/modules/documents/approval/http/handler.go:65` — `NewHandler` — accepts `signoffIdempStore` positional param
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
 > - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada
-> - `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx` — route admin
+> - `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:7` — `StageDraft` interface; `toDraft` at :49 maps existing stage fields
+> - `frontend/apps/web/src/features/approval/api/approvalTypes.ts:16` — `RouteStage` (includes `required_role`, `required_capability`, `area_code`)
+> - `internal/modules/documents/approval/http/contracts/route.go:119` — `ListStageItem` (includes `RequiredRole`, `RequiredCapability`, `AreaCode`)
+> - `internal/modules/documents/approval/http/route_admin_handler.go:207` — `ListRoutesHandler` SQL (selects all stage fields)
 > - `frontend/apps/web/src/features/approval/components/SignoffDialog.tsx` — signoff dialog with password confirm
 
 ## Concepts
@@ -40,23 +47,30 @@ A user's decision (approve / reject) recorded against a step. Stored with timest
 
 ## Reject path
 
-Rejecting any required signoff bumps the document back to `draft` and notifies the author.
+Rejecting any required signoff returns the document to `draft` so the author can edit and resubmit immediately. The `approval_instance` retains `rejected` status for audit; only the document row reverts.
 
-**Gap D4 (smoke test 2026-05-01):** The actual implementation does NOT transition the document back to `draft`. `RecordSignoff` at `decision_service.go:285-295` only marks the approval instance as `rejected` (`InstanceRejected = true`) and updates the stage/instance statuses. The document row's `status` column remains `under_review`. The prose above describes the intended behaviour, not the current one.
+**Implementation (fixed commit 2977ef96 — B4):** `QuorumRejectedStage` in `RecordSignoff` (`decision_service.go:284`):
 
-## Known implementation gaps (as of 2026-05-01)
+1. Marks stage as `rejected_here` and approval instance as `rejected`.
+2. Sets `SET LOCAL metaldocs.cancel_in_progress = '<instance_id>'` — the same GUC used by the cancel flow, which authorises the DB trigger to permit the `under_review → draft` transition.
+3. Issues `UPDATE documents SET status = 'draft', revision_version = revision_version + 1` within the same transaction.
 
-### D4 — Rejection does not return document to draft
+The approval instance record keeps `status = 'rejected'` for the audit trail. Author can edit the document and call finalize again for a new approval round.
 
-**File:** `internal/modules/documents/approval/application/decision_service.go:285`
+## Route edit — stage config preserved (fixed 41ca209d)
 
-The `QuorumRejectedStage` branch in `RecordSignoff` sets `result.InstanceRejected = true` and marks the approval instance + stage as rejected, but never issues an `UPDATE documents SET status = 'draft'`. The document remains in `under_review` indefinitely after a rejection. Callers must issue the status transition separately or via a DB patch.
+`ListStageItem` previously only returned `label`, `members`, `quorum_kind`, `drift_policy`. Opening a route for editing caused `toDraft` to call `defaultStage()` for every stage, silently wiping `required_role`, `required_capability`, and `area_code`.
 
-**Workaround (smoke testing):**
+**Fixed (F3):**
 
-```sql
-UPDATE documents SET status = 'draft' WHERE id = '<doc_id>';
-```
+1. `route_admin_handler.go:207` SQL extended: `SELECT …, required_capability, area_code, …`.
+2. `ListStageItem` gains `RequiredRole`, `RequiredCapability`, `AreaCode` JSON fields.
+3. `RouteStage` (frontend type) gains `required_role`, `required_capability`, `area_code`.
+4. `StageDraft` gains `requiredRole`, `requiredCapability`, `areaCode`.
+5. `toDraft` at `RouteAdminPage.tsx:49` maps each existing stage's fields instead of substituting `defaultStage()`.
+6. `toRouteStages` at `RouteAdminPage.tsx:118` writes all three fields back on save.
+
+## Known implementation gaps (as of 2026-05-03)
 
 ---
 
