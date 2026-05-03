@@ -36,6 +36,23 @@ func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error
 		return appendAssertedCap(ctx, tx, capability, areaCode)
 	}
 
+	// system_admin bypass — check before capability query
+	var isAdmin bool
+	if err := tx.QueryRowContext(ctx, `
+    SELECT EXISTS (
+      SELECT 1 FROM metaldocs.iam_user_roles
+       WHERE user_id   = current_setting('metaldocs.actor_id', false)
+         AND tenant_id = current_setting('metaldocs.tenant_id', false)::uuid
+         AND role_code = 'system_admin'
+    )
+`).Scan(&isAdmin); err != nil {
+		return fmt.Errorf("authz: system_admin check: %w", err)
+	}
+	if isAdmin {
+		storeGranted(ctx, capability, areaCode)
+		return appendAssertedCap(ctx, tx, capability, areaCode)
+	}
+
 	var granted bool
 	err := tx.QueryRowContext(ctx, `
 SELECT EXISTS (

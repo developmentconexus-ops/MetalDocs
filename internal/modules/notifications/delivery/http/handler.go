@@ -231,7 +231,7 @@ func (h *Handler) handleOperationsStream(w http.ResponseWriter, r *http.Request)
 
 func hasAdminRole(roles []iamdomain.Role) bool {
 	for _, role := range roles {
-		if role == iamdomain.RoleAdmin {
+		if role == iamdomain.RoleSystemAdmin {
 			return true
 		}
 	}

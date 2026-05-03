@@ -127,7 +127,7 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 func DevRoleMap() map[string][]iamdomain.Role {
 	raw := strings.TrimSpace(os.Getenv("METALDOCS_DEV_USER_ROLES"))
 	if raw == "" {
-		return map[string][]iamdomain.Role{"admin-local": {iamdomain.RoleAdmin}}
+		return map[string][]iamdomain.Role{"admin-local": {iamdomain.RoleSystemAdmin}}
 	}
 
 	out := map[string][]iamdomain.Role{}
@@ -160,7 +160,7 @@ func DevRoleMap() map[string][]iamdomain.Role {
 		}
 	}
 	if len(out) == 0 {
-		out["admin-local"] = []iamdomain.Role{iamdomain.RoleAdmin}
+		out["admin-local"] = []iamdomain.Role{iamdomain.RoleSystemAdmin}
 	}
 	return out
 }

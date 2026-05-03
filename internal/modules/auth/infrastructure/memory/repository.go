@@ -286,7 +286,7 @@ func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.Bootstr
 
 	for _, identity := range r.users {
 		for _, role := range identity.Roles {
-			if role == iamdomain.RoleAdmin {
+			if role == iamdomain.RoleSystemAdmin {
 				return false, nil
 			}
 		}
@@ -305,7 +305,7 @@ func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.Bootstr
 		PasswordAlgo:       params.PasswordAlgo,
 		MustChangePassword: params.MustChangePassword,
 		IsActive:           true,
-		Roles:              []iamdomain.Role{iamdomain.RoleAdmin},
+		Roles:              []iamdomain.Role{iamdomain.RoleSystemAdmin},
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
