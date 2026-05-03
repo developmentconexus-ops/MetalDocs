@@ -2,6 +2,15 @@
 
 > **Status:** accepted 2026-05-03
 > **Last verified:** 2026-05-03
+> **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
+> **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam-rbac.md`.
+> **Key files:**
+> - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo` implementation
+> - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require` implementation; system_admin bypass at :58
+> - `internal/modules/iam/authz/context.go:13` — typed errors `ErrActorContextMissing` / `ErrTenantContextMissing`; GUC helpers `MustActorID` at :21, `MustTenantID` at :34
+> - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` — `RolesByUserID` filters by `tenant_id` (Group B B5/B6 fix)
+> - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:20` — `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` all tenant-scoped (Group B fix)
+> - `internal/platform/bootstrap/api.go:113` — `devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` scopes bootstrap admin
 
 ## Context
 
@@ -37,6 +46,11 @@ Treat the two services as **distinct tiers** with explicit responsibilities, not
 
 - `internal/modules/iam/application/capability_service.go` — tier 1
 - `internal/modules/iam/authz/authz.go` — tier 2
+- `internal/modules/iam/authz/context.go` — typed GUC errors (Group B fix)
+- `internal/modules/iam/infrastructure/postgres/role_provider.go` — tenant-scoped `RolesByUserID` (Group B fix)
+- `internal/modules/iam/infrastructure/postgres/role_admin_repository.go` — tenant-scoped admin ops, DELETE-then-INSERT (Group B fix)
 - Migration 0162 — added `tenant_id` to `iam_user_roles`
 - Migration 0165 — reseeded `role_capabilities`
+- Migration 0170 (`migrations/0170_dev_approver_role_correction.sql`) — corrects dev approver role after 0166 over-promotion
 - Audit 2026-05-03 — bugs B1-B6 (`wiki/bugs/audit-2026-05-03.md` lines 111-136)
+- Tests: `internal/modules/iam/infrastructure/postgres/role_admin_repository_test.go`, `tests/integration/iam/tenant_isolation_test.go`

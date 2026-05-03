@@ -4,14 +4,21 @@
 > **Scope:** Capabilities, roles, area-scoped grants, DB-backed authorization.
 > **Out of scope:** Authentication mechanism (login, sessions) — see `wiki/references/local-dev-credentials.md`.
 > **Key files:**
+> - `internal/modules/iam/domain/port.go:6` — `RoleProvider` interface with `RolesByUserID(ctx, userID, tenantID)` (tenant scoping enforced)
+> - `internal/modules/iam/domain/port.go:11` — `RoleAdminRepository` interface: `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` — all include `tenantID` param
+> - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` — `RolesByUserID` impl; filters `iam_user_roles` by `tenant_id = $2::uuid`
+> - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:20` — `HasAnyRole` filters by `tenant_id`; `UpsertUserAndAssignRole` at :33, `ReplaceUserRoles` at :72 — both use DELETE-then-INSERT
 > - `internal/modules/iam/domain/capabilities.go:3` — 16 `Cap*` string constants
 > - `internal/modules/iam/domain/model.go:5` — Role constants (viewer, editor, author, approver, system_admin)
 > - `internal/modules/iam/domain/role_capabilities.go:5` — in-process role→capability map (RoleCapabilitiesVersion = 2)
 > - `internal/modules/iam/application/capability_service.go:12` — `CapabilityService` struct; `CanDo` at :31 — DB-backed tier-1 check
-> - `internal/modules/iam/authz/authz.go:34` — `authz.Require` doc comment; func at :44 — area-scoped tier-2 check with system_admin bypass at :59
-> - `internal/modules/iam/authz/context.go:21` — `MustActorID` / `MustTenantID` GUC helpers; typed errors `ErrActorContextMissing` / `ErrTenantContextMissing`
+> - `internal/modules/iam/application/cached_role_provider.go:36` — `roleCacheKey(userID, tenantID)` — cache key format `userID|tenantID`
+> - `internal/modules/iam/authz/authz.go:34` — `authz.Require` doc comment; func at :44 — area-scoped tier-2 check with system_admin bypass at :58
+> - `internal/modules/iam/authz/context.go:13` — typed errors `ErrActorContextMissing` (:13) / `ErrTenantContextMissing` (:17)
+> - `internal/modules/iam/authz/context.go:21` — `MustActorID` GUC helper (uses `missing_ok=true`); `MustTenantID` at :34
 > - `internal/modules/iam/delivery/http/middleware.go:30` — `NewMiddleware` takes `*iamapp.CapabilityService`
 > - `apps/api/cmd/metaldocs-api/permissions.go:12` — `newPermissionResolver` maps routes → `Cap*` constants
+> - `internal/platform/bootstrap/api.go:113` — `devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` scoping bootstrap admin
 
 ## Model
 
@@ -83,7 +90,7 @@ The bypass ensures `system_admin` users can act on any area without needing a `u
 | 0165 | `role_capabilities` truncated and reseeded with 40 rows covering the 5 canonical roles |
 | 0166 | `admin` → `system_admin`, `reviewer` → `approver` renamed; UNIQUE(tenant_id, user_id) added |
 | 0169 | `role_capabilities` backfill for `signer`, `area_admin`, `qms_admin` (process-area roles left with zero caps by 0165's TRUNCATE); idempotent via `ON CONFLICT DO NOTHING` |
-| 0170 | Dev `approver` user role corrected back to `approver`; migration 0166 had incorrectly promoted it to `system_admin` |
+| 0170 | Dev `approver` seed user role corrected back to `approver` (file: `migrations/0170_dev_approver_role_correction.sql`); 0166 blanket rename had incorrectly promoted it to `system_admin` |
 
 ## StaticAuthorizer removed
 

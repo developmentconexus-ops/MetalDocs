@@ -1,6 +1,12 @@
 # Authz Tiers
 
 > **Last verified:** 2026-05-03
+> **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
+> **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam-rbac.md`.
+> **Key files:**
+> - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo`
+> - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require`
+> - `internal/modules/iam/authz/context.go:13` — `ErrActorContextMissing` / `ErrTenantContextMissing` typed errors; `MustActorID` at :21, `MustTenantID` at :34
 > See ADR `wiki/decisions/0007-two-tier-authz.md` for the decision rationale.
 
 MetalDocs has **two authorization tiers**.
@@ -30,5 +36,5 @@ MetalDocs has **two authorization tiers**.
 
 ## Common pitfalls
 
-- Forgetting to set `metaldocs.actor_id`/`metaldocs.tenant_id` GUCs before calling `authz.Require` → `ErrActorContextMissing` (typed). Set via `SET LOCAL metaldocs.actor_id = '<userID>'` at start of tx.
+- Forgetting to set `metaldocs.actor_id`/`metaldocs.tenant_id` GUCs before calling `authz.Require` → returns typed sentinel errors `authz.ErrActorContextMissing` or `authz.ErrTenantContextMissing` (defined in `internal/modules/iam/authz/context.go:13`). GUC helpers use `current_setting(..., true)` (`missing_ok=true`), so Postgres does not panic on unset GUCs — the helper returns the typed error instead. Set via `SET LOCAL metaldocs.actor_id = '<userID>'` at start of tx.
 - Assigning a tenant role via IAM admin UI does NOT grant area access. Area grants live in `user_process_areas`.
