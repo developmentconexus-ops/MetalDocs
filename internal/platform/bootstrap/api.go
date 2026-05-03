@@ -21,6 +21,7 @@ import (
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/config"
 	pgdb "metaldocs/internal/platform/db/postgres"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/internal/platform/messaging"
 	"metaldocs/internal/platform/servicebus"
 	nooppub "metaldocs/internal/platform/messaging/noop"
@@ -110,13 +111,12 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 	default:
 		roles := authn.DevRoleMap()
 		authRepo := authmemory.NewRepository()
-		const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 		for userID, userRoles := range roles {
-			if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, devTenantID, userRoles[0], "bootstrap"); err != nil {
+			if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, tenant.DevTenantID, userRoles[0], "bootstrap"); err != nil {
 				return APIDependencies{}, err
 			}
 			for _, role := range userRoles[1:] {
-				if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, devTenantID, role, "bootstrap"); err != nil {
+				if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, tenant.DevTenantID, role, "bootstrap"); err != nil {
 					return APIDependencies{}, err
 				}
 			}

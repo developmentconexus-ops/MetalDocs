@@ -16,6 +16,7 @@ import (
 
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -61,9 +62,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 	}
 
 	// Bootstrap runs in single-tenant dev mode. Use the default tenant.
-	const bootstrapTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-
-	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamdomain.RoleSystemAdmin, bootstrapTenantID)
+	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamdomain.RoleSystemAdmin, tenant.DevTenantID)
 	if err != nil {
 		return err
 	}
@@ -92,7 +91,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		ctx,
 		strings.TrimSpace(s.cfg.BootstrapAdminUserID),
 		strings.TrimSpace(s.cfg.BootstrapAdminName),
-		bootstrapTenantID,
+		tenant.DevTenantID,
 		iamdomain.RoleSystemAdmin,
 		"bootstrap",
 	)
@@ -150,7 +149,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 
 	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if tenantID == "" {
-		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		tenantID = tenant.DevTenantID
 	}
 	user, err := s.buildCurrentUser(ctx, identity.UserID, tenantID)
 	if err != nil {
@@ -321,7 +320,7 @@ func (s *Service) CreateUser(ctx context.Context, userID, username, email, displ
 		return fmt.Errorf("role admin repository is required")
 	}
 	if tenantID == "" {
-		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		tenantID = tenant.DevTenantID
 	}
 	return s.roleAdmin.ReplaceUserRoles(ctx, userID, displayName, tenantID, roles, createdBy)
 }

@@ -15,6 +15,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type FillInService interface {
@@ -197,13 +198,11 @@ func requestID(r *http.Request) string {
 	return fmt.Sprintf("req-%d", time.Now().UnixNano())
 }
 
-const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-
 func tenantID(r *http.Request) string {
 	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
 		return t
 	}
-	return devTenantID
+	return tenant.DevTenantID
 }
 
 func actorID(r *http.Request) string {

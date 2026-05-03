@@ -14,6 +14,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/tenant"
 )
 
 type UserAdminService interface {
@@ -107,7 +108,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	}
 	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if tenantID == "" {
-		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		tenantID = tenant.DevTenantID
 	}
 	activeSince := time.Now().UTC().Add(-10 * time.Minute)
 	users, err := h.authService.ListUsers(r.Context(), tenantID)
@@ -223,7 +224,7 @@ func (h *AdminHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if tenantID == "" {
-		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		tenantID = tenant.DevTenantID
 	}
 	items, err := h.authService.ListUsers(r.Context(), tenantID)
 	if err != nil {
@@ -273,7 +274,7 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if tenantID == "" {
-		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		tenantID = tenant.DevTenantID
 	}
 	assignedBy := authenticatedActor(r)
 	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, tenantID, roles, assignedBy); err != nil {
@@ -343,7 +344,7 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	}
 	upsertTenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if upsertTenantID == "" {
-		upsertTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		upsertTenantID = tenant.DevTenantID
 	}
 
 	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy); err != nil {
@@ -377,7 +378,7 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	}
 	replaceTenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if replaceTenantID == "" {
-		replaceTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		replaceTenantID = tenant.DevTenantID
 	}
 
 	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, roles, assignedBy); err != nil {

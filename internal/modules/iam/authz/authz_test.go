@@ -10,6 +10,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"metaldocs/internal/platform/tenant"
 )
 
 type authzTestState struct {
@@ -134,7 +136,7 @@ func TestRequire_CapGranted(t *testing.T) {
 	state := &authzTestState{
 		granted:      true,
 		actorID:      "actor-1",
-		tenantID:     "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		tenantID:     tenant.DevTenantID,
 		assertedCaps: `[]`,
 	}
 	_, tx := openAuthzTestDB(t, state)
@@ -160,7 +162,7 @@ func TestRequire_CapDenied(t *testing.T) {
 	state := &authzTestState{
 		granted:  false,
 		actorID:  "actor-2",
-		tenantID: "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		tenantID: tenant.DevTenantID,
 	}
 	_, tx := openAuthzTestDB(t, state)
 
@@ -182,7 +184,7 @@ func TestRequire_CacheHit(t *testing.T) {
 	state := &authzTestState{
 		granted:      true,
 		actorID:      "actor-3",
-		tenantID:     "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		tenantID:     tenant.DevTenantID,
 		assertedCaps: `[]`,
 	}
 	_, tx := openAuthzTestDB(t, state)

@@ -11,9 +11,8 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/tenant"
 )
-
-const defaultTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 var (
 	writeJSON  = httpresponse.WriteJSON
@@ -198,7 +197,7 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 func tenantIDFromRequest(r *http.Request) string {
 	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if tenantID == "" {
-		return defaultTenantID
+		return tenant.DevTenantID
 	}
 	return tenantID
 }

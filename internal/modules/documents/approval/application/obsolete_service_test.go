@@ -13,6 +13,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/tenant"
 )
 
 // ---------------------------------------------------------------------------
@@ -162,7 +163,7 @@ func newObsoleteTestDB(t *testing.T, conn *obsoleteTestConn) *sql.DB {
 		conn.actorID = "user-1"
 	}
 	if conn.tenantID == "" {
-		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		conn.tenantID = tenant.DevTenantID
 	}
 	name := fmt.Sprintf("obsolete_test_%p", conn)
 	sql.Register(name, &obsoleteTestDriver{conn: conn})

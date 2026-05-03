@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/tenant"
 )
 
 // ---------------------------------------------------------------------------
@@ -142,7 +143,7 @@ func newPublishTestDB(t *testing.T, rowsAffected int64, authzGranted ...bool) *s
 		authzGranted: granted,
 		areaCode:     "QA",
 		actorID:      "user-1",
-		tenantID:     "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		tenantID:     tenant.DevTenantID,
 	}
 	name := fmt.Sprintf("publish_test_%p", conn)
 	sql.Register(name, &publishTestDriver{conn: conn})

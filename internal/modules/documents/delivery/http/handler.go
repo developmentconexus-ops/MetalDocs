@@ -19,6 +19,7 @@ import (
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/ratelimit"
+	"metaldocs/internal/platform/tenant"
 )
 
 const (
@@ -900,13 +901,11 @@ func rolesFromHeader(header string) []string {
 	return roles
 }
 
-const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-
 func tenantIDFromReq(r *http.Request) string {
 	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
 		return t
 	}
-	return devTenantID
+	return tenant.DevTenantID
 }
 
 func userIDFromReq(r *http.Request) string {

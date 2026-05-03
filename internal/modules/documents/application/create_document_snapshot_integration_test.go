@@ -14,10 +14,11 @@ import (
 	docrepo "metaldocs/internal/modules/documents/repository"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/docgenv2"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
-const createSnapshotTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const createSnapshotTenantID = tenant.DevTenantID
 
 func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 	ctx := context.Background()

@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/tenant"
 )
 
 // ---------------------------------------------------------------------------
@@ -162,7 +163,7 @@ func newCancelTestDB(t *testing.T, conn *cancelTestConn) *sql.DB {
 		conn.actorID = "user-1"
 	}
 	if conn.tenantID == "" {
-		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		conn.tenantID = tenant.DevTenantID
 	}
 	name := fmt.Sprintf("cancel_test_%p", conn)
 	sql.Register(name, &cancelTestDriver{conn: conn})

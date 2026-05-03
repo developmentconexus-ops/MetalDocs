@@ -37,6 +37,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/tenant"
 )
 
 // ============================================================
@@ -1765,7 +1766,7 @@ func (s *commitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: nil}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
-		return &submitSingleValueRows{value: "ffffffff-ffff-ffff-ffff-ffffffffffff"}, nil
+		return &submitSingleValueRows{value: tenant.DevTenantID}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: "user-1"}, nil
@@ -2955,7 +2956,7 @@ func (s *decisionPriorQueryFailStmt) Query(_ []driver.Value) (driver.Rows, error
 		return &decisionSingleValueRows{value: nil}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
-		return &decisionSingleValueRows{value: "ffffffff-ffff-ffff-ffff-ffffffffffff"}, nil
+		return &decisionSingleValueRows{value: tenant.DevTenantID}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &decisionSingleValueRows{value: "actor"}, nil
@@ -3222,7 +3223,7 @@ func (s *decisionReplayCommitFailStmt) Query(_ []driver.Value) (driver.Rows, err
 		return &decisionSingleValueRows{value: nil}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
-		return &decisionSingleValueRows{value: "ffffffff-ffff-ffff-ffff-ffffffffffff"}, nil
+		return &decisionSingleValueRows{value: tenant.DevTenantID}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &decisionSingleValueRows{value: "actor"}, nil
@@ -3577,7 +3578,7 @@ func (s *submitNoStageStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: nil}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
-		return &submitSingleValueRows{value: "ffffffff-ffff-ffff-ffff-ffffffffffff"}, nil
+		return &submitSingleValueRows{value: tenant.DevTenantID}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: "user-1"}, nil

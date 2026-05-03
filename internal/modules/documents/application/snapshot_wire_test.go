@@ -15,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 // wireSnapshotReader implements SnapshotTemplateReader for the wiring test.
@@ -42,7 +43,7 @@ func (w *wireSnapshotWriter) WriteSnapshot(_ context.Context, _, docID string, _
 }
 
 func TestCreateDocument_SnapshotPopulated(t *testing.T) {
-	const tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	const tenantID = tenant.DevTenantID
 
 	// fakeRepo is declared in service_test.go (always compiled).
 	repo := &fakeRepo{createDocIDs: [3]string{"doc-snap-1", "rev-snap-1", "sess-snap-1"}}

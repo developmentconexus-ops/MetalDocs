@@ -13,6 +13,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/tenant"
 )
 
 // ---------------------------------------------------------------------------
@@ -137,7 +138,7 @@ func newSupersedeTestDB(t *testing.T, newRowsAffected, priorRowsAffected int64, 
 		authzGranted:         granted,
 		areaCode:             "QA",
 		actorID:              "user-1",
-		tenantID:             "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		tenantID:             tenant.DevTenantID,
 	}
 	name := fmt.Sprintf("supersede_test_%p", conn)
 	sql.Register(name, &supersedeTestDriver{conn: conn})

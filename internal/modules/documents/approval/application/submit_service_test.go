@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/tenant"
 )
 
 // ---------------------------------------------------------------------------
@@ -202,7 +203,7 @@ func newSubmitTestDB(t *testing.T, authzGranted ...bool) *sql.DB {
 		authzGranted: granted,
 		areaCode:     "QA",
 		actorID:      "user-1",
-		tenantID:     "ffffffff-ffff-ffff-ffff-ffffffffffff",
+		tenantID:     tenant.DevTenantID,
 	}
 	name := fmt.Sprintf("submit_test_%p", conn)
 	sql.Register(name, &submitTestDriver{conn: conn})
