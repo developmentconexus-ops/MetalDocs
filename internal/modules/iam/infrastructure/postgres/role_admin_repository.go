@@ -23,7 +23,8 @@ func (r *RoleAdminRepository) HasAnyRole(ctx context.Context, role domain.Role, 
 SELECT COUNT(*)
 FROM metaldocs.iam_user_roles
 WHERE role_code = $1
-`, string(role)).Scan(&count); err != nil {
+  AND tenant_id = $2::uuid
+`, string(role), tenantID).Scan(&count); err != nil {
 		return false, fmt.Errorf("count role assignments: %w", err)
 	}
 	return count > 0, nil
