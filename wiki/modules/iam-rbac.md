@@ -7,8 +7,9 @@
 > - `internal/modules/iam/domain/capabilities.go:3` — 16 `Cap*` string constants
 > - `internal/modules/iam/domain/model.go:5` — Role constants (viewer, editor, author, approver, system_admin)
 > - `internal/modules/iam/domain/role_capabilities.go:5` — in-process role→capability map (RoleCapabilitiesVersion = 2)
-> - `internal/modules/iam/application/capability_service.go:12` — `CapabilityService.CanDo` — DB-backed check
-> - `internal/modules/iam/authz/authz.go:34` — `authz.Require` — area-scoped check with system_admin bypass
+> - `internal/modules/iam/application/capability_service.go:12` — `CapabilityService` struct; `CanDo` at :31 — DB-backed tier-1 check
+> - `internal/modules/iam/authz/authz.go:34` — `authz.Require` doc comment; func at :44 — area-scoped tier-2 check with system_admin bypass at :59
+> - `internal/modules/iam/authz/context.go:21` — `MustActorID` / `MustTenantID` GUC helpers; typed errors `ErrActorContextMissing` / `ErrTenantContextMissing`
 > - `internal/modules/iam/delivery/http/middleware.go:30` — `NewMiddleware` takes `*iamapp.CapabilityService`
 > - `apps/api/cmd/metaldocs-api/permissions.go:12` — `newPermissionResolver` maps routes → `Cap*` constants
 
@@ -54,7 +55,7 @@ Migration 0166 renamed `admin` → `system_admin` and `reviewer` → `approver` 
 
 ## Auth flow
 
-HTTP requests are gated by `Middleware.Wrap` (middleware.go:48). The `PermissionResolver` maps `(method, path)` → `(capability string, guarded bool)`. If guarded, `CapabilityService.CanDo` (capability_service.go:20) runs a single SQL EXISTS query across four branches:
+HTTP requests are gated by `Middleware.Wrap` (middleware.go:48). The `PermissionResolver` maps `(method, path)` → `(capability string, guarded bool)`. If guarded, `CapabilityService.CanDo` (capability_service.go:31) runs a single SQL EXISTS query across four branches:
 
 1. Direct `iam_user_roles` with `role_code = 'system_admin'`
 2. Group-derived `iam_group_roles` with `role = 'system_admin'`
@@ -65,9 +66,9 @@ Returning `allowed = true` on any branch grants access.
 
 ## authz.Require (area-scoped check)
 
-`authz.Require` (authz.go:34) is the transactional authz used inside approval/signoff handlers. It checks:
+`authz.Require` (authz.go:44) is the transactional authz used inside approval/signoff handlers. It checks:
 
-1. `system_admin` bypass — queries `iam_user_roles` for `role_code = 'system_admin'` before any capability check (authz.go:40). If true, grants immediately.
+1. `system_admin` bypass — queries `iam_user_roles` for `role_code = 'system_admin'` before any capability check (authz.go:59). If true, grants immediately.
 2. Falls through to `user_process_areas` JOIN `role_capabilities` scoped by `area_code`.
 
 The bypass ensures `system_admin` users can act on any area without needing a `user_process_areas` row.
@@ -82,6 +83,7 @@ The bypass ensures `system_admin` users can act on any area without needing a `u
 | 0165 | `role_capabilities` truncated and reseeded with 40 rows covering the 5 canonical roles |
 | 0166 | `admin` → `system_admin`, `reviewer` → `approver` renamed; UNIQUE(tenant_id, user_id) added |
 | 0169 | `role_capabilities` backfill for `signer`, `area_admin`, `qms_admin` (process-area roles left with zero caps by 0165's TRUNCATE); idempotent via `ON CONFLICT DO NOTHING` |
+| 0170 | Dev `approver` user role corrected back to `approver`; migration 0166 had incorrectly promoted it to `system_admin` |
 
 ## StaticAuthorizer removed
 
@@ -93,6 +95,8 @@ Independently of capabilities, the approval module enforces that the submitter o
 
 ## See also
 
+- [concepts/authz-tiers.md](../concepts/authz-tiers.md) — two-tier authz model quick reference
+- [decisions/0007-two-tier-authz.md](../decisions/0007-two-tier-authz.md) — ADR rationale
 - [vision/target-users.md](../vision/target-users.md)
 - [concepts/iso-segregation.md](../concepts/iso-segregation.md)
 - [modules/approval.md](approval.md)
