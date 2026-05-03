@@ -17,7 +17,10 @@
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
 > - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada
-> - `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx` — route admin
+> - `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:7` — `StageDraft` interface; `toDraft` at :49 maps existing stage fields
+> - `frontend/apps/web/src/features/approval/api/approvalTypes.ts:16` — `RouteStage` (includes `required_role`, `required_capability`, `area_code`)
+> - `internal/modules/documents/approval/http/contracts/route.go:119` — `ListStageItem` (includes `RequiredRole`, `RequiredCapability`, `AreaCode`)
+> - `internal/modules/documents/approval/http/route_admin_handler.go:207` — `ListRoutesHandler` SQL (selects all stage fields)
 > - `frontend/apps/web/src/features/approval/components/SignoffDialog.tsx` — signoff dialog with password confirm
 
 ## Concepts
@@ -53,6 +56,19 @@ Rejecting any required signoff returns the document to `draft` so the author can
 3. Issues `UPDATE documents SET status = 'draft', revision_version = revision_version + 1` within the same transaction.
 
 The approval instance record keeps `status = 'rejected'` for the audit trail. Author can edit the document and call finalize again for a new approval round.
+
+## Route edit — stage config preserved (fixed 41ca209d)
+
+`ListStageItem` previously only returned `label`, `members`, `quorum_kind`, `drift_policy`. Opening a route for editing caused `toDraft` to call `defaultStage()` for every stage, silently wiping `required_role`, `required_capability`, and `area_code`.
+
+**Fixed (F3):**
+
+1. `route_admin_handler.go:207` SQL extended: `SELECT …, required_capability, area_code, …`.
+2. `ListStageItem` gains `RequiredRole`, `RequiredCapability`, `AreaCode` JSON fields.
+3. `RouteStage` (frontend type) gains `required_role`, `required_capability`, `area_code`.
+4. `StageDraft` gains `requiredRole`, `requiredCapability`, `areaCode`.
+5. `toDraft` at `RouteAdminPage.tsx:49` maps each existing stage's fields instead of substituting `defaultStage()`.
+6. `toRouteStages` at `RouteAdminPage.tsx:118` writes all three fields back on save.
 
 ## Known implementation gaps (as of 2026-05-03)
 
