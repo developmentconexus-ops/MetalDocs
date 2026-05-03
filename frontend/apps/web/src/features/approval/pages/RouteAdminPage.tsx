@@ -7,6 +7,9 @@ import styles from './RouteAdminPage.module.css';
 interface StageDraft {
   label: string;
   membersText: string;
+  requiredRole: string;
+  requiredCapability: string;
+  areaCode: string;
   quorumKind: QuorumKind;
   m: string;
   driftPolicy: DriftPolicy;
@@ -34,6 +37,9 @@ function defaultStage(): StageDraft {
   return {
     label: '',
     membersText: '',
+    requiredRole: '',
+    requiredCapability: 'doc.signoff',
+    areaCode: '',
     quorumKind: 'any_1',
     m: '1',
     driftPolicy: 'auto_cancel',
@@ -55,6 +61,9 @@ function toDraft(route: Route | null): RouteDraft {
     stages: route.stages.map((stage) => ({
       label: stage.label,
       membersText: stage.members.join(', '),
+      requiredRole: stage.required_role,
+      requiredCapability: stage.required_capability || 'doc.signoff',
+      areaCode: stage.area_code,
       quorumKind: stage.quorum_kind,
       m: String(stage.m ?? 1),
       driftPolicy: stage.drift_policy,
@@ -112,6 +121,9 @@ function toRouteStages(draft: RouteDraft): RouteStage[] {
     const routeStage: RouteStage = {
       label: stage.label.trim(),
       members,
+      required_role: stage.requiredRole.trim() || members[0] || '',
+      required_capability: stage.requiredCapability.trim() || 'doc.signoff',
+      area_code: stage.areaCode.trim(),
       quorum_kind: stage.quorumKind,
       drift_policy: stage.driftPolicy,
     };
@@ -534,4 +546,3 @@ export function RouteAdminPage() {
     </section>
   );
 }
-
