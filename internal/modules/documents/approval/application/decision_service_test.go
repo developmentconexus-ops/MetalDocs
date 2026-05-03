@@ -157,6 +157,9 @@ func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: s.conn.areaCode}, nil
 	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &decisionSingleValueRows{value: false}, nil // non-admin
+	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &decisionSingleValueRows{value: s.conn.authzGranted}, nil
 	}

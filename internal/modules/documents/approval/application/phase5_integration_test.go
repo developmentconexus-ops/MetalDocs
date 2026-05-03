@@ -143,6 +143,9 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
 	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &submitSingleValueRows{value: false}, nil
+	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &submitSingleValueRows{value: true}, nil
 	}

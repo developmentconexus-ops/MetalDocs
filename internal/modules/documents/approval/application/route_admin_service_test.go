@@ -70,6 +70,9 @@ func (s *routeAdminStmt) Exec(_ []driver.Value) (driver.Result, error) {
 func (s *routeAdminStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	lower := strings.ToLower(s.query)
 
+	if strings.Contains(lower, "select exists") && strings.Contains(lower, "iam_user_roles") {
+		return &routeAdminRows{cols: []string{"exists"}, values: []driver.Value{false}}, nil
+	}
 	if strings.Contains(lower, "select exists") && strings.Contains(lower, "role_capabilities") {
 		return &routeAdminRows{
 			cols:   []string{"exists"},
