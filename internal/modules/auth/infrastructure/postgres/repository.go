@@ -268,7 +268,7 @@ WHERE user_id = $1
 		}
 	}
 
-	if params.Email != nil || params.NewPasswordHash != nil || params.MustChangePassword != nil {
+	if params.Email != nil || params.NewPasswordHash != nil || params.MustChangePassword != nil || params.ResetLockState {
 		if params.Email != nil {
 			if err := ensureUniqueIdentity(ctx, tx, params.UserID, "", strings.TrimSpace(*params.Email)); err != nil {
 				return err
