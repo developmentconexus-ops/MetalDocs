@@ -13,6 +13,9 @@
 
 ## Index
 
+### Bug Tracker
+- [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–E)** found in pre-smoke deep audit 2026-05-03. Group A (8 blockers) in-flight; B–E queued. **Read this before starting any new session.**
+
 ### Vision
 - [vision/product-vision.md](vision/product-vision.md) - what MetalDocs is, problem it solves (stub, Last verified: 2026-05-01)
 - [vision/target-users.md](vision/target-users.md) - quality engineers, ISO-bound orgs, document control roles (stub, Last verified: 2026-05-01)
