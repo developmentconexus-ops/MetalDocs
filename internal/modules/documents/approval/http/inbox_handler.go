@@ -1,6 +1,8 @@
 package approvalhttp
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,10 +10,15 @@ import (
 	"strings"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/domain"
+	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
+
+type inboxReader interface {
+	ListInboxItems(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
+	CountPendingForActor(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string) (int, error)
+}
 
 func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
@@ -36,20 +43,42 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.readSvc.ListPendingForActor(r.Context(), h.db, tenantID, actorID, areaCode, limit, offset)
+	reader, ok := h.readSvc.(inboxReader)
+	if !ok {
+		WriteError(w, reqID, errors.New("read service does not support inbox"))
+		return
+	}
+
+	views, err := reader.ListInboxItems(r.Context(), h.db, tenantID, actorID, areaCode, limit, offset)
 	if err != nil {
 		WriteError(w, reqID, err)
 		return
 	}
 
-	respItems := make([]contracts.InboxItem, 0, len(items))
-	for i := range items {
-		respItems = append(respItems, mapInboxItem(items[i]))
+	total, err := reader.CountPendingForActor(r.Context(), h.db, tenantID, actorID, areaCode)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
+
+	respItems := make([]contracts.InboxItem, 0, len(views))
+	for i := range views {
+		v := views[i]
+		respItems = append(respItems, contracts.InboxItem{
+			InstanceID:     v.InstanceID,
+			DocumentID:     v.DocumentID,
+			DocumentTitle:  v.DocumentTitle,
+			AreaCode:       v.AreaCode,
+			SubmittedBy:    v.SubmittedBy,
+			SubmittedAt:    v.SubmittedAt.UTC().Format(time.RFC3339),
+			StageLabel:     v.StageLabel,
+			QuorumProgress: v.QuorumProgress,
+		})
 	}
 
 	WriteJSON(w, http.StatusOK, contracts.InboxResponse{
 		Items: respItems,
-		Total: len(respItems),
+		Total: total,
 	})
 }
 
@@ -79,21 +108,4 @@ func parseInboxOffset(raw string) (int, error) {
 		return 0, fmt.Errorf("offset must be >= 0")
 	}
 	return v, nil
-}
-
-func mapInboxItem(inst domain.Instance) contracts.InboxItem {
-	item := contracts.InboxItem{
-		InstanceID:  inst.ID,
-		DocumentID:  inst.DocumentID,
-		SubmittedBy: inst.SubmittedBy,
-		SubmittedAt: inst.SubmittedAt.UTC().Format(time.RFC3339),
-	}
-
-	active := inst.Active()
-	if active != nil {
-		item.StageLabel = active.NameSnapshot
-		item.AreaCode = active.AreaCodeSnapshot
-	}
-
-	return item
 }
