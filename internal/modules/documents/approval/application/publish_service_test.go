@@ -85,6 +85,9 @@ func (s *publishTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "from documents") {
 		return &publishSingleValueRows{value: s.conn.areaCode}, nil
 	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &publishSingleValueRows{value: false}, nil
+	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &publishSingleValueRows{value: s.conn.authzGranted}, nil
 	}

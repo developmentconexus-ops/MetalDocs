@@ -101,6 +101,9 @@ func (s *obsoleteTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
 
 func (s *obsoleteTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	lower := strings.ToLower(s.query)
+	if strings.Contains(lower, "select exists") && strings.Contains(lower, "iam_user_roles") {
+		return &obsoleteSingleValueRows{value: false}, nil
+	}
 	if strings.Contains(lower, "select exists") && strings.Contains(lower, "role_capabilities") {
 		return &obsoleteSingleValueRows{value: s.conn.authzGranted}, nil
 	}

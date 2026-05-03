@@ -100,14 +100,15 @@ func (s *cancelTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
 func (s *cancelTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	lower := strings.ToLower(s.query)
 
-	// area_code fetch
-	if strings.Contains(lower, "select area_code") {
-		if s.conn.areaCode == "" {
-			return cancelEmptyRows{cols: []string{"area_code"}}, nil
-		}
-		return &cancelTestRows{cols: []string{"area_code"}, values: []driver.Value{s.conn.areaCode}}, nil
+	// area_code fetch (query selects process_area_code_snapshot from documents)
+	if strings.Contains(lower, "process_area_code_snapshot") {
+		return &cancelTestRows{cols: []string{"process_area_code_snapshot"}, values: []driver.Value{s.conn.areaCode}}, nil
 	}
-	// authz: SELECT EXISTS
+	// system_admin bypass check
+	if strings.Contains(lower, "select exists") && strings.Contains(lower, "iam_user_roles") {
+		return &cancelTestRows{cols: []string{"exists"}, values: []driver.Value{false}}, nil
+	}
+	// authz: SELECT EXISTS role_capabilities
 	if strings.Contains(lower, "select exists") && strings.Contains(lower, "role_capabilities") {
 		return &cancelTestRows{cols: []string{"exists"}, values: []driver.Value{s.conn.authzGranted}}, nil
 	}

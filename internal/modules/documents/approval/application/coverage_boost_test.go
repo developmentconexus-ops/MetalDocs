@@ -1755,6 +1755,9 @@ func (s *commitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
 	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &submitSingleValueRows{value: false}, nil
+	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &submitSingleValueRows{value: true}, nil
 	}
@@ -2939,6 +2942,9 @@ func (s *decisionPriorQueryFailStmt) Query(_ []driver.Value) (driver.Rows, error
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: "QA"}, nil
 	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &decisionSingleValueRows{value: false}, nil
+	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &decisionSingleValueRows{value: true}, nil
 	}
@@ -3199,6 +3205,9 @@ func (s *decisionReplayCommitFailStmt) Query(_ []driver.Value) (driver.Rows, err
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: "QA"}, nil
+	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &decisionSingleValueRows{value: false}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &decisionSingleValueRows{value: true}, nil
@@ -3548,6 +3557,9 @@ func (s *submitNoStageStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
+	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &submitSingleValueRows{value: false}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &submitSingleValueRows{value: true}, nil

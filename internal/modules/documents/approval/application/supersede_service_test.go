@@ -82,6 +82,9 @@ func (s *supersedeTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "from documents") {
 		return &supersedeSingleValueRows{value: s.conn.areaCode}, nil
 	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &supersedeSingleValueRows{value: false}, nil
+	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
 		return &supersedeSingleValueRows{value: s.conn.authzGranted}, nil
 	}
