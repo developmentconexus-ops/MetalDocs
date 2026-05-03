@@ -18,6 +18,7 @@ func TestSubmitForReview_Happy(t *testing.T) {
 		TemplateID:    template.ID,
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
+		ContentHash:   "deadbeef",
 		AuthorID:      "author-1",
 	}
 	reviewerRole := "reviewer"
@@ -92,6 +93,36 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrInvalidStateTransition) {
 		t.Fatalf("expected ErrInvalidStateTransition, got %v", err)
+	}
+}
+
+func TestSubmitForReview_NoUpload(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	version := &domain.TemplateVersion{
+		ID:            "ver-1",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Status:        domain.VersionStatusDraft,
+		ContentHash:   "",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	repo.approvalConfigs[template.ID] = &domain.ApprovalConfig{
+		TemplateID:   template.ID,
+		ApproverRole: "approver",
+	}
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.SubmitForReview(context.Background(), application.SubmitForReviewCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "author-1",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+	})
+	if !errors.Is(err, domain.ErrUploadMissing) {
+		t.Fatalf("expected ErrUploadMissing, got %v", err)
 	}
 }
 
