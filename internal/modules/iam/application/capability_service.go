@@ -17,6 +17,17 @@ func NewCapabilityService(db *sql.DB) *CapabilityService {
 	return &CapabilityService{db: db}
 }
 
+// CanDo enforces a tier-1 tenant-level capability check.
+// See wiki/decisions/0007-two-tier-authz.md for the boundary between tier-1
+// (this function, HTTP middleware) and tier-2 (authz.Require, in-transaction).
+//
+// Returns nil if the user holds the capability in the given tenant via either:
+//   - direct role in iam_user_roles
+//   - membership in iam_groups + iam_group_roles
+//
+// system_admin role bypasses all capability checks.
+//
+// Returns ErrCapabilityDenied otherwise.
 func (s *CapabilityService) CanDo(ctx context.Context, userID, tenantID, capability string) error {
 	const query = `
 SELECT EXISTS (
