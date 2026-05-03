@@ -27,12 +27,6 @@ var RoleCapabilities = map[Role][]Capability{
 		CapDocumentEdit,
 		CapTemplateView,
 	},
-	RoleReviewer: {
-		CapDocumentView,
-		CapDocumentEdit,
-		CapWorkflowReview,
-		CapTemplateView,
-	},
 	RoleApprover: {
 		CapDocumentView,
 		CapWorkflowApprove,
