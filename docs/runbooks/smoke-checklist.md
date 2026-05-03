@@ -10,6 +10,7 @@
 - Postgres + MinIO + Gotenberg up via Docker Compose.
 - Login admin: `admin` / `AdminMetalDocs123!`.
 - Banco com pelo menos um perfil + área **OU** ambiente limpo para validar bootstrap.
+- Bootstrap triggered quando `metaldocs.iam_user_roles` não tem nenhuma row com `role_code = 'system_admin'` (anteriormente `admin` — ver migration 0166).
 
 ---
 
@@ -21,7 +22,7 @@ Para cobrir segregação ISO precisa de **três contas distintas**:
 - `author@test` — autor de templates e de documentos.
 - `approver@test` — aprovador (não pode ser o submitter).
 
-Criar via `Configurações → Usuários` (admin). Conferir que `approver@test` tem capability `documents:approve` na área alvo.
+Criar via `Configurações → Usuários` (admin). Conferir que `approver@test` tem role `approver` (capability `doc.signoff`) na área alvo.
 
 ---
 
