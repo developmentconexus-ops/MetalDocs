@@ -207,7 +207,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		stageRows, err := h.db.QueryContext(r.Context(), `
-			SELECT route_id, name, required_role, quorum, on_eligibility_drift
+			SELECT route_id, name, required_role, required_capability, area_code, quorum, on_eligibility_drift
 			  FROM approval_route_stages
 			 WHERE route_id IN (`+strings.Join(placeholders, ", ")+`)
 			 ORDER BY route_id, stage_order`,
@@ -221,10 +221,10 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 
 		for stageRows.Next() {
 			var (
-				id                                        string
-				stageName, stageRole, quorum, driftPolicy *string
+				id                                                                      string
+				stageName, stageRole, requiredCapability, areaCode, quorum, driftPolicy *string
 			)
-			if err := stageRows.Scan(&id, &stageName, &stageRole, &quorum, &driftPolicy); err != nil {
+			if err := stageRows.Scan(&id, &stageName, &stageRole, &requiredCapability, &areaCode, &quorum, &driftPolicy); err != nil {
 				WriteError(w, reqID, err)
 				return
 			}
@@ -232,10 +232,18 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 			if stageName != nil {
 				sn := *stageName
 				sr := ""
+				sc := ""
+				sa := ""
 				sq := ""
 				sd := ""
 				if stageRole != nil {
 					sr = *stageRole
+				}
+				if requiredCapability != nil {
+					sc = *requiredCapability
+				}
+				if areaCode != nil {
+					sa = *areaCode
 				}
 				if quorum != nil {
 					sq = *quorum
@@ -244,10 +252,13 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 					sd = *driftPolicy
 				}
 				routeMap[id].Stages = append(routeMap[id].Stages, contracts.ListStageItem{
-					Label:       sn,
-					Members:     []string{sr},
-					QuorumKind:  sq,
-					DriftPolicy: sd,
+					Label:              sn,
+					Members:            []string{sr},
+					RequiredRole:       sr,
+					RequiredCapability: sc,
+					AreaCode:           sa,
+					QuorumKind:         sq,
+					DriftPolicy:        sd,
 				})
 			}
 		}

@@ -35,6 +35,7 @@ type activeDocumentResponse struct {
 	ContentHash         string  `json:"contentHash"`
 	RevisionVersion     int     `json:"revisionVersion"`
 	PublishedDocumentID *string `json:"publishedDocumentId,omitempty"`
+	ApprovalInstanceID  *string `json:"approvalInstanceId,omitempty"`
 }
 
 func (h *Handler) listDocs(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +142,20 @@ func (h *Handler) getActiveDocument(w http.ResponseWriter, r *http.Request) {
 
 	if publishedDocID.Valid {
 		resp.PublishedDocumentID = &publishedDocID.String
+	}
+	var approvalInstanceID sql.NullString
+	_ = h.db.QueryRowContext(r.Context(), `
+		SELECT id::text
+		  FROM approval_instances
+		 WHERE document_v2_id = $1::uuid
+		   AND tenant_id = $2::uuid
+		   AND status = 'in_progress'
+		 ORDER BY submitted_at DESC
+		 LIMIT 1`,
+		resp.DocumentID, tenantID,
+	).Scan(&approvalInstanceID)
+	if approvalInstanceID.Valid {
+		resp.ApprovalInstanceID = &approvalInstanceID.String
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }

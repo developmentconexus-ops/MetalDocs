@@ -117,10 +117,13 @@ type StageResponse struct {
 }
 
 type ListStageItem struct {
-	Label       string   `json:"label"`
-	Members     []string `json:"members"`
-	QuorumKind  string   `json:"quorum_kind"`
-	DriftPolicy string   `json:"drift_policy"`
+	Label              string   `json:"label"`
+	Members            []string `json:"members"`
+	RequiredRole       string   `json:"required_role"`
+	RequiredCapability string   `json:"required_capability"`
+	AreaCode           string   `json:"area_code"`
+	QuorumKind         string   `json:"quorum_kind"`
+	DriftPolicy        string   `json:"drift_policy"`
 }
 
 type ListRouteItem struct {

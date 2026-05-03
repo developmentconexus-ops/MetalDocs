@@ -109,3 +109,27 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 		t.Fatalf("expected non-empty code in API error: %s", rec.Body.String())
 	}
 }
+
+func TestActiveDocumentResponse_IncludesApprovalInstanceID(t *testing.T) {
+	approvalInstanceID := "approval-instance-1"
+	resp := activeDocumentResponse{
+		DocumentID:         "document-1",
+		ApprovalState:      "under_review",
+		ContentHash:        "hash-1",
+		RevisionVersion:    2,
+		ApprovalInstanceID: &approvalInstanceID,
+	}
+
+	body, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshal response: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got["approvalInstanceId"] != approvalInstanceID {
+		t.Fatalf("approvalInstanceId = %v, want %s", got["approvalInstanceId"], approvalInstanceID)
+	}
+}

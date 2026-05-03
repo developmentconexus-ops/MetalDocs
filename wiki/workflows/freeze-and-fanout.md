@@ -41,7 +41,7 @@ Any non-computed placeholder marked required is checked for a filled value. Comp
 
 ### 5. Resolve computed placeholders
 
-Each computed placeholder carries a `resolver_key` (e.g. `doc_code`, `approvers`). `FreezeService` looks up the resolver from `resolvers.Registry` and calls it. The context passed to each resolver is built by `context_builder.go`, which queries fields including `process_area_code_snapshot`.
+Each computed placeholder carries a `resolver_key` (e.g. `doc_code`, `approvers`). `FreezeService` looks up the resolver from `resolvers.Registry` and calls it. The context passed to each resolver is built by `context_builder.go`. `DocumentContextBuilder.loadDocumentSnapshot` (formerly `loadAreaCode`) queries both `process_area_code_snapshot` and `controlled_document_id` from the `documents` table. `Build` sets `AreaCodeSnapshot`, `ControlledDocumentID`, and `DocumentReader` on the returned `ResolveInput` (fix for A1+A2 — commit 006ceef5).
 
 Registered resolvers (`builtins.go`):
 
