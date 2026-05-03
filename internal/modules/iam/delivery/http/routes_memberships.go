@@ -9,9 +9,8 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/tenant"
 )
-
-const defaultTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 type MembershipHandler struct {
 	svc *iamapp.AreaMembershipService
@@ -130,7 +129,7 @@ func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err erro
 func tenantIDFromRequest(r *http.Request) string {
 	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	if tenantID == "" {
-		return defaultTenantID
+		return tenant.DevTenantID
 	}
 	return tenantID
 }

@@ -13,6 +13,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type submitService interface {
@@ -88,13 +89,11 @@ func actorIDFromRequest(r *http.Request) string {
 	return iamdomain.UserIDFromContext(r.Context())
 }
 
-const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-
 func tenantIDFromReq(r *http.Request) string {
 	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
 		return t
 	}
-	return devTenantID
+	return tenant.DevTenantID
 }
 
 func parseIfMatch(header string) (int, error) {

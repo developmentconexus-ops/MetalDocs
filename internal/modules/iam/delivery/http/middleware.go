@@ -9,6 +9,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	httpresponse "metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/tenant"
 )
 
 type ctxKeyCapability struct{}
@@ -75,7 +76,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 		if tenantID == "" {
-			tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+			tenantID = tenant.DevTenantID
 		}
 
 		if m.caps != nil {

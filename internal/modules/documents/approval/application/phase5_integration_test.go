@@ -25,6 +25,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/tenant"
 )
 
 // ---------------------------------------------------------------------------
@@ -153,7 +154,7 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: nil}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
-		return &submitSingleValueRows{value: "ffffffff-ffff-ffff-ffff-ffffffffffff"}, nil
+		return &submitSingleValueRows{value: tenant.DevTenantID}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: "user-1"}, nil

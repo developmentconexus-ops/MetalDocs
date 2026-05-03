@@ -13,6 +13,7 @@ import (
 
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeFreezeInvoker struct {
@@ -147,7 +148,7 @@ func newFreezeDecisionTestDB(t *testing.T, conn *freezeDecisionConn) *sql.DB {
 		conn.actorID = "approver-1"
 	}
 	if conn.tenantID == "" {
-		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		conn.tenantID = tenant.DevTenantID
 	}
 	if !conn.authzSet {
 		conn.authzGranted = true

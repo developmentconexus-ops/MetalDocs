@@ -13,6 +13,7 @@ import (
 	httpdelivery "metaldocs/internal/modules/auth/delivery/http"
 	authmemory "metaldocs/internal/modules/auth/infrastructure/memory"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T) {
@@ -26,7 +27,7 @@ func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T)
 		LoginLockDuration:      5 * time.Minute,
 	}
 	svc := authapp.NewService(repo, repo, repo, cfg)
-	if err := svc.CreateUser(context.Background(), "flow-user", "flow.user", "flow.user@test.local", "Flow User", "abc12345", "ffffffff-ffff-ffff-ffff-ffffffffffff", []iamdomain.Role{iamdomain.RoleViewer}, "test"); err != nil {
+	if err := svc.CreateUser(context.Background(), "flow-user", "flow.user", "flow.user@test.local", "Flow User", "abc12345", tenant.DevTenantID, []iamdomain.Role{iamdomain.RoleViewer}, "test"); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 

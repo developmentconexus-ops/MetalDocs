@@ -8,9 +8,10 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	"metaldocs/internal/modules/iam/infrastructure/postgres"
+	"metaldocs/internal/platform/tenant"
 )
 
-const testTenant = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const testTenant = tenant.DevTenantID
 
 func TestRolesByUserID_FiltersByTenant(t *testing.T) {
 	db, mock, err := sqlmock.New()

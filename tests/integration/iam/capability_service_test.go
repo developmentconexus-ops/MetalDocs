@@ -10,10 +10,11 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"metaldocs/internal/modules/iam/application"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
-const devTenant = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const devTenant = tenant.DevTenantID
 
 func openDB(t *testing.T) *sql.DB {
 	t.Helper()

@@ -10,10 +10,11 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
-const snapshotSvcTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const snapshotSvcTenantID = tenant.DevTenantID
 
 // fakeTemplateReader implements application.SnapshotTemplateReader.
 type fakeTemplateReader struct {

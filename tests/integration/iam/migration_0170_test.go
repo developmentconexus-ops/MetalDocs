@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
@@ -15,7 +16,7 @@ func TestMigration0170_FlipsApproverFromSystemAdminToApprover(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
 
-	const tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	const tenantID = tenant.DevTenantID
 
 	// Seed: approver user with system_admin role (simulates pre-0170 state)
 	if _, err := db.ExecContext(ctx, `
@@ -52,7 +53,7 @@ VALUES ('approver', $1::uuid, 'system_admin')
 func TestMigration0170_Idempotent(t *testing.T) {
 	db, _ := testdb.Open(t)
 	ctx := context.Background()
-	const tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	const tenantID = tenant.DevTenantID
 
 	if _, err := db.ExecContext(ctx, `
 DELETE FROM metaldocs.iam_user_roles WHERE user_id = 'approver';

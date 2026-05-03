@@ -8,6 +8,7 @@ import (
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 // PublicPathChecker returns true if the given method+path requires no session
@@ -67,7 +68,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 		if tenantID == "" {
-			tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+			tenantID = tenant.DevTenantID
 		}
 		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value, tenantID)
 		if err != nil {

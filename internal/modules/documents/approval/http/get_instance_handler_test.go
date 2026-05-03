@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeReadServiceGetInstance struct {
@@ -145,7 +146,7 @@ func TestGetInstanceHandler_NoTenantHeader(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
 	}
-	if fakeSvc.gotTenantID != devTenantID {
-		t.Fatalf("tenant_id = %q, want %q", fakeSvc.gotTenantID, devTenantID)
+	if fakeSvc.gotTenantID != tenant.DevTenantID {
+		t.Fatalf("tenant_id = %q, want %q", fakeSvc.gotTenantID, tenant.DevTenantID)
 	}
 }

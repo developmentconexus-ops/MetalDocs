@@ -11,10 +11,11 @@ import (
 
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
 )
 
-const snapshotTestTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const snapshotTestTenantID = tenant.DevTenantID
 
 func TestSnapshotRepository_WriteAndRead(t *testing.T) {
 	ctx := context.Background()

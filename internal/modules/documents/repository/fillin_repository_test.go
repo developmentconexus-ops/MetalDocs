@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/platform/tenant"
 	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
 	"metaldocs/tests/integration/testdb"
 )
 
-const fillInTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const fillInTenantID = tenant.DevTenantID
 
 func TestFillInRepository_SeedDefaults_RequiredOnly(t *testing.T) {
 	ctx := context.Background()

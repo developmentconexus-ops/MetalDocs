@@ -16,6 +16,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/tenant"
 )
 
 type routeAdminRows struct {
@@ -148,7 +149,7 @@ func newRouteAdminTestDB(t *testing.T, conn *routeAdminConn) *sql.DB {
 		conn.actorID = "user-1"
 	}
 	if conn.tenantID == "" {
-		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		conn.tenantID = tenant.DevTenantID
 	}
 	if conn.createdRouteID == "" {
 		conn.createdRouteID = "route-1"
