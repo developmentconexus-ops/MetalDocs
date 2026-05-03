@@ -211,7 +211,6 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 		`DELETE FROM approval_route_stages rs USING approval_routes r WHERE rs.route_id = r.id AND r.tenant_id = $1`,
 		`DELETE FROM approval_routes WHERE tenant_id = $1`,
 		`DELETE FROM governance_events WHERE tenant_id = $1`,
-		`DELETE FROM documents_v2 WHERE tenant_id = $1`,
 		`DELETE FROM documents WHERE tenant_id = $1`,
 		`DELETE FROM metaldocs.auth_sessions s USING metaldocs.iam_users u WHERE s.user_id = u.user_id AND u.tenant_id = $1`,
 		`DELETE FROM metaldocs.auth_identities i USING metaldocs.iam_users u WHERE i.user_id = u.user_id AND u.tenant_id = $1`,
