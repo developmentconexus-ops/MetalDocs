@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"metaldocs/internal/modules/documents_v2/approval/repository"
+	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 
 	"github.com/lib/pq"

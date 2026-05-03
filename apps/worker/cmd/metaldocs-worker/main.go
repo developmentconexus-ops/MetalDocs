@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	docrepo "metaldocs/internal/modules/documents_v2/repository"
+	docrepo "metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
 	workerapp "metaldocs/internal/platform/worker"
@@ -22,7 +22,7 @@ func main() {
 	}
 	defer deps.Cleanup()
 
-	workerSvc := workerapp.NewService(deps.Consumer, deps.NotificationsSvc, workerCfg)
+	workerSvc := workerapp.NewService(deps.Consumer, workerCfg)
 	if deps.DocgenV2Client != nil && deps.SQLDB != nil {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
 		pdfRunner := workerapp.NewPDFJobRunner(deps.DocgenV2Client, snapRepo)

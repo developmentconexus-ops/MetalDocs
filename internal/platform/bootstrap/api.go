@@ -16,17 +16,8 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	authmemory "metaldocs/internal/modules/auth/infrastructure/memory"
 	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
-	docdomain "metaldocs/internal/modules/documents/domain"
-	memoryrepo "metaldocs/internal/modules/documents/infrastructure/memory"
-	pgrepo "metaldocs/internal/modules/documents/infrastructure/postgres"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
-	notificationdomain "metaldocs/internal/modules/notifications/domain"
-	notificationmemory "metaldocs/internal/modules/notifications/infrastructure/memory"
-	notificationpg "metaldocs/internal/modules/notifications/infrastructure/postgres"
-	workflowdomain "metaldocs/internal/modules/workflow/domain"
-	workflowmemory "metaldocs/internal/modules/workflow/infrastructure/memory"
-	workflowpg "metaldocs/internal/modules/workflow/infrastructure/postgres"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/config"
 	pgdb "metaldocs/internal/platform/db/postgres"
@@ -36,23 +27,17 @@ import (
 	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/render/gotenberg"
-	localstorage "metaldocs/internal/platform/storage/local"
-	miniostorage "metaldocs/internal/platform/storage/minio"
 )
 
 type APIDependencies struct {
-	DocumentsRepo     docdomain.Repository
-	WorkflowApprovals workflowdomain.ApprovalRepository
-	AttachmentStore   docdomain.AttachmentStore
-	RoleProvider      iamdomain.RoleProvider
-	RoleAdminRepo     iamdomain.RoleAdminRepository
-	AuthRepo          authdomain.Repository
-	NotificationsRepo notificationdomain.Repository
-	AuditWriter       auditdomain.Writer
-	AuditReader       auditdomain.Reader
-	Publisher         messaging.Publisher
-	GotenbergClient   *gotenberg.Client
-	StatusProvider    observability.RuntimeStatusProvider
+	RoleProvider    iamdomain.RoleProvider
+	RoleAdminRepo   iamdomain.RoleAdminRepository
+	AuthRepo        authdomain.Repository
+	AuditWriter     auditdomain.Writer
+	AuditReader     auditdomain.Reader
+	Publisher       messaging.Publisher
+	GotenbergClient *gotenberg.Client
+	StatusProvider  observability.RuntimeStatusProvider
 	// SQLDB is the raw *sql.DB used by modules that manage their own queries
 	// (e.g. the templates module). Nil in memory/test mode.
 	SQLDB *sql.DB
@@ -85,12 +70,6 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		if err != nil {
 			return APIDependencies{}, fmt.Errorf("open postgres: %w", err)
 		}
-		store, err := buildAttachmentStore(ctx, attachmentsCfg)
-		if err != nil {
-			_ = closeDB(db)
-			return APIDependencies{}, err
-		}
-
 		authRepo := authpg.NewRepository(db)
 		docgenV2Cfg := config.LoadDocgenV2Config()
 		var docgenV2Client *servicebus.DocgenV2Client
@@ -114,30 +93,22 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			}
 		}
 		return APIDependencies{
-			DocumentsRepo:     pgrepo.NewRepository(db),
-			WorkflowApprovals: workflowpg.NewApprovalRepository(db),
-			AttachmentStore:   store,
-			RoleProvider:      iampg.NewRoleProvider(db),
-			RoleAdminRepo:     iampg.NewRoleAdminRepository(db),
-			AuthRepo:          authRepo,
-			NotificationsRepo: notificationpg.NewRepository(db),
-			AuditWriter:       auditpg.NewWriter(db),
-			AuditReader:       auditpg.NewWriter(db),
-			Publisher:         outboxpg.NewPublisher(db),
-			GotenbergClient:   gotenbergClient,
-			StatusProvider:    observability.NewPostgresRuntimeStatusProvider(db, repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
-			SQLDB:             db,
-			DocgenV2Client:    docgenV2Client,
-			MinioClient:       minioClient,
-			MinioBucket:       minioBucket,
-			Cleanup:           func() { _ = closeDB(db) },
+			RoleProvider:    iampg.NewRoleProvider(db),
+			RoleAdminRepo:   iampg.NewRoleAdminRepository(db),
+			AuthRepo:        authRepo,
+			AuditWriter:     auditpg.NewWriter(db),
+			AuditReader:     auditpg.NewWriter(db),
+			Publisher:       outboxpg.NewPublisher(db),
+			GotenbergClient: gotenbergClient,
+			StatusProvider:  observability.NewPostgresRuntimeStatusProvider(db, repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
+			SQLDB:           db,
+			DocgenV2Client:  docgenV2Client,
+			MinioClient:     minioClient,
+			MinioBucket:     minioBucket,
+			Cleanup:         func() { _ = closeDB(db) },
 		}, nil
 	default:
 		roles := authn.DevRoleMap()
-		store, err := buildAttachmentStore(ctx, attachmentsCfg)
-		if err != nil {
-			return APIDependencies{}, err
-		}
 		authRepo := authmemory.NewRepository()
 		for userID, userRoles := range roles {
 			if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, userRoles[0], "bootstrap"); err != nil {
@@ -151,40 +122,19 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		}
 		auditStore := auditmemory.NewWriter()
 		return APIDependencies{
-			DocumentsRepo:     memoryrepo.NewRepository(),
-			WorkflowApprovals: workflowmemory.NewApprovalRepository(),
-			AttachmentStore:   store,
-			RoleProvider:      authRepo,
-			RoleAdminRepo:     authRepo,
-			AuthRepo:          authRepo,
-			NotificationsRepo: notificationmemory.NewRepository(),
-			AuditWriter:       auditStore,
-			AuditReader:       auditStore,
-			Publisher:         nooppub.NewPublisher(),
-			GotenbergClient:   gotenbergClient,
-			StatusProvider:    observability.NewStaticRuntimeStatusProvider(repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
-			Cleanup:           func() {},
+			RoleProvider:    authRepo,
+			RoleAdminRepo:   authRepo,
+			AuthRepo:        authRepo,
+			AuditWriter:     auditStore,
+			AuditReader:     auditStore,
+			Publisher:       nooppub.NewPublisher(),
+			GotenbergClient: gotenbergClient,
+			StatusProvider:  observability.NewStaticRuntimeStatusProvider(repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
+			Cleanup:         func() {},
 		}, nil
 	}
 }
 
-func buildAttachmentStore(ctx context.Context, cfg config.AttachmentsConfig) (docdomain.AttachmentStore, error) {
-	switch cfg.Provider {
-	case config.StorageProviderMemory:
-		return memoryrepo.NewAttachmentStore(), nil
-	case config.StorageProviderMinIO:
-		store, err := miniostorage.NewStore(cfg)
-		if err != nil {
-			return nil, err
-		}
-		if err := store.EnsureBucket(ctx); err != nil {
-			return nil, err
-		}
-		return store, nil
-	default:
-		return localstorage.NewStore(cfg.RootPath), nil
-	}
-}
 
 func closeDB(db *sql.DB) error {
 	if db == nil {

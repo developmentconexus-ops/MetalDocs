@@ -3,7 +3,7 @@ package docgenv2
 import (
 	"testing"
 
-	"metaldocs/internal/modules/documents_v2/application"
+	"metaldocs/internal/modules/documents/application"
 )
 
 func TestNewTemplatesV2SnapshotReader(t *testing.T) {
