@@ -60,7 +60,10 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		return fmt.Errorf("role admin repository is required")
 	}
 
-	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamdomain.RoleSystemAdmin)
+	// Bootstrap runs in single-tenant dev mode. Use the default tenant.
+	const bootstrapTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+
+	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamdomain.RoleSystemAdmin, bootstrapTenantID)
 	if err != nil {
 		return err
 	}
@@ -89,6 +92,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		ctx,
 		strings.TrimSpace(s.cfg.BootstrapAdminUserID),
 		strings.TrimSpace(s.cfg.BootstrapAdminName),
+		bootstrapTenantID,
 		iamdomain.RoleSystemAdmin,
 		"bootstrap",
 	)
@@ -144,7 +148,11 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		return authdomain.AuthenticatedSession{}, err
 	}
 
-	user, err := s.buildCurrentUser(ctx, identity.UserID)
+	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if tenantID == "" {
+		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	}
+	user, err := s.buildCurrentUser(ctx, identity.UserID, tenantID)
 	if err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
@@ -156,7 +164,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	}, nil
 }
 
-func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdomain.CurrentUser, error) {
+func (s *Service) ResolveSession(ctx context.Context, rawToken, tenantID string) (authdomain.CurrentUser, error) {
 	token := strings.TrimSpace(rawToken)
 	if token == "" {
 		return authdomain.CurrentUser{}, authdomain.ErrSessionNotFound
@@ -180,7 +188,7 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdoma
 	if err := s.repo.TouchSession(ctx, sessionID, time.Now().UTC()); err != nil {
 		return authdomain.CurrentUser{}, err
 	}
-	return s.buildCurrentUser(ctx, session.UserID)
+	return s.buildCurrentUser(ctx, session.UserID, tenantID)
 }
 
 func (s *Service) Logout(ctx context.Context, rawToken string) error {
@@ -243,13 +251,13 @@ func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdom
 	return nil
 }
 
-func (s *Service) ListUsers(ctx context.Context) ([]authdomain.ManagedUser, error) {
+func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error) {
 	items, err := s.repo.ListUsers(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for i := range items {
-		roles, roleErr := s.roleProvider.RolesByUserID(ctx, items[i].UserID)
+		roles, roleErr := s.roleProvider.RolesByUserID(ctx, items[i].UserID, tenantID)
 		if roleErr != nil {
 			if errors.Is(roleErr, iamdomain.ErrUserNotFound) {
 				items[i].Roles = nil
@@ -269,7 +277,7 @@ func (s *Service) ListOnlineUsers(ctx context.Context, activeSince time.Time) ([
 	return s.repo.ListOnlineUsers(ctx, activeSince)
 }
 
-func (s *Service) CreateUser(ctx context.Context, userID, username, email, displayName, password string, roles []iamdomain.Role, createdBy string) error {
+func (s *Service) CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamdomain.Role, createdBy string) error {
 	userID = strings.TrimSpace(userID)
 	username = strings.TrimSpace(username)
 	email = strings.TrimSpace(email)
@@ -312,7 +320,10 @@ func (s *Service) CreateUser(ctx context.Context, userID, username, email, displ
 	if s.roleAdmin == nil {
 		return fmt.Errorf("role admin repository is required")
 	}
-	return s.roleAdmin.ReplaceUserRoles(ctx, userID, displayName, roles, createdBy)
+	if tenantID == "" {
+		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	}
+	return s.roleAdmin.ReplaceUserRoles(ctx, userID, displayName, tenantID, roles, createdBy)
 }
 
 func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams, newPassword string) error {
@@ -388,16 +399,16 @@ func (s *Service) ExpiredSessionCookie() *http.Cookie {
 	}
 }
 
-func (s *Service) CurrentUser(ctx context.Context, userID string) (authdomain.CurrentUser, error) {
-	return s.buildCurrentUser(ctx, userID)
+func (s *Service) CurrentUser(ctx context.Context, userID, tenantID string) (authdomain.CurrentUser, error) {
+	return s.buildCurrentUser(ctx, userID, tenantID)
 }
 
-func (s *Service) buildCurrentUser(ctx context.Context, userID string) (authdomain.CurrentUser, error) {
+func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string) (authdomain.CurrentUser, error) {
 	identity, err := s.repo.FindIdentityByUserID(ctx, userID)
 	if err != nil {
 		return authdomain.CurrentUser{}, err
 	}
-	roles, err := s.roleProvider.RolesByUserID(ctx, userID)
+	roles, err := s.roleProvider.RolesByUserID(ctx, userID, tenantID)
 	if err != nil {
 		return authdomain.CurrentUser{}, err
 	}

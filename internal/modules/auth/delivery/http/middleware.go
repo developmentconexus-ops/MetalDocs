@@ -65,7 +65,11 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
+		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+		if tenantID == "" {
+			tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		}
+		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value, tenantID)
 		if err != nil {
 			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) {
 				writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))

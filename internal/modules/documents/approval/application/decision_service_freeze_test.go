@@ -41,6 +41,7 @@ type freezeDecisionConn struct {
 	authzSet      bool
 	areaCode      string
 	actorID       string
+	tenantID      string
 
 	documentStatus string
 	pendingStatus  *string
@@ -100,6 +101,9 @@ func (s *freezeDecisionStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
 		return &freezeDecisionSingleValueRows{value: nil}, nil
 	}
+	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
+		return &freezeDecisionSingleValueRows{value: s.conn.tenantID}, nil
+	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &freezeDecisionSingleValueRows{value: s.conn.actorID}, nil
 	}
@@ -141,6 +145,9 @@ func newFreezeDecisionTestDB(t *testing.T, conn *freezeDecisionConn) *sql.DB {
 	}
 	if conn.actorID == "" {
 		conn.actorID = "approver-1"
+	}
+	if conn.tenantID == "" {
+		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	}
 	if !conn.authzSet {
 		conn.authzGranted = true

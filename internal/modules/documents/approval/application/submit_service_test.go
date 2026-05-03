@@ -57,6 +57,7 @@ type submitTestConn struct {
 	authzGranted bool
 	areaCode     string
 	actorID      string
+	tenantID     string
 }
 
 type submitNoopResult struct{}
@@ -163,6 +164,9 @@ func (s *submitTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
 		return &submitSingleValueRows{value: nil}, nil
 	}
+	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
+		return &submitSingleValueRows{value: s.conn.tenantID}, nil
+	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: s.conn.actorID}, nil
 	}
@@ -198,6 +202,7 @@ func newSubmitTestDB(t *testing.T, authzGranted ...bool) *sql.DB {
 		authzGranted: granted,
 		areaCode:     "QA",
 		actorID:      "user-1",
+		tenantID:     "ffffffff-ffff-ffff-ffff-ffffffffffff",
 	}
 	name := fmt.Sprintf("submit_test_%p", conn)
 	sql.Register(name, &submitTestDriver{conn: conn})

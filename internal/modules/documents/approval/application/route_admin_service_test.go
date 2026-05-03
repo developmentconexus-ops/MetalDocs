@@ -82,6 +82,9 @@ func (s *routeAdminStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(lower, "current_setting('metaldocs.asserted_caps'") {
 		return &routeAdminRows{cols: []string{"v"}, values: []driver.Value{nil}}, nil
 	}
+	if strings.Contains(lower, "current_setting('metaldocs.tenant_id'") {
+		return &routeAdminRows{cols: []string{"v"}, values: []driver.Value{s.conn.tenantID}}, nil
+	}
 	if strings.Contains(lower, "current_setting('metaldocs.actor_id'") {
 		return &routeAdminRows{cols: []string{"v"}, values: []driver.Value{s.conn.actorID}}, nil
 	}
@@ -118,6 +121,7 @@ func (s *routeAdminStmt) Query(_ []driver.Value) (driver.Rows, error) {
 type routeAdminConn struct {
 	authzGranted   bool
 	actorID        string
+	tenantID       string
 	createdRouteID string
 	lockedRouteID  string
 	routeExists    bool
@@ -142,6 +146,9 @@ func newRouteAdminTestDB(t *testing.T, conn *routeAdminConn) *sql.DB {
 	t.Helper()
 	if conn.actorID == "" {
 		conn.actorID = "user-1"
+	}
+	if conn.tenantID == "" {
+		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	}
 	if conn.createdRouteID == "" {
 		conn.createdRouteID = "route-1"

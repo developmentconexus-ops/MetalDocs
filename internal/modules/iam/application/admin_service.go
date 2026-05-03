@@ -20,7 +20,7 @@ func NewAdminService(repo domain.RoleAdminRepository, invalidator RoleCacheInval
 	return &AdminService{repo: repo, invalidator: invalidator}
 }
 
-func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, displayName string, role domain.Role, assignedBy string) error {
+func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role domain.Role, assignedBy string) error {
 	userID = strings.TrimSpace(userID)
 	displayName = strings.TrimSpace(displayName)
 	assignedBy = strings.TrimSpace(assignedBy)
@@ -35,7 +35,7 @@ func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, disp
 		assignedBy = "system"
 	}
 
-	if err := s.repo.UpsertUserAndAssignRole(ctx, userID, displayName, role, assignedBy); err != nil {
+	if err := s.repo.UpsertUserAndAssignRole(ctx, userID, displayName, tenantID, role, assignedBy); err != nil {
 		return err
 	}
 	if s.invalidator != nil {
@@ -44,7 +44,7 @@ func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, disp
 	return nil
 }
 
-func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName string, roles []domain.Role, assignedBy string) error {
+func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []domain.Role, assignedBy string) error {
 	userID = strings.TrimSpace(userID)
 	displayName = strings.TrimSpace(displayName)
 	assignedBy = strings.TrimSpace(assignedBy)
@@ -62,7 +62,7 @@ func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName
 		return domain.ErrUserNotFound
 	}
 
-	if err := s.repo.ReplaceUserRoles(ctx, userID, displayName, roles, assignedBy); err != nil {
+	if err := s.repo.ReplaceUserRoles(ctx, userID, displayName, tenantID, roles, assignedBy); err != nil {
 		return err
 	}
 	if s.invalidator != nil {

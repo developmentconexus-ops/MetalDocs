@@ -110,6 +110,9 @@ func (s *obsoleteTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(lower, "current_setting('metaldocs.asserted_caps'") {
 		return &obsoleteSingleValueRows{value: nil}, nil
 	}
+	if strings.Contains(lower, "current_setting('metaldocs.tenant_id'") {
+		return &obsoleteSingleValueRows{value: s.conn.tenantID}, nil
+	}
 	if strings.Contains(lower, "current_setting('metaldocs.actor_id'") {
 		return &obsoleteSingleValueRows{value: s.conn.actorID}, nil
 	}
@@ -131,6 +134,7 @@ type obsoleteTestConn struct {
 	areaCode           string
 	authzGranted       bool
 	actorID            string
+	tenantID           string
 
 	// UPDATE documents result
 	docUpdateRowsAffected int64
@@ -156,6 +160,9 @@ func newObsoleteTestDB(t *testing.T, conn *obsoleteTestConn) *sql.DB {
 	}
 	if conn.actorID == "" {
 		conn.actorID = "user-1"
+	}
+	if conn.tenantID == "" {
+		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	}
 	name := fmt.Sprintf("obsolete_test_%p", conn)
 	sql.Register(name, &obsoleteTestDriver{conn: conn})

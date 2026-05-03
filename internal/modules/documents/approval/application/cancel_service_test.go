@@ -117,6 +117,10 @@ func (s *cancelTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		strings.Contains(lower, `current_setting('metaldocs.asserted_caps'`) {
 		return &cancelTestRows{cols: []string{"v"}, values: []driver.Value{nil}}, nil
 	}
+	// tenant_id
+	if strings.Contains(lower, "current_setting('metaldocs.tenant_id'") {
+		return &cancelTestRows{cols: []string{"v"}, values: []driver.Value{s.conn.tenantID}}, nil
+	}
 	// actor_id
 	if strings.Contains(lower, "current_setting('metaldocs.actor_id'") ||
 		strings.Contains(lower, `current_setting('metaldocs.actor_id'`) {
@@ -133,6 +137,7 @@ type cancelTestConn struct {
 	areaCode      string
 	authzGranted  bool
 	actorID       string
+	tenantID      string
 	docUpdateRows int64
 }
 
@@ -155,6 +160,9 @@ func newCancelTestDB(t *testing.T, conn *cancelTestConn) *sql.DB {
 	}
 	if conn.actorID == "" {
 		conn.actorID = "user-1"
+	}
+	if conn.tenantID == "" {
+		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	}
 	name := fmt.Sprintf("cancel_test_%p", conn)
 	sql.Register(name, &cancelTestDriver{conn: conn})

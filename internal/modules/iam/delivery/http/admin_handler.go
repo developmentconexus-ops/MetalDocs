@@ -17,9 +17,9 @@ import (
 )
 
 type UserAdminService interface {
-	ListUsers(ctx context.Context) ([]authdomain.ManagedUser, error)
+	ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error)
 	ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error)
-	CreateUser(ctx context.Context, userID, username, email, displayName, password string, roles []iamdomain.Role, createdBy string) error
+	CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamdomain.Role, createdBy string) error
 	UpdateUser(ctx context.Context, params authdomain.UpdateUserParams, newPassword string) error
 	AdminResetPassword(ctx context.Context, userID, newPassword string) error
 	UnlockUser(ctx context.Context, userID string) error
@@ -105,8 +105,12 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
 		return
 	}
+	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if tenantID == "" {
+		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	}
 	activeSince := time.Now().UTC().Add(-10 * time.Minute)
-	users, err := h.authService.ListUsers(r.Context())
+	users, err := h.authService.ListUsers(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("iam admin: list users failed: %v", err)
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users", traceID)
@@ -217,7 +221,11 @@ func (h *AdminHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
 		return
 	}
-	items, err := h.authService.ListUsers(r.Context())
+	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if tenantID == "" {
+		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	}
+	items, err := h.authService.ListUsers(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("iam admin: list users failed: %v", err)
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users", traceID)
@@ -263,8 +271,12 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles", traceID)
 		return
 	}
+	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if tenantID == "" {
+		tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	}
 	assignedBy := authenticatedActor(r)
-	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, roles, assignedBy); err != nil {
+	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, tenantID, roles, assignedBy); err != nil {
 		h.writeAuthError(w, err, traceID)
 		return
 	}
@@ -329,8 +341,12 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	if assignedBy == "" {
 		assignedBy = authenticatedActor(r)
 	}
+	upsertTenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if upsertTenantID == "" {
+		upsertTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	}
 
-	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, role, assignedBy); err != nil {
+	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy); err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to upsert user role", traceID)
 		return
 	}
@@ -359,8 +375,12 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	if assignedBy == "" {
 		assignedBy = authenticatedActor(r)
 	}
+	replaceTenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if replaceTenantID == "" {
+		replaceTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	}
 
-	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, roles, assignedBy); err != nil {
+	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, roles, assignedBy); err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to replace user roles", traceID)
 		return
 	}

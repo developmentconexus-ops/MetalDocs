@@ -16,7 +16,7 @@ func NewRoleProvider(db *sql.DB) *RoleProvider {
 	return &RoleProvider{db: db}
 }
 
-func (p *RoleProvider) RolesByUserID(ctx context.Context, userID string) ([]domain.Role, error) {
+func (p *RoleProvider) RolesByUserID(ctx context.Context, userID, tenantID string) ([]domain.Role, error) {
 	const checkUserSQL = `
 SELECT is_active
 FROM metaldocs.iam_users
@@ -37,9 +37,10 @@ WHERE user_id = $1
 SELECT role_code
 FROM metaldocs.iam_user_roles
 WHERE user_id = $1
+  AND tenant_id = $2::uuid
 ORDER BY role_code ASC
 `
-	rows, err := p.db.QueryContext(ctx, rolesSQL, userID)
+	rows, err := p.db.QueryContext(ctx, rolesSQL, userID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("query iam roles: %w", err)
 	}

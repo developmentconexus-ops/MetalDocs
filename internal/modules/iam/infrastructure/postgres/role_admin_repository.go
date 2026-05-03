@@ -17,7 +17,7 @@ func NewRoleAdminRepository(db *sql.DB) *RoleAdminRepository {
 	return &RoleAdminRepository{db: db}
 }
 
-func (r *RoleAdminRepository) HasAnyRole(ctx context.Context, role domain.Role) (bool, error) {
+func (r *RoleAdminRepository) HasAnyRole(ctx context.Context, role domain.Role, tenantID string) (bool, error) {
 	var count int
 	if err := r.db.QueryRowContext(ctx, `
 SELECT COUNT(*)
@@ -29,7 +29,7 @@ WHERE role_code = $1
 	return count > 0, nil
 }
 
-func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userID, displayName string, role domain.Role, assignedBy string) error {
+func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role domain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin iam tx: %w", err)
@@ -62,7 +62,7 @@ DO UPDATE SET assigned_at = NOW(), assigned_by = EXCLUDED.assigned_by
 	return nil
 }
 
-func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName string, roles []domain.Role, assignedBy string) error {
+func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []domain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin iam replace roles tx: %w", err)
