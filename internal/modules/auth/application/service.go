@@ -60,7 +60,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		return fmt.Errorf("role admin repository is required")
 	}
 
-	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamdomain.RoleAdmin)
+	hasAdmin, err := s.roleAdmin.HasAnyRole(ctx, iamdomain.RoleSystemAdmin)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		ctx,
 		strings.TrimSpace(s.cfg.BootstrapAdminUserID),
 		strings.TrimSpace(s.cfg.BootstrapAdminName),
-		iamdomain.RoleAdmin,
+		iamdomain.RoleSystemAdmin,
 		"bootstrap",
 	)
 }

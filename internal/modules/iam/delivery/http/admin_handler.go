@@ -319,7 +319,7 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	}
 
 	switch role {
-	case iamdomain.RoleAdmin, iamdomain.RoleEditor, iamdomain.RoleReviewer, iamdomain.RoleViewer:
+	case iamdomain.RoleSystemAdmin, iamdomain.RoleApprover, iamdomain.RoleAuthor, iamdomain.RoleEditor, iamdomain.RoleViewer:
 	default:
 		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role", traceID)
 		return
@@ -451,7 +451,7 @@ func parseRoles(items []string) ([]iamdomain.Role, bool) {
 	for _, item := range items {
 		role := iamdomain.Role(strings.ToLower(strings.TrimSpace(item)))
 		switch role {
-		case iamdomain.RoleAdmin, iamdomain.RoleEditor, iamdomain.RoleReviewer, iamdomain.RoleViewer:
+		case iamdomain.RoleSystemAdmin, iamdomain.RoleApprover, iamdomain.RoleAuthor, iamdomain.RoleEditor, iamdomain.RoleViewer:
 		default:
 			return nil, false
 		}

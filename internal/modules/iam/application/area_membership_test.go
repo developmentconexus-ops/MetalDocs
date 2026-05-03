@@ -119,7 +119,7 @@ func TestGrant_Overlap_Merge(t *testing.T) {
 	service := NewAreaMembershipService(repo, logger)
 	service.nowFn = func() time.Time { return now }
 
-	err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleReviewer, "admin")
+	err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleApprover, "admin")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,8 +132,8 @@ func TestGrant_Overlap_Merge(t *testing.T) {
 	if repo.grantAtomicCalls != 1 {
 		t.Fatalf("expected one atomic grant call, got %d", repo.grantAtomicCalls)
 	}
-	if repo.atomicNew.Role != domain.RoleReviewer {
-		t.Fatalf("expected atomic new role reviewer, got %q", repo.atomicNew.Role)
+	if repo.atomicNew.Role != domain.RoleApprover {
+		t.Fatalf("expected atomic new role approver, got %q", repo.atomicNew.Role)
 	}
 }
 

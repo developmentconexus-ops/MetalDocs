@@ -64,7 +64,7 @@ func main() {
 	}
 
 	if !exists {
-		if err := authService.CreateUser(ctx, seed.UserID, seed.Username, seed.Email, seed.DisplayName, seed.Password, []iamdomain.Role{iamdomain.RoleAdmin}, "e2e-seed"); err != nil {
+		if err := authService.CreateUser(ctx, seed.UserID, seed.Username, seed.Email, seed.DisplayName, seed.Password, []iamdomain.Role{iamdomain.RoleSystemAdmin}, "e2e-seed"); err != nil {
 			log.Fatalf("create e2e user: %v", err)
 		}
 	} else {
@@ -83,7 +83,7 @@ func main() {
 		}
 	}
 
-	if err := iamAdmin.UpsertUserAndAssignRole(ctx, seed.UserID, seed.DisplayName, iamdomain.RoleAdmin, "e2e-seed"); err != nil {
+	if err := iamAdmin.UpsertUserAndAssignRole(ctx, seed.UserID, seed.DisplayName, iamdomain.RoleSystemAdmin, "e2e-seed"); err != nil {
 		log.Fatalf("ensure admin role: %v", err)
 	}
 
