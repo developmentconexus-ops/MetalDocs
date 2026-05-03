@@ -34,6 +34,14 @@ func (f *fakeReadServicePublish) ListPendingForActor(_ context.Context, _ *sql.D
 	return nil, nil
 }
 
+func (f *fakeReadServicePublish) ListInboxItems(_ context.Context, _ *sql.DB, _, _, _ string, _, _ int) ([]application.InboxView, error) {
+	return nil, nil
+}
+
+func (f *fakeReadServicePublish) CountPendingForActor(_ context.Context, _ *sql.DB, _, _, _ string) (int, error) {
+	return 0, nil
+}
+
 func publishTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v2/documents/{id}/publish", h.PublishHandler)

@@ -1,8 +1,6 @@
 package approvalhttp
 
 import (
-	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,15 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
-
-type inboxReader interface {
-	ListInboxItems(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
-	CountPendingForActor(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string) (int, error)
-}
 
 func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
@@ -43,19 +35,13 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reader, ok := h.readSvc.(inboxReader)
-	if !ok {
-		WriteError(w, reqID, errors.New("read service does not support inbox"))
-		return
-	}
-
-	views, err := reader.ListInboxItems(r.Context(), h.db, tenantID, actorID, areaCode, limit, offset)
+	views, err := h.readSvc.ListInboxItems(r.Context(), h.db, tenantID, actorID, areaCode, limit, offset)
 	if err != nil {
 		WriteError(w, reqID, err)
 		return
 	}
 
-	total, err := reader.CountPendingForActor(r.Context(), h.db, tenantID, actorID, areaCode)
+	total, err := h.readSvc.CountPendingForActor(r.Context(), h.db, tenantID, actorID, areaCode)
 	if err != nil {
 		WriteError(w, reqID, err)
 		return
