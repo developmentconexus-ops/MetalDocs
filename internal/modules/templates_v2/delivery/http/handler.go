@@ -70,9 +70,16 @@ func writeErr(w http.ResponseWriter, status int, code, message string) {
 	})
 }
 
+var friendlyMsg = map[string]string{
+	"upload_missing": "DOCX file not yet uploaded. Please upload the template file before submitting for review.",
+}
+
 func writeMappedErr(w http.ResponseWriter, err error) {
 	status, code := MapErr(err)
-	msg := err.Error()
+	msg := friendlyMsg[code]
+	if msg == "" {
+		msg = err.Error()
+	}
 	if msg == "" {
 		msg = code
 	}
