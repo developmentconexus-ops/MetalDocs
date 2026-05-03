@@ -15,6 +15,7 @@ type DocumentContextBuilder struct {
 	revReader      resolvers.RevisionReader
 	workflowReader resolvers.WorkflowReader
 	registryReader resolvers.RegistryReader
+	documentReader resolvers.DocumentReader
 }
 
 // NewDocumentContextBuilder wires a DocumentContextBuilder.
@@ -24,37 +25,40 @@ func NewDocumentContextBuilder(
 	revReader resolvers.RevisionReader,
 	workflowReader resolvers.WorkflowReader,
 	registryReader resolvers.RegistryReader,
+	documentReader resolvers.DocumentReader,
 ) *DocumentContextBuilder {
 	return &DocumentContextBuilder{
 		db:             db,
 		revReader:      revReader,
 		workflowReader: workflowReader,
 		registryReader: registryReader,
+		documentReader: documentReader,
 	}
 }
 
-func (b *DocumentContextBuilder) loadAreaCode(ctx context.Context, tenantID, revisionID string) (string, error) {
-	var areaCode string
-	err := b.db.QueryRowContext(ctx,
-		`SELECT coalesce(process_area_code_snapshot, '') FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
+func (b *DocumentContextBuilder) loadDocumentSnapshot(ctx context.Context, tenantID, revisionID string) (areaCode, controlledDocumentID string, err error) {
+	err = b.db.QueryRowContext(ctx,
+		`SELECT coalesce(process_area_code_snapshot, ''), coalesce(controlled_document_id::text, '') FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tenantID, revisionID,
-	).Scan(&areaCode)
-	return areaCode, err
+	).Scan(&areaCode, &controlledDocumentID)
+	return areaCode, controlledDocumentID, err
 }
 
 // Build returns the ResolveInput for a revision being approved.
 func (b *DocumentContextBuilder) Build(ctx context.Context, tenantID, revisionID string, _ ApproverContext) (resolvers.ResolveInput, error) {
-	areaCode, err := b.loadAreaCode(ctx, tenantID, revisionID)
+	areaCode, controlledDocumentID, err := b.loadDocumentSnapshot(ctx, tenantID, revisionID)
 	if err != nil {
 		return resolvers.ResolveInput{}, err
 	}
 	return resolvers.ResolveInput{
-		TenantID:        tenantID,
-		RevisionID:      revisionID,
-		AreaCodeSnapshot: areaCode,
-		RevisionReader:  b.revReader,
-		WorkflowReader:  b.workflowReader,
-		RegistryReader:  b.registryReader,
+		TenantID:             tenantID,
+		RevisionID:           revisionID,
+		ControlledDocumentID: controlledDocumentID,
+		AreaCodeSnapshot:     areaCode,
+		RevisionReader:       b.revReader,
+		WorkflowReader:       b.workflowReader,
+		RegistryReader:       b.registryReader,
+		DocumentReader:       b.documentReader,
 	}, nil
 }
 
