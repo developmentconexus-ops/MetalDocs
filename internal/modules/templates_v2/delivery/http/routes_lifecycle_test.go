@@ -26,6 +26,7 @@ func TestSubmitForReview_Happy(t *testing.T) {
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
+		ContentHash:   "deadbeef",
 		AuthorID:      "author-1",
 	}
 	repo.approvalConfigs["tpl-1"] = &domain.ApprovalConfig{
@@ -90,6 +91,41 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 	}
 	if out.Error.Code != "invalid_state_transition" {
 		t.Fatalf("expected error.code=invalid_state_transition, got %q", out.Error.Code)
+	}
+}
+
+func TestSubmitForReview_NoUpload(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:            "ver-1",
+		TemplateID:    "tpl-1",
+		VersionNumber: 1,
+		Status:        domain.VersionStatusDraft,
+		ContentHash:   "", // no autosave committed
+	}
+	repo.approvalConfigs["tpl-1"] = &domain.ApprovalConfig{TemplateID: "tpl-1", ApproverRole: "approver"}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/submit", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Error.Code != "upload_missing" {
+		t.Fatalf("expected error.code=upload_missing, got %q", out.Error.Code)
 	}
 }
 
