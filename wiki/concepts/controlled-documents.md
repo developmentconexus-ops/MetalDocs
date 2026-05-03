@@ -49,4 +49,4 @@ The CD itself doesn't have an approval state — its versions do. The CD just ow
 
 - [workflows/user-onboarding.md](../workflows/user-onboarding.md) — Step 5
 - [modules/taxonomy.md](../modules/taxonomy.md)
-- [modules/documents-v2.md](../modules/documents-v2.md)
+- [modules/documents.md](../modules/documents.md)

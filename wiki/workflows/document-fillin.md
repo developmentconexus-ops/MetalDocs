@@ -23,6 +23,6 @@ See [workflows/user-onboarding.md](user-onboarding.md) for the full step-by-step
 
 ## See also
 
-- [modules/documents-v2.md](../modules/documents-v2.md)
+- [modules/documents.md](../modules/documents.md)
 - [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md)
 - [concepts/controlled-documents.md](../concepts/controlled-documents.md)

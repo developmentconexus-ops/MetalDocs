@@ -1,6 +1,6 @@
 # Module: iam-rbac
 
-> **Last verified:** 2026-05-02
+> **Last verified:** 2026-05-03
 > **Scope:** Capabilities, roles, area-scoped grants, DB-backed authorization.
 > **Out of scope:** Authentication mechanism (login, sessions) — see `wiki/references/local-dev-credentials.md`.
 > **Key files:**
@@ -78,7 +78,7 @@ The bypass ensures `system_admin` users can act on any area without needing a `u
 |---|---|
 | 0162 | `tenant_id UUID` added to `metaldocs.iam_user_roles` (default `ffffffff-...`) |
 | 0163 | `iam_groups`, `iam_group_members`, `iam_group_roles` tables created |
-| 0164 | `visibility TEXT DEFAULT 'area'` added to `public.documents_v2` (values: public/area/restricted) |
+| 0164 | `visibility TEXT DEFAULT 'area'` added to `public.documents` (values: public/area/restricted; was mistakenly added to the now-dropped `public.documents_v2` — corrected by migration 0167) |
 | 0165 | `role_capabilities` truncated and reseeded with 40 rows covering the 5 canonical roles |
 | 0166 | `admin` → `system_admin`, `reviewer` → `approver` renamed; UNIQUE(tenant_id, user_id) added |
 

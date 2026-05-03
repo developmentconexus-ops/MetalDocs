@@ -257,7 +257,7 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 ## Cross-refs
 
 - Templates internals → `modules/templates-v2.md`
-- Documents internals → `modules/documents-v2.md`
+- Documents internals → `modules/documents.md`
 - Token catalog → `concepts/placeholders.md`
 - Approval routing & signoffs → `workflows/approval.md` (TBD) and `modules/approval.md` (TBD)
 - Freeze + fanout pipeline → `workflows/freeze-and-fanout.md`

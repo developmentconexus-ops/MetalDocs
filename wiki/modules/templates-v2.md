@@ -3,7 +3,7 @@
 > **Last verified:** 2026-05-01
 > **Status:** Stub. Fill in API surface, schema rules, and lifecycle invariants when refactor stabilizes.
 > **Scope:** Template authoring, versioning, approval, publishing.
-> **Out of scope:** Document fill-in (see `modules/documents-v2.md`), eigenpal editor wiring (see `modules/editor-ui-eigenpal.md`).
+> **Out of scope:** Document fill-in (see `modules/documents.md`), eigenpal editor wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
 > - `internal/modules/templates_v2/` — backend module
 > - `frontend/apps/web/src/features/templates/v2/TemplatesListPage.tsx` — list

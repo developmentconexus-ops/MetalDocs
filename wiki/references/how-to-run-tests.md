@@ -1,6 +1,6 @@
 # Reference: How to Run Tests
 
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-03
 > **Status:** Stub. Verify exact commands + paths against current scripts.
 > **Scope:** Backend (Go), frontend (Vitest), e2e (Playwright if present).
 
@@ -11,7 +11,7 @@
 go test ./...
 
 # single module
-go test ./internal/modules/documents_v2/...
+go test ./internal/modules/documents/...
 
 # verbose
 go test -v ./internal/modules/approval/...

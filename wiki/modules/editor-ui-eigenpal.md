@@ -179,5 +179,5 @@ This checklist validates MetalDocs integration only. EigenPal rendering fidelity
 - [concepts/placeholders.md](../concepts/placeholders.md) — placeholder schema and `{name}` token format
 - [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md) — approve → freeze → fanout → PDF artifact
 - [modules/templates-v2.md](templates-v2.md) — TemplateAuthorPage consumer
-- [modules/documents-v2.md](documents-v2.md) — DocumentEditorPage consumer
+- [modules/documents.md](documents.md) — DocumentEditorPage consumer
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md) — T7 outline plugin origin + caveats

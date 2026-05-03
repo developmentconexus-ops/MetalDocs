@@ -1,6 +1,6 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-05-02
+**Last verified:** 2026-05-03
 
 ## API login
 
@@ -48,7 +48,7 @@ docker exec metaldocs-postgres psql -U metaldocs_app -d metaldocs -c "<query>"
 ```
 
 User tables: `metaldocs.auth_identities`, `metaldocs.iam_users`, `metaldocs.iam_user_roles`
-Document tables: `public.documents_v2`, `public.controlled_documents`
+Document tables: `public.documents`, `public.controlled_documents` (note: `public.documents_v2` was dropped by migration 0168)
 Template tables: `public.templates_v2_template`, `public.templates_v2_template_version`
 
 ## Process-area roles (approval authz)

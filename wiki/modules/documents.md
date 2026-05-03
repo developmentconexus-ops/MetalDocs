@@ -1,8 +1,6 @@
-# documents-v2 Module
+# documents Module
 
-> **DEPRECATED:** This doc is superseded by [modules/documents.md](documents.md). The backend module was renamed from `internal/modules/documents_v2` to `internal/modules/documents` and `public.documents_v2` was dropped (migrations 0167/0168, 2026-05-03). Do not update this file — update `documents.md` instead.
-
-> **Last verified:** 2026-05-02
+> **Last verified:** 2026-05-03
 > **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
@@ -11,15 +9,20 @@
 > - `frontend/apps/web/src/features/documents/v2/routes.tsx:1` — route parsing/rendering for `/documents-v2/*`
 > - `frontend/apps/web/src/features/documents/v2/DocumentCreatePage.tsx:1` — step 1: pick controlled document
 > - `frontend/apps/web/src/features/documents/DocumentsHubView.tsx:758` — detail panel with Edit/PDF/Duplicate actions
-> - `internal/modules/documents_v2/delivery/http/handler.go:73` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
-> - `internal/modules/documents_v2/delivery/http/handler.go:259` — `finalizeDocument` — resolves approval route, calls SubmitRevisionForReview
-> - `internal/modules/documents_v2/application/service.go:1` — domain logic, session management
+> - `internal/modules/documents/delivery/http/handler.go:73` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
+> - `internal/modules/documents/delivery/http/handler.go:259` — `finalizeDocument` — resolves approval route, calls SubmitRevisionForReview
+> - `internal/modules/documents/application/service.go:1` — domain logic, session management
+> - `internal/modules/documents/repository/repository.go:35` — `CreateDocument` INSERT with `MAX(revision_number)+1` auto-increment
+> - `internal/modules/documents/module.go:1` — DI wiring
 
 ## Overview
 
 A **document** is an instance filled from a template version, bound to a controlled document entry.
 Documents move through states: `draft → under_review → approved → published`.
 Only `draft` documents can be edited in the editor.
+
+**Backend module path:** `internal/modules/documents/` (renamed from `documents_v2` in migration batch 0167/0168)
+**Table:** `public.documents`
 
 ## Frontend Routing
 
@@ -88,6 +91,25 @@ Restoring a checkpoint re-fetches the revision buffer and reloads the editor.
 | GET | `/api/v2/documents/:id/checkpoints` | List checkpoints |
 | POST | `/api/v2/documents/:id/checkpoints` | Create checkpoint |
 | POST | `/api/v2/documents/:id/checkpoints/:cid/restore` | Restore checkpoint |
+
+## public.documents Schema
+
+Migration 0167 fixed missing columns that were mistakenly added to the now-dropped `public.documents_v2` table (migrations 0126/0129). `public.documents` now has the full schema:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `controlled_document_id` | UUID | FK to `controlled_documents` |
+| `profile_code_snapshot` | TEXT | Profile code at creation time |
+| `process_area_code_snapshot` | TEXT | Area code at creation time |
+| `code` | TEXT | Document code (e.g. `DC-001`) |
+| `revision_number` | INT | Auto-incremented per CD (`MAX+1`) |
+| `revision_version` | INT | Version within a revision |
+| `effective_from` / `effective_to` | timestamptz | Effective date range |
+| `locked_at` | timestamptz | Set on freeze |
+| `content_hash_at_submit` | TEXT | Hash at submission time |
+| `status` | TEXT | Extended CHECK; includes `draft`, `under_review`, `approved`, `published`, etc. |
+
+Migration 0131's unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` now resolves correctly because `controlled_document_id` exists. `CreateDocument` at `repository.go:35` auto-computes `MAX(revision_number)+1` — the previous default-to-1 gap is fixed.
 
 ## Key Types
 

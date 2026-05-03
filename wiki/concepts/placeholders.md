@@ -3,7 +3,7 @@
 > _Changelog: 2026-04-26 — rewritten for fixed-catalog model (ADR 0008); dropped legacy fill-in workflow content._
 > _Changelog: 2026-04-27 — composition system deprecated, UI removed (Phase 1)._
 >
-> **Last verified:** 2026-04-27
+> **Last verified:** 2026-05-03
 > **Scope:** What a placeholder is, the fixed 7-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -68,7 +68,7 @@ Substitution happens exclusively at **finalize/freeze** via the existing server 
 ]
 ```
 
-This is **not** wrapped as `{"placeholders": [...]}`. `parsePlaceholderSchema()` in `internal/modules/documents_v2/application/fillin_service.go` accepts both formats for backward compatibility with any legacy rows that used the wrapped form.
+This is **not** wrapped as `{"placeholders": [...]}`. `parsePlaceholderSchema()` in `internal/modules/documents/application/fillin_service.go` accepts both formats for backward compatibility with any legacy rows that used the wrapped form.
 
 ## `applyVariables` — deferred
 

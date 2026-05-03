@@ -26,4 +26,4 @@ V2 reader joins source-of-truth tables on read rather than maintaining a denorma
 ## See also
 
 - [architecture/data-model.md](../architecture/data-model.md)
-- [modules/documents-v2.md](documents-v2.md)
+- [modules/documents.md](documents.md)
