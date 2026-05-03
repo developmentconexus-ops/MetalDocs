@@ -1,8 +1,22 @@
 package domain
 
-const RoleCapabilitiesVersion = 1
+const RoleCapabilitiesVersion = 2
 
 var RoleCapabilities = map[Role][]Capability{
+	RoleSystemAdmin: {
+		CapDocumentView,
+		CapDocumentCreate,
+		CapDocumentEdit,
+		CapTemplateView,
+		CapTemplatePublish,
+		CapWorkflowApprove,
+		CapRegistryCreate,
+	},
+	RoleAuthor: {
+		CapDocumentView,
+		CapDocumentCreate,
+		CapDocumentEdit,
+	},
 	RoleViewer: {
 		CapDocumentView,
 		CapTemplateView,
