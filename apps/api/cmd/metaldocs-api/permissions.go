@@ -10,10 +10,7 @@ import (
 )
 
 func newPermissionResolver() iamdelivery.PermissionResolver {
-	return func(method, path string) (iamdomain.Permission, bool) {
-		if path == "/api/v1/metrics" {
-			return iamdomain.PermIAMManageRoles, true
-		}
+	return func(method, path string) (string, bool) {
 		if path == "/api/v1/health/live" || path == "/api/v1/health/ready" {
 			return "", false
 		}
@@ -24,203 +21,230 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 			return "", false
 		}
 
+		if path == "/api/v1/metrics" {
+			return iamdomain.CapUserManage, true
+		}
 		if method == http.MethodPost && path == "/api/v1/documents" {
-			return iamdomain.PermDocumentCreate, true
+			return iamdomain.CapDocCreate, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/attachments") {
-			return iamdomain.PermDocumentUploadAttachment, true
+			return iamdomain.CapDocEdit, true
 		}
 		if method == http.MethodGet && path == "/api/v1/documents" {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodGet && path == "/api/v1/document-types" {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodGet && path == "/api/v1/document-templates" {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/documents/") && !strings.HasSuffix(path, "/versions") {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/submit-for-approval") {
-			return iamdomain.PermWorkflowTransition, true
+			return iamdomain.CapDocSubmit, true
 		}
 		if method == http.MethodPut && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/content") {
-			return iamdomain.PermDocumentEdit, true
+			return iamdomain.CapDocEdit, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/content/browser") {
-			return iamdomain.PermDocumentEdit, true
+			return iamdomain.CapDocEdit, true
 		}
 		if method == http.MethodPut && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/template-assignment") {
-			return iamdomain.PermDocumentEdit, true
+			return iamdomain.CapDocEdit, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/versions") {
-			return iamdomain.PermDocumentEdit, true
+			return iamdomain.CapDocEdit, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/export/docx") {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodGet && path == "/api/v1/search/documents" {
-			return iamdomain.PermSearchRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodGet && path == "/api/v1/notifications" {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/notifications/") && strings.HasSuffix(path, "/read") {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/documents/") && strings.Contains(path, "/versions/diff") {
-			return iamdomain.PermVersionRead, true
+			return iamdomain.CapDocView, true
 		}
 		if (method == http.MethodGet || method == http.MethodPut) && path == "/api/v1/access-policies" {
-			return iamdomain.PermDocumentManagePermissions, true
+			return iamdomain.CapMembershipManage, true
 		}
 		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/versions") {
-			return iamdomain.PermVersionRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/transitions") {
-			return iamdomain.PermWorkflowTransition, true
+			return iamdomain.CapDocSubmit, true
 		}
 		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/approvals") {
-			return iamdomain.PermDocumentRead, true
+			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodPost && path == "/api/v1/iam/users" {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodGet && path == "/api/v1/iam/users" {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodPatch && strings.HasPrefix(path, "/api/v1/iam/users/") && !strings.HasSuffix(path, "/roles") {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/roles") {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodPut && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/roles") {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/reset-password") {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/unlock") {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodGet && path == "/api/v1/iam/admin/overview" {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapUserManage, true
 		}
-
-		// Template admin (Phase 2). Fine-grained RBAC is enforced inside the
-		// service layer via isAllowedTemplate; at the HTTP boundary we only
-		// need to require an authenticated session. PermTemplateView is the
-		// least-privileged template permission and is granted to every role
-		// that can access any template endpoint.
+		if strings.HasPrefix(path, "/api/v1/document-profiles") {
+			switch method {
+			case http.MethodGet:
+				return iamdomain.CapDocView, true
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
+				return iamdomain.CapTaxonomyManage, true
+			}
+		}
+		if strings.HasPrefix(path, "/api/v1/process-areas") {
+			switch method {
+			case http.MethodGet:
+				return iamdomain.CapDocView, true
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
+				return iamdomain.CapTaxonomyManage, true
+			}
+		}
+		if strings.HasPrefix(path, "/api/v1/document-subjects") {
+			switch method {
+			case http.MethodGet:
+				return iamdomain.CapDocView, true
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
+				return iamdomain.CapTaxonomyManage, true
+			}
+		}
 		if path == "/api/v1/templates" || strings.HasPrefix(path, "/api/v1/templates/") {
-			return iamdomain.PermTemplateView, true
+			return iamdomain.CapTemplateView, true
 		}
-
-		// docx-v2 templates (W2+): fine-grained per-method RBAC.
 		if strings.HasPrefix(path, "/api/v2/templates") {
 			switch {
 			case method == http.MethodGet:
-				return iamdomain.PermTemplateView, true
+				return iamdomain.CapTemplateView, true
 			case method == http.MethodPost && path == "/api/v2/templates":
-				return iamdomain.PermTemplateEdit, true
+				return iamdomain.CapTemplateEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/draft"):
-				return iamdomain.PermTemplateEdit, true
+				return iamdomain.CapTemplateEdit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/publish"):
-				return iamdomain.PermTemplatePublish, true
+				return iamdomain.CapTemplatePublish, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/docx-upload-url"):
-				return iamdomain.PermTemplateEdit, true
+				return iamdomain.CapTemplateEdit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/schema-upload-url"):
-				return iamdomain.PermTemplateEdit, true
+				return iamdomain.CapTemplateEdit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/submit"):
-				return iamdomain.PermTemplateEdit, true
+				return iamdomain.CapTemplateSubmit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/review"):
-				return iamdomain.PermTemplatePublish, true
+				return iamdomain.CapTemplateApprove, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/approve"):
-				return iamdomain.PermTemplatePublish, true
+				return iamdomain.CapTemplateApprove, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/approval-config"):
-				return iamdomain.PermTemplateEdit, true
+				return iamdomain.CapTemplateEdit, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/documents") {
 			switch {
 			case method == http.MethodGet:
-				return iamdomain.PermDocumentRead, true
+				return iamdomain.CapDocView, true
 			case method == http.MethodPost && path == "/api/v2/documents":
-				return iamdomain.PermDocumentCreate, true
+				return iamdomain.CapDocCreate, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/finalize"):
-				return iamdomain.PermWorkflowTransition, true
+				return iamdomain.CapDocSignoff, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/archive"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/session/force-release"):
-				return iamdomain.PermDocumentManagePermissions, true
+				return iamdomain.CapMembershipManage, true
 			case method == http.MethodPost && strings.Contains(path, "/session/"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/autosave/"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/checkpoints/") && strings.HasSuffix(path, "/restore"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/checkpoints"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/export/pdf"):
-				return iamdomain.PermDocumentRead, true
+				return iamdomain.CapDocView, true
 			case method == http.MethodPut && strings.Contains(path, "/placeholders/"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPatch:
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/submit"):
-				return iamdomain.PermWorkflowTransition, true
+				return iamdomain.CapDocSubmit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/signoff"):
-				return iamdomain.PermWorkflowTransition, true
+				return iamdomain.CapDocSignoff, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/cancel"):
-				return iamdomain.PermWorkflowTransition, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodGet && strings.HasSuffix(path, "/approval-instance"):
-				return iamdomain.PermDocumentRead, true
+				return iamdomain.CapDocView, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/reconstruct"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/taxonomy/profiles") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.PermDocumentRead, true
+				return iamdomain.CapDocView, true
 			case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
-				return iamdomain.PermIAMManageRoles, true
+				return iamdomain.CapTaxonomyManage, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/taxonomy/areas") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.PermDocumentRead, true
+				return iamdomain.CapDocView, true
 			case http.MethodPost, http.MethodPut, http.MethodDelete:
-				return iamdomain.PermIAMManageRoles, true
+				return iamdomain.CapTaxonomyManage, true
+			}
+		}
+		if strings.HasPrefix(path, "/api/v2/taxonomy/families") {
+			switch method {
+			case http.MethodGet:
+				return iamdomain.CapDocView, true
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
+				return iamdomain.CapTaxonomyManage, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/controlled-documents") {
 			switch {
 			case method == http.MethodGet:
-				return iamdomain.PermDocumentRead, true
+				return iamdomain.CapDocView, true
 			case method == http.MethodPost && path == "/api/v2/controlled-documents":
-				return iamdomain.PermDocumentCreate, true
+				return iamdomain.CapRegistryCreate, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/obsolete"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/supersede"):
-				return iamdomain.PermDocumentEdit, true
+				return iamdomain.CapDocEdit, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/iam/area-memberships") {
-			return iamdomain.PermIAMManageRoles, true
+			return iamdomain.CapMembershipManage, true
 		}
 		if method == http.MethodGet && path == "/api/v2/signed" {
-			return iamdomain.PermTemplateView, true
+			return iamdomain.CapTemplateView, true
 		}
 		if strings.HasPrefix(path, "/api/v2/approval/") {
-			switch {
-			case method == http.MethodGet:
-				return iamdomain.PermDocumentRead, true
-			case method == http.MethodPost, method == http.MethodPut, method == http.MethodDelete:
-				return iamdomain.PermWorkflowTransition, true
+			switch method {
+			case http.MethodGet:
+				return iamdomain.CapDocView, true
+			case http.MethodPost, http.MethodPut, http.MethodDelete:
+				return iamdomain.CapDocSubmit, true
 			}
 		}
 
@@ -228,18 +252,6 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 	}
 }
 
-// newPublicPathChecker derives a PublicPathChecker from the permission resolver.
-//
-// A route is public (no session cookie required) when the resolver says it is
-// not guarded (guarded=false), UNLESS it is one of the session-required-but-
-// unguarded endpoints below. That carve-out exists because "not guarded by
-// IAM" (no RBAC permission required) is a different concern from "no session
-// required". For example, GET /api/v1/auth/me and POST /api/v1/auth/change-
-// password need a resolved session (so the handler knows which user) but are
-// not gated by any IAM permission.
-//
-// The resolver remains the single source of truth for IAM perms; this checker
-// only adds the minimal auth-scoped exceptions.
 func newPublicPathChecker(resolver iamdelivery.PermissionResolver) authdelivery.PublicPathChecker {
 	return func(method, path string) bool {
 		if requiresSessionButNoPermission(method, path) {
@@ -257,9 +269,6 @@ func requiresSessionButNoPermission(method, path string) bool {
 	if method == http.MethodPost && path == "/api/v1/auth/change-password" {
 		return true
 	}
-	// All /api/v2/ routes require a session. The resolver covers every registered
-	// route explicitly, but this catch-all ensures any gap in coverage fails
-	// closed (session required) rather than open (public).
 	if strings.HasPrefix(path, "/api/v2/") {
 		return true
 	}
