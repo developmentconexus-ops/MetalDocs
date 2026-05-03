@@ -1,6 +1,6 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-05-01
+**Last verified:** 2026-05-02
 
 ## API login
 
@@ -9,12 +9,12 @@ Body field is `identifier` (not `username`).
 
 | identifier | password | IAM role | notes |
 |---|---|---|---|
-| `admin` | `AdminMetalDocs123!` | admin | bootstrapped on first start; use to author documents/templates |
-| `approver` | `ApproverMetalDocs123!` | admin | seeded by migration 0159; use to approve templates authored by `admin` (domain enforces actorID != authorID) |
-| `author-test` | `AuthorTest123!` | admin | smoke-test author: creates templates + docs + submits for approval |
-| `approver-test` | `ApproverMetalDocs456!@` | reviewer | smoke-test approver: signs off docs submitted by `author-test` (ISO seg test requires distinct userIds); password reset 2026-05-01 |
+| `admin` | `AdminMetalDocs123!` | system_admin | bootstrapped on first start; use to author documents/templates |
+| `approver` | `ApproverMetalDocs123!` | system_admin | seeded by migration 0159; use to approve templates authored by `admin` (domain enforces actorID != authorID) |
+| `author-test` | `AuthorTest123!` | system_admin | smoke-test author: creates templates + docs + submits for approval |
+| `approver-test` | `ApproverMetalDocs456!@` | approver | smoke-test approver: signs off docs submitted by `author-test` (ISO seg test requires distinct userIds); password reset 2026-05-01; role renamed from `reviewer` by migration 0166 |
 
-Bootstrap triggers when: API starts and `metaldocs.iam_user_roles` has no `admin` role.
+Bootstrap triggers when: API starts and `metaldocs.iam_user_roles` has no `system_admin` role.
 To re-bootstrap: truncate `metaldocs.auth_identities`, `metaldocs.iam_user_roles`, `metaldocs.iam_users` and restart API.
 
 ## API startup
