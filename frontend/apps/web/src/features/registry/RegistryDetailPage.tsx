@@ -148,6 +148,7 @@ export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) 
             contentHash={instance.contentHash}
             revisionVersion={instance.revisionVersion}
             publishedDocumentId={instance.publishedDocumentId}
+            lockedByInstanceId={instance.approvalInstanceId}
           />
         </div>
       ) : doc.status === 'active' ? (
