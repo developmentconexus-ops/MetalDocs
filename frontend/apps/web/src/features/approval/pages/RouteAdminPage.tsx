@@ -40,9 +40,9 @@ function defaultStage(): StageDraft {
     requiredRole: '',
     requiredCapability: 'doc.signoff',
     areaCode: '',
-    quorumKind: 'any_1',
+    quorumKind: 'any_1_of',
     m: '1',
-    driftPolicy: 'auto_cancel',
+    driftPolicy: 'reduce_quorum',
   };
 }
 
@@ -282,7 +282,7 @@ function RouteEditor({ route, saving, onClose, onSubmit }: RouteEditorProps) {
                   }
                   disabled={saving}
                 >
-                  <option value="any_1">any_1</option>
+                  <option value="any_1_of">any_1_of</option>
                   <option value="all_of">all_of</option>
                   <option value="m_of_n">m_of_n</option>
                 </select>
@@ -319,9 +319,9 @@ function RouteEditor({ route, saving, onClose, onSubmit }: RouteEditorProps) {
                   }
                   disabled={saving}
                 >
-                  <option value="auto_cancel">auto_cancel</option>
-                  <option value="alert_only">alert_only</option>
-                  <option value="none">none</option>
+                  <option value="reduce_quorum">reduce_quorum</option>
+                  <option value="fail_stage">fail_stage</option>
+                  <option value="keep_snapshot">keep_snapshot</option>
                 </select>
               </article>
             ))}
