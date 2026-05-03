@@ -72,7 +72,7 @@ WHERE id = '<stage_id>';
 
 Previously a duplicate POST after instance close returned HTTP 500. Now it returns `was_replay:true`.
 
-`NewHandler` in `internal/modules/documents/approval/http/handler.go:63` accepts `signoffIdempStore` as a positional parameter. Pass `nil` to disable idempotency (not recommended outside tests).
+`NewHandler` in `internal/modules/documents/approval/http/handler.go:65` accepts `signoffIdempStore` as a positional parameter. Pass `nil` to disable idempotency (not recommended outside tests).
 
 Migration `0160` grants `metaldocs_app` SELECT/INSERT/UPDATE on `metaldocs.idempotency_keys`. Without this migration the store returns a Postgres permission error.
 
@@ -81,11 +81,13 @@ Migration `0160` grants `metaldocs_app` SELECT/INSERT/UPDATE on `metaldocs.idemp
 - Signoff: keyed by `Idempotency-Key` header + `(tenant_id, actor_user_id, route_template)`. Replays return `was_replay:true`.
 - Re-clicking Finalizar: `SubmitRevisionForReview` fails with `ErrDuplicateSubmission` if an in-progress instance already exists for the document.
 
-## Reject path
+## Reject path (fixed 2977ef96 — B4)
 
-- Any rejection in any required step → state intended to return to `draft` (see Gap D4 in `modules/approval.md` — not yet implemented).
-- Author notified (mechanism TBD — email? in-app? both?).
-- Author edits, resubmits → new approval round (signoff history preserved).
+- Any rejection in any required step → document returns to `draft` within the same DB transaction (cancel GUC + status UPDATE). The approval instance retains `rejected` for audit.
+- Author can immediately open the document, edit, and call finalize again → new approval round (prior signoff history preserved on the old instance).
+- Author notification mechanism TBD (email? in-app?).
+
+**File:** `internal/modules/documents/approval/application/decision_service.go:284` — `QuorumRejectedStage` branch.
 
 ## Edge cases (TBD)
 
