@@ -312,7 +312,7 @@ func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.Bootstr
 	return true, nil
 }
 
-func (r *Repository) RolesByUserID(_ context.Context, userID string) ([]iamdomain.Role, error) {
+func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamdomain.Role, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	identity, ok := r.users[userID]
@@ -328,7 +328,7 @@ func (r *Repository) RolesByUserID(_ context.Context, userID string) ([]iamdomai
 	return append([]iamdomain.Role(nil), identity.Roles...), nil
 }
 
-func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName string, role iamdomain.Role, _ string) error {
+func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role iamdomain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -357,7 +357,7 @@ func (r *Repository) UpsertUserAndAssignRole(_ context.Context, userID, displayN
 	return nil
 }
 
-func (r *Repository) HasAnyRole(_ context.Context, role iamdomain.Role) (bool, error) {
+func (r *Repository) HasAnyRole(_ context.Context, role iamdomain.Role, _ string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -371,7 +371,7 @@ func (r *Repository) HasAnyRole(_ context.Context, role iamdomain.Role) (bool, e
 	return false, nil
 }
 
-func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName string, roles []iamdomain.Role, _ string) error {
+func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, roles []iamdomain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

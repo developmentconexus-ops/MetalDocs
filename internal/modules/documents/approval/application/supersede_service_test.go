@@ -91,6 +91,9 @@ func (s *supersedeTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
 		return &supersedeSingleValueRows{value: nil}, nil
 	}
+	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
+		return &supersedeSingleValueRows{value: s.conn.tenantID}, nil
+	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &supersedeSingleValueRows{value: s.conn.actorID}, nil
 	}
@@ -104,6 +107,7 @@ type supersedeTestConn struct {
 	authzGranted         bool
 	areaCode             string
 	actorID              string
+	tenantID             string
 }
 
 func (c *supersedeTestConn) Prepare(query string) (driver.Stmt, error) {
@@ -133,6 +137,7 @@ func newSupersedeTestDB(t *testing.T, newRowsAffected, priorRowsAffected int64, 
 		authzGranted:         granted,
 		areaCode:             "QA",
 		actorID:              "user-1",
+		tenantID:             "ffffffff-ffff-ffff-ffff-ffffffffffff",
 	}
 	name := fmt.Sprintf("supersede_test_%p", conn)
 	sql.Register(name, &supersedeTestDriver{conn: conn})

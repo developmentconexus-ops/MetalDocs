@@ -85,6 +85,7 @@ type decisionTestConn struct {
 	authzSet      bool
 	areaCode      string
 	actorID       string
+	tenantID      string
 	execQueries   []string // SQL passed to Exec calls, for assertion
 }
 
@@ -170,6 +171,9 @@ func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
 		return &decisionSingleValueRows{value: nil}, nil
 	}
+	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
+		return &decisionSingleValueRows{value: s.conn.tenantID}, nil
+	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &decisionSingleValueRows{value: s.conn.actorID}, nil
 	}
@@ -216,6 +220,9 @@ func newDecisionTestDB(t *testing.T, conn *decisionTestConn) *sql.DB {
 	}
 	if conn.actorID == "" {
 		conn.actorID = "user-1"
+	}
+	if conn.tenantID == "" {
+		conn.tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 	}
 	if !conn.authzSet {
 		conn.authzGranted = true

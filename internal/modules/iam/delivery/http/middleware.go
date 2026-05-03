@@ -73,11 +73,12 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
+		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+		if tenantID == "" {
+			tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+		}
+
 		if m.caps != nil {
-			tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-			if tenantID == "" {
-				tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-			}
 			if err := m.caps.CanDo(r.Context(), userID, tenantID, capability); err != nil {
 				writeAPIError(w, http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions", traceID)
 				return
@@ -88,7 +89,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		if _, ok := authdomain.CurrentUserFromContext(ctx); !ok {
 			var roles []iamdomain.Role
 			if m.roleProvider != nil {
-				resolvedRoles, err := m.roleProvider.RolesByUserID(r.Context(), userID)
+				resolvedRoles, err := m.roleProvider.RolesByUserID(r.Context(), userID, tenantID)
 				if errors.Is(err, iamdomain.ErrUserNotFound) || errors.Is(err, iamdomain.ErrUserInactive) {
 					writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "User is not authorized", traceID)
 					return

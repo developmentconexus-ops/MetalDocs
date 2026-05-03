@@ -94,6 +94,9 @@ func (s *publishTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
 		return &publishSingleValueRows{value: nil}, nil
 	}
+	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
+		return &publishSingleValueRows{value: s.conn.tenantID}, nil
+	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &publishSingleValueRows{value: s.conn.actorID}, nil
 	}
@@ -106,6 +109,7 @@ type publishTestConn struct {
 	authzGranted bool
 	areaCode     string
 	actorID      string
+	tenantID     string
 }
 
 func (c *publishTestConn) Prepare(query string) (driver.Stmt, error) {
@@ -138,6 +142,7 @@ func newPublishTestDB(t *testing.T, rowsAffected int64, authzGranted ...bool) *s
 		authzGranted: granted,
 		areaCode:     "QA",
 		actorID:      "user-1",
+		tenantID:     "ffffffff-ffff-ffff-ffff-ffffffffffff",
 	}
 	name := fmt.Sprintf("publish_test_%p", conn)
 	sql.Register(name, &publishTestDriver{conn: conn})

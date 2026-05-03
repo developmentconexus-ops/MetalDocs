@@ -110,12 +110,13 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 	default:
 		roles := authn.DevRoleMap()
 		authRepo := authmemory.NewRepository()
+		const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 		for userID, userRoles := range roles {
-			if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, userRoles[0], "bootstrap"); err != nil {
+			if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, devTenantID, userRoles[0], "bootstrap"); err != nil {
 				return APIDependencies{}, err
 			}
 			for _, role := range userRoles[1:] {
-				if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, role, "bootstrap"); err != nil {
+				if err := authRepo.UpsertUserAndAssignRole(ctx, userID, userID, devTenantID, role, "bootstrap"); err != nil {
 					return APIDependencies{}, err
 				}
 			}

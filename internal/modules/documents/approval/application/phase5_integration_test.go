@@ -152,6 +152,9 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
 		return &submitSingleValueRows{value: nil}, nil
 	}
+	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
+		return &submitSingleValueRows{value: "ffffffff-ffff-ffff-ffff-ffffffffffff"}, nil
+	}
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: "user-1"}, nil
 	}
