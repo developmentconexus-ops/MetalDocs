@@ -47,14 +47,17 @@ DO UPDATE SET display_name = EXCLUDED.display_name, is_active = TRUE, updated_at
 		return fmt.Errorf("upsert iam user: %w", err)
 	}
 
-	const upsertRole = `
-INSERT INTO metaldocs.iam_user_roles (user_id, role_code, assigned_at, assigned_by)
-VALUES ($1, $2, NOW(), $3)
-ON CONFLICT (user_id, role_code)
-DO UPDATE SET assigned_at = NOW(), assigned_by = EXCLUDED.assigned_by
-`
-	if _, err := tx.ExecContext(ctx, upsertRole, userID, string(role), assignedBy); err != nil {
-		return fmt.Errorf("upsert iam role: %w", err)
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`,
+		tenantID, userID); err != nil {
+		return fmt.Errorf("delete prior iam roles: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)
+VALUES ($1, $2::uuid, $3, NOW(), $4)
+`, userID, tenantID, string(role), assignedBy); err != nil {
+		return fmt.Errorf("insert iam role: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -63,10 +66,13 @@ DO UPDATE SET assigned_at = NOW(), assigned_by = EXCLUDED.assigned_by
 	return nil
 }
 
+// ReplaceUserRoles writes the user+role assignment. The schema constraint
+// UNIQUE(tenant_id, user_id) means at most ONE role row per user per tenant.
+// If the input slice has multiple roles, only the last one is written.
 func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []domain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin iam replace roles tx: %w", err)
+		return fmt.Errorf("begin iam replace tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -77,62 +83,31 @@ ON CONFLICT (user_id)
 DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
 `
 	if _, err := tx.ExecContext(ctx, upsertUser, userID, displayName); err != nil {
-		return fmt.Errorf("upsert iam user for role replace: %w", err)
+		return fmt.Errorf("upsert iam user: %w", err)
 	}
 
-	desired := make([]string, 0, len(roles))
-	seen := map[string]bool{}
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`,
+		tenantID, userID); err != nil {
+		return fmt.Errorf("delete prior iam roles: %w", err)
+	}
+
+	var lastRole string
 	for _, role := range roles {
-		roleCode := strings.TrimSpace(string(role))
-		if roleCode == "" || seen[roleCode] {
-			continue
-		}
-		seen[roleCode] = true
-		desired = append(desired, roleCode)
-	}
-
-	rows, err := tx.QueryContext(ctx, `SELECT role_code FROM metaldocs.iam_user_roles WHERE user_id = $1`, userID)
-	if err != nil {
-		return fmt.Errorf("select existing iam roles: %w", err)
-	}
-	defer rows.Close()
-
-	existing := map[string]bool{}
-	for rows.Next() {
-		var roleCode string
-		if err := rows.Scan(&roleCode); err != nil {
-			return fmt.Errorf("scan existing iam role: %w", err)
-		}
-		existing[roleCode] = true
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate existing iam roles: %w", err)
-	}
-
-	desiredSet := map[string]bool{}
-	for _, roleCode := range desired {
-		desiredSet[roleCode] = true
-		if _, err := tx.ExecContext(ctx, `
-INSERT INTO metaldocs.iam_user_roles (user_id, role_code, assigned_at, assigned_by)
-VALUES ($1, $2, NOW(), $3)
-ON CONFLICT (user_id, role_code)
-DO UPDATE SET assigned_at = NOW(), assigned_by = EXCLUDED.assigned_by
-`, userID, roleCode, assignedBy); err != nil {
-			return fmt.Errorf("upsert replaced iam role: %w", err)
+		if code := strings.TrimSpace(string(role)); code != "" {
+			lastRole = code
 		}
 	}
-
-	for roleCode := range existing {
-		if desiredSet[roleCode] {
-			continue
-		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM metaldocs.iam_user_roles WHERE user_id = $1 AND role_code = $2`, userID, roleCode); err != nil {
-			return fmt.Errorf("delete stale iam role: %w", err)
-		}
+	if lastRole == "" {
+		return tx.Commit()
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit iam replace roles tx: %w", err)
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)
+VALUES ($1, $2::uuid, $3, NOW(), $4)
+`, userID, tenantID, lastRole, assignedBy); err != nil {
+		return fmt.Errorf("insert iam role: %w", err)
 	}
-	return nil
+
+	return tx.Commit()
 }
