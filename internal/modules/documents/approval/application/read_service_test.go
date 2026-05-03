@@ -18,7 +18,7 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 
 	rows := sqlmock.NewRows([]string{
-		"id", "document_id", "doc_title", "area_code",
+		"id", "document_v2_id", "doc_title", "area_code",
 		"submitted_by", "submitted_at", "stage_label", "required", "signed",
 	}).AddRow(
 		"inst-1", "doc-1", "Doc One", "finance",
@@ -70,7 +70,7 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 	mock.ExpectQuery(`asi\.eligible_actor_ids @> \$2::jsonb`).
 		WithArgs("tenant-1", []byte(`["actor-xyz"]`), "", 25, 0).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "document_id", "doc_title", "area_code",
+			"id", "document_v2_id", "doc_title", "area_code",
 			"submitted_by", "submitted_at", "stage_label", "required", "signed",
 		}))
 
