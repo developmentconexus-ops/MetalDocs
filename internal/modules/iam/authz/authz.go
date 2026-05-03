@@ -31,21 +31,39 @@ func WithCapCache(ctx context.Context) context.Context {
 	})
 }
 
+// Require enforces a tier-2 area-scoped authz check inside the caller's transaction.
+// See wiki/decisions/0007-two-tier-authz.md for the boundary between tier-1
+// (CapabilityService.CanDo, HTTP middleware) and tier-2 (this function).
+//
+// Callers MUST set the metaldocs.actor_id and metaldocs.tenant_id GUCs on the
+// transaction before invoking. Use MustActorID/MustTenantID helpers if reading
+// them from elsewhere.
+//
+// Pass areaCode = "tenant" to skip the area filter (degenerates to a tier-1
+// equivalent inside the transaction).
 func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error {
 	if cacheGranted(ctx, capability, areaCode) {
 		return appendAssertedCap(ctx, tx, capability, areaCode)
 	}
 
+	actorID, err := MustActorID(ctx, tx)
+	if err != nil {
+		return err
+	}
+	tenantID, err := MustTenantID(ctx, tx)
+	if err != nil {
+		return err
+	}
+
 	// system_admin bypass — check before capability query
 	var isAdmin bool
 	if err := tx.QueryRowContext(ctx, `
-    SELECT EXISTS (
-      SELECT 1 FROM metaldocs.iam_user_roles
-       WHERE user_id   = current_setting('metaldocs.actor_id', false)
-         AND tenant_id = current_setting('metaldocs.tenant_id', false)::uuid
-         AND role_code = 'system_admin'
-    )
-`).Scan(&isAdmin); err != nil {
+SELECT EXISTS (
+  SELECT 1 FROM metaldocs.iam_user_roles
+   WHERE user_id   = $1
+     AND tenant_id = $2::uuid
+     AND role_code = 'system_admin'
+)`, actorID, tenantID).Scan(&isAdmin); err != nil {
 		return fmt.Errorf("authz: system_admin check: %w", err)
 	}
 	if isAdmin {
@@ -54,34 +72,24 @@ func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error
 	}
 
 	var granted bool
-	err := tx.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 SELECT EXISTS (
   SELECT 1
   FROM metaldocs.role_capabilities rc
   JOIN metaldocs.user_process_areas upa
     ON upa.role = rc.role
-   AND upa.tenant_id = current_setting('metaldocs.tenant_id', false)::uuid
-   AND upa.user_id   = current_setting('metaldocs.actor_id', false)
+   AND upa.tenant_id = $4::uuid
+   AND upa.user_id   = $3
    AND upa.effective_to IS NULL
   WHERE rc.capability = $1
     AND ($2 = 'tenant' OR upa.area_code = $2)
-)`,
-		capability, areaCode,
-	).Scan(&granted)
+)`, capability, areaCode, actorID, tenantID).Scan(&granted)
 	if err != nil {
 		return err
 	}
 
 	if !granted {
-		actorID, err := actorIDFromTx(ctx, tx)
-		if err != nil {
-			return err
-		}
-		return ErrCapabilityDenied{
-			Capability: capability,
-			AreaCode:   areaCode,
-			ActorID:    actorID,
-		}
+		return ErrCapabilityDenied{Capability: capability, AreaCode: areaCode, ActorID: actorID}
 	}
 
 	storeGranted(ctx, capability, areaCode)
@@ -119,15 +127,6 @@ func storeGranted(ctx context.Context, capability, areaCode string) {
 
 func cacheKey(capability, areaCode string) string {
 	return capability + "\x00" + areaCode
-}
-
-func actorIDFromTx(ctx context.Context, tx *sql.Tx) (string, error) {
-	var actorID string
-	err := tx.QueryRowContext(ctx, "SELECT current_setting('metaldocs.actor_id', false)").Scan(&actorID)
-	if err != nil {
-		return "", err
-	}
-	return actorID, nil
 }
 
 func appendAssertedCap(ctx context.Context, tx *sql.Tx, capability, areaCode string) error {
