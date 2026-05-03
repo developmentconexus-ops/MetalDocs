@@ -18,7 +18,7 @@ func TestMigration0169_FileExists(t *testing.T) {
 
 func TestMigration0169_ProcessAreaRoleCapabilitiesSeeded(t *testing.T) {
 	ctx := context.Background()
-	db, _ := testdb.Open(t)
+	db, schema := testdb.Open(t)
 
 	checks := []struct {
 		role       string
@@ -49,7 +49,7 @@ func TestMigration0169_ProcessAreaRoleCapabilitiesSeeded(t *testing.T) {
 		err := db.QueryRowContext(ctx, `
 			SELECT EXISTS (
 				SELECT 1
-				  FROM metaldocs.role_capabilities
+				  FROM `+testdb.Qualified(schema, "role_capabilities")+`
 				 WHERE role = $1
 				   AND capability = $2
 			)`, c.role, c.capability).Scan(&found)
