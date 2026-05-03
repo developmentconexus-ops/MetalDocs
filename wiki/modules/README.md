@@ -9,4 +9,4 @@
 - [taxonomy.md](taxonomy.md) — families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - approval.md — routes, signoffs, ISO segregation; known gaps D4/E4/outbox/revision-number (Last verified: 2026-05-01)
 - render-fanout.md — TBD
-- iam-rbac.md — TBD
+- [iam-rbac.md](iam-rbac.md) — capabilities, roles, DB-backed CanDo, system_admin bypass, group grants (Last verified: 2026-05-02)
