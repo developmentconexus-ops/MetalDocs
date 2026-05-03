@@ -150,7 +150,10 @@ func main() {
 	authHandler := authdelivery.NewHandler(authService)
 	healthHandler := observability.NewHealthHandler(deps.StatusProvider)
 
-	authorizer := iamapp.NewStaticAuthorizer()
+	var capabilityService *iamapp.CapabilityService
+	if deps.SQLDB != nil {
+		capabilityService = iamapp.NewCapabilityService(deps.SQLDB)
+	}
 	cachedProvider := iamapp.NewCachedRoleProvider(deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route
 	// visibility. It is shared with the auth middleware so that fully public
@@ -159,7 +162,7 @@ func main() {
 	permResolver := newPermissionResolver()
 	authMiddleware := authdelivery.NewMiddleware(authService, authCfg, authn.Enabled()).
 		WithPublicPathChecker(newPublicPathChecker(permResolver))
-	iamMiddleware := iamdelivery.NewMiddleware(authorizer, cachedProvider, authn.Enabled(), authCfg.LegacyHeaderEnabled).
+	iamMiddleware := iamdelivery.NewMiddleware(capabilityService, cachedProvider, authn.Enabled(), authCfg.LegacyHeaderEnabled).
 		WithPermissionResolver(permResolver)
 	originProtection := security.NewOriginProtection(security.OriginProtectionConfig{
 		Enabled:           authCfg.OriginProtection,
