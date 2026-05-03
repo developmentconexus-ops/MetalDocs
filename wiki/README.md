@@ -32,7 +32,7 @@
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, idempotency store, known gaps D4/E4/outbox/revision-number (Last verified: 2026-05-02)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
-- [modules/iam-rbac.md](modules/iam-rbac.md) - capabilities, roles (viewer/editor/author/approver/system_admin), DB-backed CanDo, area-scoped authz.Require, group grants, migration 0162-0166 (Last verified: 2026-05-02)
+- [modules/iam-rbac.md](modules/iam-rbac.md) - capabilities, roles (viewer/editor/author/approver/system_admin) + process-area roles (signer/area_admin/qms_admin), DB-backed CanDo, area-scoped authz.Require, group grants, migration 0162-0166 + 0169 (Last verified: 2026-05-03)
 - [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-01)
 - [modules/search.md](modules/search.md) - cross-module search; v2 reader JOINs `controlled_documents` to populate `DocumentCode` (stub, Last verified: 2026-05-01)
 

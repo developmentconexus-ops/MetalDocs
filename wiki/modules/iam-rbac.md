@@ -15,7 +15,7 @@
 ## Model
 
 - **Capability**: fine-grained permission string (e.g. `doc.view`, `template.approve`). Defined in `capabilities.go`.
-- **Role**: named bundle of capabilities. Five roles as of migration 0166: `viewer`, `editor`, `author`, `approver`, `system_admin`.
+- **Role**: named bundle of capabilities. Five canonical roles as of migration 0166: `viewer`, `editor`, `author`, `approver`, `system_admin`. Three legacy process-area roles also exist in `user_process_areas`: `signer`, `area_admin`, `qms_admin` (capabilities backfilled by migration 0169).
 - **Area grant** (`user_process_areas`): scopes a role to one or more areas. A user can be `author` in `RH` only.
 - **Group**: `iam_groups` + `iam_group_members` + `iam_group_roles` — role grants can be made via group membership (added migration 0163). `CapabilityService.CanDo` checks both direct user roles and group-derived roles.
 
@@ -72,7 +72,7 @@ Returning `allowed = true` on any branch grants access.
 
 The bypass ensures `system_admin` users can act on any area without needing a `user_process_areas` row.
 
-## Schema changes (migrations 0162–0166)
+## Schema changes (migrations 0162–0169)
 
 | Migration | Change |
 |---|---|
@@ -81,6 +81,7 @@ The bypass ensures `system_admin` users can act on any area without needing a `u
 | 0164 | `visibility TEXT DEFAULT 'area'` added to `public.documents` (values: public/area/restricted; was mistakenly added to the now-dropped `public.documents_v2` — corrected by migration 0167) |
 | 0165 | `role_capabilities` truncated and reseeded with 40 rows covering the 5 canonical roles |
 | 0166 | `admin` → `system_admin`, `reviewer` → `approver` renamed; UNIQUE(tenant_id, user_id) added |
+| 0169 | `role_capabilities` backfill for `signer`, `area_admin`, `qms_admin` (process-area roles left with zero caps by 0165's TRUNCATE); idempotent via `ON CONFLICT DO NOTHING` |
 
 ## StaticAuthorizer removed
 
