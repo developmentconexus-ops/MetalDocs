@@ -3,11 +3,13 @@ package domain
 type Role string
 
 const (
-	RoleAdmin    Role = "admin"
-	RoleApprover Role = "approver"
-	RoleEditor   Role = "editor"
-	RoleReviewer Role = "reviewer"
-	RoleViewer   Role = "viewer"
+	RoleAdmin       Role = "admin" // keep — removed in Task 8
+	RoleApprover    Role = "approver"
+	RoleAuthor      Role = "author" // new
+	RoleEditor      Role = "editor"
+	RoleReviewer    Role = "reviewer"     // keep — removed in Task 8
+	RoleSystemAdmin Role = "system_admin" // new
+	RoleViewer      Role = "viewer"
 )
 
 type Permission string
@@ -34,9 +36,6 @@ const (
 	CapDocumentView    Capability = "document.view"
 	CapDocumentCreate  Capability = "document.create"
 	CapDocumentEdit    Capability = "document.edit"
-	CapTemplateView    Capability = "template.view"
-	CapTemplatePublish Capability = "template.publish"
 	CapWorkflowReview  Capability = "workflow.review"
 	CapWorkflowApprove Capability = "workflow.approve"
-	CapRegistryCreate  Capability = "registry.create"
 )
