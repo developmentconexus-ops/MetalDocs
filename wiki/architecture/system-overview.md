@@ -1,6 +1,6 @@
 # System Overview
 
-> **Last verified:** 2026-04-27
+> **Last verified:** 2026-05-03
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -34,14 +34,13 @@ Each module under `internal/modules/` is self-contained:
 
 Modules:
 - `templates_v2` - template authoring + schema versioning
-- `documents_v2` - document instances, creation-time snapshots, freeze, view, approval
+- `documents` - document instances, creation-time snapshots, freeze, view, approval (renamed from `documents_v2`)
 - `taxonomy` - profiles, areas, departments, subjects
 - `iam` - users, roles, capabilities, area memberships
 - `auth` - authn (token validation)
-- `approval` (under documents_v2) - routes, signoffs
+- `approval` (under documents) - routes, signoffs
 - `render/fanout` + `render/resolvers` - substitution + DOCX/PDF generation
 - `registry` - controlled-document codes, sequence counters
-- `workflow` - approval workflow definitions
 - `jobs/*` - background jobs (effective-date publisher, idempotency janitor, scheduler, watchdog)
 - `search` - cross-module document search index; `infrastructure/v2documents/reader.go` queries `public.documents LEFT JOIN controlled_documents` to populate `DocumentCode`/`DocumentSequence` (fixed 2026-04-27: was reading `d.code` which is always empty for v2 docs; now reads `COALESCE(cd.code, '')` from the join)
 
@@ -74,7 +73,7 @@ Shared packages:
 2. Edits in eigenpal editor -> autosave (1500ms debounce) -> `PUT /templates/{id}/versions/{v}/body` (DOCX bytes) + schema PUT
 3. Author submits -> `POST /templates/{id}/versions/{v}/submit` -> status=in_review
 4. Reviewer approves -> `POST /approve` -> status=approved
-5. **Document creation:** end user picks a controlled doc -> wizard creates the `documents` row. `application.SnapshotService`, wired via `documents_v2.Dependencies.SnapshotReader`/`SnapshotWriter`, populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`.
+5. **Document creation:** end user picks a controlled doc -> wizard creates the `documents` row. `application.SnapshotService`, wired via `documents.Dependencies.SnapshotReader`/`SnapshotWriter`, populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`.
 6. For catalog-only templates, `composition_config_snapshot` stores `{}`. (composition deprecated 2026-04-27 — see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27 — column still written as `{}` for back-compat)
 7. Submit -> `POST /documents/{id}/submit` -> `under_review`. Migration `0152`'s `enforce_snapshot_on_submit_trg` trigger requires all six snapshot columns to be non-NULL before draft -> under_review.
 8. Approves -> `POST /documents/{id}/approve` -> triggers `freeze`:

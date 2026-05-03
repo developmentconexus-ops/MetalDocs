@@ -1,12 +1,12 @@
 # Workflow: Freeze and Fanout
 
-> **Last verified:** 2026-04-27
+> **Last verified:** 2026-05-03
 > **Scope:** The full pipeline from signoff approval → computed value resolution → DOCX substitution → frozen artifact stored in S3 → async PDF generation via outbox worker.
 > **Out of scope:** Approval routing and signoff rules (see `workflows/approval.md`), editor-side substitution deferral (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
-> - `internal/modules/documents_v2/approval/application/decision_service.go` — triggers freeze on signoff
-> - `internal/modules/documents_v2/application/freeze_service.go` — FreezeService.Freeze orchestration
-> - `internal/modules/documents_v2/application/context_builder.go` — builds resolver input context
+> - `internal/modules/documents/approval/application/decision_service.go` — triggers freeze on signoff
+> - `internal/modules/documents/application/freeze_service.go` — FreezeService.Freeze orchestration
+> - `internal/modules/documents/application/context_builder.go` — builds resolver input context
 > - `internal/modules/render/fanout/client.go` — HTTP client calling docgen-v2
 > - `internal/modules/render/resolvers/builtins.go` — registered resolver implementations
 > - `apps/docgen-v2/src/routes/fanout.ts` — docgen-v2 fanout route, Zod request schema
@@ -104,7 +104,7 @@ Back in `FreezeService`, `WriteFinalDocx` stamps `final_docx_s3_key` and `conten
 ]
 ```
 
-This is a **raw JSON array** — NOT wrapped as `{"placeholders": [...]}`. `parsePlaceholderSchema()` in `internal/modules/documents_v2/application/fillin_service.go` handles both formats for backward compatibility with legacy rows.
+This is a **raw JSON array** — NOT wrapped as `{"placeholders": [...]}`. `parsePlaceholderSchema()` in `internal/modules/documents/application/fillin_service.go` handles both formats for backward compatibility with legacy rows.
 
 ## Gotchas
 
@@ -146,12 +146,12 @@ After step 17, `GET /api/v2/documents/{id}/view` can return a presigned URL for 
 - `apps/api/cmd/metaldocs-api/main.go` — wires `PDFDispatchAdapter` into `NewDecisionService`
 - `internal/modules/render/fanout/pdf_dispatch_adapter.go` — `PDFDispatchAdapter`: reads `final_docx_s3_key` from DB, calls `PDFDispatcher`
 - `internal/modules/render/fanout/pdf_dispatcher.go` — `PDFDispatcher`: publishes `docgen_v2_pdf` outbox event
-- `internal/modules/documents_v2/approval/application/decision_service.go` — `PDFDispatchInvoker` interface + post-commit dispatch call
+- `internal/modules/documents/approval/application/decision_service.go` — `PDFDispatchInvoker` interface + post-commit dispatch call
 - `internal/platform/worker/pdf_job_runner.go` — `PDFJobRunner`: handles `docgen_v2_pdf` events end-to-end
 - `internal/platform/worker/service.go` — routes `docgen_v2_pdf` to `PDFJobRunner`
 - `internal/platform/bootstrap/worker.go` — builds `DocgenV2Client` + exposes `SQLDB` in `WorkerDependencies`
 - `apps/worker/cmd/metaldocs-worker/main.go` — conditionally wires `PDFJobRunner` via `WithPDFRunner`
-- `internal/modules/documents_v2/http/view_handler.go` — view endpoint, reads `final_pdf_s3_key`
+- `internal/modules/documents/http/view_handler.go` — view endpoint, reads `final_pdf_s3_key`
 
 ---
 

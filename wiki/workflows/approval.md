@@ -1,14 +1,14 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-05-02
+> **Last verified:** 2026-05-03
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
-> - `internal/modules/documents_v2/delivery/http/handler.go:259` — `finalizeDocument` — atomic finalize+submit handler
-> - `internal/modules/documents_v2/approval/application/submit_service.go:140` — `resolveEligibleActors` call inside stage-instance loop
-> - `internal/modules/documents_v2/approval/application/submit_service.go:299` — `resolveEligibleActors` implementation (queries `metaldocs.user_process_areas`)
-> - `internal/modules/documents_v2/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
-> - `internal/modules/documents_v2/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
+> - `internal/modules/documents/delivery/http/handler.go:259` — `finalizeDocument` — atomic finalize+submit handler
+> - `internal/modules/documents/approval/application/submit_service.go:140` — `resolveEligibleActors` call inside stage-instance loop
+> - `internal/modules/documents/approval/application/submit_service.go:299` — `resolveEligibleActors` implementation (queries `metaldocs.user_process_areas`)
+> - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
+> - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
 
 ## Quick summary
 
@@ -36,7 +36,7 @@ Now `finalizeDocument` at `handler.go:259`:
 
 ## eligible_actor_ids populated at submit time (fixed 2026-05-02)
 
-**File:** `internal/modules/documents_v2/approval/application/submit_service.go:299`
+**File:** `internal/modules/documents/approval/application/submit_service.go:299`
 
 `resolveEligibleActors` now queries `metaldocs.user_process_areas` to find all users holding `required_role` in `area_code` as of `now()`. The result is stored in `approval_stage_instances.eligible_actor_ids` so the inbox filter can match the calling approver's user ID.
 
@@ -61,8 +61,8 @@ WHERE id = '<stage_id>';
 ## Signoff idempotency (fixed 2026-05-02)
 
 **Files:**
-- `internal/modules/documents_v2/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler`
-- `internal/modules/documents_v2/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
+- `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler`
+- `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
 
 `SignoffByDocumentHandler` now requires an `Idempotency-Key` request header. Before calling the domain:
 
@@ -72,7 +72,7 @@ WHERE id = '<stage_id>';
 
 Previously a duplicate POST after instance close returned HTTP 500. Now it returns `was_replay:true`.
 
-`NewHandler` in `internal/modules/documents_v2/approval/http/handler.go:63` accepts `signoffIdempStore` as a positional parameter. Pass `nil` to disable idempotency (not recommended outside tests).
+`NewHandler` in `internal/modules/documents/approval/http/handler.go:63` accepts `signoffIdempStore` as a positional parameter. Pass `nil` to disable idempotency (not recommended outside tests).
 
 Migration `0160` grants `metaldocs_app` SELECT/INSERT/UPDATE on `metaldocs.idempotency_keys`. Without this migration the store returns a Postgres permission error.
 

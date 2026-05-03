@@ -1,13 +1,13 @@
 # Architecture: Data Model
 
-> **Last verified:** 2026-05-02
+> **Last verified:** 2026-05-03
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
 > **Out of scope:** Migration history (see `internal/platform/db/migrations/`).
 > **Key files:**
 > - `internal/platform/db/migrations/` — source of truth for schema
 > - `internal/modules/templates_v2/infrastructure/repo/` — template tables
-> - `internal/modules/documents_v2/infrastructure/repo/` — document tables
+> - `internal/modules/documents/repository/repository.go:35` — document tables; `CreateDocument` INSERT
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:11` — document_families SQL impl
 > - `internal/modules/taxonomy/infrastructure/repo/` — profiles, areas
 > - `internal/modules/approval/infrastructure/repo/` — routes, signoffs
@@ -61,7 +61,11 @@ Globally scoped — **no `tenant_id`**. All tenants share the same family catalo
 
 See [modules/taxonomy.md](../modules/taxonomy.md) for full entity detail and API routes.
 
-## Snapshot columns (documents_v2)
+## public.documents_v2 — dropped (migration 0168)
+
+`public.documents_v2` was the W1 scaffold table created in migration 0103. Migration 0110 replaced it with `public.documents` (W3 schema). The table was orphaned — no Go code wrote to it after migration 0110. Migration 0168 drops it. Do not reference this table in new code or queries.
+
+## Snapshot columns (documents)
 
 Populated at document-version creation by `application.SnapshotService`. Trigger `enforce_snapshot_on_submit_trg` blocks `draft → under_review` if any are NULL.
 
@@ -95,6 +99,6 @@ Without `0161`: all family API endpoints fail with Postgres permission errors.
 ## See also
 
 - [architecture/system-overview.md](system-overview.md)
-- [modules/documents-v2.md](../modules/documents-v2.md)
+- [modules/documents.md](../modules/documents.md)
 - [modules/templates-v2.md](../modules/templates-v2.md)
 - [modules/taxonomy.md](../modules/taxonomy.md)

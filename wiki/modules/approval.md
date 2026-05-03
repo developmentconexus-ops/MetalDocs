@@ -1,17 +1,17 @@
 # Module: approval
 
-> **Last verified:** 2026-05-02
+> **Last verified:** 2026-05-03
 > **Scope:** Approval routes, signoffs, ISO segregation enforcement, freeze trigger.
 > **Out of scope:** Freeze pipeline mechanics (see `workflows/freeze-and-fanout.md`).
 > **Key files:**
-> - `internal/modules/documents_v2/approval/` — backend approval logic
-> - `internal/modules/documents_v2/approval/application/decision_service.go:284` — RecordSignoff reject path (D4 gap)
-> - `internal/modules/documents_v2/approval/http/errors.go:174` — looksLikeValidationError (E4 gap)
+> - `internal/modules/documents/approval/` — backend approval logic
+> - `internal/modules/documents/approval/application/decision_service.go:285` — RecordSignoff reject path (D4 gap)
+> - `internal/modules/documents/approval/http/errors.go:174` — looksLikeValidationError (E4 gap)
 > - `internal/modules/render/fanout/pdf_dispatcher.go:27` — PDFDispatcher.Dispatch (outbox idempotency_key bug)
-> - `internal/modules/documents_v2/repository/repository.go:44` — CreateDocument INSERT (revision_number gap)
-> - `internal/modules/documents_v2/approval/http/handler.go:63` — `NewHandler` — accepts `signoffIdempStore` positional param
-> - `internal/modules/documents_v2/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
-> - `internal/modules/documents_v2/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
+> - `internal/modules/documents/repository/repository.go:35` — CreateDocument INSERT with MAX(revision_number)+1
+> - `internal/modules/documents/approval/http/handler.go:63` — `NewHandler` — accepts `signoffIdempStore` positional param
+> - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
+> - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada
 > - `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx` — route admin
 > - `frontend/apps/web/src/features/approval/components/SignoffDialog.tsx` — signoff dialog with password confirm
@@ -42,13 +42,13 @@ A user's decision (approve / reject) recorded against a step. Stored with timest
 
 Rejecting any required signoff bumps the document back to `draft` and notifies the author.
 
-**Gap D4 (smoke test 2026-05-01):** The actual implementation does NOT transition the document back to `draft`. `RecordSignoff` at `decision_service.go:284-295` only marks the approval instance as `rejected` (`InstanceRejected = true`) and updates the stage/instance statuses. The document row's `status` column remains `under_review`. The prose above describes the intended behaviour, not the current one.
+**Gap D4 (smoke test 2026-05-01):** The actual implementation does NOT transition the document back to `draft`. `RecordSignoff` at `decision_service.go:285-295` only marks the approval instance as `rejected` (`InstanceRejected = true`) and updates the stage/instance statuses. The document row's `status` column remains `under_review`. The prose above describes the intended behaviour, not the current one.
 
 ## Known implementation gaps (as of 2026-05-01)
 
 ### D4 — Rejection does not return document to draft
 
-**File:** `internal/modules/documents_v2/approval/application/decision_service.go:284`
+**File:** `internal/modules/documents/approval/application/decision_service.go:285`
 
 The `QuorumRejectedStage` branch in `RecordSignoff` sets `result.InstanceRejected = true` and marks the approval instance + stage as rejected, but never issues an `UPDATE documents SET status = 'draft'`. The document remains in `under_review` indefinitely after a rejection. Callers must issue the status transition separately or via a DB patch.
 
@@ -62,7 +62,7 @@ UPDATE documents SET status = 'draft' WHERE id = '<doc_id>';
 
 ### E4 — Re-signoff on completed instance returns 500 instead of 409
 
-**File:** `internal/modules/documents_v2/approval/http/errors.go:174`
+**File:** `internal/modules/documents/approval/http/errors.go:174`
 
 When a user attempts a second signoff on an already-approved document, the domain returns an error containing `"no active stage in this approval instance"`. The HTTP error mapper at `errors.go:174` calls `looksLikeValidationError`, which only matches substrings `" is required"`, `" must be "`, and `" must not be "`. The phrase `"no active stage"` does not match, so the error falls through to the 500 path and is returned as `internal.unknown`. The correct HTTP response should be `409 state.instance_completed`.
 
@@ -80,20 +80,13 @@ When a user attempts a second signoff on an already-approved document, the domai
 
 ---
 
-### Nova Revisão fails with `ux_documents_v2_cd_revision` unique constraint
+### Nova Revisão — revision_number gap (FIXED in migration 0167)
 
-**File:** `internal/modules/documents_v2/repository/repository.go:44`
+**File:** `internal/modules/documents/repository/repository.go:35`
 
-`POST /api/v2/documents` calls `CreateDocument`, whose INSERT at line 44 does not include `revision_number`. The column defaults to `1`. If a controlled document already has a document at `revision_number = 1` (even a rejected or archived one), the unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` (migration `0131`) blocks the insert with a constraint violation. The service does not compute `MAX(revision_number) + 1`.
+Previously `CreateDocument` did not include `revision_number` in its INSERT (defaulted to `1`), causing a `ux_documents_v2_cd_revision` unique-constraint violation on any controlled document that already had a document at `revision_number = 1`.
 
-**Workaround (smoke testing):** Use a fresh controlled document per test run, or manually set `revision_number` via direct DB insert:
-
-```sql
-INSERT INTO documents (tenant_id, template_version_id, name, status, form_data_json,
-                       created_by, controlled_document_id, profile_code_snapshot,
-                       process_area_code_snapshot, code, revision_number)
-VALUES (..., 2);
-```
+**Fixed by migration 0167:** `controlled_document_id` is now present on `public.documents`, and `CreateDocument` at `repository.go:35` computes `COALESCE(MAX(revision_number), 0) + 1` in the same INSERT via a subquery. The unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` (migration `0131`) now resolves correctly.
 
 ## See also
 
