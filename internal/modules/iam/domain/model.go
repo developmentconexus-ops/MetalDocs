@@ -6,8 +6,7 @@ const (
 	RoleApprover    Role = "approver"
 	RoleAuthor      Role = "author"
 	RoleEditor      Role = "editor"
-	RoleReviewer    Role = "reviewer"
-	RoleSystemAdmin Role = "system_admin"
+RoleSystemAdmin Role = "system_admin"
 	RoleViewer      Role = "viewer"
 )
 
