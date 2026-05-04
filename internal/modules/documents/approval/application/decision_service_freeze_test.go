@@ -36,6 +36,20 @@ func (f *fakePDFDispatchInvoker) Dispatch(_ context.Context, _, _ string) error 
 	return f.err
 }
 
+type fakePDFOutboxEnqueuer struct {
+	calls      int
+	err        error
+	tenantIDs  []string
+	revisionIDs []string
+}
+
+func (f *fakePDFOutboxEnqueuer) Enqueue(_ context.Context, _ OutboxTx, tenantID, revisionID string, _ []byte) error {
+	f.calls++
+	f.tenantIDs = append(f.tenantIDs, tenantID)
+	f.revisionIDs = append(f.revisionIDs, revisionID)
+	return f.err
+}
+
 type freezeDecisionConn struct {
 	stageSignoffs []signoffRow
 	authzGranted  bool
@@ -342,6 +356,67 @@ func TestRecordSignoff_PDFDispatchError_IsBestEffort(t *testing.T) {
 	}
 	if pdf.calls != 1 {
 		t.Fatalf("PDF dispatch should be attempted once, got %d", pdf.calls)
+	}
+}
+
+func TestRecordSignoff_OutboxEnqueuedInsideTx(t *testing.T) {
+	const (
+		instanceID = "inst-outbox-1"
+		stageID    = "stage-outbox-1"
+		actorID    = "approver-1"
+		authorID   = "author-1"
+	)
+	signedAt := time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC)
+	repo := &fakeDecisionRepo{
+		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
+		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-outbox-1", WasReplay: false},
+	}
+	outbox := &fakePDFOutboxEnqueuer{}
+	conn := &freezeDecisionConn{
+		actorID: actorID,
+		stageSignoffs: []signoffRow{{
+			id:                 "sig-outbox-1",
+			approvalInstanceID: instanceID,
+			stageInstanceID:    stageID,
+			actorUserID:        actorID,
+			actorTenantID:      "tenant-1",
+			decision:           "approve",
+			signedAt:           signedAt,
+			signatureMethod:    "password",
+			signaturePayload:   []byte(`{}`),
+			contentHash:        validContentHash,
+		}},
+	}
+	db := newFreezeDecisionTestDB(t, conn)
+	svc := (&DecisionService{
+		repo:          repo,
+		emitter:       &MemoryEmitter{},
+		clock:         fixedClock{t: signedAt},
+		freezeInvoker: &fakeFreezeInvoker{},
+		pdfDispatcher: &fakePDFDispatchInvoker{},
+	}).WithPDFOutbox(outbox)
+
+	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "abc"},
+		ContentFormData:  map[string]any{"title": "Doc"},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff() error = %v", err)
+	}
+	if !result.InstanceApproved {
+		t.Fatal("expected InstanceApproved=true")
+	}
+	if outbox.calls != 1 {
+		t.Fatalf("outbox.Enqueue should be called once, got %d", outbox.calls)
+	}
+	if len(outbox.tenantIDs) == 0 || outbox.tenantIDs[0] != "tenant-1" {
+		t.Fatalf("outbox tenantID = %v, want tenant-1", outbox.tenantIDs)
 	}
 }
 
