@@ -1,14 +1,32 @@
-/**
- * ApiError — structured error from the MetalDocs API.
- * Created as a sub-plan 1 primitive; consumed by rename-rollback (E9) and other consumer-facing handlers.
- */
-export class ApiError extends Error {
-  constructor(
-    public readonly code: string,
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
+﻿import { dispatchAuthExpired } from "./authBus";
+import { ApiError } from "./errors";
+
+export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await (init !== undefined ? fetch(url, init) : fetch(url));
+
+  if (res.status === 401) {
+    dispatchAuthExpired(window.location.pathname + window.location.search);
+    throw new ApiError("authn.expired", 401, "Sessão expirada");
   }
+
+  if (!res.ok) {
+    let body: { error?: { code?: string; message?: string; details?: unknown } } | undefined;
+
+    try {
+      body = await res.json();
+    } catch {
+      body = undefined;
+    }
+
+    const code = body?.error?.code ?? `http_${res.status}`;
+    const message = body?.error?.message ?? "Erro interno";
+
+    throw new ApiError(code, res.status, message, body?.error?.details);
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  return (await res.json()) as T;
 }

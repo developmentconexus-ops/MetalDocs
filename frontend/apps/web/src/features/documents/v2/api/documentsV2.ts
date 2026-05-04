@@ -2,6 +2,8 @@
 // tenant/role headers stamped by the middleware chain; we do not set X-* from
 // the client.
 
+import { apiFetch } from '../../../../lib/api';
+
 export type DocumentRow = {
   id: string;
   name: string;
@@ -37,83 +39,77 @@ export type DocumentResponse = {
   form_data?: unknown;
 };
 
-async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) throw Object.assign(new Error(`http_${res.status}`), { status: res.status, body: await res.text() });
-  return res.json() as Promise<T>;
-}
-
 export async function listDocuments(): Promise<DocumentRow[]> {
-  return json(await fetch('/api/v2/documents'));
+  return apiFetch('/api/v2/documents');
 }
 export async function getDocument(id: string): Promise<DocumentResponse> {
-  return json(await fetch(`/api/v2/documents/${id}`));
+  return apiFetch(`/api/v2/documents/${id}`);
 }
 export async function renameDocument(id: string, name: string): Promise<void> {
-  await json(await fetch(`/api/v2/documents/${id}`, {
+  await apiFetch<void>(`/api/v2/documents/${id}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name }),
-  }));
+  });
 }
 export async function createDocument(req: { template_version_id?: string; name: string; form_data: unknown; controlled_document_id?: string }): Promise<CreateDocumentResult> {
-  return json(await fetch('/api/v2/documents', {
+  return apiFetch('/api/v2/documents', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify(req),
-  }));
+  });
 }
 export async function finalizeDocument(id: string) {
-  return json(await fetch(`/api/v2/documents/${id}/finalize`, { method: 'POST' }));
+  return apiFetch(`/api/v2/documents/${id}/finalize`, { method: 'POST' });
 }
 export async function archiveDocument(id: string) {
-  return json(await fetch(`/api/v2/documents/${id}/archive`, { method: 'POST' }));
+  return apiFetch(`/api/v2/documents/${id}/archive`, { method: 'POST' });
 }
 
 export async function acquireSession(id: string): Promise<AcquireResult> {
-  return json(await fetch(`/api/v2/documents/${id}/session/acquire`, { method: 'POST' }));
+  return apiFetch(`/api/v2/documents/${id}/session/acquire`, { method: 'POST' });
 }
 export async function heartbeatSession(id: string, sessionID: string): Promise<void> {
-  const res = await fetch(`/api/v2/documents/${id}/session/heartbeat`, {
+  await apiFetch<void>(`/api/v2/documents/${id}/session/heartbeat`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ session_id: sessionID }),
   });
-  if (!res.ok) throw Object.assign(new Error(`http_${res.status}`), { status: res.status, body: await res.text() });
 }
 export async function releaseSession(id: string, sessionID: string) {
-  return json(await fetch(`/api/v2/documents/${id}/session/release`, {
+  return apiFetch(`/api/v2/documents/${id}/session/release`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ session_id: sessionID }),
-  }));
+  });
 }
 export async function forceReleaseSession(id: string, sessionID: string) {
-  return json(await fetch(`/api/v2/documents/${id}/session/force-release`, {
+  return apiFetch(`/api/v2/documents/${id}/session/force-release`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ session_id: sessionID }),
-  }));
+  });
 }
 
 export async function presignAutosave(id: string, req: { session_id: string; base_revision_id: string; content_hash: string }): Promise<PresignResult> {
-  return json(await fetch(`/api/v2/documents/${id}/autosave/presign`, {
+  return apiFetch(`/api/v2/documents/${id}/autosave/presign`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify(req),
-  }));
+  });
 }
 // Server is authoritative for content_hash -- it re-computes SHA256 from S3 on
 // commit. Client does NOT forward a client-computed hash.
 export async function commitAutosave(id: string, req: { session_id: string; pending_upload_id: string; form_data_snapshot?: unknown }): Promise<CommitResult> {
-  return json(await fetch(`/api/v2/documents/${id}/autosave/commit`, {
+  return apiFetch(`/api/v2/documents/${id}/autosave/commit`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify(req),
-  }));
+  });
 }
 
 export async function listCheckpoints(id: string): Promise<Checkpoint[]> {
-  return json(await fetch(`/api/v2/documents/${id}/checkpoints`));
+  return apiFetch(`/api/v2/documents/${id}/checkpoints`);
 }
 export async function createCheckpoint(id: string, label: string): Promise<Checkpoint> {
-  return json(await fetch(`/api/v2/documents/${id}/checkpoints`, {
+  return apiFetch(`/api/v2/documents/${id}/checkpoints`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ label }),
-  }));
+  });
 }
 
 export type RestoreCheckpointResult = {
@@ -123,7 +119,7 @@ export type RestoreCheckpointResult = {
   idempotent: boolean;
 };
 export async function restoreCheckpoint(id: string, versionNum: number): Promise<RestoreCheckpointResult> {
-  return json(await fetch(`/api/v2/documents/${id}/checkpoints/${versionNum}/restore`, { method: 'POST' }));
+  return apiFetch(`/api/v2/documents/${id}/checkpoints/${versionNum}/restore`, { method: 'POST' });
 }
 
 export function signedRevisionURL(documentID: string, revisionID: string): string {
@@ -144,18 +140,18 @@ export type CommentRow = {
 };
 
 export async function listComments(documentID: string): Promise<CommentRow[]> {
-  return json(await fetch(`/api/v2/documents/${documentID}/comments`));
+  return apiFetch(`/api/v2/documents/${documentID}/comments`);
 }
 
 export async function createComment(
   documentID: string,
   body: { library_comment_id: number; parent_library_id?: number; author_display: string; content: unknown[] },
 ): Promise<CommentRow> {
-  return json(await fetch(`/api/v2/documents/${documentID}/comments`, {
+  return apiFetch(`/api/v2/documents/${documentID}/comments`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
-  }));
+  });
 }
 
 export async function patchComment(
@@ -163,14 +159,13 @@ export async function patchComment(
   libraryID: number,
   body: { content?: unknown[]; done?: boolean },
 ): Promise<CommentRow> {
-  return json(await fetch(`/api/v2/documents/${documentID}/comments/${libraryID}`, {
+  return apiFetch(`/api/v2/documents/${documentID}/comments/${libraryID}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
-  }));
+  });
 }
 
 export async function deleteComment(documentID: string, libraryID: number): Promise<void> {
-  const res = await fetch(`/api/v2/documents/${documentID}/comments/${libraryID}`, { method: 'DELETE' });
-  if (!res.ok) throw Object.assign(new Error(`http_${res.status}`), { status: res.status, body: await res.text() });
+  await apiFetch<void>(`/api/v2/documents/${documentID}/comments/${libraryID}`, { method: 'DELETE' });
 }

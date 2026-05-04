@@ -16,15 +16,22 @@ type ViewPresigner interface {
 	PresignObjectGET(ctx context.Context, storageKey string) (string, error)
 }
 
+// PDFOutboxStateReader returns the latest pdf_outbox state for a revision/document.
+// Returns "" + nil when no row exists.
+type PDFOutboxStateReader interface {
+	ReadState(ctx context.Context, tenantID, revisionID string) (string, error)
+}
+
 // ViewService serves viewer requests by checking area-scoped RBAC, validating
 // the revision's lifecycle state, and returning a presigned PDF URL.
 type ViewService struct {
 	db        *sql.DB
 	presigner ViewPresigner
+	outbox    PDFOutboxStateReader // optional; nil → assume pending
 }
 
-func NewViewService(db *sql.DB, presigner ViewPresigner) *ViewService {
-	return &ViewService{db: db, presigner: presigner}
+func NewViewService(db *sql.DB, presigner ViewPresigner, outbox PDFOutboxStateReader) *ViewService {
+	return &ViewService{db: db, presigner: presigner, outbox: outbox}
 }
 
 var viewableStatuses = map[string]struct{}{
@@ -71,13 +78,20 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 	if _, ok := viewableStatuses[status]; !ok {
 		return documentshttp.ViewResult{}, v2dom.ErrNotFound
 	}
-	if !pdfKey.Valid || pdfKey.String == "" {
-		return documentshttp.ViewResult{}, documentshttp.ErrPDFPending
+
+	if pdfKey.Valid && pdfKey.String != "" {
+		url, err := s.presigner.PresignObjectGET(ctx, pdfKey.String)
+		if err != nil {
+			return documentshttp.ViewResult{}, fmt.Errorf("view: presign: %w", err)
+		}
+		return documentshttp.ViewResult{PDFStatus: "ready", SignedURL: url}, nil
 	}
 
-	url, err := s.presigner.PresignObjectGET(ctx, pdfKey.String)
-	if err != nil {
-		return documentshttp.ViewResult{}, fmt.Errorf("view: presign: %w", err)
+	pdfStatus := "pending"
+	if s.outbox != nil {
+		if state, err := s.outbox.ReadState(ctx, tenantID, docID); err == nil && state == "failed" {
+			pdfStatus = "failed"
+		}
 	}
-	return documentshttp.ViewResult{SignedURL: url}, nil
+	return documentshttp.ViewResult{PDFStatus: pdfStatus}, nil
 }

@@ -1,6 +1,6 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
@@ -99,4 +99,5 @@ Migration `0160` grants `metaldocs_app` SELECT/INSERT/UPDATE on `metaldocs.idemp
 
 - [modules/approval.md](../modules/approval.md)
 - [concepts/iso-segregation.md](../concepts/iso-segregation.md)
+- [concepts/error-ux.md](../concepts/error-ux.md) — SoD error dialog states (E2), finalize toast (E3), global 401 auth-bus (E4)
 - [workflows/freeze-and-fanout.md](freeze-and-fanout.md)

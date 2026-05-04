@@ -1,6 +1,6 @@
 # Concepts
 
-> **Last verified:** 2026-04-25
+> **Last verified:** 2026-05-04
 > **Scope:** Cross-cutting ideas referenced from many places. Read these to understand WHY before HOW.
 
 - [placeholders.md](placeholders.md) — eigenpal native vs MetalDocs legacy. **Read first.**
@@ -8,3 +8,4 @@
 - controlled-documents.md — TBD
 - iso-segregation.md — TBD
 - freeze-and-hashing.md — TBD
+- [error-ux.md](error-ux.md) — shared `apiFetch` / `ApiError` / auth-bus / `resolveErrorMessage` (E2/E3/E4)
