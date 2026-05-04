@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listInbox } from '../api/approvalApi';
 import type { InboxItem } from '../api/approvalTypes';
+import { fetchAreas } from '../../taxonomy/api';
+import type { ProcessArea } from '../../taxonomy/types';
 import styles from './InboxPage.module.css';
 
 const PAGE_SIZE = 20;
-const AREA_OPTIONS = ['', 'JUR', 'RH', 'FIN', 'TI', 'COM', 'ENG'];
 
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -36,6 +37,11 @@ export function InboxPage() {
   const [areaFilter, setAreaFilter] = useState('');
   const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [page, setPage] = useState(0);
+  const [areas, setAreas] = useState<ProcessArea[]>([]);
+
+  useEffect(() => {
+    void fetchAreas().then(setAreas).catch(() => setAreas([]));
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -89,10 +95,9 @@ export function InboxPage() {
               setPage(0);
             }}
           >
-            {AREA_OPTIONS.map((area) => (
-              <option key={area || 'all'} value={area}>
-                {area || 'Todas'}
-              </option>
+            <option value="">Todas as áreas</option>
+            {areas.map((a) => (
+              <option key={a.code} value={a.code}>{a.code} — {a.name}</option>
             ))}
           </select>
         </label>
