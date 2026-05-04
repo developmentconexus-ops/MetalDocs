@@ -49,6 +49,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [concepts/iso-segregation.md](concepts/iso-segregation.md) - why submitter cannot approve own submit (stub, Last verified: 2026-05-01)
 - [concepts/freeze-and-hashing.md](concepts/freeze-and-hashing.md) - content_hash, values_hash, schema_hash, immutability (stub, Last verified: 2026-05-01)
 - [concepts/authz-tiers.md](concepts/authz-tiers.md) - two-tier authz model: tier-1 CapabilityService (HTTP middleware) vs tier-2 authz.Require (in-tx area check); GUC setup, pitfalls (Last verified: 2026-05-03)
+- [concepts/error-ux.md](concepts/error-ux.md) - shared `apiFetch`/`ApiError`/auth-bus/`resolveErrorMessage`; E2 SoD dialog states, E3 finalize toast, E4 global 401 interceptor (Last verified: 2026-05-04)
 
 ### Workflows (end-to-end flows)
 - **[workflows/user-onboarding.md](workflows/user-onboarding.md)** - full user journey, non-technical: taxonomy -> template -> profile binding -> CD -> fill-in -> approval -> freeze -> PDF (Last verified: 2026-05-02) **Start here for QA/smoke testing.**
