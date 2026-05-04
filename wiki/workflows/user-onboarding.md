@@ -1,6 +1,6 @@
 # Workflow: User Onboarding (End-to-End)
 
-> **Last verified:** 2026-05-02
+> **Last verified:** 2026-05-04
 > **Note (smoke test 2026-05-01):** Non-admin users require `user_process_areas` entries to exercise approval authz. See "Common pitfalls" below.
 > **Scope:** The full MetalDocs user journey from a brand-new tenant to a published, frozen document with PDF fanout. Written from the user's seat — what to click, in what order, why each step matters. Non-technical: no code, no API endpoints, no DB tables.
 > **Out of scope:** Implementation details (see `modules/*.md`), API reference, deployment.
@@ -201,7 +201,7 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 - Resolves the 7 fixed tokens to final values (`{doc_code}` → actual code, `{author}` → first signed-off author, `{effective_date}` → freeze timestamp, `{approvers}` → comma-separated approvers, etc.).
 - Rewrites the DOCX with all substitutions baked in.
 - Stores the frozen DOCX artifact in S3/MinIO.
-- Marks the document version `frozen` and immutable.
+- Marks the document version `approved` and immutable. (`frozen` was the previous terminology — the domain status is now `approved` post-signoff; `values_frozen_at` timestamp is stored separately.)
 
 **Fanout (async, seconds-to-minutes after freeze):**
 
@@ -212,9 +212,10 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 
 **Validation:**
 
-- Document detail page shows state `frozen`, `values_frozen_at` timestamp, hash fingerprints.
-- After ~30s the **PDF** download link appears (refresh if needed).
+- Document detail page shows state `approved`, `values_frozen_at` timestamp, hash fingerprints.
+- After ~30s the **PDF** download link appears **automatically** — the page polls the PDF status every 3s (no manual refresh needed). If PDF does not appear within 60s, check worker logs.
 - Open the PDF — all 7 tokens are real values, not chips.
+- `{author}` and `{approvers}` resolve to **display names** (not UUIDs). `{controlled_by_area}` resolves to the area **name** (e.g. "Recursos Humanos"), not the code ("RH").
 
 ---
 
@@ -225,7 +226,7 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 3. **Submitter trying to approve their own document.** The Aprovar button is hidden / API rejects. ISO segregation is non-negotiable.
 4. **Typing values for fixed tokens.** Don't type `DC-RH-001` for `{doc_code}` — just leave the chip. Freeze resolves it.
 5. **Editing a template after documents are already in flight.** Existing documents keep their snapshot. New ones use the new published version.
-6. **Waiting forever for the PDF.** Fanout is async. If after 2 min there's no PDF, check the outbox worker logs (technical — out of scope here, see `workflows/freeze-and-fanout.md`).
+6. **Waiting forever for the PDF.** Fanout is async. The document page polls automatically every 3s (60s timeout) — no F5 needed. If after 60s there is still no PDF, check the outbox worker logs (technical — out of scope here, see `workflows/freeze-and-fanout.md`).
 7. **Non-admin users cannot submit or approve without `user_process_areas` entries.** The approval authz system (`authz.Require`) resolves capabilities via `user_process_areas` joined to `role_capabilities`. If a user has no row in `user_process_areas` for the document's area, all capability checks fail silently (403). Required setup for smoke testing with dedicated accounts:
    - `author-test` needs role `author` in area `RH` (grants `doc.submit`, `doc.edit_draft`).
    - `approver-test` needs role `reviewer` in area `RH` (grants `doc.signoff`, `doc.submit`).
