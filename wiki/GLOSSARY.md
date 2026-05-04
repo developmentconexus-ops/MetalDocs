@@ -1,9 +1,11 @@
 # Glossary
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Scope:** Terms used across MetalDocs codebase, docs, and PRs.
 
 ## A
+
+**ActiveDocumentResponse** - TypeScript interface returned by `GET /api/v2/controlled-documents/{id}/active-document`. All fields optional; `publishedDocumentId` may be the only populated field when the CD has only a published version (no active draft). Previously typed as `ActiveDocumentInstance` (deprecated alias retained). See `modules/registry.md`.
 
 **ADR** - Architecture Decision Record. Short doc capturing a decision + reasoning. Lives in `wiki/decisions/`.
 
@@ -61,7 +63,13 @@
 
 **Placeholder** - Variable in a template DOCX that gets substituted at fill-in time. Currently MetalDocs uses `{{uuid}}` token format (legacy); eigenpal-native is `{name}`. See `concepts/placeholders.md`.
 
+**PDFCell** - React component (`frontend/apps/web/src/features/documents/v2/PDFCell.tsx`) that renders one of three states based on `pdf_status`: a download link (ready), an error + retry button (failed), or a "Gerando PDF…" spinner (pending). Reused in `PublishedDownloadCell`.
+
+**pdf_status** - Field returned by `GET /api/v2/documents/{id}/view`. Values: `"pending"` (PDF not yet generated), `"ready"` (PDF available; `signed_url` also present), `"failed"` (outbox row in `failed` state). The frontend polls this every 3 s via `useDocumentPdfStatus` with a 60 s timeout. See `modules/documents.md` — PDF Status Polling.
+
 **ProseMirror** - Rich-text editor framework eigenpal is built on. We rarely interact with it directly - eigenpal abstracts it.
+
+**PublishedDownloadCell** - React component (`frontend/apps/web/src/features/registry/PublishedDownloadCell.tsx`) that polls `pdf_status` for a published document and renders `PDFCell`. Shown on the registry detail page when a CD has only a published revision.
 
 **Profile / Document Profile** - Type of controlled document (e.g., "Quality Manual", "SOP"). Tenant-scoped. Belongs to a DocumentFamily via `family_code` FK. Binds to a default template version + sequence counter for code generation. Archived via `archived_at` (not `is_active`). See `modules/taxonomy.md`.
 

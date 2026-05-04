@@ -147,6 +147,35 @@ describe('SignoffDialog', () => {
     });
   });
 
+  // E2: SoD error states show Portuguese inline messages (not generic toast)
+  it('E2 — sod.submitter_cannot_sign shows SoD submitter error inline', async () => {
+    vi.mocked(approvalApi.signoff).mockRejectedValue(
+      new ApprovalError('sod.submitter_cannot_sign', 403, 'forbidden'),
+    );
+    renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('submeteu este documento');
+    });
+  });
+
+  it('E2 — sod.cross_stage_duplicate shows SoD duplicate error inline', async () => {
+    vi.mocked(approvalApi.signoff).mockRejectedValue(
+      new ApprovalError('sod.cross_stage_duplicate', 403, 'forbidden'),
+    );
+    renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('outra etapa');
+    });
+  });
+
   it('password cleared on both success and error', async () => {
     vi.useFakeTimers();
 

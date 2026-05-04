@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, type ActiveDocumentInstance } from "./api";
+import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, type ActiveDocumentResponse } from "./api";
+import { PublishedDownloadCell } from './PublishedDownloadCell';
 import type { ControlledDocument } from "./types";
 import { RegistryDetailPanel } from '../approval/components/RegistryDetailPanel';
 import { createDocument } from '../documents/v2/api/documentsV2';
@@ -25,7 +26,7 @@ function StatusBadge({ status }: { status: ControlledDocument["status"] }) {
 
 export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) {
   const [doc, setDoc] = useState<ControlledDocument | null>(null);
-  const [instance, setInstance] = useState<ActiveDocumentInstance | null>(null);
+  const [instance, setInstance] = useState<ActiveDocumentResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState(false);
@@ -140,18 +141,27 @@ export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) 
           </button>
         </div>
       )}
-      {instance !== null ? (
+      {instance?.documentId && (
         <div style={{ marginTop: 32 }}>
           <RegistryDetailPanel
             documentId={instance.documentId}
-            approvalState={instance.approvalState}
-            contentHash={instance.contentHash}
-            revisionVersion={instance.revisionVersion}
+            approvalState={instance.approvalState ?? 'draft'}
+            contentHash={instance.contentHash ?? ''}
+            revisionVersion={instance.revisionVersion ?? 0}
             publishedDocumentId={instance.publishedDocumentId}
             lockedByInstanceId={instance.approvalInstanceId}
           />
         </div>
-      ) : doc.status === 'active' ? (
+      )}
+
+      {instance?.publishedDocumentId && (
+        <div style={{ marginTop: 32, padding: 16, border: '1px solid #2a7a2a', borderRadius: 4, background: '#f4faf4' }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 600, color: '#2a7a2a' }}>Revisão publicada</p>
+          <PublishedDownloadCell documentId={instance.publishedDocumentId} />
+        </div>
+      )}
+
+      {!instance?.documentId && doc.status === 'active' && (
         <div style={{ marginTop: 32, padding: 16, border: '1px dashed #ccc', borderRadius: 4, color: '#888' }}>
           {!showNewRevisionForm ? (
             <>
@@ -206,7 +216,7 @@ export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) 
             </div>
           )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

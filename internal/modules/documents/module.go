@@ -82,7 +82,7 @@ func New(deps Dependencies) *Module {
 
 	var viewHandler *documentshttp.ViewHandler
 	if deps.Presign != nil && deps.DB != nil {
-		viewSvc := application.NewViewService(deps.DB, deps.Presign)
+		viewSvc := application.NewViewService(deps.DB, deps.Presign, nil)
 		viewHandler = documentshttp.NewViewHandler(viewSvc)
 	}
 

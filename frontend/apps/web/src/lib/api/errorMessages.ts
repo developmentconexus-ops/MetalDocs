@@ -1,20 +1,31 @@
-/**
- * resolveErrorMessage — maps an API error code to a localised user-facing string.
- * Falls back to `fallback` when no mapping exists.
- * Created as a sub-plan 1 primitive; consumed by rename-rollback (E9) and other consumer-facing handlers.
- */
-const ERROR_MESSAGES: Record<string, string> = {
-  not_found: 'Recurso não encontrado.',
-  conflict: 'Conflito ao processar a solicitação.',
-  forbidden: 'Você não tem permissão para realizar esta ação.',
-  validation_error: 'Dados inválidos. Verifique os campos e tente novamente.',
-  server_error: 'Erro interno do servidor. Tente novamente mais tarde.',
+﻿export const errorMessages: Record<string, string> = {
+  "authn.expired": "Sua sessão expirou. Faça login novamente.",
+  "authn.signature_invalid": "A assinatura informada é inválida.",
+  "authn.signature_rate_limited": "Muitas tentativas de assinatura. Tente novamente em instantes.",
+  "authz.capability_denied": "Você não tem permissão para executar esta ação.",
+  "sod.submitter_cannot_sign": "Você submeteu este documento e não pode aprová-lo. Outro usuário precisa assinar.",
+  "sod.cross_stage_duplicate": "Este usuário já assinou em outra etapa e não pode assinar novamente.",
+  "conflict.stale_revision": "O documento foi alterado por outro usuário. Atualize e tente novamente.",
+  "conflict.duplicate_submission": "Esta submissão já foi registrada.",
+  "signoff.duplicate": "Esta aprovação já foi registrada.",
+  "state.instance_completed": "Este fluxo já foi concluído.",
+  "route.in_use": "Esta rota está em uso e não pode ser alterada.",
+  "route.duplicate_profile": "Já existe uma rota para este perfil.",
+  "not_found.instance": "Documento não encontrado.",
+  "not_found.route": "Nenhuma rota de aprovação configurada para este perfil de documento. Configure uma rota antes de finalizar.",
+  "precondition.if_match_required": "A revisão do documento é obrigatória para esta operação.",
+  "precondition.content_hash_mismatch": "O conteúdo enviado não corresponde à versão esperada.",
+  "idempotency.key_required": "A chave de idempotência é obrigatória.",
+  "validation.if_match_malformed": "A revisão informada é inválida.",
+  "validation.reason_required": "Informe o motivo para continuar.",
+  "validation.json_decode": "Não foi possível ler o JSON enviado.",
+  "validation.json_type_error": "O corpo da requisição deve ser um objeto JSON.",
+  "validation.empty_body": "O corpo da requisição não pode estar vazio.",
+  "validation.content_type": "Tipo de conteúdo inválido.",
+  "validation.body_too_large": "O corpo da requisição excede o tamanho permitido.",
+  "validation.duplicate_key": "Há campos duplicados na requisição.",
+  "validation.request_invalid": "A requisição enviada é inválida.",
+  "db.fk_violation": "Não foi possível concluir porque há referências relacionadas.",
+  "db.check_violation": "Os dados informados violam uma regra do sistema.",
+  timeout: "A operação demorou mais que o esperado. Tente novamente.",
 };
-
-export function resolveErrorMessage(
-  code: string | undefined,
-  fallback: string,
-): string {
-  if (code && ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
-  return fallback;
-}
