@@ -20,17 +20,18 @@ const (
 
 // Signoff is an immutable value object. All fields are unexported.
 type Signoff struct {
-	id                 string
-	approvalInstanceID string
-	stageInstanceID    string
-	actorUserID        string
-	actorTenantID      string
-	decision           Decision
-	comment            string
-	signedAt           time.Time
-	signatureMethod    string
-	signaturePayload   json.RawMessage
-	contentHash        string // always lowercase hex sha-256
+	id                         string
+	approvalInstanceID         string
+	stageInstanceID            string
+	actorUserID                string
+	actorTenantID              string
+	decision                   Decision
+	comment                    string
+	signedAt                   time.Time
+	signatureMethod            string
+	signaturePayload           json.RawMessage
+	contentHash                string // always lowercase hex sha-256
+	actorDisplayNameSnapshot   string
 }
 
 // Getters — no setters exist; immutable after construction.
@@ -45,20 +46,22 @@ func (s *Signoff) SignedAt() time.Time                { return s.signedAt }
 func (s *Signoff) SignatureMethod() string            { return s.signatureMethod }
 func (s *Signoff) SignaturePayload() json.RawMessage  { return s.signaturePayload }
 func (s *Signoff) ContentHash() string               { return s.contentHash }
+func (s *Signoff) ActorDisplayNameSnapshot() string  { return s.actorDisplayNameSnapshot }
 
 // SignoffParams holds constructor inputs.
 type SignoffParams struct {
-	ID                 string
-	ApprovalInstanceID string
-	StageInstanceID    string
-	ActorUserID        string
-	ActorTenantID      string
-	Decision           Decision
-	Comment            string
-	SignedAt           time.Time
-	SignatureMethod    string
-	SignaturePayload    json.RawMessage
-	ContentHash        string
+	ID                       string
+	ApprovalInstanceID       string
+	StageInstanceID          string
+	ActorUserID              string
+	ActorTenantID            string
+	Decision                 Decision
+	Comment                  string
+	SignedAt                 time.Time
+	SignatureMethod          string
+	SignaturePayload         json.RawMessage
+	ContentHash              string
+	ActorDisplayNameSnapshot string
 }
 
 // NewSignoff constructs an immutable Signoff value object.
@@ -93,17 +96,18 @@ func NewSignoff(p SignoffParams) (*Signoff, error) {
 	}
 
 	return &Signoff{
-		id:                 p.ID,
-		approvalInstanceID: p.ApprovalInstanceID,
-		stageInstanceID:    p.StageInstanceID,
-		actorUserID:        p.ActorUserID,
-		actorTenantID:      p.ActorTenantID,
-		decision:           p.Decision,
-		comment:            p.Comment,
-		signedAt:           p.SignedAt,
-		signatureMethod:    p.SignatureMethod,
-		signaturePayload:   p.SignaturePayload,
-		contentHash:        hash,
+		id:                       p.ID,
+		approvalInstanceID:       p.ApprovalInstanceID,
+		stageInstanceID:          p.StageInstanceID,
+		actorUserID:              p.ActorUserID,
+		actorTenantID:            p.ActorTenantID,
+		decision:                 p.Decision,
+		comment:                  p.Comment,
+		signedAt:                 p.SignedAt,
+		signatureMethod:          p.SignatureMethod,
+		signaturePayload:         p.SignaturePayload,
+		contentHash:              hash,
+		actorDisplayNameSnapshot: p.ActorDisplayNameSnapshot,
 	}, nil
 }
 
