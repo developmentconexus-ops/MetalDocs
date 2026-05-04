@@ -16,6 +16,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
+	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
 )
 
 // Type aliases so handlers depend only on application types.
@@ -24,7 +25,7 @@ type CommitResult = repository.CommitResult
 type RestoreResult = repository.RestoreResult
 
 type Repository interface {
-	CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string) (docID, revID, sessionID string, err error)
+	CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
 	SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error
@@ -289,6 +290,18 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		}
 	}
 
+	// Resolve template snapshot pre-INSERT so snapshot columns are written
+	// atomically with the documents row (C2/C4: no half-born rows).
+	var snap domain.TemplateSnapshot
+	var phs []templatesdomain.Placeholder
+	if s.snapshotSvc != nil {
+		var resolveErr error
+		snap, phs, resolveErr = s.snapshotSvc.ResolveTemplate(ctx, cmd.TenantID, resolvedTemplateVersionID)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("resolve template snapshot: %w", resolveErr)
+		}
+	}
+
 	var contentHash, finalKey string
 	if s.docgen != nil {
 		tmpKey := fmt.Sprintf("tenants/%s/documents/tmp/%s.docx", cmd.TenantID, uuid.New().String())
@@ -306,7 +319,8 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		}()
 
 		doc := buildDocumentForCreate(cmd, cd, resolvedTemplateVersionID)
-		docID, revID, sessionID, err := s.repo.CreateDocument(ctx, &doc, contentHash)
+		doc.TemplateSnapshot = snap
+		docID, revID, sessionID, err := s.repo.CreateDocument(ctx, &doc, contentHash, phs)
 		if err != nil {
 			return nil, err
 		}
@@ -321,12 +335,6 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 			return nil, fmt.Errorf("set revision key: %w", err)
 		}
 
-		if s.snapshotSvc != nil {
-			if err := s.snapshotSvc.SnapshotFromTemplate(ctx, cmd.TenantID, docID, revID, resolvedTemplateVersionID); err != nil {
-				return nil, fmt.Errorf("snapshot template: %w", err)
-			}
-		}
-
 		s.audit.Write(ctx, cmd.TenantID, cmd.ActorUserID, "document.created", docID, map[string]any{"template_version_id": resolvedTemplateVersionID})
 		return &CreateDocumentResult{DocumentID: docID, InitialRevisionID: revID, SessionID: sessionID}, nil
 	}
@@ -337,7 +345,8 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 	contentHash = fmt.Sprintf("%x", h.Sum(nil))
 
 	doc := buildDocumentForCreate(cmd, cd, resolvedTemplateVersionID)
-	docID, revID, sessionID, err := s.repo.CreateDocument(ctx, &doc, contentHash)
+	doc.TemplateSnapshot = snap
+	docID, revID, sessionID, err := s.repo.CreateDocument(ctx, &doc, contentHash, phs)
 	if err != nil {
 		return nil, err
 	}
@@ -345,12 +354,6 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 	finalKey = docxKey // point to template docx directly
 	if err := s.repo.SetRevisionStorageKey(ctx, revID, finalKey); err != nil {
 		return nil, fmt.Errorf("set revision key: %w", err)
-	}
-
-	if s.snapshotSvc != nil {
-		if err := s.snapshotSvc.SnapshotFromTemplate(ctx, cmd.TenantID, docID, revID, resolvedTemplateVersionID); err != nil {
-			return nil, fmt.Errorf("snapshot template: %w", err)
-		}
 	}
 
 	s.audit.Write(ctx, cmd.TenantID, cmd.ActorUserID, "document.created", docID, map[string]any{"template_version_id": resolvedTemplateVersionID})

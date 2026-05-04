@@ -11,6 +11,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
+	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
 )
 
 type fakeRegistryReader struct {
@@ -49,10 +50,10 @@ type captureRepo struct {
 	initialHash string
 }
 
-func (r *captureRepo) CreateDocument(_ context.Context, d *domain.Document, initialContentHash string) (string, string, string, error) {
+func (r *captureRepo) CreateDocument(_ context.Context, d *domain.Document, initialContentHash string, phs []templatesdomain.Placeholder) (string, string, string, error) {
 	r.createdDoc = d
 	r.initialHash = initialContentHash
-	return r.fakeRepo.CreateDocument(context.Background(), d, initialContentHash)
+	return r.fakeRepo.CreateDocument(context.Background(), d, initialContentHash, phs)
 }
 
 func strptr(v string) *string { return &v }

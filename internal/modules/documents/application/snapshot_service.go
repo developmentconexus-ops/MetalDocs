@@ -42,9 +42,9 @@ func NewSnapshotServiceWithSeeder(t SnapshotTemplateReader, w SnapshotWriter, s 
 	return &SnapshotService{templates: t, writer: w, seeder: s}
 }
 
-// SnapshotFromTemplate loads the template identified by templateID, writes all
-// snapshot columns onto the document identified by docID, and seeds default
-// placeholder value rows for revisionID (if a seeder is configured).
+// Deprecated: SnapshotFromTemplate writes snapshot post-commit, breaking
+// atomicity guarantees (see audit C2/C4). Use ResolveTemplate + pass payload
+// to Repository.CreateDocument instead. Retained only for backfill scripts.
 func (s *SnapshotService) SnapshotFromTemplate(ctx context.Context, tenantID, docID, revisionID, templateID string) error {
 	snap, err := s.templates.LoadForSnapshot(ctx, tenantID, templateID)
 	if err != nil {
