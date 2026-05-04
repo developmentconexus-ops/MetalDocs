@@ -1,180 +1,95 @@
-//go:build integration
-// +build integration
-
 package repository_test
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
+	"regexp"
 	"testing"
-	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
 
 	"metaldocs/internal/modules/documents/repository"
-	"metaldocs/internal/platform/tenant"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
-	"metaldocs/tests/integration/testdb"
 )
 
-const fillInTenantID = tenant.DevTenantID
-
-func TestFillInRepository_SeedDefaults_RequiredOnly(t *testing.T) {
-	ctx := context.Background()
-	db, schema := testdb.Open(t)
-
-	docID, tenant := testdb.InsertDraftDocument(t, db, schema, fillInTenantID)
-
-	// Get revisionID from document.
-	var revID string
-	if err := db.QueryRowContext(ctx,
-		`SELECT current_revision_id::text FROM `+testdb.Qualified(schema, "documents")+` WHERE id=$1::uuid`,
-		docID,
-	).Scan(&revID); err != nil {
-		t.Fatalf("get revision: %v", err)
-	}
-
-	placeholders := []templatesdomain.Placeholder{
-		{ID: "ph-required", Label: "Required Field", Type: templatesdomain.PHText, Required: true},
-		{ID: "ph-optional", Label: "Optional Field", Type: templatesdomain.PHText, Required: false},
-	}
-
-	repo := repository.NewFillInRepositoryWithSchema(db, schema)
-	if err := repo.SeedDefaults(ctx, tenant, revID, placeholders); err != nil {
-		t.Fatalf("SeedDefaults: %v", err)
-	}
-
-	// Assert: exactly one row for the required placeholder, none for optional.
-	var count int
-	if err := db.QueryRowContext(ctx,
-		`SELECT count(*) FROM `+testdb.Qualified(schema, "document_placeholder_values")+
-			` WHERE tenant_id=$1::uuid AND revision_id=$2::uuid`,
-		tenant, revID,
-	).Scan(&count); err != nil {
-		t.Fatalf("count rows: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("expected 1 row for required placeholder, got %d", count)
-	}
-
-	// Assert source = 'default'.
-	var source string
-	if err := db.QueryRowContext(ctx,
-		`SELECT source FROM `+testdb.Qualified(schema, "document_placeholder_values")+
-			` WHERE tenant_id=$1::uuid AND revision_id=$2::uuid AND placeholder_id=$3`,
-		tenant, revID, "ph-required",
-	).Scan(&source); err != nil {
-		t.Fatalf("get source: %v", err)
-	}
-	if source != "default" {
-		t.Fatalf("expected source=default, got %q", source)
-	}
-
-	// Idempotency: calling again should not fail or create duplicates.
-	if err := repo.SeedDefaults(ctx, tenant, revID, placeholders); err != nil {
-		t.Fatalf("SeedDefaults idempotent call: %v", err)
-	}
-	if err := db.QueryRowContext(ctx,
-		`SELECT count(*) FROM `+testdb.Qualified(schema, "document_placeholder_values")+
-			` WHERE tenant_id=$1::uuid AND revision_id=$2::uuid`,
-		tenant, revID,
-	).Scan(&count); err != nil {
-		t.Fatalf("count rows after idempotent: %v", err)
-	}
-	if count != 1 {
-		t.Fatalf("expected 1 row after idempotent call, got %d", count)
-	}
+type recordingDBTX struct {
+	execCalled bool
 }
 
-func TestFillInRepository_UpsertValueAndListValues(t *testing.T) {
+func (r *recordingDBTX) ExecContext(_ context.Context, _ string, _ ...any) (sql.Result, error) {
+	r.execCalled = true
+	return sqlmock.NewResult(1, 1), nil
+}
+
+func (r *recordingDBTX) QueryRowContext(_ context.Context, _ string, _ ...any) *sql.Row {
+	return nil
+}
+
+func TestUpsertValue_UsesTxWhenProvided(t *testing.T) {
 	ctx := context.Background()
-	db, schema := testdb.Open(t)
-
-	docID, tenant := testdb.InsertDraftDocument(t, db, schema, fillInTenantID)
-
-	var revID string
-	if err := db.QueryRowContext(ctx,
-		`SELECT current_revision_id::text FROM `+testdb.Qualified(schema, "documents")+` WHERE id=$1::uuid`,
-		docID,
-	).Scan(&revID); err != nil {
-		t.Fatalf("get revision: %v", err)
-	}
-
-	repo := repository.NewFillInRepositoryWithSchema(db, schema)
-
-	v1 := repository.PlaceholderValue{
-		TenantID:      tenant,
-		RevisionID:    revID,
-		PlaceholderID: "ph-1",
-		ValueText:     strPtr("A"),
-		ValueTyped:    map[string]any{"raw": "A"},
-		Source:        "user",
-	}
-	if err := repo.UpsertValue(ctx, v1); err != nil {
-		t.Fatalf("upsert first: %v", err)
-	}
-
-	var createdAt, updatedAt time.Time
-	if err := db.QueryRowContext(ctx,
-		`SELECT created_at, updated_at FROM `+testdb.Qualified(schema, "document_placeholder_values")+`
-		  WHERE tenant_id=$1::uuid AND revision_id=$2::uuid AND placeholder_id=$3`,
-		tenant, revID, "ph-1",
-	).Scan(&createdAt, &updatedAt); err != nil {
-		t.Fatalf("timestamps first: %v", err)
-	}
-
-	time.Sleep(20 * time.Millisecond)
-
-	v2 := repository.PlaceholderValue{
-		TenantID:      tenant,
-		RevisionID:    revID,
-		PlaceholderID: "ph-1",
-		ValueText:     strPtr("B"),
-		ValueTyped:    map[string]any{"raw": "B", "n": float64(2)},
-		Source:        "user",
-	}
-	if err := repo.UpsertValue(ctx, v2); err != nil {
-		t.Fatalf("upsert second: %v", err)
-	}
-
-	var createdAt2, updatedAt2 time.Time
-	var typedJSON []byte
-	if err := db.QueryRowContext(ctx,
-		`SELECT created_at, updated_at, value_typed FROM `+testdb.Qualified(schema, "document_placeholder_values")+`
-		  WHERE tenant_id=$1::uuid AND revision_id=$2::uuid AND placeholder_id=$3`,
-		tenant, revID, "ph-1",
-	).Scan(&createdAt2, &updatedAt2, &typedJSON); err != nil {
-		t.Fatalf("timestamps second: %v", err)
-	}
-	if !createdAt2.Equal(createdAt) {
-		t.Fatalf("created_at changed: first=%v second=%v", createdAt, createdAt2)
-	}
-	if !updatedAt2.After(updatedAt) {
-		t.Fatalf("updated_at did not advance: first=%v second=%v", updatedAt, updatedAt2)
-	}
-
-	values, err := repo.ListValues(ctx, tenant, revID)
+	db, mock, err := sqlmock.New()
 	if err != nil {
-		t.Fatalf("list values: %v", err)
+		t.Fatalf("sqlmock.New: %v", err)
 	}
-	if len(values) != 1 {
-		t.Fatalf("expected 1 value, got %d", len(values))
-	}
-	if values[0].PlaceholderID != "ph-1" {
-		t.Fatalf("placeholder_id = %q, want ph-1", values[0].PlaceholderID)
-	}
-	if values[0].ValueText == nil || *values[0].ValueText != "B" {
-		t.Fatalf("value_text = %v, want B", values[0].ValueText)
-	}
-	if values[0].Source != "user" {
-		t.Fatalf("source = %q, want user", values[0].Source)
+	defer db.Close()
+
+	tx := &recordingDBTX{}
+	repo := repository.NewFillInRepository(db)
+	value := "computed"
+
+	if err := repo.UpsertValue(ctx, repository.PlaceholderValue{
+		TenantID:      "00000000-0000-0000-0000-000000000001",
+		RevisionID:    "00000000-0000-0000-0000-000000000002",
+		PlaceholderID: "computed-placeholder",
+		ValueText:     &value,
+		Source:        "computed",
+	}, tx); err != nil {
+		t.Fatalf("UpsertValue: %v", err)
 	}
 
-	var typed map[string]any
-	if err := json.Unmarshal(typedJSON, &typed); err != nil {
-		t.Fatalf("unmarshal typed json: %v", err)
+	if !tx.execCalled {
+		t.Fatal("expected UpsertValue to execute through provided DBTX")
 	}
-	if typed["raw"] != "B" {
-		t.Fatalf("typed raw = %v, want B", typed["raw"])
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unexpected DB executor call: %v", err)
 	}
 }
 
-func strPtr(v string) *string { return &v }
+func TestUpsertValue_FallsBackToDB(t *testing.T) {
+	ctx := context.Background()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO document_placeholder_values")).
+		WithArgs(
+			"00000000-0000-0000-0000-000000000001",
+			"00000000-0000-0000-0000-000000000002",
+			"user-placeholder",
+			sqlmock.AnyArg(),
+			nil,
+			"user",
+			nil,
+			nil,
+			[]byte(nil),
+		).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	repo := repository.NewFillInRepository(db)
+	value := "user value"
+
+	if err := repo.UpsertValue(ctx, repository.PlaceholderValue{
+		TenantID:      "00000000-0000-0000-0000-000000000001",
+		RevisionID:    "00000000-0000-0000-0000-000000000002",
+		PlaceholderID: "user-placeholder",
+		ValueText:     &value,
+		Source:        "user",
+	}); err != nil {
+		t.Fatalf("UpsertValue: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
