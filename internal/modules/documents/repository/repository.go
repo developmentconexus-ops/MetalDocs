@@ -833,6 +833,29 @@ type commentScanner interface {
 	Scan(dest ...any) error
 }
 
+// MarkArchived sets archived_at on a document without changing its status.
+// Idempotent: WHERE archived_at IS NULL means double-call is a no-op.
+func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID string) error {
+	_ = actorID // reserved for future audit column; audit via Service layer
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE metaldocs.documents
+		   SET archived_at = now(), updated_at = now()
+		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NULL`,
+		tenantID, docID)
+	return err
+}
+
+// Unarchive clears archived_at, restoring the document to active queries.
+func (r *Repository) Unarchive(ctx context.Context, tenantID, docID, actorID string) error {
+	_ = actorID
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE metaldocs.documents
+		   SET archived_at = NULL, updated_at = now()
+		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NOT NULL`,
+		tenantID, docID)
+	return err
+}
+
 func scanComment(row commentScanner) (*domain.Comment, error) {
 	var (
 		idText       string
