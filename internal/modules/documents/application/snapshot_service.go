@@ -67,6 +67,21 @@ func (s *SnapshotService) SnapshotFromTemplate(ctx context.Context, tenantID, do
 	return s.seeder.SeedDefaults(ctx, tenantID, revisionID, phs)
 }
 
+// ResolveTemplate loads the template snapshot and required-placeholder list
+// without writing to the DB. Used by Service.Create so the snapshot is
+// written atomically with the documents row inside CreateDocument.
+func (s *SnapshotService) ResolveTemplate(ctx context.Context, tenantID, templateID string) (domain.TemplateSnapshot, []templatesdomain.Placeholder, error) {
+	snap, err := s.templates.LoadForSnapshot(ctx, tenantID, templateID)
+	if err != nil {
+		return domain.TemplateSnapshot{}, nil, err
+	}
+	phs, err := parseRequiredPlaceholders(snap.PlaceholderSchemaJSON)
+	if err != nil {
+		return domain.TemplateSnapshot{}, nil, fmt.Errorf("parse placeholder schema: %w", err)
+	}
+	return snap, phs, nil
+}
+
 // parseRequiredPlaceholders extracts placeholders with Required=true from
 // the placeholder schema JSON blob. Returns empty slice on empty/nil input.
 func parseRequiredPlaceholders(schemaJSON []byte) ([]templatesdomain.Placeholder, error) {
