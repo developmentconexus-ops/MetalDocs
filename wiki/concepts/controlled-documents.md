@@ -1,12 +1,12 @@
 # Concept: Controlled Documents
 
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-04
 > **Status:** Stub. Verify exact code-format string + sequence reset rules against domain code.
 > **Scope:** What a Controlled Document (CD) is, code generation, profile + area binding, sequence counters.
 > **Key files:**
 > - `internal/modules/registry/` — CD module (verify path)
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — CD list
-> - `frontend/apps/web/src/features/registry/RegistryCreateDialog.tsx` — CD create dialog
+> - `frontend/apps/web/src/features/registry/RegistryCreateDialog.tsx:13` — CD create dialog; submit gated on `isAuthReady = !!currentUser?.userId` (E12); author field shows placeholder when auth not ready
 
 ## What it is
 
@@ -44,6 +44,16 @@ Sequence pads with leading zeros (verify width — usually 3 digits).
 3. Future revisions create additional versions on the same CD.
 
 The CD itself doesn't have an approval state — its versions do. The CD just owns the code and the version history.
+
+## Create dialog auth-gate (E12 — fixed 8f719580)
+
+`RegistryCreateDialog` previously allowed the submit button to be clicked before `currentUser` resolved from the auth store, causing a race on first load (empty `ownerUserId`). Fixed by:
+
+- `isAuthReady = !!currentUser?.userId` at `RegistryCreateDialog.tsx:15`.
+- Submit button `disabled={saving || !isAuthReady}` (line 202).
+- Author field shows `"Aguardando autenticação..."` placeholder until ready (line 129).
+
+---
 
 ## See also
 
