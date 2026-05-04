@@ -3,10 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InboxPage } from './InboxPage';
 
 import * as approvalApi from '../api/approvalApi';
+import * as taxonomyApi from '../../taxonomy/api';
 
 const navigateMock = vi.fn();
 
 vi.mock('../api/approvalApi');
+vi.mock('../../taxonomy/api', () => ({
+  fetchAreas: vi.fn().mockResolvedValue([]),
+}));
 vi.mock('react-router-dom', () => ({
   useNavigate: () => navigateMock,
 }));
@@ -24,6 +28,8 @@ function createDeferred<T>() {
 describe('InboxPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Restore default: areas effect must not throw
+    vi.mocked(taxonomyApi.fetchAreas).mockResolvedValue([]);
   });
 
   it('loading state', () => {
@@ -118,6 +124,8 @@ describe('InboxPage', () => {
   });
 
   it('filter by area re-fetches', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(taxonomyApi.fetchAreas).mockResolvedValue([{ code: 'JUR', name: 'Jurídico', archived: false } as any]);
     vi.mocked(approvalApi.listInbox).mockResolvedValue({ items: [], total: 0 });
     render(<InboxPage />);
 
@@ -129,6 +137,11 @@ describe('InboxPage', () => {
       });
     });
 
+    // Wait for areas to load so 'JUR' option exists before firing change
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /JUR/i })).toBeTruthy();
+    });
+
     fireEvent.change(screen.getByLabelText('Área'), { target: { value: 'JUR' } });
 
     await waitFor(() => {
@@ -138,5 +151,23 @@ describe('InboxPage', () => {
         limit: 20,
       });
     });
+  });
+
+  it('populates area filter from fetchAreas, not hardcoded list', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(taxonomyApi.fetchAreas).mockResolvedValue([
+      { code: 'OPS', name: 'Operações', archived: false } as any,
+      { code: 'QA', name: 'Qualidade', archived: false } as any,
+    ]);
+    vi.mocked(approvalApi.listInbox).mockResolvedValue({ items: [], total: 0 });
+
+    render(<InboxPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Todas as áreas/i })).toBeTruthy();
+    });
+    expect(screen.getByRole('option', { name: /OPS — Operações/ })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /QA — Qualidade/ })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /JUR/ })).toBeNull();
   });
 });
