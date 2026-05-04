@@ -37,12 +37,12 @@ func NewDocumentContextBuilder(
 	}
 }
 
-func (b *DocumentContextBuilder) loadDocumentSnapshot(ctx context.Context, tenantID, revisionID string) (areaCode, controlledDocumentID string, err error) {
+func (b *DocumentContextBuilder) loadDocumentSnapshot(ctx context.Context, tenantID, revisionID string) (areaCode, controlledDocumentID, areaName string, err error) {
 	err = b.db.QueryRowContext(ctx,
-		`SELECT coalesce(process_area_code_snapshot, ''), coalesce(controlled_document_id::text, '') FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
+		`SELECT coalesce(process_area_code_snapshot, ''), coalesce(controlled_document_id::text, ''), coalesce(area_name_snapshot, '') FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tenantID, revisionID,
-	).Scan(&areaCode, &controlledDocumentID)
-	return areaCode, controlledDocumentID, err
+	).Scan(&areaCode, &controlledDocumentID, &areaName)
+	return areaCode, controlledDocumentID, areaName, err
 }
 
 const activeInstanceSQL = `
@@ -53,7 +53,7 @@ SELECT id FROM approval_instances
 
 // Build returns the ResolveInput for a revision being approved.
 func (b *DocumentContextBuilder) Build(ctx context.Context, tenantID, revisionID string, _ ApproverContext) (resolvers.ResolveInput, error) {
-	areaCode, controlledDocumentID, err := b.loadDocumentSnapshot(ctx, tenantID, revisionID)
+	areaCode, controlledDocumentID, areaName, err := b.loadDocumentSnapshot(ctx, tenantID, revisionID)
 	if err != nil {
 		return resolvers.ResolveInput{}, err
 	}
@@ -67,6 +67,7 @@ func (b *DocumentContextBuilder) Build(ctx context.Context, tenantID, revisionID
 		RevisionID:           revisionID,
 		ControlledDocumentID: controlledDocumentID,
 		AreaCodeSnapshot:     areaCode,
+		AreaNameSnapshot:     areaName,
 		ApprovalInstanceID:   instanceID.String,
 		RevisionReader:       b.revReader,
 		WorkflowReader:       b.workflowReader,

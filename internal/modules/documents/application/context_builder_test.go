@@ -55,9 +55,9 @@ func TestBuild_WiresDocumentReaderAndControlledDocumentID(t *testing.T) {
 	cdID := "00000000-0000-0000-0000-000000000003"
 	areaCode := "QMS"
 
-	mock.ExpectQuery(`SELECT coalesce\(process_area_code_snapshot, ?''\), coalesce\(controlled_document_id::text, ?''\) FROM documents WHERE`).
+	mock.ExpectQuery(`SELECT coalesce\(process_area_code_snapshot, ?''\), coalesce\(controlled_document_id::text, ?''\), coalesce\(area_name_snapshot, ?''\) FROM documents WHERE`).
 		WithArgs(tenantID, revisionID).
-		WillReturnRows(sqlmock.NewRows([]string{"area_code", "controlled_document_id"}).AddRow(areaCode, cdID))
+		WillReturnRows(sqlmock.NewRows([]string{"area_code", "controlled_document_id", "area_name"}).AddRow(areaCode, cdID, ""))
 
 	mock.ExpectQuery(`SELECT id FROM approval_instances`).
 		WithArgs(tenantID, revisionID).
