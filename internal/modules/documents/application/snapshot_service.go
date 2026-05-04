@@ -42,9 +42,9 @@ func NewSnapshotServiceWithSeeder(t SnapshotTemplateReader, w SnapshotWriter, s 
 	return &SnapshotService{templates: t, writer: w, seeder: s}
 }
 
-// SnapshotFromTemplate loads the template identified by templateID, writes all
-// snapshot columns onto the document identified by docID, and seeds default
-// placeholder value rows for revisionID (if a seeder is configured).
+// Deprecated: SnapshotFromTemplate writes snapshot post-commit, breaking
+// atomicity guarantees (see audit C2/C4). Use ResolveTemplate + pass payload
+// to Repository.CreateDocument instead. Retained only for backfill scripts.
 func (s *SnapshotService) SnapshotFromTemplate(ctx context.Context, tenantID, docID, revisionID, templateID string) error {
 	snap, err := s.templates.LoadForSnapshot(ctx, tenantID, templateID)
 	if err != nil {
@@ -65,6 +65,21 @@ func (s *SnapshotService) SnapshotFromTemplate(ctx context.Context, tenantID, do
 		return nil
 	}
 	return s.seeder.SeedDefaults(ctx, tenantID, revisionID, phs)
+}
+
+// ResolveTemplate loads the template snapshot and required-placeholder list
+// without writing to the DB. Used by Service.Create so the snapshot is
+// written atomically with the documents row inside CreateDocument.
+func (s *SnapshotService) ResolveTemplate(ctx context.Context, tenantID, templateID string) (domain.TemplateSnapshot, []templatesdomain.Placeholder, error) {
+	snap, err := s.templates.LoadForSnapshot(ctx, tenantID, templateID)
+	if err != nil {
+		return domain.TemplateSnapshot{}, nil, err
+	}
+	phs, err := parseRequiredPlaceholders(snap.PlaceholderSchemaJSON)
+	if err != nil {
+		return domain.TemplateSnapshot{}, nil, fmt.Errorf("parse placeholder schema: %w", err)
+	}
+	return snap, phs, nil
 }
 
 // parseRequiredPlaceholders extracts placeholders with Required=true from
