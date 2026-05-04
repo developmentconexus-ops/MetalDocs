@@ -2,7 +2,7 @@
 import { ApiError } from "./errors";
 
 export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  const res = await (init !== undefined ? fetch(url, init) : fetch(url));
 
   if (res.status === 401) {
     dispatchAuthExpired(window.location.pathname + window.location.search);
