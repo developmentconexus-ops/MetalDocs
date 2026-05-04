@@ -12,7 +12,7 @@
   "route.in_use": "Esta rota está em uso e não pode ser alterada.",
   "route.duplicate_profile": "Já existe uma rota para este perfil.",
   "not_found.instance": "Documento não encontrado.",
-  "not_found.route": "Rota não encontrada.",
+  "not_found.route": "Nenhuma rota de aprovação configurada para este perfil de documento. Configure uma rota antes de finalizar.",
   "precondition.if_match_required": "A revisão do documento é obrigatória para esta operação.",
   "precondition.content_hash_mismatch": "O conteúdo enviado não corresponde à versão esperada.",
   "idempotency.key_required": "A chave de idempotência é obrigatória.",
