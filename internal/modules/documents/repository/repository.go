@@ -189,7 +189,7 @@ func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]doma
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
 		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,'')
-		 FROM documents WHERE tenant_id=$1 ORDER BY updated_at DESC`, tenantID)
+		 FROM documents WHERE tenant_id=$1 AND archived_at IS NULL ORDER BY updated_at DESC`, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
 		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,'')
-		 FROM documents WHERE tenant_id=$1 AND created_by=$2 ORDER BY updated_at DESC`, tenantID, userID)
+		 FROM documents WHERE tenant_id=$1 AND created_by=$2 AND archived_at IS NULL ORDER BY updated_at DESC`, tenantID, userID)
 	if err != nil {
 		return nil, err
 	}
