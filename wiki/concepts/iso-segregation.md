@@ -1,8 +1,12 @@
 # Concept: ISO Segregation of Duties
 
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-04
 > **Status:** Stub. Add full enforcement points + edge cases when audited.
 > **Scope:** Why and how the platform enforces that submitters cannot approve their own work.
+> **Out of scope:** Error messages shown to users when SoD is violated (see `concepts/error-ux.md`).
+> **Key files:**
+> - `frontend/apps/web/src/features/approval/components/SignoffDialog.tsx:17` — `error_sod_submitter` / `error_sod_duplicate` dialog states
+> - `frontend/apps/web/src/features/approval/api/mutationClient.ts:9` — `ApprovalError` thrown on 403 with SoD code
 
 ## Why
 
@@ -42,3 +46,4 @@ If a route has multiple stages with the same approver, the approver can sign off
 - [modules/approval.md](../modules/approval.md)
 - [modules/iam-rbac.md](../modules/iam-rbac.md)
 - [workflows/user-onboarding.md](../workflows/user-onboarding.md) — Step 8 (D2 in smoke routine validates this)
+- [concepts/error-ux.md](error-ux.md) — Portuguese error messages for `sod.submitter_cannot_sign` / `sod.cross_stage_duplicate`; E2 SoD dialog states in `SignoffDialog`

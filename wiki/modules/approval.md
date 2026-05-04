@@ -1,6 +1,6 @@
 # Module: approval
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Scope:** Approval routes, signoffs, ISO segregation enforcement, freeze trigger.
 > **Out of scope:** Freeze pipeline mechanics (see `workflows/freeze-and-fanout.md`).
 > **Key files:**
@@ -21,7 +21,8 @@
 > - `frontend/apps/web/src/features/approval/api/approvalTypes.ts:16` — `RouteStage` (includes `required_role`, `required_capability`, `area_code`)
 > - `internal/modules/documents/approval/http/contracts/route.go:119` — `ListStageItem` (includes `RequiredRole`, `RequiredCapability`, `AreaCode`)
 > - `internal/modules/documents/approval/http/route_admin_handler.go:207` — `ListRoutesHandler` SQL (selects all stage fields)
-> - `frontend/apps/web/src/features/approval/components/SignoffDialog.tsx` — signoff dialog with password confirm
+> - `frontend/apps/web/src/features/approval/components/SignoffDialog.tsx:17` — `error_sod_submitter` / `error_sod_duplicate` states; `mapErrorToState` at :124
+> - `frontend/apps/web/src/features/approval/api/mutationClient.ts:9` — `ApprovalError extends ApiError`; 401 dispatches auth-bus; 403 throws with SoD code
 
 ## Concepts
 
@@ -107,4 +108,5 @@ Previously `CreateDocument` did not include `revision_number` in its INSERT (def
 - [workflows/user-onboarding.md](../workflows/user-onboarding.md) — Step 8
 - [workflows/approval.md](../workflows/approval.md)
 - [concepts/iso-segregation.md](../concepts/iso-segregation.md)
+- [concepts/error-ux.md](../concepts/error-ux.md) — SoD dialog states (E2), auth-bus on 401 (E4), shared `ApprovalError`/`ApiError` hierarchy
 - [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md)
