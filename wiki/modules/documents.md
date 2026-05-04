@@ -1,10 +1,10 @@
 # documents Module
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:1` — editor page (chrome + MetalDocsEditor mount)
+> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:126` — `handleFinalize` — catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
 > - `frontend/apps/web/src/features/documents/v2/styles/DocumentEditorPage.module.css:1` — wine-brand chrome CSS
 > - `frontend/apps/web/src/features/documents/v2/routes.tsx:1` — route parsing/rendering for `/documents-v2/*`
 > - `frontend/apps/web/src/features/documents/v2/DocumentCreatePage.tsx:1` — step 1: pick controlled document
@@ -133,3 +133,9 @@ Note: backend returns both camelCase and snake_case fields depending on endpoint
 - **Navigating to `/documents-v2/<uuid>` from library views:** Works correctly — `viewFromPath` maps this to `"documents-v2"` activeView, which renders `renderDocumentsV2View`. No extra wiring needed.
 - **Checking `doc.status` for edit eligibility:** Status from `SearchDocumentItem` (hub list) is uppercase `"DRAFT"`. Status from `DocumentResponse` (editor API) can be lowercase `"draft"`. Normalize before comparing.
 - **204 responses on PUT endpoints:** Vite dev proxy aborts 204 with no body. Backend must return 200 + `{}` body for all mutating endpoints in dev.
+
+## See also
+
+- [concepts/error-ux.md](../concepts/error-ux.md) — `apiFetch` wrapper used in `DocumentEditorPage`; `resolveErrorMessage` for finalize error toast (E3)
+- [modules/approval.md](approval.md)
+- [workflows/approval.md](../workflows/approval.md)
