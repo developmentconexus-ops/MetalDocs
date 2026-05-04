@@ -13,7 +13,7 @@ import (
 )
 
 type outboxRepoAPI interface {
-	ClaimPending(ctx context.Context, limit int) ([]OutboxRow, error)
+	ClaimPending(ctx context.Context, limit, maxAttempts int) ([]OutboxRow, error)
 	MarkDispatched(ctx context.Context, id string) error
 	MarkFailed(ctx context.Context, id, errStr string, nextRetryAt time.Time, finalize bool) error
 	ResetStaleClaims(ctx context.Context, olderThan time.Duration) (int, error)
@@ -55,7 +55,7 @@ func (w *PDFOutboxWorker) tick(ctx context.Context) {
 	if _, err := w.repo.ResetStaleClaims(ctx, w.staleAfter); err != nil {
 		w.log.Warn("reset stale claims", "err", err)
 	}
-	rows, err := w.repo.ClaimPending(ctx, w.batchSize)
+	rows, err := w.repo.ClaimPending(ctx, w.batchSize, w.maxAttempt)
 	if err != nil {
 		w.log.Warn("claim pending", "err", err)
 		return

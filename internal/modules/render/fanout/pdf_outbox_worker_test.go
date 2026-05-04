@@ -18,7 +18,7 @@ type fakeOutboxRepo struct {
 	finalizedIDs  []string
 }
 
-func (f *fakeOutboxRepo) ClaimPending(_ context.Context, _ int) ([]OutboxRow, error) {
+func (f *fakeOutboxRepo) ClaimPending(_ context.Context, _, _ int) ([]OutboxRow, error) {
 	return f.rows, nil
 }
 func (f *fakeOutboxRepo) MarkDispatched(_ context.Context, id string) error {
