@@ -159,19 +159,27 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: marshal signature payload: %w", err)
 	}
+
+	var actorDisplayName sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT display_name FROM metaldocs.iam_users WHERE user_id = $1`, req.ActorUserID).Scan(&actorDisplayName); err != nil && err != sql.ErrNoRows {
+		_ = tx.Rollback()
+		return SignoffResult{}, fmt.Errorf("recordSignoff: lookup actor display name: %w", err)
+	}
+
 	now := s.clock.Now()
 	signoff, err := domain.NewSignoff(domain.SignoffParams{
-		ID:                 uuid.New().String(),
-		ApprovalInstanceID: req.InstanceID,
-		StageInstanceID:    activeStage.ID,
-		ActorUserID:        req.ActorUserID,
-		ActorTenantID:      req.TenantID,
-		Decision:           domain.Decision(req.Decision),
-		Comment:            req.Comment,
-		SignedAt:           now,
-		SignatureMethod:    req.SignatureMethod,
-		SignaturePayload:   sigPayload,
-		ContentHash:        contentHash,
+		ID:                       uuid.New().String(),
+		ApprovalInstanceID:       req.InstanceID,
+		StageInstanceID:          activeStage.ID,
+		ActorUserID:              req.ActorUserID,
+		ActorTenantID:            req.TenantID,
+		Decision:                 domain.Decision(req.Decision),
+		Comment:                  req.Comment,
+		SignedAt:                 now,
+		SignatureMethod:          req.SignatureMethod,
+		SignaturePayload:         sigPayload,
+		ContentHash:              contentHash,
+		ActorDisplayNameSnapshot: actorDisplayName.String,
 	})
 	if err != nil {
 		_ = tx.Rollback()

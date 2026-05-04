@@ -117,12 +117,18 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx *sql.
 		payload = json.RawMessage("{}")
 	}
 
+	var actorDisplayNameSnapshot sql.NullString
+	if v := s.ActorDisplayNameSnapshot(); v != "" {
+		actorDisplayNameSnapshot = sql.NullString{String: v, Valid: true}
+	}
+
 	var returnedID string
 	err := tx.QueryRowContext(ctx, `
 		INSERT INTO approval_signoffs
 		  (id, approval_instance_id, stage_instance_id, actor_user_id, actor_tenant_id,
-		   decision, comment, signed_at, signature_method, signature_payload, content_hash)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		   decision, comment, signed_at, signature_method, signature_payload, content_hash,
+		   actor_display_name_snapshot)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (approval_instance_id, actor_user_id) DO NOTHING
 		RETURNING id`,
 		s.ID(),
@@ -136,6 +142,7 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx *sql.
 		s.SignatureMethod(),
 		payload,
 		s.ContentHash(),
+		actorDisplayNameSnapshot,
 	).Scan(&returnedID)
 
 	if err == nil {

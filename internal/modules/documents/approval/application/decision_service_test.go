@@ -178,6 +178,10 @@ func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &decisionSingleValueRows{value: s.conn.actorID}, nil
 	}
+	// IAM display name lookup for actor_display_name_snapshot.
+	if strings.Contains(q, "from metaldocs.iam_users") && strings.Contains(q, "display_name") {
+		return &decisionSingleValueRows{value: nil}, nil // NULL — best-effort
+	}
 	// loadStageSignoffs queries WHERE stage_instance_id = $1 (no "!=")
 	// loadPriorSignoffs queries WHERE stage_instance_id != $2
 	// Both hit "approval_signoffs" table.
