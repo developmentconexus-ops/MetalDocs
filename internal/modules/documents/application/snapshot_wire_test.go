@@ -1,11 +1,8 @@
 package application_test
 
-// snapshot_wire_test.go — unit test asserting SnapshotService is called
-// inside CreateDocument when wired via NewServiceWithSnapshot.
-//
-// Uses fakes already defined in service_test.go and service_cd_test.go:
-// fakeRepo, fakeTplReader, noopAudit, fakeRegistryReader, fakeAuthzChecker,
-// fakeProfileDefaultTemplateReader, strptr.
+// snapshot_wire_test.go — unit test asserting SnapshotService.ResolveTemplate
+// is called inside CreateDocument when wired via NewServiceWithSnapshot, and
+// that the resolved snapshot is set on the document before repo.CreateDocument.
 
 import (
 	"context"
@@ -18,35 +15,23 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-// wireSnapshotReader implements SnapshotTemplateReader for the wiring test.
-type wireSnapshotReader struct{}
-
-func (wireSnapshotReader) LoadForSnapshot(_ context.Context, _, _ string) (domain.TemplateSnapshot, error) {
-	return domain.TemplateSnapshot{
-		PlaceholderSchemaJSON: []byte(`{"placeholders":[]}`),
-		CompositionJSON:       []byte(`{}`),
-		BodyDocxBytes:         []byte("DOCX"),
-		BodyDocxS3Key:         "s3://t/k",
-	}, nil
-}
-
-// wireSnapshotWriter records WriteSnapshot calls.
-type wireSnapshotWriter struct {
+// trackingSnapshotReader records LoadForSnapshot calls.
+type trackingSnapshotReader struct {
+	snap   domain.TemplateSnapshot
 	called bool
-	docID  string
 }
 
-func (w *wireSnapshotWriter) WriteSnapshot(_ context.Context, _, docID string, _ domain.TemplateSnapshot) error {
-	w.called = true
-	w.docID = docID
-	return nil
+func (r *trackingSnapshotReader) LoadForSnapshot(_ context.Context, _, _ string) (domain.TemplateSnapshot, error) {
+	r.called = true
+	return r.snap, nil
 }
 
 func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 	const tenantID = tenant.DevTenantID
 
-	// fakeRepo is declared in service_test.go (always compiled).
-	repo := &fakeRepo{createDocIDs: [3]string{"doc-snap-1", "rev-snap-1", "sess-snap-1"}}
+	innerRepo := &fakeRepo{createDocIDs: [3]string{"doc-snap-1", "rev-snap-1", "sess-snap-1"}}
+	repo := &captureRepo{fakeRepo: innerRepo}
+
 	cd := &registrydomain.ControlledDocument{
 		ID:              "cd-snap-1",
 		TenantID:        tenantID,
@@ -55,8 +40,15 @@ func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 		Status:          registrydomain.CDStatusActive,
 	}
 
-	writer := &wireSnapshotWriter{}
-	snapSvc := application.NewSnapshotService(wireSnapshotReader{}, writer)
+	reader := &trackingSnapshotReader{
+		snap: domain.TemplateSnapshot{
+			PlaceholderSchemaJSON: []byte(`{"placeholders":[]}`),
+			CompositionJSON:       []byte(`{}`),
+			BodyDocxS3Key:         "s3://t/k",
+		},
+	}
+	// writer is nil — ResolveTemplate does not use it
+	snapSvc := application.NewSnapshotService(reader, nil)
 
 	svc := application.NewServiceWithSnapshot(
 		repo,
@@ -82,10 +74,13 @@ func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateDocument: %v", err)
 	}
-	if !writer.called {
-		t.Fatal("expected SnapshotService.SnapshotFromTemplate to be called, was not")
+	if !reader.called {
+		t.Fatal("expected SnapshotService.ResolveTemplate to call LoadForSnapshot")
 	}
-	if writer.docID != "doc-snap-1" {
-		t.Fatalf("snapshot written for wrong docID: got %q, want doc-snap-1", writer.docID)
+	if repo.createdDoc == nil {
+		t.Fatal("captureRepo did not capture document")
+	}
+	if string(repo.createdDoc.TemplateSnapshot.PlaceholderSchemaJSON) != string(reader.snap.PlaceholderSchemaJSON) {
+		t.Fatalf("doc.TemplateSnapshot not populated: got %q", repo.createdDoc.TemplateSnapshot.PlaceholderSchemaJSON)
 	}
 }

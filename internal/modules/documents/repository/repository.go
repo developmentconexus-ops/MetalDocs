@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"metaldocs/internal/modules/documents/domain"
+	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
 )
 
 // isInvalidUUID returns true when err is a Postgres error with SQLSTATE 22P02
@@ -32,7 +33,8 @@ func New(db *sql.DB) *Repository { return &Repository{db: db} }
 // deferrable-FK transaction. The initial revision's storage_key is empty - the
 // caller uploads the .docx to the final content-addressed key via
 // Presigner.AdoptTempObject, then calls SetRevisionStorageKey to finalize.
-func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string) (docID, revID, sessionID string, err error) {
+// requiredPlaceholders seeds document_placeholder_values rows in the same tx.
+func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return "", "", "", err
@@ -90,6 +92,40 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 		revID, sessionID, docID,
 	); err != nil {
 		return "", "", "", fmt.Errorf("update document pointers: %w", err)
+	}
+
+	// Write snapshot columns in same tx (C2/C4: atomic creation).
+	if snap := d.TemplateSnapshot; snap.PlaceholderSchemaJSON != nil || snap.CompositionJSON != nil || snap.BodyDocxS3Key != "" {
+		h := snap.Hashes()
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE metaldocs.documents
+			   SET placeholder_schema_snapshot = $1,
+			       placeholder_schema_hash     = $2,
+			       composition_config_snapshot = $3,
+			       composition_config_hash     = $4,
+			       body_docx_snapshot_s3_key   = $5,
+			       body_docx_hash              = $6
+			 WHERE id = $7`,
+			snap.PlaceholderSchemaJSON, h.PlaceholderSchemaHash,
+			snap.CompositionJSON, h.CompositionHash,
+			snap.BodyDocxS3Key, h.BodyDocxHash,
+			docID,
+		); err != nil {
+			return "", "", "", fmt.Errorf("write snapshot: %w", err)
+		}
+	}
+
+	// Seed required placeholder_values rows in same tx (C4).
+	for _, p := range requiredPlaceholders {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO metaldocs.document_placeholder_values
+			    (tenant_id, revision_id, placeholder_id, source, created_at, updated_at)
+			VALUES ($1, $2, $3, 'default', NOW(), NOW())
+			ON CONFLICT DO NOTHING`,
+			d.TenantID, revID, p.ID,
+		); err != nil {
+			return "", "", "", fmt.Errorf("seed placeholder %q: %w", p.ID, err)
+		}
 	}
 
 	return docID, revID, sessionID, tx.Commit()
