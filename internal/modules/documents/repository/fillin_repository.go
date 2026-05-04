@@ -70,7 +70,7 @@ func (r *FillInRepository) SeedDefaults(ctx context.Context, tenantID, revisionI
 	return tx.Commit()
 }
 
-func (r *FillInRepository) UpsertValue(ctx context.Context, v PlaceholderValue) error {
+func (r *FillInRepository) UpsertValue(ctx context.Context, v PlaceholderValue, q ...DBTX) error {
 	var valueTyped any
 	if v.ValueTyped != nil {
 		b, err := json.Marshal(v.ValueTyped)
@@ -80,7 +80,12 @@ func (r *FillInRepository) UpsertValue(ctx context.Context, v PlaceholderValue) 
 		valueTyped = b
 	}
 
-	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+	exec := DBTX(r.db)
+	if len(q) > 0 && q[0] != nil {
+		exec = q[0]
+	}
+
+	_, err := exec.ExecContext(ctx, fmt.Sprintf(`
 		INSERT INTO %s
 		    (tenant_id, revision_id, placeholder_id, value_text, value_typed,
 		     source, computed_from, resolver_version, inputs_hash, validated_at, created_at, updated_at)

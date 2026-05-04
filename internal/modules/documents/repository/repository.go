@@ -43,12 +43,26 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 	// revision_number: unique index ux_documents_v2_cd_revision serialises concurrent
 	// creation for the same CD; second concurrent caller gets a constraint violation.
 	// COALESCE handles hypothetical NULL CD (schema enforces NOT NULL since migration 0129).
+
+	var createdByDisplayName sql.NullString
+	if err := tx.QueryRowContext(ctx, `SELECT display_name FROM metaldocs.iam_users WHERE user_id = $1`, d.CreatedBy).Scan(&createdByDisplayName); err != nil && err != sql.ErrNoRows {
+		return "", "", "", fmt.Errorf("create document: lookup created_by display name: %w", err)
+	}
+
+	var areaName sql.NullString
+	if d.ProcessAreaCodeSnapshot != nil && *d.ProcessAreaCodeSnapshot != "" {
+		if err := tx.QueryRowContext(ctx, `SELECT name FROM metaldocs.process_areas WHERE tenant_id=$1::uuid AND code=$2`, d.TenantID, *d.ProcessAreaCodeSnapshot).Scan(&areaName); err != nil && err != sql.ErrNoRows {
+			return "", "", "", fmt.Errorf("create document: lookup area name: %w", err)
+		}
+	}
+
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO documents (tenant_id, template_version_id, name, status, form_data_json, created_by, controlled_document_id, profile_code_snapshot, process_area_code_snapshot, code, revision_number)
+		`INSERT INTO documents (tenant_id, template_version_id, name, status, form_data_json, created_by, controlled_document_id, profile_code_snapshot, process_area_code_snapshot, code, revision_number, created_by_display_name_snapshot, area_name_snapshot)
 		 SELECT $1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9,
-		        COALESCE((SELECT MAX(d2.revision_number) FROM documents d2 WHERE d2.controlled_document_id = $6), 0) + 1
+		        COALESCE((SELECT MAX(d2.revision_number) FROM documents d2 WHERE d2.controlled_document_id = $6), 0) + 1,
+		        $10, $11
 		 RETURNING id`,
-		d.TenantID, d.TemplateVersionID, d.Name, d.FormDataJSON, d.CreatedBy, d.ControlledDocumentID, d.ProfileCodeSnapshot, d.ProcessAreaCodeSnapshot, d.Code,
+		d.TenantID, d.TemplateVersionID, d.Name, d.FormDataJSON, d.CreatedBy, d.ControlledDocumentID, d.ProfileCodeSnapshot, d.ProcessAreaCodeSnapshot, d.Code, createdByDisplayName, areaName,
 	).Scan(&docID); err != nil {
 		return "", "", "", fmt.Errorf("insert document: %w", err)
 	}
