@@ -1,21 +1,7 @@
+import { apiFetch, ApiError } from "../../lib/api";
 import type { ControlledDocument, CreateControlledDocumentRequest } from "./types";
 
 const BASE = "/api/v2/controlled-documents";
-
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (res.status === 204) {
-    return undefined as T;
-  }
-  const data = await res.json() as { message?: string; code?: string };
-  if (!res.ok) {
-    throw new Error(data.message ?? data.code ?? "Request failed");
-  }
-  return data as T;
-}
 
 export async function fetchControlledDocuments(filter?: {
   profileCode?: string;
@@ -31,30 +17,33 @@ export async function fetchControlledDocuments(filter?: {
   if (filter?.limit != null) params.set("limit", String(filter.limit));
   if (filter?.offset != null) params.set("offset", String(filter.offset));
   const qs = params.toString() ? `?${params.toString()}` : "";
-  const res = await request<{ items: ControlledDocument[] }>(`${qs}`);
+  const res = await apiFetch<{ items: ControlledDocument[] }>(`${BASE}${qs}`);
   return res.items;
 }
 
 export async function fetchControlledDocument(id: string): Promise<ControlledDocument> {
-  return request<ControlledDocument>(`/${encodeURIComponent(id)}`);
+  return apiFetch<ControlledDocument>(`${BASE}/${encodeURIComponent(id)}`);
 }
 
 export async function createControlledDocument(req: CreateControlledDocumentRequest): Promise<ControlledDocument> {
-  return request<ControlledDocument>("", {
+  return apiFetch<ControlledDocument>(BASE, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
 }
 
 export async function obsoleteControlledDocument(id: string): Promise<void> {
-  return request<void>(`/${encodeURIComponent(id)}/obsolete`, {
+  await apiFetch<void>(`${BASE}/${encodeURIComponent(id)}/obsolete`, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 export async function supersedeControlledDocument(id: string): Promise<void> {
-  return request<void>(`/${encodeURIComponent(id)}/supersede`, {
+  await apiFetch<void>(`${BASE}/${encodeURIComponent(id)}/supersede`, {
     method: "PUT",
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -70,10 +59,12 @@ export interface ActiveDocumentInstance {
 export async function fetchActiveDocumentInstance(
   controlledDocumentId: string,
 ): Promise<ActiveDocumentInstance | null> {
-  const res = await fetch(`${BASE}/${encodeURIComponent(controlledDocumentId)}/active-document`, {
-    credentials: "include",
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error("Failed to load active document instance");
-  return res.json() as Promise<ActiveDocumentInstance>;
+  try {
+    return await apiFetch<ActiveDocumentInstance>(
+      `${BASE}/${encodeURIComponent(controlledDocumentId)}/active-document`,
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }
