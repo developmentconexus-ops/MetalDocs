@@ -26,12 +26,7 @@ type PDFDispatchInvoker interface {
 
 // PDFOutboxEnqueuer enqueues a PDF dispatch inside the approval transaction.
 type PDFOutboxEnqueuer interface {
-	Enqueue(ctx context.Context, tx OutboxTx, tenantID, revisionID string, contentHash []byte) error
-}
-
-// OutboxTx is the subset of *sql.Tx required by PDFOutboxEnqueuer.
-type OutboxTx interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error
 }
 
 // DecisionService handles approver approve/reject decisions.

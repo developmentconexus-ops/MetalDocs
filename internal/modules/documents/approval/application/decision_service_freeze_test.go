@@ -43,7 +43,7 @@ type fakePDFOutboxEnqueuer struct {
 	revisionIDs []string
 }
 
-func (f *fakePDFOutboxEnqueuer) Enqueue(_ context.Context, _ OutboxTx, tenantID, revisionID string, _ []byte) error {
+func (f *fakePDFOutboxEnqueuer) Enqueue(_ context.Context, _ *sql.Tx, tenantID, revisionID string, _ []byte) error {
 	f.calls++
 	f.tenantIDs = append(f.tenantIDs, tenantID)
 	f.revisionIDs = append(f.revisionIDs, revisionID)

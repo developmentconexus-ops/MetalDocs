@@ -287,9 +287,16 @@ func main() {
 	if freezeSvc != nil {
 		effectiveFreezeInvoker = freezeSvc
 	}
+	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
+	pdfOutboxWorker := fanout.NewPDFOutboxWorker(pdfOutboxRepo, deps.Publisher, slog.Default())
+	go func() {
+		if err := pdfOutboxWorker.Run(ctx); err != nil {
+			slog.Error("pdf outbox worker exited", "err", err)
+		}
+	}()
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, effectiveFreezeInvoker, pdfDispatchAdapter,
-	)
+	).WithPDFOutbox(pdfOutboxRepo)
 	docDeps.SubmitSvc = approvalServices.Submit
 
 	docMod := documents.New(docDeps)

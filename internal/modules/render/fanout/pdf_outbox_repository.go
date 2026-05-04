@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-// OutboxTx is the subset of *sql.Tx used by PDFOutboxRepository.Enqueue.
-// Defined locally to avoid an import cycle with documents/repository.
-type OutboxTx interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
-
 type OutboxRow struct {
 	ID          string
 	TenantID    string
@@ -27,8 +21,10 @@ func NewPDFOutboxRepository(db *sql.DB) *PDFOutboxRepository {
 	return &PDFOutboxRepository{db: db}
 }
 
-func (r *PDFOutboxRepository) Enqueue(ctx context.Context, tx OutboxTx, tenantID, revisionID string, contentHash []byte) error {
-	var exec OutboxTx = r.db
+func (r *PDFOutboxRepository) Enqueue(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, contentHash []byte) error {
+	var exec interface {
+		ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	} = r.db
 	if tx != nil {
 		exec = tx
 	}
