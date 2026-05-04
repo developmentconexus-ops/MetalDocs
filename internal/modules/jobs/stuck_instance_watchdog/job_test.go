@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"metaldocs/internal/modules/documents_v2/approval/application"
+	"metaldocs/internal/modules/documents/approval/application"
 )
 
 type mockCancelService struct {

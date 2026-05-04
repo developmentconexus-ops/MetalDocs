@@ -11,6 +11,7 @@ import (
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/tenant"
 )
 
 type Handler struct {
@@ -112,7 +113,11 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		h.writeAuthError(w, err, traceID)
 		return
 	}
-	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID)
+	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if tenantID == "" {
+		tenantID = tenant.DevTenantID
+	}
+	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, tenantID)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error", traceID)
 		return

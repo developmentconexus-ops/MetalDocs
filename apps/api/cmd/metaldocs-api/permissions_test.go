@@ -13,41 +13,39 @@ func TestPermissionResolver(t *testing.T) {
 	resolver := newPermissionResolver()
 
 	testCases := []struct {
-		name       string
-		method     string
-		path       string
-		wantPerm   iamdomain.Permission
-		wantGuard  bool
+		name      string
+		method    string
+		path      string
+		wantCap   string
+		wantGuard bool
 	}{
-		{name: "health live unguarded", method: http.MethodGet, path: "/api/v1/health/live", wantPerm: "", wantGuard: false},
-		{name: "auth login unguarded", method: http.MethodPost, path: "/api/v1/auth/login", wantPerm: "", wantGuard: false},
-		{name: "documents create", method: http.MethodPost, path: "/api/v1/documents", wantPerm: iamdomain.PermDocumentCreate, wantGuard: true},
-		{name: "documents list", method: http.MethodGet, path: "/api/v1/documents", wantPerm: iamdomain.PermDocumentRead, wantGuard: true},
-		{name: "document detail", method: http.MethodGet, path: "/api/v1/documents/doc-1", wantPerm: iamdomain.PermDocumentRead, wantGuard: true},
-		{name: "document browser content save", method: http.MethodPost, path: "/api/v1/documents/doc-1/content/browser", wantPerm: iamdomain.PermDocumentEdit, wantGuard: true},
-		{name: "document versions list", method: http.MethodGet, path: "/api/v1/documents/doc-1/versions", wantPerm: iamdomain.PermVersionRead, wantGuard: true},
-		{name: "document version create", method: http.MethodPost, path: "/api/v1/documents/doc-1/versions", wantPerm: iamdomain.PermDocumentEdit, wantGuard: true},
-		{name: "workflow transition", method: http.MethodPost, path: "/api/v1/workflow/documents/doc-1/transitions", wantPerm: iamdomain.PermWorkflowTransition, wantGuard: true},
-		{name: "iam users list", method: http.MethodGet, path: "/api/v1/iam/users", wantPerm: iamdomain.PermIAMManageRoles, wantGuard: true},
-		{name: "iam roles update", method: http.MethodPut, path: "/api/v1/iam/users/u-1/roles", wantPerm: iamdomain.PermIAMManageRoles, wantGuard: true},
-		// feature-flags is fully public: no permission required, no session required.
-		// This must remain unguarded so initFeatureFlags() can call it before login.
-		{name: "feature flags unguarded", method: http.MethodGet, path: "/api/v1/feature-flags", wantPerm: "", wantGuard: false},
-		{name: "unknown endpoint unguarded", method: http.MethodGet, path: "/api/v1/unknown", wantPerm: "", wantGuard: false},
-		// Template admin (Phase 2) — all HTTP methods on /api/v1/templates[/...] require
-		// an authenticated session; fine-grained RBAC is enforced inside the service layer.
-		{name: "template list", method: http.MethodGet, path: "/api/v1/templates", wantPerm: iamdomain.PermTemplateView, wantGuard: true},
-		{name: "template create", method: http.MethodPost, path: "/api/v1/templates", wantPerm: iamdomain.PermTemplateView, wantGuard: true},
-		{name: "template draft sub-route", method: http.MethodGet, path: "/api/v1/templates/my-key/draft", wantPerm: iamdomain.PermTemplateView, wantGuard: true},
-		{name: "template publish sub-route", method: http.MethodPost, path: "/api/v1/templates/my-key/publish", wantPerm: iamdomain.PermTemplateView, wantGuard: true},
-		// docx-v2 template routes (W2+).
-		{name: "v2 templates list", method: http.MethodGet, path: "/api/v2/templates", wantPerm: iamdomain.PermTemplateView, wantGuard: true},
-		{name: "v2 templates create", method: http.MethodPost, path: "/api/v2/templates", wantPerm: iamdomain.PermTemplateEdit, wantGuard: true},
-		{name: "v2 templates version draft", method: http.MethodPut, path: "/api/v2/templates/t1/versions/1/draft", wantPerm: iamdomain.PermTemplateEdit, wantGuard: true},
-		{name: "v2 templates publish", method: http.MethodPost, path: "/api/v2/templates/t1/versions/1/publish", wantPerm: iamdomain.PermTemplatePublish, wantGuard: true},
-		{name: "v2 docx-upload-url", method: http.MethodPost, path: "/api/v2/templates/t1/versions/1/docx-upload-url", wantPerm: iamdomain.PermTemplateEdit, wantGuard: true},
-		{name: "v2 schema-upload-url", method: http.MethodPost, path: "/api/v2/templates/t1/versions/1/schema-upload-url", wantPerm: iamdomain.PermTemplateEdit, wantGuard: true},
-		{name: "v2 signed download", method: http.MethodGet, path: "/api/v2/signed", wantPerm: iamdomain.PermTemplateView, wantGuard: true},
+		{name: "health live unguarded", method: http.MethodGet, path: "/api/v1/health/live", wantCap: "", wantGuard: false},
+		{name: "auth login unguarded", method: http.MethodPost, path: "/api/v1/auth/login", wantCap: "", wantGuard: false},
+		{name: "feature flags unguarded", method: http.MethodGet, path: "/api/v1/feature-flags", wantCap: "", wantGuard: false},
+		{name: "unknown endpoint unguarded", method: http.MethodGet, path: "/api/v1/unknown", wantCap: "", wantGuard: false},
+		{name: "documents create", method: http.MethodPost, path: "/api/v1/documents", wantCap: iamdomain.CapDocCreate, wantGuard: true},
+		{name: "documents list", method: http.MethodGet, path: "/api/v1/documents", wantCap: iamdomain.CapDocView, wantGuard: true},
+		{name: "document detail", method: http.MethodGet, path: "/api/v1/documents/doc-1", wantCap: iamdomain.CapDocView, wantGuard: true},
+		{name: "document browser content save", method: http.MethodPost, path: "/api/v1/documents/doc-1/content/browser", wantCap: iamdomain.CapDocEdit, wantGuard: true},
+		{name: "document versions list", method: http.MethodGet, path: "/api/v1/documents/doc-1/versions", wantCap: iamdomain.CapDocView, wantGuard: true},
+		{name: "document version create", method: http.MethodPost, path: "/api/v1/documents/doc-1/versions", wantCap: iamdomain.CapDocEdit, wantGuard: true},
+		{name: "workflow transition", method: http.MethodPost, path: "/api/v1/workflow/documents/doc-1/transitions", wantCap: iamdomain.CapDocSubmit, wantGuard: true},
+		{name: "iam users list", method: http.MethodGet, path: "/api/v1/iam/users", wantCap: iamdomain.CapUserManage, wantGuard: true},
+		{name: "iam roles update", method: http.MethodPut, path: "/api/v1/iam/users/u-1/roles", wantCap: iamdomain.CapUserManage, wantGuard: true},
+		{name: "template list", method: http.MethodGet, path: "/api/v1/templates", wantCap: iamdomain.CapTemplateView, wantGuard: true},
+		{name: "template create", method: http.MethodPost, path: "/api/v1/templates", wantCap: iamdomain.CapTemplateView, wantGuard: true},
+		{name: "v2 templates list", method: http.MethodGet, path: "/api/v2/templates", wantCap: iamdomain.CapTemplateView, wantGuard: true},
+		{name: "v2 templates create", method: http.MethodPost, path: "/api/v2/templates", wantCap: iamdomain.CapTemplateEdit, wantGuard: true},
+		{name: "v2 templates version draft", method: http.MethodPut, path: "/api/v2/templates/t1/versions/1/draft", wantCap: iamdomain.CapTemplateEdit, wantGuard: true},
+		{name: "v2 templates publish", method: http.MethodPost, path: "/api/v2/templates/t1/versions/1/publish", wantCap: iamdomain.CapTemplatePublish, wantGuard: true},
+		{name: "v2 docx-upload-url", method: http.MethodPost, path: "/api/v2/templates/t1/versions/1/docx-upload-url", wantCap: iamdomain.CapTemplateEdit, wantGuard: true},
+		{name: "v2 schema-upload-url", method: http.MethodPost, path: "/api/v2/templates/t1/versions/1/schema-upload-url", wantCap: iamdomain.CapTemplateEdit, wantGuard: true},
+		{name: "v2 signed download", method: http.MethodGet, path: "/api/v2/signed", wantCap: iamdomain.CapTemplateView, wantGuard: true},
+		{name: "v2 doc submit", method: http.MethodPost, path: "/api/v2/documents/d1/submit", wantCap: iamdomain.CapDocSubmit, wantGuard: true},
+		{name: "v2 doc signoff", method: http.MethodPost, path: "/api/v2/documents/d1/signoff", wantCap: iamdomain.CapDocSignoff, wantGuard: true},
+		{name: "v2 taxonomy families list", method: http.MethodGet, path: "/api/v2/taxonomy/families", wantCap: iamdomain.CapDocView, wantGuard: true},
+		{name: "v2 taxonomy families create", method: http.MethodPost, path: "/api/v2/taxonomy/families", wantCap: iamdomain.CapTaxonomyManage, wantGuard: true},
+		{name: "v2 controlled-documents create", method: http.MethodPost, path: "/api/v2/controlled-documents", wantCap: iamdomain.CapRegistryCreate, wantGuard: true},
 	}
 
 	for _, tc := range testCases {
@@ -55,12 +53,12 @@ func TestPermissionResolver(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			gotPerm, gotGuard := resolver(tc.method, tc.path)
+			gotCap, gotGuard := resolver(tc.method, tc.path)
 			if gotGuard != tc.wantGuard {
 				t.Fatalf("guard mismatch: got %v want %v", gotGuard, tc.wantGuard)
 			}
-			if gotPerm != tc.wantPerm {
-				t.Fatalf("permission mismatch: got %q want %q", gotPerm, tc.wantPerm)
+			if gotCap != tc.wantCap {
+				t.Fatalf("capability mismatch: got %q want %q", gotCap, tc.wantCap)
 			}
 		})
 	}

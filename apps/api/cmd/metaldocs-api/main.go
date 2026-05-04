@@ -19,13 +19,14 @@ import (
 	"github.com/google/uuid"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
-	documents_v2 "metaldocs/internal/modules/documents_v2"
-	docapp "metaldocs/internal/modules/documents_v2/application"
-	approvalapp "metaldocs/internal/modules/documents_v2/approval/application"
-	approvalhttp "metaldocs/internal/modules/documents_v2/approval/http"
-	approvalrepo "metaldocs/internal/modules/documents_v2/approval/repository"
-	"metaldocs/internal/modules/documents_v2/jobs"
-	docrepo "metaldocs/internal/modules/documents_v2/repository"
+	documents "metaldocs/internal/modules/documents"
+	docapp "metaldocs/internal/modules/documents/application"
+	approvalapp "metaldocs/internal/modules/documents/approval/application"
+	approvalhttp "metaldocs/internal/modules/documents/approval/http"
+	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
+	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/documents/jobs"
+	docrepo "metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/jobs/effective_date_publisher"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	jobscheduler "metaldocs/internal/modules/jobs/scheduler"
@@ -42,8 +43,6 @@ import (
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
-	notificationapp "metaldocs/internal/modules/notifications/application"
-	notificationdelivery "metaldocs/internal/modules/notifications/delivery/http"
 	"metaldocs/internal/modules/registry"
 	registryapp "metaldocs/internal/modules/registry/application"
 	registrydomain "metaldocs/internal/modules/registry/domain"
@@ -56,8 +55,6 @@ import (
 	"metaldocs/internal/modules/taxonomy"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
-	workflowapp "metaldocs/internal/modules/workflow/application"
-	workflowdelivery "metaldocs/internal/modules/workflow/delivery/http"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -142,14 +139,13 @@ func main() {
 	auditHandler := auditdelivery.NewHandler(auditService)
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB))
 	searchHandler := searchdelivery.NewHandler(searchService)
-	notificationService := notificationapp.NewService(deps.NotificationsRepo, deps.DocumentsRepo, nil)
-	notificationHandler := notificationdelivery.NewHandler(notificationService)
-	workflowService := workflowapp.NewService(deps.DocumentsRepo, deps.WorkflowApprovals, deps.AuditWriter, deps.Publisher, nil)
-	workflowHandler := workflowdelivery.NewHandler(workflowService)
 	authHandler := authdelivery.NewHandler(authService)
 	healthHandler := observability.NewHealthHandler(deps.StatusProvider)
 
-	authorizer := iamapp.NewStaticAuthorizer()
+	var capabilityService *iamapp.CapabilityService
+	if deps.SQLDB != nil {
+		capabilityService = iamapp.NewCapabilityService(deps.SQLDB)
+	}
 	cachedProvider := iamapp.NewCachedRoleProvider(deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route
 	// visibility. It is shared with the auth middleware so that fully public
@@ -158,7 +154,7 @@ func main() {
 	permResolver := newPermissionResolver()
 	authMiddleware := authdelivery.NewMiddleware(authService, authCfg, authn.Enabled()).
 		WithPublicPathChecker(newPublicPathChecker(permResolver))
-	iamMiddleware := iamdelivery.NewMiddleware(authorizer, cachedProvider, authn.Enabled(), authCfg.LegacyHeaderEnabled).
+	iamMiddleware := iamdelivery.NewMiddleware(capabilityService, cachedProvider, authn.Enabled(), authCfg.LegacyHeaderEnabled).
 		WithPermissionResolver(permResolver)
 	originProtection := security.NewOriginProtection(security.OriginProtectionConfig{
 		Enabled:           authCfg.OriginProtection,
@@ -180,8 +176,6 @@ func main() {
 	featureFlagsHandler.RegisterRoutes(mux)
 	auditHandler.RegisterRoutes(mux)
 	searchHandler.RegisterRoutes(mux)
-	notificationHandler.RegisterRoutes(mux)
-	workflowHandler.RegisterRoutes(mux)
 	iamAdminHandler.RegisterRoutes(mux)
 
 	taxonomyModule := taxonomy.New(taxonomy.Dependencies{
@@ -237,7 +231,7 @@ func main() {
 		revReader := docrepo.NewRevisionReader(deps.SQLDB)
 		wfReader := docrepo.NewWorkflowReader(deps.SQLDB)
 		ctxBuilder := docapp.NewDocumentContextBuilder(deps.SQLDB, revReader, wfReader,
-			cdRegistryAdapter{cdRepo})
+			cdRegistryAdapter{cdRepo}, revReader)
 		resolverReg := resolvers.NewRegistry()
 		resolvers.RegisterBuiltins(resolverReg)
 		freezeSvc = docapp.NewFreezeService(
@@ -253,7 +247,7 @@ func main() {
 
 	docSnapshotReader := docgenv2.NewTemplatesV2SnapshotReader(deps.SQLDB)
 	docSnapshotWriter := docrepo.NewSnapshotRepository(deps.SQLDB)
-	docDeps := documents_v2.Dependencies{
+	docDeps := documents.Dependencies{
 		DB:      deps.SQLDB,
 		Docgen:  nil,
 		Presign: docPresigner,
@@ -283,13 +277,9 @@ func main() {
 			nil,
 		)
 	}
-	docMod := documents_v2.New(docDeps)
-	docMod.RegisterRoutes(mux)
 
-	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
-	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})
-	tv2http.New(tv2Svc, nil).Register(mux)
-
+	// Approval services must be constructed before docMod so that
+	// SubmitSvc can be wired into the finalize→submit flow.
 	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB)
 	approvalEmitter := approvalapp.NewSQLEmitter()
 	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{})
@@ -300,7 +290,16 @@ func main() {
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, effectiveFreezeInvoker, pdfDispatchAdapter,
 	)
-	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB)
+	docDeps.SubmitSvc = approvalServices.Submit
+
+	docMod := documents.New(docDeps)
+	docMod.RegisterRoutes(mux)
+
+	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
+	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})
+	tv2http.New(tv2Svc, nil).Register(mux)
+	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
+	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
 	e2etest.RegisterE2EHandlers(mux, deps.SQLDB, func(ctx context.Context) error {
 		_, err := approvalServices.Scheduler.RunDuePublishes(ctx, deps.SQLDB)

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,32 +33,42 @@ func NewCachedRoleProvider(base domain.RoleProvider, ttl time.Duration) *CachedR
 	}
 }
 
-func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID string) ([]domain.Role, error) {
+func roleCacheKey(userID, tenantID string) string {
+	return userID + "|" + tenantID
+}
+
+func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID, tenantID string) ([]domain.Role, error) {
+	key := roleCacheKey(userID, tenantID)
 	now := time.Now().UTC()
 
 	c.mu.RLock()
-	entry, ok := c.items[userID]
+	entry, ok := c.items[key]
 	c.mu.RUnlock()
 
 	if ok && now.Before(entry.expiresAt) {
 		return cloneRoles(entry.roles), nil
 	}
 
-	roles, err := c.base.RolesByUserID(ctx, userID)
+	roles, err := c.base.RolesByUserID(ctx, userID, tenantID)
 	if err != nil {
 		return nil, err
 	}
 
 	c.mu.Lock()
-	c.items[userID] = cacheEntry{roles: cloneRoles(roles), expiresAt: now.Add(c.ttl)}
+	c.items[key] = cacheEntry{roles: cloneRoles(roles), expiresAt: now.Add(c.ttl)}
 	c.mu.Unlock()
 
 	return roles, nil
 }
 
+// InvalidateUser invalidates cache entries for a user across all tenants.
 func (c *CachedRoleProvider) InvalidateUser(userID string) {
 	c.mu.Lock()
-	delete(c.items, userID)
+	for k := range c.items {
+		if strings.HasPrefix(k, userID+"|") {
+			delete(c.items, k)
+		}
+	}
 	c.mu.Unlock()
 }
 

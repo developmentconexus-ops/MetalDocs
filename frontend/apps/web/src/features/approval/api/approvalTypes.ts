@@ -10,12 +10,15 @@ export type ApprovalState =
   | 'cancelled';
 
 export type SignatureMethod = 'password_reauth' | 'icp_brasil';
-export type QuorumKind = 'any_1' | 'all_of' | 'm_of_n';
-export type DriftPolicy = 'auto_cancel' | 'alert_only' | 'none';
+export type QuorumKind = 'any_1_of' | 'all_of' | 'm_of_n';
+export type DriftPolicy = 'reduce_quorum' | 'fail_stage' | 'keep_snapshot';
 
 export interface RouteStage {
   label: string;
   members: string[];
+  required_role: string;
+  required_capability: string;
+  area_code: string;
   quorum_kind: QuorumKind;
   m?: number;
   drift_policy: DriftPolicy;

@@ -23,6 +23,9 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 	if version.Status != domain.VersionStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
 	}
+	if version.ContentHash == "" {
+		return nil, domain.ErrUploadMissing
+	}
 
 	config, err := s.repo.GetApprovalConfig(ctx, cmd.TemplateID)
 	if err != nil {

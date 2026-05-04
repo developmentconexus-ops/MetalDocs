@@ -10,11 +10,14 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	"metaldocs/internal/platform/tenant"
 )
 
 type authzTestState struct {
 	granted         bool
 	actorID         string
+	tenantID        string
 	assertedCaps    string
 	requireQueries  int
 	executedQueries []string
@@ -71,10 +74,15 @@ func (c *authzTestConn) QueryContext(_ context.Context, query string, _ []driver
 			columns: []string{"current_setting"},
 			rows:    [][]driver.Value{{c.state.assertedCaps}},
 		}, nil
-	case strings.Contains(query, "current_setting('metaldocs.actor_id', false)"):
+	case strings.Contains(query, "current_setting('metaldocs.actor_id', true)"):
 		return &authzTestRows{
 			columns: []string{"current_setting"},
 			rows:    [][]driver.Value{{c.state.actorID}},
+		}, nil
+	case strings.Contains(query, "current_setting('metaldocs.tenant_id', true)"):
+		return &authzTestRows{
+			columns: []string{"current_setting"},
+			rows:    [][]driver.Value{{c.state.tenantID}},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unexpected query: %s", query)
@@ -128,6 +136,7 @@ func TestRequire_CapGranted(t *testing.T) {
 	state := &authzTestState{
 		granted:      true,
 		actorID:      "actor-1",
+		tenantID:     tenant.DevTenantID,
 		assertedCaps: `[]`,
 	}
 	_, tx := openAuthzTestDB(t, state)
@@ -151,8 +160,9 @@ func TestRequire_CapGranted(t *testing.T) {
 
 func TestRequire_CapDenied(t *testing.T) {
 	state := &authzTestState{
-		granted: false,
-		actorID: "actor-2",
+		granted:  false,
+		actorID:  "actor-2",
+		tenantID: tenant.DevTenantID,
 	}
 	_, tx := openAuthzTestDB(t, state)
 
@@ -174,6 +184,7 @@ func TestRequire_CacheHit(t *testing.T) {
 	state := &authzTestState{
 		granted:      true,
 		actorID:      "actor-3",
+		tenantID:     tenant.DevTenantID,
 		assertedCaps: `[]`,
 	}
 	_, tx := openAuthzTestDB(t, state)

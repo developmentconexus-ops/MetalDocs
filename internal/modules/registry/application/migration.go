@@ -29,7 +29,7 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 
 	rows, err := db.QueryContext(ctx, `
 		SELECT id::text, tenant_id::text
-		FROM documents_v2
+		FROM documents
 		WHERE controlled_document_id IS NULL
 		ORDER BY created_at ASC`)
 	if err != nil {
@@ -75,7 +75,7 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		}
 
 		res, err := tx.ExecContext(ctx, `
-			UPDATE documents_v2
+			UPDATE documents
 			SET controlled_document_id = $1,
 			    profile_code_snapshot = 'unassigned',
 			    process_area_code_snapshot = 'unassigned'

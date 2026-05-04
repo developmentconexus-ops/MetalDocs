@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 
-	"metaldocs/internal/modules/documents_v2/application"
-	"metaldocs/internal/modules/documents_v2/domain"
+	"metaldocs/internal/modules/documents/application"
+	"metaldocs/internal/modules/documents/domain"
 )
 
 var _ application.SnapshotTemplateReader = (*TemplatesV2SnapshotReader)(nil)

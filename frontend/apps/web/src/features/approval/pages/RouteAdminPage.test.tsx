@@ -24,7 +24,7 @@ describe('RouteAdminPage', () => {
             {
               label: 'Revisão',
               members: ['ana'],
-              quorum_kind: 'any_1',
+              quorum_kind: 'any_1_of',
               drift_policy: 'auto_cancel',
             },
             {
@@ -73,7 +73,7 @@ describe('RouteAdminPage', () => {
             {
               label: 'Financeiro',
               members: ['joao'],
-              quorum_kind: 'any_1',
+              quorum_kind: 'any_1_of',
               drift_policy: 'alert_only',
             },
           ],
@@ -106,7 +106,7 @@ describe('RouteAdminPage', () => {
             {
               label: 'Operação',
               members: ['luis'],
-              quorum_kind: 'any_1',
+              quorum_kind: 'any_1_of',
               drift_policy: 'auto_cancel',
             },
           ],
@@ -139,11 +139,14 @@ describe('RouteAdminPage', () => {
     fireEvent.change(screen.getByLabelText('Quórum da etapa 1'), { target: { value: 'm_of_n' } });
     fireEvent.change(screen.getByLabelText('M da etapa 1'), { target: { value: '3' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar rota' }));
+    const saveButton = screen.getByRole('button', { name: 'Salvar rota' });
+    fireEvent.submit(saveButton.closest('form')!);
 
-    expect(
-      screen.getByText('Na etapa "Jurídico", M não pode ser maior que o número de membros.'),
-    ).toBeTruthy();
+    await waitFor(() => {
+      expect(
+        screen.getByText('Na etapa "Jurídico", M não pode ser maior que o número de membros.'),
+      ).toBeTruthy();
+    });
     expect(vi.mocked(approvalApi.createRoute)).not.toHaveBeenCalled();
   });
 });

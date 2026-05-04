@@ -1,6 +1,6 @@
 # Glossary
 
-> **Last verified:** 2026-04-27
+> **Last verified:** 2026-05-03
 > **Scope:** Terms used across MetalDocs codebase, docs, and PRs.
 
 ## A
@@ -13,7 +13,7 @@
 
 ## C
 
-**Capability** - Permission unit (e.g., `doc:edit:draft`, `doc:view:published`). Granted per role + area. See `modules/iam-rbac.md`.
+**Capability** - Permission unit (e.g., `doc.view`, `doc.edit`, `template.approve`). 16 constants defined in `internal/modules/iam/domain/capabilities.go`. Granted per role; checked DB-side by `CapabilityService.CanDo`. See `modules/iam-rbac.md`.
 
 **CD / Controlled Document** - A document instance bound to a profile + identified by an auto-generated code (e.g., `E2E-0001`). Lives in `controlled_documents` table.
 
@@ -36,6 +36,8 @@
 **Editable Zone** - DEPRECATED. Removed 2026-04-25 in commit `chore/purge-editable-zones`. See `decisions/0002-zone-purge.md`.
 
 ## F
+
+**Family / DocumentFamily** - Broad grouping of document types (e.g. "Qualidade", "Recursos Humanos"). Globally scoped — no `tenant_id`. All tenants share the same family catalog. Profiles belong to a family via `family_code` FK. Deactivation uses `is_active` (not `archived_at`). Deactivation blocked if active profiles reference the family. See `modules/taxonomy.md`.
 
 **Fanout** - Server-side service that takes a frozen template + placeholder values and renders the final DOCX + PDF. Lives in `internal/modules/render/fanout/`.
 
@@ -61,7 +63,7 @@
 
 **ProseMirror** - Rich-text editor framework eigenpal is built on. We rarely interact with it directly - eigenpal abstracts it.
 
-**Profile / Document Profile** - Type of controlled document (e.g., "Quality Manual", "SOP"). Binds to a default template version + sequence counter for code generation.
+**Profile / Document Profile** - Type of controlled document (e.g., "Quality Manual", "SOP"). Tenant-scoped. Belongs to a DocumentFamily via `family_code` FK. Binds to a default template version + sequence counter for code generation. Archived via `archived_at` (not `is_active`). See `modules/taxonomy.md`.
 
 ## S
 
@@ -69,7 +71,7 @@
 
 **Search module** - `internal/modules/search/` — aggregates documents across sources for the hub list. The v2 reader (`infrastructure/v2documents/reader.go`) queries `public.documents LEFT JOIN controlled_documents cd` to return the real document code and sequence number. Bug fixed 2026-04-27: prior to the fix, `d.code` was always empty for v2 docs; the reader now uses `COALESCE(cd.code, '')` and `COALESCE(cd.sequence_num, d.revision_number, 0)`.
 
-**Snapshot** - Immutable copy captured when a document is created, not when it is submitted. `application.SnapshotService` is wired through `documents_v2.Dependencies.SnapshotReader`/`SnapshotWriter` and populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`; catalog-only templates use `{}` for `composition_config_snapshot`. The `enforce_snapshot_on_submit_trg` trigger enforces these six columns before draft -> under_review.
+**Snapshot** - Immutable copy captured when a document is created, not when it is submitted. `application.SnapshotService` is wired through `documents.Dependencies.SnapshotReader`/`SnapshotWriter` and populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`; catalog-only templates use `{}` for `composition_config_snapshot` (composition deprecated 2026-04-27 — see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27 — every doc now writes `{}`). The `enforce_snapshot_on_submit_trg` trigger enforces these six columns before draft -> under_review.
 
 ## T
 

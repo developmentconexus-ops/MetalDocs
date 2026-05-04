@@ -17,6 +17,8 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+
+	"metaldocs/internal/platform/tenant"
 )
 
 const (
@@ -25,7 +27,7 @@ const (
 	minioAccessKey  = "minioadmin"
 	minioSecretKey  = "minioadmin"
 	minioBucket     = "metaldocs-attachments"
-	tenantID        = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	tenantID        = tenant.DevTenantID
 	adminUsername   = "e2e.admin"
 	formDataJSON    = `{}`
 	emptyJSON       = `{}`

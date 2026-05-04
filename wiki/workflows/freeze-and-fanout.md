@@ -1,12 +1,12 @@
 # Workflow: Freeze and Fanout
 
-> **Last verified:** 2026-04-27
+> **Last verified:** 2026-05-03
 > **Scope:** The full pipeline from signoff approval → computed value resolution → DOCX substitution → frozen artifact stored in S3 → async PDF generation via outbox worker.
 > **Out of scope:** Approval routing and signoff rules (see `workflows/approval.md`), editor-side substitution deferral (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
-> - `internal/modules/documents_v2/approval/application/decision_service.go` — triggers freeze on signoff
-> - `internal/modules/documents_v2/application/freeze_service.go` — FreezeService.Freeze orchestration
-> - `internal/modules/documents_v2/application/context_builder.go` — builds resolver input context
+> - `internal/modules/documents/approval/application/decision_service.go` — triggers freeze on signoff
+> - `internal/modules/documents/application/freeze_service.go` — FreezeService.Freeze orchestration
+> - `internal/modules/documents/application/context_builder.go` — builds resolver input context
 > - `internal/modules/render/fanout/client.go` — HTTP client calling docgen-v2
 > - `internal/modules/render/resolvers/builtins.go` — registered resolver implementations
 > - `apps/docgen-v2/src/routes/fanout.ts` — docgen-v2 fanout route, Zod request schema
@@ -41,7 +41,7 @@ Any non-computed placeholder marked required is checked for a filled value. Comp
 
 ### 5. Resolve computed placeholders
 
-Each computed placeholder carries a `resolver_key` (e.g. `doc_code`, `approvers`). `FreezeService` looks up the resolver from `resolvers.Registry` and calls it. The context passed to each resolver is built by `context_builder.go`, which queries fields including `process_area_code_snapshot`.
+Each computed placeholder carries a `resolver_key` (e.g. `doc_code`, `approvers`). `FreezeService` looks up the resolver from `resolvers.Registry` and calls it. The context passed to each resolver is built by `context_builder.go`. `DocumentContextBuilder.loadDocumentSnapshot` (formerly `loadAreaCode`) queries both `process_area_code_snapshot` and `controlled_document_id` from the `documents` table. `Build` sets `AreaCodeSnapshot`, `ControlledDocumentID`, and `DocumentReader` on the returned `ResolveInput` (fix for A1+A2 — commit 006ceef5).
 
 Registered resolvers (`builtins.go`):
 
@@ -104,12 +104,12 @@ Back in `FreezeService`, `WriteFinalDocx` stamps `final_docx_s3_key` and `conten
 ]
 ```
 
-This is a **raw JSON array** — NOT wrapped as `{"placeholders": [...]}`. `parsePlaceholderSchema()` in `internal/modules/documents_v2/application/fillin_service.go` handles both formats for backward compatibility with legacy rows.
+This is a **raw JSON array** — NOT wrapped as `{"placeholders": [...]}`. `parsePlaceholderSchema()` in `internal/modules/documents/application/fillin_service.go` handles both formats for backward compatibility with legacy rows.
 
 ## Gotchas
 
 - **Wrong S3 bucket in local dev:** docgen-v2 reads template DOCX from `metaldocs-docx-v2`, not `metaldocs-attachments`. Template DOCX must exist in `metaldocs-docx-v2` in the local MinIO instance.
-- **`composition_config` defaults:** `header_sub_blocks`, `footer_sub_blocks`, and `sub_block_params` default to empty — templates without sub-blocks work fine without explicit values.
+- **`composition_config` defaults:** `header_sub_blocks`, `footer_sub_blocks`, and `sub_block_params` default to empty — templates without sub-blocks work fine without explicit values. (composition deprecated 2026-04-27 — see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27 — UI no longer sets any sub-blocks; field is always empty in practice)
 - **Freeze is idempotent:** `values_frozen_at` already set → early return, no duplicate writes, no error.
 - **Freeze runs inside signoff transaction:** if the freeze step fails, the entire signoff is rolled back.
 
@@ -146,12 +146,12 @@ After step 17, `GET /api/v2/documents/{id}/view` can return a presigned URL for 
 - `apps/api/cmd/metaldocs-api/main.go` — wires `PDFDispatchAdapter` into `NewDecisionService`
 - `internal/modules/render/fanout/pdf_dispatch_adapter.go` — `PDFDispatchAdapter`: reads `final_docx_s3_key` from DB, calls `PDFDispatcher`
 - `internal/modules/render/fanout/pdf_dispatcher.go` — `PDFDispatcher`: publishes `docgen_v2_pdf` outbox event
-- `internal/modules/documents_v2/approval/application/decision_service.go` — `PDFDispatchInvoker` interface + post-commit dispatch call
+- `internal/modules/documents/approval/application/decision_service.go` — `PDFDispatchInvoker` interface + post-commit dispatch call
 - `internal/platform/worker/pdf_job_runner.go` — `PDFJobRunner`: handles `docgen_v2_pdf` events end-to-end
 - `internal/platform/worker/service.go` — routes `docgen_v2_pdf` to `PDFJobRunner`
 - `internal/platform/bootstrap/worker.go` — builds `DocgenV2Client` + exposes `SQLDB` in `WorkerDependencies`
 - `apps/worker/cmd/metaldocs-worker/main.go` — conditionally wires `PDFJobRunner` via `WithPDFRunner`
-- `internal/modules/documents_v2/http/view_handler.go` — view endpoint, reads `final_pdf_s3_key`
+- `internal/modules/documents/http/view_handler.go` — view endpoint, reads `final_pdf_s3_key`
 
 ---
 

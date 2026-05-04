@@ -5,8 +5,6 @@ import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-js-editor/react';
 import { createEmptyDocument } from '@eigenpal/docx-js-editor/core';
 import { filterTransactionGuard } from '../../../editor-adapters/filter-transaction-guard';
 import { type TemplateSchemas, type VersionDTO, submitForReview } from './api/templatesV2';
-import { CompositionConfigPanel } from '../composition-config-panel';
-import type { SubBlockDef } from '../placeholder-types';
 import { useTemplateDraft } from './hooks/useTemplateDraft';
 import { useTemplateAutosave } from './hooks/useTemplateAutosave';
 import { useTemplateSchemas } from './hooks/useTemplateSchemas';
@@ -27,15 +25,9 @@ type RailItem = {
   tip: string;
   kbd?: string;
   icon: JSX.Element;
+  soon?: boolean;
 };
 
-const SUB_BLOCK_CATALOGUE: SubBlockDef[] = [
-  { key: 'doc-header', label: 'Document Header', params: [] },
-  { key: 'approval-footer', label: 'Approval Footer', params: [] },
-  { key: 'revision-history', label: 'Revision History', params: [] },
-];
-
-const EMPTY_COMPOSITION = { headerSubBlocks: [], footerSubBlocks: [], subBlockParams: {} };
 const VARIABLE_SYNC_DEBOUNCE_MS = 400;
 
 export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion: _nav, onBack }: TemplateAuthorPageProps) {
@@ -53,8 +45,7 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
   const [importing, setImporting] = React.useState(false);
   const [importErr, setImportErr] = React.useState<string | null>(null);
   const [liveVersion, setLiveVersion] = useState<VersionDTO | null>(null);
-  const [leftActive, setLeftActive] = useState<string>('variables');
-  const [rightActive, setRightActive] = useState<string>('inspector');
+  const [leftActive, setLeftActive] = useState<string | null>('variables');
   const [localSchemas, setLocalSchemas] = useState<TemplateSchemas | null>(null);
   const [catalog, setCatalog] = useState<PlaceholderCatalogEntry[]>([]);
   useEffect(() => { void fetchPlaceholderCatalog().then(setCatalog); }, []);
@@ -136,14 +127,6 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     return () => window.clearTimeout(timer);
   }, [isDraft, localSchemas, schemaState]);
 
-  const updateComposition = useCallback((updated: TemplateSchemas['composition']) => {
-    if (!isDraft) return;
-    setLocalSchemas((prev) => {
-      if (!prev) return prev;
-      return { ...prev, composition: updated };
-    });
-  }, [isDraft]);
-
   // Eigenpal closes its popovers on any capture-phase scroll event. Scrolling
   // inside its own listbox (e.g. to reach font size 48) triggers the close.
   // Swallow scroll events that originate inside an eigenpal dropdown before
@@ -204,22 +187,12 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     '';
 
   const leftRailItems: (RailItem | { divider: true })[] = [
-    { key: 'variables', tip: 'Variables',                icon: IconBraces },
-    { key: 'layout',  tip: 'Layout (soon)',              icon: IconLayout },
-    { key: 'media',   tip: 'Media (soon)',               icon: IconImage },
+    { key: 'variables', tip: 'Variables',       icon: IconBraces },
     { divider: true },
-    { key: 'outline', tip: 'Outline',                    icon: IconOutline },
-    { key: 'search',  tip: 'Find',           kbd: '⌘F', icon: IconSearch },
+    { key: 'layout',    tip: 'Layout',           icon: IconLayout, soon: true },
+    { key: 'media',     tip: 'Media',            icon: IconImage,  soon: true },
+    { key: 'search',    tip: 'Find',  kbd: '⌘F', icon: IconSearch, soon: true },
   ];
-  const rightRailItems: (RailItem | { divider: true })[] = [
-    { key: 'inspector', tip: 'Inspector',        icon: IconInspector },
-    { key: 'composition', tip: 'Composition',    icon: IconBlocks },
-    { key: 'variables', tip: 'Variables',        icon: IconBraces },
-    { key: 'comments',  tip: 'Comments',         icon: IconComment },
-    { divider: true },
-    { key: 'versions',  tip: 'Versions',         icon: IconGitBranch },
-  ];
-
   const autosaveNode = (() => {
     if (autosave.status === 'saving') {
       return <span className={styles.autosaveStatus}><span className={styles.autosaveDot} aria-hidden="true" /> Saving…</span>;
@@ -254,11 +227,12 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
                 key={it.key}
                 type="button"
                 aria-label={it.tip}
+                disabled={it.soon}
                 className={`${styles.railBtn} ${leftActive === it.key ? styles.isActive : ''}`}
-                onClick={() => setLeftActive(it.key)}
+                onClick={() => setLeftActive(leftActive === it.key ? null : it.key)}
               >
                 {it.icon}
-                <span className={styles.railTip}>{it.tip}{it.kbd ? `  ${it.kbd}` : ''}</span>
+                <span className={styles.railTip}>{it.tip}{it.kbd ? `  ${it.kbd}` : ''}{it.soon ? ' (soon)' : ''}</span>
               </button>
             )
           )}
@@ -334,49 +308,12 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
               readOnly={!isDraft}
               onChange={handleEditorChange}
               externalPlugins={editorPlugins}
+              showRuler
+              showMarginGuides
             />
           </div>
         </main>
 
-        <aside className={styles.rightPanel}>
-          {rightActive === 'inspector' && (
-            <div className={styles.panelHeader} />
-          )}
-          {rightActive === 'composition' && (
-            <fieldset className={styles.inspectorFieldset} disabled={!isDraft}>
-              <CompositionConfigPanel
-                value={localSchemas?.composition ?? EMPTY_COMPOSITION}
-                subBlockCatalogue={SUB_BLOCK_CATALOGUE}
-                onChange={(updated) => {
-                  if (!isDraft) return;
-                  updateComposition(updated);
-                }}
-              />
-            </fieldset>
-          )}
-          {rightActive !== 'inspector' && rightActive !== 'composition' && (
-            <div className={styles.panelHeader} />
-          )}
-        </aside>
-
-        <aside className={`${styles.rail} ${styles.railRight}`}>
-          {rightRailItems.map((it, i) =>
-            'divider' in it ? (
-              <div key={`d${i}`} className={styles.railDivider} />
-            ) : (
-              <button
-                key={it.key}
-                type="button"
-                aria-label={it.tip}
-                className={`${styles.railBtn} ${rightActive === it.key ? styles.isActive : ''}`}
-                onClick={() => setRightActive(it.key)}
-              >
-                {it.icon}
-                <span className={styles.railTip}>{it.tip}</span>
-              </button>
-            )
-          )}
-        </aside>
       </div>
 
       {currentVersion && ['in_review', 'approved', 'published'].includes(currentVersion.status) && (
@@ -410,9 +347,6 @@ function IconCheck({ className }: { className?: string }) {
 const IconSend = (
   <svg {...svgBase} width={14} height={14}><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
 );
-const IconBlocks = (
-  <svg {...svgBase}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
-);
 const IconLayout = (
   <svg {...svgBase}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
 );
@@ -425,17 +359,8 @@ const IconOutline = (
 const IconSearch = (
   <svg {...svgBase}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
 );
-const IconInspector = (
-  <svg {...svgBase}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M15 3v18" /></svg>
-);
 const IconBraces = (
   <svg {...svgBase}><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1" /><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" /></svg>
-);
-const IconComment = (
-  <svg {...svgBase}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-);
-const IconGitBranch = (
-  <svg {...svgBase}><line x1="6" y1="3" x2="6" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" /></svg>
 );
 const IconChevronLeft = (
   <svg {...svgBase} width={14} height={14}><path d="M15 18l-6-6 6-6" /></svg>

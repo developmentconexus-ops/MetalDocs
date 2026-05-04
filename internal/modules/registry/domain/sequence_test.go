@@ -14,6 +14,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"metaldocs/internal/modules/registry/infrastructure"
+	"metaldocs/internal/platform/tenant"
 )
 
 func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
@@ -35,7 +36,7 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 		t.Skipf("cannot connect to database: %v", err)
 	}
 
-	tenantID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	tenantID := tenant.DevTenantID
 	profileCode := "seqtest" + strings.ToLower(time.Now().UTC().Format("150405"))
 
 	_, err = db.ExecContext(context.Background(), `

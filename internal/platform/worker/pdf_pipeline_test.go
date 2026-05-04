@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	notificationapp "metaldocs/internal/modules/notifications/application"
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/messaging"
 	"metaldocs/internal/platform/servicebus"
@@ -138,7 +137,7 @@ func TestPDFPipeline_WorkerLoop(t *testing.T) {
 	runner := NewPDFJobRunner(client, persister)
 
 	cfg := config.WorkerConfig{MaxAttempts: 3, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
-	svc := NewService(consumer, new(notificationapp.Service), cfg).WithPDFRunner(runner)
+	svc := NewService(consumer, cfg).WithPDFRunner(runner)
 
 	if err := svc.RunOnce(context.Background(), 10); err != nil {
 		t.Fatalf("RunOnce: %v", err)

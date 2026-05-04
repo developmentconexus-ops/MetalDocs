@@ -1,6 +1,6 @@
 # ADR 0001: Adopt eigenpal as the document editor
 
-> **Last verified:** 2026-04-25
+> **Last verified:** 2026-05-01
 > **Status:** Accepted
 > **Date:** ~2026-04 (verify from git log)
 > **Scope:** Editor library choice for MetalDocs WYSIWYG.
@@ -14,7 +14,9 @@ We needed a DOCX-native WYSIWYG editor in the browser. Candidates:
 
 ## Decision
 
-**Adopt `@eigenpal/docx-js-editor`.**
+**Adopt `@eigenpal/docx-js-editor` as the MetalDocs DOCX editor.**
+
+As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. This keeps the application dependency deterministic while EigenPal fixes are maintained in the fork and prepared for upstream/published-package consolidation.
 
 ## Reasoning
 
@@ -35,6 +37,8 @@ We needed a DOCX-native WYSIWYG editor in the browser. Candidates:
 ## Consequences
 
 - All editor-related code consolidates in `packages/editor-ui/`
+- EigenPal implementation details stay in the EigenPal fork; MetalDocs only documents the integration contract.
+- Dependency refreshes must update `vendor/eigenpal/`, package manifests, and lockfiles together.
 - CKEditor + BlockNote deps removed (purge plan: see `decisions/0002-zone-purge.md` companion notes)
 - Future work: leverage native eigenpal capabilities instead of reinventing
 - ProseMirror DOM access patterns documented for tests/debugging
@@ -47,6 +51,7 @@ We needed a DOCX-native WYSIWYG editor in the browser. Candidates:
 ## Cross-refs
 
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md)
+- [references/eigenpal-controlled-package.md](../references/eigenpal-controlled-package.md)
 - [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md)
 - [decisions/0002-zone-purge.md](0002-zone-purge.md)
 - [decisions/0003-token-syntax-migration.md](0003-token-syntax-migration.md)

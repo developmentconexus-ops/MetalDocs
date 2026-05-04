@@ -59,7 +59,7 @@ func TestIAMAdminHandlerReplaceRoles(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/iam/users/test-user/roles", strings.NewReader(`{"displayName":"Test User","roles":["editor","reviewer"]}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/iam/users/test-user/roles", strings.NewReader(`{"displayName":"Test User","roles":["editor","approver"]}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-Id", "admin-local")
 	rr := httptest.NewRecorder()

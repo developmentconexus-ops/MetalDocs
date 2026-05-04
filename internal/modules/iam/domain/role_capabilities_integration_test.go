@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/iam/application"
+	"metaldocs/internal/platform/tenant"
 
 	_ "github.com/lib/pq"
 )
@@ -35,7 +36,7 @@ func TestRoleCapabilities_VersionBumpEmitsGovernanceEvent(t *testing.T) {
 		t.Skipf("integration test skipped: db unreachable: %v", err)
 	}
 
-	const tenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	const tenantID = tenant.DevTenantID
 	const eventType = "role.capability_map.version_bump"
 
 	if _, err := db.ExecContext(ctx, `

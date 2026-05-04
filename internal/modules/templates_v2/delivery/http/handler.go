@@ -7,9 +7,8 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates_v2/application"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/tenant"
 )
-
-const devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 type AuthzFunc func(r *http.Request, tenantID, area string, action string) error
 
@@ -54,7 +53,7 @@ func tenantIDFromReq(r *http.Request) string {
 	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
 		return t
 	}
-	return devTenantID
+	return tenant.DevTenantID
 }
 
 func userIDFromReq(r *http.Request) string {
@@ -70,9 +69,16 @@ func writeErr(w http.ResponseWriter, status int, code, message string) {
 	})
 }
 
+var friendlyMsg = map[string]string{
+	"upload_missing": "DOCX file not yet uploaded. Please upload the template file before submitting for review.",
+}
+
 func writeMappedErr(w http.ResponseWriter, err error) {
 	status, code := MapErr(err)
-	msg := err.Error()
+	msg := friendlyMsg[code]
+	if msg == "" {
+		msg = err.Error()
+	}
 	if msg == "" {
 		msg = code
 	}

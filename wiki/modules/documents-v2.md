@@ -1,6 +1,8 @@
 # documents-v2 Module
 
-> **Last verified:** 2026-04-27
+> **DEPRECATED:** This doc is superseded by [modules/documents.md](documents.md). The backend module was renamed from `internal/modules/documents_v2` to `internal/modules/documents` and `public.documents_v2` was dropped (migrations 0167/0168, 2026-05-03). Do not update this file — update `documents.md` instead.
+
+> **Last verified:** 2026-05-02
 > **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
@@ -9,7 +11,8 @@
 > - `frontend/apps/web/src/features/documents/v2/routes.tsx:1` — route parsing/rendering for `/documents-v2/*`
 > - `frontend/apps/web/src/features/documents/v2/DocumentCreatePage.tsx:1` — step 1: pick controlled document
 > - `frontend/apps/web/src/features/documents/DocumentsHubView.tsx:758` — detail panel with Edit/PDF/Duplicate actions
-> - `internal/modules/documents_v2/delivery/http/handler.go:1` — REST handlers
+> - `internal/modules/documents_v2/delivery/http/handler.go:73` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
+> - `internal/modules/documents_v2/delivery/http/handler.go:259` — `finalizeDocument` — resolves approval route, calls SubmitRevisionForReview
 > - `internal/modules/documents_v2/application/service.go:1` — domain logic, session management
 
 ## Overview
@@ -45,7 +48,7 @@ Entry points:
    - If another user holds the session → falls back to `readonly` mode.
 2. Fetches signed URL for current revision DOCX → loads buffer into `MetalDocsEditor`.
 3. On change: debounced autosave via `useDocumentAutosave` (`PUT /api/v2/documents/:id/revisions`).
-4. "Finalizar" button: flushes autosave → `POST /api/v2/documents/:id/finalize` → releases session → navigates away.
+4. "Finalizar" button: flushes autosave → `POST /api/v2/documents/:id/finalize` → atomically creates approval instance + transitions document to `under_review` → returns `{"instanceId":"<uuid>"}` (HTTP 201) → releases session → navigates away.
 
 ## Session Model
 
@@ -79,7 +82,7 @@ Restoring a checkpoint re-fetches the revision buffer and reloads the editor.
 | DELETE | `/api/v2/documents/:id/sessions/:sid` | Release session |
 | GET | `/api/v2/documents/:id/revisions/:rid/signed-url` | Signed URL for DOCX |
 | PUT | `/api/v2/documents/:id/revisions` | Save new revision (autosave) |
-| POST | `/api/v2/documents/:id/finalize` | Finalize (draft → under_review) |
+| POST | `/api/v2/documents/:id/finalize` | Finalize: atomically draft → under_review + create approval instance (HTTP 201, body `{"instanceId":"<uuid>"}`) |
 | POST | `/api/v2/documents/:id/duplicate` | Duplicate document |
 | GET | `/api/v2/documents/:id/view` | Signed PDF view URL |
 | GET | `/api/v2/documents/:id/checkpoints` | List checkpoints |

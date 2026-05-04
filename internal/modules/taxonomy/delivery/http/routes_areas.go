@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 )
@@ -108,6 +109,7 @@ func (h *Handler) archiveArea(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
+	var pgErr *pgconn.PgError
 	switch {
 	case errors.Is(err, domain.ErrAreaNotFound):
 		writeError(w, http.StatusNotFound, "AREA_NOT_FOUND", "process area not found")
@@ -117,6 +119,8 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "AREA_PARENT_CYCLE", "area parent assignment creates cycle")
 	case errors.Is(err, domain.ErrAreaCodeImmutable):
 		writeError(w, http.StatusBadRequest, "AREA_CODE_IMMUTABLE", "area code is immutable")
+	case errors.As(err, &pgErr) && pgErr.Code == "23514":
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", pgErr.Message)
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 	}
