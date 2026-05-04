@@ -12,6 +12,7 @@ type Props = {
 
 export function RegistryCreateDialog({ onClose, onCreated }: Props) {
   const currentUser = useAuthStore((s) => s.user);
+  const isAuthReady = !!currentUser?.userId;
   const [profiles, setProfiles] = useState<DocumentProfile[]>([]);
   const [areas, setAreas] = useState<ProcessArea[]>([]);
   const [profileCode, setProfileCode] = useState("");
@@ -122,9 +123,16 @@ export function RegistryCreateDialog({ onClose, onCreated }: Props) {
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>Autor</label>
             <input
-              value={currentUser?.displayName ?? currentUser?.userId ?? ""}
+              value={
+                isAuthReady
+                  ? (currentUser!.displayName ?? currentUser!.userId)
+                  : "Aguardando autenticação..."
+              }
               readOnly
-              style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box", background: "#f5f5f5", color: "#666", cursor: "not-allowed" }}
+              style={{
+                width: "100%", padding: "6px 8px", boxSizing: "border-box" as const,
+                background: "#f5f5f5", color: isAuthReady ? "#666" : "#aaa", cursor: "not-allowed",
+              }}
             />
           </div>
 
@@ -191,8 +199,8 @@ export function RegistryCreateDialog({ onClose, onCreated }: Props) {
           {error && <p style={{ color: "#c00", fontSize: 12, marginBottom: 8 }}>{error}</p>}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} style={{ padding: "6px 14px" }}>Cancelar</button>
-            <button type="submit" disabled={saving} style={{ padding: "6px 14px" }}>
-              {saving ? "Criando..." : "Criar"}
+            <button type="submit" disabled={saving || !isAuthReady} style={{ padding: "6px 14px" }}>
+              {!isAuthReady ? "Aguardando..." : saving ? "Criando..." : "Criar"}
             </button>
           </div>
         </form>

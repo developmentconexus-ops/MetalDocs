@@ -7,7 +7,13 @@ import { DocumentEditorPage } from './DocumentEditorPage';
 vi.mock('@metaldocs/editor-ui', () => ({
   MetalDocsEditor: (props: Record<string, unknown>) => (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <div data-testid="editor" data-mode={props.mode as any} />
+    <div
+      data-testid="editor"
+      data-mode={props.mode as any}
+      onClick={() =>
+        (props.onTitleChange as ((name: string) => void) | undefined)?.('NewName')
+      }
+    />
   ),
 }));
 
@@ -74,19 +80,21 @@ vi.mock('./api/documentsV2', () => ({
 
 import * as api from './api/documentsV2';
 import * as pdfHook from './hooks/useDocumentPdfStatus';
+import { toast } from 'sonner';
 
-function makeDoc(status: string) {
+function makeDoc(status: string, overrides: Record<string, unknown> = {}) {
   return {
     Status: status,
     status,
     CurrentRevisionID: 'r1',
     current_revision_id: 'r1',
-    Name: 'Doc X',
-    name: 'Doc X',
+    Name: 'Original.docx',
+    name: 'Original.docx',
     Code: 'C-001',
     code: 'C-001',
     RevisionVersion: 1,
     revision_version: 1,
+    ...overrides,
   };
 }
 
@@ -149,6 +157,35 @@ describe('DocumentEditorPage E1 gate', () => {
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
     );
+  });
+});
+
+describe('DocumentEditorPage E9 rename rollback', () => {
+  it('rolls back document name on rename failure and shows error toast', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    vi.mocked(api.renameDocument).mockRejectedValueOnce(new Error('Server error'));
+    const toastSpy = vi.spyOn(toast, 'error');
+
+    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    // Wait for editor to mount with draft mode
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    // Title: C-001-Original (docCode-displayName, strips .docx)
+    expect(screen.getByText(/C-001-Original/)).toBeTruthy();
+
+    // Click editor → onTitleChange('NewName') → handleRename('NewName')
+    fireEvent.click(screen.getByTestId('editor'));
+
+    // After reject + rollback, title should revert
+    await waitFor(() =>
+      expect(screen.getByText(/C-001-Original/)).toBeTruthy(),
+    );
+
+    expect(vi.mocked(api.renameDocument)).toHaveBeenCalledWith('d1', 'NewName');
+    expect(toastSpy).toHaveBeenCalled();
   });
 });
 

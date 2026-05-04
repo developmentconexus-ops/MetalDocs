@@ -121,11 +121,16 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }, [sessionPhase]);
 
   const handleRename = useCallback((name: string) => {
+    const prev = documentName;
     setDocumentName(name);
-    void renameDocument(documentID, name).catch(() => {
-      toast.error('Failed to rename document.');
+    void renameDocument(documentID, name).catch((err: unknown) => {
+      setDocumentName(prev);
+      const code = (err && typeof err === 'object' && 'code' in err)
+        ? (err as { code?: string }).code
+        : undefined;
+      toast.error(resolveErrorMessage(code, 'Falha ao renomear documento.'));
     });
-  }, [documentID]);
+  }, [documentID, documentName]);
 
   async function handleSave() {
     if (!editorRef.current) return;
@@ -261,6 +266,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 onCommentDelete={(c: Comment) => { if (isEditable) void commentsHook.remove(c); }}
                 onCommentReply={(reply: Comment, parent: Comment) => { if (isEditable) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}
+                onTitleChange={handleRename}
                 showRuler={false}
               />
             ) : null}
