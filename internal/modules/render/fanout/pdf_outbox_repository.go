@@ -39,11 +39,11 @@ ON CONFLICT (tenant_id, revision_id) DO NOTHING`,
 	return nil
 }
 
-func (r *PDFOutboxRepository) ClaimPending(ctx context.Context, limit int) ([]OutboxRow, error) {
+func (r *PDFOutboxRepository) ClaimPending(ctx context.Context, limit, maxAttempts int) ([]OutboxRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
 WITH claimed AS (
   SELECT id FROM metaldocs.pdf_dispatch_outbox
-   WHERE status = 'pending' AND next_retry_at <= NOW() AND attempts < 5
+   WHERE status = 'pending' AND next_retry_at <= NOW() AND attempts < $2
    ORDER BY next_retry_at ASC
    LIMIT $1
    FOR UPDATE SKIP LOCKED
@@ -52,7 +52,7 @@ UPDATE metaldocs.pdf_dispatch_outbox o
    SET status='processing', claimed_at=NOW()
   FROM claimed c
  WHERE o.id = c.id
-RETURNING o.id, o.tenant_id, o.revision_id, o.content_hash, o.attempts`, limit)
+RETURNING o.id, o.tenant_id, o.revision_id, o.content_hash, o.attempts`, limit, maxAttempts)
 	if err != nil {
 		return nil, fmt.Errorf("claim pending: %w", err)
 	}
