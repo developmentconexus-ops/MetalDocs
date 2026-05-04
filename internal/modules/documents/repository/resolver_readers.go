@@ -39,13 +39,14 @@ func (r *RevisionReader) GetEffectiveFrom(ctx context.Context, tenantID, revisio
 
 func (r *RevisionReader) GetAuthor(ctx context.Context, tenantID, revisionID string) (resolvers.AuthorInfo, error) {
 	var userID string
+	var displayName string
 	err := r.db.QueryRowContext(ctx,
-		`SELECT created_by FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
-		tenantID, revisionID).Scan(&userID)
+		`SELECT created_by::text, COALESCE(created_by_display_name_snapshot, created_by::text) FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
+		tenantID, revisionID).Scan(&userID, &displayName)
 	if err != nil {
 		return resolvers.AuthorInfo{}, err
 	}
-	return resolvers.AuthorInfo{UserID: userID, DisplayName: userID}, nil
+	return resolvers.AuthorInfo{UserID: userID, DisplayName: displayName}, nil
 }
 
 func (r *RevisionReader) GetDocumentTitle(ctx context.Context, tenantID, revisionID string) (string, error) {
