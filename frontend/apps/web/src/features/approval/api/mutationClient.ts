@@ -2,15 +2,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
+import { ApiError, dispatchAuthExpired } from '../../../lib/api';
 import { etagCache } from './etagCache';
 
-export class ApprovalError extends Error {
-  constructor(
-    public readonly code: string,
-    public readonly status: number,
-    message: string,
-  ) {
-    super(message);
+// Re-export ApiError subclass for backwards compatibility with existing import sites.
+export class ApprovalError extends ApiError {
+  constructor(code: string, status: number, message: string) {
+    super(code, status, message);
     this.name = 'ApprovalError';
   }
 }
@@ -59,7 +57,9 @@ export async function mutate<TReq, TRes>(
   }
 
   if (res.status === 401) {
-    toast.error('Sessão expirada. Por favor, autentique novamente.');
+    // Dispatch auth bus so useAuthSession listener can store returnTo + reset state.
+    // No toast here — auth layer handles the UX (E4).
+    dispatchAuthExpired(window.location.pathname + window.location.search);
     throw new ApprovalError('authn.expired', 401, 'Não autorizado');
   }
 
@@ -67,7 +67,7 @@ export async function mutate<TReq, TRes>(
     const responseBody = (await res.json().catch(() => ({}))) as {
       error?: { code?: string; message?: string };
     };
-    toast.error('Permissão negada.');
+    // No generic toast — callers use resolveErrorMessage on the thrown code (E2).
     throw new ApprovalError(
       responseBody.error?.code ?? 'authz.denied',
       403,
