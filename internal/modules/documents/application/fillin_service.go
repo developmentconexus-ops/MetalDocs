@@ -20,7 +20,7 @@ type SchemaReader interface {
 }
 
 type FillInWriter interface {
-	UpsertValue(ctx context.Context, v repository.PlaceholderValue) error
+	UpsertValue(ctx context.Context, v repository.PlaceholderValue, q ...repository.DBTX) error
 }
 
 type draftResolver interface {

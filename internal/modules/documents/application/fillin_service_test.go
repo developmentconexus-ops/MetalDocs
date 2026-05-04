@@ -27,7 +27,7 @@ type fakeFillInWriter struct {
 	err     error
 }
 
-func (f *fakeFillInWriter) UpsertValue(_ context.Context, v repository.PlaceholderValue) error {
+func (f *fakeFillInWriter) UpsertValue(_ context.Context, v repository.PlaceholderValue, _ ...repository.DBTX) error {
 	if f.err != nil {
 		return f.err
 	}
