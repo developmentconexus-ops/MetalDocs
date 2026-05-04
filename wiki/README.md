@@ -63,6 +63,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [decisions/0003-token-syntax-migration.md](decisions/0003-token-syntax-migration.md) - plan to move from `{{uuid}}` -> `{name}` (stub, Last verified: 2026-05-01)
 - [decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) - accept two distinct authz tiers (CapabilityService vs authz.Require); no schema migration needed (Last verified: 2026-05-03)
 - [decisions/0008-placeholder-fixed-catalog.md](decisions/0008-placeholder-fixed-catalog.md) - replace user-fill placeholders with fixed 7-token computed catalog (2026-04-26)
+- [decisions/0009-pdf-dispatch-outbox.md](decisions/0009-pdf-dispatch-outbox.md) - transactional outbox for PDF dispatch events; at-least-once delivery (2026-05-03)
 
 ### References
 - [references/eigenpal-spike.md](references/eigenpal-spike.md) - pointer to spike repo + key findings (T1-T8)

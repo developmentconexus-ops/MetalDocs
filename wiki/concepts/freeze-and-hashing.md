@@ -1,6 +1,6 @@
 # Concept: Freeze and Hashing
 
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-03
 > **Status:** Stub. Verify exact hash algorithm + canonicalization rules against domain code.
 > **Scope:** What freeze produces, what the three hashes prove, why immutability matters.
 > **Out of scope:** Full freeze pipeline (see `workflows/freeze-and-fanout.md`).
