@@ -3,6 +3,7 @@ package fanout
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -89,6 +90,25 @@ UPDATE metaldocs.pdf_dispatch_outbox
    SET status='pending', last_error=$2, attempts=attempts+1, next_retry_at=$3, claimed_at=NULL
  WHERE id=$1::uuid`, id, errStr, nextRetryAt)
 	return err
+}
+
+// ReadState returns the latest status of the pdf_dispatch_outbox row for the
+// given tenant+revision. Returns ("", nil) when no row exists.
+func (r *PDFOutboxRepository) ReadState(ctx context.Context, tenantID, revisionID string) (string, error) {
+	var status string
+	err := r.db.QueryRowContext(ctx, `
+SELECT status FROM metaldocs.pdf_dispatch_outbox
+ WHERE tenant_id=$1::uuid AND revision_id=$2::uuid
+ ORDER BY created_at DESC LIMIT 1`,
+		tenantID, revisionID,
+	).Scan(&status)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("pdf outbox read state: %w", err)
+	}
+	return status, nil
 }
 
 func (r *PDFOutboxRepository) ResetStaleClaims(ctx context.Context, olderThan time.Duration) (int, error) {

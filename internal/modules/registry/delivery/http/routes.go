@@ -29,10 +29,10 @@ type createDocRequest struct {
 }
 
 type activeDocumentResponse struct {
-	DocumentID          string  `json:"documentId"`
-	ApprovalState       string  `json:"approvalState"`
-	ContentHash         string  `json:"contentHash"`
-	RevisionVersion     int     `json:"revisionVersion"`
+	DocumentID          *string `json:"documentId,omitempty"`
+	ApprovalState       *string `json:"approvalState,omitempty"`
+	ContentHash         *string `json:"contentHash,omitempty"`
+	RevisionVersion     *int    `json:"revisionVersion,omitempty"`
 	PublishedDocumentID *string `json:"publishedDocumentId,omitempty"`
 	ApprovalInstanceID  *string `json:"approvalInstanceId,omitempty"`
 }
@@ -92,43 +92,53 @@ func (h *Handler) getActiveDocument(w http.ResponseWriter, r *http.Request) {
 	tenantID := tenantIDFromRequest(r)
 	cdID := r.PathValue("id")
 
-	var resp activeDocumentResponse
-	var publishedDocID sql.NullString
+	// FULL OUTER JOIN so we get a row whenever either an active doc or a published
+	// doc exists for this controlled document.  If neither exists the query returns
+	// no rows and we 404.
+	var (
+		docID          sql.NullString
+		contentHash    sql.NullString
+		revisionVer    sql.NullInt64
+		approvalState  sql.NullString
+		publishedDocID sql.NullString
+	)
 	err := h.db.QueryRowContext(r.Context(), `
-		SELECT d.id,
-		       COALESCE(d.content_hash_at_submit,
-		                (SELECT r.content_hash FROM document_revisions r
-		                  WHERE r.document_id = d.id
-		                  ORDER BY r.created_at DESC LIMIT 1),
-		                ''),
-		       COALESCE(d.revision_version, 0),
-		       COALESCE(
-		         (SELECT CASE ai.status
-		            WHEN 'in_progress' THEN 'under_review'
-		            WHEN 'approved'    THEN 'approved'
-		            WHEN 'scheduled'   THEN 'scheduled'
-		            WHEN 'rejected'    THEN 'rejected'
-		            WHEN 'cancelled'   THEN 'cancelled'
-		          END
-		          FROM approval_instances ai
-		          WHERE ai.document_v2_id = d.id
-		          ORDER BY ai.submitted_at DESC
-		          LIMIT 1),
-		         'draft'
-		       ),
-		       (SELECT pd.id::text FROM documents pd
-		         WHERE pd.controlled_document_id = $2::uuid
-		           AND pd.tenant_id = $1::uuid
-		           AND pd.status = 'published'
-		         ORDER BY pd.revision_number DESC
-		         LIMIT 1)
-		  FROM documents d
-		 WHERE d.tenant_id = $1::uuid
-		   AND d.controlled_document_id = $2::uuid
-		   AND d.status IN ('draft','under_review','approved','rejected','scheduled')
-		 LIMIT 1`,
+SELECT active.id,
+       COALESCE(active.content_hash_at_submit,
+                (SELECT r.content_hash FROM document_revisions r
+                  WHERE r.document_id = active.id
+                  ORDER BY r.created_at DESC LIMIT 1)),
+       active.revision_version,
+       COALESCE(
+         (SELECT CASE ai.status
+            WHEN 'in_progress' THEN 'under_review'
+            WHEN 'approved'    THEN 'approved'
+            WHEN 'scheduled'   THEN 'scheduled'
+            WHEN 'rejected'    THEN 'rejected'
+            WHEN 'cancelled'   THEN 'cancelled'
+          END
+          FROM approval_instances ai
+          WHERE ai.document_v2_id = active.id
+          ORDER BY ai.submitted_at DESC
+          LIMIT 1),
+         'draft'
+       ),
+       pub.id::text
+  FROM (SELECT id, content_hash_at_submit, revision_version
+          FROM documents
+         WHERE tenant_id = $1::uuid
+           AND controlled_document_id = $2::uuid
+           AND status IN ('draft','under_review','approved','rejected','scheduled')
+         LIMIT 1) active
+  FULL OUTER JOIN
+       (SELECT id FROM documents
+         WHERE tenant_id = $1::uuid
+           AND controlled_document_id = $2::uuid
+           AND status = 'published'
+         ORDER BY revision_number DESC
+         LIMIT 1) pub ON TRUE`,
 		tenantID, cdID,
-	).Scan(&resp.DocumentID, &resp.ContentHash, &resp.RevisionVersion, &resp.ApprovalState, &publishedDocID)
+	).Scan(&docID, &contentHash, &revisionVer, &approvalState, &publishedDocID)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -139,23 +149,48 @@ func (h *Handler) getActiveDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If both sides are NULL the controlled document simply does not exist.
+	if !docID.Valid && !publishedDocID.Valid {
+		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
+		return
+	}
+
+	var resp activeDocumentResponse
+	if docID.Valid {
+		resp.DocumentID = &docID.String
+	}
+	if contentHash.Valid {
+		resp.ContentHash = &contentHash.String
+	}
+	if revisionVer.Valid {
+		v := int(revisionVer.Int64)
+		resp.RevisionVersion = &v
+	}
+	if approvalState.Valid {
+		resp.ApprovalState = &approvalState.String
+	}
 	if publishedDocID.Valid {
 		resp.PublishedDocumentID = &publishedDocID.String
 	}
-	var approvalInstanceID sql.NullString
-	_ = h.db.QueryRowContext(r.Context(), `
-		SELECT id::text
-		  FROM approval_instances
-		 WHERE document_v2_id = $1::uuid
-		   AND tenant_id = $2::uuid
-		   AND status = 'in_progress'
-		 ORDER BY submitted_at DESC
-		 LIMIT 1`,
-		resp.DocumentID, tenantID,
-	).Scan(&approvalInstanceID)
-	if approvalInstanceID.Valid {
-		resp.ApprovalInstanceID = &approvalInstanceID.String
+
+	// Fetch in-progress approval instance only when an active doc exists.
+	if docID.Valid {
+		var approvalInstanceID sql.NullString
+		_ = h.db.QueryRowContext(r.Context(), `
+SELECT id::text
+  FROM approval_instances
+ WHERE document_v2_id = $1::uuid
+   AND tenant_id = $2::uuid
+   AND status = 'in_progress'
+ ORDER BY submitted_at DESC
+ LIMIT 1`,
+			docID.String, tenantID,
+		).Scan(&approvalInstanceID)
+		if approvalInstanceID.Valid {
+			resp.ApprovalInstanceID = &approvalInstanceID.String
+		}
 	}
+
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
