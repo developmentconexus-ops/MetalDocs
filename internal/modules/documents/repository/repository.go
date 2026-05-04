@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"metaldocs/internal/modules/documents/domain"
+	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
 )
 
 // isInvalidUUID returns true when err is a Postgres error with SQLSTATE 22P02
@@ -32,16 +33,26 @@ func New(db *sql.DB) *Repository { return &Repository{db: db} }
 // deferrable-FK transaction. The initial revision's storage_key is empty - the
 // caller uploads the .docx to the final content-addressed key via
 // Presigner.AdoptTempObject, then calls SetRevisionStorageKey to finalize.
-func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string) (docID, revID, sessionID string, err error) {
+// requiredPlaceholders seeds document_placeholder_values rows in the same tx.
+func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return "", "", "", err
 	}
 	defer tx.Rollback()
 
+	// Serialise revision_number allocation per (tenant, controlled_document).
+	// pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK.
+	if d.ControlledDocumentID != nil && *d.ControlledDocumentID != "" {
+		lockKey := d.TenantID + ":" + *d.ControlledDocumentID
+		if _, err := tx.ExecContext(ctx,
+			`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, lockKey,
+		); err != nil {
+			return "", "", "", fmt.Errorf("acquire revision lock: %w", err)
+		}
+	}
+
 	// Deferrable FKs allow inserting doc -> session -> revision in any order in tx.
-	// revision_number: unique index ux_documents_v2_cd_revision serialises concurrent
-	// creation for the same CD; second concurrent caller gets a constraint violation.
 	// COALESCE handles hypothetical NULL CD (schema enforces NOT NULL since migration 0129).
 
 	var createdByDisplayName sql.NullString
@@ -97,6 +108,40 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 		return "", "", "", fmt.Errorf("update document pointers: %w", err)
 	}
 
+	// Write snapshot columns in same tx (C2/C4: atomic creation).
+	if snap := d.TemplateSnapshot; snap.PlaceholderSchemaJSON != nil || snap.CompositionJSON != nil || snap.BodyDocxS3Key != "" {
+		h := snap.Hashes()
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE metaldocs.documents
+			   SET placeholder_schema_snapshot = $1,
+			       placeholder_schema_hash     = $2,
+			       composition_config_snapshot = $3,
+			       composition_config_hash     = $4,
+			       body_docx_snapshot_s3_key   = $5,
+			       body_docx_hash              = $6
+			 WHERE id = $7`,
+			snap.PlaceholderSchemaJSON, h.PlaceholderSchemaHash,
+			snap.CompositionJSON, h.CompositionHash,
+			snap.BodyDocxS3Key, h.BodyDocxHash,
+			docID,
+		); err != nil {
+			return "", "", "", fmt.Errorf("write snapshot: %w", err)
+		}
+	}
+
+	// Seed required placeholder_values rows in same tx (C4).
+	for _, p := range requiredPlaceholders {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO metaldocs.document_placeholder_values
+			    (tenant_id, revision_id, placeholder_id, source, created_at, updated_at)
+			VALUES ($1, $2, $3, 'default', NOW(), NOW())
+			ON CONFLICT DO NOTHING`,
+			d.TenantID, revID, p.ID,
+		); err != nil {
+			return "", "", "", fmt.Errorf("seed placeholder %q: %w", p.ID, err)
+		}
+	}
+
 	return docID, revID, sessionID, tx.Commit()
 }
 
@@ -122,11 +167,11 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-		        finalized_at, archived_at, created_at, updated_at, created_by,
+		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,''), revision_version
 		 FROM documents WHERE id=$1 AND tenant_id=$2`, id, tenantID,
 	).Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
-		&d.CurrentRevisionID, &d.ActiveSessionID, &d.FinalizedAt, &d.ArchivedAt,
+		&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
 		&d.RevisionVersion)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
@@ -156,9 +201,9 @@ func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]doma
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-		        finalized_at, archived_at, created_at, updated_at, created_by,
+		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,'')
-		 FROM documents WHERE tenant_id=$1 ORDER BY updated_at DESC`, tenantID)
+		 FROM documents WHERE tenant_id=$1 AND archived_at IS NULL ORDER BY updated_at DESC`, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +212,7 @@ func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]doma
 	for rows.Next() {
 		var d domain.Document
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
-			&d.CurrentRevisionID, &d.ActiveSessionID, &d.FinalizedAt, &d.ArchivedAt,
+			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code); err != nil {
 			return nil, err
 		}
@@ -183,9 +228,9 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-		        finalized_at, archived_at, created_at, updated_at, created_by,
+		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,'')
-		 FROM documents WHERE tenant_id=$1 AND created_by=$2 ORDER BY updated_at DESC`, tenantID, userID)
+		 FROM documents WHERE tenant_id=$1 AND created_by=$2 AND archived_at IS NULL ORDER BY updated_at DESC`, tenantID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +239,7 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 	for rows.Next() {
 		var d domain.Document
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
-			&d.CurrentRevisionID, &d.ActiveSessionID, &d.FinalizedAt, &d.ArchivedAt,
+			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code); err != nil {
 			return nil, err
 		}
@@ -206,9 +251,6 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error {
 	col := ""
 	if stampTime {
-		if next == domain.DocStatusFinalized {
-			col = "finalized_at = now(),"
-		}
 		if next == domain.DocStatusArchived {
 			col = "archived_at  = now(),"
 		}
@@ -845,6 +887,29 @@ func (r *Repository) DeleteComment(ctx context.Context, tenantID, documentID str
 
 type commentScanner interface {
 	Scan(dest ...any) error
+}
+
+// MarkArchived sets archived_at on a document without changing its status.
+// Idempotent: WHERE archived_at IS NULL means double-call is a no-op.
+func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID string) error {
+	_ = actorID // reserved for future audit column; audit via Service layer
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE metaldocs.documents
+		   SET archived_at = now(), updated_at = now()
+		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NULL`,
+		tenantID, docID)
+	return err
+}
+
+// Unarchive clears archived_at, restoring the document to active queries.
+func (r *Repository) Unarchive(ctx context.Context, tenantID, docID, actorID string) error {
+	_ = actorID
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE metaldocs.documents
+		   SET archived_at = NULL, updated_at = now()
+		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NOT NULL`,
+		tenantID, docID)
+	return err
 }
 
 func scanComment(row commentScanner) (*domain.Comment, error) {

@@ -32,7 +32,6 @@ type Document struct {
 	CurrentRevisionID string
 	RevisionVersion   int64
 	ActiveSessionID   string
-	FinalizedAt       *time.Time
 	ValuesFrozenAt    *time.Time
 	ArchivedAt        *time.Time
 	CreatedAt         time.Time
@@ -44,6 +43,11 @@ type Document struct {
 	ProcessAreaCodeSnapshot *string
 	Code                    string
 	// TemplateVersionID is already present above — now semantically write-once after this migration
+
+	// TemplateSnapshot is the frozen template payload. Populated by Service.Create
+	// from SnapshotService.ResolveTemplate before CreateDocument INSERT so all
+	// snapshot columns are written atomically with the documents row.
+	TemplateSnapshot TemplateSnapshot `json:"-"`
 }
 
 type Session struct {

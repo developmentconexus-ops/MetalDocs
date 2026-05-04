@@ -128,7 +128,7 @@ func (f *fakeSvc) DuplicateDocument(_ context.Context, _, _, _ string) (*applica
 
 func (f *fakeSvc) Finalize(_ context.Context, _, _, _ string) error { return nil }
 
-func (f *fakeSvc) Archive(_ context.Context, _, _, _ string, _ bool) error { return nil }
+func (f *fakeSvc) Archive(_ context.Context, _, _, _ string) error { return nil }
 
 func (f *fakeSvc) SignedRevisionURL(_ context.Context, _, _, _ string) (string, error) {
 	return "https://example/rev", nil

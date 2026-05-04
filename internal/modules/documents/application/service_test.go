@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
+	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
 )
 
 type fakeRepo struct {
@@ -51,7 +52,7 @@ type fakeRepo struct {
 
 var _ application.Repository = (*fakeRepo)(nil)
 
-func (f *fakeRepo) CreateDocument(_ context.Context, _ *domain.Document, _ string) (string, string, string, error) {
+func (f *fakeRepo) CreateDocument(_ context.Context, _ *domain.Document, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
 	if f.createDocErr != nil {
 		return "", "", "", f.createDocErr
 	}
@@ -176,6 +177,8 @@ func (f *fakeRepo) UpdateComment(_ context.Context, _, _ string, _ int, _ string
 func (f *fakeRepo) DeleteComment(_ context.Context, _, _ string, _ int) error {
 	return nil
 }
+
+func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { return nil }
 
 type fakePresigner struct {
 	hashReturn  string
