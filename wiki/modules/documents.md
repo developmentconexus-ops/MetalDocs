@@ -1,14 +1,20 @@
 # documents Module
 
-> **Last verified:** 2026-05-03
-> **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, archive, export.
-> **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
+> **Last verified:** 2026-05-04
+> **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, archive, export, PDF status polling.
+> **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`), registry/CD codes (see `modules/registry.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:1` — editor page (chrome + MetalDocsEditor mount)
+> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:164` — `isEditable` gate: `phase=writer && status=draft`; PDF polling wired at line 166
+> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:235` — `PDFCell` rendered for non-draft docs
+> - `frontend/apps/web/src/features/documents/v2/hooks/useDocumentPdfStatus.ts:15` — polling hook: 3 s interval, 60 s timeout; calls `GET /api/v2/documents/{id}/view`
+> - `frontend/apps/web/src/features/documents/v2/PDFCell.tsx:5` — display component: pending/ready/failed states + retry button
 > - `frontend/apps/web/src/features/documents/v2/styles/DocumentEditorPage.module.css:1` — wine-brand chrome CSS
 > - `frontend/apps/web/src/features/documents/v2/routes.tsx:1` — route parsing/rendering for `/documents-v2/*`
 > - `frontend/apps/web/src/features/documents/v2/DocumentCreatePage.tsx:1` — step 1: pick controlled document
 > - `frontend/apps/web/src/features/documents/DocumentsHubView.tsx:758` — detail panel with Edit/PDF/Duplicate actions
+> - `internal/modules/documents/http/view_handler.go:12` — `ViewResult` struct (`PDFStatus string`, `SignedURL string`); handler returns 200+`pdf_status` always
+> - `internal/modules/documents/application/view_service.go:21` — `PDFOutboxStateReader` interface; `NewViewService` takes 3rd arg
+> - `internal/modules/documents/application/view_service.go:43` — `GetViewURL` — returns `{PDFStatus: "ready/pending/failed"}`
 > - `internal/modules/documents/delivery/http/handler.go:73` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
 > - `internal/modules/documents/delivery/http/handler.go:259` — `finalizeDocument` — resolves approval route, calls SubmitRevisionForReview
 > - `internal/modules/documents/application/service.go:218` — `CreateDocument` — calls `ResolveTemplate` pre-INSERT for atomic snapshot
@@ -66,6 +72,19 @@ Entry points:
 3. On change: debounced autosave via `useDocumentAutosave` (`PUT /api/v2/documents/:id/revisions`).
 4. "Finalizar" button: flushes autosave → `POST /api/v2/documents/:id/finalize` → atomically creates approval instance + transitions document to `under_review` → returns `{"instanceId":"<uuid>"}` (HTTP 201) → releases session → navigates away.
 
+**Edit gate (E1 fix):** `isEditable = session.phase === 'writer' && docStatus === 'draft'`. Comment/checkpoint mutations and the Finalizar button are gated on `isEditable`. A `window.focus` effect refetches the doc so the status updates when the user returns to the tab without a manual reload.
+
+## PDF Status Polling (non-draft documents)
+
+When `docStatus !== 'draft'` (e.g., `under_review`, `approved`, `published`), `DocumentEditorPage` activates `useDocumentPdfStatus`, which polls `GET /api/v2/documents/{id}/view` every 3 seconds until:
+- `pdf_status === 'ready'` — shows "Baixar PDF" download link via `PDFCell`.
+- `pdf_status === 'failed'` — shows error + retry button via `PDFCell`.
+- 60 seconds elapse without `ready` — treated as `failed`.
+
+`PDFCell` (`frontend/apps/web/src/features/documents/v2/PDFCell.tsx`) is a pure display component consuming `{status, url, onRetry}`. It is reused by `PublishedDownloadCell` in the registry detail page (`frontend/apps/web/src/features/registry/PublishedDownloadCell.tsx`).
+
+Backend: `GET /api/v2/documents/{id}/view` now **always returns 200** with `{"pdf_status":"pending|ready|failed"}` (plus `signed_url`/`pdf_url` when ready). It no longer returns 404 when the PDF is not yet generated. See `internal/modules/documents/http/view_handler.go:33` and `internal/modules/documents/application/view_service.go:43`.
+
 ## Session Model
 
 - Writer sessions are exclusive (one writer at a time).
@@ -100,7 +119,7 @@ Restoring a checkpoint re-fetches the revision buffer and reloads the editor.
 | PUT | `/api/v2/documents/:id/revisions` | Save new revision (autosave) |
 | POST | `/api/v2/documents/:id/finalize` | Finalize: atomically draft → under_review + create approval instance (HTTP 201, body `{"instanceId":"<uuid>"}`) |
 | POST | `/api/v2/documents/:id/duplicate` | Duplicate document |
-| GET | `/api/v2/documents/:id/view` | Signed PDF view URL |
+| GET | `/api/v2/documents/:id/view` | PDF status + optional signed URL. Returns 200 always with `{"pdf_status":"pending\|ready\|failed"}`; `signed_url`/`pdf_url` only when ready. |
 | GET | `/api/v2/documents/:id/checkpoints` | List checkpoints |
 | POST | `/api/v2/documents/:id/checkpoints` | Create checkpoint |
 | POST | `/api/v2/documents/:id/checkpoints/:cid/restore` | Restore checkpoint |

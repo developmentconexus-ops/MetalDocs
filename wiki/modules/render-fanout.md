@@ -1,6 +1,6 @@
 # Module: render-fanout
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Status:** Stub. Cross-references `workflows/freeze-and-fanout.md` which has the full pipeline.
 > **Scope:** DOCX → PDF rendering pipeline, token substitution engine, outbox-driven dispatch.
 > **Out of scope:** Approval-triggered freeze invocation (see `modules/approval.md`).
@@ -8,7 +8,7 @@
 > - `internal/modules/render/fanout/client.go` — HTTP client to docgen-v2
 > - `internal/modules/render/fanout/pdf_dispatcher.go` — outbox publisher
 > - `internal/modules/render/fanout/pdf_dispatch_adapter.go` — invoker bridge
-> - `internal/modules/render/fanout/pdf_outbox_repository.go` — transactional outbox reader/writer
+> - `internal/modules/render/fanout/pdf_outbox_repository.go:97` — `ReadState(ctx, tenantID, revisionID)` — returns latest outbox status; used by `view_service.go` to report `pdf_status=failed`
 > - `internal/modules/render/fanout/pdf_outbox_worker.go` — background worker polls + dispatches
 > - `internal/platform/worker/pdf_job_runner.go` — outbox consumer
 > - `internal/modules/render/resolvers/builtins.go` — resolver implementations
