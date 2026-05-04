@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import type { Comment } from '@metaldocs/editor-ui';
 import { toast } from 'sonner';
+import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
 import { useDocumentSession } from './hooks/useDocumentSession';
 import { useDocumentAutosave } from './hooks/useDocumentAutosave';
 import { useDocumentComments } from './hooks/useDocumentComments';
@@ -29,9 +30,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       setBuffer(null);
       return;
     }
-    const signedRes = await fetch(signedRevisionURL(documentID, revisionID));
-    if (!signedRes.ok) throw Object.assign(new Error(`http_${signedRes.status}`), { status: signedRes.status });
-    const signedPayload = await signedRes.json() as { url?: string };
+    const signedPayload = await apiFetch<{ url?: string }>(signedRevisionURL(documentID, revisionID));
     if (!signedPayload.url) {
       throw new Error('missing_signed_url');
     }
@@ -131,8 +130,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       await finalizeDocument(documentID);
       await session.release();
       onDone();
-    } catch {
-      toast.error('Failed to finalize document.');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toast.error(resolveErrorMessage(err.code, err.message));
+      } else {
+        toast.error('Erro ao finalizar documento.');
+      }
     }
   }
 
