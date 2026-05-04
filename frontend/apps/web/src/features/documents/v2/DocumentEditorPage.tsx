@@ -6,6 +6,7 @@ import { useDocumentSession } from './hooks/useDocumentSession';
 import { useDocumentAutosave } from './hooks/useDocumentAutosave';
 import { useDocumentComments } from './hooks/useDocumentComments';
 import { getDocument, finalizeDocument, renameDocument, signedRevisionURL } from './api/documentsV2';
+import { resolveErrorMessage } from '../../../lib/api/errorMessages';
 import type { DocumentResponse } from './api/documentsV2';
 import { CheckpointsDialog } from './CheckpointsDialog';
 import { ExportMenuButton } from './ExportMenuButton';
@@ -110,11 +111,16 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }, [sessionPhase]);
 
   const handleRename = useCallback((name: string) => {
+    const prev = documentName;
     setDocumentName(name);
-    void renameDocument(documentID, name).catch(() => {
-      toast.error('Failed to rename document.');
+    void renameDocument(documentID, name).catch((err: unknown) => {
+      setDocumentName(prev);
+      const code = (err && typeof err === 'object' && 'code' in err)
+        ? (err as { code?: string }).code
+        : undefined;
+      toast.error(resolveErrorMessage(code, 'Falha ao renomear documento.'));
     });
-  }, [documentID]);
+  }, [documentID, documentName]);
 
   async function handleSave() {
     if (!editorRef.current) return;
@@ -240,6 +246,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 onCommentDelete={(c: Comment) => void commentsHook.remove(c)}
                 onCommentReply={(reply: Comment, parent: Comment) => void commentsHook.reply(reply, parent)}
                 onAutoSave={handleSave}
+                onTitleChange={handleRename}
                 showRuler={false}
               />
             ) : null}
