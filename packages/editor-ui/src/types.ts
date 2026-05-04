@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { Comment, ReactEditorPlugin } from '@eigenpal/docx-js-editor';
+import type { Comment, EditorPlugin } from '@eigenpal/docx-js-editor';
 import type { SidebarModel } from './plugins/mergefieldPlugin';
 
 export type EditorMode = 'template-draft' | 'document-edit' | 'readonly';
@@ -8,7 +8,7 @@ export interface MetalDocsEditorProps {
   documentId?: string;
   documentBuffer?: ArrayBuffer;
   mode: EditorMode;
-  author: string;
+  author?: string;
   documentName?: string;
   documentNameEditable?: boolean;
   onDocumentNameChange?: (name: string) => void;
@@ -20,7 +20,7 @@ export interface MetalDocsEditorProps {
   onCommentReply?: (reply: Comment, parent: Comment) => void;
   renderTitleBarRight?: () => ReactNode;
   sidebarModel?: SidebarModel;
-  externalPlugins?: ReactEditorPlugin[];
+  externalPlugins?: EditorPlugin[];
   onAutoSave?: (buf: ArrayBuffer) => Promise<void>;
   onLockLost?: () => void;
   showRuler?: boolean;

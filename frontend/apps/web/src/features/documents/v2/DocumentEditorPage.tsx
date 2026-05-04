@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import type { Comment } from '@metaldocs/editor-ui';
 import { toast } from 'sonner';
+import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
 import { useDocumentSession } from './hooks/useDocumentSession';
 import { useDocumentAutosave } from './hooks/useDocumentAutosave';
 import { useDocumentComments } from './hooks/useDocumentComments';
@@ -29,9 +30,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       setBuffer(null);
       return;
     }
-    const signedRes = await fetch(signedRevisionURL(documentID, revisionID));
-    if (!signedRes.ok) throw Object.assign(new Error(`http_${signedRes.status}`), { status: signedRes.status });
-    const signedPayload = await signedRes.json() as { url?: string };
+    const signedPayload = await apiFetch<{ url?: string }>(signedRevisionURL(documentID, revisionID));
     if (!signedPayload.url) {
       throw new Error('missing_signed_url');
     }
@@ -131,8 +130,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       await finalizeDocument(documentID);
       await session.release();
       onDone();
-    } catch {
-      toast.error('Failed to finalize document.');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toast.error(resolveErrorMessage(err.code, err.message));
+      } else {
+        toast.error('Erro ao finalizar documento.');
+      }
     }
   }
 
@@ -170,27 +173,21 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     <div className={styles.page} data-editor-root>
       <div className={styles.body}>
 
-        <aside className={`${styles.rail} ${styles.railLeft}`}>
-          <button
-            className={styles.railBackBtn}
-            onClick={onDone}
-            aria-label="Voltar"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-            <span className={styles.railTip}>Voltar</span>
-          </button>
-        </aside>
-
         <main className={styles.canvas}>
           <div className={styles.editorWrapper}>
 
+            <div className={styles.overlayBack}>
+              <button className={styles.overlayBackBtn} onClick={onDone} aria-label="Voltar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+            </div>
+
             <div className={styles.overlayTitle}>
-              <span className={styles.docTitle}>{displayName || 'Documento'}</span>
-              <span className={styles.docSep}>·</span>
               <span className={styles.docMeta}>Documento</span>
-              {docCode && <span className={styles.versionBadge}>{docCode}</span>}
+              <span className={styles.docSep}>·</span>
+              <span className={styles.docTitle}>{docCode ? `${docCode}-${displayName}` : (displayName || 'Documento')}</span>
               {doc && <span className={styles.versionBadge}>REV{String(revNum).padStart(2, '0')}</span>}
               {docStatus && (
                 <span className={`${styles.statusPill} ${statusPillClass}`}>

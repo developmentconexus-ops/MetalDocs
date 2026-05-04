@@ -21,7 +21,7 @@ func NewRoleAdminRepository() *RoleAdminRepository {
 	return &RoleAdminRepository{users: map[string]userRecord{}}
 }
 
-func (r *RoleAdminRepository) HasAnyRole(_ context.Context, role domain.Role) (bool, error) {
+func (r *RoleAdminRepository) HasAnyRole(_ context.Context, role domain.Role, _ string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -33,7 +33,7 @@ func (r *RoleAdminRepository) HasAnyRole(_ context.Context, role domain.Role) (b
 	return false, nil
 }
 
-func (r *RoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID, displayName string, role domain.Role, _ string) error {
+func (r *RoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID, displayName, _ string, role domain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -47,7 +47,7 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID,
 	return nil
 }
 
-func (r *RoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName string, roles []domain.Role, _ string) error {
+func (r *RoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, roles []domain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

@@ -49,6 +49,13 @@ func TestPDFDispatcher_Dispatch_PublishesEvent(t *testing.T) {
 	if e.Payload["final_docx_s3_key"] != "final/rev-1.docx" {
 		t.Errorf("payload final_docx_s3_key = %v", e.Payload["final_docx_s3_key"])
 	}
+	if e.EventID == "" {
+		t.Error("EventID must be non-empty")
+	}
+	wantKey := "docgen_v2_pdf:rev-1"
+	if e.IdempotencyKey != wantKey {
+		t.Errorf("IdempotencyKey = %q, want %q", e.IdempotencyKey, wantKey)
+	}
 }
 
 func TestPDFDispatcher_Dispatch_PropagatesErr(t *testing.T) {

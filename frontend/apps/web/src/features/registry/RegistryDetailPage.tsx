@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, type ActiveDocumentInstance } from "./api";
 import type { ControlledDocument } from "./types";
 import { RegistryDetailPanel } from '../approval/components/RegistryDetailPanel';
+import { createDocument } from '../documents/v2/api/documentsV2';
 
 type Props = {
   id: string;
   onBack: () => void;
+  onOpenDocumentEditor?: (docId: string) => void;
 };
 
 function StatusBadge({ status }: { status: ControlledDocument["status"] }) {
@@ -21,12 +23,17 @@ function StatusBadge({ status }: { status: ControlledDocument["status"] }) {
   );
 }
 
-export function RegistryDetailPage({ id, onBack }: Props) {
+export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) {
   const [doc, setDoc] = useState<ControlledDocument | null>(null);
   const [instance, setInstance] = useState<ActiveDocumentInstance | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState(false);
+
+  const [showNewRevisionForm, setShowNewRevisionForm] = useState(false);
+  const [newRevisionName, setNewRevisionName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -60,6 +67,28 @@ export function RegistryDetailPage({ id, onBack }: Props) {
       setError(err instanceof Error ? err.message : "Failed to obsolete.");
     } finally {
       setActioning(false);
+    }
+  }
+
+  async function handleCreateNewRevision() {
+    if (!doc || !newRevisionName.trim()) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const res = await createDocument({
+        controlled_document_id: doc.id,
+        name: newRevisionName.trim(),
+        form_data: {},
+      });
+      if (onOpenDocumentEditor) {
+        onOpenDocumentEditor(res.document_id);
+      } else {
+        await load();
+      }
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Falha ao criar revisão.");
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -118,11 +147,64 @@ export function RegistryDetailPage({ id, onBack }: Props) {
             approvalState={instance.approvalState}
             contentHash={instance.contentHash}
             revisionVersion={instance.revisionVersion}
+            publishedDocumentId={instance.publishedDocumentId}
+            lockedByInstanceId={instance.approvalInstanceId}
           />
         </div>
       ) : doc.status === 'active' ? (
         <div style={{ marginTop: 32, padding: 16, border: '1px dashed #ccc', borderRadius: 4, color: '#888' }}>
-          <p style={{ margin: 0 }}>Nenhum documento ativo para este registro.</p>
+          {!showNewRevisionForm ? (
+            <>
+              <p style={{ margin: "0 0 12px" }}>Nenhuma revisão ativa para este registro.</p>
+              <button
+                type="button"
+                onClick={() => setShowNewRevisionForm(true)}
+                style={{ padding: "6px 14px", fontWeight: 600 }}
+              >
+                Nova Revisão
+              </button>
+            </>
+          ) : (
+            <div>
+              <p style={{ margin: "0 0 12px", fontWeight: 600, color: "#333" }}>Nova Revisão — {doc.code}</p>
+              <p style={{ margin: "0 0 8px", fontSize: 12, color: "#666" }}>
+                Template resolvido pelo servidor via perfil <strong>{doc.profileCode}</strong>
+                {doc.overrideTemplateVersionId ? ` (override: ${doc.overrideTemplateVersionId})` : ""}
+              </p>
+              <label style={{ display: "block", marginBottom: 8, fontSize: 13, color: "#333" }}>
+                Nome do documento
+                <input
+                  type="text"
+                  value={newRevisionName}
+                  onChange={(e) => setNewRevisionName(e.target.value)}
+                  disabled={creating}
+                  style={{ display: "block", marginTop: 4, padding: "6px 8px", width: 320, fontSize: 13 }}
+                  placeholder={`${doc.code} — nova revisão`}
+                />
+              </label>
+              {createError && (
+                <p role="alert" style={{ color: "#c00", fontSize: 12, margin: "4px 0 8px" }}>{createError}</p>
+              )}
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => void handleCreateNewRevision()}
+                  disabled={creating || !newRevisionName.trim()}
+                  style={{ padding: "6px 14px", fontWeight: 600 }}
+                >
+                  {creating ? "Criando..." : "Gerar Documento"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowNewRevisionForm(false); setNewRevisionName(""); setCreateError(""); }}
+                  disabled={creating}
+                  style={{ padding: "6px 14px" }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
     </div>

@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	pgrepo "metaldocs/internal/modules/documents/infrastructure/postgres"
-	notificationapp "metaldocs/internal/modules/notifications/application"
-	notificationpg "metaldocs/internal/modules/notifications/infrastructure/postgres"
 	"metaldocs/internal/platform/config"
 	pgdb "metaldocs/internal/platform/db/postgres"
 	"metaldocs/internal/platform/messaging"
@@ -17,11 +14,10 @@ import (
 )
 
 type WorkerDependencies struct {
-	Consumer         messaging.Consumer
-	NotificationsSvc *notificationapp.Service
-	DocgenV2Client   *servicebus.DocgenV2Client
-	SQLDB            *sql.DB
-	Cleanup          func()
+	Consumer       messaging.Consumer
+	DocgenV2Client *servicebus.DocgenV2Client
+	SQLDB          *sql.DB
+	Cleanup        func()
 }
 
 func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig) (WorkerDependencies, error) {
@@ -44,16 +40,12 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 		)
 	}
 
-	docRepo := pgrepo.NewRepository(db)
-	notificationsRepo := notificationpg.NewRepository(db)
 	consumer := outboxpg.NewConsumer(db, time.Duration(workerCfg.RetryBaseSeconds)*time.Second)
-	notificationsSvc := notificationapp.NewService(notificationsRepo, docRepo, nil)
 
 	return WorkerDependencies{
-		Consumer:         consumer,
-		NotificationsSvc: notificationsSvc,
-		DocgenV2Client:   docgenV2Client,
-		SQLDB:            db,
-		Cleanup:          func() { _ = closeDB(db) },
+		Consumer:       consumer,
+		DocgenV2Client: docgenV2Client,
+		SQLDB:          db,
+		Cleanup:        func() { _ = closeDB(db) },
 	}, nil
 }

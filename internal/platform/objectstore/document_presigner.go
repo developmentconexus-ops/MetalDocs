@@ -14,7 +14,7 @@ import (
 
 	"github.com/minio/minio-go/v7"
 
-	"metaldocs/internal/modules/documents_v2/domain"
+	"metaldocs/internal/modules/documents/domain"
 )
 
 type DocumentPresigner struct {

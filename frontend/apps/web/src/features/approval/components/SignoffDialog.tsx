@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 
 import { signoff } from '../api/approvalApi';
 import { ApprovalError } from '../api/mutationClient';
+import { resolveErrorMessage } from '../../../lib/api';
 import styles from './SignoffDialog.module.css';
 
 type DialogState =
@@ -12,7 +13,9 @@ type DialogState =
   | 'error_session_expired'
   | 'error_rate_limited'
   | 'error_network'
-  | 'error_server';
+  | 'error_server'
+  | 'error_sod_submitter'
+  | 'error_sod_duplicate';
 
 type Decision = 'approve' | 'reject';
 
@@ -22,6 +25,9 @@ const ERROR_MESSAGES: Record<Exclude<DialogState, 'idle' | 'submitting' | 'succe
   error_rate_limited: 'Muitas tentativas. Aguarde 30 segundos antes de tentar novamente.',
   error_network: 'Erro de conexão. Verifique sua internet e tente novamente.',
   error_server: 'Erro interno do servidor. Tente novamente em instantes.',
+  // E2: SoD codes get Portuguese messages from shared errorMessages map.
+  error_sod_submitter: resolveErrorMessage('sod.submitter_cannot_sign', 'Segregação de funções: submissão e aprovação pelo mesmo usuário não é permitida.'),
+  error_sod_duplicate: resolveErrorMessage('sod.cross_stage_duplicate', 'Você já assinou este documento em uma etapa anterior.'),
 };
 
 interface SignoffDialogProps {
@@ -124,6 +130,8 @@ export function SignoffDialog({
       if (error.code === 'authn.signature_invalid') return 'error_bad_password';
       if (error.status === 401) return 'error_session_expired';
       if (error.status === 429 || error.code === 'authn.rate_limited') return 'error_rate_limited';
+      if (error.code === 'sod.submitter_cannot_sign') return 'error_sod_submitter';
+      if (error.code === 'sod.cross_stage_duplicate') return 'error_sod_duplicate';
       return 'error_server';
     }
 

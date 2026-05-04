@@ -13,6 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"metaldocs/internal/platform/tenant"
 )
 
 func TestCodeImmutability(t *testing.T) {
@@ -42,7 +44,7 @@ func TestCodeImmutability(t *testing.T) {
 
 	oldCode := "immut_old_" + time.Now().UTC().Format("150405")
 	newCode := "immut_new_" + time.Now().UTC().Format("150405")
-	tenantID := "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	tenantID := tenant.DevTenantID
 
 	_, err = tx.ExecContext(
 		context.Background(),

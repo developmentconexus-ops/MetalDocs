@@ -6,23 +6,20 @@ import (
 	"log"
 	"time"
 
-	notificationapp "metaldocs/internal/modules/notifications/application"
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/messaging"
 )
 
 type Service struct {
-	consumer      messaging.Consumer
-	notifications *notificationapp.Service
-	pdfRunner     *PDFJobRunner
-	cfg           config.WorkerConfig
+	consumer  messaging.Consumer
+	pdfRunner *PDFJobRunner
+	cfg       config.WorkerConfig
 }
 
-func NewService(consumer messaging.Consumer, notifications *notificationapp.Service, cfg config.WorkerConfig) *Service {
+func NewService(consumer messaging.Consumer, cfg config.WorkerConfig) *Service {
 	return &Service{
-		consumer:      consumer,
-		notifications: notifications,
-		cfg:           cfg,
+		consumer: consumer,
+		cfg:      cfg,
 	}
 }
 
@@ -33,7 +30,7 @@ func (s *Service) WithPDFRunner(r *PDFJobRunner) *Service {
 }
 
 func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
-	if s.consumer == nil || s.notifications == nil {
+	if s.consumer == nil {
 		return fmt.Errorf("worker dependencies not configured")
 	}
 
@@ -54,7 +51,7 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 				handleErr = s.pdfRunner.Handle(ctx, event)
 			}
 		default:
-			handleErr = s.notifications.HandleEvent(ctx, event)
+			log.Printf("worker_event event_id=%s event_type=%s result=skipped_unknown_type", event.EventID, event.EventType)
 		}
 		if handleErr != nil {
 			failed++
@@ -74,12 +71,6 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 		processed++
 		log.Printf("worker_event event_id=%s event_type=%s attempt_count=%d result=published trace_id=%s",
 			event.EventID, event.EventType, event.AttemptCount, event.TraceID)
-	}
-
-	if s.cfg.ReviewReminderDays > 0 {
-		if err := s.notifications.EmitReviewReminders(ctx, s.cfg.ReviewReminderDays); err != nil {
-			return err
-		}
 	}
 
 	log.Printf("worker_batch result=completed processed=%d failed=%d dead_lettered=%d duration_ms=%d",

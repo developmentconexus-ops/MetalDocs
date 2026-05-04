@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@eigenpal/docx-js-editor':
-        specifier: 0.0.34
-        version: 0.0.34(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
+        version: file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@fontsource/dm-mono':
         specifier: ^5.2.7
         version: 5.2.7
@@ -296,8 +296,9 @@ packages:
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
 
-  '@eigenpal/docx-js-editor@0.0.34':
-    resolution: {integrity: sha512-1fnle5IVuXq1eeXnKurqsxUzgGrI5CUj5cqC0+gBvXQ6DswPSJh1YGLyopdL9FxXk2oPvyba3KO0hEJSlGqZTw==}
+  '@eigenpal/docx-js-editor@file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz':
+    resolution: {integrity: sha512-vyEdQ+o00RPNqKepxa45YfrN89CM4voNzjY/q3B/mNdjcckyf4QmDxSyTA9vEK8wYNgx/HBrC0rtLPkWrrfpRg==, tarball: file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz}
+    version: 0.2.0
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
@@ -2923,7 +2924,7 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@eigenpal/docx-js-editor@0.0.34(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@eigenpal/docx-js-editor@file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@radix-ui/react-select': 2.2.6(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       clsx: 2.1.1
@@ -3082,7 +3083,7 @@ snapshots:
 
   '@metaldocs/editor-ui@file:../../../packages/editor-ui(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@eigenpal/docx-js-editor': 0.0.34(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@eigenpal/docx-js-editor': file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@metaldocs/shared-tokens': file:../../../packages/shared-tokens
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)

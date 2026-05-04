@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"metaldocs/internal/modules/documents_v2/approval/application"
+	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/jobs/scheduler"
 )
 

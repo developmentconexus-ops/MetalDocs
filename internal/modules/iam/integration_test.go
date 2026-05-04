@@ -13,13 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"metaldocs/internal/modules/documents_v2/approval/repository"
+	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/tenant"
 
 	"github.com/lib/pq"
 )
 
-const probeTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+const probeTenantID = tenant.DevTenantID
 
 func integrationDB(t *testing.T) *sql.DB {
 	t.Helper()

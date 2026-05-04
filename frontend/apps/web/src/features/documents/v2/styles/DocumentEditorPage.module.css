@@ -322,23 +322,31 @@
   position: relative;
 }
 
-.railBackBtn {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  padding: 0;
+.overlayBack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+  z-index: 100;
+}
+.overlayBackBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   background: var(--brand);
   border: 0;
-  border-radius: 6px;
+  border-radius: 5px;
   color: #fff;
   cursor: pointer;
-  transition: background 150ms ease;
-  flex-shrink: 0;
+  transition: background 150ms;
 }
-.railBackBtn:hover { background: #7d2433; }
-.railBackBtn .railTip { left: calc(100% + 10px); }
+.overlayBackBtn:hover { background: #7d2433; }
+.overlayBackBtn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
 .overlayTitle {
   position: absolute;
@@ -542,6 +550,9 @@
   background: linear-gradient(180deg, #c16672 0%, #7a2431 100%);
 }
 .editorWrapper :global(.ep-root) { scrollbar-width: thin; scrollbar-color: var(--brand) transparent; }
+
+/* Shift eigenpal title bar right so back button doesn't cover doc symbol */
+.editorWrapper :global(.ep-root [data-testid="title-bar"]) { padding-left: 40px; }
 
 /* Hide template annotation chips — plugin still active for substitution */
 .editorWrapper :global(.plugin-panels-left),

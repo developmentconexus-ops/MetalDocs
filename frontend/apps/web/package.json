@@ -13,7 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@eigenpal/docx-js-editor": "0.0.34",
+    "@eigenpal/docx-js-editor": "file:../../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz",
     "@fontsource/dm-mono": "^5.2.7",
     "@fontsource/dm-sans": "^5.2.8",
     "@metaldocs/editor-ui": "file:../../../packages/editor-ui",

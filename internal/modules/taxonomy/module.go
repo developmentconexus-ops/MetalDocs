@@ -23,9 +23,12 @@ func New(deps Dependencies) *Module {
 	areaRepo := infrastructure.NewAreaRepository(deps.DB)
 	govLogger := application.NewDBGovernanceLogger(deps.DB)
 
+	familyRepo := infrastructure.NewFamilyRepository(deps.DB)
+
 	profileService := application.NewProfileService(profileRepo, deps.TplChecker, govLogger)
 	areaService := application.NewAreaService(areaRepo, govLogger)
-	handler := thttp.NewHandler(profileService, areaService)
+	familyService := application.NewFamilyService(familyRepo)
+	handler := thttp.NewHandler(profileService, areaService, familyService)
 
 	return &Module{Handler: handler}
 }

@@ -1,18 +1,22 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-04-27
+**Last verified:** 2026-05-03
 
 ## API login
 
 Login endpoint: `POST /api/v1/auth/login`
 Body field is `identifier` (not `username`).
 
-| identifier | password | role | notes |
+| identifier | password | IAM role | notes |
 |---|---|---|---|
-| `admin` | `AdminMetalDocs123!` | admin | bootstrapped on first start; use to author documents/templates |
-| `approver` | `ApproverMetalDocs123!` | admin | seeded by migration 0159; use to approve templates authored by `admin` (domain enforces actorID != authorID) |
+| `admin` | `AdminMetalDocs123!` | system_admin | bootstrapped on first start; use to author documents/templates |
+| `approver` | `ApproverMetalDocs123!` | approver | seeded by migration 0159; corrected to `approver` by migration 0170 (0166 had incorrectly set this to `system_admin`) — use to test SoD signoff flows |
+| `author-test` | `AuthorTest123!` | system_admin | smoke-test author: creates templates + docs + submits for approval |
+| `approver-test` | `ApproverMetalDocs456!@` | approver | smoke-test approver: signs off docs submitted by `author-test` (ISO seg test requires distinct userIds); password reset 2026-05-01; role renamed from `reviewer` by migration 0166 |
 
-Bootstrap triggers when: API starts and `metaldocs.iam_user_roles` has no `admin` role.
+> **Migration 0170:** Corrects the dev `approver` user back to role `approver`. Migration 0166's blanket `admin→system_admin` rename incorrectly caught this user. SoD (Segregation of Duties) requires `approver` and `admin-local` to be distinct roles.
+
+Bootstrap triggers when: API starts and `metaldocs.iam_user_roles` has no `system_admin` role.
 To re-bootstrap: truncate `metaldocs.auth_identities`, `metaldocs.iam_user_roles`, `metaldocs.iam_users` and restart API.
 
 ## API startup
@@ -31,6 +35,14 @@ PGPASSWORD=***REDACTED***   ← set via $env:PGPASSWORD in PowerShell, never via
 
 See `.env` for full var list. Use `scripts/start-api-ps.ps1` if it exists, otherwise set manually.
 
+**CRITICAL:** `docgen-v2` (port 3001) must be running before starting the API. The approval/signoff transaction calls docgen-v2 synchronously — if it's down, signoffs fail and roll back. Start it with:
+```powershell
+cd apps/docgen-v2
+$env:METALDOCS_STORAGE_PROVIDER="minio"; $env:MINIO_ENDPOINT="localhost:9000"; ...  # see .env.docgen-v2
+npx tsx src/index.ts
+```
+Or use `scripts/dev-docgen.ps1` if available.
+
 ## DB access
 
 ```
@@ -38,7 +50,7 @@ docker exec metaldocs-postgres psql -U metaldocs_app -d metaldocs -c "<query>"
 ```
 
 User tables: `metaldocs.auth_identities`, `metaldocs.iam_users`, `metaldocs.iam_user_roles`
-Document tables: `public.documents_v2`, `public.controlled_documents`
+Document tables: `public.documents`, `public.controlled_documents` (note: `public.documents_v2` was dropped by migration 0168)
 Template tables: `public.templates_v2_template`, `public.templates_v2_template_version`
 
 ## Process-area roles (approval authz)

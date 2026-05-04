@@ -24,7 +24,7 @@ SELECT
 	COALESCE(d.status, ''),
 	COALESCE(d.profile_code_snapshot, ''),
 	COALESCE(d.process_area_code_snapshot, ''),
-	COALESCE(d.created_by, ''),
+	d.created_by::text,
 	COALESCE(cd.code, ''),
 	COALESCE(cd.sequence_num, d.revision_number, 0),
 	d.created_at

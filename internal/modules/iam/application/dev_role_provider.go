@@ -19,7 +19,7 @@ func NewDevRoleProvider(rolesByUser map[string][]domain.Role) *DevRoleProvider {
 	return &DevRoleProvider{rolesByUser: rolesByUser}
 }
 
-func (p *DevRoleProvider) RolesByUserID(_ context.Context, userID string) ([]domain.Role, error) {
+func (p *DevRoleProvider) RolesByUserID(_ context.Context, userID, _ string) ([]domain.Role, error) {
 	id := strings.TrimSpace(userID)
 	if id == "" {
 		return nil, domain.ErrUserNotFound

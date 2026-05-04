@@ -3,6 +3,8 @@ package fanout
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	"metaldocs/internal/platform/messaging"
 )
 
@@ -26,9 +28,11 @@ func NewPDFDispatcher(pub messaging.Publisher) *PDFDispatcher {
 
 func (d *PDFDispatcher) Dispatch(ctx context.Context, in DispatchInput) error {
 	return d.pub.Publish(ctx, messaging.Event{
-		EventType:     "docgen_v2_pdf",
-		AggregateType: "document_revision",
-		AggregateID:   in.RevisionID,
+		EventID:        uuid.NewString(),
+		EventType:      "docgen_v2_pdf",
+		AggregateType:  "document_revision",
+		AggregateID:    in.RevisionID,
+		IdempotencyKey: "docgen_v2_pdf:" + in.RevisionID,
 		Payload: map[string]any{
 			"tenant_id":         in.TenantID,
 			"revision_id":       in.RevisionID,
