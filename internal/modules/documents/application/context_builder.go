@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 
 	"metaldocs/internal/modules/render/resolvers"
 )
@@ -57,7 +58,10 @@ func (b *DocumentContextBuilder) Build(ctx context.Context, tenantID, revisionID
 		return resolvers.ResolveInput{}, err
 	}
 	var instanceID sql.NullString
-	_ = b.db.QueryRowContext(ctx, activeInstanceSQL, tenantID, revisionID).Scan(&instanceID)
+	if err := b.db.QueryRowContext(ctx, activeInstanceSQL, tenantID, revisionID).Scan(&instanceID); err != nil && err != sql.ErrNoRows {
+		// Best-effort: proceed with empty instance ID; resolvers return nil approvers gracefully.
+		slog.WarnContext(ctx, "approval instance lookup failed", "revision_id", revisionID, "err", err)
+	}
 	return resolvers.ResolveInput{
 		TenantID:             tenantID,
 		RevisionID:           revisionID,
