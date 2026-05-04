@@ -71,7 +71,7 @@ func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID,
 		  FROM approval_signoffs s
 		 WHERE s.tenant_id = $1::uuid
 		   AND s.approval_instance_id = $2::uuid
-		   AND s.decision = 'approved'
+		   AND s.decision = 'approve'
 		 ORDER BY s.signed_at ASC`,
 		tenantID, approvalInstanceID)
 	if err != nil {
