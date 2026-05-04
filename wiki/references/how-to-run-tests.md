@@ -39,7 +39,7 @@ cd frontend\apps\web
 npm.cmd run test:e2e
 ```
 
-Smoke routine for manual e2e: see [`docs/runbooks/smoke-checklist.md`](../../docs/runbooks/smoke-checklist.md).
+System acceptance test (manual e2e): see [`wiki/tests/system-acceptance-test.md`](../tests/system-acceptance-test.md).
 
 ## CI
 
@@ -48,4 +48,4 @@ TBD — fill in once CI pipeline is locked.
 ## See also
 
 - [references/local-dev-startup.md](local-dev-startup.md)
-- [`docs/runbooks/smoke-checklist.md`](../../docs/runbooks/smoke-checklist.md) — manual smoke routine derived from [workflows/user-onboarding.md](../workflows/user-onboarding.md)
+- [`wiki/tests/system-acceptance-test.md`](../tests/system-acceptance-test.md) — full manual acceptance run, Groups A–E; derived from [workflows/user-onboarding.md](../workflows/user-onboarding.md)
