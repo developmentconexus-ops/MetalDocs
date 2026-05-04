@@ -16,6 +16,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	approvalsignature "metaldocs/internal/modules/documents/approval/infra/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
+	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 )
 
@@ -89,6 +90,13 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 			wantCode:   "sod.cross_stage_duplicate",
 			wantMsg:    domain.ErrActorAlreadySigned.Error(),
+		},
+		{
+			name:       "freeze effective date missing",
+			err:        v2dom.ErrEffectiveDateMissing,
+			wantStatus: http.StatusUnprocessableEntity,
+			wantCode:   "freeze.effective_date_missing",
+			wantMsg:    v2dom.ErrEffectiveDateMissing.Error(),
 		},
 		{
 			name:       "repository fk violation",
