@@ -1,10 +1,12 @@
 # documents Module
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, archive, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:1` — editor page (chrome + MetalDocsEditor mount)
+> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:20` — `DocumentEditorPage` component; `handleRename` at :113 captures previous name for rollback on server error (E9)
+> - `frontend/apps/web/src/lib/api/errorMessages.ts:14` — `resolveErrorMessage` — maps API error codes to localised user strings; used by rename handler
+> - `frontend/apps/web/src/lib/api/client.ts:5` — `ApiError` class — structured error with `.code` + `.status` fields
 > - `frontend/apps/web/src/features/documents/v2/styles/DocumentEditorPage.module.css:1` — wine-brand chrome CSS
 > - `frontend/apps/web/src/features/documents/v2/routes.tsx:1` — route parsing/rendering for `/documents-v2/*`
 > - `frontend/apps/web/src/features/documents/v2/DocumentCreatePage.tsx:1` — step 1: pick controlled document
@@ -65,6 +67,19 @@ Entry points:
 2. Fetches signed URL for current revision DOCX → loads buffer into `MetalDocsEditor`.
 3. On change: debounced autosave via `useDocumentAutosave` (`PUT /api/v2/documents/:id/revisions`).
 4. "Finalizar" button: flushes autosave → `POST /api/v2/documents/:id/finalize` → atomically creates approval instance + transitions document to `under_review` → returns `{"instanceId":"<uuid>"}` (HTTP 201) → releases session → navigates away.
+
+## Rename — optimistic update + rollback (E9 — fixed b14c7753)
+
+`handleRename` at `DocumentEditorPage.tsx:113` implements the canonical optimistic-UI pattern for document renames:
+
+1. Captures `prev = documentName` before the state update.
+2. Calls `setDocumentName(name)` immediately (optimistic).
+3. Fires `renameDocument(documentID, name)` (`PUT /api/v2/documents/:id/name`) asynchronously.
+4. On server error: restores `setDocumentName(prev)` (rollback) and shows a toast via `resolveErrorMessage(code, 'Falha ao renomear documento.')`.
+
+`resolveErrorMessage` (`lib/api/errorMessages.ts:14`) maps structured `ApiError.code` values to localised strings, falling back to the provided literal. `ApiError` (`lib/api/client.ts:5`) is the typed error primitive thrown by the API client layer.
+
+---
 
 ## Session Model
 

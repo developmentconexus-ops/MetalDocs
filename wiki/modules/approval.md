@@ -1,6 +1,6 @@
 # Module: approval
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Scope:** Approval routes, signoffs, ISO segregation enforcement, freeze trigger.
 > **Out of scope:** Freeze pipeline mechanics (see `workflows/freeze-and-fanout.md`).
 > **Key files:**
@@ -16,7 +16,7 @@
 > - `internal/modules/documents/approval/http/handler.go:65` — `NewHandler` — accepts `signoffIdempStore` positional param
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
 > - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
-> - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada
+> - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx:31` — `InboxPage` component; area filter populated via `fetchAreas()` (E7 — removed hardcoded AREA_OPTIONS)
 > - `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:7` — `StageDraft` interface; `toDraft` at :49 maps existing stage fields
 > - `frontend/apps/web/src/features/approval/api/approvalTypes.ts:16` — `RouteStage` (includes `required_role`, `required_capability`, `area_code`)
 > - `internal/modules/documents/approval/http/contracts/route.go:119` — `ListStageItem` (includes `RequiredRole`, `RequiredCapability`, `AreaCode`)
@@ -69,6 +69,12 @@ The approval instance record keeps `status = 'rejected'` for the audit trail. Au
 4. `StageDraft` gains `requiredRole`, `requiredCapability`, `areaCode`.
 5. `toDraft` at `RouteAdminPage.tsx:49` maps each existing stage's fields instead of substituting `defaultStage()`.
 6. `toRouteStages` at `RouteAdminPage.tsx:118` writes all three fields back on save.
+
+## Inbox area filter (E7 — fixed 6cc016f5)
+
+`InboxPage` previously used a hardcoded `AREA_OPTIONS` array of 6 area codes. The filter now loads areas dynamically via `fetchAreas()` (`frontend/apps/web/src/features/taxonomy/api.ts`) on component mount (`InboxPage.tsx:42`). The `<select>` renders one `<option>` per `ProcessArea` returned by the taxonomy API. No backend change required — the existing `area_code` query param on `listInbox` was already correct.
+
+---
 
 ## Known implementation gaps (as of 2026-05-03)
 
