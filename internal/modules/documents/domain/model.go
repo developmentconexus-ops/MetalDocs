@@ -32,7 +32,6 @@ type Document struct {
 	CurrentRevisionID string
 	RevisionVersion   int64
 	ActiveSessionID   string
-	FinalizedAt       *time.Time
 	ValuesFrozenAt    *time.Time
 	ArchivedAt        *time.Time
 	CreatedAt         time.Time

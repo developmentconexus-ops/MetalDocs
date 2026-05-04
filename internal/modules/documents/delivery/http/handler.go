@@ -46,7 +46,7 @@ type Service interface {
 	ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error)
 	RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*application.RestoreResult, error)
 	Finalize(ctx context.Context, tenantID, docID, actorID string) error
-	Archive(ctx context.Context, tenantID, docID, actorID string, fromFinalized bool) error
+	Archive(ctx context.Context, tenantID, docID, actorID string) error
 	SignedRevisionURL(ctx context.Context, tenantID, docID, revID string) (string, error)
 	ListDocumentComments(ctx context.Context, tenantID, userID, documentID string) ([]domain.Comment, error)
 	AddDocumentComment(ctx context.Context, tenantID, userID, authorDisplay, documentID string, in domain.CommentCreateInput) (*domain.Comment, error)
@@ -372,18 +372,7 @@ func (h *Handler) archiveDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errFirst := h.svc.Archive(r.Context(), tenantID, docID, userID, true)
-	if errFirst == nil {
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	// Only fall back to draft→archived when the doc is not in finalized state.
-	if !errors.Is(errFirst, domain.ErrInvalidStateTransition) {
-		status, msg := mapErr(errFirst)
-		httpErr(w, status, msg)
-		return
-	}
-	if err := h.svc.Archive(r.Context(), tenantID, docID, userID, false); err != nil {
+	if err := h.svc.Archive(r.Context(), tenantID, docID, userID); err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return

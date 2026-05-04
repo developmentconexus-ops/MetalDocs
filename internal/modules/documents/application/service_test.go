@@ -178,6 +178,8 @@ func (f *fakeRepo) DeleteComment(_ context.Context, _, _ string, _ int) error {
 	return nil
 }
 
+func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { return nil }
+
 type fakePresigner struct {
 	hashReturn  string
 	hashErr     error
