@@ -24,11 +24,17 @@ func (r *RevisionReader) GetRevisionNumber(ctx context.Context, tenantID, revisi
 }
 
 func (r *RevisionReader) GetEffectiveFrom(ctx context.Context, tenantID, revisionID string) (time.Time, error) {
-	var t time.Time
+	var nt sql.NullTime
 	err := r.db.QueryRowContext(ctx,
-		`SELECT coalesce(effective_from, now()) FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
-		tenantID, revisionID).Scan(&t)
-	return t, err
+		`SELECT effective_from FROM documents WHERE tenant_id=$1::uuid AND id=$2::uuid`,
+		tenantID, revisionID).Scan(&nt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if !nt.Valid {
+		return time.Time{}, nil
+	}
+	return nt.Time, nil
 }
 
 func (r *RevisionReader) GetAuthor(ctx context.Context, tenantID, revisionID string) (resolvers.AuthorInfo, error) {
@@ -56,15 +62,18 @@ type WorkflowReader struct{ db *sql.DB }
 
 func NewWorkflowReader(db *sql.DB) *WorkflowReader { return &WorkflowReader{db: db} }
 
-func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID string) ([]resolvers.ApproverInfo, error) {
+func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID, approvalInstanceID string) ([]resolvers.ApproverInfo, error) {
+	if approvalInstanceID == "" {
+		return nil, nil
+	}
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT s.actor_user_id, s.signed_at
+		SELECT s.actor_user_id, COALESCE(s.actor_display_name_snapshot, s.actor_user_id::text), s.signed_at
 		  FROM approval_signoffs s
-		  JOIN approval_instances ai ON ai.id = s.approval_instance_id
-		 WHERE ai.tenant_id=$1::uuid AND ai.document_v2_id=$2::uuid
-		   AND s.decision='approve'
-		 ORDER BY s.signed_at`,
-		tenantID, revisionID)
+		 WHERE s.tenant_id = $1::uuid
+		   AND s.approval_instance_id = $2::uuid
+		   AND s.decision = 'approved'
+		 ORDER BY s.signed_at ASC`,
+		tenantID, approvalInstanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,10 +81,9 @@ func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID 
 	var out []resolvers.ApproverInfo
 	for rows.Next() {
 		var a resolvers.ApproverInfo
-		if err := rows.Scan(&a.UserID, &a.SignedAt); err != nil {
+		if err := rows.Scan(&a.UserID, &a.DisplayName, &a.SignedAt); err != nil {
 			return nil, err
 		}
-		a.DisplayName = a.UserID
 		out = append(out, a)
 	}
 	return out, rows.Err()
