@@ -10,7 +10,7 @@
 > - `internal/modules/iam/authz/context.go:13` — typed errors `ErrActorContextMissing` / `ErrTenantContextMissing`; GUC helpers `MustActorID` at :21, `MustTenantID` at :34
 > - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` — `RolesByUserID` filters by `tenant_id` (Group B B5/B6 fix)
 > - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:20` — `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` all tenant-scoped (Group B fix)
-> - `internal/platform/bootstrap/api.go:113` — `devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` scopes bootstrap admin
+> - `internal/platform/tenant/const.go:4` — `DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` sentinel UUID for single-tenant dev/test mode (extracted from bootstrap/api.go by c4a7d9a9)
 
 ## Context
 

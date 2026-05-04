@@ -1,7 +1,7 @@
 import type { CurrentUser, UserRole } from "../lib.types";
 import { request } from "./client";
 
-const allowedRoles = new Set<UserRole>(["admin", "editor", "reviewer", "viewer"]);
+const allowedRoles = new Set<UserRole>(["admin", "system_admin", "editor", "reviewer", "approver", "author", "viewer"]);
 
 function normalizeRoles(value: unknown): UserRole[] {
   if (!Array.isArray(value)) {

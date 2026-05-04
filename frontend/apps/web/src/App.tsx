@@ -177,7 +177,7 @@ function AppContent() {
   } = registry;
   const { notifications, handleMarkNotificationRead, subscribeOperations } = notificationsApi;
   const currentUserRoles = Array.isArray(user?.roles) ? user.roles : [];
-  const isAdmin = currentUserRoles.includes("admin");
+  const isAdmin = currentUserRoles.includes("admin") || currentUserRoles.includes("system_admin");
   const userRoleLabel = roleLabelFromRoles(currentUserRoles);
   const visibleDocuments = activeView === "my-docs"
     ? documents.filter((item) => item.ownerId === user?.userId)
@@ -585,8 +585,9 @@ function formatDate(value?: string): string {
 }
 
 function roleLabelFromRoles(roles: UserRole[]): string {
-  if (roles.includes("admin")) return "Administrador";
-  if (roles.includes("reviewer")) return "Revisor";
+  if (roles.includes("admin") || roles.includes("system_admin")) return "Administrador";
+  if (roles.includes("approver") || roles.includes("reviewer")) return "Aprovador";
+  if (roles.includes("author")) return "Autor";
   if (roles.includes("editor")) return "Editor";
   return "Visualizador";
 }

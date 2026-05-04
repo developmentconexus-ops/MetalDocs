@@ -7,6 +7,8 @@ import { useDocumentSession } from './hooks/useDocumentSession';
 import { useDocumentAutosave } from './hooks/useDocumentAutosave';
 import { useDocumentComments } from './hooks/useDocumentComments';
 import { getDocument, finalizeDocument, renameDocument, signedRevisionURL } from './api/documentsV2';
+import { useDocumentPdfStatus } from './hooks/useDocumentPdfStatus';
+import { PDFCell } from './PDFCell';
 import type { DocumentResponse } from './api/documentsV2';
 import { CheckpointsDialog } from './CheckpointsDialog';
 import { ExportMenuButton } from './ExportMenuButton';
@@ -54,6 +56,16 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       }
     })();
   }, [documentID, fetchRevisionBuffer]);
+
+  // Refetch doc status when the user returns to the tab so the editor mode
+  // updates without requiring a manual reload (E1).
+  useEffect(() => {
+    const onFocus = () => {
+      void getDocument(documentID).then((d) => setDoc(d)).catch(() => {});
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [documentID]);
 
   const sessionPhase = session.state.phase;
   const sessionID = sessionPhase === 'writer' ? session.state.sessionID : '';
@@ -152,6 +164,9 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }
 
   const docStatus = doc?.Status ?? doc?.status ?? '';
+  const isEditable = session.state.phase === 'writer' && docStatus === 'draft';
+  // Poll view endpoint for PDF status when doc is not a draft (E11).
+  const pdf = useDocumentPdfStatus(documentID, docStatus !== '' && docStatus !== 'draft');
   const docCode = doc?.Code ?? doc?.code ?? '';
   const revNum = doc?.RevisionVersion ?? doc?.revision_version ?? 0;
   const displayName = documentName.replace(/\.docx$/i, '');
@@ -220,11 +235,14 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 documentID={documentID}
                 canExport={sessionPhase === 'writer' || sessionPhase === 'readonly'}
               />
+              {docStatus !== 'draft' && docStatus !== '' && (
+                <PDFCell status={pdf.status} url={pdf.url} onRetry={pdf.retry} />
+              )}
               <button
                 type="button"
                 className={styles.editorSubmitBtn}
                 onClick={() => void handleFinalize()}
-                disabled={session.state.phase !== 'writer' || docStatus !== 'draft'}
+                disabled={!isEditable}
               >
                 Finalizar
               </button>
@@ -233,15 +251,15 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             {canMountEditor ? (
               <MetalDocsEditor
                 ref={editorRef}
-                mode={session.state.phase === 'writer' ? 'document-edit' : 'readonly'}
+                mode={isEditable ? 'document-edit' : 'readonly'}
                 documentBuffer={buffer ?? undefined}
                 author={authorDisplay}
                 comments={commentsHook.comments}
                 onCommentsChange={commentsHook.setComments}
-                onCommentAdd={(c: Comment) => void commentsHook.add(c)}
-                onCommentResolve={(c: Comment) => void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c))}
-                onCommentDelete={(c: Comment) => void commentsHook.remove(c)}
-                onCommentReply={(reply: Comment, parent: Comment) => void commentsHook.reply(reply, parent)}
+                onCommentAdd={(c: Comment) => { if (isEditable) void commentsHook.add(c); }}
+                onCommentResolve={(c: Comment) => { if (isEditable) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
+                onCommentDelete={(c: Comment) => { if (isEditable) void commentsHook.remove(c); }}
+                onCommentReply={(reply: Comment, parent: Comment) => { if (isEditable) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}
                 showRuler={false}
               />
@@ -256,7 +274,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         open={checkpointsOpen}
         onClose={() => setCheckpointsOpen(false)}
         documentID={documentID}
-        disabled={session.state.phase !== 'writer'}
+        disabled={!isEditable}
         onRestored={(rev) => {
           setCheckpointsOpen(false);
           void handleRestored(rev);

@@ -13,6 +13,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	approvalsignature "metaldocs/internal/modules/documents/approval/infra/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
+	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 )
 
@@ -50,6 +51,9 @@ func MapErrorToResponse(err error) (statusCode int, body contracts.ErrorResponse
 	case errors.Is(err, domain.ErrActorAlreadySigned):
 		statusCode = http.StatusForbidden
 		code = "sod.cross_stage_duplicate"
+	case errors.Is(err, v2dom.ErrEffectiveDateMissing):
+		statusCode = http.StatusUnprocessableEntity
+		code = "freeze.effective_date_missing"
 	case errors.Is(err, repository.ErrFKViolation):
 		statusCode = http.StatusUnprocessableEntity
 		code = "db.fk_violation"

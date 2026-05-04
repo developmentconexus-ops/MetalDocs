@@ -7,7 +7,7 @@
 > **Key files:**
 > - `internal/platform/db/migrations/` — source of truth for schema
 > - `internal/modules/templates_v2/infrastructure/repo/` — template tables
-> - `internal/modules/documents/repository/repository.go:35` — document tables; `CreateDocument` INSERT
+> - `internal/modules/documents/repository/repository.go:37` — document tables; `CreateDocument` INSERT (accepts `requiredPlaceholders`; seeds `document_placeholder_values` atomically)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:11` — document_families SQL impl
 > - `internal/modules/taxonomy/infrastructure/repo/` — profiles, areas
 > - `internal/modules/approval/infrastructure/repo/` — routes, signoffs

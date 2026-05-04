@@ -47,20 +47,25 @@ export async function supersedeControlledDocument(id: string): Promise<void> {
   });
 }
 
-export interface ActiveDocumentInstance {
-  documentId: string;
-  approvalState: string;
-  contentHash: string;
-  revisionVersion: number;
+// All fields are optional — the backend may return only publishedDocumentId
+// when the controlled document has no active draft (published-only state, E10).
+export interface ActiveDocumentResponse {
+  documentId?: string;
+  approvalState?: string;
+  contentHash?: string;
+  revisionVersion?: number;
   publishedDocumentId?: string;
   approvalInstanceId?: string;
 }
 
+/** @deprecated use ActiveDocumentResponse */
+export type ActiveDocumentInstance = ActiveDocumentResponse;
+
 export async function fetchActiveDocumentInstance(
   controlledDocumentId: string,
-): Promise<ActiveDocumentInstance | null> {
+): Promise<ActiveDocumentResponse | null> {
   try {
-    return await apiFetch<ActiveDocumentInstance>(
+    return await apiFetch<ActiveDocumentResponse>(
       `${BASE}/${encodeURIComponent(controlledDocumentId)}/active-document`,
     );
   } catch (err) {

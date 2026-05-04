@@ -58,7 +58,7 @@ func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
 		}
 	}
 
-	firstDocID, _, _, err := repo.CreateDocument(ctx, newDocument("Revision 1", "PO-REV-001"), "hash-1")
+	firstDocID, _, _, err := repo.CreateDocument(ctx, newDocument("Revision 1", "PO-REV-001"), "hash-1", nil)
 	if err != nil {
 		t.Fatalf("CreateDocument first: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
 		t.Fatalf("publish first document: %v", err)
 	}
 
-	secondDocID, _, _, err := repo.CreateDocument(ctx, newDocument("Revision 2", "PO-REV-002"), "hash-2")
+	secondDocID, _, _, err := repo.CreateDocument(ctx, newDocument("Revision 2", "PO-REV-002"), "hash-2", nil)
 	if err != nil {
 		t.Fatalf("CreateDocument second: %v", err)
 	}

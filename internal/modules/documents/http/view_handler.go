@@ -9,12 +9,9 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 )
 
-// ErrPDFPending distinguishes "approved but PDF not yet generated" from plain
-// not-found so the handler can surface a specific `pdf_pending` error code.
-var ErrPDFPending = errors.New("pdf_pending")
-
 type ViewResult struct {
-	SignedURL string
+	PDFStatus string // "pending" | "ready" | "failed"
+	SignedURL string // populated only when PDFStatus == "ready"
 }
 
 type ViewService interface {
@@ -43,17 +40,18 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 		writeViewError(w, err)
 		return
 	}
-	writeFillInJSON(w, http.StatusOK, map[string]any{
-		"signed_url": result.SignedURL,
-	})
+	payload := map[string]any{"pdf_status": result.PDFStatus}
+	if result.PDFStatus == "ready" && result.SignedURL != "" {
+		payload["signed_url"] = result.SignedURL
+		payload["pdf_url"] = result.SignedURL
+	}
+	writeFillInJSON(w, http.StatusOK, payload)
 }
 
 func writeViewError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.As(err, &authz.ErrCapabilityDenied{}):
 		writeFillInJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
-	case errors.Is(err, ErrPDFPending):
-		writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "pdf_pending"})
 	case errors.Is(err, v2domain.ErrNotFound):
 		writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})
 	default:
