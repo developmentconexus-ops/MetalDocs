@@ -8,6 +8,8 @@ import (
 type ResolveInput struct {
 	TenantID, RevisionID, ControlledDocumentID string
 	ProfileCodeSnapshot, AreaCodeSnapshot      string
+	AreaNameSnapshot                           string // D2 (populated in Phase 3)
+	ApprovalInstanceID                         string // D8
 	RegistryReader                             RegistryReader
 	RevisionReader                             RevisionReader
 	WorkflowReader                             WorkflowReader
@@ -54,7 +56,7 @@ type RevisionReader interface {
 }
 
 type WorkflowReader interface {
-	GetApprovers(ctx context.Context, tenantID, revisionID string) ([]ApproverInfo, error)
+	GetApprovers(ctx context.Context, tenantID, revisionID, approvalInstanceID string) ([]ApproverInfo, error)
 	GetFinalApprovalDate(ctx context.Context, tenantID, revisionID string) (time.Time, error)
 }
 

@@ -44,17 +44,26 @@ func (b *DocumentContextBuilder) loadDocumentSnapshot(ctx context.Context, tenan
 	return areaCode, controlledDocumentID, err
 }
 
+const activeInstanceSQL = `
+SELECT id FROM approval_instances
+ WHERE tenant_id = $1::uuid AND document_v2_id = $2::uuid
+   AND status IN ('approved', 'in_progress')
+ ORDER BY submitted_at DESC LIMIT 1`
+
 // Build returns the ResolveInput for a revision being approved.
 func (b *DocumentContextBuilder) Build(ctx context.Context, tenantID, revisionID string, _ ApproverContext) (resolvers.ResolveInput, error) {
 	areaCode, controlledDocumentID, err := b.loadDocumentSnapshot(ctx, tenantID, revisionID)
 	if err != nil {
 		return resolvers.ResolveInput{}, err
 	}
+	var instanceID sql.NullString
+	_ = b.db.QueryRowContext(ctx, activeInstanceSQL, tenantID, revisionID).Scan(&instanceID)
 	return resolvers.ResolveInput{
 		TenantID:             tenantID,
 		RevisionID:           revisionID,
 		ControlledDocumentID: controlledDocumentID,
 		AreaCodeSnapshot:     areaCode,
+		ApprovalInstanceID:   instanceID.String,
 		RevisionReader:       b.revReader,
 		WorkflowReader:       b.workflowReader,
 		RegistryReader:       b.registryReader,
