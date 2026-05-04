@@ -24,13 +24,25 @@ type PDFDispatchInvoker interface {
 	Dispatch(ctx context.Context, tenantID, revisionID string) error
 }
 
+// PDFOutboxEnqueuer enqueues a PDF dispatch inside the approval transaction.
+type PDFOutboxEnqueuer interface {
+	Enqueue(ctx context.Context, tx OutboxTx, tenantID, revisionID string, contentHash []byte) error
+}
+
+// OutboxTx is the subset of *sql.Tx required by PDFOutboxEnqueuer.
+type OutboxTx interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 // DecisionService handles approver approve/reject decisions.
 type DecisionService struct {
 	repo          repository.ApprovalRepository
 	emitter       EventEmitter
 	clock         Clock
 	freezeInvoker FreezeInvoker
+	// deprecated: post-commit best-effort dispatcher; replaced by pdfOutbox.
 	pdfDispatcher PDFDispatchInvoker
+	pdfOutbox     PDFOutboxEnqueuer
 }
 
 func NewDecisionService(
@@ -47,6 +59,12 @@ func NewDecisionService(
 		freezeInvoker: freezeInvoker,
 		pdfDispatcher: pdfDispatcher,
 	}
+}
+
+// WithPDFOutbox sets the transactional outbox enqueuer, replacing the post-commit dispatcher.
+func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionService {
+	s.pdfOutbox = enqueuer
+	return s
 }
 
 // SignoffRequest carries all inputs for RecordSignoff.
@@ -355,11 +373,21 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, fmt.Errorf("recordSignoff: emit event: %w", err)
 	}
 
-	// Step 13: commit.
+	// Step 13: enqueue PDF dispatch inside tx (transactional outbox).
+	if shouldDispatchPDF && s.pdfOutbox != nil {
+		if err := s.pdfOutbox.Enqueue(ctx, tx, pdfTenantID, pdfRevisionID, []byte(contentHash)); err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: enqueue pdf outbox: %w", err)
+		}
+	}
+
+	// Step 14: commit.
 	if err := tx.Commit(); err != nil {
 		return SignoffResult{}, fmt.Errorf("recordSignoff: commit: %w", err)
 	}
-	if shouldDispatchPDF && s.pdfDispatcher != nil {
+	// deprecated: post-commit best-effort dispatch (replaced by pdfOutbox transactional enqueue above).
+	// Left in place for callers that have not yet wired pdfOutbox.
+	if shouldDispatchPDF && s.pdfOutbox == nil && s.pdfDispatcher != nil {
 		_ = s.pdfDispatcher.Dispatch(ctx, pdfTenantID, pdfRevisionID)
 	}
 	return result, nil
