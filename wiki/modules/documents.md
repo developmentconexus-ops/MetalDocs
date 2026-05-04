@@ -1,7 +1,7 @@
 # documents Module
 
 > **Last verified:** 2026-05-03
-> **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, export.
+> **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, archive, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:1` — editor page (chrome + MetalDocsEditor mount)
@@ -11,15 +11,26 @@
 > - `frontend/apps/web/src/features/documents/DocumentsHubView.tsx:758` — detail panel with Edit/PDF/Duplicate actions
 > - `internal/modules/documents/delivery/http/handler.go:73` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
 > - `internal/modules/documents/delivery/http/handler.go:259` — `finalizeDocument` — resolves approval route, calls SubmitRevisionForReview
-> - `internal/modules/documents/application/service.go:1` — domain logic, session management
-> - `internal/modules/documents/repository/repository.go:35` — `CreateDocument` INSERT with `MAX(revision_number)+1` auto-increment
+> - `internal/modules/documents/application/service.go:218` — `CreateDocument` — calls `ResolveTemplate` pre-INSERT for atomic snapshot
+> - `internal/modules/documents/application/service.go:598` — `Archive` — soft-archive via `MarkArchived`; no status change
+> - `internal/modules/documents/application/snapshot_service.go:73` — `ResolveTemplate` — returns `TemplateSnapshot` + `[]Placeholder` pre-INSERT
+> - `internal/modules/documents/application/snapshot_service.go:48` — `SnapshotFromTemplate` — deprecated; retained for backfill only
+> - `internal/modules/documents/repository/repository.go:37` — `CreateDocument` — accepts `requiredPlaceholders`; seeds `document_placeholder_values` atomically
+> - `internal/modules/documents/repository/repository.go:186` — `ListDocuments` — filters `archived_at IS NULL` by default
+> - `internal/modules/documents/repository/repository.go:880` — `MarkArchived` / `Unarchive` — set/clear `documents.archived_at`
+> - `internal/modules/documents/domain/model.go:25` — `Document` struct — `TemplateSnapshot` field; `FinalizedAt` removed
 > - `internal/modules/documents/module.go:1` — DI wiring
+> - `migrations/0171_drop_finalized_at.sql` — drops `documents.finalized_at`; adds `v_document_finalized` view
 
 ## Overview
 
 A **document** is an instance filled from a template version, bound to a controlled document entry.
 Documents move through states: `draft → under_review → approved → published`.
 Only `draft` documents can be edited in the editor.
+
+**Archive:** soft-hide via `documents.archived_at` timestamp (ADR 0008-soft-archive-via-timestamp). Status is never changed by archive. Default list queries filter `archived_at IS NULL`. `Service.Archive` / `Service.Unarchive` set/clear this column without touching the lifecycle status.
+
+**Finalization timestamp:** `documents.finalized_at` was dropped (migration 0171). The finalization time now derives from `document_state_history` via the `v_document_finalized` view. `archived_at` is kept as a column because it is a hot-path list predicate.
 
 **Backend module path:** `internal/modules/documents/` (renamed from `documents_v2` in migration batch 0167/0168)
 **Table:** `public.documents`
@@ -39,6 +50,8 @@ Only `draft` documents can be edited in the editor.
 1. `DocumentCreatePage` lists active controlled documents (fetched from `GET /api/v2/registry/controlled-documents?status=active`).
 2. User picks a controlled document + enters a name → `POST /api/v2/documents` → returns `{ document_id }`.
 3. On success: navigate to `/documents-v2/<uuid>` → `DocumentEditorPage`.
+
+Backend `Service.CreateDocument` calls `SnapshotService.ResolveTemplate` **before** the INSERT so that `TemplateSnapshot` + `requiredPlaceholders` are written atomically in the same transaction (fixes audit C2/C4). `SnapshotService.SnapshotFromTemplate` is deprecated — retained only for backfill scripts.
 
 ## Edit Flow (Draft Documents)
 
@@ -94,7 +107,7 @@ Restoring a checkpoint re-fetches the revision buffer and reloads the editor.
 
 ## public.documents Schema
 
-Migration 0167 fixed missing columns that were mistakenly added to the now-dropped `public.documents_v2` table (migrations 0126/0129). `public.documents` now has the full schema:
+Migration 0167 fixed missing columns that were mistakenly added to the now-dropped `public.documents_v2` table (migrations 0126/0129). Migration 0171 dropped `finalized_at` and added `v_document_finalized` view. `public.documents` current schema:
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -108,8 +121,11 @@ Migration 0167 fixed missing columns that were mistakenly added to the now-dropp
 | `locked_at` | timestamptz | Set on freeze |
 | `content_hash_at_submit` | TEXT | Hash at submission time |
 | `status` | TEXT | Extended CHECK; includes `draft`, `under_review`, `approved`, `published`, etc. |
+| `archived_at` | timestamptz | NULL = visible; non-NULL = soft-archived. Set by `MarkArchived`, cleared by `Unarchive`. |
 
-Migration 0131's unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` now resolves correctly because `controlled_document_id` exists. `CreateDocument` at `repository.go:35` auto-computes `MAX(revision_number)+1` — the previous default-to-1 gap is fixed.
+`finalized_at` column was **removed** by migration 0171. Use `v_document_finalized` view (derives from `document_state_history`) for the finalization timestamp.
+
+Migration 0131's unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` resolves correctly. `CreateDocument` at `repository.go:37` auto-computes `MAX(revision_number)+1` and seeds `document_placeholder_values` in the same transaction.
 
 ## Key Types
 

@@ -18,7 +18,7 @@
 > - `internal/modules/iam/authz/context.go:21` — `MustActorID` GUC helper (uses `missing_ok=true`); `MustTenantID` at :34
 > - `internal/modules/iam/delivery/http/middleware.go:30` — `NewMiddleware` takes `*iamapp.CapabilityService`
 > - `apps/api/cmd/metaldocs-api/permissions.go:12` — `newPermissionResolver` maps routes → `Cap*` constants
-> - `internal/platform/bootstrap/api.go:113` — `devTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` scoping bootstrap admin
+> - `internal/platform/tenant/const.go:4` — `DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` sentinel UUID for single-tenant dev/test mode (extracted from bootstrap/api.go by c4a7d9a9)
 
 ## Model
 
