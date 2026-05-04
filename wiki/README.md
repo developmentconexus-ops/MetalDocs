@@ -28,7 +28,7 @@
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval (stub, Last verified: 2026-05-01)
-- [modules/documents.md](modules/documents.md) - document instances, editing flow, session model, API; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-03)
+- [modules/documents.md](modules/documents.md) - document instances, editing flow, session model, API, archive (soft-hide via `archived_at`); `finalized_at` dropped → `v_document_finalized` view; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-03)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, idempotency store, known gaps D4/E4/outbox/revision-number (Last verified: 2026-05-02)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
@@ -38,7 +38,7 @@
 
 #### documents snapshot note
 
-Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document creation by `application.SnapshotService`, wired via `documents.Dependencies.SnapshotReader`/`SnapshotWriter`. The `enforce_snapshot_on_submit_trg` trigger enforces these are non-NULL before draft -> under_review.
+Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated **atomically at document creation** by `SnapshotService.ResolveTemplate` (Group C, audit C2/C4). `Service.CreateDocument` calls `ResolveTemplate` before the INSERT and passes the result to `Repository.CreateDocument`, which writes snapshot columns and seeds `document_placeholder_values` in the same transaction. `SnapshotService.SnapshotFromTemplate` is deprecated (post-commit write, breaks atomicity) — retained only for backfill scripts. The `enforce_snapshot_on_submit_trg` trigger enforces snapshot columns are non-NULL before draft -> under_review.
 
 `public.documents_v2` was the W1 scaffold table (migration 0103); dropped by migration 0168. Use `public.documents` for all queries.
 
@@ -63,6 +63,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [decisions/0003-token-syntax-migration.md](decisions/0003-token-syntax-migration.md) - plan to move from `{{uuid}}` -> `{name}` (stub, Last verified: 2026-05-01)
 - [decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) - accept two distinct authz tiers (CapabilityService vs authz.Require); no schema migration needed (Last verified: 2026-05-03)
 - [decisions/0008-placeholder-fixed-catalog.md](decisions/0008-placeholder-fixed-catalog.md) - replace user-fill placeholders with fixed 7-token computed catalog (2026-04-26)
+- [decisions/0008-soft-archive-via-timestamp.md](decisions/0008-soft-archive-via-timestamp.md) - archive via `archived_at` timestamp; status unchanged; `finalized_at` dropped → `v_document_finalized` view (accepted 2026-05-03)
 - [decisions/0009-pdf-dispatch-outbox.md](decisions/0009-pdf-dispatch-outbox.md) - transactional outbox for PDF dispatch events; at-least-once delivery (2026-05-03)
 
 ### References

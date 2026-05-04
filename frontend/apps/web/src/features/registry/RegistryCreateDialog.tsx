@@ -3,6 +3,7 @@ import type { DocumentProfile, ProcessArea } from "../taxonomy/types";
 import { fetchProfiles, fetchAreas } from "../taxonomy/api";
 import { createControlledDocument } from "./api";
 import type { ControlledDocument, CreateControlledDocumentRequest } from "./types";
+import { useAuthStore } from "../../store/auth.store";
 
 type Props = {
   onClose: () => void;
@@ -10,12 +11,12 @@ type Props = {
 };
 
 export function RegistryCreateDialog({ onClose, onCreated }: Props) {
+  const currentUser = useAuthStore((s) => s.user);
   const [profiles, setProfiles] = useState<DocumentProfile[]>([]);
   const [areas, setAreas] = useState<ProcessArea[]>([]);
   const [profileCode, setProfileCode] = useState("");
   const [processAreaCode, setProcessAreaCode] = useState("");
   const [title, setTitle] = useState("");
-  const [ownerUserId, setOwnerUserId] = useState("");
   const [manualCodeEnabled, setManualCodeEnabled] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [manualCodeReason, setManualCodeReason] = useState("");
@@ -46,7 +47,7 @@ export function RegistryCreateDialog({ onClose, onCreated }: Props) {
         profileCode,
         processAreaCode,
         title: title.trim(),
-        ownerUserId: ownerUserId.trim(),
+        ownerUserId: currentUser?.userId ?? "",
       };
       if (manualCodeEnabled && manualCode.trim()) {
         req.manualCode = manualCode.trim();
@@ -119,12 +120,11 @@ export function RegistryCreateDialog({ onClose, onCreated }: Props) {
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>Dono (User ID) *</label>
+            <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>Autor</label>
             <input
-              value={ownerUserId}
-              onChange={(e) => setOwnerUserId(e.target.value)}
-              required
-              style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box" }}
+              value={currentUser?.displayName ?? currentUser?.userId ?? ""}
+              readOnly
+              style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box", background: "#f5f5f5", color: "#666", cursor: "not-allowed" }}
             />
           </div>
 
