@@ -34,7 +34,7 @@ MetalDocs defines exactly 7 computed tokens. Template authors may only use names
 | `{author}` | Display name of the document author (creator) |
 | `{effective_date}` | Effective date set during approval/freeze |
 | `{approvers}` | Approver names joined by `", "`; `"[aguardando aprovação]"` if none |
-| `{controlled_by_area}` | Area name from the document's taxonomy binding |
+| `{controlled_by_area}` | Area name (not code) from the document's taxonomy binding |
 
 All tokens are **computed** — no user input is required. There is no fill-in panel in the document editor.
 
@@ -122,4 +122,4 @@ Backend untouched:
 
 Future: when standardized blocks (revision history table, approval signatures) genuinely need to return, implement as **rich-content resolvers** — `{revision_history_table}` resolver returns OOXML table. User drops the placeholder where they want it in the eigenpal editor. One mental model: everything is a placeholder.
 
-Last verified: 2026-04-27
+**Last verified:** 2026-05-03

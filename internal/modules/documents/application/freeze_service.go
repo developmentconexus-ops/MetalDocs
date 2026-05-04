@@ -142,16 +142,12 @@ func (s *FreezeService) Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisi
 		}
 		strVal := fmt.Sprintf("%v", rv.Value)
 		key, ver := *p.ResolverKey, rv.ResolverVer
-		// UpsertValue writes via s.db (not the caller-supplied tx). These upserts are
-		// intentionally outside the approval transaction: the primary key is
-		// (tenant_id, revision_id, placeholder_id) so they are idempotent on retry.
-		// If the approval tx rolls back the caller retries and recomputes the same values.
 		if err := s.values.UpsertValue(ctx, repository.PlaceholderValue{
 			TenantID: tenantID, RevisionID: revisionID, PlaceholderID: p.ID,
 			ValueText: &strVal, Source: "computed",
 			ComputedFrom: &key, ResolverVersion: &ver,
 			InputsHash: rv.InputsHash,
-		}); err != nil {
+		}, tx); err != nil {
 			return err
 		}
 		byID[p.ID] = repository.PlaceholderValue{ValueText: &strVal}

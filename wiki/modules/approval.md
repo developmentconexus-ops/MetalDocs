@@ -12,7 +12,7 @@
 > - `internal/modules/documents/approval/http/handler.go:26` — readService interface (widened to include ListInboxItems + CountPendingForActor)
 > - `internal/modules/documents/approval/http/errors.go:174` — looksLikeValidationError (E4 gap)
 > - `internal/modules/render/fanout/pdf_dispatcher.go:27` — PDFDispatcher.Dispatch (outbox idempotency_key bug)
-> - `internal/modules/documents/repository/repository.go:35` — CreateDocument INSERT with MAX(revision_number)+1
+> - `internal/modules/documents/repository/repository.go:37` — CreateDocument INSERT with MAX(revision_number)+1
 > - `internal/modules/documents/approval/http/handler.go:65` — `NewHandler` — accepts `signoffIdempStore` positional param
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
 > - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
@@ -97,11 +97,11 @@ When a user attempts a second signoff on an already-approved document, the domai
 
 ### Nova Revisão — revision_number gap (FIXED in migration 0167)
 
-**File:** `internal/modules/documents/repository/repository.go:35`
+**File:** `internal/modules/documents/repository/repository.go:37`
 
 Previously `CreateDocument` did not include `revision_number` in its INSERT (defaulted to `1`), causing a `ux_documents_v2_cd_revision` unique-constraint violation on any controlled document that already had a document at `revision_number = 1`.
 
-**Fixed by migration 0167:** `controlled_document_id` is now present on `public.documents`, and `CreateDocument` at `repository.go:35` computes `COALESCE(MAX(revision_number), 0) + 1` in the same INSERT via a subquery. The unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` (migration `0131`) now resolves correctly.
+**Fixed by migration 0167:** `controlled_document_id` is now present on `public.documents`, and `CreateDocument` at `repository.go:37` computes `COALESCE(MAX(revision_number), 0) + 1` in the same INSERT via a subquery. The unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` (migration `0131`) now resolves correctly.
 
 ## See also
 

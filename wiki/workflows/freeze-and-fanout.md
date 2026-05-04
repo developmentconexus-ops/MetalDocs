@@ -1,6 +1,6 @@
 # Workflow: Freeze and Fanout
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Scope:** The full pipeline from signoff approval → computed value resolution → DOCX substitution → frozen artifact stored in S3 → async PDF generation via outbox worker.
 > **Out of scope:** Approval routing and signoff rules (see `workflows/approval.md`), editor-side substitution deferral (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -128,7 +128,7 @@ This is a **raw JSON array** — NOT wrapped as `{"placeholders": [...]}`. `pars
 | 16 | docgen-v2 | Converts DOCX→PDF, uploads to `tenants/{id}/revisions/{id}/final.pdf`, returns `OutputKey` + `ContentHash` |
 | 17 | `PDFJobRunner.Handle` (cont.) | Calls `WritePDF` — stamps `final_pdf_s3_key` and `pdf_content_hash` on document row |
 
-After step 17, `GET /api/v2/documents/{id}/view` can return a presigned URL for the PDF.
+After step 17, `GET /api/v2/documents/{id}/view` returns `{"pdf_status":"ready","signed_url":"..."}`. Before step 17 completes the same endpoint returns `{"pdf_status":"pending"}` (or `"failed"` if the outbox row is in `failed` state). The frontend polls this endpoint every 3 s via `useDocumentPdfStatus`. See `modules/documents.md` — PDF Status Polling section.
 
 ### S3 key pattern
 
@@ -151,7 +151,7 @@ After step 17, `GET /api/v2/documents/{id}/view` can return a presigned URL for 
 - `internal/platform/worker/service.go` — routes `docgen_v2_pdf` to `PDFJobRunner`
 - `internal/platform/bootstrap/worker.go` — builds `DocgenV2Client` + exposes `SQLDB` in `WorkerDependencies`
 - `apps/worker/cmd/metaldocs-worker/main.go` — conditionally wires `PDFJobRunner` via `WithPDFRunner`
-- `internal/modules/documents/http/view_handler.go` — view endpoint, reads `final_pdf_s3_key`
+- `internal/modules/documents/http/view_handler.go:33` — view endpoint; returns 200 always with `pdf_status`; signed URL only when `PDFStatus == "ready"`
 
 ---
 
