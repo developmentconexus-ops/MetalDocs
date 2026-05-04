@@ -39,9 +39,18 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 	}
 	defer tx.Rollback()
 
+	// Serialise revision_number allocation per (tenant, controlled_document).
+	// pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK.
+	if d.ControlledDocumentID != nil && *d.ControlledDocumentID != "" {
+		lockKey := d.TenantID + ":" + *d.ControlledDocumentID
+		if _, err := tx.ExecContext(ctx,
+			`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, lockKey,
+		); err != nil {
+			return "", "", "", fmt.Errorf("acquire revision lock: %w", err)
+		}
+	}
+
 	// Deferrable FKs allow inserting doc -> session -> revision in any order in tx.
-	// revision_number: unique index ux_documents_v2_cd_revision serialises concurrent
-	// creation for the same CD; second concurrent caller gets a constraint violation.
 	// COALESCE handles hypothetical NULL CD (schema enforces NOT NULL since migration 0129).
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO documents (tenant_id, template_version_id, name, status, form_data_json, created_by, controlled_document_id, profile_code_snapshot, process_area_code_snapshot, code, revision_number)
