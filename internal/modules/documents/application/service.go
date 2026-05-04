@@ -32,6 +32,7 @@ type Repository interface {
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
 	UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error
+	MarkArchived(ctx context.Context, tenantID, docID, actorID string) error
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, error)
 	HeartbeatSession(ctx context.Context, sessionID, userID string) error
@@ -594,12 +595,8 @@ func (s *Service) Finalize(ctx context.Context, tenantID, docID, actorID string)
 	return nil
 }
 
-func (s *Service) Archive(ctx context.Context, tenantID, docID, actorID string, fromFinalized bool) error {
-	cur := domain.DocStatusDraft
-	if fromFinalized {
-		cur = domain.DocStatusFinalized
-	}
-	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, docID, cur, domain.DocStatusArchived, true); err != nil {
+func (s *Service) Archive(ctx context.Context, tenantID, docID, actorID string) error {
+	if err := s.repo.MarkArchived(ctx, tenantID, docID, actorID); err != nil {
 		return err
 	}
 	s.audit.Write(ctx, tenantID, actorID, "document.archived", docID, nil)

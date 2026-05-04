@@ -153,11 +153,11 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-		        finalized_at, archived_at, created_at, updated_at, created_by,
+		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,''), revision_version
 		 FROM documents WHERE id=$1 AND tenant_id=$2`, id, tenantID,
 	).Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
-		&d.CurrentRevisionID, &d.ActiveSessionID, &d.FinalizedAt, &d.ArchivedAt,
+		&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
 		&d.RevisionVersion)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
@@ -187,7 +187,7 @@ func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]doma
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-		        finalized_at, archived_at, created_at, updated_at, created_by,
+		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,'')
 		 FROM documents WHERE tenant_id=$1 ORDER BY updated_at DESC`, tenantID)
 	if err != nil {
@@ -198,7 +198,7 @@ func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]doma
 	for rows.Next() {
 		var d domain.Document
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
-			&d.CurrentRevisionID, &d.ActiveSessionID, &d.FinalizedAt, &d.ArchivedAt,
+			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code); err != nil {
 			return nil, err
 		}
@@ -214,7 +214,7 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-		        finalized_at, archived_at, created_at, updated_at, created_by,
+		        archived_at, created_at, updated_at, created_by,
 		        controlled_document_id, coalesce(code,'')
 		 FROM documents WHERE tenant_id=$1 AND created_by=$2 ORDER BY updated_at DESC`, tenantID, userID)
 	if err != nil {
@@ -225,7 +225,7 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 	for rows.Next() {
 		var d domain.Document
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
-			&d.CurrentRevisionID, &d.ActiveSessionID, &d.FinalizedAt, &d.ArchivedAt,
+			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code); err != nil {
 			return nil, err
 		}
@@ -237,9 +237,6 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error {
 	col := ""
 	if stampTime {
-		if next == domain.DocStatusFinalized {
-			col = "finalized_at = now(),"
-		}
 		if next == domain.DocStatusArchived {
 			col = "archived_at  = now(),"
 		}
