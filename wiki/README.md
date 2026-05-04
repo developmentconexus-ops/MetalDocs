@@ -1,6 +1,6 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-04
 > **Purpose:** Single source of truth for codebase knowledge. Read this first - drill into folders only after.
 
 ## How to use this wiki
@@ -28,12 +28,13 @@
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval (stub, Last verified: 2026-05-01)
-- [modules/documents.md](modules/documents.md) - document instances, editing flow, session model, API, archive (soft-hide via `archived_at`); `finalized_at` dropped → `v_document_finalized` view; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-03)
+- [modules/documents.md](modules/documents.md) - document instances, editing flow, isEditable gate, PDF status polling (`useDocumentPdfStatus`/`PDFCell`), session model, API, archive; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-04)
+- [modules/registry.md](modules/registry.md) - controlled-document catalog, code generation, `getActiveDocument` FULL OUTER JOIN (E10), `ActiveDocumentResponse`, registry detail page, `PublishedDownloadCell` (Last verified: 2026-05-04)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, idempotency store, known gaps D4/E4/outbox/revision-number (Last verified: 2026-05-02)
-- [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
+- [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine, `pdf_outbox_repository.ReadState` (stub, Last verified: 2026-05-04)
 - [modules/iam-rbac.md](modules/iam-rbac.md) - capabilities, roles (viewer/editor/author/approver/system_admin) + process-area roles (signer/area_admin/qms_admin), DB-backed CanDo, area-scoped authz.Require, group grants, tenant-scoped role_provider + role_admin_repository (Group B), migration 0162-0166 + 0169 + 0170 (Last verified: 2026-05-03)
-- [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-01)
+- [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring; DocumentEditorPage consumer updated with isEditable gate + PDF polling (Last verified: 2026-05-04)
 - [modules/search.md](modules/search.md) - cross-module search; v2 reader JOINs `controlled_documents` to populate `DocumentCode` (stub, Last verified: 2026-05-01)
 
 #### documents snapshot note

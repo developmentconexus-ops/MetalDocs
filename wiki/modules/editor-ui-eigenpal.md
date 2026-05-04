@@ -1,8 +1,8 @@
 # Module: Editor UI (Eigenpal Integration)
 
-> _Changelog: 2026-04-26 — added note that `applyVariables` is NOT used in writer mode (ADR 0008)._
+> _Changelog: 2026-04-26 — added note that `applyVariables` is NOT used in writer mode (ADR 0008). 2026-05-04 — DocumentEditorPage consumer updated: isEditable gate, PDF polling wired._
 >
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-04
 > **Scope:** How MetalDocs wraps `@eigenpal/docx-js-editor`, what plugins are registered, autosave wiring, ProseMirror access patterns.
 > **Out of scope:** EigenPal fork internals (see `vendor/eigenpal/README.md` and the fork docs), placeholder semantics (see `concepts/placeholders.md`), template authoring page UX (see `modules/templates-v2.md`).
 > **Key files:**
@@ -27,7 +27,7 @@
   - Imperative `ref` exposing `getDocumentBuffer()` for parent to grab DOCX bytes
 - **Consumers:**
   - `frontend/apps/web/src/features/templates/v2/TemplateAuthorPage.tsx` (template authoring, mode=editing)
-  - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx` (document fill-in/view, mode=editing or readonly)
+  - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx` (document fill-in/view, mode=`document-edit` when `isEditable`, otherwise `readonly`; non-draft docs also show `PDFCell` via `useDocumentPdfStatus`)
 
 ## Package contract
 
