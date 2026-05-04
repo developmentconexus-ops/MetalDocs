@@ -3,9 +3,36 @@ package resolvers
 import (
 	"bytes"
 	"context"
+	"errors"
 	"testing"
 	"time"
+
+	v2dom "metaldocs/internal/modules/documents/domain"
 )
+
+type stubRevReaderZero struct{}
+
+func (stubRevReaderZero) GetRevisionNumber(_ context.Context, _, _ string) (int64, error) {
+	return 0, nil
+}
+func (stubRevReaderZero) GetEffectiveFrom(_ context.Context, _, _ string) (time.Time, error) {
+	return time.Time{}, nil
+}
+func (stubRevReaderZero) GetAuthor(_ context.Context, _, _ string) (AuthorInfo, error) {
+	return AuthorInfo{}, nil
+}
+
+func TestEffectiveDateResolver_NullReturnsTypedError(t *testing.T) {
+	r := EffectiveDateResolver{}
+	in := ResolveInput{
+		TenantID: "t1", RevisionID: "r1",
+		RevisionReader: stubRevReaderZero{},
+	}
+	_, err := r.Resolve(context.Background(), in)
+	if !errors.Is(err, v2dom.ErrEffectiveDateMissing) {
+		t.Fatalf("want ErrEffectiveDateMissing, got %v", err)
+	}
+}
 
 func TestEffectiveDateResolver_Resolve(t *testing.T) {
 	r := EffectiveDateResolver{}

@@ -3,6 +3,8 @@ package resolvers
 import (
 	"context"
 	"time"
+
+	v2dom "metaldocs/internal/modules/documents/domain"
 )
 
 type EffectiveDateResolver struct{}
@@ -15,6 +17,9 @@ func (EffectiveDateResolver) Resolve(ctx context.Context, in ResolveInput) (Reso
 	effectiveFrom, err := in.RevisionReader.GetEffectiveFrom(ctx, in.TenantID, in.RevisionID)
 	if err != nil {
 		return ResolvedValue{}, err
+	}
+	if effectiveFrom.IsZero() {
+		return ResolvedValue{}, v2dom.ErrEffectiveDateMissing
 	}
 
 	inputsHash, err := hashInputs(struct {
