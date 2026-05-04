@@ -1,5 +1,6 @@
-import { useCallback } from "react";
+﻿import { useCallback, useEffect } from "react";
 import { api } from "../../lib.api";
+import { onAuthExpired } from "../../lib/api";
 import type { CurrentUser } from "../../lib.types";
 import { useAuthStore } from "../../store/auth.store";
 import { useDocumentsStore } from "../../store/documents.store";
@@ -38,6 +39,15 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
   const { setSelectedProfileSchema, setSelectedProfileSchemas, setSelectedProfileGovernance, setSubjects } = useRegistryStore();
   const { setMessage, setError, setManagedUsers } = useUiStore();
 
+  useEffect(() => {
+    return onAuthExpired(({ returnTo }) => {
+      if (returnTo && returnTo !== "/" && !returnTo.startsWith("/login")) {
+        sessionStorage.setItem("auth:returnTo", returnTo);
+      }
+      setUser(null);
+      setAuthState("idle");
+    });
+  }, [setAuthState, setUser]);
   const clearWorkspaceAfterPasswordChange = useCallback(() => {
     setSubjects([]);
     setDocuments([]);
@@ -154,6 +164,12 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
         setAuthState("ready");
         if (!response.user.mustChangePassword) {
           await onAuthenticated(response.user);
+          const returnTo = sessionStorage.getItem("auth:returnTo");
+          if (returnTo) {
+            sessionStorage.removeItem("auth:returnTo");
+            window.history.pushState({}, "", returnTo);
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }
         } else {
           clearWorkspaceAfterPasswordChange();
         }
@@ -238,3 +254,5 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
     handleChangePassword,
   };
 }
+
+
