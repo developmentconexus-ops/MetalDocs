@@ -33,7 +33,7 @@ func newViewReq(docID string) *http.Request {
 }
 
 func TestViewHandler_ApprovedReturnsSignedURL(t *testing.T) {
-	h := NewViewHandler(fakeViewService{result: ViewResult{SignedURL: "https://s3.example/signed?x=1"}})
+	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/signed?x=1"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-1"))
@@ -55,7 +55,7 @@ func TestViewHandler_ApprovedReturnsSignedURL(t *testing.T) {
 func TestViewHandler_PublishedReturnsSignedURL(t *testing.T) {
 	// Handler does not distinguish status — service does. From handler
 	// perspective the behavior is identical to approved: success with URL.
-	h := NewViewHandler(fakeViewService{result: ViewResult{SignedURL: "https://s3.example/pub"}})
+	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/pub"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-pub"))
@@ -87,22 +87,44 @@ func TestViewHandler_MissingAreaGrantReturns403(t *testing.T) {
 	}
 }
 
-func TestViewHandler_PDFPendingReturns404WithCode(t *testing.T) {
-	h := NewViewHandler(fakeViewService{err: ErrPDFPending})
+func TestViewHandler_PDFPendingReturns200WithStatus(t *testing.T) {
+	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "pending"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-pending"))
 
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status=%d, want 404", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", rec.Code)
 	}
-	var body struct {
-		Error string `json:"error"`
-	}
+	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if body.Error != "pdf_pending" {
-		t.Errorf("error = %q, want pdf_pending", body.Error)
+	if body["pdf_status"] != "pending" {
+		t.Errorf("pdf_status = %v, want pending", body["pdf_status"])
+	}
+	if _, ok := body["signed_url"]; ok {
+		t.Errorf("signed_url should be absent when pending")
+	}
+}
+
+func TestHandleView_ReadyReturnsURL(t *testing.T) {
+	h := NewViewHandler(fakeViewService{result: ViewResult{PDFStatus: "ready", SignedURL: "https://s3.example/x.pdf"}})
+
+	rec := httptest.NewRecorder()
+	h.HandleView(rec, newViewReq("doc-ready"))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", rec.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["pdf_status"] != "ready" || body["pdf_url"] == nil {
+		t.Errorf("payload = %v", body)
+	}
+	if body["signed_url"] == nil {
+		t.Errorf("signed_url should be present when ready")
 	}
 }
