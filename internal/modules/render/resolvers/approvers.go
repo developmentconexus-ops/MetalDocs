@@ -12,7 +12,7 @@ func (ApproversResolver) Key() string  { return "approvers" }
 func (ApproversResolver) Version() int { return 1 }
 
 func (ApproversResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
-	approvers, err := in.WorkflowReader.GetApprovers(ctx, in.TenantID, in.RevisionID)
+	approvers, err := in.WorkflowReader.GetApprovers(ctx, in.TenantID, in.RevisionID, in.ApprovalInstanceID)
 	if err != nil {
 		return ResolvedValue{}, err
 	}
