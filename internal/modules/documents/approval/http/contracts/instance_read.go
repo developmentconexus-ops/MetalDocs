@@ -31,14 +31,15 @@ type SignoffRecord struct {
 }
 
 type InboxItem struct {
-	InstanceID     string `json:"instance_id"`
-	DocumentID     string `json:"document_id"`
-	DocumentTitle  string `json:"document_title"`
-	AreaCode       string `json:"area_code"`
-	SubmittedBy    string `json:"submitted_by"`
-	SubmittedAt    string `json:"submitted_at"`
-	StageLabel     string `json:"stage_label"`
-	QuorumProgress string `json:"quorum_progress"`
+	InstanceID           string `json:"instance_id"`
+	DocumentID           string `json:"document_id"`
+	ControlledDocumentID string `json:"controlled_document_id"`
+	DocumentTitle        string `json:"document_title"`
+	AreaCode             string `json:"area_code"`
+	SubmittedBy          string `json:"submitted_by"`
+	SubmittedAt          string `json:"submitted_at"`
+	StageLabel           string `json:"stage_label"`
+	QuorumProgress       string `json:"quorum_progress"`
 }
 
 type InboxResponse struct {

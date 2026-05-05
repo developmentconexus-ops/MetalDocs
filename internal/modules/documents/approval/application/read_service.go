@@ -14,14 +14,15 @@ import (
 
 // InboxView is the read-model projection for the inbox UI.
 type InboxView struct {
-	InstanceID     string
-	DocumentID     string
-	DocumentTitle  string
-	AreaCode       string
-	SubmittedBy    string
-	SubmittedAt    time.Time
-	StageLabel     string
-	QuorumProgress string // e.g. "1/2"
+	InstanceID           string
+	DocumentID           string
+	ControlledDocumentID string
+	DocumentTitle        string
+	AreaCode             string
+	SubmittedBy          string
+	SubmittedAt          time.Time
+	StageLabel           string
+	QuorumProgress       string // e.g. "1/2"
 }
 
 // ReadService exposes read-only operations for approval HTTP handlers.
@@ -163,6 +164,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 		SELECT
 			ai.id,
 			ai.document_v2_id,
+			COALESCE(d.controlled_document_id::text, '') AS controlled_document_id,
 			COALESCE(d.name, '') AS doc_title,
 			COALESCE(asi.area_code_snapshot, '') AS area_code,
 			ai.submitted_by,
@@ -205,7 +207,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 		var v InboxView
 		var signed, required int
 		if err := rows.Scan(
-			&v.InstanceID, &v.DocumentID, &v.DocumentTitle,
+			&v.InstanceID, &v.DocumentID, &v.ControlledDocumentID, &v.DocumentTitle,
 			&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 			&v.StageLabel, &required, &signed,
 		); err != nil {

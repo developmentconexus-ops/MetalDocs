@@ -67,6 +67,7 @@ export interface ApprovalInstance {
 export interface InboxItem {
   instance_id: string;
   document_id: string;
+  controlled_document_id: string;
   document_title: string;
   area_code: string;
   submitted_by: string;

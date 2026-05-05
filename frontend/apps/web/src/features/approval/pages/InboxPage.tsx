@@ -147,11 +147,11 @@ export function InboxPage() {
                 <tr
                   key={item.instance_id}
                   className={styles.clickableRow}
-                  onClick={() => navigate(`/documents/${item.document_id}`)}
+                  onClick={() => navigate(`/registry-v2/${item.controlled_document_id}`)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      navigate(`/documents/${item.document_id}`);
+                      navigate(`/registry-v2/${item.controlled_document_id}`);
                     }
                   }}
                   tabIndex={0}

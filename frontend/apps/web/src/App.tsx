@@ -487,7 +487,7 @@ function AppContent() {
       return <TemplatesV2View route={tplRoute} onNavigate={setTplRoute} />;
     }
     if (activeView === "documents-v2") {
-      return renderDocumentsV2View(docsRoute, setDocsRoute);
+      return renderDocumentsV2View(docsRoute, setDocsRoute, () => navigate('/registry-v2'));
     }
 
     if (activeView === "registry-v2") {

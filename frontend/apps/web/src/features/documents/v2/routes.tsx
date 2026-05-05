@@ -28,6 +28,7 @@ export function pathFromRoute(route: DocumentsV2Route): string {
 export function renderDocumentsV2View(
   route: DocumentsV2Route,
   onNavigate: (next: DocumentsV2Route) => void,
+  onFinalized?: () => void,
 ): React.ReactElement {
   if (route.kind === 'create') {
     return (
@@ -43,7 +44,11 @@ export function renderDocumentsV2View(
     <DocumentEditorPage
       documentID={route.documentID}
       onDone={() => {
-        onNavigate({ kind: 'create' });
+        if (onFinalized) {
+          onFinalized();
+        } else {
+          onNavigate({ kind: 'create' });
+        }
       }}
     />
   );
