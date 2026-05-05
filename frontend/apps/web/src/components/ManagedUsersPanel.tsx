@@ -43,10 +43,11 @@ interface ManagedUsersPanelProps {
 }
 
 const PROFILE_OPTIONS: Array<{ value: UserRole; label: string }> = [
-  { value: "admin", label: "Administrador" },
-  { value: "editor", label: "Editor" },
-  { value: "reviewer", label: "Revisor" },
   { value: "viewer", label: "Viewer" },
+  { value: "editor", label: "Editor" },
+  { value: "author", label: "Author" },
+  { value: "approver", label: "Approver" },
+  { value: "system_admin", label: "System Admin" },
 ];
 
 const DEPARTMENT_OPTIONS: SelectMenuOption[] = [
@@ -74,16 +75,16 @@ function roleLabel(role?: UserRole) {
 }
 
 function roleChipClass(role?: UserRole) {
-  if (role === "admin") return `${styles.roleChip} ${styles.roleChipAdmin}`;
+  if (role === "system_admin") return `${styles.roleChip} ${styles.roleChipAdmin}`;
   if (role === "editor") return `${styles.roleChip} ${styles.roleChipEditor}`;
-  if (role === "reviewer") return `${styles.roleChip} ${styles.roleChipReviewer}`;
+  if (role === "approver") return `${styles.roleChip} ${styles.roleChipReviewer}`;
   return `${styles.roleChip} ${styles.roleChipViewer}`;
 }
 
 function departmentFromRole(role?: UserRole) {
-  if (role === "admin") return "Operacoes";
+  if (role === "system_admin") return "Operacoes";
   if (role === "editor") return "Qualidade";
-  if (role === "reviewer") return "Engenharia";
+  if (role === "approver") return "Engenharia";
   return "Administrativo";
 }
 

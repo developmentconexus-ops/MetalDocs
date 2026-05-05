@@ -74,6 +74,7 @@ export function ProfileEditDialog({ mode, profile, onClose, onSaved }: Props) {
     try {
       await setDefaultTemplate(profile!.code, { templateVersionId: templateVersionId.trim() });
       setTemplateVersionId("");
+      onSaved();
     } catch (err) {
       setTemplateError(err instanceof Error ? err.message : "Falha ao definir template.");
     } finally {
@@ -166,10 +167,11 @@ export function ProfileEditDialog({ mode, profile, onClose, onSaved }: Props) {
               required
               style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box" }}
             >
-              <option value="admin">admin</option>
-              <option value="editor">editor</option>
-              <option value="reviewer">reviewer</option>
               <option value="viewer">viewer</option>
+              <option value="editor">editor</option>
+              <option value="author">author</option>
+              <option value="approver">approver</option>
+              <option value="system_admin">system_admin</option>
             </select>
           </div>
           {error && <p style={{ color: "#c00", fontSize: 12, marginBottom: 8 }}>{error}</p>}

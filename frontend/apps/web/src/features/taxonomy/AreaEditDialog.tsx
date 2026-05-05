@@ -122,11 +122,13 @@ export function AreaEditDialog({ mode, area, areas, onClose, onSaved }: Props) {
               style={{ width: "100%", padding: "6px 8px", boxSizing: "border-box" }}
             >
               <option value="">— Nenhuma —</option>
-              <option value="admin">admin</option>
-              <option value="approver">approver</option>
-              <option value="editor">editor</option>
-              <option value="reviewer">reviewer</option>
               <option value="viewer">viewer</option>
+              <option value="editor">editor</option>
+              <option value="author">author</option>
+              <option value="approver">approver</option>
+              <option value="signer">signer</option>
+              <option value="area_admin">area_admin</option>
+              <option value="qms_admin">qms_admin</option>
             </select>
           </div>
           {error && <p style={{ color: "#c00", fontSize: 12, marginBottom: 8 }}>{error}</p>}
