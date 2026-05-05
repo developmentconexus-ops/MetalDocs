@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildDocumentProfileCountMap } from "./adapters/catalogSummary";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { metalNobreProcessAreaHint } from "./adapters/metalNobreExperience";
@@ -9,7 +9,7 @@ import { DocumentsHubHeader } from "./DocumentsHubHeader";
 import { buildDocumentsPath, documentsBasePath, parseDocumentsRoute } from "../../routing/workspaceRoutes";
 import { formatISODate } from "../../lib/formatDate";
 import styles from "./DocumentsHubView.module.css";
-import type { DocumentListItem, DocumentProfileGovernanceItem, DocumentProfileItem, ManagedUserItem, ProcessAreaItem, SearchDocumentItem } from "../../lib.types";
+import type { DocumentListItem, DocumentProfileGovernanceItem, DocumentProfileItem, ManagedUserItem, ProcessAreaItem, SearchDocumentItem } from "../../lib/types";
 
 type DocumentsHubViewProps = {
   view: "library" | "my-docs" | "recent";
@@ -1178,7 +1178,7 @@ export function DocumentsHubView(props: DocumentsHubViewProps) {
                   navigateWithParams(buildDocumentsPath(props.view, { view: "collection" }));
                 }}
               >
-                Ver todos →
+                Ver todos ?
               </button>
             </div>
             <div className={styles.recentList}>

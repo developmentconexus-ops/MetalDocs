@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DocumentFamily, CreateFamilyRequest, UpdateFamilyRequest } from "./types";
-import { createFamily, updateFamily } from "./api";
+import { createFamily, updateFamily } from './api/taxonomy';
 
 type Props = {
   mode: "create" | "edit";

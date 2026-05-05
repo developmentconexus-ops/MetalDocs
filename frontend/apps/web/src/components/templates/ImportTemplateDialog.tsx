@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { importTemplate } from "../../api/templates";
-import type { ImportResultDTO } from "../../api/templates";
+import { importTemplate } from "../../features/templates/api/templates";
+import type { ImportResultDTO } from "../../features/templates/api/templates";
 
 type ImportTemplateDialogProps = {
   profileCode: string;

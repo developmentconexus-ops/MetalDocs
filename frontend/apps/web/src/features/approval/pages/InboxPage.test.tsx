@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InboxPage } from './InboxPage';
 
 import * as approvalApi from '../api/approvalApi';
-import * as taxonomyApi from '../../taxonomy/api';
+import * as taxonomyApi from '../../taxonomy/api/taxonomy';
 
 const navigateMock = vi.fn();
 
 vi.mock('../api/approvalApi');
-vi.mock('../../taxonomy/api', () => ({
+vi.mock('../../taxonomy/api/taxonomy', () => ({
   fetchAreas: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('react-router-dom', () => ({

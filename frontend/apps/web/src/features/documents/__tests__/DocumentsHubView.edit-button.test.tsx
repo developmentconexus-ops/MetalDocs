@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { DocumentsHubView } from '../DocumentsHubView';
-import type { DocumentListItem } from '../../../lib.types';
+import type { DocumentListItem } from '../../../lib/types';
 
 function makeDoc(status: string): DocumentListItem {
   return {

@@ -11,14 +11,14 @@ export type ApprovalState =
 
 export type SignatureMethod = 'password_reauth' | 'icp_brasil';
 export type QuorumKind = 'any_1_of' | 'all_of' | 'm_of_n';
-export type DriftPolicy = 'reduce_quorum' | 'fail_stage' | 'keep_snapshot';
+export type DriftPolicy = 'reduce_quorum' | 'fail_stage' | 'keep_snapshot' | 'auto_cancel' | 'alert_only' | 'none';
 
 export interface RouteStage {
   label: string;
   members: string[];
-  required_role: string;
-  required_capability: string;
-  area_code: string;
+  required_role?: string;
+  required_capability?: string;
+  area_code?: string;
   quorum_kind: QuorumKind;
   m?: number;
   drift_policy: DriftPolicy;

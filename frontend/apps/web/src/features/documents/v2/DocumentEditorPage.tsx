@@ -266,7 +266,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 onCommentDelete={(c: Comment) => { if (isEditable) void commentsHook.remove(c); }}
                 onCommentReply={(reply: Comment, parent: Comment) => { if (isEditable) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}
-                onTitleChange={handleRename}
+                onDocumentNameChange={handleRename}
                 showRuler={false}
               />
             ) : null}

@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { api } from "../../lib.api";
+import * as api from './api/iam';
 import { useAdminStore } from "../../store/admin.store";
 import { useUiStore } from "../../store/ui.store";
 import { asMessage } from "../shared/errors";

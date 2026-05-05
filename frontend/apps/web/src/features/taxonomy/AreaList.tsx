@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ProcessArea } from "./types";
-import { archiveArea } from "./api";
+import { archiveArea } from './api/taxonomy';
 import { AreaEditDialog } from "./AreaEditDialog";
 
 type Props = {

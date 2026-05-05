@@ -1,4 +1,4 @@
-import type { CurrentUser, NotificationItem, UserRole } from "../lib.types";
+import type { CurrentUser, NotificationItem, UserRole } from "../lib/types";
 
 type AppShellHeaderProps = {
   user: CurrentUser;

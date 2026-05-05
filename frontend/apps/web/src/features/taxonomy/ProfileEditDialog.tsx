@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { DocumentFamily, DocumentProfile, CreateProfileRequest, UpdateProfileRequest } from "./types";
-import { createProfile, updateProfile, setDefaultTemplate, fetchFamilies } from "./api";
+import { createProfile, updateProfile, setDefaultTemplate, fetchFamilies } from './api/taxonomy';
 import { listTemplates, type TemplateListRow } from "../templates/v2/api/templatesV2";
 
 type Props = {
@@ -29,7 +29,11 @@ export function ProfileEditDialog({ mode, profile, onClose, onSaved }: Props) {
     fetchFamilies().then(setFamilies).catch(() => {/* non-critical */});
     if (mode !== "edit") return;
     listTemplates().then(({ templates }) =>
-      setPublishedTemplates(templates.filter((t) => t.published_version_id != null))
+      setPublishedTemplates(
+        templates
+          .filter((t) => t.published_version_id != null)
+          .map((t) => ({ ...t, description: t.description ?? undefined }))
+      )
     ).catch(() => {/* non-critical */});
   }, [mode]);
 

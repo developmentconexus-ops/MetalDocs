@@ -1,9 +1,31 @@
-﻿import { dispatchAuthExpired } from "./authBus";
+import createClient from "openapi-fetch";
+import type { paths } from '../api-types';
+import { traceRequestEnd, traceRequestStart } from "../observability/apiTrace";
+import { dispatchAuthExpired } from "./authBus";
 import { ApiError } from "./errors";
 
-export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await (init !== undefined ? fetch(url, init) : fetch(url));
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
+function apiUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path;
+  if (path.startsWith("/api/")) return path;
+  if (!path.startsWith("/")) return path;
+  return `${API_BASE_URL}${path}`;
+}
+
+function withDefaultHeaders(init?: RequestInit): RequestInit | undefined {
+  if (!init) return undefined;
+  return {
+    credentials: "include",
+    ...init,
+    headers: {
+      ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+      ...(init.headers ?? {}),
+    },
+  };
+}
+
+async function assertApiResponse(res: Response) {
   if (res.status === 401) {
     dispatchAuthExpired(window.location.pathname + window.location.search);
     throw new ApiError("authn.expired", 401, "Sessão expirada");
@@ -23,6 +45,24 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
     throw new ApiError(code, res.status, message, body?.error?.details);
   }
+}
+
+export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T>;
+export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+export async function apiFetch<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T | Response> {
+  const isRawFetch = input instanceof Request || input instanceof URL;
+  const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  const path = input instanceof Request ? input.url : String(input);
+  const traceItemId = traceRequestStart(method, path);
+  const requestInput = typeof input === "string" ? apiUrl(input) : input;
+  const res = await fetch(requestInput, withDefaultHeaders(init));
+  traceRequestEnd(traceItemId);
+
+  await assertApiResponse(res);
+
+  if (isRawFetch) {
+    return res;
+  }
 
   if (res.status === 204) {
     return undefined as T;
@@ -30,3 +70,25 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
   return (await res.json()) as T;
 }
+
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  return apiFetch<T>(path, init ?? {});
+}
+
+export async function requestRaw(path: string, init?: RequestInit, allowedErrorStatuses: number[] = []): Promise<Response> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const traceItemId = traceRequestStart(method, path);
+  const response = await fetch(apiUrl(path), withDefaultHeaders(init ?? {}));
+  traceRequestEnd(traceItemId);
+  if (!allowedErrorStatuses.includes(response.status)) {
+    await assertApiResponse(response);
+  }
+  return response;
+}
+
+export async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
+  const response = await requestRaw(path, init);
+  return response.blob();
+}
+
+export const api = createClient<paths>({ fetch: apiFetch });

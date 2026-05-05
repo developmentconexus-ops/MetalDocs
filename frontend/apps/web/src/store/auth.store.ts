@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CurrentUser } from "../lib.types";
+import type { CurrentUser } from "../lib/types";
 
 export type LoadState = "idle" | "loading" | "ready" | "error";
 

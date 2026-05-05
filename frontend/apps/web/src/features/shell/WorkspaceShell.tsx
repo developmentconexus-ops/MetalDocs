@@ -1,6 +1,6 @@
 import { DocumentWorkspaceShell } from "../../components/DocumentWorkspaceShell";
 import type { WorkspaceView } from "../../components/DocumentWorkspaceShell";
-import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../../lib.types";
+import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../../lib/types";
 
 type WorkspaceShellProps = {
   userDisplayName: string;

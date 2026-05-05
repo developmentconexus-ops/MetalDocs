@@ -26,7 +26,7 @@ const baseArgs = (): AutosaveArgs => ({
 
 describe('useDocumentAutosave', () => {
   beforeEach(() => {
-    vi.mocked(api.presignAutosave).mockResolvedValue({ UploadURL: 'http://s3/upload', PendingUploadID: 'pend-1', ExpiresAt: '' });
+    vi.mocked(api.presignAutosave).mockResolvedValue({ upload_url: 'http://s3/upload', pending_upload_id: 'pend-1', expires_at: '' });
     vi.mocked(api.commitAutosave).mockResolvedValue({ revision_id: 'rev-1', revision_num: 2 });
     global.fetch = vi.fn().mockResolvedValue({ ok: true } as any);
   });

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { WorkspaceView } from "../components/DocumentWorkspaceShell";
-import type { ManagedUserItem, UserRole } from "../lib.types";
+import type { ManagedUserItem, UserRole } from "../lib/types";
 
 type UserFormState = {
   userId: string;

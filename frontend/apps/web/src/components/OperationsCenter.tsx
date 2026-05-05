@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { metalNobreProcessAreaHint } from "../features/documents/adapters/metalNobreExperience";
 import { formatDocumentDisplayName } from "../features/shared/documentDisplay";
-import type { DocumentProfileItem, NotificationItem, ProcessAreaItem, SearchDocumentItem } from "../lib.types";
+import type { DocumentProfileItem, NotificationItem, ProcessAreaItem, SearchDocumentItem } from "../lib/types";
 import { WorkspaceDataState } from "./WorkspaceDataState";
 import styles from "./OperationsCenter.module.css";
 import { TimelineRail } from "./ui/TimelineRail";

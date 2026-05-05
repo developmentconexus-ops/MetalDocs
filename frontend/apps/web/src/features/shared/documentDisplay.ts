@@ -1,4 +1,4 @@
-import type { DocumentListItem, DocumentProfileItem } from "../../lib.types";
+import type { DocumentListItem, DocumentProfileItem } from "../../lib/types";
 
 type DocumentIdentity = Pick<DocumentListItem, "documentId" | "title" | "documentProfile" | "documentCode">;
 

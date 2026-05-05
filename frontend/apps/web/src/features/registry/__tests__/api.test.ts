@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchControlledDocuments, fetchActiveDocumentInstance } from '../api';
+import { fetchControlledDocuments, fetchActiveDocumentInstance } from '../api/controlledDocuments';
 import { ApiError } from '../../../lib/api';
 
 describe('registry/api with apiFetch', () => {

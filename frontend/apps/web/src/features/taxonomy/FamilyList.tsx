@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DocumentFamily } from "./types";
-import { deactivateFamily } from "./api";
+import { deactivateFamily } from './api/taxonomy';
 import { FamilyEditDialog } from "./FamilyEditDialog";
 
 type Props = {

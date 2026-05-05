@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ProcessArea, CreateAreaRequest, UpdateAreaRequest } from "./types";
-import { createArea, updateArea } from "./api";
+import { createArea, updateArea } from './api/taxonomy';
 
 type Props = {
   mode: "create" | "edit";

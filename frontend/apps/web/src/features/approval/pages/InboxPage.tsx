@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listInbox } from '../api/approvalApi';
 import type { InboxItem } from '../api/approvalTypes';
-import { fetchAreas } from '../../taxonomy/api';
+import { fetchAreas } from '../../taxonomy/api/taxonomy';
 import type { ProcessArea } from '../../taxonomy/types';
 import styles from './InboxPage.module.css';
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DocumentProfile } from "./types";
-import { archiveProfile } from "./api";
+import { archiveProfile } from './api/taxonomy';
 import { ProfileEditDialog } from "./ProfileEditDialog";
 
 type Props = {

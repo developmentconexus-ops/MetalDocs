@@ -70,8 +70,8 @@ describe('DocumentEditorPage', () => {
       expires_at: '2099-01-01T00:00:00Z',
       last_ack_revision_id: 'rev-1',
     });
-    vi.mocked(api.heartbeatSession).mockResolvedValue({});
-    vi.mocked(api.releaseSession).mockResolvedValue({});
+    vi.mocked(api.heartbeatSession).mockResolvedValue(undefined);
+    vi.mocked(api.releaseSession).mockResolvedValue(undefined);
 
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({

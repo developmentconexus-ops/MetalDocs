@@ -1,10 +1,11 @@
 import { useCallback, useRef } from "react";
-import { api, markUx, reportUxSequence, startApiTrace, stopApiTrace } from "../../lib.api";
+import * as api from './api/catalog';
+import { markUx, reportUxSequence, startApiTrace, stopApiTrace } from "../../lib/observability/apiTrace";
 import type {
   DocumentProfileGovernanceItem,
   DocumentProfileSchemaItem,
   MetadataFieldRuleItem,
-} from "../../lib.types";
+} from "../../lib/types";
 import { useDocumentsStore } from "../../store/documents.store";
 import { useRegistryStore } from "../../store/registry.store";
 import { useUiStore } from "../../store/ui.store";

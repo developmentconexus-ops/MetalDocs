@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { metalNobreProcessAreaHint, metalNobreProfileContext } from "../features/documents/adapters/metalNobreExperience";
-import type { DocumentProfileGovernanceItem, DocumentProfileItem, DocumentProfileSchemaItem, MetadataFieldRuleItem, ProcessAreaItem, SubjectItem } from "../lib.types";
+import type { DocumentProfileGovernanceItem, DocumentProfileItem, DocumentProfileSchemaItem, MetadataFieldRuleItem, ProcessAreaItem, SubjectItem } from "../lib/types";
 import { WorkspaceDataState } from "./WorkspaceDataState";
 import { WorkspaceViewFrame } from "./WorkspaceViewFrame";
 import { FilterDropdown, type SelectMenuOption } from "./ui/FilterDropdown";

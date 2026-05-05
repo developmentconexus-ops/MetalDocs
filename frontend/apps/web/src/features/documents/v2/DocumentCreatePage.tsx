@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createDocument } from './api/documentsV2';
-import { fetchControlledDocuments } from '../../registry/api';
+import { fetchControlledDocuments } from '../../registry/api/controlledDocuments';
 import type { ControlledDocument } from '../../registry/types';
 
 export type DocumentCreatePageProps = {

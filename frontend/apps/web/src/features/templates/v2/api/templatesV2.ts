@@ -1,4 +1,4 @@
-﻿export type VersionStatus = 'draft' | 'in_review' | 'approved' | 'published' | 'obsolete';
+export type VersionStatus = 'draft' | 'in_review' | 'approved' | 'published' | 'obsolete';
 
 import type { Placeholder, CompositionConfig } from '../../placeholder-types';
 export type { Placeholder, CompositionConfig };
@@ -14,7 +14,7 @@ export interface TemplateDTO {
   doc_type_code: string | null;
   key: string;
   name: string;
-  description: string | null;
+  description: string | null | undefined;
   areas: string[];
   visibility: string;
   specific_areas: string[];

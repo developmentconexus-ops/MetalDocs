@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildProfileAccordions } from "../features/documents/adapters/catalogSummary";
-import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../lib.types";
+import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../lib/types";
 import styles from "./DocumentWorkspaceShell.module.css";
 
 export type WorkspaceView = "operations" | "approvals" | "audit" | "library" | "my-docs" | "recent" | "create" | "content-builder" | "registry" | "notifications" | "admin" | "taxonomy-admin" | "templates-v2" | "documents-v2" | "registry-v2" | "iam-memberships" | "approval-routes";

@@ -11,7 +11,7 @@ import type {
   VersionDiffResponse,
   VersionListItem,
   WorkflowApprovalItem,
-} from "../lib.types";
+} from "../lib/types";
 import type { LoadState } from "./auth.store";
 
 type ContentMode = "native" | "docx_upload";
