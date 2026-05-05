@@ -41,7 +41,6 @@ import (
 	authdelivery "metaldocs/internal/modules/auth/delivery/http"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/modules/registry"
 	registryapp "metaldocs/internal/modules/registry/application"
@@ -55,6 +54,7 @@ import (
 	"metaldocs/internal/modules/taxonomy"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
+	"metaldocs/apps/api/internal/wiring"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
@@ -271,7 +271,7 @@ func main() {
 		ExportPresign:      docPresigner,
 		RegistryReader:     cdRepo,
 		RegistryDuplicator: docRegistryDuplicator,
-		AuthzChecker:       permissiveAuthzChecker{},
+		Caps:               wiring.WireDocuments(wiring.DocumentsDeps{Caps: capabilityService}),
 		ProfileDefaults:    &profileDefaultsAdapter{profileRepo: profileRepo},
 		SnapshotReader:     docSnapshotReader,
 		SnapshotWriter:     docSnapshotWriter,
@@ -477,13 +477,6 @@ func schedulerLeaderID() string {
 		hostname = "unknown"
 	}
 	return fmt.Sprintf("%s:%d", hostname, os.Getpid())
-}
-
-// permissiveAuthzChecker always grants access (dev/MVP only — IAM area check not yet enforced).
-type permissiveAuthzChecker struct{}
-
-func (permissiveAuthzChecker) Check(_ context.Context, _, _ string, _ iamdomain.Capability, _ iamapp.ResourceCtx) error {
-	return nil
 }
 
 // cdRegistryAdapter bridges the registry ControlledDocumentRepository → resolvers.RegistryReader.
