@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { TemplateAuthorPage } from "../v2/TemplateAuthorPage";
+import { TemplateAuthorPage } from "../TemplateAuthorPage";
 
 export function Component() {
   const navigate = useNavigate();

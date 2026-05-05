@@ -1,8 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TemplateAuthorPage } from '../v2/TemplateAuthorPage';
-import type { TemplateSchemas } from '../v2/api/templatesV2';
+import { TemplateAuthorPage } from '../TemplateAuthorPage';
+import type { TemplateSchemas } from '../api/templatesV2';
 
 let detectedVariables: string[] = [];
 const saveSchemas = vi.fn();

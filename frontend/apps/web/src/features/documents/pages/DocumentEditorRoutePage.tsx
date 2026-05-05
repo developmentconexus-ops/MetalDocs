@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { DocumentEditorPage } from "../v2/DocumentEditorPage";
+import { DocumentEditorPage } from "./DocumentEditorPage";
 
 export function Component() {
   const navigate = useNavigate();

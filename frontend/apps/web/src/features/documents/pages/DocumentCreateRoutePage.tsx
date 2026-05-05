@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { DocumentCreatePage } from "../v2/DocumentCreatePage";
+import { DocumentCreatePage } from "./DocumentCreatePage";
 
 export function Component() {
   const navigate = useNavigate();
