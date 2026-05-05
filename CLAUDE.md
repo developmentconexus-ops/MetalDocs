@@ -21,6 +21,12 @@ When you change code referenced by a wiki doc, update its `Last verified:` stamp
 
 **After refactors / new implementations, dispatch the `wiki-curator` agent** (`.claude/agents/wiki-curator.md`). It owns wiki drift: refreshes Key files anchors, bumps `Last verified` stamps, updates `wiki/README.md` index, and creates new docs when a new module/concept/workflow is introduced. Invoke proactively — do not let wiki drift accumulate.
 
+## Frontend
+
+For ANY work under `frontend/apps/web/src/` (new screens, components, refactors, design implementation, routing, state, API wiring), use the **`metaldocs-frontend`** skill (`.claude/skills/metaldocs-frontend/SKILL.md`). It enforces the canonical structure defined in `wiki/architecture/frontend-structure.md` — feature-sliced layout, `createBrowserRouter` + per-feature `routes.tsx`, TanStack Query for server state, OpenAPI-codegen types from `lib/api-types/`, CSS Modules + design tokens, no `HashRouter`, no string-pattern path dispatchers, no legacy `src/api/` or root flat files. **Never reintroduce legacy paths.** When you touch a file outside the canonical layout, migrate it in the same change (no shims, no re-exports).
+
+Designed screens land in `frontend/apps/web/design-source/<slug>/` (HTML + screenshot + NOTES.md) — read the NOTES file before implementing.
+
 ---
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

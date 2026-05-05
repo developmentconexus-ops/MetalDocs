@@ -26,6 +26,7 @@
 - [architecture/data-model.md](architecture/data-model.md) - Postgres tables, key relationships, document_families (global/is_active), metaldocs_app grants (stub, Last verified: 2026-05-02)
 - [architecture/tech-stack.md](architecture/tech-stack.md) - Go, React, Postgres, MinIO, Gotenberg, eigenpal (stub, Last verified: 2026-05-01)
 - [architecture/deployment.md](architecture/deployment.md) - Docker compose, env vars, dev setup (stub, Last verified: 2026-05-01)
+- **[architecture/frontend-structure.md](architecture/frontend-structure.md) - canonical frontend layout, routing, state, API, design-system rules; comparison baseline for refactor reviews (Last verified: 2026-05-05)**
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval (stub, Last verified: 2026-05-01)
