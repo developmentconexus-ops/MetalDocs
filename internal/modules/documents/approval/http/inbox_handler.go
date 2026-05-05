@@ -51,14 +51,15 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	for i := range views {
 		v := views[i]
 		respItems = append(respItems, contracts.InboxItem{
-			InstanceID:     v.InstanceID,
-			DocumentID:     v.DocumentID,
-			DocumentTitle:  v.DocumentTitle,
-			AreaCode:       v.AreaCode,
-			SubmittedBy:    v.SubmittedBy,
-			SubmittedAt:    v.SubmittedAt.UTC().Format(time.RFC3339),
-			StageLabel:     v.StageLabel,
-			QuorumProgress: v.QuorumProgress,
+			InstanceID:           v.InstanceID,
+			DocumentID:           v.DocumentID,
+			ControlledDocumentID: v.ControlledDocumentID,
+			DocumentTitle:        v.DocumentTitle,
+			AreaCode:             v.AreaCode,
+			SubmittedBy:          v.SubmittedBy,
+			SubmittedAt:          v.SubmittedAt.UTC().Format(time.RFC3339),
+			StageLabel:           v.StageLabel,
+			QuorumProgress:       v.QuorumProgress,
 		})
 	}
 

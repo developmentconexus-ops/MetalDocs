@@ -1,5 +1,6 @@
 // TODO: This replaces RegistryExplorerView.tsx — switch routing in Phase 8 or 9
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { fetchControlledDocuments } from "./api";
 import type { ControlledDocument } from "./types";
 import { RegistryCreateDialog } from "./RegistryCreateDialog";
@@ -10,13 +11,17 @@ type Props = {
 };
 
 export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [docs, setDocs] = useState<ControlledDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [detailId, setDetailId] = useState<string | null>(null);
+
+  const pathMatch = /^\/registry-v2\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(location.pathname);
+  const detailId = pathMatch ? pathMatch[1] : null;
 
   async function load() {
     setLoading(true);
@@ -45,7 +50,7 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
       <RegistryDetailPage
         id={detailId}
         onBack={() => {
-          setDetailId(null);
+          navigate('/registry-v2');
           void load();
         }}
         onOpenDocumentEditor={onOpenDocumentEditor}
@@ -106,7 +111,7 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
             {docs.map((doc) => (
               <tr
                 key={doc.id}
-                onClick={() => setDetailId(doc.id)}
+                onClick={() => navigate(`/registry-v2/${doc.id}`)}
                 style={{ borderBottom: "1px solid #f0f0f0", cursor: "pointer" }}
                 onMouseOver={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "#f7f7f7"; }}
                 onMouseOut={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}

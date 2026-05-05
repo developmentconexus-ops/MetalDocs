@@ -58,6 +58,7 @@ describe('InboxPage', () => {
         {
           instance_id: 'inst-1',
           document_id: 'doc-1',
+          controlled_document_id: 'cd-1',
           document_title: 'POP Limpeza',
           area_code: 'JUR',
           submitted_by: 'maria',
@@ -68,6 +69,7 @@ describe('InboxPage', () => {
         {
           instance_id: 'inst-2',
           document_id: 'doc-2',
+          controlled_document_id: 'cd-2',
           document_title: 'Manual Segurança',
           area_code: 'RH',
           submitted_by: 'ana',
@@ -78,6 +80,7 @@ describe('InboxPage', () => {
         {
           instance_id: 'inst-3',
           document_id: 'doc-3',
+          controlled_document_id: 'cd-3',
           document_title: 'Instrução Técnica',
           area_code: 'ENG',
           submitted_by: 'joao',
@@ -105,6 +108,7 @@ describe('InboxPage', () => {
         {
           instance_id: 'inst-1',
           document_id: 'doc-1',
+          controlled_document_id: 'cd-1',
           document_title: 'Documento A',
           area_code: 'JUR',
           submitted_by: 'maria',
@@ -120,7 +124,7 @@ describe('InboxPage', () => {
     const rowCell = await screen.findByText('Documento A');
     fireEvent.click(rowCell.closest('tr') as HTMLElement);
 
-    expect(navigateMock).toHaveBeenCalledWith('/documents/doc-1');
+    expect(navigateMock).toHaveBeenCalledWith('/registry-v2/cd-1');
   });
 
   it('filter by area re-fetches', async () => {
