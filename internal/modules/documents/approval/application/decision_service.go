@@ -113,7 +113,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, fmt.Errorf("recordSignoff: %w", err)
 	}
 
-	// Step 4: load the approval instance (FOR UPDATE via LoadInstance).
+	// Step 4: load approval instance; child stage rows locked FOR UPDATE inside LoadInstance (J1).
 	instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 	if err != nil {
 		_ = tx.Rollback()
