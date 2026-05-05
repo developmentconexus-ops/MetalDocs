@@ -58,6 +58,7 @@ import (
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
+	"metaldocs/internal/platform/httpclient"
 	docgenv2 "metaldocs/internal/platform/docgenv2"
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
@@ -235,7 +236,7 @@ func main() {
 	var freezeSvc *docapp.FreezeService
 	var pdfDispatchAdapter approvalapp.PDFDispatchInvoker
 	if fanoutURL != "" && deps.SQLDB != nil {
-		fanoutCli = fanout.NewClient(fanoutURL, serviceToken, nil)
+		fanoutCli = fanout.NewClient(fanoutURL, serviceToken, httpclient.NewInternalClient())
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
 		fillInRepo := docrepo.NewFillInRepository(deps.SQLDB)
 		schemaReader := docapp.NewSnapshotSchemaReader(deps.SQLDB)
