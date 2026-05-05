@@ -1,12 +1,15 @@
 ﻿import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { createRoute, deactivateRoute, listRoutes, updateRoute } from '../api/approvalApi';
-import type { DriftPolicy, QuorumKind, Route, RouteStage } from '../api/approvalTypes';
+import type { DriftPolicy, QuorumKind, Route, StageWriteRequest } from '../api/approvalTypes';
+import { fetchAreas } from '../../taxonomy/api';
+import type { ProcessArea } from '../../taxonomy/types';
 import styles from './RouteAdminPage.module.css';
+
+const STAGE_ROLES = ['approver', 'author', 'editor', 'system_admin', 'viewer'] as const;
 
 interface StageDraft {
   label: string;
-  membersText: string;
   requiredRole: string;
   requiredCapability: string;
   areaCode: string;
@@ -26,17 +29,9 @@ function toLocalDate(iso: string): string {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR');
 }
 
-function parseMembers(membersText: string): string[] {
-  return membersText
-    .split(',')
-    .map((member) => member.trim())
-    .filter(Boolean);
-}
-
 function defaultStage(): StageDraft {
   return {
     label: '',
-    membersText: '',
     requiredRole: '',
     requiredCapability: 'doc.signoff',
     areaCode: '',
@@ -60,7 +55,6 @@ function toDraft(route: Route | null): RouteDraft {
     profileCode: route.profile_code,
     stages: route.stages.map((stage) => ({
       label: stage.label,
-      membersText: stage.members.join(', '),
       requiredRole: stage.required_role,
       requiredCapability: stage.required_capability || 'doc.signoff',
       areaCode: stage.area_code,
@@ -96,9 +90,11 @@ function validateDraft(draft: RouteDraft): string | null {
     }
     labels.add(normalized);
 
-    const members = parseMembers(stage.membersText);
-    if (members.length === 0) {
-      return `A etapa "${label}" deve possuir ao menos um membro.`;
+    if (!stage.requiredRole) {
+      return `A etapa "${label}" deve ter uma role definida.`;
+    }
+    if (!stage.areaCode) {
+      return `A etapa "${label}" deve ter uma área definida.`;
     }
 
     if (stage.quorumKind === 'm_of_n') {
@@ -106,30 +102,26 @@ function validateDraft(draft: RouteDraft): string | null {
       if (!Number.isFinite(mValue) || mValue < 1) {
         return `Na etapa "${label}", informe um valor de M válido.`;
       }
-      if (mValue > members.length) {
-        return `Na etapa "${label}", M não pode ser maior que o número de membros.`;
-      }
     }
   }
 
   return null;
 }
 
-function toRouteStages(draft: RouteDraft): RouteStage[] {
-  return draft.stages.map((stage) => {
-    const members = parseMembers(stage.membersText);
-    const routeStage: RouteStage = {
-      label: stage.label.trim(),
-      members,
-      required_role: stage.requiredRole.trim() || members[0] || '',
+function toRouteStages(draft: RouteDraft): StageWriteRequest[] {
+  return draft.stages.map((stage, index) => {
+    const routeStage: StageWriteRequest = {
+      order: index + 1,
+      name: stage.label.trim(),
+      required_role: stage.requiredRole.trim(),
       required_capability: stage.requiredCapability.trim() || 'doc.signoff',
       area_code: stage.areaCode.trim(),
-      quorum_kind: stage.quorumKind,
+      quorum: stage.quorumKind,
       drift_policy: stage.driftPolicy,
     };
 
     if (stage.quorumKind === 'm_of_n') {
-      routeStage.m = Number(stage.m);
+      routeStage.quorum_m = Number(stage.m);
     }
 
     return routeStage;
@@ -146,6 +138,11 @@ interface RouteEditorProps {
 function RouteEditor({ route, saving, onClose, onSubmit }: RouteEditorProps) {
   const [draft, setDraft] = useState<RouteDraft>(() => toDraft(route));
   const [error, setError] = useState<string | null>(null);
+  const [areas, setAreas] = useState<ProcessArea[]>([]);
+
+  useEffect(() => {
+    fetchAreas().then(setAreas).catch(() => {/* non-critical */});
+  }, []);
 
   const modeTitle = route ? 'Editar rota' : 'Criar rota';
 
@@ -257,16 +254,37 @@ function RouteEditor({ route, saving, onClose, onSubmit }: RouteEditorProps) {
                   disabled={saving}
                 />
 
-                <label className={styles.fieldLabel} htmlFor={`stage-members-${index}`}>
-                  Membros da etapa {index + 1}
+                <label className={styles.fieldLabel} htmlFor={`stage-role-${index}`}>
+                  Role requerida da etapa {index + 1}
                 </label>
-                <input
-                  id={`stage-members-${index}`}
+                <select
+                  id={`stage-role-${index}`}
                   className={styles.input}
-                  value={stage.membersText}
-                  onChange={(event) => updateStage(index, { membersText: event.target.value })}
+                  value={stage.requiredRole}
+                  onChange={(event) => updateStage(index, { requiredRole: event.target.value })}
                   disabled={saving}
-                />
+                >
+                  <option value="" disabled>Selecione a role</option>
+                  {STAGE_ROLES.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+
+                <label className={styles.fieldLabel} htmlFor={`stage-area-${index}`}>
+                  Área da etapa {index + 1}
+                </label>
+                <select
+                  id={`stage-area-${index}`}
+                  className={styles.input}
+                  value={stage.areaCode}
+                  onChange={(event) => updateStage(index, { areaCode: event.target.value })}
+                  disabled={saving}
+                >
+                  <option value="" disabled>Selecione a área</option>
+                  {areas.map((a) => (
+                    <option key={a.code} value={a.code}>{a.name} ({a.code})</option>
+                  ))}
+                </select>
 
                 <label className={styles.fieldLabel} htmlFor={`stage-quorum-${index}`}>
                   Quórum da etapa {index + 1}

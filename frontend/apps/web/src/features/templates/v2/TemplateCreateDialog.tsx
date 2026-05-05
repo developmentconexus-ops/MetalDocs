@@ -125,10 +125,8 @@ export function TemplateCreateDialog({ onClose, onCreated }: TemplateCreateDialo
               required
             >
               <option value="" disabled>Select a role</option>
-              <option value="admin">admin</option>
-              <option value="editor">editor</option>
-              <option value="reviewer">reviewer</option>
-              <option value="viewer">viewer</option>
+              <option value="system_admin">system_admin</option>
+              <option value="approver">approver</option>
             </select>
           </div>
 

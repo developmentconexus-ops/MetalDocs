@@ -9,7 +9,7 @@ type Props = {
   onGranted: () => void;
 };
 
-const ROLES: GrantMembershipRequest["role"][] = ["viewer", "editor", "reviewer", "approver"];
+const ROLES: GrantMembershipRequest["role"][] = ["viewer", "editor", "author", "approver", "signer", "area_admin", "qms_admin"];
 
 export function MembershipGrantDialog({ onClose, onGranted }: Props) {
   const [areas, setAreas] = useState<ProcessArea[]>([]);

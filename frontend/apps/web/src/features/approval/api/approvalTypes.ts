@@ -141,10 +141,21 @@ export interface CancelResponse {
   document_id: string;
 }
 
+export interface StageWriteRequest {
+  order: number;
+  name: string;
+  required_role: string;
+  required_capability: string;
+  area_code: string;
+  quorum: QuorumKind;
+  quorum_m?: number;
+  drift_policy: DriftPolicy;
+}
+
 export interface CreateRouteRequest {
   name: string;
   profile_code: string;
-  stages: RouteStage[];
+  stages: StageWriteRequest[];
 }
 
 export interface CreateRouteResponse {
@@ -153,7 +164,7 @@ export interface CreateRouteResponse {
 
 export interface UpdateRouteRequest {
   name?: string;
-  stages?: RouteStage[];
+  stages?: StageWriteRequest[];
 }
 
 export interface UpdateRouteResponse {

@@ -1,7 +1,7 @@
 export type DocumentStatus = "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED";
 export type Classification = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
 export type ResourceScope = "document" | "document_type" | "area";
-export type UserRole = "admin" | "system_admin" | "editor" | "reviewer" | "approver" | "author" | "viewer";
+export type UserRole = "system_admin" | "approver" | "author" | "editor" | "viewer";
 export type DocumentContentSource = "native" | "docx_upload" | "browser_editor";
 
 export interface CurrentUser {
