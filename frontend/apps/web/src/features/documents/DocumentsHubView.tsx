@@ -7,6 +7,7 @@ import { type RecentDocumentItem, useDocumentsStore } from "../../store/document
 import { FilterDropdown, type SelectMenuOption } from "../../components/ui/FilterDropdown";
 import { DocumentsHubHeader } from "./DocumentsHubHeader";
 import { buildDocumentsPath, documentsBasePath, parseDocumentsRoute } from "../../routing/workspaceRoutes";
+import { formatISODate } from "../../lib/formatDate";
 import styles from "./DocumentsHubView.module.css";
 import type { DocumentListItem, DocumentProfileGovernanceItem, DocumentProfileItem, ManagedUserItem, ProcessAreaItem, SearchDocumentItem } from "../../lib.types";
 
@@ -134,7 +135,7 @@ function formatDateOnly(value?: string): string {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("pt-BR");
+  return formatISODate(date);
 }
 
 function normalizeToken(value?: string): string {

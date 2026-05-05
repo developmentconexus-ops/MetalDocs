@@ -1,4 +1,5 @@
 import type { ApprovalInstance, Signoff, StageInstance } from '../api/approvalTypes';
+import { formatDateTime as formatDateTimeValue } from '../../../lib/formatDate';
 import styles from './ApprovalTimelinePanel.module.css';
 
 interface ApprovalTimelinePanelProps {
@@ -25,7 +26,7 @@ function formatDateTime(iso?: string): string {
   if (!iso) {
     return '-';
   }
-  return new Date(iso).toLocaleString('pt-BR');
+  return formatDateTimeValue(iso);
 }
 
 function formatSignatureMethod(signatureMethod: Signoff['signature_method']): string {

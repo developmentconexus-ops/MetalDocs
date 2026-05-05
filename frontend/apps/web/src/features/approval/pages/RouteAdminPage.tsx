@@ -4,6 +4,7 @@ import { createRoute, deactivateRoute, listRoutes, updateRoute } from '../api/ap
 import type { DriftPolicy, QuorumKind, Route, StageWriteRequest } from '../api/approvalTypes';
 import { fetchAreas } from '../../taxonomy/api';
 import type { ProcessArea } from '../../taxonomy/types';
+import { formatISODate } from '../../../lib/formatDate';
 import styles from './RouteAdminPage.module.css';
 
 const STAGE_ROLES = ['approver', 'author', 'editor', 'system_admin', 'viewer'] as const;
@@ -26,7 +27,7 @@ interface RouteDraft {
 
 function toLocalDate(iso: string): string {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR');
+  return Number.isNaN(date.getTime()) ? '-' : formatISODate(date);
 }
 
 function defaultStage(): StageDraft {
