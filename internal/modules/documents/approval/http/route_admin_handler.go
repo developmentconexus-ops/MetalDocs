@@ -288,7 +288,7 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 			Name:               s.Name,
 			RequiredRole:       s.RequiredRole,
 			RequiredCapability: s.RequiredCapability,
-			AreaCode:           s.AreaCode,
+			AreaCode:           strings.ToLower(strings.TrimSpace(s.AreaCode)),
 			Quorum:             domain.QuorumPolicy(s.Quorum),
 			QuorumM:            s.QuorumM,
 			OnEligibilityDrift: domain.DriftPolicy(s.DriftPolicy),
