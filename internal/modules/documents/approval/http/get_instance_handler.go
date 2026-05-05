@@ -46,12 +46,27 @@ func mapInstanceResponse(inst *domain.Instance) contracts.InstanceResponse {
 
 	stages := make([]contracts.StageInstance, len(inst.Stages))
 	for i, s := range inst.Stages {
+		recs := make([]contracts.SignoffRecord, 0, len(s.Signoffs))
+		for _, sig := range s.Signoffs {
+			name := sig.ActorDisplayNameSnapshot()
+			if name == "" {
+				name = sig.ActorUserID()
+			}
+			recs = append(recs, contracts.SignoffRecord{
+				ID:              sig.ID(),
+				ActorUserID:     name,
+				Decision:        string(sig.Decision()),
+				Reason:          sig.Comment(),
+				SignatureMethod: sig.SignatureMethod(),
+				SignedAt:        sig.SignedAt().UTC().Format(time.RFC3339),
+			})
+		}
 		stages[i] = contracts.StageInstance{
 			ID:         s.ID,
 			StageIndex: s.StageOrder,
 			Label:      s.NameSnapshot,
 			Status:     mapStageStatus(s.Status),
-			Signoffs:   []contracts.SignoffRecord{},
+			Signoffs:   recs,
 		}
 	}
 

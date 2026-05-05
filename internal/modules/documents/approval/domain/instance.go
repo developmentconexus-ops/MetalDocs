@@ -51,6 +51,7 @@ type StageInstance struct {
 	OpenedAt                    *time.Time
 	CompletedAt                 *time.Time
 	SkipReason                  string
+	Signoffs                    []*Signoff
 }
 
 // Instance is the approval instance aggregate.
