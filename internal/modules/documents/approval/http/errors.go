@@ -45,6 +45,9 @@ func MapErrorToResponse(err error) (statusCode int, body contracts.ErrorResponse
 	case errors.Is(err, repository.ErrDuplicateRouteProfile):
 		statusCode = http.StatusConflict
 		code = "route.duplicate_profile"
+	case errors.Is(err, domain.ErrActorNotEligible):
+		statusCode = http.StatusForbidden
+		code = "signoff.not_eligible"
 	case errors.Is(err, domain.ErrAuthorCannotSign):
 		statusCode = http.StatusForbidden
 		code = "sod.submitter_cannot_sign"
