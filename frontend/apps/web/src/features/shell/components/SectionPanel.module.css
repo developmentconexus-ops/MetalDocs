@@ -1,0 +1,8 @@
+.panel {
+  width: 224px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow: auto;
+  height: 100%;
+}
