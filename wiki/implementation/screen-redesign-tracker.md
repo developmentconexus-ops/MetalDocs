@@ -3,7 +3,7 @@
 **Branch:** `feature/screen-redesign`
 **Spec:** `docs/superpowers/specs/2026-05-05-screen-redesign-design.md`
 **Design source:** `frontend/apps/web/design-source/`
-**Last updated:** 2026-05-05
+**Last updated:** 2026-05-05 · Foundation ✅
 
 ---
 
@@ -19,8 +19,8 @@ Each block gets its own detailed plan in `docs/superpowers/plans/`. Mark complet
 
 | Block | Description | Plan | Status |
 |---|---|---|---|
-| **Foundation** | Tokens rename, fonts, Zustand cleanup, UI primitives, queryKeys, AppShell, Rail, AppToolbar, AppRoot, Router restructure | `wiki/implementation/plan-foundation.md` | 🔲 Not started |
-| **Login** | Full-page split layout, auth form, no Rail | `wiki/implementation/plan-login.md` | ⏳ Waiting on Foundation |
+| **Foundation** | Tokens rename, fonts, Zustand cleanup, UI primitives, queryKeys, AppShell, Rail, AppToolbar, AppRoot, Router restructure | `wiki/implementation/plan-foundation.md` | ✅ Complete |
+| **Login** | Full-page split layout, auth form, no Rail | `wiki/implementation/plan-login.md` | 🔲 Not started |
 | **Library** | Dense document table, stat cards, filter tabs, collapsible activity sidebar, SectionPanel | — | ⏳ Waiting on Login |
 | **Editor** | Slim doc bar, mini toolbar, paper canvas, metadata sidebar | — | ⏳ Waiting on Library |
 | **Wizard** | 4-step stepper, profile/area/visibility/template pickers | — | ⏳ Waiting on Editor |
