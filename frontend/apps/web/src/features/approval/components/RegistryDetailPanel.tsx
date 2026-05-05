@@ -8,6 +8,7 @@ import { LockBadge } from './LockBadge';
 import { SignoffDialog } from './SignoffDialog';
 import { StateBadge } from './StateBadge';
 import { SupersedePublishDialog } from './SupersedePublishDialog';
+import { formatISODate } from '../../../lib/formatDate';
 import styles from './RegistryDetailPanel.module.css';
 
 interface RegistryDetailPanelProps {
@@ -82,7 +83,7 @@ function formatDate(iso?: string): string {
   if (Number.isNaN(date.getTime())) {
     return '-';
   }
-  return date.toLocaleDateString('pt-BR');
+  return formatISODate(date);
 }
 
 function toApprovalState(status: string): ApprovalState {
