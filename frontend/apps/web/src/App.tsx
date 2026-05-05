@@ -17,8 +17,8 @@ import { useDocumentsStore } from "./store/documents.store";
 import { useRegistryStore } from "./store/registry.store";
 import { useNotificationsStore } from "./store/notifications.store";
 import { listTaxonomyAreas, listTaxonomyProfiles } from "./api/registry";
-import { asMessage, statusOf } from "./features/shared/errors";
-import type { AccessPolicyItem, CurrentUser, ManagedUserItem } from "./lib.types";
+import { asMessage } from "./features/shared/errors";
+import type { CurrentUser, ManagedUserItem } from "./lib.types";
 import { useNotifications } from "./features/notifications/useNotifications";
 import { DocumentsHubView } from "./features/documents/DocumentsHubView";
 import { RegistryExplorerView } from "./features/registry/RegistryExplorerView";
@@ -140,7 +140,8 @@ function AppContent() {
           safe(listTaxonomyAreas(), empty as never),
           Promise.resolve({ items: [] }),
           Promise.resolve({ items: [] }),
-          safe(api.searchDocuments(new URLSearchParams({ limit: "25" })), empty as never),
+          // TODO: migrate to /api/v2/* in frontend rewrite
+          Promise.resolve({ items: [] }),
           (Array.isArray(currentUser.roles) ? currentUser.roles : []).includes("admin")
             ? safe(api.listUsers(), empty as never)
             : Promise.resolve({ items: [] as ManagedUserItem[] }),
@@ -196,7 +197,8 @@ function AppContent() {
     streamRefreshInFlightRef.current = true;
     try {
       const [docsResponse, notificationsResponse] = await Promise.all([
-        api.searchDocuments(new URLSearchParams({ limit: "25" })),
+        // TODO: migrate to /api/v2/* in frontend rewrite
+        Promise.resolve({ items: [] }),
         api.listNotifications(new URLSearchParams({ limit: "10" })),
       ]);
       setDocuments(Array.isArray(docsResponse.items) ? docsResponse.items : []);
@@ -215,40 +217,19 @@ function AppContent() {
       }
       startApiTrace(`open-document:${normalizedDocumentID}`);
       markUx(`open-document-start:${normalizedDocumentID}`);
-      try {
-        const [docResponse, versionsResponse, approvalsResponse, attachmentsResponse, auditResponse] = await Promise.all([
-          api.getDocument(normalizedDocumentID),
-          api.listVersions(normalizedDocumentID),
-          api.listApprovals(normalizedDocumentID),
-          api.listAttachments(normalizedDocumentID),
-          api.listAuditEvents(new URLSearchParams({ resourceId: normalizedDocumentID })),
-        ]);
-        const orderedVersions = [...versionsResponse.items].sort((a, b) => b.version - a.version);
-        setSelectedDocument(docResponse);
-        setVersions(orderedVersions);
-        setApprovals(approvalsResponse.items);
-        setAttachments(attachmentsResponse.items);
-        setCollaborationPresence([]);
-        setDocumentEditLock(null);
-        setAuditEvents(auditResponse.items);
-        setPolicyResourceId(normalizedDocumentID);
-        const policyResponse = await api.listAccessPolicies("document", normalizedDocumentID).catch((err) => {
-          if (statusOf(err) === 403) return { items: [] as AccessPolicyItem[] };
-          throw err;
-        });
-        const nextDiff = orderedVersions.length >= 2
-          ? await api.getVersionDiff(normalizedDocumentID, orderedVersions[1].version, orderedVersions[0].version)
-          : null;
-        setPolicies(policyResponse.items);
-        setVersionDiff(nextDiff);
-        markUx(`open-document-ready:${normalizedDocumentID}`);
-        stopApiTrace();
-        return true;
-      } catch (err) {
-        setErrorStore(asMessage(err));
-        stopApiTrace();
-        return false;
-      }
+      // TODO: migrate to /api/v2/* in frontend rewrite
+      setSelectedDocument(null);
+      setVersions([]);
+      setApprovals([]);
+      setAttachments([]);
+      setCollaborationPresence([]);
+      setDocumentEditLock(null);
+      setAuditEvents([]);
+      setPolicyResourceId(normalizedDocumentID);
+      setPolicies([]);
+      setVersionDiff(null);
+      stopApiTrace();
+      return false;
     },
     [setApprovals, setAttachments, setAuditEvents, setCollaborationPresence, setDocumentEditLock, setErrorStore, setPolicies, setPolicyResourceId, setSelectedDocument, setVersionDiff, setVersions],
   );
@@ -451,18 +432,9 @@ function AppContent() {
 
     const emitHeartbeat = async () => {
       try {
-        await api.heartbeatDocumentPresence(selectedDocument.documentId, { displayName: user?.displayName ?? "" });
-        const [presenceResponse, lockResponse] = await Promise.all([
-          api.listDocumentPresence(selectedDocument.documentId),
-          api.getDocumentEditLock(selectedDocument.documentId).catch((err) => {
-            if (statusOf(err) === 404) {
-              return null;
-            }
-            throw err;
-          }),
-        ]);
-        setCollaborationPresence(presenceResponse.items);
-        setDocumentEditLock(lockResponse);
+        // TODO: migrate to /api/v2/* in frontend rewrite
+        setCollaborationPresence([]);
+        setDocumentEditLock(null);
       } catch {
         // Collaboration refresh is best-effort and must not block normal workspace usage.
       }
