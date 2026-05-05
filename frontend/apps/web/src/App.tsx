@@ -1,6 +1,6 @@
 import { Component, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { api } from "./lib.api";
+import { api, markUx, startApiTrace, stopApiTrace } from "./lib.api";
 import { AuthShell } from "./components/AuthShell";
 import { AdminCenterView } from "./features/iam/AdminCenterView";
 import { TaxonomyAdminPage } from "./features/taxonomy";
@@ -12,10 +12,14 @@ import { WorkspacePlaceholder } from "./components/WorkspacePlaceholder";
 import type { UserRole } from "./lib.types";
 import { useUiStore } from "./store/ui.store";
 import { useAuthSession } from "./features/auth/useAuthSession";
-import { useDocumentsWorkspace } from "./features/documents/useDocumentsWorkspace";
 import { useRegistryExplorer } from "./features/registry/useRegistryExplorer";
+import { useDocumentsStore } from "./store/documents.store";
+import { useRegistryStore } from "./store/registry.store";
+import { useNotificationsStore } from "./store/notifications.store";
+import { listTaxonomyAreas, listTaxonomyProfiles } from "./api/registry";
+import { asMessage, statusOf } from "./features/shared/errors";
+import type { AccessPolicyItem, CurrentUser, ManagedUserItem } from "./lib.types";
 import { useNotifications } from "./features/notifications/useNotifications";
-import { statusOf } from "./features/shared/errors";
 import { DocumentsHubView } from "./features/documents/DocumentsHubView";
 import { RegistryExplorerView } from "./features/registry/RegistryExplorerView";
 import { WorkspaceShell } from "./features/shell/WorkspaceShell";
@@ -79,7 +83,6 @@ function AppContent() {
   const {
     message,
     error,
-    isCreateSubmitting,
     activeView,
     pendingViewNavigation,
     searchQuery,
@@ -90,46 +93,182 @@ function AppContent() {
     requestViewNavigation,
     clearPendingViewNavigation,
     setSearchQuery,
+    setManagedUsers,
   } = useUiStore();
 
   const location = useLocation();
   const navigate = useNavigate();
   const navSourceRef = useRef<"url" | "store" | null>(null);
 
-  const registry = useRegistryExplorer(() => documentsWorkspace.refreshWorkspace(user));
-  const documentsWorkspace = useDocumentsWorkspace(registry.applyDocumentProfile, registry.prefetchProfile);
-  const notificationsApi = useNotifications();
-  const authSession = useAuthSession({ onAuthenticated: documentsWorkspace.loadWorkspace });
-
-  const { authState, user, loginForm, passwordForm, setLoginForm, setPasswordForm, bootstrap, handleLogin, handleLogout, handleChangePassword } = authSession;
-  const refreshWorkspace = useCallback(() => documentsWorkspace.refreshWorkspace(user), [documentsWorkspace, user]);
   const {
     loadState,
     documentForm,
-    contentMode,
-    contentFile,
-    contentPdfUrl,
-    contentDocxUrl,
-    contentStatus,
-    contentError,
     documents,
     selectedDocument,
-    collaborationPresence,
-    documentEditLock,
     setDocumentForm,
     setCollaborationPresence,
     setDocumentEditLock,
-    openDocument,
-    openDocumentForHub,
-    refreshOperationalSignals,
-    handleCreateDocument: handleCreateDocumentInternal,
-    handleContentModeChange,
-    handleContentFileChange,
-    handleDownloadTemplate,
-  } = documentsWorkspace;
-  const handleCreateDocument = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => handleCreateDocumentInternal(event, user),
-    [handleCreateDocumentInternal, user],
+    setDocuments,
+    setLoadState,
+    setSelectedDocument,
+    setVersions,
+    setApprovals,
+    setAttachments,
+    setAuditEvents,
+    setPolicies,
+    setVersionDiff,
+    setPolicyResourceId,
+  } = useDocumentsStore();
+  const { setDocumentProfiles, setProcessAreas, setDocumentDepartments, setSubjects } = useRegistryStore();
+  const { setNotifications } = useNotificationsStore();
+  const setErrorStore = setError;
+
+  const streamRefreshInFlightRef = useRef(false);
+  // registry and notificationsApi declared before loadWorkspace so their methods are in scope.
+  // The callbacks are lazy closures — by call time all vars are initialized.
+  const registry = useRegistryExplorer(() => refreshWorkspace(user));
+  const notificationsApi = useNotifications();
+
+  const loadWorkspace = useCallback(
+    async (currentUser: CurrentUser) => {
+      setLoadState("loading");
+      try {
+        const empty = { items: [] };
+        const safe = <T,>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
+        const [profilesResponse, processAreasResponse, departmentsResponse, subjectsResponse, docsResponse, usersResponse, notificationsResponse] = await Promise.all([
+          safe(listTaxonomyProfiles(), empty as never),
+          safe(listTaxonomyAreas(), empty as never),
+          Promise.resolve({ items: [] }),
+          Promise.resolve({ items: [] }),
+          safe(api.searchDocuments(new URLSearchParams({ limit: "25" })), empty as never),
+          (Array.isArray(currentUser.roles) ? currentUser.roles : []).includes("admin")
+            ? safe(api.listUsers(), empty as never)
+            : Promise.resolve({ items: [] as ManagedUserItem[] }),
+          safe(api.listNotifications(new URLSearchParams({ limit: "10" })), empty as never),
+        ]);
+        const profiles = Array.isArray(profilesResponse.items) ? profilesResponse.items : [];
+        const areas = Array.isArray(processAreasResponse.items) ? processAreasResponse.items : [];
+        const departments = Array.isArray(departmentsResponse.items) ? departmentsResponse.items : [];
+        const nextSubjects = Array.isArray(subjectsResponse.items) ? subjectsResponse.items : [];
+        const docs = Array.isArray(docsResponse.items) ? docsResponse.items : [];
+        const users = Array.isArray(usersResponse.items) ? usersResponse.items : [];
+        setDocumentProfiles(profiles);
+        setProcessAreas(areas);
+        setDocumentDepartments(departments);
+        setSubjects(nextSubjects);
+        setDocuments(docs);
+        setManagedUsers(users);
+        setNotifications(Array.isArray(notificationsResponse.items) ? notificationsResponse.items : []);
+        if (profiles.length > 0) {
+          const nextProfileCode = profiles.find((item) => item.code === documentForm.documentProfile)?.code ?? profiles[0]?.code ?? "";
+          if (nextProfileCode) {
+            try {
+              await registry.applyDocumentProfile(nextProfileCode, documentForm.processArea);
+              await registry.prefetchProfile(nextProfileCode);
+            } catch {
+              // profile bundle unavailable (v2-only profile) — workspace still loads
+            }
+          }
+        }
+        setLoadState("ready");
+      } catch (err) {
+        setErrorStore(asMessage(err));
+        setLoadState("error");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [documentForm.documentProfile, documentForm.processArea, setDocuments, setErrorStore, setLoadState, setNotifications, setDocumentProfiles, setProcessAreas, setDocumentDepartments, setSubjects, setManagedUsers],
+  );
+
+  const refreshWorkspace = useCallback(async (currentUser: typeof user) => {
+    if (!currentUser) return;
+    await loadWorkspace(currentUser);
+  }, [loadWorkspace]);
+
+  const authSession = useAuthSession({ onAuthenticated: loadWorkspace });
+  const { authState, user, loginForm, passwordForm, setLoginForm, setPasswordForm, bootstrap, handleLogin, handleLogout, handleChangePassword } = authSession;
+
+  // Zero-arg wrapper for prop sites that declare onRefreshWorkspace: () => void | Promise<void>
+  const handleRefreshWorkspace = useCallback(() => refreshWorkspace(user), [refreshWorkspace, user]);
+
+  const refreshOperationalSignals = useCallback(async () => {
+    if (streamRefreshInFlightRef.current) return;
+    streamRefreshInFlightRef.current = true;
+    try {
+      const [docsResponse, notificationsResponse] = await Promise.all([
+        api.searchDocuments(new URLSearchParams({ limit: "25" })),
+        api.listNotifications(new URLSearchParams({ limit: "10" })),
+      ]);
+      setDocuments(Array.isArray(docsResponse.items) ? docsResponse.items : []);
+      setNotifications(Array.isArray(notificationsResponse.items) ? notificationsResponse.items : []);
+    } finally {
+      streamRefreshInFlightRef.current = false;
+    }
+  }, [setDocuments, setNotifications]);
+
+  const loadDocumentDetails = useCallback(
+    async (documentId: string) => {
+      const normalizedDocumentID = documentId.trim();
+      if (!normalizedDocumentID) {
+        setErrorStore("Selecione um documento valido antes de abrir.");
+        return false;
+      }
+      startApiTrace(`open-document:${normalizedDocumentID}`);
+      markUx(`open-document-start:${normalizedDocumentID}`);
+      try {
+        const [docResponse, versionsResponse, approvalsResponse, attachmentsResponse, auditResponse] = await Promise.all([
+          api.getDocument(normalizedDocumentID),
+          api.listVersions(normalizedDocumentID),
+          api.listApprovals(normalizedDocumentID),
+          api.listAttachments(normalizedDocumentID),
+          api.listAuditEvents(new URLSearchParams({ resourceId: normalizedDocumentID })),
+        ]);
+        const orderedVersions = [...versionsResponse.items].sort((a, b) => b.version - a.version);
+        setSelectedDocument(docResponse);
+        setVersions(orderedVersions);
+        setApprovals(approvalsResponse.items);
+        setAttachments(attachmentsResponse.items);
+        setCollaborationPresence([]);
+        setDocumentEditLock(null);
+        setAuditEvents(auditResponse.items);
+        setPolicyResourceId(normalizedDocumentID);
+        const policyResponse = await api.listAccessPolicies("document", normalizedDocumentID).catch((err) => {
+          if (statusOf(err) === 403) return { items: [] as AccessPolicyItem[] };
+          throw err;
+        });
+        const nextDiff = orderedVersions.length >= 2
+          ? await api.getVersionDiff(normalizedDocumentID, orderedVersions[1].version, orderedVersions[0].version)
+          : null;
+        setPolicies(policyResponse.items);
+        setVersionDiff(nextDiff);
+        markUx(`open-document-ready:${normalizedDocumentID}`);
+        stopApiTrace();
+        return true;
+      } catch (err) {
+        setErrorStore(asMessage(err));
+        stopApiTrace();
+        return false;
+      }
+    },
+    [setApprovals, setAttachments, setAuditEvents, setCollaborationPresence, setDocumentEditLock, setErrorStore, setPolicies, setPolicyResourceId, setSelectedDocument, setVersionDiff, setVersions],
+  );
+
+  const openDocument = useCallback(
+    async (documentId: string, nextView: "library" | "content-builder" = "library") => {
+      const ok = await loadDocumentDetails(documentId);
+      if (ok) requestViewNavigation(nextView);
+    },
+    [loadDocumentDetails, requestViewNavigation],
+  );
+
+  const openDocumentForHub = useCallback(
+    async (documentId: string) => {
+      const { documents: currentDocs } = useDocumentsStore.getState();
+      const existing = currentDocs.find((d) => d.documentId === documentId);
+      if (existing) { setSelectedDocument(existing); return; }
+      await loadDocumentDetails(documentId);
+    },
+    [loadDocumentDetails, setSelectedDocument],
   );
 
   const handleBackToCreate = useCallback(() => {
@@ -364,7 +503,7 @@ function AppContent() {
           documentProfiles={documentProfiles}
           processAreas={processAreas}
           formatDate={formatDate}
-          onRefreshWorkspace={refreshWorkspace}
+          onRefreshWorkspace={handleRefreshWorkspace}
           onOpenDocument={openDocument}
         />
       );
@@ -386,7 +525,7 @@ function AppContent() {
           formatDate={formatDate}
           onSearchQueryChange={setSearchQuery}
           onCreateDocument={handlePrimaryAction}
-          onRefreshDocuments={refreshWorkspace}
+          onRefreshDocuments={handleRefreshWorkspace}
           onOpenDocument={openDocument}
           onOpenDocumentForHub={openDocumentForHub}
         />
@@ -415,7 +554,7 @@ function AppContent() {
           selectedProfileSchemas={selectedProfileSchemas}
           selectedProfileGovernance={selectedProfileGovernance}
           showAdmin={isAdmin}
-          onRefreshWorkspace={refreshWorkspace}
+          onRefreshWorkspace={handleRefreshWorkspace}
           onSelectProfile={(profileCode) => applyDocumentProfile(profileCode, documentForm.processArea)}
           onCreateProcessArea={handleCreateProcessArea}
           onUpdateProcessArea={handleUpdateProcessArea}
@@ -439,7 +578,7 @@ function AppContent() {
           loadState={loadState}
           notifications={notifications}
           formatDate={formatDate}
-          onRefreshWorkspace={refreshWorkspace}
+          onRefreshWorkspace={handleRefreshWorkspace}
           onMarkRead={handleMarkNotificationRead}
         />
       );
@@ -538,7 +677,7 @@ function AppContent() {
           onSearchChange={setSearchQuery}
           onNavigate={handleWorkspaceNavigate}
           onPrimaryAction={handlePrimaryAction}
-          onRefreshWorkspace={refreshWorkspace}
+          onRefreshWorkspace={handleRefreshWorkspace}
           isRefreshing={loadState === "loading"}
           flushContent={tplRoute.kind === 'author'}
           editMode={tplRoute.kind === 'author'}

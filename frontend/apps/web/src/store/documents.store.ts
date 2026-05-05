@@ -12,8 +12,9 @@ import type {
   VersionListItem,
   WorkflowApprovalItem,
 } from "../lib.types";
-import type { ContentMode } from "../components/create/documentCreateTypes";
 import type { LoadState } from "./auth.store";
+
+type ContentMode = "native" | "docx_upload";
 
 type ContentStatus = "idle" | "saving" | "ready" | "error";
 type DocumentsHubView = "overview" | "collection" | "detail";
