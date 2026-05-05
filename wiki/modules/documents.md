@@ -1,6 +1,6 @@
 # documents Module
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-05
 > **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
@@ -17,6 +17,13 @@
 
 ## Overview
 
+> **Cleanup note (2026-05-05, branch chore/api-cleanup-sub-project-b):**
+> - `src/api/documents.ts` (legacy v1 client, 496 lines) — deleted. Canonical client: `features/documents/v2/api/documentsV2.ts`.
+> - `src/components/DocumentCreateView.tsx`, `DocumentsWorkspaceView`, `useDocumentsWorkspace` — deleted. Replaced by `features/documents/v2/DocumentCreatePage.tsx` + `DocumentEditorPage.tsx`.
+> - `api/notifications.ts` — stubbed pending backend rewrite (commit d136449a).
+> - Edit-lock (`/api/v1/documents/:id/lock`) and presence endpoints — dropped from backend + client (I4, commit b0158354).
+> - `documents.locked_at` column — dropped (migration 0181, commit c866de8a).
+
 A **document** is an instance filled from a template version, bound to a controlled document entry.
 Documents move through states: `draft → under_review → approved → published`.
 Only `draft` documents can be edited in the editor.
@@ -32,7 +39,7 @@ Only `draft` documents can be edited in the editor.
 ```
 
 `viewFromPath` in `workspaceRoutes.ts` maps both to `activeView = "documents-v2"`.
-`docsRouteFromPath` in `v2/routes.tsx` distinguishes `{ kind: 'create' }` vs `{ kind: 'editor', documentID }`.
+`routeFromPath` in `v2/routes.tsx` distinguishes `{ kind: 'create' }` vs `{ kind: 'editor', documentID }`.
 
 ## Create Flow
 
@@ -105,7 +112,6 @@ Migration 0167 fixed missing columns that were mistakenly added to the now-dropp
 | `revision_number` | INT | Auto-incremented per CD (`MAX+1`) |
 | `revision_version` | INT | Version within a revision |
 | `effective_from` / `effective_to` | timestamptz | Effective date range |
-| `locked_at` | timestamptz | Set on freeze |
 | `content_hash_at_submit` | TEXT | Hash at submission time |
 | `status` | TEXT | Extended CHECK; includes `draft`, `under_review`, `approved`, `published`, etc. |
 
@@ -114,7 +120,7 @@ Migration 0131's unique index `ux_documents_v2_cd_revision ON documents(controll
 ## Key Types
 
 ```typescript
-// v2/api/documentsV2.ts
+// features/documents/v2/api/documentsV2.ts  ← canonical API client (legacy api/documents.ts deleted in b0158354)
 type DocumentResponse = {
   ID?: string; id?: string;           // UUID
   Name?: string; name?: string;
