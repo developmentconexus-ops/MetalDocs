@@ -366,7 +366,75 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 
 		stages = append(stages, s)
 	}
-	return stages, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Load signoffs for the instance and attach to stages.
+	byStage, err := r.loadSignoffsForInstance(ctx, tx, instanceID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range stages {
+		if sigs, ok := byStage[stages[i].ID]; ok {
+			stages[i].Signoffs = sigs
+		}
+	}
+	return stages, nil
+}
+
+// loadSignoffsForInstance fetches all signoffs for an approval instance,
+// keyed by stage_instance_id.
+func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context, tx *sql.Tx, instanceID string) (map[string][]*domain.Signoff, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, approval_instance_id, stage_instance_id, actor_user_id,
+		       actor_tenant_id, decision, coalesce(comment,''), signed_at,
+		       signature_method, signature_payload, content_hash,
+		       coalesce(actor_display_name_snapshot,'')
+		FROM approval_signoffs
+		WHERE approval_instance_id = $1
+		ORDER BY signed_at ASC`,
+		instanceID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer rows.Close()
+
+	out := map[string][]*domain.Signoff{}
+	for rows.Next() {
+		var (
+			id, instID, stageID, actorUserID, actorTenantID string
+			decision, comment, signatureMethod, contentHash  string
+			displayName                                      string
+			signedAt                                         time.Time
+			sigPayload                                       []byte
+		)
+		if err := rows.Scan(&id, &instID, &stageID, &actorUserID, &actorTenantID,
+			&decision, &comment, &signedAt, &signatureMethod, &sigPayload,
+			&contentHash, &displayName); err != nil {
+			return nil, err
+		}
+		sig, err := domain.NewSignoff(domain.SignoffParams{
+			ID:                       id,
+			ApprovalInstanceID:       instID,
+			StageInstanceID:          stageID,
+			ActorUserID:              actorUserID,
+			ActorTenantID:            actorTenantID,
+			Decision:                 domain.Decision(decision),
+			Comment:                  comment,
+			SignedAt:                 signedAt,
+			SignatureMethod:          signatureMethod,
+			SignaturePayload:         sigPayload,
+			ContentHash:              contentHash,
+			ActorDisplayNameSnapshot: displayName,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("scan signoff %s: %w", id, err)
+		}
+		out[stageID] = append(out[stageID], sig)
+	}
+	return out, rows.Err()
 }
 
 // UpdateStageStatus applies an OCC (optimistic concurrency control) UPDATE.
