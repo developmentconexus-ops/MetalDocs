@@ -107,9 +107,13 @@ func (s *FreezeService) Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisi
 		byID[v.PlaceholderID] = v
 	}
 
+	isComputed := func(p tmpldom.Placeholder) bool {
+		return p.Computed || p.Type == tmpldom.PHComputed
+	}
+
 	// Validate required are filled for all non-computed
 	for _, p := range schema {
-		if !p.Required || p.Computed {
+		if !p.Required || isComputed(p) {
 			continue
 		}
 		v, ok := byID[p.ID]
@@ -124,7 +128,7 @@ func (s *FreezeService) Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisi
 		return err
 	}
 	for _, p := range schema {
-		if !p.Computed {
+		if !isComputed(p) {
 			continue
 		}
 		if p.ResolverKey == nil {

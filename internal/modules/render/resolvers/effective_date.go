@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	v2dom "metaldocs/internal/modules/documents/domain"
 )
 
 type EffectiveDateResolver struct{}
@@ -18,10 +17,6 @@ func (EffectiveDateResolver) Resolve(ctx context.Context, in ResolveInput) (Reso
 	if err != nil {
 		return ResolvedValue{}, err
 	}
-	if effectiveFrom.IsZero() {
-		return ResolvedValue{}, v2dom.ErrEffectiveDateMissing
-	}
-
 	inputsHash, err := hashInputs(struct {
 		TenantID   string `json:"tenant_id"`
 		RevisionID string `json:"revision_id"`
@@ -33,8 +28,12 @@ func (EffectiveDateResolver) Resolve(ctx context.Context, in ResolveInput) (Reso
 		return ResolvedValue{}, err
 	}
 
+	value := ""
+	if !effectiveFrom.IsZero() {
+		value = effectiveFrom.UTC().Format("2006-01-02")
+	}
 	return ResolvedValue{
-		Value:       effectiveFrom.UTC().Format("2006-01-02"),
+		Value:       value,
 		ResolverKey: "effective_date",
 		ResolverVer: 1,
 		InputsHash:  inputsHash,

@@ -54,7 +54,7 @@ func (s *DraftResolverService) ResolveComputedIfStale(ctx context.Context, tenan
 	}
 
 	for _, p := range schema {
-		if !p.Computed || p.ResolverKey == nil {
+		if (!p.Computed && p.Type != tmpldom.PHComputed) || p.ResolverKey == nil {
 			continue
 		}
 		r, ok := s.reg.Get(*p.ResolverKey)
