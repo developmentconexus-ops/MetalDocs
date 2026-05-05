@@ -2,7 +2,6 @@ import { Component, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "./lib.api";
 import { AuthShell } from "./components/AuthShell";
-import { DocumentCreateView } from "./components/DocumentCreateView";
 import { AdminCenterView } from "./features/iam/AdminCenterView";
 import { TaxonomyAdminPage } from "./features/taxonomy";
 import { NotificationsPanel } from "./components/NotificationsPanel";
@@ -17,7 +16,7 @@ import { useDocumentsWorkspace } from "./features/documents/useDocumentsWorkspac
 import { useRegistryExplorer } from "./features/registry/useRegistryExplorer";
 import { useNotifications } from "./features/notifications/useNotifications";
 import { statusOf } from "./features/shared/errors";
-import { DocumentsWorkspaceView } from "./features/documents/DocumentsWorkspaceView";
+import { DocumentsHubView } from "./features/documents/DocumentsHubView";
 import { RegistryExplorerView } from "./features/registry/RegistryExplorerView";
 import { WorkspaceShell } from "./features/shell/WorkspaceShell";
 import { isPathForView, pathFromView, viewFromPath } from "./routing/workspaceRoutes";
@@ -373,7 +372,7 @@ function AppContent() {
 
     if (activeView === "library" || activeView === "my-docs" || activeView === "recent") {
       return (
-        <DocumentsWorkspaceView
+        <DocumentsHubView
           view={activeView}
           loadState={loadState}
           documentProfiles={documentProfiles}
@@ -387,36 +386,9 @@ function AppContent() {
           formatDate={formatDate}
           onSearchQueryChange={setSearchQuery}
           onCreateDocument={handlePrimaryAction}
-          onRefreshWorkspace={refreshWorkspace}
+          onRefreshDocuments={refreshWorkspace}
           onOpenDocument={openDocument}
           onOpenDocumentForHub={openDocumentForHub}
-        />
-      );
-    }
-
-    if (activeView === "create") {
-      return (
-        <DocumentCreateView
-          documentForm={documentForm}
-          documentProfiles={documentProfiles}
-          processAreas={processAreas}
-          documentDepartments={documentDepartments}
-          subjects={subjects}
-          selectedProfileSchema={selectedProfileSchema}
-          selectedProfileGovernance={selectedProfileGovernance}
-          contentMode={contentMode}
-          contentFile={contentFile}
-          contentPdfUrl={contentPdfUrl}
-          contentDocxUrl={contentDocxUrl}
-          contentStatus={contentStatus}
-          contentError={contentError}
-          isSubmitting={isCreateSubmitting}
-          onDocumentFormChange={setDocumentForm}
-          onApplyProfile={applyDocumentProfile}
-          onSubmitCreateDocument={handleCreateDocument}
-          onContentModeChange={handleContentModeChange}
-          onContentFileChange={handleContentFileChange}
-          onDownloadTemplate={handleDownloadTemplate}
         />
       );
     }
