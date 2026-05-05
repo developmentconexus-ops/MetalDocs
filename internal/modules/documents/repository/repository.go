@@ -62,7 +62,7 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 
 	var areaName sql.NullString
 	if d.ProcessAreaCodeSnapshot != nil && *d.ProcessAreaCodeSnapshot != "" {
-		if err := tx.QueryRowContext(ctx, `SELECT name FROM metaldocs.process_areas WHERE tenant_id=$1::uuid AND code=$2`, d.TenantID, *d.ProcessAreaCodeSnapshot).Scan(&areaName); err != nil && err != sql.ErrNoRows {
+		if err := tx.QueryRowContext(ctx, `SELECT name FROM metaldocs.document_process_areas WHERE tenant_id=$1::uuid AND code=$2`, d.TenantID, *d.ProcessAreaCodeSnapshot).Scan(&areaName); err != nil && err != sql.ErrNoRows {
 			return "", "", "", fmt.Errorf("create document: lookup area name: %w", err)
 		}
 	}
@@ -112,7 +112,7 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 	if snap := d.TemplateSnapshot; snap.PlaceholderSchemaJSON != nil || snap.CompositionJSON != nil || snap.BodyDocxS3Key != "" {
 		h := snap.Hashes()
 		if _, err := tx.ExecContext(ctx, `
-			UPDATE metaldocs.documents
+			UPDATE public.documents
 			   SET placeholder_schema_snapshot = $1,
 			       placeholder_schema_hash     = $2,
 			       composition_config_snapshot = $3,
@@ -132,7 +132,7 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 	// Seed required placeholder_values rows in same tx (C4).
 	for _, p := range requiredPlaceholders {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO metaldocs.document_placeholder_values
+			INSERT INTO public.document_placeholder_values
 			    (tenant_id, revision_id, placeholder_id, source, created_at, updated_at)
 			VALUES ($1, $2, $3, 'default', NOW(), NOW())
 			ON CONFLICT DO NOTHING`,
@@ -894,7 +894,7 @@ type commentScanner interface {
 func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID string) error {
 	_ = actorID // reserved for future audit column; audit via Service layer
 	_, err := r.db.ExecContext(ctx, `
-		UPDATE metaldocs.documents
+		UPDATE public.documents
 		   SET archived_at = now(), updated_at = now()
 		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NULL`,
 		tenantID, docID)
@@ -905,7 +905,7 @@ func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID 
 func (r *Repository) Unarchive(ctx context.Context, tenantID, docID, actorID string) error {
 	_ = actorID
 	_, err := r.db.ExecContext(ctx, `
-		UPDATE metaldocs.documents
+		UPDATE public.documents
 		   SET archived_at = NULL, updated_at = now()
 		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NOT NULL`,
 		tenantID, docID)
