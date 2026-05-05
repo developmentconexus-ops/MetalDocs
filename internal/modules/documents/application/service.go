@@ -13,7 +13,6 @@ import (
 
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
-	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
@@ -86,11 +85,6 @@ type RegistryDuplicator interface {
 	DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*registrydomain.ControlledDocument, error)
 }
 
-// AuthorizationChecker validates that the actor can perform an action on a resource.
-type AuthorizationChecker interface {
-	Check(ctx context.Context, userID, tenantID string, cap iamdomain.Capability, res iamapp.ResourceCtx) error
-}
-
 type ProfileDefaultTemplateReader interface {
 	GetDefaultTemplateVersionID(ctx context.Context, tenantID, profileCode string) (*string, *string, error)
 	// returns (*templateVersionID, *templateVersionStatus, error)
@@ -105,7 +99,7 @@ type Service struct {
 	audit              Audit
 	registry           RegistryReader
 	registryDuplicator RegistryDuplicator
-	authz              AuthorizationChecker
+	caps               CapabilityChecker
 	profileTemplates   ProfileDefaultTemplateReader
 	snapshotSvc        *SnapshotService
 }
@@ -129,7 +123,7 @@ func NewService(
 	fv FormValidator,
 	a Audit,
 	reg RegistryReader,
-	authz AuthorizationChecker,
+	caps CapabilityChecker,
 	profileTemplates ProfileDefaultTemplateReader,
 ) *Service {
 	return &Service{
@@ -140,7 +134,7 @@ func NewService(
 		fv:               fv,
 		audit:            a,
 		registry:         reg,
-		authz:            authz,
+		caps:             caps,
 		profileTemplates: profileTemplates,
 	}
 }
@@ -155,7 +149,7 @@ func NewServiceWithSnapshot(
 	fv FormValidator,
 	a Audit,
 	reg RegistryReader,
-	authz AuthorizationChecker,
+	caps CapabilityChecker,
 	profileTemplates ProfileDefaultTemplateReader,
 	snap *SnapshotService,
 ) *Service {
@@ -167,7 +161,7 @@ func NewServiceWithSnapshot(
 		fv:               fv,
 		audit:            a,
 		registry:         reg,
-		authz:            authz,
+		caps:             caps,
 		profileTemplates: profileTemplates,
 		snapshotSvc:      snap,
 	}
@@ -181,7 +175,7 @@ func (s *Service) WithRegistryDuplicator(d RegistryDuplicator) *Service {
 var ErrControlledDocumentRequired = errors.New("controlled_document_id is required")
 var errRegistryReaderNotConfigured = errors.New("registry reader not configured")
 var errRegistryDuplicatorNotConfigured = errors.New("registry duplicator not configured")
-var errAuthorizationCheckerNotConfigured = errors.New("authorization checker not configured")
+var errCapabilityCheckerNotConfigured = errors.New("capability checker not configured")
 var errProfileTemplateReaderNotConfigured = errors.New("profile default template reader not configured")
 
 type CreateDocumentInput struct {
@@ -222,8 +216,8 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 	if s.registry == nil {
 		return nil, errRegistryReaderNotConfigured
 	}
-	if s.authz == nil {
-		return nil, errAuthorizationCheckerNotConfigured
+	if s.caps == nil {
+		return nil, errCapabilityCheckerNotConfigured
 	}
 	if s.profileTemplates == nil {
 		return nil, errProfileTemplateReaderNotConfigured
@@ -237,9 +231,7 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		return nil, registrydomain.ErrCDNotActive
 	}
 
-	if err := s.authz.Check(ctx, cmd.ActorUserID, cmd.TenantID, iamdomain.CapDocumentCreate, iamapp.ResourceCtx{
-		AreaCode: cd.ProcessAreaCode,
-	}); err != nil {
+	if err := s.caps.CanDo(ctx, cmd.ActorUserID, cmd.TenantID, iamdomain.CapDocumentCreate); err != nil {
 		return nil, err
 	}
 

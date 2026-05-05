@@ -36,7 +36,7 @@ type Dependencies struct {
 	Audit              application.Audit
 	RegistryReader     application.RegistryReader
 	RegistryDuplicator application.RegistryDuplicator
-	AuthzChecker       application.AuthorizationChecker
+	Caps               application.CapabilityChecker
 	ProfileDefaults    application.ProfileDefaultTemplateReader
 	SnapshotReader     application.SnapshotTemplateReader
 	SnapshotWriter     application.SnapshotWriter
@@ -53,9 +53,9 @@ func New(deps Dependencies) *Module {
 	var svc *application.Service
 	if deps.SnapshotReader != nil && deps.SnapshotWriter != nil {
 		snapSvc := application.NewSnapshotService(deps.SnapshotReader, deps.SnapshotWriter)
-		svc = application.NewServiceWithSnapshot(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.RegistryReader, deps.AuthzChecker, deps.ProfileDefaults, snapSvc)
+		svc = application.NewServiceWithSnapshot(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.RegistryReader, deps.Caps, deps.ProfileDefaults, snapSvc)
 	} else {
-		svc = application.NewService(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.RegistryReader, deps.AuthzChecker, deps.ProfileDefaults)
+		svc = application.NewService(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.RegistryReader, deps.Caps, deps.ProfileDefaults)
 	}
 	svc.WithRegistryDuplicator(deps.RegistryDuplicator)
 	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc)
