@@ -3,7 +3,7 @@ import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlle
 import { PublishedDownloadCell } from './PublishedDownloadCell';
 import type { ControlledDocument } from "./types";
 import { RegistryDetailPanel } from '../approval/components/RegistryDetailPanel';
-import { createDocument } from '../documents/v2/api/documentsV2';
+import { createDocument } from '../documents/api/documentsV2';
 
 type Props = {
   id: string;

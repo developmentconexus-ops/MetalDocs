@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { TemplateCreateDialog } from "../v2/TemplateCreateDialog";
-import { TemplatesListPage } from "../v2/TemplatesListPage";
+import { TemplateCreateDialog } from "../TemplateCreateDialog";
+import { TemplatesListPage } from "../TemplatesListPage";
 
 export function Component() {
   const navigate = useNavigate();

@@ -1,5 +1,5 @@
-import { useDocumentPdfStatus } from '../documents/v2/hooks/useDocumentPdfStatus';
-import { PDFCell } from '../documents/v2/PDFCell';
+import { useDocumentPdfStatus } from '../documents/hooks/v2/useDocumentPdfStatus';
+import { PDFCell } from '../documents/components/PDFCell';
 
 export function PublishedDownloadCell({ documentId }: { documentId: string }) {
   const pdf = useDocumentPdfStatus(documentId, true);

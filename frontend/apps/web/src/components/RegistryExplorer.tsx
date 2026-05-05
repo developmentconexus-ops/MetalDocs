@@ -4,7 +4,7 @@ import type { DocumentProfileGovernanceItem, DocumentProfileItem, DocumentProfil
 import { WorkspaceDataState } from "./WorkspaceDataState";
 import { WorkspaceViewFrame } from "./WorkspaceViewFrame";
 import { FilterDropdown, type SelectMenuOption } from "./ui/FilterDropdown";
-import { TemplateListPanel } from "./templates/TemplateListPanel";
+import { TemplateListPanel } from "../features/templates/components/TemplateListPanel";
 import styles from "./RegistryExplorer.module.css";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
