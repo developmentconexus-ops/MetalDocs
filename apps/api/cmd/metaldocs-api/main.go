@@ -272,7 +272,7 @@ func main() {
 		ExportPresign:      docPresigner,
 		RegistryReader:     cdRepo,
 		RegistryDuplicator: docRegistryDuplicator,
-		Caps:               wiring.WireDocuments(wiring.DocumentsDeps{Caps: capabilityService}),
+		Caps:               wiring.NewCapabilityChecker(capabilityService),
 		ProfileDefaults:    &profileDefaultsAdapter{profileRepo: profileRepo},
 		SnapshotReader:     docSnapshotReader,
 		SnapshotWriter:     docSnapshotWriter,
