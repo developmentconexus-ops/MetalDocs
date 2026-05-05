@@ -18,10 +18,10 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	submittedAt := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
 
 	rows := sqlmock.NewRows([]string{
-		"id", "document_v2_id", "doc_title", "area_code",
+		"id", "document_v2_id", "controlled_document_id", "doc_title", "area_code",
 		"submitted_by", "submitted_at", "stage_label", "required", "signed",
 	}).AddRow(
-		"inst-1", "doc-1", "Doc One", "finance",
+		"inst-1", "doc-1", "CD-001", "Doc One", "finance",
 		"user-1", submittedAt, "Stage 1", 2, 1,
 	)
 
