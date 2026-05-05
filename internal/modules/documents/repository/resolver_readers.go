@@ -70,7 +70,7 @@ func (r *WorkflowReader) GetApprovers(ctx context.Context, tenantID, revisionID,
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT s.actor_user_id, COALESCE(s.actor_display_name_snapshot, s.actor_user_id::text), s.signed_at
 		  FROM approval_signoffs s
-		 WHERE s.tenant_id = $1::uuid
+		 WHERE s.actor_tenant_id = $1::uuid
 		   AND s.approval_instance_id = $2::uuid
 		   AND s.decision = 'approve'
 		 ORDER BY s.signed_at ASC`,

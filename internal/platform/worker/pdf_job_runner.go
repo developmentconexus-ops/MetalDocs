@@ -33,9 +33,12 @@ func NewPDFJobRunner(converter PDFConverter, persister PDFPersister) *PDFJobRunn
 func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error {
 	tenantID, _ := event.Payload["tenant_id"].(string)
 	revisionID, _ := event.Payload["revision_id"].(string)
-	docxKey, _ := event.Payload["final_docx_s3_key"].(string)
-	if tenantID == "" || revisionID == "" || docxKey == "" {
+	if tenantID == "" || revisionID == "" {
 		return fmt.Errorf("pdf job runner: missing payload fields")
+	}
+	docxKey, _ := event.Payload["final_docx_s3_key"].(string)
+	if docxKey == "" {
+		docxKey = fmt.Sprintf("tenants/%s/revisions/%s/frozen.docx", tenantID, revisionID)
 	}
 
 	outputKey := fmt.Sprintf("tenants/%s/revisions/%s/final.pdf", tenantID, revisionID)
