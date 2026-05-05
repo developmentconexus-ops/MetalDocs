@@ -18,3 +18,7 @@ CREATE TABLE IF NOT EXISTS metaldocs.pdf_dispatch_outbox (
 CREATE INDEX IF NOT EXISTS ix_pdf_dispatch_outbox_pending
     ON metaldocs.pdf_dispatch_outbox (next_retry_at)
  WHERE status IN ('pending','processing');
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('0176', 'add metaldocs.pdf_dispatch_outbox transactional outbox table')
+ON CONFLICT (version) DO NOTHING;

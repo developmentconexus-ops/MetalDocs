@@ -28,4 +28,8 @@ INSERT INTO metaldocs.role_capabilities (role, capability) VALUES
   ('qms_admin', 'taxonomy.manage')
 ON CONFLICT (role, capability) DO NOTHING;
 
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('0169', 'backfill role_capabilities for legacy process-area roles (signer/area_admin/qms_admin)')
+ON CONFLICT (version) DO NOTHING;
+
 COMMIT;
