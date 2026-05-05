@@ -1,6 +1,6 @@
 # Error UX — Shared HTTP Client & Auth Bus
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-05
 > **Branch:** `phase-e-error-ux` (merged into main)
 > **Bugs fixed:** E2, E3, E4
 
@@ -66,6 +66,7 @@ Priority: `errorMessages[code]` → `backendMessage` (non-empty) → `'Ocorreu u
 Key codes:
 - `sod.submitter_cannot_sign` — submitter ≠ approver SoD
 - `sod.cross_stage_duplicate` — same user, multiple stages
+- `signoff.not_eligible` — actor not in `eligible_actor_ids` snapshot frozen at submit time; HTTP 403. Mapped from `domain.ErrActorNotEligible` at `internal/modules/documents/approval/http/errors.go:48-50`. Handle analogously to SoD codes in `SignoffDialog` — inline dialog error, not a toast.
 - `not_found.route` — no approval route configured for document profile
 - `authn.expired` — session expired
 - `authn.rate_limited` — too many attempts
