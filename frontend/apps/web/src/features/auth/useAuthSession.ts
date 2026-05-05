@@ -1,11 +1,9 @@
 import { useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import * as api from './api/auth';
 import { onAuthExpired } from "../../lib/api";
 import type { CurrentUser } from "../../lib/types";
 import { useAuthStore } from "../../store/auth.store";
-import { useDocumentsStore } from "../documents/state/documents.store";
-import { useNotificationsStore } from "../notifications/state/notifications.store";
-import { useRegistryStore } from "../registry/state/registry.store";
 import { useUiStore } from "../../store/ui.store";
 import { asMessage, statusOf } from "../shared/errors";
 
@@ -14,31 +12,14 @@ type UseAuthSessionOptions = {
 };
 
 export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
-  const { authState, user, loginForm, passwordForm, setAuthState, setUser, setLoginForm, setPasswordForm } = useAuthStore();
+  const queryClient = useQueryClient();
   const {
-    setLoadState,
-    setDocuments,
-    setSelectedDocument,
-    setVersions,
-    setVersionDiff,
-    setApprovals,
-    setAttachments,
-    setCollaborationPresence,
-    setDocumentEditLock,
-    setPolicies,
-    setAuditEvents,
-    setDocumentForm,
-    setContentMode,
-    setContentFile,
-    setContentPdfUrl,
-    setContentDocxUrl,
-    setContentStatus,
-    setContentError,
-  } = useDocumentsStore();
-  const { setNotifications } = useNotificationsStore();
-  const { setSelectedProfileSchema, setSelectedProfileSchemas, setSelectedProfileGovernance, setSubjects } = useRegistryStore();
-  const { setMessage, setError, setManagedUsers } = useUiStore();
+    authState, user, loginForm, passwordForm,
+    setAuthState, setUser, setLoginForm, setPasswordForm,
+  } = useAuthStore();
+  const { setMessage, setError } = useUiStore();
 
+  // Clear session when token expires server-side.
   useEffect(() => {
     return onAuthExpired(({ returnTo }) => {
       if (returnTo && returnTo !== "/" && !returnTo.startsWith("/login")) {
@@ -46,97 +27,14 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
       }
       setUser(null);
       setAuthState("idle");
+      queryClient.clear();
     });
-  }, [setAuthState, setUser]);
-  const clearWorkspaceAfterPasswordChange = useCallback(() => {
-    setSubjects([]);
-    setDocuments([]);
-    setVersions([]);
-    setVersionDiff(null);
-    setApprovals([]);
-    setAttachments([]);
-    setCollaborationPresence([]);
-    setDocumentEditLock(null);
-    setPolicies([]);
-    setAuditEvents([]);
-    setManagedUsers([]);
-    setNotifications([]);
-    setSelectedDocument(null);
-    setLoadState("idle");
-  }, [
-    setApprovals,
-    setAttachments,
-    setAuditEvents,
-    setCollaborationPresence,
-    setDocumentEditLock,
-    setDocuments,
-    setLoadState,
-    setManagedUsers,
-    setNotifications,
-    setPolicies,
-    setSelectedDocument,
-    setSubjects,
-    setVersionDiff,
-    setVersions,
-  ]);
-
-  const clearWorkspaceOnLogout = useCallback(() => {
-    setSelectedProfileSchema(null);
-    setSelectedProfileSchemas([]);
-    setSelectedProfileGovernance(null);
-    setSubjects([]);
-    setDocuments([]);
-    setVersions([]);
-    setVersionDiff(null);
-    setApprovals([]);
-    setAttachments([]);
-    setCollaborationPresence([]);
-    setDocumentEditLock(null);
-    setPolicies([]);
-    setAuditEvents([]);
-    setManagedUsers([]);
-    setNotifications([]);
-    setSelectedDocument(null);
-    setContentMode("native");
-    setContentFile(null);
-    setContentPdfUrl("");
-    setContentDocxUrl("");
-    setContentStatus("idle");
-    setContentError("");
-    setMessage("");
-    setError("");
-  }, [
-    setApprovals,
-    setAttachments,
-    setAuditEvents,
-    setCollaborationPresence,
-    setContentDocxUrl,
-    setContentError,
-    setContentFile,
-    setContentMode,
-    setContentPdfUrl,
-    setContentStatus,
-    setDocumentEditLock,
-    setDocuments,
-    setError,
-    setManagedUsers,
-    setMessage,
-    setNotifications,
-    setPolicies,
-    setSelectedDocument,
-    setSelectedProfileGovernance,
-    setSelectedProfileSchema,
-    setSelectedProfileSchemas,
-    setSubjects,
-    setVersionDiff,
-    setVersions,
-  ]);
+  }, [setAuthState, setUser, queryClient]);
 
   const bootstrap = useCallback(async () => {
     try {
       const currentUser = await api.me();
       setUser(currentUser);
-      setDocumentForm((current) => ({ ...current, ownerId: currentUser.userId }));
       setAuthState("ready");
       if (!currentUser.mustChangePassword) {
         await onAuthenticated(currentUser);
@@ -149,7 +47,7 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
       setAuthState("error");
       setError(asMessage(err));
     }
-  }, [onAuthenticated, setAuthState, setDocumentForm, setError, setUser]);
+  }, [onAuthenticated, setAuthState, setError, setUser]);
 
   const handleLogin = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -160,7 +58,6 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
         setAuthState("loading");
         const response = await api.login(loginForm);
         setUser(response.user);
-        setDocumentForm((current) => ({ ...current, ownerId: response.user.userId }));
         setAuthState("ready");
         if (!response.user.mustChangePassword) {
           await onAuthenticated(response.user);
@@ -170,14 +67,9 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
             window.history.pushState({}, "", returnTo);
             window.dispatchEvent(new PopStateEvent("popstate"));
           }
-        } else {
-          clearWorkspaceAfterPasswordChange();
         }
       } catch (err) {
         setUser(null);
-        setManagedUsers([]);
-        setDocuments([]);
-        setSelectedDocument(null);
         if (statusOf(err) === 401) {
           setError("Usuario ou senha invalidos.");
           setAuthState("idle");
@@ -187,19 +79,7 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
         setAuthState("error");
       }
     },
-    [
-      clearWorkspaceAfterPasswordChange,
-      loginForm,
-      onAuthenticated,
-      setAuthState,
-      setDocumentForm,
-      setDocuments,
-      setError,
-      setManagedUsers,
-      setMessage,
-      setSelectedDocument,
-      setUser,
-    ],
+    [loginForm, onAuthenticated, setAuthState, setError, setMessage, setUser],
   );
 
   const handleLogout = useCallback(async () => {
@@ -210,11 +90,11 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
     } catch {
       // Best-effort logout; still clear local state.
     } finally {
-      clearWorkspaceOnLogout();
       setUser(null);
       setAuthState("idle");
+      queryClient.clear();
     }
-  }, [clearWorkspaceOnLogout, setAuthState, setError, setMessage, setUser]);
+  }, [queryClient, setAuthState, setError, setMessage, setUser]);
 
   const handleChangePassword = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -229,8 +109,7 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
         const response = await api.changePassword(passwordForm);
         setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
         setUser(response.user);
-        setLoginForm((current) => ({ ...current, identifier: response.user.username, password: "" }));
-        setDocumentForm((current) => ({ ...current, ownerId: response.user.userId }));
+        setLoginForm((current: { identifier: string; password: string }) => ({ ...current, identifier: response.user.username, password: "" }));
         await onAuthenticated(response.user);
         setAuthState("ready");
         setMessage("Senha alterada com sucesso.");
@@ -238,7 +117,7 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
         setError(asMessage(err));
       }
     },
-    [onAuthenticated, passwordForm, setAuthState, setDocumentForm, setError, setLoginForm, setMessage, setPasswordForm, setUser],
+    [onAuthenticated, passwordForm, setAuthState, setError, setLoginForm, setMessage, setPasswordForm, setUser],
   );
 
   return {
@@ -254,4 +133,3 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
     handleChangePassword,
   };
 }
-

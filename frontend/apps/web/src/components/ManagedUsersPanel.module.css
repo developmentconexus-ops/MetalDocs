@@ -101,8 +101,8 @@
 }
 
 .buttonPrimary {
-  background: var(--vinho);
-  border-color: var(--vinho-d);
+  background: var(--brand);
+  border-color: var(--brand-deep);
   color: #fff;
 }
 
@@ -193,7 +193,7 @@
 }
 
 .userRowSelected {
-  background: var(--vinho-soft);
+  background: var(--brand-pale);
 }
 
 .avatar {
@@ -202,7 +202,7 @@
   border-radius: 999px;
   border: 1px solid #e9c6c6;
   background: #f9efef;
-  color: var(--vinho);
+  color: var(--brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -231,9 +231,9 @@
 }
 
 .roleChipAdmin {
-  background: var(--vinho-soft);
-  color: var(--vinho);
-  border-color: var(--vinho-muted);
+  background: var(--brand-pale);
+  color: var(--brand);
+  border-color: var(--border-strong);
 }
 
 .roleChipEditor {
@@ -263,7 +263,7 @@
   width: 3rem;
   height: 3rem;
   border-radius: 999px;
-  background: var(--vinho);
+  background: var(--brand);
   color: #fff;
   font-family: "Cormorant Garamond", serif;
   font-size: 1.5rem;
