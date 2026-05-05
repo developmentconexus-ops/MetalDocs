@@ -1,5 +1,3 @@
-import type { WorkspaceView } from "../components/DocumentWorkspaceShell";
-
 type DocumentsScopeView = "library" | "my-docs" | "recent";
 
 const documentsBaseByView: Record<DocumentsScopeView, string> = {
@@ -24,102 +22,6 @@ type DocumentsRoute =
   | { view: "overview" }
   | { view: "collection"; areaCode?: string; profileCode?: string }
   | { view: "detail"; documentId: string };
-
-export function viewFromPath(pathname: string): WorkspaceView {
-  const path = normalizePath(pathname);
-
-  if (path === "/documents-v2/new" || path === "/documents-v2") return "documents-v2";
-  if (path.startsWith("/documents-v2/")) return "documents-v2";
-  if (path.startsWith("/documents/mine")) return "my-docs";
-  if (path.startsWith("/documents/recent")) return "recent";
-  if (path.startsWith("/documents")) return "library";
-  if (path.startsWith("/content-builder")) return "content-builder";
-  if (path.startsWith("/registry-v2")) return "registry-v2";
-  if (path.startsWith("/registry")) return "registry";
-  if (path.startsWith("/notifications")) return "notifications";
-  if (path.startsWith("/admin/memberships")) return "iam-memberships";
-  if (path.startsWith("/admin/taxonomy")) return "taxonomy-admin";
-  if (path.startsWith("/admin")) return "admin";
-  if (path.startsWith("/approval-routes")) return "approval-routes";
-  if (path.startsWith("/approvals")) return "approvals";
-  if (path.startsWith("/audit")) return "audit";
-  if (path.startsWith("/operations")) return "operations";
-  if (path === "/templates-v2" || path.startsWith("/templates-v2/")) return "templates-v2";
-  // Legacy /templates path redirects to templates-v2
-  if (path === "/templates" || path.startsWith("/templates/")) return "templates-v2";
-
-  return "operations";
-}
-
-export function pathFromView(view: WorkspaceView): string {
-  switch (view) {
-    case "library":
-      return documentsBaseByView["library"];
-    case "my-docs":
-      return documentsBaseByView["my-docs"];
-    case "recent":
-      return documentsBaseByView["recent"];
-    case "create":
-      // Legacy wizard `/create` depends on v1 profile/area endpoints that
-      // are not wired. Redirect sidebar + primary-button "Novo documento"
-      // clicks to the v2 create flow instead.
-      return "/documents-v2/new";
-    case "content-builder":
-      return "/content-builder";
-    case "registry":
-      return "/registry";
-    case "notifications":
-      return "/notifications";
-    case "taxonomy-admin":
-      return "/admin/taxonomy";
-    case "admin":
-      return "/admin";
-    case "approvals":
-      return "/approvals";
-    case "audit":
-      return "/audit";
-    case "operations":
-      return "/";
-    case "templates-v2":
-      return "/templates-v2";
-    case "documents-v2":
-      return "/documents-v2/new";
-    case "registry-v2":
-      return "/registry-v2";
-    case "iam-memberships":
-      return "/admin/memberships";
-    case "approval-routes":
-      return "/approval-routes";
-    default:
-      return "/";
-  }
-}
-
-export function isPathForView(pathname: string, view: WorkspaceView): boolean {
-  const path = normalizePath(pathname);
-
-  if (view === "library") {
-    return path === "/documents" || (path.startsWith("/documents/") && !path.startsWith("/documents/mine") && !path.startsWith("/documents/recent"));
-  }
-
-  if (view === "my-docs") return path.startsWith("/documents/mine");
-  if (view === "recent") return path.startsWith("/documents/recent");
-  if (view === "content-builder") return path.startsWith("/content-builder");
-  if (view === "registry") return path.startsWith("/registry");
-  if (view === "notifications") return path.startsWith("/notifications");
-  if (view === "taxonomy-admin") return path.startsWith("/admin/taxonomy");
-  if (view === "admin") return path.startsWith("/admin");
-  if (view === "approvals") return path.startsWith("/approvals");
-  if (view === "audit") return path.startsWith("/audit");
-  if (view === "operations") return path === "/" || path.startsWith("/operations");
-  if (view === "templates-v2") return path === "/templates-v2" || path.startsWith("/templates-v2/");
-  if (view === "documents-v2") return path === "/documents-v2" || path === "/documents-v2/new" || path.startsWith("/documents-v2/");
-  if (view === "registry-v2") return path.startsWith("/registry-v2");
-  if (view === "iam-memberships") return path.startsWith("/admin/memberships");
-  if (view === "approval-routes") return path.startsWith("/approval-routes");
-
-  return false;
-}
 
 export function parseDocumentsRoute(scopeView: DocumentsScopeView, pathname: string): DocumentsRoute {
   const basePath = documentsBasePath(scopeView);
