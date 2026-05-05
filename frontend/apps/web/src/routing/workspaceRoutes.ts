@@ -33,7 +33,6 @@ export function viewFromPath(pathname: string): WorkspaceView {
   if (path.startsWith("/documents/mine")) return "my-docs";
   if (path.startsWith("/documents/recent")) return "recent";
   if (path.startsWith("/documents")) return "library";
-  if (path.startsWith("/create")) return "create";
   if (path.startsWith("/content-builder")) return "content-builder";
   if (path.startsWith("/registry-v2")) return "registry-v2";
   if (path.startsWith("/registry")) return "registry";
@@ -105,7 +104,6 @@ export function isPathForView(pathname: string, view: WorkspaceView): boolean {
 
   if (view === "my-docs") return path.startsWith("/documents/mine");
   if (view === "recent") return path.startsWith("/documents/recent");
-  if (view === "create") return path.startsWith("/create");
   if (view === "content-builder") return path.startsWith("/content-builder");
   if (view === "registry") return path.startsWith("/registry");
   if (view === "notifications") return path.startsWith("/notifications");
