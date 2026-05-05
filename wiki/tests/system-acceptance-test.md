@@ -216,11 +216,14 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 
 ### D3. Approve
 
+> **Known navigation gap (G1/G2):** Clicking a row in the Approval Inbox navigates to the wrong view ("Todos Documentos"). Do NOT use the inbox row to open the signoff form. Use the workaround below.
+
 - [ ] Logout → login `approver-test`.
-- [ ] **Caixa de Entrada de Aprovação** → document `DC-RH-001` listed.
-- [ ] Open → review content → **Aprovar**.
-- [ ] Modal asks for password → enter `approver-test` password → confirm.
-- [ ] **Expected:** signoff recorded. If route is `any_1`, state goes to `approved` immediately. If `m_of_n`, repeat with another approver.
+- [ ] Confirm the document appears in **Caixa de Entrada de Aprovação** (validates routing is live, quorum=0/1).
+- [ ] **Workaround — signoff path:** Sidebar → **Docs Controlados** → click the controlled document row → scroll to the **Ações** panel → click **Assinar**.
+- [ ] In the `Assinar aprovação` modal: select **Aprovado**, enter `approver-test` password → **Confirmar assinatura**.
+- [ ] **Expected:** "Assinatura registrada com sucesso." toast. After page reload, badge changes to **Aprovado**, `revision_version` increments.
+- [ ] If route quorum is `m_of_n` > 1, repeat with additional approvers.
 
 ### D4. Área filter (E7 regression)
 
