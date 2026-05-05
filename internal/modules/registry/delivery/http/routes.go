@@ -58,6 +58,10 @@ func (h *Handler) createDoc(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
 		return
 	}
+	if strings.TrimSpace(req.Title) == "" {
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "title is required")
+		return
+	}
 
 	doc, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
 		TenantID:                  tenantIDFromRequest(r),
