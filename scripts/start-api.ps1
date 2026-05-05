@@ -20,19 +20,15 @@ if ($held) {
     Start-Sleep -Seconds 1
 }
 
-# Build binaries if missing or if -Build flag passed
+# Always rebuild binaries to avoid stale binary issues
 $binary = Join-Path $root "metaldocs-api.exe"
 $workerBinary = Join-Path $root "metaldocs-worker.exe"
-if (-not (Test-Path $binary) -or $args -contains "-Build") {
-    Write-Host "Building metaldocs-api.exe..."
-    go build -o metaldocs-api.exe ./apps/api/cmd/metaldocs-api/...
-    if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
-}
-if (-not (Test-Path $workerBinary) -or $args -contains "-Build") {
-    Write-Host "Building metaldocs-worker.exe..."
-    go build -o metaldocs-worker.exe ./apps/worker/cmd/metaldocs-worker/...
-    if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
-}
+Write-Host "Building metaldocs-api.exe..."
+go build -o metaldocs-api.exe ./apps/api/cmd/metaldocs-api/...
+if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
+Write-Host "Building metaldocs-worker.exe..."
+go build -o metaldocs-worker.exe ./apps/worker/cmd/metaldocs-worker/...
+if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
 
 # Start worker in background so PDF jobs are consumed alongside the API
 if ($args -notcontains "-NoWorker") {
