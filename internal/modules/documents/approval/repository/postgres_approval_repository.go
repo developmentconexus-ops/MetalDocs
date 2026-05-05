@@ -311,7 +311,9 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		       status, opened_at, completed_at
 		FROM approval_stage_instances
 		WHERE approval_instance_id = $1
-		ORDER BY stage_order ASC`,
+		-- FOR UPDATE: prevents re-submit from re-snapshotting eligible_actor_ids during signoff (J1).
+		ORDER BY stage_order ASC
+		FOR UPDATE`,
 		instanceID,
 	)
 	if err != nil {
