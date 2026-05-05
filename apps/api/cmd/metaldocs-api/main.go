@@ -61,6 +61,7 @@ import (
 	docgenv2 "metaldocs/internal/platform/docgenv2"
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
+	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/security"
@@ -128,6 +129,16 @@ func main() {
 		log.Fatalf("build api dependencies: %v", err)
 	}
 	defer deps.Cleanup()
+
+	if deps.SQLDB != nil && !strings.EqualFold(strings.TrimSpace(os.Getenv("METALDOCS_SKIP_STARTUP_MIGRATIONS")), "true") {
+		migrationsDir := strings.TrimSpace(os.Getenv("METALDOCS_MIGRATIONS_DIR"))
+		if migrationsDir == "" {
+			migrationsDir = "migrations"
+		}
+		if err := migrate.Apply(ctx, deps.SQLDB, migrationsDir, slog.Default()); err != nil {
+			log.Fatalf("apply startup migrations: %v", err)
+		}
+	}
 
 	authService := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, authCfg)
 	if err := authService.BootstrapLocalAdmin(ctx); err != nil {
