@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TemplateDraftDTO, PublishErrorDTO } from "../features/templates/api/templates";
+import type { TemplateDraftDTO, PublishErrorDTO } from "../api/templates";
 
 interface TemplatesState {
   activeTemplateKey: string | null;

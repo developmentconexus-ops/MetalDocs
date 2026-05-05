@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SchemaDocumentEditorState } from "../features/documents/runtime/schemaRuntimeTypes";
+import type { SchemaDocumentEditorState } from "../runtime/schemaRuntimeTypes";
 import type {
   AccessPolicyItem,
   AttachmentItem,
@@ -11,8 +11,8 @@ import type {
   VersionDiffResponse,
   VersionListItem,
   WorkflowApprovalItem,
-} from "../lib/types";
-import type { LoadState } from "./auth.store";
+} from "../../../lib/types";
+import type { LoadState } from "../../../store/auth.store";
 
 type ContentMode = "native" | "docx_upload";
 

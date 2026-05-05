@@ -3,9 +3,9 @@ import * as api from './api/auth';
 import { onAuthExpired } from "../../lib/api";
 import type { CurrentUser } from "../../lib/types";
 import { useAuthStore } from "../../store/auth.store";
-import { useDocumentsStore } from "../../store/documents.store";
-import { useNotificationsStore } from "../../store/notifications.store";
-import { useRegistryStore } from "../../store/registry.store";
+import { useDocumentsStore } from "../documents/state/documents.store";
+import { useNotificationsStore } from "../notifications/state/notifications.store";
+import { useRegistryStore } from "../registry/state/registry.store";
 import { useUiStore } from "../../store/ui.store";
 import { asMessage, statusOf } from "../shared/errors";
 

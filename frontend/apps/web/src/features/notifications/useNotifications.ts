@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react";
 import * as api from './api/notifications';
 import type { OperationsStreamSnapshot } from './api/notifications';
 import type { NotificationItem } from "../../lib/types";
-import { useNotificationsStore } from "../../store/notifications.store";
+import { useNotificationsStore } from "./state/notifications.store";
 import { useUiStore } from "../../store/ui.store";
 import { asMessage } from "../shared/errors";
 
