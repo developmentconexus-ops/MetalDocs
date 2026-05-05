@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import * as api from './api/iam';
-import { useAdminStore } from "../../store/admin.store";
+import { useAdminStore } from "./state/admin.store";
 import { useUiStore } from "../../store/ui.store";
 import { asMessage } from "../shared/errors";
 

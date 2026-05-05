@@ -6,8 +6,8 @@ import type {
   DocumentProfileSchemaItem,
   MetadataFieldRuleItem,
 } from "../../lib/types";
-import { useDocumentsStore } from "../../store/documents.store";
-import { useRegistryStore } from "../../store/registry.store";
+import { useDocumentsStore } from "../documents/state/documents.store";
+import { useRegistryStore } from "./state/registry.store";
 import { useUiStore } from "../../store/ui.store";
 import { asMessage } from "../shared/errors";
 

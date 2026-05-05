@@ -3,7 +3,7 @@ import { buildDocumentProfileCountMap } from "./adapters/catalogSummary";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { metalNobreProcessAreaHint } from "./adapters/metalNobreExperience";
 import { formatDocumentDisplayName } from "../shared/documentDisplay";
-import { type RecentDocumentItem, useDocumentsStore } from "../../store/documents.store";
+import { type RecentDocumentItem, useDocumentsStore } from "./state/documents.store";
 import { FilterDropdown, type SelectMenuOption } from "../../components/ui/FilterDropdown";
 import { DocumentsHubHeader } from "./DocumentsHubHeader";
 import { buildDocumentsPath, documentsBasePath, parseDocumentsRoute } from "../../routing/workspaceRoutes";
