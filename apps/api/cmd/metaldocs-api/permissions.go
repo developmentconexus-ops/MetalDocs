@@ -24,42 +24,6 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if path == "/api/v1/metrics" {
 			return iamdomain.CapUserManage, true
 		}
-		if method == http.MethodPost && path == "/api/v1/documents" {
-			return iamdomain.CapDocCreate, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/attachments") {
-			return iamdomain.CapDocEdit, true
-		}
-		if method == http.MethodGet && path == "/api/v1/documents" {
-			return iamdomain.CapDocView, true
-		}
-		if method == http.MethodGet && path == "/api/v1/document-types" {
-			return iamdomain.CapDocView, true
-		}
-		if method == http.MethodGet && path == "/api/v1/document-templates" {
-			return iamdomain.CapDocView, true
-		}
-		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/documents/") && !strings.HasSuffix(path, "/versions") {
-			return iamdomain.CapDocView, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/submit-for-approval") {
-			return iamdomain.CapDocSubmit, true
-		}
-		if method == http.MethodPut && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/content") {
-			return iamdomain.CapDocEdit, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/content/browser") {
-			return iamdomain.CapDocEdit, true
-		}
-		if method == http.MethodPut && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/template-assignment") {
-			return iamdomain.CapDocEdit, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/versions") {
-			return iamdomain.CapDocEdit, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/export/docx") {
-			return iamdomain.CapDocView, true
-		}
 		if method == http.MethodGet && path == "/api/v1/search/documents" {
 			return iamdomain.CapDocView, true
 		}
@@ -69,14 +33,8 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/notifications/") && strings.HasSuffix(path, "/read") {
 			return iamdomain.CapDocView, true
 		}
-		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/documents/") && strings.Contains(path, "/versions/diff") {
-			return iamdomain.CapDocView, true
-		}
 		if (method == http.MethodGet || method == http.MethodPut) && path == "/api/v1/access-policies" {
 			return iamdomain.CapMembershipManage, true
-		}
-		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/versions") {
-			return iamdomain.CapDocView, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/transitions") {
 			return iamdomain.CapDocSubmit, true
