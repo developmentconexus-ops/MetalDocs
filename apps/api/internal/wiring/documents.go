@@ -20,7 +20,7 @@ func (a capabilityServiceAdapter) CanDo(ctx context.Context, userID, tenantID st
 }
 
 // NewCapabilityChecker returns a docsapp.CapabilityChecker bound to the
-// production CapabilityService. Replaces the deprecated permissiveAuthzChecker.
+// production CapabilityService.
 func NewCapabilityChecker(svc *iamapp.CapabilityService) docsapp.CapabilityChecker {
 	return capabilityServiceAdapter{svc: svc}
 }
