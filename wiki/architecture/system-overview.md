@@ -1,6 +1,6 @@
 # System Overview
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-05
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -8,6 +8,7 @@
 > - `apps/api/cmd/metaldocs-api/main.go` - Go entry point
 > - `frontend/apps/web/vite.config.ts` - frontend dev server
 > - `internal/platform/bootstrap/` - service wiring
+> - `internal/platform/httpclient/internal_client.go:12` - `NewInternalClient` factory; tuned `*http.Client` for service-to-service HTTP (M1 fix)
 
 ---
 
@@ -42,6 +43,7 @@ Modules:
 - `render/fanout` + `render/resolvers` - substitution + DOCX/PDF generation
 - `registry` - controlled-document codes, sequence counters
 - `jobs/*` - background jobs (effective-date publisher, idempotency janitor, scheduler, watchdog)
+- `platform/httpclient` - `NewInternalClient()` — tuned `*http.Client` for intra-cluster service fanout; `Timeout: 60s`, `ResponseHeaderTimeout: 10s`, `MaxIdleConnsPerHost: 20`, `ForceAttemptHTTP2: true`. No retry logic embedded; retry is owned by `PDFOutboxWorker`. See `internal/platform/httpclient/internal_client.go:12-30` and `wiki/decisions/0009-pdf-dispatch-outbox.md`.
 - `search` - cross-module document search index; `infrastructure/v2documents/reader.go` queries `public.documents LEFT JOIN controlled_documents` to populate `DocumentCode`/`DocumentSequence` (fixed 2026-04-27: was reading `d.code` which is always empty for v2 docs; now reads `COALESCE(cd.code, '')` from the join)
 
 ## Frontend topology

@@ -1,11 +1,15 @@
 # Module: approval
 
-> **Last verified:** 2026-05-04
-> **Scope:** Approval routes, signoffs, ISO segregation enforcement, freeze trigger.
+> **Last verified:** 2026-05-05
+> **Scope:** Approval routes, signoffs, ISO segregation enforcement, eligibility enforcement, freeze trigger.
 > **Out of scope:** Freeze pipeline mechanics (see `workflows/freeze-and-fanout.md`).
 > **Key files:**
 > - `internal/modules/documents/approval/` — backend approval logic
+> - `internal/modules/documents/approval/domain/eligibility.go:1` — pure `CheckEligibility` rule; `ErrActorNotEligible` sentinel
+> - `internal/modules/documents/approval/application/decision_service.go:158-170` — eligibility check + audit event in RecordSignoff (step 5b)
 > - `internal/modules/documents/approval/application/decision_service.go:284` — RecordSignoff QuorumRejectedStage branch (sets cancel GUC + transitions doc to draft)
+> - `internal/modules/documents/approval/repository/postgres_approval_repository.go:305-316` — `loadStageInstances` SELECT … FOR UPDATE (prevents concurrent re-snapshot during signoff, J1)
+> - `migrations/0180_signoff_eligibility_trigger.sql:1` — BEFORE INSERT trigger on `approval_signoffs`; DB defense in depth for J1
 > - `internal/modules/documents/approval/application/read_service.go:152` — ListInboxItems (JOIN against documents + signoff-count subquery)
 > - `internal/modules/documents/approval/application/read_service.go:222` — CountPendingForActor (global count for pagination)
 > - `internal/modules/documents/approval/http/inbox_handler.go:15` — InboxHandler (calls ListInboxItems + CountPendingForActor)
@@ -45,6 +49,19 @@ A user's decision (approve / reject) recorded against a step. Stored with timest
 - **ISO segregation**: the document submitter cannot record a signoff on the same document version. Enforced at API, hidden in UI.
 - **Idempotency**: re-submitting the same signoff with the same `Idempotency-Key` header returns `{"was_replay":true}` (HTTP 200). Backed by `PostgresSignoffIdempStore` which reads/writes `metaldocs.idempotency_keys`. Keys expire after 24 h.
 - **Freeze trigger**: when the final stage's quorum is met, `decision_service.go` calls the freeze service inside the same transaction.
+- **Signoff eligibility**: actor must be present in `eligible_actor_ids` frozen at submit time. Enforced at three layers — see _RecordSignoff eligibility check_ below.
+
+## RecordSignoff eligibility check (J1 — fixed cb56e1e0..1cebea64)
+
+`RecordSignoff` enforces eligibility at three layers:
+
+1. **Domain (pure function):** `domain.CheckEligibility(actorUserID, activeStage.EligibleActorIDs)` (`eligibility.go:11`) — returns `ErrActorNotEligible` if actor absent. No DB, no globals. Mirrors `sod.go` shape.
+2. **Service (in-tx):** called at `decision_service.go:159` — step 5b, after `authz.Require`, before `CheckSoD`. On failure: emits `signoff.rejected` governance event with `reason=not_eligible` (:160-168), rolls back, surfaces `ErrActorNotEligible`.
+3. **DB trigger (defense in depth):** `enforce_signoff_eligibility_trg` (`migrations/0180_signoff_eligibility_trigger.sql`) — `BEFORE INSERT` on `approval_signoffs`; checks `eligible_actor_ids @> actor_user_id` on the parent stage row; raises `ERRCODE 23514` if absent. Belt to application braces.
+
+**FOR UPDATE lock:** `loadStageInstances` (`postgres_approval_repository.go:305-316`) acquires `SELECT … FOR UPDATE` on all stage rows for the instance. This prevents a concurrent re-submit from re-snapshotting `eligible_actor_ids` while a signoff transaction is in flight.
+
+**HTTP error:** `ErrActorNotEligible` → HTTP 403 `signoff.not_eligible` (`errors.go:48-50`). Frontend should handle this code analogously to the existing SoD codes — see `concepts/error-ux.md`.
 
 ## Reject path
 

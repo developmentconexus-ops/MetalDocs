@@ -1,7 +1,7 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** accepted 2026-05-03
-> **Last verified:** 2026-05-03
+> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring)
+> **Last verified:** 2026-05-05
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam-rbac.md`.
 > **Key files:**
@@ -42,6 +42,19 @@ Treat the two services as **distinct tiers** with explicit responsibilities, not
 - **Negative:** IAM admin UI must distinguish "tenant role" assignment from "area membership" assignment — separate flows.
 - **Open:** future area-membership service consolidation if area grants diverge from `user_process_areas`.
 
+## Amendment — J2: `document.create` wiring (2026-05-05)
+
+**Bug J2** (`wiki/bugs/audit-2026-05-04.md`) found that `permissiveAuthzChecker` in `main.go` returned `nil` for every capability check, bypassing tier-1 enforcement on `document.create`.
+
+**Resolution (commits 563d650e, c0fa0485, 7b26f3cd, 1cebea64):**
+
+- `AuthorizationChecker` interface removed from the documents module.
+- New consumer port `CapabilityChecker` declared in `internal/modules/documents/application/ports.go` — one-method interface matching `CapabilityService.CanDo`.
+- `apps/api/internal/wiring/documents.go:24` — `NewCapabilityChecker` adapter bridges `*iamapp.CapabilityService` to `docsapp.CapabilityChecker` (string capability conversion).
+- `apps/api/cmd/metaldocs-api/main.go:275` — `Caps: wiring.NewCapabilityChecker(capabilityService)` replaces the former `permissiveAuthzChecker`. `permissiveAuthzChecker` struct deleted.
+
+Documents module wiring was also lifted out of `main.go` into `apps/api/internal/wiring/documents.go` as part of this change (god-file reduction).
+
 ## References
 
 - `internal/modules/iam/application/capability_service.go` — tier 1
@@ -49,8 +62,10 @@ Treat the two services as **distinct tiers** with explicit responsibilities, not
 - `internal/modules/iam/authz/context.go` — typed GUC errors (Group B fix)
 - `internal/modules/iam/infrastructure/postgres/role_provider.go` — tenant-scoped `RolesByUserID` (Group B fix)
 - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go` — tenant-scoped admin ops, DELETE-then-INSERT (Group B fix)
+- `apps/api/internal/wiring/documents.go:24` — `NewCapabilityChecker` adapter (J2 fix)
 - Migration 0162 — added `tenant_id` to `iam_user_roles`
 - Migration 0165 — reseeded `role_capabilities`
 - Migration 0170 (`migrations/0170_dev_approver_role_correction.sql`) — corrects dev approver role after 0166 over-promotion
 - Audit 2026-05-03 — bugs B1-B6 (`wiki/bugs/audit-2026-05-03.md` lines 111-136)
+- Audit 2026-05-04 — bug J2 (`wiki/bugs/audit-2026-05-04.md`)
 - Tests: `internal/modules/iam/infrastructure/postgres/role_admin_repository_test.go`, `tests/integration/iam/tenant_isolation_test.go`
