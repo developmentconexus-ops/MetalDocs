@@ -1,30 +1,61 @@
+/* MetalDocs Design System — Wine Palette */
 :root {
-  color-scheme: light;
-  --vinho: #6b1f2a;
-  --vinho-d: #3e1018;
-  --vinho-l: #8b2e3a;
-  --vinho-pale: #f9f3f3;
-  --vinho-soft: #f2eaea;
-  --vinho-muted: #dfc8c8;
+  /* Fonts */
+  --font-sans: "Inter Tight", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Brand */
+  --brand: #6b1f2a;
+  --brand-deep: #3e1018;
+  --brand-soft: #8b2e3a;
+  --brand-pale: #f9f0f0;
   --accent: #c8364a;
-  --bg: #f0ebeb;
+
+  /* Surface */
+  --bg: #f4eeee;
   --surface: #ffffff;
   --surface-2: #faf6f6;
-  --border: #e8dede;
-  --border-2: #d8caca;
-  --border-strong: #dfc8c8;
+  --surface-3: #f0e9e9;
+
+  /* Border */
+  --border: #e6dcdc;
+  --border-strong: #d4c2c2;
+
+  /* Text */
   --text: #1a0e0e;
-  --text-soft: #483030;
-  --text-muted: #7a6060;
-  --muted: #7a6060;
-  --muted-soft: #a89090;
-  --warning: #c89020;
-  --danger: #c8364a;
+  --text-soft: #4a3434;
+  --text-muted: #8a7575;
+  --text-faint: #b3a0a0;
+
+  /* Rail (dark sidebar) */
+  --rail: #2a1418;
+  --rail-text: #e8d6d6;
+  --rail-text-muted: #9c7e7e;
+  --rail-active: #6b1f2a;
+  --rail-divider: #3e2025;
+
+  /* Semantic */
   --success: #1a6b35;
   --success-bg: #e6f5ec;
-  --warning-bg: #fdf5e0;
+  --warning: #b07016;
+  --warning-bg: #fbf2dc;
+  --danger: #c8364a;
+  --danger-bg: #fae8eb;
+  --info: #1a3a7a;
   --info-bg: #e8eef8;
-  --info-fg: #1a3a7a;
-  --shadow: 0 18px 40px rgba(74, 33, 33, 0.08);
-  font-family: "DM Sans", sans-serif;
+
+  /* Shadow */
+  --shadow-1: 0 1px 2px rgba(74, 33, 33, 0.06);
+  --shadow-2: 0 8px 24px rgba(74, 33, 33, 0.08);
+
+  /* Radii */
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 8px;
+  --r-4: 12px;
+  --r-pill: 999px;
+
+  /* Spacing */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px; --sp-9: 56px;
 }
