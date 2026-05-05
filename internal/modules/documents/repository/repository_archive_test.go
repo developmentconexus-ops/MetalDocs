@@ -15,7 +15,7 @@ func TestMarkArchived_StampsTimestampWithoutStatusChange(t *testing.T) {
 	defer db.Close()
 	r := New(db)
 
-	mock.ExpectExec(`UPDATE metaldocs\.documents`).
+	mock.ExpectExec(`UPDATE public\.documents`).
 		WithArgs("tenant-1", "doc-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
@@ -32,7 +32,7 @@ func TestUnarchive_ClearsTimestamp(t *testing.T) {
 	defer db.Close()
 	r := New(db)
 
-	mock.ExpectExec(`UPDATE metaldocs\.documents`).
+	mock.ExpectExec(`UPDATE public\.documents`).
 		WithArgs("tenant-1", "doc-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 

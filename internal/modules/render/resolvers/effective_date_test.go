@@ -3,11 +3,8 @@ package resolvers
 import (
 	"bytes"
 	"context"
-	"errors"
 	"testing"
 	"time"
-
-	v2dom "metaldocs/internal/modules/documents/domain"
 )
 
 type stubRevReaderZero struct{}
@@ -22,15 +19,20 @@ func (stubRevReaderZero) GetAuthor(_ context.Context, _, _ string) (AuthorInfo, 
 	return AuthorInfo{}, nil
 }
 
-func TestEffectiveDateResolver_NullReturnsTypedError(t *testing.T) {
+// NULL effective_from is valid (H5: commit 939bf24a). Resolver returns empty
+// string value with no error — callers treat empty string as "not set".
+func TestEffectiveDateResolver_NullReturnsEmptyValue(t *testing.T) {
 	r := EffectiveDateResolver{}
 	in := ResolveInput{
 		TenantID: "t1", RevisionID: "r1",
 		RevisionReader: stubRevReaderZero{},
 	}
-	_, err := r.Resolve(context.Background(), in)
-	if !errors.Is(err, v2dom.ErrEffectiveDateMissing) {
-		t.Fatalf("want ErrEffectiveDateMissing, got %v", err)
+	v, err := r.Resolve(context.Background(), in)
+	if err != nil {
+		t.Fatalf("want nil error for zero effective_from, got %v", err)
+	}
+	if v.Value != "" {
+		t.Fatalf("want empty Value for zero effective_from, got %q", v.Value)
 	}
 }
 
