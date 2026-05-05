@@ -383,7 +383,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	// deprecated: post-commit best-effort dispatch (replaced by pdfOutbox transactional enqueue above).
 	// Left in place for callers that have not yet wired pdfOutbox.
 	if shouldDispatchPDF && s.pdfOutbox == nil && s.pdfDispatcher != nil {
-		_ = s.pdfDispatcher.Dispatch(ctx, pdfTenantID, pdfRevisionID)
+		// Client fails fast; retry owned by PDFOutboxWorker (wiki/decisions/0009-pdf-dispatch-outbox.md).
+		dispatchCtx, dispatchCancel := context.WithTimeout(ctx, 45*time.Second)
+		defer dispatchCancel()
+		_ = s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID)
 	}
 	return result, nil
 }
