@@ -30,7 +30,7 @@ type fakeAuthzChecker struct {
 	err error
 }
 
-func (f *fakeAuthzChecker) Check(_ context.Context, _, _ string, _ iamdomain.Capability, _ iamapp.ResourceCtx) error {
+func (f *fakeAuthzChecker) CanDo(_ context.Context, _, _ string, _ iamdomain.Capability) error {
 	return f.err
 }
 
