@@ -3,13 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { dispatchAuthExpired } from "../../../lib/api";
 import { useAuthSession } from "../useAuthSession";
 
-vi.mock("../../../lib.api", () => ({
-  api: {
-    me: vi.fn(),
-    login: vi.fn(),
-    logout: vi.fn(),
-    changePassword: vi.fn(),
-  },
+vi.mock("../api/auth", () => ({
+  me: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
+  changePassword: vi.fn(),
 }));
 
 describe("useAuthSession auth:expired returnTo", () => {

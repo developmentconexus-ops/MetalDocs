@@ -13,7 +13,7 @@ export interface AreaMembership {
 export interface GrantMembershipRequest {
   userId: string;
   areaCode: string;
-  role: 'viewer' | 'editor' | 'reviewer' | 'approver';
+  role: 'viewer' | 'editor' | 'reviewer' | 'author' | 'approver' | 'signer' | 'area_admin' | 'qms_admin';
 }
 
 const BASE = "/api/v2/iam/area-memberships";

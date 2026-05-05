@@ -1,7 +1,7 @@
 // TODO: This replaces RegistryExplorerView.tsx — switch routing in Phase 8 or 9
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fetchControlledDocuments } from "./api";
+import { fetchControlledDocuments } from './api/controlledDocuments';
 import type { ControlledDocument } from "./types";
 import { RegistryCreateDialog } from "./RegistryCreateDialog";
 import { RegistryDetailPage } from "./RegistryDetailPage";

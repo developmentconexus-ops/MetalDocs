@@ -1,4 +1,4 @@
-﻿import { type FormEvent, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { createTemplate } from './api/templatesV2';
 import styles from './TemplateCreateDialog.module.css';
 

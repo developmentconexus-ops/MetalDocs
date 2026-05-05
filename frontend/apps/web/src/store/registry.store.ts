@@ -6,7 +6,7 @@ import type {
   DocumentProfileSchemaItem,
   ProcessAreaItem,
   SubjectItem,
-} from "../lib.types";
+} from "../lib/types";
 
 interface RegistryStore {
   documentProfiles: DocumentProfileItem[];

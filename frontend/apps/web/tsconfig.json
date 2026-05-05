@@ -15,7 +15,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    "types": ["vite/client", "@testing-library/jest-dom"],
     "baseUrl": ".",
     "paths": {
       "@metaldocs/editor-ui": ["../../../packages/editor-ui/src/index.ts"],

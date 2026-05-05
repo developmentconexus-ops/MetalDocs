@@ -6,7 +6,7 @@ import type {
   MetadataFieldRuleItem,
   ProcessAreaItem,
   SubjectItem,
-} from "../../lib.types";
+} from "../../lib/types";
 
 type RegistryExplorerViewProps = {
   loadState: "idle" | "loading" | "ready" | "error";

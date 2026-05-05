@@ -1,7 +1,7 @@
-﻿import { useCallback, useEffect } from "react";
-import { api } from "../../lib.api";
+import { useCallback, useEffect } from "react";
+import * as api from './api/auth';
 import { onAuthExpired } from "../../lib/api";
-import type { CurrentUser } from "../../lib.types";
+import type { CurrentUser } from "../../lib/types";
 import { useAuthStore } from "../../store/auth.store";
 import { useDocumentsStore } from "../../store/documents.store";
 import { useNotificationsStore } from "../../store/notifications.store";
@@ -254,5 +254,4 @@ export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
     handleChangePassword,
   };
 }
-
 

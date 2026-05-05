@@ -1,13 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TemplateRowActions } from "../TemplateRowActions";
-import type { TemplateListItemDTO } from "../../../api/templates";
+import type { TemplateListItemDTO } from "../../../features/templates/api/templates";
 
 // ---------------------------------------------------------------------------
 // Mock api/templates
 // ---------------------------------------------------------------------------
 
-vi.mock("../../../api/templates", () => ({
+vi.mock("../../../features/templates/api/templates", () => ({
   listTemplates: vi.fn(),
   createTemplate: vi.fn(),
   importTemplate: vi.fn(),
@@ -92,7 +92,7 @@ describe("TemplateListPanel — api integration", () => {
   });
 
   it("createTemplate and navigate are called when 'Novo template' is triggered", async () => {
-    const { createTemplate } = await import("../../../api/templates");
+    const { createTemplate } = await import("../../../features/templates/api/templates");
     const mockCreate = vi.mocked(createTemplate);
     mockCreate.mockResolvedValue({
       templateKey: "tpl-new",
@@ -111,7 +111,7 @@ describe("TemplateListPanel — api integration", () => {
   });
 
   it("listTemplates is called with the correct profileCode", async () => {
-    const { listTemplates } = await import("../../../api/templates");
+    const { listTemplates } = await import("../../../features/templates/api/templates");
     const mockList = vi.mocked(listTemplates);
     mockList.mockResolvedValue([]);
     const result = await mockList("PO-001");
@@ -120,7 +120,7 @@ describe("TemplateListPanel — api integration", () => {
   });
 
   it("empty result resolves to empty array", async () => {
-    const { listTemplates } = await import("../../../api/templates");
+    const { listTemplates } = await import("../../../features/templates/api/templates");
     const mockList = vi.mocked(listTemplates);
     mockList.mockResolvedValue([]);
     const items = await mockList("PO-EMPTY");
@@ -128,7 +128,7 @@ describe("TemplateListPanel — api integration", () => {
   });
 
   it("importTemplate is called with profileCode and file", async () => {
-    const { importTemplate } = await import("../../../api/templates");
+    const { importTemplate } = await import("../../../features/templates/api/templates");
     const mockImport = vi.mocked(importTemplate);
     const fakeResult = { templateKey: "tpl-imported", hasStrippedFields: false, strippedFields: [] };
     mockImport.mockResolvedValue(fakeResult);

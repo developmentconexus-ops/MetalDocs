@@ -1,8 +1,8 @@
-﻿import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { createRoute, deactivateRoute, listRoutes, updateRoute } from '../api/approvalApi';
 import type { DriftPolicy, QuorumKind, Route, StageWriteRequest } from '../api/approvalTypes';
-import { fetchAreas } from '../../taxonomy/api';
+import { fetchAreas } from '../../taxonomy/api/taxonomy';
 import type { ProcessArea } from '../../taxonomy/types';
 import { formatISODate } from '../../../lib/formatDate';
 import styles from './RouteAdminPage.module.css';
@@ -56,9 +56,9 @@ function toDraft(route: Route | null): RouteDraft {
     profileCode: route.profile_code,
     stages: route.stages.map((stage) => ({
       label: stage.label,
-      requiredRole: stage.required_role,
+      requiredRole: stage.required_role ?? '',
       requiredCapability: stage.required_capability || 'doc.signoff',
-      areaCode: stage.area_code,
+      areaCode: stage.area_code ?? '',
       quorumKind: stage.quorum_kind,
       m: String(stage.m ?? 1),
       driftPolicy: stage.drift_policy,

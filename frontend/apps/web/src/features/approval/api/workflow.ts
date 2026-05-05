@@ -1,5 +1,5 @@
-import type { WorkflowApprovalItem } from "../lib.types";
-import { request } from "./client";
+import type { WorkflowApprovalItem } from "../../../lib/types";
+import { request } from "../../../lib/api/client";
 
 function normalizeApprovalItem(value: WorkflowApprovalItem): WorkflowApprovalItem {
   return {

@@ -1,4 +1,4 @@
-import type { DocumentTemplateSnapshotItem } from "../../../lib.types";
+import type { DocumentTemplateSnapshotItem } from "../../../lib/types";
 import type { CanvasTemplateNode, CanvasTemplatePage } from "./templateTypes";
 
 function asRecord(value: unknown): Record<string, unknown> {

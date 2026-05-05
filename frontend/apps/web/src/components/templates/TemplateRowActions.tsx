@@ -1,4 +1,4 @@
-import type { TemplateListItemDTO } from "../../api/templates";
+import type { TemplateListItemDTO } from "../../features/templates/api/templates";
 
 type TemplateRowActionsProps = {
   template: TemplateListItemDTO;

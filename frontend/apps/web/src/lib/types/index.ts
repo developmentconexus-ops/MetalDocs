@@ -1,7 +1,27 @@
-export type DocumentStatus = "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED";
+export type DocumentStatus =
+  | "DRAFT"
+  | "IN_REVIEW"
+  | "APPROVED"
+  | "PUBLISHED"
+  | "ARCHIVED"
+  | "draft"
+  | "under_review"
+  | "approved"
+  | "published"
+  | "obsolete";
 export type Classification = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
 export type ResourceScope = "document" | "document_type" | "area";
-export type UserRole = "system_admin" | "approver" | "author" | "editor" | "viewer";
+export type UserRole =
+  | "admin"
+  | "system_admin"
+  | "approver"
+  | "author"
+  | "editor"
+  | "reviewer"
+  | "viewer"
+  | "signer"
+  | "area_admin"
+  | "qms_admin";
 export type DocumentContentSource = "native" | "docx_upload" | "browser_editor";
 
 export interface CurrentUser {
@@ -369,4 +389,3 @@ export interface ApiErrorEnvelope {
     trace_id: string;
   };
 }
-

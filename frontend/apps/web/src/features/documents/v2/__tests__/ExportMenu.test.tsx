@@ -27,9 +27,9 @@ describe('ExportMenu', () => {
     });
 
     render(<ExportMenu documentID="doc1" canExport={true} />);
-    fireEvent.click(screen.getByTestId ? screen.getByRole('button', { name: /export pdf/i }) : screen.getByText('Export PDF'));
+    fireEvent.click(screen.getByRole('button', { name: /export pdf/i }));
     await waitFor(() => screen.getByText(/generated/i));
-    expect(screen.getByTestId ? screen.getByRole('button', { name: /export pdf/i }) : screen.getByText('Export PDF')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /export pdf/i })).toBeTruthy();
     const status = document.querySelector('[data-export-status="done"]');
     expect(status).toBeTruthy();
     expect(status?.getAttribute('data-export-cached')).toBe('false');

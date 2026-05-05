@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { api } from "../../lib.api";
-import type { ManagedUserItem, UserRole } from "../../lib.types";
+import * as api from './api/iam';
+import type { ManagedUserItem, UserRole } from "../../lib/types";
 import { useUiStore } from "../../store/ui.store";
 import { asMessage } from "../shared/errors";
 

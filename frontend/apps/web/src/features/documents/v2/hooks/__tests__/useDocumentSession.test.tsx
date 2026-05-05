@@ -24,7 +24,7 @@ describe('useDocumentSession (phase 3)', () => {
   let hidden = false;
 
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true, shouldAdvanceTimeDelta: 20 });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-04-19T00:00:00.000Z'));
     hidden = false;
     Object.defineProperty(document, 'hidden', {

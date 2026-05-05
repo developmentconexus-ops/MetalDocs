@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import type { DocumentProfileSchemaItem } from "../../../lib.types";
+import type { DocumentProfileSchemaItem } from "../../../lib/types";
 import styles from "./DynamicEditor.module.css";
 import {
   toRuntimeDocumentSchema,

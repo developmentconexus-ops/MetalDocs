@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DocumentProfile, ProcessArea } from "../taxonomy/types";
-import { fetchProfiles, fetchAreas } from "../taxonomy/api";
-import { createControlledDocument } from "./api";
+import { fetchProfiles, fetchAreas } from '../taxonomy/api/taxonomy';
+import { createControlledDocument } from './api/controlledDocuments';
 import type { ControlledDocument, CreateControlledDocumentRequest } from "./types";
 import { useAuthStore } from "../../store/auth.store";
 

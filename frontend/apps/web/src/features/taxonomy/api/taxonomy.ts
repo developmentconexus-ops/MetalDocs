@@ -9,23 +9,13 @@ import type {
   UpdateAreaRequest,
   UpdateFamilyRequest,
   UpdateProfileRequest,
-} from "./types";
+} from "../types";
+import { request as apiRequest } from "../../../lib/api/client";
 
 const BASE = "/api/v2/taxonomy";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (res.status === 204) {
-    return undefined as T;
-  }
-  const data = await res.json() as { message?: string; code?: string };
-  if (!res.ok) {
-    throw new Error((data as { message?: string; code?: string }).message ?? (data as { code?: string }).code ?? "Request failed");
-  }
-  return data as T;
+  return apiRequest<T>(`${BASE}${path}`, options);
 }
 
 export async function fetchProfiles(includeArchived?: boolean): Promise<DocumentProfile[]> {

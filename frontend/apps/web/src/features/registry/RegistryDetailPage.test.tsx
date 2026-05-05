@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { RegistryDetailPage } from './RegistryDetailPage';
 
-vi.mock('./api', async (importOriginal) => {
-  const orig = await importOriginal<typeof import('./api')>();
+vi.mock('./api/controlledDocuments', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./api/controlledDocuments')>();
   return {
     ...orig,
     fetchControlledDocument: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock('../documents/v2/api/documentsV2', () => ({
   createDocument: vi.fn(),
 }));
 
-import * as api from './api';
+import * as api from './api/controlledDocuments';
 
 function makeControlledDoc(overrides: Partial<{
   id: string; code: string; title: string; status: 'active' | 'obsolete' | 'superseded';

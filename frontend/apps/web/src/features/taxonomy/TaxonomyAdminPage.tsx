@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DocumentFamily, DocumentProfile, ProcessArea } from "./types";
-import { fetchFamilies, fetchProfiles, fetchAreas } from "./api";
+import { fetchFamilies, fetchProfiles, fetchAreas } from './api/taxonomy';
 import { FamilyList } from "./FamilyList";
 import { ProfileList } from "./ProfileList";
 import { AreaList } from "./AreaList";

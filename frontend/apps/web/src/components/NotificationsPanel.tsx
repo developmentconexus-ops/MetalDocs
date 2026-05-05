@@ -1,4 +1,4 @@
-import type { NotificationItem } from "../lib.types";
+import type { NotificationItem } from "../lib/types";
 import { WorkspaceViewFrame } from "./WorkspaceViewFrame";
 import { WorkspaceDataState } from "./WorkspaceDataState";
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchAreas } from "../taxonomy/api";
+import { fetchAreas } from "../taxonomy/api/taxonomy";
 import type { ProcessArea } from "../taxonomy/types";
 import { grantMembership } from "./membershipApi";
 import type { GrantMembershipRequest } from "./membershipApi";

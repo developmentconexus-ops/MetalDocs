@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, type ActiveDocumentResponse } from "./api";
+import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, type ActiveDocumentResponse } from './api/controlledDocuments';
 import { PublishedDownloadCell } from './PublishedDownloadCell';
 import type { ControlledDocument } from "./types";
 import { RegistryDetailPanel } from '../approval/components/RegistryDetailPanel';

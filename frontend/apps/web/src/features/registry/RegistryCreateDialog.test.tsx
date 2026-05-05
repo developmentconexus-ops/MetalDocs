@@ -9,7 +9,7 @@ vi.mock('../taxonomy/api', () => ({
   fetchProfiles: vi.fn().mockResolvedValue([]),
   fetchAreas: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('./api', () => ({
+vi.mock('./api/controlledDocuments', () => ({
   createControlledDocument: vi.fn(),
 }));
 

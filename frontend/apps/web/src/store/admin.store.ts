@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AdminOverviewResponse, AuditEventItem, ManagedUserItem, OnlineUserItem } from "../lib.types";
+import type { AdminOverviewResponse, AuditEventItem, ManagedUserItem, OnlineUserItem } from "../lib/types";
 import type { LoadState } from "./auth.store";
 
 interface AdminStore {

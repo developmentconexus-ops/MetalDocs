@@ -1,4 +1,4 @@
-import { request, requestBlob, API_BASE_URL } from "./client";
+import { request, requestBlob, requestRaw } from "../../../lib/api/client";
 
 // ---------------------------------------------------------------------------
 // DTOs
@@ -96,15 +96,7 @@ function encodeKey(key: string): string {
  * structured error bodies that need special error types.
  */
 async function requestWithStructuredErrors<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    ...init,
-    headers: {
-      ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...(init?.headers ?? {}),
-    },
-  });
-
+  const response = await requestRaw(path, init, [409, 422]);
   if (!response.ok) {
     const body = await response.json().catch(() => null) as Record<string, unknown> | null;
 

@@ -1,4 +1,4 @@
-﻿import { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import { listTemplates, type TemplateDTO } from './api/templatesV2';
 import styles from './TemplatesListPage.module.css';
 

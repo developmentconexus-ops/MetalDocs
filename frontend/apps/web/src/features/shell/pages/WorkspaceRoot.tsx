@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Outlet, useMatches, useNavigate, useOutletContext } from "react-router-dom";
-import { api, markUx, startApiTrace, stopApiTrace } from "../../../lib.api";
+import * as iamApi from '../../iam/api/iam';
+import * as notificationsApiClient from '../../notifications/api/notifications';
+import { listTaxonomyAreas, listTaxonomyProfiles } from '../../taxonomy/api/catalog';
+import { markUx, startApiTrace, stopApiTrace } from "../../../lib/observability/apiTrace";
 import { AuthShell } from "../../../components/AuthShell";
 import { PasswordChangePanel } from "../../../components/PasswordChangePanel";
 import type { WorkspaceView } from "../../../components/DocumentWorkspaceShell";
-import type { CurrentUser, ManagedUserItem } from "../../../lib.types";
-import { listTaxonomyAreas, listTaxonomyProfiles } from "../../../api/registry";
+import type { CurrentUser, ManagedUserItem } from "../../../lib/types";
 import { useDocumentsStore } from "../../../store/documents.store";
 import { useNotificationsStore } from "../../../store/notifications.store";
 import { useRegistryStore } from "../../../store/registry.store";
@@ -149,9 +151,9 @@ export function Component() {
           Promise.resolve({ items: [] }),
           Promise.resolve({ items: [] }),
           currentUserRoleValues.some((role) => role === "admin" || role === "system_admin")
-            ? safe(api.listUsers(), empty as never)
+            ? safe(iamApi.listUsers(), empty as never)
             : Promise.resolve({ items: [] as ManagedUserItem[] }),
-          safe(api.listNotifications(new URLSearchParams({ limit: "10" })), empty as never),
+          safe(notificationsApiClient.listNotifications(new URLSearchParams({ limit: "10" })), empty as never),
         ]);
         const profiles = Array.isArray(profilesResponse.items) ? profilesResponse.items : [];
         const areas = Array.isArray(processAreasResponse.items) ? processAreasResponse.items : [];
@@ -203,7 +205,7 @@ export function Component() {
     try {
       const [docsResponse, notificationsResponse] = await Promise.all([
         Promise.resolve({ items: [] }),
-        api.listNotifications(new URLSearchParams({ limit: "10" })),
+        notificationsApiClient.listNotifications(new URLSearchParams({ limit: "10" })),
       ]);
       setDocuments(Array.isArray(docsResponse.items) ? docsResponse.items : []);
       setNotifications(Array.isArray(notificationsResponse.items) ? notificationsResponse.items : []);

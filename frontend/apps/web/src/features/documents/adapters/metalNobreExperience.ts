@@ -1,4 +1,4 @@
-import type { DocumentProfileItem, ProcessAreaItem } from "../../../lib.types";
+import type { DocumentProfileItem, ProcessAreaItem } from "../../../lib/types";
 
 const profileContextByCode: Record<string, string> = {
   po: "Padrao para procedimentos do SGQ com foco em fluxos operacionais e rastreabilidade.",

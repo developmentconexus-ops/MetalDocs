@@ -1,4 +1,4 @@
-import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../../../lib.types";
+import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../../../lib/types";
 
 export type ProfileAccordionSummary = {
   code: string;

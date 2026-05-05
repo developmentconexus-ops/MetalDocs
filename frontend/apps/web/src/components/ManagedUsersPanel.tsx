@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ManagedUserItem, UserRole } from "../lib.types";
+import type { ManagedUserItem, UserRole } from "../lib/types";
 import { WorkspaceDataState } from "./WorkspaceDataState";
 import type { SelectMenuOption } from "./ui/FilterDropdown";
 import { DropdownFieldBox, TextFieldBox } from "./ui/FormFieldBox";

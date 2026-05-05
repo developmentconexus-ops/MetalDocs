@@ -1,5 +1,5 @@
-import type { AdminOverviewResponse, AuditEventItem, ManagedUserItem, OnlineUserItem, UserRole } from "../lib.types";
-import { request } from "./client";
+import type { AdminOverviewResponse, AuditEventItem, ManagedUserItem, OnlineUserItem, UserRole } from "../../../lib/types";
+import { request } from "../../../lib/api/client";
 
 const allowedRoles = new Set<UserRole>(["admin", "editor", "reviewer", "viewer"]);
 

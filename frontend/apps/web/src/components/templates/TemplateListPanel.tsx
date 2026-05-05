@@ -9,8 +9,8 @@ import {
   discardDraft,
   deprecateTemplate,
   exportTemplate,
-} from "../../api/templates";
-import type { TemplateListItemDTO, ImportResultDTO } from "../../api/templates";
+} from "../../features/templates/api/templates";
+import type { TemplateListItemDTO, ImportResultDTO } from "../../features/templates/api/templates";
 import { buildTemplateEditorPath } from "../../routing/workspaceRoutes";
 import { TemplateRowActions } from "./TemplateRowActions";
 import { ImportTemplateDialog } from "./ImportTemplateDialog";

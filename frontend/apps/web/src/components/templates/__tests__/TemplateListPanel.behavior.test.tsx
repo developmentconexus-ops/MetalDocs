@@ -11,8 +11,8 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => navigateMock,
 }));
 
-vi.mock("../../../api/templates", async () => {
-  const actual = await vi.importActual<typeof import("../../../api/templates")>("../../../api/templates");
+vi.mock("../../../features/templates/api/templates", async () => {
+  const actual = await vi.importActual<typeof import("../../../features/templates/api/templates")>("../../../features/templates/api/templates");
   return {
     ...actual,
     listTemplates: vi.fn(),
@@ -52,7 +52,7 @@ afterEach(() => {
 
 describe("TemplateListPanel behaviors", () => {
   it("calls editPublished before navigating when editing a published template", async () => {
-    const { listTemplates, editPublished } = await import("../../../api/templates");
+    const { listTemplates, editPublished } = await import("../../../features/templates/api/templates");
 
     vi.mocked(listTemplates).mockResolvedValueOnce([
       { templateKey: "tmpl-published", version: 4, profileCode: "po", name: "Published", status: "published" },
@@ -87,7 +87,7 @@ describe("TemplateListPanel behaviors", () => {
   });
 
   it("navigates to the cloned draft after a clone action succeeds", async () => {
-    const { listTemplates, cloneTemplate } = await import("../../../api/templates");
+    const { listTemplates, cloneTemplate } = await import("../../../features/templates/api/templates");
 
     vi.mocked(listTemplates).mockResolvedValueOnce([
       { templateKey: "tmpl-source", version: 2, profileCode: "po", name: "Source", status: "published" },
