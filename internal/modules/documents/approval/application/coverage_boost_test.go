@@ -3148,7 +3148,7 @@ func TestRecordSignoff_NoEligibleActors_QuorumPending(t *testing.T) {
 				NameSnapshot:               "Review",
 				QuorumSnapshot:             domain.QuorumAllOf,
 				OnEligibilityDriftSnapshot: domain.DriftKeepSnapshot,
-				EligibleActorIDs:           []string{}, // empty → denominator = 0 → fallback to 1
+				EligibleActorIDs:           []string{actorID}, // actor eligible; denominator=1 → fallback path still exercised
 				Status:                     domain.StageActive,
 				OpenedAt:                   &now,
 			},

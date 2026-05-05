@@ -586,6 +586,64 @@ func TestRecordSignoff_SoDViolation(t *testing.T) {
 	}
 }
 
+// TestRecordSignoff_RejectsNonEligibleActor: actor not in EligibleActorIDs → ErrActorNotEligible
+// and a signoff.rejected governance event with Reason="not_eligible".
+func TestRecordSignoff_RejectsNonEligibleActor(t *testing.T) {
+	const (
+		instanceID = "inst-elig-1"
+		stageID    = "stage-elig-1"
+		actorID    = "bob" // NOT in eligible list
+		authorID   = "alice"
+	)
+
+	// eligible list contains only "alice" — bob is the author but also not eligible as signoff actor
+	// Use a separate author so SoD doesn't fire first. bob is non-eligible.
+	inst := buildSingleStageInstance(instanceID, stageID, authorID, []string{"alice"})
+
+	conn := &decisionTestConn{
+		authzGranted: true,
+		areaCode:     "QA",
+		actorID:      actorID,
+	}
+	repo := &fakeDecisionRepo{instance: inst}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+	svc := &DecisionService{repo: repo, emitter: emitter, clock: clock, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	db := newDecisionTestDB(t, conn)
+
+	req := SignoffRequest{
+		TenantID:        "tenant-1",
+		InstanceID:      instanceID,
+		StageInstanceID: stageID,
+		ActorUserID:     actorID,
+		Decision:        "approve",
+		ContentFormData: map[string]any{"title": "Doc"},
+	}
+
+	_, err := svc.RecordSignoff(context.Background(), db, req)
+	if err == nil {
+		t.Fatal("expected ErrActorNotEligible; got nil")
+	}
+	if !errors.Is(err, domain.ErrActorNotEligible) {
+		t.Fatalf("expected domain.ErrActorNotEligible; got %v", err)
+	}
+
+	// Expect one audit governance event with kind=signoff.rejected, reason=not_eligible.
+	if len(emitter.Events) != 1 {
+		t.Fatalf("expected 1 audit event; got %d", len(emitter.Events))
+	}
+	ev := emitter.Events[0]
+	if ev.EventType != "signoff.rejected" {
+		t.Errorf("event type = %q; want %q", ev.EventType, "signoff.rejected")
+	}
+	if ev.Reason != "not_eligible" {
+		t.Errorf("event reason = %q; want %q", ev.Reason, "not_eligible")
+	}
+	if ev.ActorUserID != actorID {
+		t.Errorf("event actor = %q; want %q", ev.ActorUserID, actorID)
+	}
+}
+
 func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 	const (
 		instanceID = "inst-authz-1"

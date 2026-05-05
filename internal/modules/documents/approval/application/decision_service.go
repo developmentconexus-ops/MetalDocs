@@ -155,6 +155,20 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, repository.ErrStageNotActive
 	}
 
+	// Step 5b: eligibility check — actor must be in the eligible_actor_ids snapshot (J1).
+	if err := domain.CheckEligibility(req.ActorUserID, activeStage.EligibleActorIDs); err != nil {
+		_ = s.emitter.Emit(ctx, tx, GovernanceEvent{
+			TenantID:     req.TenantID,
+			EventType:    "signoff.rejected",
+			ActorUserID:  req.ActorUserID,
+			ResourceType: "approval_instance",
+			ResourceID:   req.InstanceID,
+			Reason:       "not_eligible",
+		})
+		_ = tx.Rollback()
+		return SignoffResult{}, err
+	}
+
 	// Step 6: SoD check — author cannot sign, actor cannot sign twice in same instance.
 	priorSignoffs, err := s.loadPriorSignoffs(ctx, tx, req.TenantID, req.InstanceID, activeStage.ID)
 	if err != nil {
