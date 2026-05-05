@@ -32,7 +32,7 @@ This spec collapses both into two invariants:
 - `internal/modules/documents/repository/repository.go`
 - `internal/modules/documents/snapshot/service.go`
 - New migration `0171_drop_finalized_at.sql`
-- Audit doc + new ADR `wiki/decisions/0008-soft-archive-via-timestamp.md`
+- Audit doc + new ADR `wiki/decisions/0010-soft-archive-via-timestamp.md`
 
 ---
 
@@ -72,7 +72,7 @@ List/search query builders gain default predicate `AND archived_at IS NULL`. Adm
 
 `Service.Archive(fromFinalized bool)` parameter dropped — no longer needed. Caller cleanup required (find via `grep -r "Archive("`).
 
-ADR: `wiki/decisions/0008-soft-archive-via-timestamp.md` records the rationale (regulatory requirement that terminal status remain immutable; archive is orthogonal storage concern).
+ADR: `wiki/decisions/0010-soft-archive-via-timestamp.md` records the rationale (regulatory requirement that terminal status remain immutable; archive is orthogonal storage concern).
 
 **Test:**
 - Unit (sqlmock): `TestMarkArchived_SetsTimestampNoStatusChange`
@@ -250,7 +250,7 @@ Asymmetry vs C1 (which keeps `archived_at`): `archived_at` is a hot-path filter 
 - Smoke: bootstrap dev DB, create doc from template, assert all snapshot columns populated, submit→approve→archive, assert `archived_at` set with terminal status unchanged, default list excludes archived
 - Concurrent submit test (C5)
 - Codex independent audit per-bug PASS/FAIL with file:line evidence
-- Wiki-curator: refresh stamps on `wiki/concepts/document-lifecycle.md`, `wiki/modules/documents-*.md`, new ADR `wiki/decisions/0008-soft-archive-via-timestamp.md`
+- Wiki-curator: refresh stamps on `wiki/concepts/document-lifecycle.md`, `wiki/modules/documents-*.md`, new ADR `wiki/decisions/0010-soft-archive-via-timestamp.md`
 
 **Coverage targets:** new code ≥80% line coverage. No new lint warnings.
 
