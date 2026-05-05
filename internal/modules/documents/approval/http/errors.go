@@ -182,5 +182,6 @@ func looksLikeValidationError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, " is required") ||
 		strings.Contains(msg, " must be ") ||
-		strings.Contains(msg, " must not be ")
+		strings.Contains(msg, " must not be ") ||
+		strings.HasPrefix(msg, "json: unknown field")
 }
