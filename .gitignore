@@ -42,3 +42,40 @@ coverage_phase5.out
 .codex/
 .gomodcache/
 .env.docgen-v2
+
+# Build artifacts
+*.exe~
+metaldocs-e2e-seed.exe
+metaldocs-worker.exe
+seed-test-document.exe
+
+# Runtime log files
+api-*.log
+api-*.err.log
+api-*.out.log
+api-*.err
+api-*.out
+api-new.log
+api-restart.log
+docgen-v2.log
+docgen-v2.err
+docgen-v2.*.log
+worker.log
+worker-*.log
+worker-*.err.log
+worker-*.out.log
+frontend/apps/web/vite-*.log
+frontend/apps/web/vite-*.err.log
+frontend/apps/web/vite-*.out.log
+
+# Codex runtime dirs
+.codex-appdata/
+.codex-go-build-cache/
+
+# Claude agents config
+.claude/agents/
+
+# Superpowers plans/reviews (AI session artifacts)
+docs/superpowers/plans/
+docs/superpowers/reviews/
+reviews/
