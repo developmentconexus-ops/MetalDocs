@@ -26,7 +26,7 @@
   margin: 0;
   font-size: 1rem;
   line-height: 1.25;
-  color: var(--vinho-d);
+  color: var(--brand-deep);
 }
 
 .sectionBody {
@@ -68,7 +68,7 @@
 }
 
 .slotRequired {
-  color: var(--vinho);
+  color: var(--brand);
   font-weight: 700;
 }
 
@@ -101,8 +101,8 @@
 
 .slotControl:focus,
 .richEditorContent:focus {
-  border-color: var(--vinho);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vinho-soft) 68%, transparent);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-pale) 68%, transparent);
 }
 
 .slotCheckboxRow {
@@ -134,9 +134,9 @@
 }
 
 .richToolbarButtonActive {
-  border-color: var(--vinho);
-  background: var(--vinho-soft);
-  color: var(--vinho-d);
+  border-color: var(--brand);
+  background: var(--brand-pale);
+  color: var(--brand-deep);
 }
 
 .richToolbarButton:disabled {
@@ -153,7 +153,7 @@
   padding: 0.875rem 1rem;
   border-radius: 0.875rem;
   border: 1px dashed var(--border-2);
-  background: var(--vinho-pale);
+  background: var(--brand-pale);
   color: var(--text-soft);
 }
 
