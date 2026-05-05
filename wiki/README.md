@@ -15,7 +15,7 @@
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
-- [bugs/audit-2026-05-04.md](bugs/audit-2026-05-04.md) - **13 bugs in 6 groups (I–N)** QA pass 2026-05-04. J1/J2/M1 resolved 2026-05-05 (commits cb56e1e0..1cebea64). Remaining groups open. (Last verified: 2026-05-05)
+- [bugs/audit-2026-05-04.md](bugs/audit-2026-05-04.md) - **13 bugs in 6 groups (I–N)** QA pass 2026-05-04. J1/J2/M1 resolved 2026-05-05 (commits cb56e1e0..1cebea64). I/L/N resolved 2026-05-05 (branch chore/api-cleanup-sub-project-b). K still open. (Last verified: 2026-05-05)
 
 ### Vision
 - [vision/product-vision.md](vision/product-vision.md) - what MetalDocs is, problem it solves (stub, Last verified: 2026-05-01)
@@ -29,7 +29,7 @@
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval (stub, Last verified: 2026-05-01)
-- [modules/documents.md](modules/documents.md) - document instances, editing flow, session model, API; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-04)
+- [modules/documents.md](modules/documents.md) - document instances, editing flow, session model, API; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-05)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4 (Last verified: 2026-05-05)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
