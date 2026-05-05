@@ -42,7 +42,7 @@ export function OperationsCenter(props: OperationsCenterProps) {
   const hasOperationalData = filteredDocuments.length > 0 || props.notifications.length > 0;
   const profileNameByCode = new Map(props.documentProfiles.map((item) => [item.code, item.name]));
   const areaNameByCode = new Map(props.processAreas.map((item) => [item.code, item.name]));
-  const pendingReviews = filteredDocuments.filter((item) => item.status === "IN_REVIEW");
+  const pendingReviews = filteredDocuments.filter((item) => item.status === "under_review");
   const recentDocuments = [...filteredDocuments]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 5);

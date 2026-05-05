@@ -104,12 +104,12 @@ function profileBadgeText(profile: DocumentProfileItem): string {
 
 function statusLabel(status: string): string {
   switch (status) {
-    case "IN_REVIEW":
+    case "under_review":
       return "Em revisao";
-    case "APPROVED":
-    case "PUBLISHED":
+    case "approved":
+    case "published":
       return "Aprovado";
-    case "ARCHIVED":
+    case "archived":
       return "Arquivado";
     default:
       return "Draft";
@@ -520,8 +520,8 @@ export function DocumentsHubView(props: DocumentsHubViewProps) {
       .filter((item) => item.count > 0);
   }, [profileCounts, props.documentProfiles]);
 
-  const approvedCount = scopedDocuments.filter((item) => item.status === "APPROVED" || item.status === "PUBLISHED").length;
-  const inReviewCount = scopedDocuments.filter((item) => item.status === "IN_REVIEW").length;
+  const approvedCount = scopedDocuments.filter((item) => item.status === "approved" || item.status === "published").length;
+  const inReviewCount = scopedDocuments.filter((item) => item.status === "under_review").length;
   const expiringSoon = scopedDocuments.filter((item) => {
     if (!item.expiryAt) return false;
     const expiry = new Date(item.expiryAt).getTime();
@@ -554,21 +554,21 @@ export function DocumentsHubView(props: DocumentsHubViewProps) {
 
   const tabCounts = useMemo(() => ({
     all: baseFilteredDocuments.length,
-    draft: baseFilteredDocuments.filter((item) => item.status === "DRAFT").length,
-    review: baseFilteredDocuments.filter((item) => item.status === "IN_REVIEW").length,
-    approved: baseFilteredDocuments.filter((item) => item.status === "APPROVED" || item.status === "PUBLISHED").length,
+    draft: baseFilteredDocuments.filter((item) => item.status === "draft").length,
+    review: baseFilteredDocuments.filter((item) => item.status === "under_review").length,
+    approved: baseFilteredDocuments.filter((item) => item.status === "approved" || item.status === "published").length,
   }), [baseFilteredDocuments]);
 
   const collectionDocuments = useMemo(() => {
     let nextItems = baseFilteredDocuments;
     if (documentsHubStatus === "draft") {
-      nextItems = nextItems.filter((item) => item.status === "DRAFT");
+      nextItems = nextItems.filter((item) => item.status === "draft");
     }
     if (documentsHubStatus === "review") {
-      nextItems = nextItems.filter((item) => item.status === "IN_REVIEW");
+      nextItems = nextItems.filter((item) => item.status === "under_review");
     }
     if (documentsHubStatus === "approved") {
-      nextItems = nextItems.filter((item) => item.status === "APPROVED" || item.status === "PUBLISHED");
+      nextItems = nextItems.filter((item) => item.status === "approved" || item.status === "published");
     }
 
     return [...nextItems].sort((left, right) => {
