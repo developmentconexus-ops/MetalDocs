@@ -6,3 +6,5 @@ export { StatusPill } from './StatusPill';
 export type { DocumentStatus } from './StatusPill';
 export { Stepper } from './Stepper';
 export type { StepperProps, StepperStep } from './Stepper';
+export { SelectableCard } from './SelectableCard';
+export type { SelectableCardProps } from './SelectableCard';
