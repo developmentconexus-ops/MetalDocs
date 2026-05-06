@@ -1,42 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ActivityPanel } from '../components/ActivityPanel';
+import { AuthorCell } from '../components/AuthorCell';
 import { LibraryFilterTabs } from '../components/LibraryFilterTabs';
 import { LibraryStatCards } from '../components/LibraryStatCards';
 import { LibrarySidebar } from '../components/LibrarySidebar';
-import type { LibraryFilter } from '../components/LibrarySidebar';
 import { PageSizeSelector } from '../components/PageSizeSelector';
 import { Pagination } from '../components/Pagination';
 import { useLibraryQuery } from '../queries/useLibraryQuery';
 import { useLibraryStatsQuery } from '../queries/useLibraryStatsQuery';
+import { filterToStatus, type LibraryFilter } from '../lib/libraryStatus';
+import { StatusPill, type DocumentStatus } from '../../../components/ui/StatusPill';
+import { ApiError, resolveErrorMessage } from '../../../lib/api/errors';
+import { useDebouncedValue } from '../../../lib/hooks/useDebouncedValue';
 import styles from './LibraryPage.module.css';
 
 const PAGE_SIZE_KEY = 'metaldocs.library.pageSize';
 const ACTIVITY_OPEN_KEY = 'metaldocs.library.activityOpen';
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
-function readStoredPageSize(): number {
-  const raw = localStorage.getItem(PAGE_SIZE_KEY);
+function readStoredPageSize(): PageSize {
+  if (typeof window === 'undefined') return 20;
+  const raw = window.localStorage.getItem(PAGE_SIZE_KEY);
   const parsed = raw ? Number(raw) : NaN;
-  return PAGE_SIZE_OPTIONS.includes(parsed as (typeof PAGE_SIZE_OPTIONS)[number]) ? parsed : 20;
+  return PAGE_SIZE_OPTIONS.includes(parsed as PageSize) ? (parsed as PageSize) : 20;
 }
 
 function readStoredActivityOpen(): boolean {
-  const raw = localStorage.getItem(ACTIVITY_OPEN_KEY);
-  // Default open when never set
+  if (typeof window === 'undefined') return true;
+  const raw = window.localStorage.getItem(ACTIVITY_OPEN_KEY);
   return raw === null ? true : raw === 'true';
-}
-
-function filterToStatus(filter: LibraryFilter): string | undefined {
-  switch (filter) {
-    case 'rascunhos':  return 'draft';
-    case 'em_revisao': return 'under_review';
-    case 'aprovados':  return 'approved';
-    case 'publicados': return 'published';
-    case 'rejeitados': return 'rejected';
-    case 'obsoletos':  return 'obsolete';
-    default:           return undefined;
-  }
 }
 
 export default function LibraryPage(): JSX.Element {
@@ -44,18 +38,21 @@ export default function LibraryPage(): JSX.Element {
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<LibraryFilter>('todos');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [activityOpen, setActivityOpen] = useState(true);
+  // Lazy init — reads localStorage once on mount, prevents hydration flash.
+  const [pageSize, setPageSize] = useState<PageSize>(readStoredPageSize);
+  const [activityOpen, setActivityOpen] = useState<boolean>(readStoredActivityOpen);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(searchQuery, 300);
 
   useEffect(() => {
-    setPageSize(readStoredPageSize());
-    setActivityOpen(readStoredActivityOpen());
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(PAGE_SIZE_KEY, String(pageSize));
+    window.localStorage.setItem(PAGE_SIZE_KEY, String(pageSize));
   }, [pageSize]);
+
+  // Reset to page 1 whenever the debounced search query changes — avoids
+  // landing on page N of a smaller filtered result set.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery]);
 
   const status = useMemo(() => filterToStatus(activeFilter), [activeFilter]);
 
@@ -72,10 +69,20 @@ export default function LibraryPage(): JSX.Element {
   function toggleActivity() {
     const next = !activityOpen;
     setActivityOpen(next);
-    localStorage.setItem(ACTIVITY_OPEN_KEY, String(next));
+    window.localStorage.setItem(ACTIVITY_OPEN_KEY, String(next));
   }
 
-  const libraryQuery = useLibraryQuery({ page, pageSize, status, areaCode: selectedArea ?? undefined });
+  function openDocument(id: string) {
+    navigate(`/documents/${id}`);
+  }
+
+  const libraryQuery = useLibraryQuery({
+    page,
+    pageSize,
+    status,
+    areaCode: selectedArea ?? undefined,
+    q: debouncedQuery.trim() || undefined,
+  });
   const statsQuery = useLibraryStatsQuery();
 
   const items = libraryQuery.data?.items ?? [];
@@ -84,10 +91,16 @@ export default function LibraryPage(): JSX.Element {
   const statsByStatus = statsQuery.data?.byStatus ?? {};
   const statsByArea = statsQuery.data?.byArea ?? {};
 
+  const errorMessage =
+    libraryQuery.isError
+      ? resolveErrorMessage(
+          libraryQuery.error instanceof ApiError ? libraryQuery.error.code : undefined,
+          libraryQuery.error instanceof Error ? libraryQuery.error.message : undefined,
+        )
+      : null;
+
   return (
     <div className={`${styles.root} ${activityOpen ? styles.withActivity : ''}`}>
-
-      {/* Dark left sidebar */}
       <aside className={styles.sidebar}>
         <LibrarySidebar
           activeFilter={activeFilter}
@@ -98,11 +111,10 @@ export default function LibraryPage(): JSX.Element {
           statsByArea={statsByArea}
           totalDocuments={total}
           searchQuery={searchQuery}
-          onSearchChange={(q) => { setSearchQuery(q); setPage(1); }}
+          onSearchChange={setSearchQuery}
         />
       </aside>
 
-      {/* Main content */}
       <main className={styles.main}>
         <header className={styles.header}>
           <p className={styles.kicker}>Documentos · Biblioteca</p>
@@ -112,11 +124,6 @@ export default function LibraryPage(): JSX.Element {
               <span className={styles.metaPair}>
                 <span className={styles.metaValue}>{total.toLocaleString('pt-BR')}</span>
                 <span className={styles.metaLabel}>documentos</span>
-              </span>
-              <span className={styles.metaDivider} aria-hidden="true" />
-              <span className={styles.metaPair}>
-                <span className={styles.metaLabel}>Última fanout</span>
-                <span className={styles.metaValue}>{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
               </span>
               <button type="button" className={styles.activityButton} onClick={toggleActivity}>
                 {activityOpen ? (
@@ -131,7 +138,6 @@ export default function LibraryPage(): JSX.Element {
                     <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <circle cx="10" cy="10" r="7" />
                       <path d="M10 6v4l3 2" />
-                      <path d="M3 10a7 7 0 0 1 12-5" />
                     </svg>
                     Mostrar atividade
                   </>
@@ -148,7 +154,7 @@ export default function LibraryPage(): JSX.Element {
 
         <LibraryFilterTabs
           activeTab={activeFilter}
-          onTabChange={(tab) => handleFilterChange(tab as LibraryFilter)}
+          onTabChange={handleFilterChange}
           statsByStatus={statsByStatus}
           total={total}
         />
@@ -158,16 +164,18 @@ export default function LibraryPage(): JSX.Element {
             <span>Código</span>
             <span>Título</span>
             <span>Área</span>
-            <span>Perfil</span>
+            <span>Estado</span>
+            <span>Autor</span>
             <span>Rev.</span>
+            <span />
           </div>
 
           {libraryQuery.isPending ? (
             <div className={styles.empty}>Carregando...</div>
           ) : null}
 
-          {libraryQuery.isError ? (
-            <div className={styles.empty}>Erro ao carregar documentos.</div>
+          {errorMessage ? (
+            <div className={styles.empty} role="alert">{errorMessage}</div>
           ) : null}
 
           {!libraryQuery.isPending && !libraryQuery.isError && items.length === 0 ? (
@@ -175,32 +183,47 @@ export default function LibraryPage(): JSX.Element {
           ) : null}
 
           {items.map((d) => (
-            <button
+            <div
               key={d.ID}
-              type="button"
+              role="button"
+              tabIndex={0}
               className={styles.row}
-              onClick={() => navigate(`/documents/${d.ID}`)}
+              onClick={() => openDocument(d.ID)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openDocument(d.ID);
+                }
+              }}
             >
               <span className={styles.codeLink}>{d.Code}</span>
               <span className={styles.nameCell}>{d.Name}</span>
               <span className={styles.metaCell}>{d.ProcessAreaCodeSnapshot ?? '–'}</span>
-              <span className={styles.metaCell}>{d.ProfileCodeSnapshot ?? '–'}</span>
-              <span className={styles.metaCell}>v{d.RevisionVersion}</span>
-            </button>
+              <StatusPill status={d.Status as DocumentStatus} />
+              <AuthorCell name={d.CreatedBy} />
+              <span className={styles.monoCell}>v{d.RevisionVersion}</span>
+              <button
+                type="button"
+                className={styles.moreBtn}
+                aria-label="Mais opções"
+                onClick={(e) => e.stopPropagation()}
+              >
+                ···
+              </button>
+            </div>
           ))}
 
           <footer className={styles.tableFooter}>
             <PageSizeSelector
               pageSize={pageSize}
               options={[...PAGE_SIZE_OPTIONS]}
-              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              onPageSizeChange={(size) => { setPageSize(size as PageSize); setPage(1); }}
             />
             <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
           </footer>
         </section>
       </main>
 
-      {/* Right activity panel */}
       {activityOpen ? <ActivityPanel onClose={toggleActivity} /> : null}
     </div>
   );
