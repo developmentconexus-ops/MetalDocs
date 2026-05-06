@@ -26,11 +26,11 @@
 - [architecture/data-model.md](architecture/data-model.md) - Postgres tables, key relationships, document_families (global/is_active), metaldocs_app grants, two-query LIMIT/OFFSET+COUNT pattern (stub, Last verified: 2026-05-06)
 - [architecture/tech-stack.md](architecture/tech-stack.md) - Go, React, Postgres, MinIO, Gotenberg, eigenpal (stub, Last verified: 2026-05-01)
 - [architecture/deployment.md](architecture/deployment.md) - Docker compose, env vars, dev setup (stub, Last verified: 2026-05-01)
-- **[architecture/frontend-structure.md](architecture/frontend-structure.md) - canonical frontend layout, routing, state, API, design-system rules; comparison baseline for refactor reviews (Last verified: 2026-05-05)**
+- **[architecture/frontend-structure.md](architecture/frontend-structure.md) - canonical frontend layout, routing, state, API, design-system rules; `lib/hooks/` added; `Avatar` color prop; comparison baseline for refactor reviews (Last verified: 2026-05-06)**
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval (stub, Last verified: 2026-05-01)
-- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), editing flow, session model, API; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-06)
+- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), editing flow, session model, API; `libraryStatus.ts` status-meta pattern, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime` query defaults; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-06)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4 (Last verified: 2026-05-05)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)

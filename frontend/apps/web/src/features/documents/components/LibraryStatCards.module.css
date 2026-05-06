@@ -1,15 +1,12 @@
 .root {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--sp-3);
+  gap: 12px;
 }
 
 .card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-4) var(--sp-5);
+  padding: 14px 16px;
   border-radius: var(--r-3);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -17,6 +14,7 @@
   overflow: hidden;
 }
 
+/* Left accent stripe */
 .card::before {
   content: '';
   position: absolute;
@@ -24,39 +22,58 @@
   left: 0;
   bottom: 0;
   width: 3px;
-  background: var(--border);
+  opacity: 0.7;
 }
 
+/* ─── Label (kicker style) ────────────────────────────── */
 .label {
-  font-size: 0.62rem;
-  font-weight: 700;
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
   color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+/* ─── Value row: number + trend inline ────────────────── */
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .count {
-  font-size: 2.4rem;
-  font-weight: 800;
+  font-size: 1.75rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   letter-spacing: -0.02em;
+  color: var(--text);
 }
 
-.subtitle {
-  font-size: 0.72rem;
-  color: var(--text-soft);
-  margin-top: 2px;
+.trend {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero" 1;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: normal;
+  line-height: 1;
 }
 
-.review    .count { color: var(--info); }
-.review::before    { background: var(--info); }
-.draft     .count { color: var(--warning); }
-.draft::before     { background: var(--warning); }
-.published .count { color: var(--success); }
-.published::before { background: var(--success); }
-.approved  .count { color: #2d9e5a; }
-.approved::before  { background: #2d9e5a; }
+/* ─── Color variants ──────────────────────────────────── */
+.review::before  { background: var(--warning); }
+.trend_review    { color: var(--warning); }
+
+.pending::before { background: var(--accent); }
+.trend_pending   { color: var(--accent); }
+
+.frozen::before  { background: var(--success); }
+.trend_frozen    { color: var(--success); }
+
+.upcoming::before{ background: var(--info); }
+.trend_upcoming  { color: var(--info); }
 
 @media (max-width: 1100px) {
   .root { grid-template-columns: repeat(2, minmax(0, 1fr)); }

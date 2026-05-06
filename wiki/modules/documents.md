@@ -4,15 +4,20 @@
 > **Scope:** Document instances — library listing, create, edit, autosave, checkpoints, finalize, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/pages/LibraryPage.tsx:45` — `LibraryPage` — server-side paginated table at `/documents`
-> - `frontend/apps/web/src/features/documents/api/library.ts:23` — `fetchLibrary` — `GET /api/v2/documents` typed client
-> - `frontend/apps/web/src/features/documents/api/library.ts:41` — `fetchLibraryStats` — `GET /api/v2/documents/stats` typed client
-> - `frontend/apps/web/src/features/documents/queries/useLibraryQuery.ts:15` — `useLibraryQuery` — TanStack Query hook for paginated list
-> - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook for stats
-> - `frontend/apps/web/src/features/documents/components/LibraryFilterTabs.tsx:22` — `LibraryFilterTabs` — 7-tab filter strip mapped to real Spec 2 states
-> - `frontend/apps/web/src/features/documents/components/LibraryAreaTree.tsx:12` — `LibraryAreaTree` — SectionPanel area-tree navigation
+> - `frontend/apps/web/src/features/documents/pages/LibraryPage.tsx:36` — `LibraryPage` — server-side paginated table at `/documents`; lazy `useState` init, debounced search, `resolveErrorMessage` error UX
+> - `frontend/apps/web/src/features/documents/api/library.ts:34` — `fetchLibrary` — `GET /api/v2/documents` typed client; `asApiError` wrapper ensures all errors surface as `ApiError`
+> - `frontend/apps/web/src/features/documents/api/library.ts:46` — `fetchLibraryStats` — `GET /api/v2/documents/stats` typed client
+> - `frontend/apps/web/src/features/documents/api/library.ts:28` — `asApiError` — wraps any 2xx-envelope error into a real `ApiError` so `resolveErrorMessage` works downstream
+> - `frontend/apps/web/src/features/documents/lib/libraryStatus.ts:1` — `LIBRARY_STATUSES` + `LibraryFilter` + `filterToStatus()` — single source of truth for backend status ↔ URL filter ↔ pt-BR label
+> - `frontend/apps/web/src/features/documents/lib/libraryStatus.ts:29` — `LIBRARY_STATUSES` array (6 entries: draft → obsolete)
+> - `frontend/apps/web/src/features/documents/lib/libraryStatus.ts:38` — `filterToStatus()` — maps `LibraryFilter` slug to `DocumentStatus | undefined`
+> - `frontend/apps/web/src/features/documents/components/AuthorCell.tsx:30` — `AuthorCell` — Avatar + deterministic hashed color + first-name display for document rows
+> - `frontend/apps/web/src/features/documents/components/LibraryFilterTabs.tsx:11` — `LibraryFilterTabs` — iterates `LIBRARY_STATUSES`; prop type tightened to `LibraryFilter`; Filtros/Exportar disabled with `aria-disabled`
+> - `frontend/apps/web/src/features/documents/components/LibrarySidebar.tsx:32` — `LibrarySidebar` — iterates `LIBRARY_STATUSES` for status section
 > - `frontend/apps/web/src/features/documents/components/Pagination.tsx:9` — `Pagination` — prev/next controls
 > - `frontend/apps/web/src/features/documents/components/PageSizeSelector.tsx:9` — `PageSizeSelector` — 10/20/50 dropdown
+> - `frontend/apps/web/src/features/documents/queries/useLibraryQuery.ts:15` — `useLibraryQuery` — TanStack Query hook; `placeholderData: keepPreviousData` prevents empty flash on page/filter change
+> - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook; `staleTime: 30_000` avoids refetch on every focus
 > - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library) and `/documents-v2/*` (Editor)
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:1` — editor page; `handleFinalize` catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
 > - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — step 1: pick controlled document
@@ -65,12 +70,49 @@ Routes are defined in `features/documents/routes.tsx`.
 - **Server-side pagination:** page, pageSize (10/20/50, cap=50), status filter, areaCode filter, profileCode filter, and free-text `q` (ILIKE on name) are all sent to the backend. Client never filters/sorts in memory.
 - **RBAC scoping:** `document_filler` users are auto-scoped to their own documents server-side via `effectiveUserID` in `parseListOptions`; `system_admin` sees all.
 - **pageSize cap:** backend returns 400 if `pageSize > 50` (defense-in-depth; selector is also limited to 10/20/50).
-- **Filter tabs:** 7 tabs (Todos / Meus / Rascunhos / Em revisão / Publicados / Rejeitados / Obsoletos) mapped to Spec 2 8-state model. "Meus" triggers server-side user scope, not a status filter.
-- **SectionPanel:** `LibraryAreaTree` on the left (224px) lists process areas from the taxonomy API; selecting an area adds `areaCode` to the query.
-- **Activity sidebar:** 320px, default-collapsed, toggle persisted to `localStorage`. Placeholder only in Phase 4 — approval inbox integration deferred.
+- **Status meta — single source of truth:** `features/documents/lib/libraryStatus.ts` exports `LIBRARY_STATUSES`, `LibraryFilter`, and `filterToStatus()`. Both `LibraryFilterTabs` and `LibrarySidebar` iterate `LIBRARY_STATUSES` — no local STATUS_ITEMS / TABS arrays in component files.
+- **Filter tabs:** 6 status tabs (Rascunhos / Em Revisão / Aprovados / Publicados / Rejeitados / Obsoletos) + "Todos" root, rendered by `LibraryFilterTabs`. Filtros and Exportar buttons are `disabled + aria-disabled` until backend endpoints exist.
+- **Debounced search:** `searchQuery` state is passed to `useDebouncedValue(q, 300)` before inclusion in the query params; resets `page` to 1 on change.
+- **Lazy `useState` init:** `readStoredPageSize()` and `readStoredActivityOpen()` are passed as initializer functions (not expressions) to avoid unnecessary `localStorage` reads on re-renders and prevent hydration flash.
+- **Area navigation:** `LibrarySidebar` contains the ÁREAS section (no separate `LibraryAreaTree` component); it fetches process areas via `QK.taxonomy.areas()` and adds `areaCode` to the query on selection.
+- **Activity sidebar:** 320px, default-collapsed, toggle persisted to `localStorage`. Placeholder only — `ActivityPanel` and `LibraryStatCards` carry TODO trails for hardcoded mocks; approval inbox integration deferred.
+- **AuthorCell:** `features/documents/components/AuthorCell.tsx` renders Avatar + first name per row. Avatar background color is derived deterministically from the username hash (stable across sessions, no server round-trip).
+- **Row accessibility:** document rows are `<div role="button">` (valid, keyboard-accessible) with `:focus-visible` outline in CSS.
 - **StatusPill:** extended to all 8 Spec 2 states (`draft`, `under_review`, `approved`, `rejected`, `scheduled`, `published`, `superseded`, `obsolete`) with Portuguese labels.
+- **Error UX:** `resolveErrorMessage(apiError.code, apiError.message)` used directly in `LibraryPage` to surface query errors inline (not toast). Pattern matches `concepts/error-ux.md`.
 
-See `wiki/implementation/plan-library.md` for full implementation plan and phase-by-phase detail.
+## Library Patterns
+
+### Status-meta module (`libraryStatus.ts`)
+
+```typescript
+// features/documents/lib/libraryStatus.ts:29
+export const LIBRARY_STATUSES: readonly StatusEntry[] = [
+  { status: 'draft',        filter: 'rascunhos',  label: 'Rascunhos'  },
+  { status: 'under_review', filter: 'em_revisao', label: 'Em Revisão' },
+  { status: 'approved',     filter: 'aprovados',  label: 'Aprovados'  },
+  { status: 'published',    filter: 'publicados', label: 'Publicados' },
+  { status: 'rejected',     filter: 'rejeitados', label: 'Rejeitados' },
+  { status: 'obsolete',     filter: 'obsoletos',  label: 'Obsoletos'  },
+];
+```
+
+`filterToStatus('todos')` returns `undefined` (no status param → server returns all). Components must not redeclare their own status/label lists — import from this module.
+
+### `asApiError` wrapper (`library.ts:28`)
+
+Wraps any error from a successful HTTP response (2xx with error envelope) into a real `ApiError` so that `resolveErrorMessage` works downstream without null-checking. 4xx/5xx are already `ApiError` from `apiFetch`.
+
+### TanStack Query defaults for library hooks
+
+| Hook | Key option | Reason |
+|------|-----------|--------|
+| `useLibraryQuery` | `placeholderData: keepPreviousData` | Hold previous page while new page/filter loads — no empty-state flash |
+| `useLibraryStatsQuery` | `staleTime: 30_000` | Stats are stable; skip refetch on every window focus/mount |
+
+### `useDebouncedValue` (`lib/hooks/useDebouncedValue.ts:10`)
+
+Generic hook for debouncing any value. Used by `LibraryPage` for the search input (300 ms). Lives in `lib/hooks/` because it has no domain dependency — reusable across features.
 
 ## Create Flow
 
