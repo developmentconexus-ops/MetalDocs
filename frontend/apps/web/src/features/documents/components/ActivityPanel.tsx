@@ -1,5 +1,16 @@
 import styles from './ActivityPanel.module.css';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TODO(library/activity): wire to real backend.
+//   - INBOX → GET /api/v2/users/me/inbox (pending approvals for current user,
+//     joined with document due dates). Endpoint not yet defined.
+//   - AUDIT → GET /api/v2/audit?scope=documents&limit=8h (existing audit log
+//     filtered to last 8h, current user's tenant). Endpoint exists but not
+//     surfaced via openapi codegen.
+// Keep mock arrays below as design fixtures until both endpoints land. Do NOT
+// remove until the panel renders real data — designers reference these shapes.
+// ─────────────────────────────────────────────────────────────────────────────
+
 type InboxItem = {
   code: string;
   due: string;
@@ -16,12 +27,14 @@ type AuditItem = {
   isSystem?: boolean;
 };
 
+// MOCK — see TODO above.
 const INBOX: InboxItem[] = [
   { code: 'POP-QUA-118', due: 'Vence em 6h', dueTone: 'danger' },
   { code: 'POP-QUA-119', due: 'Vence em 2d', dueTone: 'warning' },
   { code: 'POL-RH-003', due: 'Sem prazo', dueTone: 'muted' },
 ];
 
+// MOCK — see TODO above.
 const AUDIT: AuditItem[] = [
   { id: 'a1', initials: 'JP', who: 'Juliana P.', action: 'aprovou', target: 'POP-FIN-019', time: '14:32' },
   { id: 'a2', initials: 'S',  who: 'Sistema',    action: 'gerou PDF', target: 'IT-PROD-204', time: '13:51', isSystem: true },
@@ -59,7 +72,7 @@ export function ActivityPanel({ onClose }: Props): JSX.Element {
             </li>
           ))}
         </ul>
-        <button type="button" className={styles.inboxButton}>
+        <button type="button" className={styles.inboxButton} disabled aria-disabled="true" title="Em breve">
           Abrir caixa de aprovação
         </button>
       </section>
@@ -86,7 +99,7 @@ export function ActivityPanel({ onClose }: Props): JSX.Element {
             </li>
           ))}
         </ul>
-        <button type="button" className={styles.viewAll}>Ver tudo →</button>
+        <button type="button" className={styles.viewAll} disabled aria-disabled="true" title="Em breve">Ver tudo →</button>
       </section>
     </aside>
   );
