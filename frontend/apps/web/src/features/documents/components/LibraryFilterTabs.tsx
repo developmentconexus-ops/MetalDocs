@@ -8,7 +8,7 @@ type FilterTab = {
 const TABS: FilterTab[] = [
   { value: 'todos', label: 'Todos' },
   { value: 'rascunhos', label: 'Rascunhos' },
-  { value: 'em_revisao', label: 'Em Revis„o' },
+  { value: 'em_revisao', label: 'Em Revis√£o' },
   { value: 'publicados', label: 'Publicados' },
   { value: 'rejeitados', label: 'Rejeitados' },
   { value: 'obsoletos', label: 'Obsoletos' },

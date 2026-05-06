@@ -9,7 +9,7 @@ type PageSizeSelectorProps = {
 export function PageSizeSelector({ pageSize, options, onPageSizeChange }: PageSizeSelectorProps) {
   return (
     <label className={styles.root}>
-      <span className={styles.label}>Itens por p·gina</span>
+      <span className={styles.label}>Itens por p√°gina</span>
       <select
         className={styles.select}
         value={pageSize}

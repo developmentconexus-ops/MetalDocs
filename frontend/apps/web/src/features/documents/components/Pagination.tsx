@@ -20,7 +20,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         Anterior
       </button>
       <span className={styles.indicator}>
-        Página {page} de {safeTotalPages}
+        PÃ¡gina {page} de {safeTotalPages}
       </span>
       <button
         type="button"
@@ -28,7 +28,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         onClick={() => onPageChange(page + 1)}
         disabled={page >= safeTotalPages}
       >
-        Próxima
+        PrÃ³xima
       </button>
     </div>
   );
