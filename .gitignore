@@ -40,7 +40,11 @@ coverage_phase5.out
 .claude/worktrees/
 .claude/launch.json
 .codex/
+.codex-gocache/
 .gomodcache/
+worker.err.log
+worker.out.log
+frontend/apps/web/design-source/.design-canvas.state.json
 .env.docgen-v2
 
 # Build artifacts
