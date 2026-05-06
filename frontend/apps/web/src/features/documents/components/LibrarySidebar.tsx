@@ -2,16 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { listTaxonomyAreas } from '../../taxonomy/api/catalog';
 import { QK } from '../../../lib/queryKeys';
+import { LIBRARY_STATUSES, type LibraryFilter } from '../lib/libraryStatus';
 import styles from './LibrarySidebar.module.css';
 
-export type LibraryFilter =
-  | 'todos'
-  | 'rascunhos'
-  | 'em_revisao'
-  | 'aprovados'
-  | 'publicados'
-  | 'rejeitados'
-  | 'obsoletos';
+export type { LibraryFilter };
 
 type Props = {
   activeFilter: LibraryFilter;
@@ -25,19 +19,15 @@ type Props = {
   onSearchChange: (q: string) => void;
 };
 
-const STATUS_ITEMS: Array<{
-  value: LibraryFilter;
-  label: string;
-  statusKey: string;
-  dotMod: keyof typeof styles;
-}> = [
-  { value: 'rascunhos', label: 'Rascunhos', statusKey: 'draft', dotMod: 'dotDraft' },
-  { value: 'em_revisao', label: 'Em revisão', statusKey: 'under_review', dotMod: 'dotReview' },
-  { value: 'aprovados', label: 'Aprovados', statusKey: 'approved', dotMod: 'dotApproved' },
-  { value: 'publicados', label: 'Publicados', statusKey: 'published', dotMod: 'dotPublished' },
-  { value: 'rejeitados', label: 'Rejeitados', statusKey: 'rejected', dotMod: 'dotRejected' },
-  { value: 'obsoletos', label: 'Obsoletos', statusKey: 'obsolete', dotMod: 'dotObsolete' },
-];
+// Map backend status → sidebar dot style. Lives next to the only consumer.
+const STATUS_DOT: Record<string, string> = {
+  draft:        'dotDraft',
+  under_review: 'dotReview',
+  approved:     'dotApproved',
+  published:    'dotPublished',
+  rejected:     'dotRejected',
+  obsolete:     'dotObsolete',
+};
 
 export function LibrarySidebar({
   activeFilter,
@@ -109,18 +99,18 @@ export function LibrarySidebar({
       {/* Estado */}
       <section className={styles.section}>
         <span className={styles.sectionLabel}>ESTADO</span>
-        {STATUS_ITEMS.map((item) => {
-          const count = statsByStatus[item.statusKey] ?? 0;
-          const isActive = activeFilter === item.value;
+        {LIBRARY_STATUSES.map((entry) => {
+          const count = statsByStatus[entry.status] ?? 0;
+          const isActive = activeFilter === entry.filter;
           return (
             <button
-              key={item.value}
+              key={entry.filter}
               type="button"
               className={`${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
-              onClick={() => onFilterChange(item.value)}
+              onClick={() => onFilterChange(entry.filter)}
             >
-              <span className={`${styles.dot} ${styles[item.dotMod]}`} aria-hidden="true" />
-              <span className={styles.navLabel}>{item.label}</span>
+              <span className={`${styles.dot} ${styles[STATUS_DOT[entry.status]]}`} aria-hidden="true" />
+              <span className={styles.navLabel}>{entry.label}</span>
               {count > 0 ? <span className={styles.navBadge}>{count}</span> : null}
             </button>
           );
