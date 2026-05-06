@@ -176,6 +176,54 @@
   white-space: nowrap;
 }
 
+.itemFlat,
+.itemFlatButton {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  min-height: unset;
+  text-align: left;
+  width: 100%;
+}
+
+.itemFlatButton {
+  cursor: pointer;
+}
+
+.itemFlatButton:hover,
+.itemFlatButton:focus-visible {
+  background: color-mix(in srgb, var(--text, #1f2a3f) 5%, transparent);
+}
+
+.itemFlatContent {
+  min-width: 0;
+  display: contents;
+}
+
+.itemFlatTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text, #1f2a3f);
+  line-height: 1.2;
+}
+
+.itemFlatSubtitle {
+  font-size: 0.75rem;
+  color: var(--text-soft, #4f6178);
+  flex: 1;
+}
+
+.itemFlatAside {
+  font-size: 0.6875rem;
+  color: var(--text-faint, #8a98ab);
+  white-space: nowrap;
+}
+
 .emptyState {
   border: 1px dashed #c8ced9;
   border-radius: 0.82rem;

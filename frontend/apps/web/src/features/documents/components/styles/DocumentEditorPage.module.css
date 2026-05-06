@@ -1,0 +1,15 @@
+/* CheckpointsDialog styles */
+
+.checkpointsDialog {
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  padding: var(--sp-6);
+  min-width: 480px;
+  max-width: 640px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.checkpointsDialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}

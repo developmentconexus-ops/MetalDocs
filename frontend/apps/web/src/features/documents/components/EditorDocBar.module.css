@@ -1,16 +1,44 @@
-.bar {
+/* EditorDocBar — overlays on eigenpal's title bar (matches TemplateAuthorPage pattern) */
+
+.overlayLeft {
+  position: absolute;
+  top: 0;
+  left: var(--sp-3);
+  height: 40px;
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: 0 var(--sp-6);
-  height: 44px;
-  flex-shrink: 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-2);
+  z-index: 60;
+}
+
+.overlayCenter {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 40px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  z-index: 60;
+  pointer-events: none;
+  white-space: nowrap;
   font-size: 0.8125rem;
   font-family: var(--font-sans);
 }
 
+.overlayRight {
+  position: absolute;
+  top: 0;
+  right: var(--sp-3);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  z-index: 100;
+}
+
+/* Back button */
 .backBtn {
   display: inline-flex;
   align-items: center;
@@ -18,22 +46,23 @@
   width: 26px;
   height: 26px;
   padding: 0;
-  background: var(--brand);
-  border: 0;
+  background: transparent;
+  border: 1px solid var(--border);
   border-radius: var(--r-1);
-  color: #fff;
+  color: var(--text-soft);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 150ms ease;
+  transition: background 150ms ease, border-color 150ms ease;
 }
-.backBtn:hover { background: var(--brand-soft); }
+.backBtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
 
+/* Center: doc name + version */
 .docName {
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 280px;
+  max-width: 260px;
 }
 
 .versionMeta {
@@ -44,10 +73,7 @@
   flex-shrink: 0;
 }
 
-.spacer {
-  flex: 1;
-}
-
+/* Autosave indicator */
 .autosave {
   display: inline-flex;
   align-items: center;
@@ -56,7 +82,9 @@
   font-size: 0.75rem;
   white-space: nowrap;
   flex-shrink: 0;
+  font-family: var(--font-sans);
 }
+.autosaveError { color: var(--error, #dc2626); }
 
 .autosaveDot {
   width: 6px;
@@ -65,12 +93,15 @@
   background: var(--success);
   flex-shrink: 0;
 }
+.autosaveDotSaving { background: var(--brand); }
+.autosaveDotError { background: var(--error, #dc2626); }
 
+/* Action buttons */
 .ghostBtn {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 28px;
+  height: 26px;
   padding: 0 var(--sp-3);
   background: transparent;
   border: 1px solid var(--border);
@@ -80,6 +111,7 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  font-family: var(--font-sans);
   transition: background 150ms ease, border-color 150ms ease;
 }
 .ghostBtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
@@ -88,7 +120,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 28px;
+  height: 26px;
   padding: 0 var(--sp-3);
   background: var(--brand);
   border: 0;
@@ -98,6 +130,7 @@
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  font-family: var(--font-sans);
   transition: background 150ms ease;
 }
 .primaryBtn:hover:not(:disabled) { background: var(--brand-soft); }
