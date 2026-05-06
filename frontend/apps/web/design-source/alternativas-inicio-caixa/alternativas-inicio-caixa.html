@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>Alternativas · Início + Caixa de Aprovação · MetalDocs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body,#root{height:100%;margin:0;}
+  body { background: #f4f1ec; }
+</style>
+</head>
+<body class="palette-wine">
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="../shell.jsx"></script>
+<script type="text/babel" src="../design-canvas.jsx"></script>
+<script type="text/babel" src="../dashboard-alts.jsx"></script>
+<script type="text/babel" src="../inbox-alts.jsx"></script>
+<script type="text/babel">
+const { Rail, Toolbar } = window.MD;
+const { DashboardEditorial, DashboardBento, DashboardTerminal } = window.MD_DASH_ALT;
+const { InboxStack, InboxKanban, InboxTimeline } = window.MD_INBOX_ALT;
+
+const ScreenFrame = ({ section, breadcrumb, children }) => (
+  <div style={{ width: '100%', height: '100%', display: 'flex', background: 'var(--surface)', overflow: 'hidden' }}>
+    <Rail section={section}/>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <Toolbar breadcrumb={breadcrumb}/>
+      {children}
+    </div>
+  </div>
+);
+
+const ROOT_W = 1440;
+const ROOT_H = 900;
+
+const App = () => (
+  <DesignCanvas
+    title="Alternativas — Início & Caixa de Aprovação"
+    subtitle="Três variações para cada tela, com micro-animações ao vivo. Hover, abra em foco (clique no card), pegue o que ressoar."
+  >
+    <DCSection id="dashboard" title="§10 · Início (dashboard pessoal)" subtitle="Atualmente: Editorial · Bento · Terminal — três temperamentos para a mesma informação">
+      <DCArtboard id="dash-editorial" label="A · Editorial / Magazine" width={ROOT_W} height={ROOT_H}>
+        <ScreenFrame section="home" breadcrumb={['Início']}>
+          <DashboardEditorial/>
+        </ScreenFrame>
+      </DCArtboard>
+      <DCArtboard id="dash-bento" label="B · Bento / Profundidade" width={ROOT_W} height={ROOT_H}>
+        <ScreenFrame section="home" breadcrumb={['Início']}>
+          <DashboardBento/>
+        </ScreenFrame>
+      </DCArtboard>
+      <DCArtboard id="dash-terminal" label="C · Command Center" width={ROOT_W} height={ROOT_H}>
+        <ScreenFrame section="home" breadcrumb={['Início']}>
+          <DashboardTerminal/>
+        </ScreenFrame>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="inbox" title="§11 · Caixa de aprovação" subtitle="Stack focado · Kanban por estado · Linha do tempo por prazo — três modelos mentais para 11 documentos">
+      <DCArtboard id="inbox-stack" label="A · Stack / Foco em uma decisão" width={ROOT_W} height={ROOT_H}>
+        <ScreenFrame section="approvals" breadcrumb={['Aprovações','Caixa de entrada']}>
+          <InboxStack/>
+        </ScreenFrame>
+      </DCArtboard>
+      <DCArtboard id="inbox-kanban" label="B · Kanban / Swimlanes" width={ROOT_W} height={ROOT_H}>
+        <ScreenFrame section="approvals" breadcrumb={['Aprovações','Caixa de entrada']}>
+          <InboxKanban/>
+        </ScreenFrame>
+      </DCArtboard>
+      <DCArtboard id="inbox-timeline" label="C · Linha do tempo / Por prazo" width={ROOT_W} height={ROOT_H}>
+        <ScreenFrame section="approvals" breadcrumb={['Aprovações','Caixa de entrada']}>
+          <InboxTimeline/>
+        </ScreenFrame>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>
+);
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body></html>

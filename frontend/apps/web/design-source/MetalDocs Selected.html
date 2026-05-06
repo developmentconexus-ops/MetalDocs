@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>MetalDocs — Telas selecionadas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  dc-canvas { background: #2a1418; }
+</style>
+</head>
+<body class="palette-wine">
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="shell.jsx"></script>
+<script type="text/babel" src="screens-2.jsx"></script>
+<script type="text/babel" src="selected-library.jsx"></script>
+<script type="text/babel" src="selected-editor-v2.jsx"></script>
+<script type="text/babel" src="selected-wizard.jsx"></script>
+<script type="text/babel" src="selected-wizard-v2.jsx"></script>
+
+<script type="text/babel">
+const { Sidebar, Rail, Toolbar, Icon } = window.MD;
+const { SelectedLibrary } = window.MD_LIB_SELECTED;
+const { SelectedEditorV2 } = window.MD_EDITOR_V2;
+const { WizardStep1, WizardStep3, WizardStep4 } = window.MD_WIZARD;
+const { WizardStep2V2 } = window.MD_WIZARD_V2;
+const { Login, Templates, Registry } = window.MD_SCREENS_2;
+
+// Frame WITH full sidebar (rail + filter panel) — only Biblioteca uses this
+const FrameFull = ({ active = 'library', breadcrumb, children }) => (
+  <div style={{ width: '100%', height: '100%', display: 'flex', background: 'var(--surface)', overflow: 'hidden', position: 'relative' }}>
+    <Sidebar section="documents" active={active}/>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <Toolbar breadcrumb={breadcrumb}/>
+      {children}
+    </div>
+  </div>
+);
+
+// Frame with RAIL ONLY — for Templates, Registry, Wizard, Editor
+const FrameRail = ({ section = 'documents', breadcrumb, children, hideToolbar }) => (
+  <div style={{ width: '100%', height: '100%', display: 'flex', background: 'var(--surface)', overflow: 'hidden' }}>
+    <Rail section={section}/>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      {!hideToolbar && <Toolbar breadcrumb={breadcrumb}/>}
+      {children}
+    </div>
+  </div>
+);
+
+function App() {
+  return (
+    <dc-canvas style={{ width: '100%', height: '100%' }}>
+      {/* === 01 — LIBRARY (approved) === */}
+      <dc-section id="library" title="01 · Biblioteca de documentos · APROVADA">
+        <dc-artboard id="library-final" label="Biblioteca · sidebar de filtros + atividade colapsável" width={1480} height={920}>
+          <FrameFull breadcrumb={['Documentos', 'Biblioteca']}><SelectedLibrary/></FrameFull>
+        </dc-artboard>
+      </dc-section>
+
+      {/* === 02 — EDITOR v2 — minimal chrome === */}
+      <dc-section id="editor" title="02 · Editor · v2 · chrome reduzido, foco no documento">
+        <dc-artboard id="editor-v2" label="Editor · POP-RH-001 v5 (rascunho)" width={1480} height={920}>
+          <FrameRail section="documents" hideToolbar={true}><SelectedEditorV2/></FrameRail>
+        </dc-artboard>
+      </dc-section>
+
+      {/* === 03-06 — WIZARD all 4 steps · só rail === */}
+      <dc-section id="wizard" title="03-06 · Novo documento controlado · 4 passos (rail apenas)">
+        <dc-artboard id="wiz-1" label="1 · Perfil" width={1280} height={900}>
+          <FrameRail section="documents" breadcrumb={['Documentos', 'Novo']}><WizardStep1/></FrameRail>
+        </dc-artboard>
+        <dc-artboard id="wiz-2-v2" label="2 · Área, Código & Visibilidade (NOVO)" width={1280} height={920}>
+          <FrameRail section="documents" breadcrumb={['Documentos', 'Novo']}><WizardStep2V2/></FrameRail>
+        </dc-artboard>
+        <dc-artboard id="wiz-3" label="3 · Template" width={1280} height={900}>
+          <FrameRail section="documents" breadcrumb={['Documentos', 'Novo']}><WizardStep3/></FrameRail>
+        </dc-artboard>
+        <dc-artboard id="wiz-4" label="4 · Confirmação" width={1280} height={900}>
+          <FrameRail section="documents" breadcrumb={['Documentos', 'Novo']}><WizardStep4/></FrameRail>
+        </dc-artboard>
+      </dc-section>
+
+      {/* === 07 — TEMPLATES · com rail === */}
+      <dc-section id="templates" title="07 · Templates · com rail de navegação">
+        <dc-artboard id="templates-final" label="Layouts reutilizáveis" width={1280} height={900}>
+          <FrameRail section="templates" breadcrumb={['Templates']}><Templates/></FrameRail>
+        </dc-artboard>
+      </dc-section>
+
+      {/* === 08 — REGISTRY · com rail === */}
+      <dc-section id="registry" title="08 · Catálogo de slots · com rail de navegação">
+        <dc-artboard id="registry-final" label="Códigos de documento — registro de slots" width={1280} height={900}>
+          <FrameRail section="registry" breadcrumb={['Registro']}><Registry/></FrameRail>
+        </dc-artboard>
+      </dc-section>
+
+      {/* === 09 — LOGIN (sem rail, pré-auth) — APROVADA === */}
+      <dc-section id="login" title="09 · Login · APROVADA (sem rail, pré-autenticação)">
+        <dc-artboard id="login-final" label="Login / SSO" width={1280} height={820}>
+          <Login/>
+        </dc-artboard>
+      </dc-section>
+    </dc-canvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
