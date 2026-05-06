@@ -1,177 +1,291 @@
 .root {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
   min-height: 100%;
-  color: var(--text);
 }
 
-.root:has(.rightAside) {
-  grid-template-columns: 240px minmax(0, 1fr) 280px;
+.withActivity {
+  grid-template-columns: 224px minmax(0, 1fr) 300px;
 }
 
-.leftAside {
-  border-right: 1px solid var(--border);
-  background: var(--surface);
-  padding: 1rem 0.75rem;
+/* ─── Sidebar ─────────────────────────────────────────── */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
+/* ─── Main ────────────────────────────────────────────── */
 .main {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
-  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding: var(--sp-6) var(--sp-7) var(--sp-8);
   background: var(--bg);
+  min-width: 0;
 }
 
+/* ─── Header ──────────────────────────────────────────── */
 .header {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--sp-6);
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: column;
   align-items: flex-end;
-  gap: 1rem;
+  gap: var(--sp-3);
+  flex-shrink: 0;
+  padding-top: var(--sp-2);
 }
 
 .kicker {
   margin: 0;
-  color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
 }
 
 .title {
-  margin: 0.25rem 0 0;
-  font-size: 1.8rem;
-  line-height: 1.1;
+  margin: 0;
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1.05;
+  color: var(--text);
+  letter-spacing: -0.02em;
 }
 
-.headerMeta {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.description {
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 460px;
 }
 
 .totalBadge {
   display: inline-flex;
   align-items: center;
-  min-height: 2rem;
-  padding: 0 0.75rem;
-  border-radius: 999px;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-pill);
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--muted);
+  color: var(--text-soft);
   font-size: 0.78rem;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .activityButton {
-  min-height: 2rem;
-  padding: 0 0.8rem;
-  border-radius: 0.6rem;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-2);
   border: 1px solid var(--border);
   background: var(--surface);
-  color: var(--text);
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-family: var(--font-sans);
   cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
 }
 
+.activityButton:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+/* ─── Table card ──────────────────────────────────────── */
 .tableCard {
   border: 1px solid var(--border);
-  border-radius: 0.8rem;
+  border-radius: var(--r-4);
   background: var(--surface);
   overflow: hidden;
-}
-
-.tableHeader,
-.row {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 110px 100px 90px 120px 150px;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-1);
 }
 
 .tableHeader {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr) 110px 90px 72px 110px;
+  gap: var(--sp-4);
+  align-items: center;
+  padding: var(--sp-3) var(--sp-5);
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
-  color: var(--muted);
+  color: var(--text-muted);
+  font-size: 0.67rem;
+  font-weight: 700;
   text-transform: uppercase;
-  font-size: 0.7rem;
   letter-spacing: 0.08em;
 }
 
 .row {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr) 110px 90px 72px 110px;
+  gap: var(--sp-4);
+  align-items: center;
+  padding: var(--sp-3) var(--sp-5);
+  border: none;
   border-bottom: 1px solid var(--border);
+  background: transparent;
+  font-family: var(--font-sans);
   font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.1s;
 }
 
 .row:last-of-type {
   border-bottom: 0;
 }
 
-.nameCell {
+.row:hover {
+  background: var(--brand-pale);
+}
+
+/* Code as colored link — no chip, plain text */
+.codeLink {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brand);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.empty {
-  padding: 1.5rem;
-  color: var(--muted);
-  text-align: center;
+.nameCell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text);
 }
 
+.metaCell {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.dateCell {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  padding: var(--sp-8);
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 0.88rem;
+}
+
+/* ─── Table footer ────────────────────────────────────── */
 .tableFooter {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
   border-top: 1px solid var(--border);
+  background: var(--surface-2);
 }
 
-.rightAside {
+/* ─── Activity panel ──────────────────────────────────── */
+.activityPanel {
   border-left: 1px solid var(--border);
   background: var(--surface);
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.activityHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.activityTitle {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.activitySub {
+  margin: var(--sp-1) 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.activityClose {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: var(--sp-1);
+  border-radius: var(--r-1);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.activityClose:hover {
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .activityPlaceholder {
-  margin: 0;
-  color: var(--muted);
+  margin: var(--sp-6) var(--sp-5);
+  color: var(--text-muted);
+  font-size: 0.83rem;
+  line-height: 1.5;
 }
 
-@media (max-width: 1200px) {
-  .root,
-  .root:has(.rightAside) {
-    grid-template-columns: 220px minmax(0, 1fr);
+/* ─── Responsive ──────────────────────────────────────── */
+@media (max-width: 1280px) {
+  .withActivity {
+    grid-template-columns: 224px minmax(0, 1fr);
   }
-
-  .rightAside {
+  .activityPanel {
     display: none;
   }
 }
 
 @media (max-width: 900px) {
   .root,
-  .root:has(.rightAside) {
+  .withActivity {
     grid-template-columns: 1fr;
   }
-
-  .leftAside {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
+  .sidebar {
+    position: static;
+    height: auto;
   }
-
-  .header {
-    flex-direction: column;
-    align-items: stretch;
+  .title {
+    font-size: 2rem;
   }
-
   .tableHeader {
     display: none;
   }
-
   .row {
     grid-template-columns: 1fr;
-    gap: 0.3rem;
+    gap: var(--sp-1);
   }
 }

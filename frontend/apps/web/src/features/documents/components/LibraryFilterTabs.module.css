@@ -1,28 +1,58 @@
-.root {
+﻿.root {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.root::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
-  height: 2rem;
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.83rem;
   font-family: var(--font-sans);
-  font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.1s, border-color 0.1s;
 }
 
 .tab:hover {
-  border-color: var(--border-strong);
-  background: var(--surface-2);
+  color: var(--text);
 }
 
 .activeTab {
-  border-color: var(--brand);
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.activeTab .count {
   background: var(--brand-pale);
-  color: var(--brand-deep);
+  color: var(--brand);
 }

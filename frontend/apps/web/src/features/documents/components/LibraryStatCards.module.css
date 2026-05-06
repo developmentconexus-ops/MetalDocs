@@ -1,0 +1,38 @@
+.root {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-3);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  min-width: 108px;
+  box-shadow: var(--shadow-1);
+}
+
+.count {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.total  .count { color: var(--text); }
+.review .count { color: var(--info); }
+.draft  .count { color: var(--warning); }
+.published .count { color: var(--success); }
+.approved  .count { color: #2d9e5a; }
