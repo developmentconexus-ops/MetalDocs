@@ -1,0 +1,26 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.label {
+  color: var(--text-soft);
+  font-size: 0.875rem;
+}
+
+.select {
+  height: 2rem;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

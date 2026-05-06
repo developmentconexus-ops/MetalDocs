@@ -9,3 +9,4 @@
 - iso-segregation.md — TBD
 - freeze-and-hashing.md — TBD
 - [error-ux.md](error-ux.md) — shared `apiFetch` / `ApiError` / auth-bus / `resolveErrorMessage` (E2/E3/E4)
+- [design-workflow-audit.md](design-workflow-audit.md) — audit AI-generated `design-source/` mockups against real workflow / RBAC / personas before implementing

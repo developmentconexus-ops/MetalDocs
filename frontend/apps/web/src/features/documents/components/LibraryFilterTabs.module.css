@@ -1,0 +1,28 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.tab {
+  height: 2rem;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.tab:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.activeTab {
+  border-color: var(--brand);
+  background: var(--brand-pale);
+  color: var(--brand-deep);
+}

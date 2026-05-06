@@ -48,6 +48,16 @@ type fakeRepo struct {
 	renameName     string
 	renameDocID    string
 	renameTenantID string
+
+	lastOpts           application.ListOptions
+	listPaginatedReturn []*domain.Document
+	listPaginatedErr    error
+	countReturn         int64
+	countErr            error
+	statsByStatusReturn map[string]int64
+	statsByStatusErr    error
+	statsByAreaReturn   map[string]int64
+	statsByAreaErr      error
 }
 
 var _ application.Repository = (*fakeRepo)(nil)
@@ -85,6 +95,38 @@ func (f *fakeRepo) ListDocuments(_ context.Context, _ string) ([]domain.Document
 
 func (f *fakeRepo) ListDocumentsForUser(_ context.Context, _, _ string) ([]domain.Document, error) {
 	return f.listReturn, nil
+}
+
+func (f *fakeRepo) ListDocumentsPaginated(_ context.Context, _ string, opts application.ListOptions) ([]*domain.Document, error) {
+	f.lastOpts = opts
+	if f.listPaginatedErr != nil {
+		return nil, f.listPaginatedErr
+	}
+	return f.listPaginatedReturn, nil
+}
+
+func (f *fakeRepo) CountDocuments(_ context.Context, _ string, opts application.ListOptions) (int64, error) {
+	f.lastOpts = opts
+	if f.countErr != nil {
+		return 0, f.countErr
+	}
+	return f.countReturn, nil
+}
+
+func (f *fakeRepo) StatsByStatus(_ context.Context, _ string, opts application.ListOptions) (map[string]int64, error) {
+	f.lastOpts = opts
+	if f.statsByStatusErr != nil {
+		return nil, f.statsByStatusErr
+	}
+	return f.statsByStatusReturn, nil
+}
+
+func (f *fakeRepo) StatsByArea(_ context.Context, _ string, opts application.ListOptions) (map[string]int64, error) {
+	f.lastOpts = opts
+	if f.statsByAreaErr != nil {
+		return nil, f.statsByAreaErr
+	}
+	return f.statsByAreaReturn, nil
 }
 
 func (f *fakeRepo) UpdateDocumentStatus(_ context.Context, _, _ string, cur, next domain.DocumentStatus, stampTime bool) error {

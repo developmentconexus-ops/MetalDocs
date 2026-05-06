@@ -30,6 +30,10 @@ type Repository interface {
 	UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
+	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error)
+	CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error)
+	StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
+	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error
 	MarkArchived(ctx context.Context, tenantID, docID, actorID string) error
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
@@ -388,6 +392,50 @@ func (s *Service) ListDocuments(ctx context.Context, tenantID string) ([]domain.
 
 func (s *Service) ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error) {
 	return s.repo.ListDocumentsForUser(ctx, tenantID, userID)
+}
+
+type DocumentStats struct {
+	ByStatus map[string]int64 `json:"byStatus"`
+	ByArea   map[string]int64 `json:"byArea"`
+}
+
+func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts ListOptions) ([]*domain.Document, int64, error) {
+	if userID != "" {
+		opts.CreatedBy = userID
+	}
+
+	items, err := s.repo.ListDocumentsPaginated(ctx, tenantID, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, err := s.repo.CountDocuments(ctx, tenantID, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return items, total, nil
+}
+
+func (s *Service) DocumentStats(ctx context.Context, tenantID, userID string, opts ListOptions) (*DocumentStats, error) {
+	if userID != "" {
+		opts.CreatedBy = userID
+	}
+
+	byStatus, err := s.repo.StatsByStatus(ctx, tenantID, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	byArea, err := s.repo.StatsByArea(ctx, tenantID, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DocumentStats{
+		ByStatus: byStatus,
+		ByArea:   byArea,
+	}, nil
 }
 
 func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error {

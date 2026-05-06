@@ -3,7 +3,7 @@
 **Branch:** `feature/screen-redesign`
 **Spec:** `docs/superpowers/specs/2026-05-05-screen-redesign-design.md`
 **Design source:** `frontend/apps/web/design-source/`
-**Last updated:** 2026-05-05 · Foundation ✅
+**Last updated:** 2026-05-06 · Library ✅
 
 ---
 
@@ -21,8 +21,8 @@ Each block gets its own detailed plan in `docs/superpowers/plans/`. Mark complet
 |---|---|---|---|
 | **Foundation** | Tokens rename, fonts, Zustand cleanup, UI primitives, queryKeys, AppShell, Rail, AppToolbar, AppRoot, Router restructure | `wiki/implementation/plan-foundation.md` | ✅ Complete |
 | **Login** | Full-page split layout, auth form, no Rail | `wiki/implementation/plan-login.md` | ✅ Complete |
-| **Library** | Dense document table, stat cards, filter tabs, collapsible activity sidebar, SectionPanel | — | 🔲 Not started |
-| **Editor** | Slim doc bar, mini toolbar, paper canvas, metadata sidebar | — | ⏳ Waiting on Library |
+| **Library** | Dense document table, stat cards, filter tabs, collapsible activity sidebar, SectionPanel | `wiki/implementation/plan-library.md` | ✅ Complete |
+| **Editor** | Slim doc bar, mini toolbar, paper canvas, metadata sidebar | — | 🔲 Not started |
 | **Wizard** | 4-step stepper, profile/area/visibility/template pickers | — | ⏳ Waiting on Editor |
 | **Templates** | 3-col card grid, mini doc preview | — | ⏳ Waiting on Wizard |
 | **Registry** | Sequence counter grid, controlled documents table | — | ⏳ Waiting on Templates |
@@ -66,6 +66,15 @@ When block is complete and committed: change to `✅ Complete`, update next bloc
 | `src/features/shell/components/AppToolbar.tsx` | 52px top bar |
 | `src/app/AppRouter.tsx` | Router (public `/login` + protected routes) |
 | `src/features/auth/pages/LoginPage.tsx` | Full-page login, no Rail |
+| `src/features/documents/pages/LibraryPage.tsx` | Server-side paginated document library at `/documents` |
+| `src/features/documents/api/library.ts` | Typed fetch functions for `/api/v2/documents` + `/api/v2/documents/stats` |
+| `src/features/documents/queries/useLibraryQuery.ts` | TanStack Query hook — paginated document list |
+| `src/features/documents/queries/useLibraryStatsQuery.ts` | TanStack Query hook — stats (byStatus/byArea) |
+| `src/features/documents/components/LibraryFilterTabs.tsx` | 7-tab filter strip mapped to 8-state Spec 2 model |
+| `src/features/documents/components/LibraryAreaTree.tsx` | SectionPanel area tree (224px left rail) |
+| `src/features/documents/components/Pagination.tsx` | Prev/next pagination controls |
+| `src/features/documents/components/PageSizeSelector.tsx` | 10/20/50 per-page selector |
+| `src/features/documents/routes.tsx` | Routes: `/documents` (Library) + `/documents-v2/*` (Editor/Create) |
 
 ---
 
