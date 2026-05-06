@@ -41,14 +41,20 @@ const MOCK_APPROVERS = [
 
 export function EditorMetaSidebar({ open, onToggle, code }: EditorMetaSidebarProps) {
   return (
-    <>
+    <div className={styles.sidebarOuter}>
       <button
         type="button"
-        className={styles.toggleBtn}
+        className={styles.toggleTab}
         onClick={onToggle}
         aria-label={open ? 'Fechar painel de metadados' : 'Abrir painel de metadados'}
         aria-expanded={open}
-      />
+      >
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {open
+            ? <polyline points="9 18 15 12 9 6" />
+            : <polyline points="15 18 9 12 15 6" />}
+        </svg>
+      </button>
       {open && (
         <aside className={styles.sidebar} aria-label="Metadados do documento">
           <section className={styles.section}>
@@ -71,7 +77,7 @@ export function EditorMetaSidebar({ open, onToggle, code }: EditorMetaSidebarPro
           <div className={styles.divider} />
           <section className={styles.section}>
             <div className={styles.sectionHeader}>Revisões</div>
-            <TimelineRail items={MOCK_REVISIONS} ariaLabel="Histórico de revisões" />
+            <TimelineRail items={MOCK_REVISIONS} ariaLabel="Histórico de revisões" variant="flat" />
           </section>
           <div className={styles.divider} />
           <section className={styles.section}>
@@ -93,6 +99,6 @@ export function EditorMetaSidebar({ open, onToggle, code }: EditorMetaSidebarPro
           </section>
         </aside>
       )}
-    </>
+    </div>
   );
 }

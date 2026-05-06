@@ -15,6 +15,7 @@ type TimelineRailProps = {
   emptyState?: ReactNode;
   accent?: "blue" | "gold" | "green";
   ariaLabel?: string;
+  variant?: "card" | "flat";
 };
 
 function railClassName(accent: TimelineRailProps["accent"]) {
@@ -34,6 +35,7 @@ export function TimelineRail({
   emptyState = "Sem itens para exibir.",
   accent = "blue",
   ariaLabel = "Timeline",
+  variant = "card",
 }: TimelineRailProps) {
   if (items.length === 0) {
     return <div className={styles.emptyState}>{emptyState}</div>;
@@ -47,7 +49,7 @@ export function TimelineRail({
         const shellClassName = `${styles.itemShell}${isLast ? ` ${styles.itemShellLast}` : ""}`;
         const markerClassName = `${styles.marker}${isActive ? ` ${styles.markerActive}` : ""}`;
 
-        const content = (
+        const cardContent = (
           <>
             <div className={styles.itemContent}>
               <strong className={styles.itemTitle}>{item.title}</strong>
@@ -57,15 +59,31 @@ export function TimelineRail({
           </>
         );
 
+        const flatContent = (
+          <>
+            <strong className={styles.itemFlatTitle}>{item.title}</strong>
+            {item.subtitle ? <span className={styles.itemFlatSubtitle}>{item.subtitle}</span> : null}
+            {item.aside ? <span className={styles.itemFlatAside}>{item.aside}</span> : null}
+          </>
+        );
+
         return (
           <div key={item.id} className={shellClassName}>
             <span className={markerClassName} aria-hidden="true" />
-            {item.onClick ? (
+            {variant === "flat" ? (
+              item.onClick ? (
+                <button type="button" className={styles.itemFlatButton} onClick={item.onClick}>
+                  {flatContent}
+                </button>
+              ) : (
+                <div className={styles.itemFlat}>{flatContent}</div>
+              )
+            ) : item.onClick ? (
               <button type="button" className={styles.itemCardButton} onClick={item.onClick}>
-                {content}
+                {cardContent}
               </button>
             ) : (
-              <div className={styles.itemCardStatic}>{content}</div>
+              <div className={styles.itemCardStatic}>{cardContent}</div>
             )}
           </div>
         );

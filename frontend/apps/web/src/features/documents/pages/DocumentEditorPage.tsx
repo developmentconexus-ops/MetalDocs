@@ -197,26 +197,26 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
 
   return (
     <div className={styles.page} data-editor-root>
-      <EditorDocBar
-        code={docCode || undefined}
-        documentName={displayName}
-        revisionVersion={revNum}
-        docStatus={docStatus || undefined}
-        autosaveStatus={autosave.status === 'saving' ? 'saving' : autosave.status === 'error' ? 'error' : autosave.status === 'saved' ? 'saved' : 'idle'}
-        isEditable={isEditable}
-        onBack={onDone}
-        onCheckpoints={() => setCheckpointsOpen(true)}
-        exportButton={
-          <ExportMenuButton
-            documentID={documentID}
-            canExport={sessionPhase === 'writer' || sessionPhase === 'readonly'}
-          />
-        }
-        onFinalize={() => void handleFinalize()}
-      />
       <div className={styles.body}>
         <main className={styles.canvas}>
           <div className={styles.editorWrapper}>
+            <EditorDocBar
+              code={docCode || undefined}
+              documentName={displayName}
+              revisionVersion={revNum}
+              docStatus={docStatus || undefined}
+              autosaveStatus={autosave.status === 'saving' ? 'saving' : autosave.status === 'error' ? 'error' : autosave.status === 'saved' ? 'saved' : 'idle'}
+              isEditable={isEditable}
+              onBack={onDone}
+              onCheckpoints={() => setCheckpointsOpen(true)}
+              exportButton={
+                <ExportMenuButton
+                  documentID={documentID}
+                  canExport={sessionPhase === 'writer' || sessionPhase === 'readonly'}
+                />
+              }
+              onFinalize={() => void handleFinalize()}
+            />
             {canMountEditor ? (
               <MetalDocsEditor
                 ref={editorRef}

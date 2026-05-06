@@ -1,18 +1,28 @@
-.toggleBtn {
-  width: var(--sp-5);
-  flex: 0 0 var(--sp-5);
-  background: var(--surface-2);
-  border: none;
-  border-left: 1px solid var(--border);
-  cursor: pointer;
+.sidebarOuter {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.toggleTab {
+  width: 20px;
+  height: 32px;
+  margin-top: var(--sp-5);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--r-1) 0 0 var(--r-1);
+  cursor: pointer;
   color: var(--text-faint);
-  transition: background 150ms ease;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 150ms, color 150ms;
 }
-.toggleBtn:hover { background: var(--surface-3); }
+.toggleTab:hover { background: var(--surface-3); color: var(--text-soft); }
 
 .sidebar {
   width: 300px;
