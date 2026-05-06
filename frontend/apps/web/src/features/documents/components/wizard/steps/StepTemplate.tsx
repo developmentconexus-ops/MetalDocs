@@ -1,109 +1,188 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
+import { ApiError, resolveErrorMessage } from '../../../../../lib/api';
+import type { TemplateDTO } from '../../../../templates/api/templatesV2';
 import { WizardFooter } from '../WizardShell';
 import styles from './StepTemplate.module.css';
 
-type TemplateSample = {
-  id: string;
-  version: string;
-  date: string;
-  author: string;
-  label: string;
-  notes: string;
-  current?: boolean;
-  warning?: boolean;
-  blank?: boolean;
-  selected?: boolean;
+export type StepTemplateProps = {
+  profileLabel: string;
+  templates: TemplateDTO[];
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  onRetry: () => void;
+  selectedTemplateID: string | null;
+  selectedVersionID: string | null;
+  onSelect: (templateID: string, versionID: string | null) => void;
+  onAdvance: () => void;
+  onBack: () => void;
+  onCancel: () => void;
+  advanceDisabled: boolean;
 };
 
-// TODO(novo-documento): Phase 3c replaces this hardcoded sample with
-// `useTemplatesByProfileQuery(profileCode)` results. "Em branco" remains
-// disabled (no backend path); older versions remain disabled until
-// `GET /api/v2/templates/:id/versions` ships. See worksheet §1.6.
-const TEMPLATE_SAMPLES: TemplateSample[] = [
-  {
-    id: 'latest',
-    version: 'v3.2',
-    date: '12 dias atrás',
-    author: 'Documento exemplo',
-    label: 'Versão publicada (recomendada)',
-    notes: 'Documento exemplo — notas da versão publicada.',
-    current: true,
-    selected: true,
-  },
-  {
-    id: 'v31',
-    version: 'v3.1',
-    date: '3 meses atrás',
-    author: 'Documento exemplo',
-    label: 'Versão anterior',
-    notes: 'Documento exemplo — notas da versão anterior.',
-  },
-  {
-    id: 'blank',
-    version: '—',
-    date: '',
-    author: '',
-    label: 'Em branco',
-    notes: 'Documento exemplo — começar sem template.',
-    warning: true,
-    blank: true,
-  },
-];
+export function StepTemplate(props: StepTemplateProps): JSX.Element {
+  const {
+    profileLabel,
+    templates,
+    isLoading,
+    isError,
+    error,
+    onRetry,
+    selectedTemplateID,
+    selectedVersionID,
+    onSelect,
+    onAdvance,
+    onBack,
+    onCancel,
+    advanceDisabled,
+  } = props;
 
-export function StepTemplate(): JSX.Element {
   return (
     <div className="card">
-      <div className="kicker">Etapa 3 de 4 · Perfil POP — Procedimento Operacional</div>
+      <div className="kicker">Etapa 3 de 4 · {profileLabel}</div>
       <h2 className="h2">Selecione o template a ser clonado</h2>
       <p className="caption">
         O conteúdo do template será copiado para o documento. Tokens fixos serão resolvidos no freeze.
       </p>
-      <div className={styles.templateStack}>
-        {TEMPLATE_SAMPLES.map((template) => (
+
+      {isLoading ? (
+        <div className={styles.templateStack} aria-busy="true">
+          <div className="card">
+            <div className="caption">Carregando templates…</div>
+          </div>
+        </div>
+      ) : isError ? (
+        <div role="alert" className="card">
+          {resolveErrorMessage(
+            error instanceof ApiError ? error.code : undefined,
+            error instanceof Error ? error.message : undefined,
+          )}
+          <div>
+            <button type="button" className="btn btn-sm" onClick={onRetry}>
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      ) : templates.length === 0 ? (
+        <div className="card">
+          <div className="caption">Nenhum template publicado para este perfil.</div>
+        </div>
+      ) : (
+        <div className={styles.templateStack}>
+          {/* TODO(novo-documento:template-versions): only published version is
+              selectable; older versions rendered disabled with "Em breve" tooltip.
+              GET /api/v2/templates/:id/versions endpoint not yet shipped.
+              See wiki/backlog/novo-documento.md#template-versions. */}
+          {templates.map((template) => {
+            const publishedID = template.published_version_id;
+            const selectable = publishedID !== null;
+            const selected = selected_(template.id, publishedID, selectedTemplateID, selectedVersionID);
+            return (
+              <SelectableCard
+                key={template.id}
+                selected={selected}
+                disabled={!selectable}
+                title={selectable ? undefined : 'Em breve'}
+                onSelect={() => {
+                  if (!selectable) return;
+                  onSelect(template.id, publishedID);
+                }}
+              >
+                <div className={styles.templateRow}>
+                  <div className={styles.templatePreview}>
+                    <div className={styles.previewTitleBar} />
+                    {Array.from({ length: 7 }).map((_, idx) => (
+                      <div key={idx} className={styles.previewLine} />
+                    ))}
+                  </div>
+                  <div className={styles.templateMain}>
+                    <div className={styles.templateLabelRow}>
+                      <span className={styles.templateLabel}>{template.name}</span>
+                      <span className="pill mono">v{template.latest_version}</span>
+                      {selectable ? (
+                        <span className="pill pill-frozen">
+                          <span className="dot" />
+                          publicada
+                        </span>
+                      ) : (
+                        <span className="pill" title="Em breve">
+                          sem versão publicada
+                        </span>
+                      )}
+                    </div>
+                    <p className="caption">{template.description ?? ''}</p>
+                    <div className={styles.templateMeta}>
+                      por {template.created_by} · atualizado {formatDate(template.created_at)}
+                    </div>
+                  </div>
+                  {selected ? <Icon name="check" /> : null}
+                </div>
+              </SelectableCard>
+            );
+          })}
+
+          {/* TODO(novo-documento:blank-template): "Em branco" rendered disabled —
+              POST /api/v2/documents does not support template_version_id: null today.
+              See wiki/backlog/novo-documento.md#blank-template. */}
           <SelectableCard
-            key={template.id}
-            selected={Boolean(template.selected)}
+            selected={false}
+            disabled
+            title="Em breve"
             onSelect={() => {}}
           >
             <div className={styles.templateRow}>
               <div className={styles.templatePreview}>
                 <div className={styles.previewTitleBar} />
-                {template.blank
-                  ? null
-                  : Array.from({ length: 7 }).map((_, idx) => (
-                      <div key={idx} className={styles.previewLine} />
-                    ))}
               </div>
               <div className={styles.templateMain}>
                 <div className={styles.templateLabelRow}>
-                  <span className={styles.templateLabel}>{template.label}</span>
-                  {template.version !== '—' ? (
-                    <span className="pill mono">{template.version}</span>
-                  ) : null}
-                  {template.current ? (
-                    <span className="pill pill-frozen">
-                      <span className="dot" />
-                      publicada
-                    </span>
-                  ) : null}
-                  {template.warning ? <span className="pill">cuidado</span> : null}
+                  <span className={styles.templateLabel}>Em branco</span>
+                  <span className="pill" title="Em breve">
+                    cuidado
+                  </span>
                 </div>
-                <p className="caption">{template.notes}</p>
-                {template.author ? (
-                  <div className={styles.templateMeta}>
-                    por {template.author} · atualizado {template.date}
-                  </div>
-                ) : null}
+                <p className="caption">Começar sem template (em breve).</p>
               </div>
-              {template.selected ? <Icon name="check" /> : null}
             </div>
           </SelectableCard>
-        ))}
-      </div>
-      <WizardFooter stepLabel="Etapa 3 de 4 · Avance para revisar e confirmar" />
+        </div>
+      )}
+
+      <WizardFooter
+        stepLabel={
+          advanceDisabled
+            ? 'Etapa 3 de 4 · Selecione um template para continuar'
+            : 'Etapa 3 de 4 · Avance para revisar e confirmar'
+        }
+        primaryDisabled={advanceDisabled}
+        onAdvance={onAdvance}
+        onBack={onBack}
+        onCancel={onCancel}
+      />
     </div>
   );
+}
+
+function selected_(
+  templateID: string,
+  publishedVersionID: string | null,
+  selectedTemplateID: string | null,
+  selectedVersionID: string | null,
+): boolean {
+  return (
+    selectedTemplateID === templateID &&
+    selectedVersionID !== null &&
+    selectedVersionID === publishedVersionID
+  );
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('pt-BR');
+  } catch {
+    return iso;
+  }
 }
 
 export default StepTemplate;
