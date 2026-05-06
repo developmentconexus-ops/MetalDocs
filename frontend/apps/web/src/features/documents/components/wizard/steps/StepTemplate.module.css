@@ -1,23 +1,92 @@
+/* Vertical stack of template cards. Mirrors selected-wizard.jsx line 121:
+   { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 8 }.
+   gap 10 rounds to --sp-2 (8). */
 .templateStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
 }
 
+/* Template card horizontal row (preview + main + check). Mirrors
+   selected-wizard.jsx line 128: { display: 'flex', alignItems: 'center',
+   gap: 16 }. Card padding lives in SelectableCard primitive. */
 .templateRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
 }
 
+/* Mini doc preview thumbnail. Mirrors selected-wizard.jsx line 131:
+   { width: 60, height: 76, background: 'white',
+     boxShadow: '0 2px 6px rgba(0,0,0,0.06)', borderRadius: 2,
+     padding: '6px 5px', flexShrink: 0 }.
+   60×76, radius 2px, padding 6/5 are fixed pixel-perfect mini-thumbnail
+   dimensions (per dispatcher allow-list). Background uses --surface
+   (= #ffffff). */
 .templatePreview {
+  width: 60px;
+  height: 76px;
+  flex-shrink: 0;
+  padding: 6px 5px;
+  background: var(--surface);
+  border-radius: 2px;
+  box-shadow: var(--shadow-paper-1);
 }
 
+/* Mini-preview top title bar. Mirrors selected-wizard.jsx line 132:
+   { height: 3, background: 'var(--brand)' [or 'var(--border-strong)' for blank],
+     marginBottom: 4, width: '60%' }.
+   Height 3px is part of the fixed-pixel mini-thumbnail layout.
+   marginBottom 4 → --sp-1. */
 .previewTitleBar {
+  height: 3px;
+  width: 60%;
+  margin-bottom: var(--sp-1);
+  background: var(--brand);
 }
 
+/* Mini-preview content line. Mirrors selected-wizard.jsx line 133:
+   { height: 1.5, background: 'var(--border-strong)', marginBottom: 2.5,
+     width: variable }.
+   Height 1.5px and marginBottom 2.5px are part of the fixed-pixel
+   mini-thumbnail layout (not body spacing).
+   TODO(novo-documento): reference varies width per line via inline style
+   (`${55 + (k*9) % 35}%`); Phase 3c may restore that variation if visual
+   diff requires it. */
 .previewLine {
+  height: 1.5px;
+  width: 70%;
+  margin-bottom: 2.5px;
+  background: var(--border-strong);
 }
 
+/* Template main col. Mirrors selected-wizard.jsx line 135:
+   { flex: 1, minWidth: 0 }. */
 .templateMain {
+  flex: 1;
+  min-width: 0;
 }
 
+/* Template label + pills row. Mirrors selected-wizard.jsx line 136:
+   { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }. */
 .templateLabelRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
 }
 
+/* Template label span (the human-readable name). Mirrors selected-wizard.jsx
+   line 137: { fontSize: 14, fontWeight: 500 }. */
+.templateLabel {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Tiny by/updated meta. Mirrors selected-wizard.jsx line 143:
+   { color: 'var(--text-muted)' }. Inner is .tiny — kept as utility class
+   in TSX (no rule needed here beyond color). */
 .templateMeta {
+  color: var(--text-muted);
 }

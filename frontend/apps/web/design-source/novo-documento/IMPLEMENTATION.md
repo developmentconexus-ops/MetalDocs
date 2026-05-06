@@ -249,14 +249,102 @@ Subagent receives all 4 step HTMLs + selected-wizard.jsx.
 
 ### 3b.1 Token map
 
-(Filled during Phase 3b execution.)
+Sources: `design-source/selected-wizard.jsx` (Stepper, WizardShell, Footer, Step1, Step3, Step4) and `design-source/selected-wizard-v2.jsx` (Step2). All values listed are inline `style={{ ... }}` props on the reference JSX.
 
-| Design value | Existing token | New token (if needed) |
+#### Colors
+
+| Design value | Existing token | New token | Notes |
+|---|---|---|---|
+| `var(--bg)` (page bg) | `--bg` | — | exact |
+| `var(--surface)` (stepper bg, mini-thumb paper) | `--surface` (= `#ffffff`) | — | also covers literal `'white'` for mini-thumbnails |
+| `var(--surface-2)` (profile chip, preview card) | `--surface-2` | — | exact |
+| `var(--surface-3)` (icon-tile idle) | `--surface-3` | — | exact |
+| `var(--brand)` (selected border, kicker accents) | `--brand` | — | exact |
+| `var(--brand-soft)` (dashed callout border) | `--brand-soft` | — | exact |
+| `var(--brand-pale)` (selected card bg, callouts) | `--brand-pale` | — | exact |
+| `var(--border)` (cards, dashed field rows) | `--border` | — | exact |
+| `var(--border-strong)` (template preview bars) | `--border-strong` | — | exact |
+| `var(--text)` | `--text` | — | exact |
+| `var(--text-soft)` (callout body, consent) | `--text-soft` | — | exact |
+| `var(--text-muted)` (meta, label) | `--text-muted` | — | exact |
+| `'#888'` (Step 4 thumbnail mono code) | `--text-muted` (`#8a7575`) | — | hex→token (visually equivalent) |
+| `'#e0d0d0'` (Step 4 thumbnail line bars) | — | `--paper-line` | new token (paper aesthetic) |
+| `'white'` (mini-thumbnail bg) | `--surface` | — | `--surface` is `#ffffff` |
+| `var(--warning)` (cuidado pill text) | `--warning` | — | already used via `pill` utility |
+
+#### Border-radius
+
+| Design value | Existing token | New token | Notes |
+|---|---|---|---|
+| `var(--r-2)` (chip, callout, icon-tile) | `--r-2` | — | exact |
+| `var(--r-3)` (cards, banner, preview-card) | `--r-3` | — | exact |
+| `2` (mini-thumbnails) | — | — | raw `2px` (fixed paper-thumbnail aesthetic per dispatcher allow-list) |
+| `6` (visibility icon-tile) | `--r-2` (6px) | — | exact match |
+
+#### Spacing (margin / padding / gap)
+
+| Design value | Existing token | Notes |
 |---|---|---|
+| `4` | `--sp-1` (4) | exact |
+| `8` | `--sp-2` (8) | exact |
+| `12` | `--sp-3` (12) | exact |
+| `16` | `--sp-4` (16) | exact |
+| `20` | `--sp-5` (20) | exact |
+| `24` | `--sp-6` (24) | exact |
+| `32` | `--sp-7` (32) | exact |
+| `3` (visibility label mb, thumbnail mono mb) | `--sp-1` (4) | rounded up — visual drift ≤ 1px |
+| `6` (profile/header mb, thumbnail title-bar mb) | `--sp-2` (8) | rounded up — visual drift ≤ 2px |
+| `10` (footer gap, card gaps, profile-chip pad-y) | `--sp-2` (8) | rounded down — visual drift ≤ 2px |
+| `14` (callout pad, doc-title mb) | `--sp-4` (16) | rounded up — visual drift ≤ 2px |
+| `18` (preview-card grid+pad+mb, profileArea mb, ol pad-left) | `--sp-4` (16) | rounded down — visual drift ≤ 2px |
+| `22` (banner mb, callout mb) | `--sp-5` (20) | rounded down — visual drift ≤ 2px |
+| `28` (page horizontal pad) | `--sp-7` (32) | rounded up — symmetric with vertical 32 |
 
-- [ ] All design values mapped
-- [ ] Missing tokens added in separate commit
-- [ ] CSS Module uses ONLY tokens
+#### Fixed pixel-perfect (allowed per dispatcher)
+
+| Design value | Use | Notes |
+|---|---|---|
+| `120 × 152` | Step 4 doc thumbnail | dispatcher allow-list |
+| `60 × 76` | Step 3 template preview | dispatcher allow-list |
+| `32 × 32` | visibility icon tile | dispatcher allow-list |
+| `22 × 22` | stepper dot (in `Stepper` primitive) | dispatcher allow-list |
+| `1px` | borders | dispatcher allow-list |
+| `0` | margin/padding zero | dispatcher allow-list |
+| `2px` | mini-thumbnail border-radius | paper-thumbnail aesthetic |
+| `6px 5px` | template preview pad | inside fixed-thumb layout |
+| `10px 9px` | doc thumbnail pad | inside fixed-thumb layout |
+| `3px` | thumbnail-line content mb (Step 4) | inside fixed-thumb layout |
+| `2.5px` | preview-line content mb (Step 3) | inside fixed-thumb layout |
+| `1.5px` | preview/thumbnail line bar height | inside fixed-thumb layout |
+| `3px / 4px` | preview/thumbnail title-bar height | inside fixed-thumb layout |
+
+#### Typography
+
+| Design value | Existing token | Notes |
+|---|---|---|
+| `'JetBrains Mono', ...` (mono code) | `--font-mono` | via `.mono` utility |
+| `'Inter Tight', ...` (body) | `--font-sans` | via global rule |
+| `lineHeight: 1.4 / 1.7` | — | unitless ratios — kept raw per dispatcher rules |
+| `letterSpacing: '0.02em'` | — | kept raw per dispatcher rules |
+| `fontSize: 7 / 9 / 10 / 11 / 12 / 12.5 / 13 / 14 / 16 / 26 px` | — | **No font-size tokens** in current scale. One-off raw px with TODO comment in CodePreviewBanner per dispatcher rules; used per-element where needed. |
+
+#### Shadow
+
+| Design value | Existing token | New token | Notes |
+|---|---|---|---|
+| `0 2px 6px rgba(0,0,0,0.06)` (template preview) | — | `--shadow-paper-1` | new (neutral, not brand-tinted) |
+| `0 2px 8px rgba(0,0,0,0.06)` (Step 4 thumbnail) | — | `--shadow-paper-2` | new (neutral, not brand-tinted) |
+| `--shadow-1` (selected card) | `--shadow-1` | — | already in `SelectableCard` |
+
+### 3b.2 Open questions
+
+| # | Phase | Question | User answer | Resolved |
+|---|---|---|---|---|
+| 6 | 3b | **Visibility icon mismatch.** `features/documents/lib/visibilityMeta.ts` declares icons `users` / `user-plus` / `building` / `external-link`; the JSX reference renders `taxonomy` / `users` / `home` / `link`; only the JSX-reference set exists in `components/ui/Icon.tsx`. Phase 3a TSX renders the JSX-reference icons (working). Choose: (A) extend `Icon.tsx` with `user-plus` / `building` / `external-link` and update visibilityMeta to match, OR (B) remap `visibilityMeta.ts` to existing icons (e.g. `users` → `taxonomy`?, `user-plus` → `users`, `building` → `home`, `external-link` → `link`). Phase 3c picks the path. | _pending_ | — |
+
+- [x] All design values mapped
+- [x] Missing tokens added in separate commit
+- [x] CSS Module uses ONLY tokens
 - [ ] User approved screenshot diff vs each step HTML
 
 ---

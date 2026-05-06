@@ -1,3 +1,1 @@
-/* Page is a thin wrapper around WizardShell — most styles live in
-   WizardShell.module.css and per-step modules. Reserved for any future
-   page-level layout concerns (e.g. background, scroll behavior). */
+/* intentionally empty — page is dispatch shell */

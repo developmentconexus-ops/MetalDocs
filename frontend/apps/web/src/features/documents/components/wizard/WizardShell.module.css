@@ -1,8 +1,24 @@
+/* Page-scroll wrapper. Mirrors selected-wizard.jsx WizardShell outer div
+   (line 31): { flex: 1, overflow: 'auto', background: 'var(--bg)',
+   padding: '32px 28px' }. Horizontal 28 rounds to --sp-7 (32). */
 .scrollWrapper {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+  padding: var(--sp-7) var(--sp-7);
 }
 
+/* Max-width content container. Mirrors selected-wizard.jsx WizardShell inner div
+   (line 32): { maxWidth: 880, margin: '0 auto' }. */
 .container {
+  max-width: 880px;
+  margin: 0 auto;
 }
 
+/* Footer row. Mirrors selected-wizard.jsx Footer (line 47):
+   { display: 'flex', alignItems: 'center', gap: 10 }. 10 rounds to --sp-2 (8). */
 .footerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
 }
