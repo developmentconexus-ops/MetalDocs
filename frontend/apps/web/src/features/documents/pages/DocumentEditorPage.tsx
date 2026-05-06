@@ -12,6 +12,8 @@ import { PDFCell } from '../components/PDFCell';
 import type { DocumentResponse } from '../api/documentsV2';
 import { CheckpointsDialog } from '../components/CheckpointsDialog';
 import { ExportMenuButton } from '../components/ExportMenuButton';
+import { EditorDocBar } from '../components/EditorDocBar';
+import { EditorMetaSidebar } from '../components/EditorMetaSidebar';
 import styles from './styles/DocumentEditorPage.module.css';
 
 export type DocumentEditorPageProps = {
@@ -189,70 +191,32 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     && session.state.phase !== 'acquiring'
     && buffer !== undefined;
 
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(
+    () => localStorage.getItem('editor-sidebar-open') !== 'false'
+  );
+
   return (
     <div className={styles.page} data-editor-root>
+      <EditorDocBar
+        code={docCode || undefined}
+        documentName={displayName}
+        revisionVersion={revNum}
+        docStatus={docStatus || undefined}
+        autosaveStatus={autosave.status === 'saving' ? 'saving' : autosave.status === 'error' ? 'error' : autosave.status === 'saved' ? 'saved' : 'idle'}
+        isEditable={isEditable}
+        onBack={onDone}
+        onCheckpoints={() => setCheckpointsOpen(true)}
+        exportButton={
+          <ExportMenuButton
+            documentID={documentID}
+            canExport={sessionPhase === 'writer' || sessionPhase === 'readonly'}
+          />
+        }
+        onFinalize={() => void handleFinalize()}
+      />
       <div className={styles.body}>
-
         <main className={styles.canvas}>
           <div className={styles.editorWrapper}>
-
-            <div className={styles.overlayBack}>
-              <button className={styles.overlayBackBtn} onClick={onDone} aria-label="Voltar">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-            </div>
-
-            <div className={styles.overlayTitle}>
-              <span className={styles.docMeta}>Documento</span>
-              <span className={styles.docSep}>·</span>
-              <span className={styles.docTitle}>{docCode ? `${docCode}-${displayName}` : (displayName || 'Documento')}</span>
-              {doc && <span className={styles.versionBadge}>REV{String(revNum).padStart(2, '0')}</span>}
-              {docStatus && (
-                <span className={`${styles.statusPill} ${statusPillClass}`}>
-                  {docStatus.replace('_', ' ')}
-                </span>
-              )}
-            </div>
-
-            <div className={styles.overlayRight}>
-              {autosave.status === 'saving' ? (
-                <span className={styles.autosaveStatus}>
-                  <span className={styles.autosaveDot} aria-hidden="true" />
-                  Saving…
-                </span>
-              ) : autosave.status === 'error' ? (
-                <span className={styles.autosaveStatus} style={{ color: '#dc2626' }}>Save failed</span>
-              ) : autosave.status === 'saved' ? (
-                <span className={styles.autosaveStatus}>✓ Saved</span>
-              ) : (
-                <span className={styles.autosaveStatus} />
-              )}
-              <button
-                type="button"
-                className={styles.editorSubmitBtn}
-                onClick={() => setCheckpointsOpen(true)}
-              >
-                Checkpoints
-              </button>
-              <ExportMenuButton
-                documentID={documentID}
-                canExport={sessionPhase === 'writer' || sessionPhase === 'readonly'}
-              />
-              {docStatus !== 'draft' && docStatus !== '' && (
-                <PDFCell status={pdf.status} url={pdf.url} onRetry={pdf.retry} />
-              )}
-              <button
-                type="button"
-                className={styles.editorSubmitBtn}
-                onClick={() => void handleFinalize()}
-                disabled={!isEditable}
-              >
-                Finalizar
-              </button>
-            </div>
-
             {canMountEditor ? (
               <MetalDocsEditor
                 ref={editorRef}
@@ -270,12 +234,20 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 showRuler={false}
               />
             ) : null}
-
           </div>
         </main>
-
+        <EditorMetaSidebar
+          open={sidebarOpen}
+          onToggle={() => {
+            setSidebarOpen((prev) => {
+              const next = !prev;
+              localStorage.setItem('editor-sidebar-open', String(next));
+              return next;
+            });
+          }}
+          code={docCode || undefined}
+        />
       </div>
-
       <CheckpointsDialog
         open={checkpointsOpen}
         onClose={() => setCheckpointsOpen(false)}
