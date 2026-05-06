@@ -30,6 +30,11 @@
   background: var(--info-bg);
 }
 
+:global(.pill-frozen) {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
 :global(.pill-published) {
   color: var(--success);
   background: var(--success-bg);
