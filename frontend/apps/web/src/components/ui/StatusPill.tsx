@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<DocumentStatus, { label: string; pillClass: string }
   review: { label: 'Em Revisão', pillClass: 'pill pill-review' },
   under_review: { label: 'Em Revisão', pillClass: 'pill pill-review' },
   approved: { label: 'Aprovado', pillClass: 'pill pill-approved' },
-  frozen: { label: 'Agendado', pillClass: 'pill pill-scheduled' },
+  frozen: { label: 'Congelado', pillClass: 'pill pill-frozen' },
   rejected: { label: 'Rejeitado', pillClass: 'pill pill-rejected' },
   archived: { label: 'Obsoleto', pillClass: 'pill pill-obsolete' },
   finalized: { label: 'Publicado', pillClass: 'pill pill-published' },
