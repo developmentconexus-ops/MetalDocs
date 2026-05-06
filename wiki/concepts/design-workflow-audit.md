@@ -2,6 +2,8 @@
 
 **Last verified:** 2026-05-06
 
+> **In the implementation workflow:** this audit is now **Phase 0** of the `metaldocs-screen-implementation` skill (`.claude/skills/metaldocs-screen-implementation/SKILL.md`). The Keep/Cut/Defer decisions land in `frontend/apps/web/design-source/<slug>/IMPLEMENTATION.md` §0.1 and require user confirmation before any TSX is written.
+
 When implementing any screen sourced from `frontend/apps/web/design-source/<slug>/` (the Claude-Design-generated mockups powering the screen-redesign initiative), you MUST audit the design against the real MetalDocs workflow before writing TSX.
 
 ## Why this exists
