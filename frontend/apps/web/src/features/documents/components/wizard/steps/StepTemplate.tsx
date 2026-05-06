@@ -77,7 +77,7 @@ export function StepTemplate(): JSX.Element {
               </div>
               <div className={styles.templateMain}>
                 <div className={styles.templateLabelRow}>
-                  <span>{template.label}</span>
+                  <span className={styles.templateLabel}>{template.label}</span>
                   {template.version !== '—' ? (
                     <span className="pill mono">{template.version}</span>
                   ) : null}

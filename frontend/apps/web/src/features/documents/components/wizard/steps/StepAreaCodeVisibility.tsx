@@ -90,7 +90,7 @@ export function StepAreaCodeVisibility(): JSX.Element {
                 <Icon name={option.icon} />
               </span>
               <div className={styles.visibilityText}>
-                <div>{option.label}</div>
+                <div className={styles.visibilityLabel}>{option.label}</div>
                 <p className="caption">{option.desc}</p>
               </div>
               {option.selected ? <Icon name="check" /> : null}

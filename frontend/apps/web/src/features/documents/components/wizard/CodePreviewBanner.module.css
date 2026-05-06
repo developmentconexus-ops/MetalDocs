@@ -1,5 +1,24 @@
+/* Step 2 dashed brand-pale callout. Mirrors selected-wizard-v2.jsx line 76:
+   { padding: 16, background: 'var(--brand-pale)',
+     border: '1px dashed var(--brand-soft)',
+     borderRadius: 'var(--r-3)', marginBottom: 22 }.
+   marginBottom 22 rounds to --sp-5 (20). */
 .banner {
+  padding: var(--sp-4);
+  background: var(--brand-pale);
+  border: 1px dashed var(--brand-soft);
+  border-radius: var(--r-3);
+  margin-bottom: var(--sp-5);
 }
 
+/* Generated code mono text. Mirrors selected-wizard-v2.jsx line 78:
+   { fontSize: 26, fontWeight: 600, color: 'var(--brand)',
+     letterSpacing: '0.02em' }.
+   TODO(novo-documento): wizard uses ad-hoc 13/12.5/11/10/9px sizes plus 26px
+   for the code preview; consider a typography token scale. */
 .code {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--brand);
+  letter-spacing: 0.02em;
 }

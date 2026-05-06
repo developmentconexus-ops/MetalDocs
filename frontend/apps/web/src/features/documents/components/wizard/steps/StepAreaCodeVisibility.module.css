@@ -1,20 +1,83 @@
+/* Profile-chip + area select 2-col row. Mirrors selected-wizard-v2.jsx line 46:
+   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16,
+     marginBottom: 18 }. marginBottom 18 rounds to --sp-4 (16). */
 .profileAreaRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
 }
 
+/* Surface-2 selected-profile chip row. Mirrors selected-wizard-v2.jsx line 49:
+   { padding: '10px 12px', background: 'var(--surface-2)',
+     border: '1px solid var(--border)', borderRadius: 'var(--r-2)',
+     display: 'flex', alignItems: 'center', gap: 10 }.
+   padding 10/12 rounds to --sp-2/--sp-3; gap 10 rounds to --sp-2. */
 .profileChip {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
 }
 
+/* Title row wrapper. Mirrors selected-wizard-v2.jsx line 70:
+   { marginBottom: 18 }. 18 rounds to --sp-4 (16). */
 .titleRow {
+  margin-bottom: var(--sp-4);
 }
 
+/* Visibility 2x2 grid. Mirrors selected-wizard-v2.jsx line 84:
+   { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
+     marginBottom: 24 }. gap 10 rounds to --sp-2 (8). */
 .visibilityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-6);
 }
 
+/* Visibility card body (icon-tile + text + check). Mirrors selected-wizard-v2.jsx
+   line 86: { display: 'flex', alignItems: 'flex-start', gap: 10 }.
+   Padding handled by SelectableCard primitive. gap 10 rounds to --sp-2 (8). */
 .visibilityCardBody {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
 }
 
+/* Visibility icon tile. Mirrors selected-wizard-v2.jsx line 93:
+   { width: 32, height: 32, background: 'var(--surface-3)',
+     color: 'var(--text-muted)', borderRadius: 6,
+     display: 'grid', placeItems: 'center', flexShrink: 0 }.
+   32×32 is a fixed icon-tile dimension (not spacing). borderRadius 6 → --r-2.
+   TODO(novo-documento): selected state changes background to var(--brand) +
+   color white; wired in Phase 3c when SelectableCard exposes selected
+   context to children (or via inline className on the tile span). */
 .visibilityIconTile {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  border-radius: var(--r-2);
 }
 
+/* Visibility text col. Mirrors selected-wizard-v2.jsx line 96:
+   { flex: 1 }. Inner label is 13/500 with 3px bottom margin. */
 .visibilityText {
+  flex: 1;
+}
+
+/* Visibility option label (sibling of caption inside .visibilityText).
+   Mirrors selected-wizard-v2.jsx line 97:
+   { fontSize: 13, fontWeight: 500, marginBottom: 3 }. 3 rounds to --sp-1 (4). */
+.visibilityLabel {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: var(--sp-1);
 }

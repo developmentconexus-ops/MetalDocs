@@ -26,7 +26,7 @@ export function StepConfirm(): JSX.Element {
       <div className={styles.previewCard}>
         <div className={styles.docThumbnail}>
           <div className={styles.thumbnailTitleBar} />
-          <div className="mono">POP-QUA-??? v1</div>
+          <div className={`${styles.thumbnailCode} mono`}>POP-QUA-??? v1</div>
           {Array.from({ length: 11 }).map((_, idx) => (
             <div key={idx} className={styles.thumbnailLine} />
           ))}
@@ -50,8 +50,8 @@ export function StepConfirm(): JSX.Element {
       </div>
 
       <div className={styles.nextStepsCallout}>
-        <div className="kicker">Ao confirmar</div>
-        <ol>
+        <div className={`${styles.nextStepsKicker} kicker`}>Ao confirmar</div>
+        <ol className={styles.nextStepsList}>
           <li>
             O slot <span className="mono">POP-QUA-???</span> será reservado permanentemente — códigos não são reutilizados mesmo após arquivamento.
           </li>

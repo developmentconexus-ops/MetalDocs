@@ -1,35 +1,162 @@
+/* Doc preview-card 2-col grid (thumbnail + summary). Mirrors selected-wizard.jsx
+   line 164: { display: 'grid', gridTemplateColumns: '120px 1fr', gap: 18,
+   padding: 18, background: 'var(--surface-2)',
+   border: '1px solid var(--border)', borderRadius: 'var(--r-3)',
+   marginBottom: 18 }.
+   gap/padding/marginBottom 18 round to --sp-4 (16). */
 .previewCard {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
 }
 
+/* Mini doc thumbnail. Mirrors selected-wizard.jsx line 165:
+   { width: 120, height: 152, background: 'white',
+     boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 2,
+     padding: '10px 9px' }.
+   120×152, radius 2px, padding 10/9 are fixed pixel-perfect mini-thumbnail
+   dimensions (per dispatcher allow-list). Background uses --surface
+   (= #ffffff). */
 .docThumbnail {
+  width: 120px;
+  height: 152px;
+  padding: 10px 9px;
+  background: var(--surface);
+  border-radius: 2px;
+  box-shadow: var(--shadow-paper-2);
 }
 
+/* Thumbnail top title bar. Mirrors selected-wizard.jsx line 166:
+   { height: 4, background: 'var(--brand)', marginBottom: 6, width: '70%' }.
+   Height 4px is part of the fixed-pixel thumbnail layout.
+   marginBottom 6 rounds to --sp-2 (8). */
 .thumbnailTitleBar {
+  height: 4px;
+  width: 70%;
+  margin-bottom: var(--sp-2);
+  background: var(--brand);
 }
 
+/* Mono code line inside thumbnail. Mirrors selected-wizard.jsx line 167:
+   { fontSize: 7, fontFamily: 'var(--font-mono)', color: '#888',
+     marginBottom: 4 }.
+   fontSize 7px is a deliberate paper-aesthetic mini-text.
+   marginBottom 4 → --sp-1. The reference uses literal '#888' which is
+   visually equivalent to var(--text-muted) (#8a7575); chose the token. */
+.thumbnailCode {
+  font-size: 7px;
+  margin-bottom: var(--sp-1);
+  color: var(--text-muted);
+}
+
+/* Thumbnail content line bar. Mirrors selected-wizard.jsx line 168:
+   { height: 1.5, background: '#e0d0d0', marginBottom: 3, width: variable }.
+   Height 1.5px and marginBottom 3px are part of the fixed-pixel
+   thumbnail layout (not body spacing). Color uses --paper-line.
+   TODO(novo-documento): reference varies width per line via inline
+   style (`${55 + (k*11) % 38}%`); Phase 3c may restore that variation. */
 .thumbnailLine {
+  height: 1.5px;
+  width: 70%;
+  margin-bottom: 3px;
+  background: var(--paper-line);
 }
 
+/* Summary header row (chip + status + ver). Mirrors selected-wizard.jsx
+   line 171: { display: 'flex', alignItems: 'center', gap: 8,
+   marginBottom: 8 }. */
 .summaryHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
 }
 
+/* Doc title. Mirrors selected-wizard.jsx line 176:
+   { fontSize: 16, fontWeight: 500, marginBottom: 14 }.
+   marginBottom 14 rounds to --sp-4 (16). */
 .docTitle {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: var(--sp-4);
 }
 
+/* 2-col field grid. Mirrors selected-wizard.jsx line 177:
+   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
+   fontSize: 12 }. */
 .fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+  font-size: 12px;
 }
 
+/* Field row. Mirrors selected-wizard.jsx line 186:
+   { display: 'flex', justifyContent: 'space-between', padding: '4px 0',
+   borderBottom: '1px dashed var(--border)' }. */
 .fieldRow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--sp-1) 0;
+  border-bottom: 1px dashed var(--border);
 }
 
+/* Field label. Mirrors selected-wizard.jsx line 187:
+   { color: 'var(--text-muted)' }. */
 .fieldLabel {
+  color: var(--text-muted);
 }
 
+/* Field value. Reference has no extra style — kept empty for symmetry
+   and for Phase 3c hooks if needed. */
 .fieldValue {
 }
 
+/* Dashed brand-pale "what happens" callout. Mirrors selected-wizard.jsx
+   line 196: { padding: 14, background: 'var(--brand-pale)',
+   border: '1px dashed var(--brand-soft)', borderRadius: 'var(--r-2)',
+   marginBottom: 22 }.
+   padding 14 → --sp-4 (16). marginBottom 22 → --sp-5 (20).
+   Inner kicker is colored var(--brand); inner ol uses paddingLeft 18,
+   fontSize 12.5, lineHeight 1.7, color var(--text-soft). */
 .nextStepsCallout {
+  padding: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  background: var(--brand-pale);
+  border: 1px dashed var(--brand-soft);
+  border-radius: var(--r-2);
 }
 
+/* Kicker inside the callout overrides the utility .kicker color.
+   Mirrors selected-wizard.jsx line 197: { color: 'var(--brand)' }. */
+.nextStepsKicker {
+  color: var(--brand);
+}
+
+/* Ordered list inside the callout. Mirrors selected-wizard.jsx line 198:
+   { margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7,
+   color: 'var(--text-soft)' }. paddingLeft 18 → --sp-4 (16). */
+.nextStepsList {
+  margin: 0;
+  padding-left: var(--sp-4);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-soft);
+}
+
+/* Consent checkbox row. Mirrors selected-wizard.jsx line 206:
+   { display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 12.5,
+   color: 'var(--text-soft)', marginBottom: 8 }. gap 10 → --sp-2 (8). */
 .consentRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+  font-size: 12.5px;
+  color: var(--text-soft);
 }
