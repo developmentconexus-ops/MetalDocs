@@ -25,7 +25,7 @@ When you change code referenced by a wiki doc, update its `Last verified:` stamp
 
 For ANY work under `frontend/apps/web/src/` (new screens, components, refactors, design implementation, routing, state, API wiring), use the **`metaldocs-frontend`** skill (`.claude/skills/metaldocs-frontend/SKILL.md`). It enforces the canonical structure defined in `wiki/architecture/frontend-structure.md` — feature-sliced layout, `createBrowserRouter` + per-feature `routes.tsx`, TanStack Query for server state, OpenAPI-codegen types from `lib/api-types/`, CSS Modules + design tokens, no `HashRouter`, no string-pattern path dispatchers, no legacy `src/api/` or root flat files. **Never reintroduce legacy paths.** When you touch a file outside the canonical layout, migrate it in the same change (no shims, no re-exports).
 
-Designed screens land in `frontend/apps/web/design-source/<slug>/` (HTML + screenshot + NOTES.md) — read the NOTES file before implementing.
+Designed screens land in `frontend/apps/web/design-source/<slug>/` (HTML + screenshot + NOTES.md). For any task that says "implement screen X" or references a `design-source/<slug>/` directory, ALSO use the **`metaldocs-screen-implementation`** skill (`.claude/skills/metaldocs-screen-implementation/SKILL.md`) on top of `metaldocs-frontend`. It drives a 6-phase workflow (Audit → Map → Pre-flight → Page assembly → Verify → Document) with hard gates that captures lessons from the Library screen rollout.
 
 ---
 
