@@ -1,6 +1,26 @@
-.pill {
+﻿.pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+}
+
+:global(.pill-scheduled) {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+:global(.pill-published) {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+:global(.pill-superseded) {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+:global(.pill-obsolete) {
+  color: var(--danger);
+  background: var(--danger-bg);
 }
