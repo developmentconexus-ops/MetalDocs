@@ -1,257 +1,88 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import * as api from './api/auth';
-import { onAuthExpired } from "../../lib/api";
-import type { CurrentUser } from "../../lib/types";
-import { useAuthStore } from "../../store/auth.store";
-import { useDocumentsStore } from "../documents/state/documents.store";
-import { useNotificationsStore } from "../notifications/state/notifications.store";
-import { useRegistryStore } from "../registry/state/registry.store";
-import { useUiStore } from "../../store/ui.store";
-import { asMessage, statusOf } from "../shared/errors";
+import { useAuthStore } from '../../store/auth.store';
+import { useUiStore } from '../../store/ui.store';
+import { asMessage, statusOf } from '../shared/errors';
 
-type UseAuthSessionOptions = {
-  onAuthenticated: (user: CurrentUser) => Promise<void>;
-};
-
-export function useAuthSession({ onAuthenticated }: UseAuthSessionOptions) {
-  const { authState, user, loginForm, passwordForm, setAuthState, setUser, setLoginForm, setPasswordForm } = useAuthStore();
+// useAuthSession — login / logout / change-password.
+// Bootstrap (me() on mount) is handled by AppRoot.
+// All server cache invalidation happens via queryClient.clear() on logout/expiry.
+export function useAuthSession() {
+  const queryClient = useQueryClient();
   const {
-    setLoadState,
-    setDocuments,
-    setSelectedDocument,
-    setVersions,
-    setVersionDiff,
-    setApprovals,
-    setAttachments,
-    setCollaborationPresence,
-    setDocumentEditLock,
-    setPolicies,
-    setAuditEvents,
-    setDocumentForm,
-    setContentMode,
-    setContentFile,
-    setContentPdfUrl,
-    setContentDocxUrl,
-    setContentStatus,
-    setContentError,
-  } = useDocumentsStore();
-  const { setNotifications } = useNotificationsStore();
-  const { setSelectedProfileSchema, setSelectedProfileSchemas, setSelectedProfileGovernance, setSubjects } = useRegistryStore();
-  const { setMessage, setError, setManagedUsers } = useUiStore();
-
-  useEffect(() => {
-    return onAuthExpired(({ returnTo }) => {
-      if (returnTo && returnTo !== "/" && !returnTo.startsWith("/login")) {
-        sessionStorage.setItem("auth:returnTo", returnTo);
-      }
-      setUser(null);
-      setAuthState("idle");
-    });
-  }, [setAuthState, setUser]);
-  const clearWorkspaceAfterPasswordChange = useCallback(() => {
-    setSubjects([]);
-    setDocuments([]);
-    setVersions([]);
-    setVersionDiff(null);
-    setApprovals([]);
-    setAttachments([]);
-    setCollaborationPresence([]);
-    setDocumentEditLock(null);
-    setPolicies([]);
-    setAuditEvents([]);
-    setManagedUsers([]);
-    setNotifications([]);
-    setSelectedDocument(null);
-    setLoadState("idle");
-  }, [
-    setApprovals,
-    setAttachments,
-    setAuditEvents,
-    setCollaborationPresence,
-    setDocumentEditLock,
-    setDocuments,
-    setLoadState,
-    setManagedUsers,
-    setNotifications,
-    setPolicies,
-    setSelectedDocument,
-    setSubjects,
-    setVersionDiff,
-    setVersions,
-  ]);
-
-  const clearWorkspaceOnLogout = useCallback(() => {
-    setSelectedProfileSchema(null);
-    setSelectedProfileSchemas([]);
-    setSelectedProfileGovernance(null);
-    setSubjects([]);
-    setDocuments([]);
-    setVersions([]);
-    setVersionDiff(null);
-    setApprovals([]);
-    setAttachments([]);
-    setCollaborationPresence([]);
-    setDocumentEditLock(null);
-    setPolicies([]);
-    setAuditEvents([]);
-    setManagedUsers([]);
-    setNotifications([]);
-    setSelectedDocument(null);
-    setContentMode("native");
-    setContentFile(null);
-    setContentPdfUrl("");
-    setContentDocxUrl("");
-    setContentStatus("idle");
-    setContentError("");
-    setMessage("");
-    setError("");
-  }, [
-    setApprovals,
-    setAttachments,
-    setAuditEvents,
-    setCollaborationPresence,
-    setContentDocxUrl,
-    setContentError,
-    setContentFile,
-    setContentMode,
-    setContentPdfUrl,
-    setContentStatus,
-    setDocumentEditLock,
-    setDocuments,
-    setError,
-    setManagedUsers,
-    setMessage,
-    setNotifications,
-    setPolicies,
-    setSelectedDocument,
-    setSelectedProfileGovernance,
-    setSelectedProfileSchema,
-    setSelectedProfileSchemas,
-    setSubjects,
-    setVersionDiff,
-    setVersions,
-  ]);
-
-  const bootstrap = useCallback(async () => {
-    try {
-      const currentUser = await api.me();
-      setUser(currentUser);
-      setDocumentForm((current) => ({ ...current, ownerId: currentUser.userId }));
-      setAuthState("ready");
-      if (!currentUser.mustChangePassword) {
-        await onAuthenticated(currentUser);
-      }
-    } catch (err) {
-      if (statusOf(err) === 401) {
-        setAuthState("idle");
-        return;
-      }
-      setAuthState("error");
-      setError(asMessage(err));
-    }
-  }, [onAuthenticated, setAuthState, setDocumentForm, setError, setUser]);
+    loginForm, passwordForm,
+    setAuthState, setUser, setLoginForm, setPasswordForm,
+  } = useAuthStore();
+  const { setError, setMessage } = useUiStore();
 
   const handleLogin = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setError("");
-      setMessage("");
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setError('');
       try {
-        setAuthState("loading");
+        setAuthState('loading');
         const response = await api.login(loginForm);
         setUser(response.user);
-        setDocumentForm((current) => ({ ...current, ownerId: response.user.userId }));
-        setAuthState("ready");
+        setAuthState('ready');
         if (!response.user.mustChangePassword) {
-          await onAuthenticated(response.user);
-          const returnTo = sessionStorage.getItem("auth:returnTo");
+          const returnTo = sessionStorage.getItem('auth:returnTo');
           if (returnTo) {
-            sessionStorage.removeItem("auth:returnTo");
-            window.history.pushState({}, "", returnTo);
-            window.dispatchEvent(new PopStateEvent("popstate"));
+            sessionStorage.removeItem('auth:returnTo');
+            window.history.pushState({}, '', returnTo);
+            window.dispatchEvent(new PopStateEvent('popstate'));
           }
-        } else {
-          clearWorkspaceAfterPasswordChange();
         }
       } catch (err) {
         setUser(null);
-        setManagedUsers([]);
-        setDocuments([]);
-        setSelectedDocument(null);
-        if (statusOf(err) === 401) {
-          setError("Usuario ou senha invalidos.");
-          setAuthState("idle");
-          return;
-        }
-        setError(asMessage(err));
-        setAuthState("error");
+        setAuthState('idle');
+        setError(statusOf(err) === 401 ? 'Usuário ou senha inválidos.' : asMessage(err));
       }
     },
-    [
-      clearWorkspaceAfterPasswordChange,
-      loginForm,
-      onAuthenticated,
-      setAuthState,
-      setDocumentForm,
-      setDocuments,
-      setError,
-      setManagedUsers,
-      setMessage,
-      setSelectedDocument,
-      setUser,
-    ],
+    [loginForm, setAuthState, setError, setUser],
   );
 
   const handleLogout = useCallback(async () => {
-    setError("");
-    setMessage("");
     try {
       await api.logout();
     } catch {
-      // Best-effort logout; still clear local state.
+      // best-effort
     } finally {
-      clearWorkspaceOnLogout();
       setUser(null);
-      setAuthState("idle");
+      setAuthState('idle');
+      queryClient.clear();
     }
-  }, [clearWorkspaceOnLogout, setAuthState, setError, setMessage, setUser]);
+  }, [queryClient, setAuthState, setUser]);
 
   const handleChangePassword = useCallback(
-    async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setError("");
-      setMessage("");
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setError('');
+      setMessage('');
+      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+        setError('A confirmação da nova senha não confere.');
+        return;
+      }
       try {
-        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-          setError("A confirmacao da nova senha nao confere.");
-          return;
-        }
         const response = await api.changePassword(passwordForm);
-        setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
         setUser(response.user);
-        setLoginForm((current) => ({ ...current, identifier: response.user.username, password: "" }));
-        setDocumentForm((current) => ({ ...current, ownerId: response.user.userId }));
-        await onAuthenticated(response.user);
-        setAuthState("ready");
-        setMessage("Senha alterada com sucesso.");
+        setAuthState('ready');
+        setMessage('Senha alterada com sucesso.');
       } catch (err) {
         setError(asMessage(err));
       }
     },
-    [onAuthenticated, passwordForm, setAuthState, setDocumentForm, setError, setLoginForm, setMessage, setPasswordForm, setUser],
+    [passwordForm, setAuthState, setError, setMessage, setPasswordForm, setUser],
   );
 
   return {
-    authState,
-    user,
     loginForm,
     passwordForm,
     setLoginForm,
     setPasswordForm,
-    bootstrap,
     handleLogin,
     handleLogout,
     handleChangePassword,
   };
 }
-

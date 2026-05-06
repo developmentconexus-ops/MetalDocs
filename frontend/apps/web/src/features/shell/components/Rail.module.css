@@ -1,0 +1,83 @@
+.rail {
+  width: 56px;
+  flex-shrink: 0;
+  background: var(--rail);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.logo {
+  margin-bottom: 20px;
+}
+
+.nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.navItem {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-3);
+  color: var(--rail-text-muted);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: color 100ms, background 100ms;
+}
+
+.navItem:hover {
+  color: var(--rail-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.navItemActive {
+  color: var(--rail-text);
+  background: var(--rail-active);
+}
+
+.divider {
+  width: 28px;
+  height: 1px;
+  background: var(--rail-divider);
+  margin: 8px 0;
+}
+
+.bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.logoutBtn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-3);
+  color: var(--rail-text-muted);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.logoutBtn:hover {
+  color: var(--rail-text);
+  background: rgba(255, 255, 255, 0.06);
+}

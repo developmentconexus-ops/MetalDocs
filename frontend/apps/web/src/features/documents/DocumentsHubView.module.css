@@ -139,7 +139,7 @@
 .linkButton {
   border: 0;
   background: transparent;
-  color: var(--vinho);
+  color: var(--brand);
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
@@ -177,7 +177,7 @@
 .typeCard:focus-within {
   transform: translateY(-3px);
   border-width: 2px;
-  border-color: color-mix(in srgb, var(--vinho) 50%, var(--border));
+  border-color: color-mix(in srgb, var(--brand) 50%, var(--border));
   box-shadow: 0 18px 36px rgba(27, 14, 18, 0.16);
 }
 
@@ -212,7 +212,7 @@
   width: 6px;
   align-self: stretch;
   border-radius: 999px;
-  background: var(--area-color, var(--vinho));
+  background: var(--area-color, var(--brand));
 }
 
 .areaMeta {
@@ -235,7 +235,7 @@
 .areaBarFill {
   display: block;
   height: 100%;
-  background: var(--area-color, var(--vinho));
+  background: var(--area-color, var(--brand));
 }
 
 .areaButton strong,
@@ -272,7 +272,7 @@
   width: 6px;
   align-self: stretch;
   border-radius: 999px;
-  background: var(--type-color, var(--vinho));
+  background: var(--type-color, var(--brand));
 }
 
 .typeBadge {
@@ -280,7 +280,7 @@
   height: 34px;
   border-radius: 12px;
   background: var(--surface-2);
-  color: var(--vinho);
+  color: var(--brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -338,7 +338,7 @@
 .recentRow:focus-visible {
   transform: translateY(-3px);
   border-width: 2px;
-  border-color: color-mix(in srgb, var(--vinho) 24%, var(--border));
+  border-color: color-mix(in srgb, var(--brand) 24%, var(--border));
   box-shadow: 0 18px 36px rgba(27, 14, 18, 0.16);
 }
 
@@ -347,7 +347,7 @@
   height: 28px;
   border-radius: 10px;
   background: var(--surface-2);
-  color: var(--vinho);
+  color: var(--brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -475,7 +475,7 @@
   align-items: center;
   border: 0;
   border-radius: 14px;
-  background: var(--vinho);
+  background: var(--brand);
   color: #fff;
   padding: 0.72rem 1.05rem;
   font-size: 0.82rem;
@@ -545,9 +545,9 @@
 }
 
 .tabActive {
-  background: var(--vinho);
+  background: var(--brand);
   color: #fff;
-  border-color: var(--vinho);
+  border-color: var(--brand);
 }
 
 .collectionControlRow {
@@ -600,7 +600,7 @@
 .docCard:focus-within {
   transform: translateY(-3px);
   border-width: 2px;
-  border-color: color-mix(in srgb, var(--vinho) 30%, var(--border));
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
   box-shadow: 0 18px 36px rgba(27, 14, 18, 0.16);
 }
 
@@ -615,7 +615,7 @@
   box-sizing: border-box;
   background:
     radial-gradient(circle at top right, rgba(255, 255, 255, 0.1) 0, rgba(255, 255, 255, 0.1) 1.75rem, transparent 1.8rem),
-    linear-gradient(180deg, color-mix(in srgb, var(--vinho) 94%, #ffffff) 0%, color-mix(in srgb, var(--vinho) 90%, #000000 8%) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--brand) 94%, #ffffff) 0%, color-mix(in srgb, var(--brand) 90%, #000000 8%) 100%);
 }
 
 .docCardOrb {
@@ -714,7 +714,7 @@
 }
 
 .docCardBodyButton:active .docCardBody {
-  background: color-mix(in srgb, var(--surface) 92%, var(--vinho-soft));
+  background: color-mix(in srgb, var(--surface) 92%, var(--brand-pale));
 }
 
 .docCardBody {
@@ -848,10 +848,10 @@
 
 .listRow:hover,
 .listRow:focus-visible {
-  background: color-mix(in srgb, var(--surface) 84%, var(--vinho-soft));
+  background: color-mix(in srgb, var(--surface) 84%, var(--brand-pale));
   border-width: 2px;
-  border-color: color-mix(in srgb, var(--vinho) 26%, var(--border));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--vinho) 56%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 26%, var(--border));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--brand) 56%, transparent);
   transform: translateX(2px);
 }
 
@@ -898,7 +898,7 @@
   right: 0;
   top: 0;
   height: 7px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--vinho) 78%, #ffffff), var(--vinho));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand) 78%, #ffffff), var(--brand));
 }
 
 .detailHeroMain {
@@ -956,8 +956,8 @@
 }
 
 .primaryButton {
-  border: 1px solid color-mix(in srgb, var(--vinho) 82%, #000000 8%);
-  background: var(--vinho);
+  border: 1px solid color-mix(in srgb, var(--brand) 82%, #000000 8%);
+  background: var(--brand);
   color: #fff;
   min-height: 44px;
   padding: 0.62rem 1.05rem;
@@ -1313,7 +1313,7 @@
 .typeBarFill {
   display: block;
   height: 100%;
-  background: var(--type-color, var(--vinho));
+  background: var(--type-color, var(--brand));
 }
 
 .typeDescription {

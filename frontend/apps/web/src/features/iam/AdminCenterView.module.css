@@ -74,7 +74,7 @@
 }
 
 .summaryCardTotal::after {
-  background: var(--vinho);
+  background: var(--brand);
 }
 
 .summaryTop {
@@ -105,8 +105,8 @@
 }
 
 .kpiIconRed {
-  background: var(--vinho-soft);
-  color: var(--vinho);
+  background: var(--brand-pale);
+  color: var(--brand);
 }
 
 .kpiTrend {
@@ -192,7 +192,7 @@
 .onlineLink {
   border: 0;
   background: transparent;
-  color: var(--vinho);
+  color: var(--brand);
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -214,9 +214,9 @@
 }
 
 .panelBadge {
-  background: var(--vinho-soft);
-  color: var(--vinho);
-  border: 1px solid var(--vinho-muted);
+  background: var(--brand-pale);
+  color: var(--brand);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   padding: 0.2rem 0.6rem;
   font-size: 0.7rem;
@@ -226,7 +226,7 @@
 .activityLink {
   border: 0;
   background: transparent;
-  color: var(--vinho);
+  color: var(--brand);
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -343,9 +343,9 @@
   width: 30px;
   height: 30px;
   border-radius: 999px;
-  background: var(--vinho-soft);
-  border: 1px solid var(--vinho-muted);
-  color: var(--vinho);
+  background: var(--brand-pale);
+  border: 1px solid var(--border-strong);
+  color: var(--brand);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -378,7 +378,7 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: var(--vinho);
+  background: var(--brand);
   flex-shrink: 0;
 }
 
@@ -395,7 +395,7 @@
 }
 
 .activityDotCrimson {
-  background: var(--vinho);
+  background: var(--brand);
 }
 
 .activityChip {
@@ -429,9 +429,9 @@
 }
 
 .activityChipCrimson {
-  background: var(--vinho-soft);
-  color: var(--vinho);
-  border-color: var(--vinho-muted);
+  background: var(--brand-pale);
+  color: var(--brand);
+  border-color: var(--border-strong);
 }
 
 .empty {
