@@ -8,11 +8,11 @@
 > **Key UI files (for cross-ref only — do not need to read them as a user):**
 > - `frontend/apps/web/src/features/taxonomy/TaxonomyAdminPage.tsx` — Tipos Documentais admin
 > - `frontend/apps/web/src/features/taxonomy/ProfileEditDialog.tsx` — perfil editor + template binding
-> - `frontend/apps/web/src/features/templates/v2/TemplatesListPage.tsx` — Templates list
-> - `frontend/apps/web/src/features/templates/v2/TemplateAuthorPage.tsx` — eigenpal author
+> - `frontend/apps/web/src/features/templates/TemplatesListPage.tsx` — Templates list
+> - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — eigenpal author
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — Documentos Controlados list
-> - `frontend/apps/web/src/features/documents/v2/DocumentCreatePage.tsx` — wizard
-> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx` — eigenpal fill-in editor
+> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx` — wizard
+> - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx` — eigenpal fill-in editor
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada de Aprovação
 
 ---

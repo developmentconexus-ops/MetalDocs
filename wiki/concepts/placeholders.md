@@ -8,7 +8,7 @@
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
 > - `packages/editor-ui/src/MetalDocsEditor.tsx:54` — eigenpal `templatePlugin` wired here
-> - `frontend/apps/web/src/features/templates/v2/TemplateAuthorPage.tsx` — catalog panel, auto-detect via `getVariables()`
+> - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — catalog panel, auto-detect via `getVariables()`
 > - `frontend/apps/web/src/features/templates/placeholder-types.ts` — `CatalogPlaceholder` type
 > - `internal/modules/templates_v2/application/validate_placeholders.go` — `ValidatePlaceholders` rejects non-catalog names
 > - `internal/modules/render/fanout/` — server-side substitution at freeze/finalize (Go)

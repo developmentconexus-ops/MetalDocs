@@ -63,7 +63,7 @@
 
 **Placeholder** - Variable in a template DOCX that gets substituted at fill-in time. Currently MetalDocs uses `{{uuid}}` token format (legacy); eigenpal-native is `{name}`. See `concepts/placeholders.md`.
 
-**PDFCell** - React component (`frontend/apps/web/src/features/documents/v2/PDFCell.tsx`) that renders one of three states based on `pdf_status`: a download link (ready), an error + retry button (failed), or a "Gerando PDF…" spinner (pending). Reused in `PublishedDownloadCell`.
+**PDFCell** - React component (`frontend/apps/web/src/features/documents/components/PDFCell.tsx`) that renders one of three states based on `pdf_status`: a download link (ready), an error + retry button (failed), or a "Gerando PDF…" spinner (pending). Reused in `PublishedDownloadCell`.
 
 **pdf_status** - Field returned by `GET /api/v2/documents/{id}/view`. Values: `"pending"` (PDF not yet generated), `"ready"` (PDF available; `signed_url` also present), `"failed"` (outbox row in `failed` state). The frontend polls this every 3 s via `useDocumentPdfStatus` with a 60 s timeout. See `modules/documents.md` — PDF Status Polling.
 

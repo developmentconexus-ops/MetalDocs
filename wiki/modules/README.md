@@ -3,7 +3,8 @@
 > **Last verified:** 2026-05-06
 > **Scope:** Per-module deep dives. One file per backend module / frontend feature area.
 
-- [editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal integration layer (Last verified: 2026-05-04)
+- [editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal integration layer (Last verified: 2026-05-06)
+- [editor-chrome.md](editor-chrome.md) — shared toolbar overlay + eigenpal CSS overrides for eigenpal-based pages; slot API, `VersionBadge`, `AutosaveStatus`; consumed by templates + documents (Last verified: 2026-05-06)
 - templates-v2.md — TBD
 - [documents.md](documents.md) — document instances, Library screen, editing flow, session model, API; `libraryStatus.ts` status-meta, `AuthorCell`, `asApiError`, debounced search, `keepPreviousData`/`staleTime`; `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-06)
 - [registry.md](registry.md) — controlled-document catalog, code generation, active-document FULL OUTER JOIN (E10), registry detail page, PublishedDownloadCell (Last verified: 2026-05-04)

@@ -6,8 +6,8 @@
 > **Audience:** QA engineers, release approvers, on-call engineers validating a hot-fix deploy.
 > **Key files:**
 > - `frontend/apps/web/src/features/approval/components/RegistryDetailPanel.tsx:314` — "Submeter para revisão" button label
-> - `frontend/apps/web/src/features/documents/v2/hooks/useDocumentPdfStatus.ts:12-13` — POLL_INTERVAL_MS=3000, TIMEOUT_MS=60000 (E11)
-> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:172` — isEditable gate: `docStatus === 'draft'` (E1)
+> - `frontend/apps/web/src/features/documents/hooks/v2/useDocumentPdfStatus.ts:12-13` — POLL_INTERVAL_MS=3000, TIMEOUT_MS=60000 (E11)
+> - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:181` — isEditable gate: `session.state.phase === 'writer' && docStatus === 'draft'` (E1)
 > - `frontend/apps/web/src/features/registry/RegistryCreateDialog.tsx:203` — "Aguardando..." submit button when auth not ready (E12)
 > - `frontend/apps/web/src/features/registry/RegistryDetailPage.tsx:174` — "Nova Revisão" button (E10)
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx:98` — area filter first option "Todas as áreas", options from taxonomy (E7)
@@ -245,7 +245,7 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 
 - [ ] Immediately after last signoff in D3, open document detail.
 - [ ] **Expected:** state `approved` (`frozen` terminology removed — `approved` is the post-signoff immutable state). Hashes `content_hash` visible, `revision_version` incremented.
-- [ ] Attempt to edit → **Expected:** editor read-only. Edit button and Save disabled. Gate: `docStatus === 'draft'` — independent of session phase. (`DocumentEditorPage.tsx:172`)
+- [ ] Attempt to edit → **Expected:** editor read-only. Edit button and Save disabled. Gate: `session.state.phase === 'writer' && docStatus === 'draft'` — independent of session phase. (`DocumentEditorPage.tsx:181`)
 
 ### E2. Token resolution (D1, D2, D3, D8 regressions)
 

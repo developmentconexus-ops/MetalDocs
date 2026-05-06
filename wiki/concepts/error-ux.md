@@ -24,7 +24,7 @@ Before this work, error handling was fragmented across features: each had its ow
 | `src/features/auth/useAuthSession.ts` | Registers `auth:expired` listener; stores returnTo; restores on login |
 | `src/features/approval/api/mutationClient.ts` | `ApprovalError extends ApiError`; 401 uses auth-bus; 403 throws with code |
 | `src/features/approval/components/SignoffDialog.tsx` | E2 SoD states: `error_sod_submitter`, `error_sod_duplicate` |
-| `src/features/documents/v2/DocumentEditorPage.tsx` | E3 finalize uses `resolveErrorMessage` |
+| `src/features/documents/pages/DocumentEditorPage.tsx` | E3 finalize uses `resolveErrorMessage` |
 
 ---
 

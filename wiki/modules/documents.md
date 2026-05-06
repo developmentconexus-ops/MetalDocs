@@ -1,7 +1,7 @@
 # documents Module
 
 > **Last verified:** 2026-05-06
-> **Scope:** Document instances — library listing, create, edit, autosave, checkpoints, finalize, export.
+> **Scope:** Document instances — library listing, create, edit, autosave, finalize.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/pages/LibraryPage.tsx:36` — `LibraryPage` — server-side paginated table at `/documents`; lazy `useState` init, debounced search, `resolveErrorMessage` error UX
@@ -19,7 +19,8 @@
 > - `frontend/apps/web/src/features/documents/queries/useLibraryQuery.ts:15` — `useLibraryQuery` — TanStack Query hook; `placeholderData: keepPreviousData` prevents empty flash on page/filter change
 > - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook; `staleTime: 30_000` avoids refetch on every focus
 > - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library) and `/documents-v2/*` (Editor)
-> - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:1` — editor page; `handleFinalize` catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
+> - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:200` — layout root: `<aside class={styles.rail}>` left rail + `<main class={styles.canvas}>` + `EditorChrome` center/right slots; `handleFinalize` catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
+> - `frontend/apps/web/src/features/documents/pages/styles/DocumentEditorPage.module.css:19` — `.rail`, `.railBackBtn`, `.railTip` — design-token-only; mirrors TemplateAuthorPage rail
 > - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — step 1: pick controlled document
 > - `internal/modules/documents/delivery/http/handler.go:76` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
 > - `internal/modules/documents/delivery/http/handler.go:189` — `listDocuments` — paginated `GET /api/v2/documents`; filler auto-scoped server-side
@@ -39,8 +40,8 @@
 ## Overview
 
 > **Cleanup note (2026-05-05, branch chore/api-cleanup-sub-project-b):**
-> - `src/api/documents.ts` (legacy v1 client, 496 lines) — deleted. Canonical client: `features/documents/v2/api/documentsV2.ts`.
-> - `src/components/DocumentCreateView.tsx`, `DocumentsWorkspaceView`, `useDocumentsWorkspace` — deleted. Replaced by `features/documents/v2/DocumentCreatePage.tsx` + `DocumentEditorPage.tsx`.
+> - `src/api/documents.ts` (legacy v1 client, 496 lines) — deleted. Canonical client: `features/documents/api/documentsV2.ts`.
+> - `src/components/DocumentCreateView.tsx`, `DocumentsWorkspaceView`, `useDocumentsWorkspace` — deleted. Replaced by `features/documents/pages/DocumentCreatePage.tsx` + `DocumentEditorPage.tsx`.
 > - `api/notifications.ts` — stubbed pending backend rewrite (commit d136449a).
 > - Edit-lock (`/api/v1/documents/:id/lock`) and presence endpoints — dropped from backend + client (I4, commit b0158354).
 > - `documents.locked_at` column — dropped (migration 0181, commit c866de8a).
@@ -141,17 +142,25 @@ Entry points:
 
 ## Checkpoints
 
-Checkpoints are manual snapshots. "Checkpoints" button opens `CheckpointsDialog`.
-Restoring a checkpoint re-fetches the revision buffer and reloads the editor.
+Checkpoints are manual snapshots stored on the server. The `CheckpointsDialog` component and checkpoint API endpoints exist but the dialog is **not currently mounted** from `DocumentEditorPage` — the "Revisões" button was removed in the 2026-05-06 editor layout pass. Restoring a checkpoint would re-fetch the revision buffer and reload the editor when re-enabled.
 
 ## Editor Chrome
 
-`DocumentEditorPage` uses the same chrome pattern as `TemplateAuthorPage`:
-- Left rail (48 px) with branded back button.
-- `<main className={styles.canvas}>` → `<div className={styles.editorWrapper}>` contains `MetalDocsEditor`.
-- `overlayTitle`: centered doc name + code + state badge (absolute, pointer-events: none).
-- `overlayRight`: autosave status + Checkpoints + Export + Finalizar buttons (absolute, z-index 100).
-- Eigenpal overrides in CSS tint the formatting bar with wine brand color.
+`DocumentEditorPage` uses `<EditorChrome>` (see `modules/editor-chrome.md`) — the shared toolbar overlay primitive used by both the document editor and `TemplateAuthorPage`. The intermediate `EditorDocBar.tsx` + `EditorDocBar.module.css` were deleted when this page was migrated.
+
+**Layout:** The page shell is `<div.page> → <div.body>` which holds three siblings:
+1. `<aside class={styles.rail}>` — 48px left rail with the back ("Voltar") button + tooltip. The `EditorChrome` `left` slot is **not used** here; the rail is an independent `<aside>` element to avoid collision with eigenpal's own toolbar.
+2. `<main class={styles.canvas}>` — flex:1 host for `EditorChrome`.
+3. `<EditorMetaSidebar>` — collapsible right metadata panel (300px when open).
+
+Slot assignment inside `EditorChrome`:
+- `left` — **unused** (back button is in the `<aside>` rail, not in the chrome overlay)
+- `center` — `CodeChip` (doc code) + document name + `VersionBadge` (revision) + `StatusPill`
+- `right` — `AutosaveStatus` + "Submeter para revisão" button only
+
+**Removed from right slot (intentional):** `CheckpointsDialog` mount + `checkpointsOpen` state + `handleRestored` callback were deleted as orphans. `ExportMenuButton` and the "Revisões" button were also removed. These components still exist as standalone files but are not currently mounted from the editor page.
+
+Eigenpal CSS overrides (wine formatting bar, compact title bar, gradient scrollbar) live in `EditorChrome.module.css`; `DocumentEditorPage.module.css` covers only page-level rail + canvas layout (`.rail`, `.railBackBtn`, `.railTip`, `.canvas`).
 
 ## API Endpoints (Backend)
 
@@ -194,7 +203,7 @@ Migration 0131's unique index `ux_documents_v2_cd_revision ON documents(controll
 ## Key Types
 
 ```typescript
-// features/documents/v2/api/documentsV2.ts  ← canonical API client (legacy api/documents.ts deleted in b0158354)
+// features/documents/api/documentsV2.ts  ← canonical API client (legacy api/documents.ts deleted in b0158354)
 type DocumentResponse = {
   ID?: string; id?: string;           // UUID
   Name?: string; name?: string;
