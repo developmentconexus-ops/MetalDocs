@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ActivityPanel } from '../components/ActivityPanel';
 import { LibraryFilterTabs } from '../components/LibraryFilterTabs';
 import { LibraryStatCards } from '../components/LibraryStatCards';
 import { LibrarySidebar } from '../components/LibrarySidebar';
@@ -21,7 +22,9 @@ function readStoredPageSize(): number {
 }
 
 function readStoredActivityOpen(): boolean {
-  return localStorage.getItem(ACTIVITY_OPEN_KEY) === 'true';
+  const raw = localStorage.getItem(ACTIVITY_OPEN_KEY);
+  // Default open when never set
+  return raw === null ? true : raw === 'true';
 }
 
 function filterToStatus(filter: LibraryFilter): string | undefined {
@@ -42,7 +45,7 @@ export default function LibraryPage(): JSX.Element {
   const [activeFilter, setActiveFilter] = useState<LibraryFilter>('todos');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -102,19 +105,43 @@ export default function LibraryPage(): JSX.Element {
       {/* Main content */}
       <main className={styles.main}>
         <header className={styles.header}>
-          <div className={styles.headerLeft}>
-            <p className={styles.kicker}>Documentos · Biblioteca</p>
+          <p className={styles.kicker}>Documentos · Biblioteca</p>
+          <div className={styles.titleRow}>
             <h1 className={styles.title}>Acervo<br />controlado</h1>
-            <p className={styles.description}>
-              Documentos controlados por código, perfil e área. Filtre por estado para revisões pendentes ou trilha de auditoria.
-            </p>
+            <div className={styles.titleMeta}>
+              <span className={styles.metaPair}>
+                <span className={styles.metaValue}>{total.toLocaleString('pt-BR')}</span>
+                <span className={styles.metaLabel}>documentos</span>
+              </span>
+              <span className={styles.metaDivider} aria-hidden="true" />
+              <span className={styles.metaPair}>
+                <span className={styles.metaLabel}>Última fanout</span>
+                <span className={styles.metaValue}>{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+              </span>
+              <button type="button" className={styles.activityButton} onClick={toggleActivity}>
+                {activityOpen ? (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M13 5l-5 5 5 5" />
+                    </svg>
+                    Recolher atividade
+                  </>
+                ) : (
+                  <>
+                    <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="10" cy="10" r="7" />
+                      <path d="M10 6v4l3 2" />
+                      <path d="M3 10a7 7 0 0 1 12-5" />
+                    </svg>
+                    Mostrar atividade
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-          <div className={styles.headerRight}>
-            <span className={styles.totalBadge}>{total.toLocaleString('pt-BR')} documentos</span>
-            <button type="button" className={styles.activityButton} onClick={toggleActivity}>
-              {activityOpen ? 'Recolher atividade' : 'Mostrar atividade'}
-            </button>
-          </div>
+          <p className={styles.description}>
+            Documentos controlados por código, perfil e área. Filtre por estado para revisões pendentes ou trilha de auditoria.
+          </p>
         </header>
 
         <LibraryStatCards total={total} statsByStatus={statsByStatus} />
@@ -132,8 +159,7 @@ export default function LibraryPage(): JSX.Element {
             <span>Título</span>
             <span>Área</span>
             <span>Perfil</span>
-            <span>Revisão</span>
-            <span>Atualizado</span>
+            <span>Rev.</span>
           </div>
 
           {libraryQuery.isPending ? (
@@ -160,9 +186,6 @@ export default function LibraryPage(): JSX.Element {
               <span className={styles.metaCell}>{d.ProcessAreaCodeSnapshot ?? '–'}</span>
               <span className={styles.metaCell}>{d.ProfileCodeSnapshot ?? '–'}</span>
               <span className={styles.metaCell}>v{d.RevisionVersion}</span>
-              <span className={styles.dateCell}>
-                {new Date(d.UpdatedAt).toLocaleDateString('pt-BR')}
-              </span>
             </button>
           ))}
 
@@ -178,20 +201,7 @@ export default function LibraryPage(): JSX.Element {
       </main>
 
       {/* Right activity panel */}
-      {activityOpen ? (
-        <aside className={styles.activityPanel}>
-          <div className={styles.activityHeader}>
-            <div>
-              <span className={styles.activityTitle}>Atividade &amp; auditoria</span>
-              <p className={styles.activitySub}>Tempo real · últimas 8h</p>
-            </div>
-            <button type="button" className={styles.activityClose} aria-label="Fechar" onClick={toggleActivity}>
-              ✕
-            </button>
-          </div>
-          <p className={styles.activityPlaceholder}>Em breve: trilha de auditoria e notificações em tempo real.</p>
-        </aside>
-      ) : null}
+      {activityOpen ? <ActivityPanel onClose={toggleActivity} /> : null}
     </div>
   );
 }

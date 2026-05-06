@@ -12,19 +12,18 @@ type Props = {
   statsByStatus: Record<string, number>;
 };
 
-export function LibraryStatCards({ total, statsByStatus }: Props): JSX.Element {
+export function LibraryStatCards({ statsByStatus }: Props): JSX.Element {
   return (
     <div className={styles.root}>
-      <div className={`${styles.card} ${styles.total}`}>
-        <span className={styles.count}>{total.toLocaleString('pt-BR')}</span>
-        <span className={styles.label}>Total</span>
-      </div>
-      {CARDS.map(({ statusKey, label, mod }) => (
-        <div key={statusKey} className={`${styles.card} ${styles[mod]}`}>
-          <span className={styles.count}>{(statsByStatus[statusKey] ?? 0).toLocaleString('pt-BR')}</span>
-          <span className={styles.label}>{label}</span>
-        </div>
-      ))}
+      {CARDS.map(({ statusKey, label, mod }) => {
+        const count = statsByStatus[statusKey] ?? 0;
+        return (
+          <div key={statusKey} className={`${styles.card} ${styles[mod]}`}>
+            <span className={styles.label}>{label}</span>
+            <span className={styles.count}>{count.toLocaleString('pt-BR')}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
