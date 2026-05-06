@@ -1,5 +1,5 @@
 // Centralized TanStack Query key constants.
-// All useQuery / invalidateQueries calls must import from here — never inline string arrays.
+// All useQuery / invalidateQueries calls must import from here - never inline string arrays.
 
 type InboxParams = {
   page?: number;
@@ -14,9 +14,21 @@ type ControlledDocFilter = {
   status?: string;
 };
 
+type DocumentLibraryListParams = {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  areaCode?: string;
+  profileCode?: string;
+  q?: string;
+  includeArchived?: boolean;
+};
+
 export const QK = {
   documents: {
-    list: () => ['documents', 'list'] as const,
+    all: ['documents'] as const,
+    list: (params: DocumentLibraryListParams = {}) => ['documents', 'list', params] as const,
+    stats: () => ['documents', 'stats'] as const,
     detail: (id: string) => ['documents', 'detail', id] as const,
   },
   inbox: (params: InboxParams = {}) =>
