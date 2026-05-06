@@ -87,6 +87,22 @@ func (f *fakeRepo) ListDocumentsForUser(_ context.Context, _, _ string) ([]domai
 	return f.listReturn, nil
 }
 
+func (f *fakeRepo) ListDocumentsPaginated(_ context.Context, _ string, _ application.ListOptions) ([]*domain.Document, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) CountDocuments(_ context.Context, _ string, _ application.ListOptions) (int64, error) {
+	return 0, nil
+}
+
+func (f *fakeRepo) StatsByStatus(_ context.Context, _ string, _ application.ListOptions) (map[string]int64, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) StatsByArea(_ context.Context, _ string, _ application.ListOptions) (map[string]int64, error) {
+	return nil, nil
+}
+
 func (f *fakeRepo) UpdateDocumentStatus(_ context.Context, _, _ string, cur, next domain.DocumentStatus, stampTime bool) error {
 	f.statusCalls++
 	f.statusCur = cur
