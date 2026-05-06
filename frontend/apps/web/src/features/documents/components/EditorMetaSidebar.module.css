@@ -1,17 +1,117 @@
-.toggleBtn {}
-.sidebar {}
-.section {}
-.sectionHeader {}
-.metaRows {}
-.metaRow {}
-.metaLabel {}
-.metaValue {}
-.divider {}
-.approverList {}
-.approverRow {}
-.approverInfo {}
-.approverName {}
-.approverRole {}
-.approverBadge {}
-.approverBadgeNext {}
-.approverBadgeWait {}
+.toggleBtn {
+  width: var(--sp-5);
+  flex: 0 0 var(--sp-5);
+  background: var(--surface-2);
+  border: none;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--text-faint);
+  transition: background 150ms ease;
+}
+.toggleBtn:hover { background: var(--surface-3); }
+
+.sidebar {
+  width: 300px;
+  flex: 0 0 300px;
+  border-left: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow-y: auto;
+  padding: var(--sp-5) var(--sp-5);
+}
+
+.section {
+  margin-bottom: var(--sp-4);
+}
+
+.sectionHeader {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-bottom: var(--sp-2);
+  font-family: var(--font-sans);
+}
+
+.metaRows {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 0.78125rem;
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.metaLabel {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.metaValue {
+  color: var(--text);
+  text-align: right;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0 calc(-1 * var(--sp-5)) var(--sp-4);
+}
+
+.approverList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.approverRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 0.75rem;
+}
+
+.approverInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.approverName {
+  display: block;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.approverRole {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.approverBadge {
+  font-size: 0.625rem;
+  padding: 2px var(--sp-1);
+  border-radius: var(--r-pill);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.approverBadgeNext {
+  background: var(--brand-pale);
+  color: var(--brand);
+}
+
+.approverBadgeWait {
+  background: transparent;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+}
