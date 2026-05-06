@@ -293,9 +293,11 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 
 	includeArchived := strings.TrimSpace(query.Get("includeArchived"))
 	if includeArchived != "" {
-		if _, err := strconv.ParseBool(includeArchived); err != nil {
+		v, err := strconv.ParseBool(includeArchived)
+		if err != nil {
 			return opts, "", errors.New("includeArchived must be a valid boolean")
 		}
+		opts.IncludeArchived = v
 	}
 
 	effectiveUserID := ""
