@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 
 	"metaldocs/internal/modules/documents/domain"
 	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
@@ -246,6 +248,107 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 		out = append(out, d)
 	}
 	return out, rows.Err()
+}
+
+type ListOptions struct {
+	Page        int
+	PageSize    int
+	CreatedBy   string
+	Status      []string
+	AreaCode    string
+	ProfileCode string
+	Q           string
+}
+
+func (o ListOptions) Offset() int {
+	if o.Page < 1 {
+		return 0
+	}
+	return (o.Page - 1) * o.Limit()
+}
+
+func (o ListOptions) Limit() int {
+	if o.PageSize == 0 {
+		return 20
+	}
+	if o.PageSize < 1 {
+		return 1
+	}
+	if o.PageSize > 50 {
+		return 50
+	}
+	return o.PageSize
+}
+
+func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string, args []interface{}) {
+	conds := []string{"tenant_id = $1", "archived_at IS NULL"}
+	args = []interface{}{tenantID}
+
+	if opts.CreatedBy != "" {
+		args = append(args, opts.CreatedBy)
+		conds = append(conds, fmt.Sprintf("created_by = $%d", len(args)))
+	}
+	if len(opts.Status) > 0 {
+		args = append(args, pq.Array(opts.Status))
+		conds = append(conds, fmt.Sprintf("status = ANY($%d)", len(args)))
+	}
+	if opts.AreaCode != "" {
+		args = append(args, opts.AreaCode)
+		conds = append(conds, fmt.Sprintf("process_area_code_snapshot = $%d", len(args)))
+	}
+	if opts.ProfileCode != "" {
+		args = append(args, opts.ProfileCode)
+		conds = append(conds, fmt.Sprintf("profile_code_snapshot = $%d", len(args)))
+	}
+	if opts.Q != "" {
+		args = append(args, "%"+opts.Q+"%")
+		conds = append(conds, fmt.Sprintf("name ILIKE $%d", len(args)))
+	}
+
+	return strings.Join(conds, " AND "), args
+}
+
+func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error) {
+	where, args := buildDocumentFilter(tenantID, opts)
+	args = append(args, opts.Limit(), opts.Offset())
+	limitIdx := len(args) - 1
+	offsetIdx := len(args)
+	q := fmt.Sprintf(`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
+			coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
+			archived_at, created_at, updated_at, created_by,
+			controlled_document_id, coalesce(code,'')
+		FROM documents
+		WHERE %s
+		ORDER BY updated_at DESC
+		LIMIT $%d OFFSET $%d`, where, limitIdx, offsetIdx)
+
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*domain.Document, 0)
+	for rows.Next() {
+		var d domain.Document
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
+			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
+			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code); err != nil {
+			return nil, err
+		}
+		out = append(out, &d)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error) {
+	where, args := buildDocumentFilter(tenantID, opts)
+	q := fmt.Sprintf(`SELECT COUNT(*) FROM documents WHERE %s`, where)
+	var n int64
+	if err := r.db.QueryRowContext(ctx, q, args...).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error {
