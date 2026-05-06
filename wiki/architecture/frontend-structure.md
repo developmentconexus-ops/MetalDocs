@@ -1,6 +1,6 @@
 # Frontend Structure
 
-> **Last verified:** 2026-05-05
+> **Last verified:** 2026-05-06
 > **Scope:** Canonical folder layout, naming, routing, state, API, design-system rules for `frontend/apps/web`. Comparison baseline for refactor reviews and the `metaldocs-frontend` skill.
 > **Out of scope:** Backend module layout (see `system-overview.md`), eigenpal internals (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -57,7 +57,7 @@ frontend/apps/web/src/
 ├── components/
 │   └── ui/                     # design-system primitives ONLY
 │       ├── Icon.tsx            # unified icon wrapper
-│       ├── Avatar.tsx          # user avatar (initials fallback)
+│       ├── Avatar.tsx          # user avatar (initials fallback); optional `color` prop for hashed background
 │       ├── CodeChip.tsx        # inline code badge
 │       ├── Logo.tsx            # product logotype
 │       ├── StatusPill.tsx      # document/workflow status badge
@@ -66,6 +66,7 @@ frontend/apps/web/src/
 ├── lib/
 │   ├── api/                    # apiFetch, ApiError, authBus, openapi-fetch wrapper
 │   ├── api-types/              # generated (never hand-edit)
+│   ├── hooks/                  # generic domain-agnostic React hooks (e.g. useDebouncedValue)
 │   ├── queryKeys.ts            # centralized QK constants (see §8)
 │   └── types/                  # cross-cutting types only
 ├── store/                      # GLOBAL stores only: ui.store, auth.store
@@ -121,7 +122,7 @@ When adding code, ask in order:
 
 1. **Is it a generic primitive (Button, Input, Modal, Card, Tabs)?** → `components/ui/`
 2. **Is it specific to one domain?** → `features/<domain>/<correct subfolder>/`
-3. **Is it cross-cutting infra (HTTP, auth bus, error mapping, types from spec)?** → `lib/`
+3. **Is it cross-cutting infra (HTTP, auth bus, error mapping, types from spec)?** → `lib/`. Generic domain-agnostic React hooks (e.g. debounce, window size) → `lib/hooks/`. Promote a feature hook here only when a **second** feature calls it.
 4. **Is it routing wiring?** → feature owns `routes.tsx`; `app/AppRouter.tsx` composes them.
 5. **Is it global UI state (sidebar open, theme)?** → `store/ui.store.ts`. Otherwise feature-local.
 

@@ -1,0 +1,15 @@
+.cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  overflow: hidden;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.firstName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
