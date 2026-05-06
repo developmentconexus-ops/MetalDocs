@@ -340,7 +340,7 @@ Sources: `design-source/selected-wizard.jsx` (Stepper, WizardShell, Footer, Step
 
 | # | Phase | Question | User answer | Resolved |
 |---|---|---|---|---|
-| 6 | 3b | **Visibility icon mismatch.** `features/documents/lib/visibilityMeta.ts` declares icons `users` / `user-plus` / `building` / `external-link`; the JSX reference renders `taxonomy` / `users` / `home` / `link`; only the JSX-reference set exists in `components/ui/Icon.tsx`. Phase 3a TSX renders the JSX-reference icons (working). Choose: (A) extend `Icon.tsx` with `user-plus` / `building` / `external-link` and update visibilityMeta to match, OR (B) remap `visibilityMeta.ts` to existing icons (e.g. `users` → `taxonomy`?, `user-plus` → `users`, `building` → `home`, `external-link` → `link`). Phase 3c picks the path. | _pending_ | — |
+| 6 | 3b | **Visibility icon mismatch.** `features/documents/lib/visibilityMeta.ts` declares icons `users` / `user-plus` / `building` / `external-link`; the JSX reference renders `taxonomy` / `users` / `home` / `link`; only the JSX-reference set exists in `components/ui/Icon.tsx`. Phase 3a TSX renders the JSX-reference icons (working). Choose: (A) extend `Icon.tsx` with `user-plus` / `building` / `external-link` and update visibilityMeta to match, OR (B) remap `visibilityMeta.ts` to existing icons. | **B** — remapped `visibilityMeta.ts` to `taxonomy` / `users` / `home` / `link` (matches JSX reference). `IconName` type promoted to `export` from `components/ui/Icon.tsx`; meta now imports it for type safety. | 2026-05-06 |
 
 - [x] All design values mapped
 - [x] Missing tokens added in separate commit

@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-type IconName =
+export type IconName =
   | 'home' | 'docs' | 'library' | 'registry' | 'template' | 'inbox'
   | 'workflow' | 'taxonomy' | 'users' | 'audit' | 'bell' | 'search'
   | 'plus' | 'chevron' | 'chevdown' | 'filter' | 'list' | 'lock'
