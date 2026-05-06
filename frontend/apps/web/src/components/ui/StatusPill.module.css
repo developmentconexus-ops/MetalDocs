@@ -1,8 +1,28 @@
-﻿.pill {
+.pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+}
+
+:global(.pill-draft) {
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+
+:global(.pill-review) {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+:global(.pill-approved) {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+:global(.pill-rejected) {
+  color: var(--danger);
+  background: var(--danger-bg);
 }
 
 :global(.pill-scheduled) {

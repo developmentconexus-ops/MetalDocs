@@ -1,4 +1,4 @@
-﻿import styles from './StatusPill.module.css';
+import styles from './StatusPill.module.css';
 
 export type DocumentStatus =
   | 'draft'
