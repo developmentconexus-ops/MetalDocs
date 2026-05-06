@@ -1,0 +1,100 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: 0 0 auto;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: transparent;
+  border: none;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-2);
+  font: inherit;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.button:disabled {
+  cursor: default;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sp-6);
+  height: var(--sp-6);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dotCheck {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.connector {
+  display: inline-block;
+  width: var(--sp-7);
+  height: 1px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* Active step */
+.itemActive .dot {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--surface);
+}
+
+.itemActive .label {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+/* Completed steps */
+.itemCompleted .dot {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--surface);
+}
+
+.itemCompleted .label {
+  color: var(--success);
+}
+
+/* Upcoming steps */
+.itemUpcoming .label {
+  color: var(--text-muted);
+}
