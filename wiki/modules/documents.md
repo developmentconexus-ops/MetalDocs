@@ -1,18 +1,34 @@
 # documents Module
 
-> **Last verified:** 2026-05-05
-> **Scope:** Document instances — create, edit, autosave, checkpoints, finalize, export.
+> **Last verified:** 2026-05-06
+> **Scope:** Document instances — library listing, create, edit, autosave, checkpoints, finalize, export.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx:126` — `handleFinalize` — catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
-> - `frontend/apps/web/src/features/documents/v2/styles/DocumentEditorPage.module.css:1` — wine-brand chrome CSS
-> - `frontend/apps/web/src/features/documents/v2/routes.tsx:1` — route parsing/rendering for `/documents-v2/*`
-> - `frontend/apps/web/src/features/documents/v2/DocumentCreatePage.tsx:1` — step 1: pick controlled document
-> - `frontend/apps/web/src/features/documents/DocumentsHubView.tsx:758` — detail panel with Edit/PDF/Duplicate actions
-> - `internal/modules/documents/delivery/http/handler.go:73` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
-> - `internal/modules/documents/delivery/http/handler.go:259` — `finalizeDocument` — resolves approval route, calls SubmitRevisionForReview
-> - `internal/modules/documents/application/service.go:1` — domain logic, session management
-> - `internal/modules/documents/repository/repository.go:35` — `CreateDocument` INSERT with `MAX(revision_number)+1` auto-increment
+> - `frontend/apps/web/src/features/documents/pages/LibraryPage.tsx:45` — `LibraryPage` — server-side paginated table at `/documents`
+> - `frontend/apps/web/src/features/documents/api/library.ts:23` — `fetchLibrary` — `GET /api/v2/documents` typed client
+> - `frontend/apps/web/src/features/documents/api/library.ts:41` — `fetchLibraryStats` — `GET /api/v2/documents/stats` typed client
+> - `frontend/apps/web/src/features/documents/queries/useLibraryQuery.ts:15` — `useLibraryQuery` — TanStack Query hook for paginated list
+> - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook for stats
+> - `frontend/apps/web/src/features/documents/components/LibraryFilterTabs.tsx:22` — `LibraryFilterTabs` — 7-tab filter strip mapped to real Spec 2 states
+> - `frontend/apps/web/src/features/documents/components/LibraryAreaTree.tsx:12` — `LibraryAreaTree` — SectionPanel area-tree navigation
+> - `frontend/apps/web/src/features/documents/components/Pagination.tsx:9` — `Pagination` — prev/next controls
+> - `frontend/apps/web/src/features/documents/components/PageSizeSelector.tsx:9` — `PageSizeSelector` — 10/20/50 dropdown
+> - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library) and `/documents-v2/*` (Editor)
+> - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:1` — editor page; `handleFinalize` catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
+> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — step 1: pick controlled document
+> - `internal/modules/documents/delivery/http/handler.go:76` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
+> - `internal/modules/documents/delivery/http/handler.go:189` — `listDocuments` — paginated `GET /api/v2/documents`; filler auto-scoped server-side
+> - `internal/modules/documents/delivery/http/handler.go:219` — `documentStats` — `GET /api/v2/documents/stats`
+> - `internal/modules/documents/delivery/http/handler.go:244` — `parseListOptions` — shared query-param parser; pageSize cap=50 returns 400
+> - `internal/modules/documents/application/service.go:26` — `Repository` interface; includes `ListDocumentsPaginated`, `CountDocuments`, `StatsByStatus`, `StatsByArea`
+> - `internal/modules/documents/application/list_options.go:1` — `ListOptions` type alias (alias for `repository.ListOptions`)
+> - `internal/modules/documents/repository/repository.go:253` — `ListOptions` struct with `IncludeArchived`
+> - `internal/modules/documents/repository/repository.go:284` — `buildDocumentFilter` — shared WHERE builder (list, count, stats)
+> - `internal/modules/documents/repository/repository.go:315` — `ListDocumentsPaginated` — LIMIT/OFFSET query
+> - `internal/modules/documents/repository/repository.go:348` — `CountDocuments` — COUNT(*) with same filter
+> - `internal/modules/documents/repository/repository.go:358` — `StatsByStatus` — GROUP BY status
+> - `internal/modules/documents/repository/repository.go:379` — `StatsByArea` — GROUP BY area
+> - `internal/modules/documents/repository/repository.go:39` — `CreateDocument` INSERT with `MAX(revision_number)+1` auto-increment
 > - `internal/modules/documents/module.go:1` — DI wiring
 
 ## Overview
@@ -34,12 +50,27 @@ Only `draft` documents can be edited in the editor.
 ## Frontend Routing
 
 ```
+/documents                 → LibraryPage (server-side paginated document list)
 /documents-v2/new          → DocumentCreatePage (pick controlled document)
 /documents-v2/<uuid>       → DocumentEditorPage
 ```
 
-`viewFromPath` in `workspaceRoutes.ts` maps both to `activeView = "documents-v2"`.
-`routeFromPath` in `v2/routes.tsx` distinguishes `{ kind: 'create' }` vs `{ kind: 'editor', documentID }`.
+Routes are defined in `features/documents/routes.tsx`.
+
+## Library Screen (`/documents`)
+
+`LibraryPage` is the primary document list view. Key design decisions:
+
+- **Two-query pattern:** `GET /api/v2/documents` (LIMIT/OFFSET items) + `GET /api/v2/documents/stats` (GROUP BY counts) run in parallel via TanStack Query. No full-list fetch.
+- **Server-side pagination:** page, pageSize (10/20/50, cap=50), status filter, areaCode filter, profileCode filter, and free-text `q` (ILIKE on name) are all sent to the backend. Client never filters/sorts in memory.
+- **RBAC scoping:** `document_filler` users are auto-scoped to their own documents server-side via `effectiveUserID` in `parseListOptions`; `system_admin` sees all.
+- **pageSize cap:** backend returns 400 if `pageSize > 50` (defense-in-depth; selector is also limited to 10/20/50).
+- **Filter tabs:** 7 tabs (Todos / Meus / Rascunhos / Em revisão / Publicados / Rejeitados / Obsoletos) mapped to Spec 2 8-state model. "Meus" triggers server-side user scope, not a status filter.
+- **SectionPanel:** `LibraryAreaTree` on the left (224px) lists process areas from the taxonomy API; selecting an area adds `areaCode` to the query.
+- **Activity sidebar:** 320px, default-collapsed, toggle persisted to `localStorage`. Placeholder only in Phase 4 — approval inbox integration deferred.
+- **StatusPill:** extended to all 8 Spec 2 states (`draft`, `under_review`, `approved`, `rejected`, `scheduled`, `published`, `superseded`, `obsolete`) with Portuguese labels.
+
+See `wiki/implementation/plan-library.md` for full implementation plan and phase-by-phase detail.
 
 ## Create Flow
 
@@ -84,7 +115,8 @@ Restoring a checkpoint re-fetches the revision buffer and reloads the editor.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v2/documents` | List documents |
+| GET | `/api/v2/documents` | Paginated list; params: `page`, `pageSize` (max 50), `status` (comma-sep or repeated), `areaCode`, `profileCode`, `q`, `includeArchived`. Returns `{items, page, pageSize, total}`. |
+| GET | `/api/v2/documents/stats` | Counts grouped by `{byStatus, byArea}`. Same filter params (minus pagination). |
 | POST | `/api/v2/documents` | Create document from CD |
 | GET | `/api/v2/documents/:id` | Get document metadata |
 | PUT | `/api/v2/documents/:id/name` | Rename |
