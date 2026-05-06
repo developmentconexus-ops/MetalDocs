@@ -351,6 +351,48 @@ func (r *Repository) CountDocuments(ctx context.Context, tenantID string, opts L
 	return n, nil
 }
 
+func (r *Repository) StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error) {
+	where, args := buildDocumentFilter(tenantID, opts)
+	q := fmt.Sprintf(`SELECT status, COUNT(*) FROM documents WHERE %s GROUP BY status`, where)
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]int64)
+	for rows.Next() {
+		var status string
+		var count int64
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, err
+		}
+		out[status] = count
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error) {
+	where, args := buildDocumentFilter(tenantID, opts)
+	q := fmt.Sprintf(`SELECT COALESCE(process_area_code_snapshot, '') AS area, COUNT(*) FROM documents WHERE %s GROUP BY area`, where)
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]int64)
+	for rows.Next() {
+		var area string
+		var count int64
+		if err := rows.Scan(&area, &count); err != nil {
+			return nil, err
+		}
+		out[area] = count
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error {
 	col := ""
 	if stampTime {

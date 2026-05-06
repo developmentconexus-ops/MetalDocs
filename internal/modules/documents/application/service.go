@@ -32,6 +32,8 @@ type Repository interface {
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
 	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error)
 	CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error)
+	StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
+	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error
 	MarkArchived(ctx context.Context, tenantID, docID, actorID string) error
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
