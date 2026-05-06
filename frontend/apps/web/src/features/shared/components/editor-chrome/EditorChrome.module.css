@@ -1,0 +1,242 @@
+/* =========================================================
+   EditorChrome — shared toolbar/wrapper for eigenpal editors
+   Used by TemplateAuthorPage and DocumentEditorPage.
+   Renders 3 absolute-positioned overlays atop eigenpal's
+   40px title bar, plus eigenpal styling overrides scoped
+   to .wrapper :global(.ep-root).
+   ========================================================= */
+
+.wrapper {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-2);
+  position: relative;
+}
+
+/* ---------- Overlays (positioned over eigenpal title bar) ---------- */
+
+.overlayLeft {
+  position: absolute;
+  top: 0;
+  left: var(--sp-3);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  z-index: 60;
+}
+
+.overlayCenter {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 40px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  z-index: 60;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 13px;
+  font-family: var(--font-sans);
+}
+
+/* Children of overlayCenter that need to be interactive (e.g. dropdowns)
+   must opt back in by setting pointer-events: auto themselves. */
+
+.overlayRight {
+  position: absolute;
+  top: 0;
+  right: var(--sp-2);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  z-index: 100;
+}
+
+.overlayAlert {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 6px var(--sp-5);
+  font-size: 12.5px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ---------- Title text inside overlayCenter ---------- */
+
+.docTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+
+.docSep {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.docMeta {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+/* ---------- Button primitives ---------- */
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  color: var(--text-soft);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.iconBtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 26px;
+  padding: 0 var(--sp-3);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.ghostBtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.ghostBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 26px;
+  padding: 0 var(--sp-3);
+  background: var(--brand);
+  border: 0;
+  border-radius: var(--r-2);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  transition: background 150ms ease;
+}
+.primaryBtn:hover:not(:disabled) { background: var(--brand-soft); }
+.primaryBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ===== Eigenpal overrides — scoped to .wrapper :global(.ep-root) ===== */
+
+/* Title bar: compact (eigenpal default has too much vertical padding) */
+.wrapper :global(.ep-root [data-testid="title-bar"]) {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+/* Doc icon → wine color + smaller */
+.wrapper :global(.ep-root) svg path[fill="#cbd5e1"] { fill: var(--brand); }
+.wrapper :global(.ep-root) svg path[fill="#94a3b8"] { fill: var(--brand-soft); }
+.wrapper :global(.ep-root) svg[viewBox="0 0 32 40"] { width: 16px; height: 20px; }
+
+/* Formatting bar wine pill.
+   Both overflow axes must match — eigenpal closes font-size dropdown on any
+   capture-phase scroll event. overflow-x:hidden alone forces overflow-y:auto,
+   making the bar a scroll container, killing the dropdown when input focuses. */
+.wrapper :global(.ep-root [data-testid="formatting-bar"]) {
+  background: rgba(107, 31, 42, 0.18) !important;
+  border: 1px solid rgba(107, 31, 42, 0.2) !important;
+  overflow: hidden !important;
+}
+
+/* All buttons inside formatting bar */
+.wrapper :global(.ep-root [data-testid="formatting-bar"] button:not(.docx-advanced-color-picker-dropdown *)) {
+  color: var(--text-soft) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+.wrapper :global(.ep-root [data-testid="formatting-bar"] button:not(.docx-advanced-color-picker-dropdown *):hover) {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: var(--text) !important;
+}
+.wrapper :global(.ep-root [data-testid="formatting-bar"] button:not(.docx-advanced-color-picker-dropdown *) svg) {
+  fill: var(--text-soft) !important;
+}
+.wrapper :global(.ep-root [data-testid="formatting-bar"] button[aria-pressed="true"]:not(.docx-advanced-color-picker-dropdown *)) {
+  background: rgba(0, 0, 0, 0.12) !important;
+  color: var(--text) !important;
+}
+
+/* Font size button + input. Width must be wide enough to avoid scrollLeft
+   on focus — eigenpal closes dropdown on any capture-phase scroll. */
+.wrapper :global(.ep-root [data-testid="font-size-display"]),
+.wrapper :global(.ep-root [data-testid="font-size-input"]) {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  color: var(--text-soft) !important;
+  border-radius: var(--r-1) !important;
+  width: 56px !important;
+  height: 28px !important;
+  min-width: 56px !important;
+  min-height: 28px !important;
+  padding: 4px !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+/* Font family / style selectors */
+.wrapper :global(.ep-root [data-testid="formatting-bar"] [role="combobox"]),
+.wrapper :global(.ep-root [data-testid="formatting-bar"] select) {
+  color: var(--text-soft) !important;
+  background: transparent !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Group dividers */
+.wrapper :global(.ep-root [data-testid="formatting-bar"] [role="separator"]) {
+  background: rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Wine gradient scrollbar inside eigenpal scroll region */
+.wrapper :global(.ep-root) ::-webkit-scrollbar { width: 10px; height: 10px; }
+.wrapper :global(.ep-root) ::-webkit-scrollbar-track { background: transparent; }
+.wrapper :global(.ep-root) ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--brand-soft) 0%, var(--brand) 100%);
+  border-radius: 10px;
+  border: 2px solid var(--surface-2);
+}
+.wrapper :global(.ep-root) ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--brand-soft) 100%);
+}
+.wrapper :global(.ep-root) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand) transparent;
+}
