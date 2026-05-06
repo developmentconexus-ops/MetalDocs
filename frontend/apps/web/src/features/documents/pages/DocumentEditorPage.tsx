@@ -10,10 +10,15 @@ import { getDocument, finalizeDocument, renameDocument, signedRevisionURL } from
 import { useDocumentPdfStatus } from '../hooks/v2/useDocumentPdfStatus';
 import { PDFCell } from '../components/PDFCell';
 import type { DocumentResponse } from '../api/documentsV2';
-import { CheckpointsDialog } from '../components/CheckpointsDialog';
-import { ExportMenuButton } from '../components/ExportMenuButton';
-import { EditorDocBar } from '../components/EditorDocBar';
 import { EditorMetaSidebar } from '../components/EditorMetaSidebar';
+import {
+  EditorChrome,
+  editorChromeStyles,
+  VersionBadge,
+  AutosaveStatus,
+  type AutosaveState,
+} from '../../shared/components/editor-chrome';
+import { CodeChip, StatusPill, type DocumentStatus } from '../../../components/ui';
 import styles from './styles/DocumentEditorPage.module.css';
 
 export type DocumentEditorPageProps = {
@@ -26,7 +31,6 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [doc, setDoc] = useState<DocumentResponse | null>(null);
   const [documentName, setDocumentName] = useState('');
   const [buffer, setBuffer] = useState<ArrayBuffer | null | undefined>(undefined);
-  const [checkpointsOpen, setCheckpointsOpen] = useState(false);
   const editorRef = useRef<MetalDocsEditorRef>(null);
 
   const fetchRevisionBuffer = useCallback(async (revisionID: string) => {
@@ -158,18 +162,6 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     }
   }
 
-  async function handleRestored(newRevisionID: string) {
-    try {
-      await fetchRevisionBuffer(newRevisionID);
-      const refreshedDoc = await getDocument(documentID);
-      setDoc(refreshedDoc);
-      setDocumentName(refreshedDoc.Name ?? refreshedDoc.name ?? 'Document');
-      session.setLastAck(newRevisionID);
-    } catch {
-      toast.error('Failed to refresh document after restore.');
-    }
-  }
-
   const docStatus = doc?.Status ?? doc?.status ?? '';
   const isEditable = session.state.phase === 'writer' && docStatus === 'draft';
   // Poll view endpoint for PDF status when doc is not a draft (E11).
@@ -177,12 +169,6 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const docCode = doc?.Code ?? doc?.code ?? '';
   const revNum = doc?.RevisionVersion ?? doc?.revision_version ?? 0;
   const displayName = documentName.replace(/\.docx$/i, '');
-  const statusPillClass = {
-    draft: styles.draft,
-    under_review: styles.inReview,
-    approved: styles.approved,
-    published: styles.published,
-  }[docStatus] ?? '';
   const userID = doc?.CreatedBy ?? doc?.created_by ?? '';
   const authorDisplay = String(userID);
   const commentsHook = useDocumentComments(documentID, authorDisplay);
@@ -195,28 +181,62 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     () => localStorage.getItem('editor-sidebar-open') !== 'false'
   );
 
+  const autosaveState: AutosaveState =
+    autosave.status === 'saving' ? 'saving' :
+    autosave.status === 'error' ? 'error' :
+    autosave.status === 'saved' ? 'saved' :
+    'idle';
+
+  const statusForPill: DocumentStatus | null = (() => {
+    if (!docStatus) return null;
+    const allowed: DocumentStatus[] = [
+      'draft', 'review', 'under_review', 'approved', 'frozen',
+      'rejected', 'archived', 'finalized', 'scheduled', 'published',
+      'superseded', 'obsolete',
+    ];
+    return (allowed as string[]).includes(docStatus) ? (docStatus as DocumentStatus) : null;
+  })();
+
   return (
     <div className={styles.page} data-editor-root>
       <div className={styles.body}>
+        <aside className={styles.rail}>
+          <button
+            type="button"
+            className={styles.railBackBtn}
+            onClick={onDone}
+            aria-label="Voltar"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            <span className={styles.railTip}>Voltar</span>
+          </button>
+        </aside>
         <main className={styles.canvas}>
-          <div className={styles.editorWrapper}>
-            <EditorDocBar
-              code={docCode || undefined}
-              documentName={displayName}
-              revisionVersion={revNum}
-              docStatus={docStatus || undefined}
-              autosaveStatus={autosave.status === 'saving' ? 'saving' : autosave.status === 'error' ? 'error' : autosave.status === 'saved' ? 'saved' : 'idle'}
-              isEditable={isEditable}
-              onBack={onDone}
-              onCheckpoints={() => setCheckpointsOpen(true)}
-              exportButton={
-                <ExportMenuButton
-                  documentID={documentID}
-                  canExport={sessionPhase === 'writer' || sessionPhase === 'readonly'}
-                />
-              }
-              onFinalize={() => void handleFinalize()}
-            />
+          <EditorChrome
+            center={
+              <>
+                {docCode && <CodeChip>{docCode}</CodeChip>}
+                {displayName && <span className={editorChromeStyles.docTitle}>{displayName}</span>}
+                {revNum > 0 && <VersionBadge>{`v${revNum}`}</VersionBadge>}
+                {statusForPill && <StatusPill status={statusForPill} />}
+              </>
+            }
+            right={
+              <>
+                <AutosaveStatus status={autosaveState} />
+                <button
+                  type="button"
+                  className={editorChromeStyles.primaryBtn}
+                  onClick={() => void handleFinalize()}
+                  disabled={!isEditable}
+                >
+                  Submeter para revisão
+                </button>
+              </>
+            }
+          >
             {canMountEditor ? (
               <MetalDocsEditor
                 ref={editorRef}
@@ -234,7 +254,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 showRuler={false}
               />
             ) : null}
-          </div>
+          </EditorChrome>
         </main>
         <EditorMetaSidebar
           open={sidebarOpen}
@@ -248,16 +268,6 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
           code={docCode || undefined}
         />
       </div>
-      <CheckpointsDialog
-        open={checkpointsOpen}
-        onClose={() => setCheckpointsOpen(false)}
-        documentID={documentID}
-        disabled={!isEditable}
-        onRestored={(rev) => {
-          setCheckpointsOpen(false);
-          void handleRestored(rev);
-        }}
-      />
     </div>
   );
 }

@@ -47,8 +47,13 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
     };
 
     const libMode = props.mode === 'readonly' ? 'viewing' : 'editing';
+    // templatePlugin renders the `template-annotation-chip` items into the
+    // unified sidebar (used for variable authoring in template-draft mode).
+    // Document editing renders fully-substituted output — skip the plugin so
+    // the sidebar stays empty (no chips, canvas centered) when there are also
+    // no comments to display. See wiki/modules/editor-ui-eigenpal.md.
     const plugins: EditorPlugin[] = [
-      templatePlugin,
+      ...(props.mode === 'template-draft' ? [templatePlugin] : []),
       ...(props.sidebarModel ? [buildSidebarModelPlugin(props.sidebarModel)] : []),
       ...(props.externalPlugins ?? []),
     ];

@@ -15,6 +15,60 @@
   overflow: hidden;
 }
 
+/* ---------- Left rail (back button) ---------- */
+.rail {
+  --rail-w: 48px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--sp-2) 0;
+  gap: 2px;
+  width: var(--rail-w);
+  flex: 0 0 var(--rail-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.railBackBtn {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: var(--brand);
+  border: 0;
+  border-radius: var(--r-2);
+  color: #fff;
+  cursor: pointer;
+  transition: background 150ms ease;
+  flex-shrink: 0;
+}
+.railBackBtn:hover { background: var(--brand-soft); }
+
+.railTip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--text);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: var(--r-1);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  z-index: 30;
+}
+.railBackBtn:hover .railTip { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .railBackBtn, .railTip { transition: none; }
+}
+
 .canvas {
   flex: 1;
   min-width: 0;
@@ -22,14 +76,4 @@
   background: var(--surface-2);
   display: flex;
   flex-direction: column;
-}
-
-.editorWrapper {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
 }

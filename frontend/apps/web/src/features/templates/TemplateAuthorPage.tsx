@@ -11,6 +11,14 @@ import { useTemplateSchemas } from './hooks/useTemplateSchemas';
 import { VersionActionPanel } from './VersionActionPanel';
 import { PlaceholderCatalogPanel } from './PlaceholderCatalogPanel';
 import { fetchPlaceholderCatalog, type PlaceholderCatalogEntry } from './api/catalog';
+import {
+  EditorChrome,
+  editorChromeStyles,
+  VersionBadge,
+  AutosaveStatus,
+  type AutosaveState,
+} from '../shared/components/editor-chrome';
+import { StatusPill, type DocumentStatus } from '../../components/ui';
 import styles from './TemplateAuthorPage.module.css';
 
 export type TemplateAuthorPageProps = {
@@ -179,12 +187,20 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
   if (draft.error) return <div role="alert" className={styles.error}>{draft.error}</div>;
   if (schemaState.error && !localSchemas) return <div role="alert" className={styles.error}>{schemaState.error}</div>;
 
-  const statusPillClass =
-    currentVersion?.status === 'draft' ? styles.draft :
-    currentVersion?.status === 'in_review' ? styles.inReview :
-    currentVersion?.status === 'approved' ? styles.approved :
-    currentVersion?.status === 'published' ? styles.published :
-    '';
+  // Map template VersionDTO.status onto the shared StatusPill DocumentStatus.
+  const versionStatus: DocumentStatus | null = (() => {
+    const s = currentVersion?.status;
+    if (!s) return null;
+    if (s === 'in_review') return 'under_review';
+    if (s === 'draft' || s === 'approved' || s === 'published') return s;
+    return null;
+  })();
+
+  const autosaveState: AutosaveState =
+    autosave.status === 'saving' ? 'saving' :
+    autosave.status === 'error' ? 'error' :
+    autosave.status === 'saved' ? 'saved' :
+    'idle';
 
   const leftRailItems: (RailItem | { divider: true })[] = [
     { key: 'variables', tip: 'Variables',       icon: IconBraces },
@@ -193,19 +209,6 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     { key: 'media',     tip: 'Media',            icon: IconImage,  soon: true },
     { key: 'search',    tip: 'Find',  kbd: '⌘F', icon: IconSearch, soon: true },
   ];
-  const autosaveNode = (() => {
-    if (autosave.status === 'saving') {
-      return <span className={styles.autosaveStatus}><span className={styles.autosaveDot} aria-hidden="true" /> Saving…</span>;
-    }
-    if (autosave.status === 'error') {
-      return <span className={styles.autosaveStatus} style={{ color: '#dc2626' }}>Save failed</span>;
-    }
-    if (autosave.status === 'saved') {
-      return <span className={styles.autosaveStatus}><IconCheck className={styles.autosaveCheck} /> Saved</span>;
-    }
-    return <span className={styles.autosaveStatus} />;
-  })();
-
   return (
     <div className={styles.page}>
       <div className={styles.body}>
@@ -242,65 +245,65 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
           <PlaceholderCatalogPanel detected={detectedVariables} />
         )}
 
-        <main
-          className={styles.canvas}
-        >
-          <div className={styles.editorWrapper}>
-            <div className={styles.overlayTitle}>
-              <span className={styles.docTitle}>{draft.template?.name ?? 'Untitled template'}</span>
-              <span className={styles.docSep}>·</span>
-              <span className={styles.docMeta}>Template</span>
-              <span className={styles.versionBadge}>REV{String(versionNum).padStart(2, '0')}</span>
-              {currentVersion?.status && (
-                <span className={`${styles.statusPill} ${statusPillClass}`}>{currentVersion.status.replace('_', ' ')}</span>
-              )}
-            </div>
-            <div className={styles.overlayRight}>
-              {autosaveNode}
-              {isDraft && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type='file'
-                    accept='.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                    style={{ display: 'none' }}
-                    onChange={handleImportFile}
-                  />
-                  <button
-                    className={styles.editorSubmitBtn}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={importing}
-                  >
-                    {importing ? 'Importando…' : 'Importar .docx'}
-                  </button>
-                <button
-                  className={styles.editorSubmitBtn}
-                  onClick={() => void handleSubmitForReview()}
-                  disabled={submitting}
+        <main className={styles.canvas}>
+          <EditorChrome
+            center={
+              <>
+                <span className={editorChromeStyles.docTitle}>{draft.template?.name ?? 'Untitled template'}</span>
+                <span className={editorChromeStyles.docSep}>·</span>
+                <span className={editorChromeStyles.docMeta}>Template</span>
+                <VersionBadge>{`REV${String(versionNum).padStart(2, '0')}`}</VersionBadge>
+                {versionStatus && <StatusPill status={versionStatus} />}
+              </>
+            }
+            right={
+              <>
+                <AutosaveStatus
+                  status={autosaveState}
+                  labels={{ idle: '', saving: 'Saving…', saved: 'Saved', error: 'Save failed' }}
+                />
+                {isDraft && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type='file'
+                      accept='.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                      style={{ display: 'none' }}
+                      onChange={handleImportFile}
+                    />
+                    <button
+                      type="button"
+                      className={editorChromeStyles.primaryBtn}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={importing}
+                    >
+                      {importing ? 'Importando…' : 'Importar .docx'}
+                    </button>
+                    <button
+                      type="button"
+                      className={editorChromeStyles.primaryBtn}
+                      onClick={() => void handleSubmitForReview()}
+                      disabled={submitting}
+                    >
+                      {IconSend} {submitting ? 'Enviando…' : 'Solicitar Revisão'}
+                    </button>
+                  </>
+                )}
+              </>
+            }
+            alert={
+              submitErr ? (
+                <div
+                  role="alert"
+                  style={{ color: submitErr === 'Submitted for review.' ? '#065f46' : '#dc2626' }}
                 >
-                  {IconSend} {submitting ? 'Enviando…' : 'Solicitar Revisão'}
-                </button>
-                </>
-              )}
-            </div>
-            {submitErr && (
-              <div
-                role="alert"
-                className={styles.overlayAlert}
-                style={{ color: submitErr === 'Submitted for review.' ? '#065f46' : '#dc2626' }}
-              >
-                {submitErr}
-              </div>
-            )}
-            {importErr && (
-              <div
-                role="alert"
-                className={styles.overlayAlert}
-                style={{ color: '#dc2626' }}
-              >
-                {importErr}
-              </div>
-            )}
+                  {submitErr}
+                </div>
+              ) : importErr ? (
+                <div role="alert" style={{ color: '#dc2626' }}>{importErr}</div>
+              ) : undefined
+            }
+          >
             <DocxEditor
               ref={editorRef}
               documentBuffer={draft.docxBytes ?? undefined}
@@ -311,7 +314,7 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
               showRuler
               showMarginGuides
             />
-          </div>
+          </EditorChrome>
         </main>
 
       </div>
@@ -339,11 +342,6 @@ const svgBase = {
   strokeLinejoin: 'round' as const,
 };
 
-function IconCheck({ className }: { className?: string }) {
-  return (
-    <svg {...svgBase} width={14} height={14} className={className}><path d="M20 6 9 17l-5-5" /></svg>
-  );
-}
 const IconSend = (
   <svg {...svgBase} width={14} height={14}><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
 );
