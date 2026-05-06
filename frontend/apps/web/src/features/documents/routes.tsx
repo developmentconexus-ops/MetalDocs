@@ -54,7 +54,7 @@ export const documentsRoutes: RouteObject[] = [
   {
     path: "documents-v2/new",
     handle: { workspaceView: "documents-v2" },
-    lazy: () => import("./pages/DocumentCreateRoutePage"),
+    lazy: () => import("./pages/NewDocumentWizardPage").then((m) => ({ Component: m.NewDocumentWizardPage })),
   },
   {
     path: "documents-v2/:documentID",
