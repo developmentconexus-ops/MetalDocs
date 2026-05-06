@@ -20,6 +20,11 @@
 > - `frontend/apps/web/design-source/` — claude.design HTML screen specs (committed reference)
 > - `packages/shared-tokens/` — cross-app design tokens
 
+## Related skills
+
+- `.claude/skills/metaldocs-frontend/SKILL.md` — architecture rulebook (use for any frontend work).
+- `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow for implementing designed screens from `design-source/<slug>/`. Use when the task is "implement screen X".
+
 ---
 
 ## 1. Mental model
