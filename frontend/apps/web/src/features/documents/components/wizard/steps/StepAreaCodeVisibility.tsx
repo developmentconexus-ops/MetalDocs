@@ -1,36 +1,71 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
-import { SelectMenu } from '../../../../../components/ui/SelectMenu';
+import { SelectMenu, type SelectMenuOption } from '../../../../../components/ui/SelectMenu';
 import { CodeChip } from '../../../../../components/ui/CodeChip';
 import { Icon } from '../../../../../components/ui/Icon';
+import { ApiError, resolveErrorMessage } from '../../../../../lib/api';
+import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
+import { VISIBILITY_KEYS, VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
 import { CodePreviewBanner } from '../CodePreviewBanner';
 import { WizardFooter } from '../WizardShell';
+import type { WizardExternalConfig, WizardInvitee } from '../../../state/wizard.reducer';
 import styles from './StepAreaCodeVisibility.module.css';
 
-type VisibilitySample = {
-  id: 'area' | 'people' | 'company' | 'external';
-  icon: 'taxonomy' | 'users' | 'home' | 'link';
-  label: string;
-  desc: string;
-  selected?: boolean;
+export type StepAreaCodeVisibilityProps = {
+  profile: DocumentProfile | null;
+  areas: ProcessArea[];
+  isAreasLoading: boolean;
+  isAreasError: boolean;
+  areasError: unknown;
+  onAreasRetry: () => void;
+  areaCode: string;
+  title: string;
+  visibility: VisibilityKey;
+  invitees: WizardInvitee[];
+  external: WizardExternalConfig;
+  onChangeProfile: () => void;
+  onSetArea: (code: string) => void;
+  onSetTitle: (value: string) => void;
+  onSetVisibility: (key: VisibilityKey) => void;
+  onAddInvitee: (invitee: WizardInvitee) => void;
+  onRemoveInvitee: (id: string) => void;
+  onSetExternal: (patch: Partial<WizardExternalConfig>) => void;
+  onAdvance: () => void;
+  onBack: () => void;
+  onCancel: () => void;
+  advanceDisabled: boolean;
 };
 
-// TODO(novo-documento): Phase 3c maps these against `visibilityMeta.ts`. The
-// JSX reference uses {taxonomy, users, home, link} for the four cards; the
-// SSOT in `visibilityMeta.ts` uses {users, user-plus, building, external-link}
-// (icons not yet in Icon.tsx). Reconciliation deferred to Phase 3b/3c.
-const VISIBILITY_SAMPLES: VisibilitySample[] = [
-  { id: 'area', icon: 'taxonomy', label: 'Apenas a área', desc: 'Documento exemplo — descrição da visibilidade.' },
-  { id: 'people', icon: 'users', label: 'Pessoas selecionadas', desc: 'Documento exemplo — descrição da visibilidade.' },
-  { id: 'company', icon: 'home', label: 'Toda a empresa', desc: 'Documento exemplo — descrição da visibilidade.', selected: true },
-  { id: 'external', icon: 'link', label: 'Externo / Cliente', desc: 'Documento exemplo — descrição da visibilidade.' },
-];
+export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.Element {
+  const {
+    profile,
+    areas,
+    isAreasLoading,
+    isAreasError,
+    areasError,
+    onAreasRetry,
+    areaCode,
+    title,
+    visibility,
+    invitees,
+    external,
+    onChangeProfile,
+    onSetArea,
+    onSetTitle,
+    onSetVisibility,
+    onAddInvitee,
+    onRemoveInvitee,
+    onSetExternal,
+    onAdvance,
+    onBack,
+    onCancel,
+    advanceDisabled,
+  } = props;
 
-const AREA_OPTIONS = [
-  { value: 'QUA', label: 'QUA — Qualidade' },
-  { value: 'PRD', label: 'PRD — Produção' },
-];
+  const areaOptions: SelectMenuOption[] = areas.map((area) => ({
+    value: area.code,
+    label: `${area.code} — ${area.name}`,
+  }));
 
-export function StepAreaCodeVisibility(): JSX.Element {
   return (
     <div className="card">
       <div className="kicker">Etapa 2 de 4</div>
@@ -40,70 +75,215 @@ export function StepAreaCodeVisibility(): JSX.Element {
         <div>
           <label className="kicker">Perfil selecionado</label>
           <div className={styles.profileChip}>
-            <CodeChip>POP</CodeChip>
+            <CodeChip>{profile?.code ?? '—'}</CodeChip>
             <div>
-              <div>Procedimento Operacional</div>
-              <div className="caption">Família: Qualidade</div>
+              <div>{profile?.name ?? '—'}</div>
+              <div className="caption">Família: {profile?.familyCode ?? '—'}</div>
             </div>
-            <button type="button" className="btn btn-sm btn-ghost">
+            <button type="button" className="btn btn-sm btn-ghost" onClick={onChangeProfile}>
               Trocar
             </button>
           </div>
         </div>
         <div>
-          <label className="kicker">Área *</label>
-          <SelectMenu
-            id="wizard-area"
-            value="QUA"
-            options={AREA_OPTIONS}
-            onSelect={() => {}}
-          />
+          <label className="kicker" htmlFor="wizard-area">
+            Área *
+          </label>
+          {isAreasLoading ? (
+            <div className="caption" aria-busy="true">
+              Carregando áreas…
+            </div>
+          ) : isAreasError ? (
+            <div role="alert">
+              {resolveErrorMessage(
+                areasError instanceof ApiError ? areasError.code : undefined,
+                areasError instanceof Error ? areasError.message : undefined,
+              )}{' '}
+              <button type="button" className="btn btn-sm" onClick={onAreasRetry}>
+                Tentar novamente
+              </button>
+            </div>
+          ) : areas.length === 0 ? (
+            <div>
+              <div className="caption">Nenhuma área cadastrada.</div>
+              <a className="btn btn-sm" href="/taxonomy/areas">
+                Cadastrar área
+              </a>
+            </div>
+          ) : (
+            <SelectMenu
+              id="wizard-area"
+              value={areaCode}
+              options={areaOptions}
+              placeholder="Selecione uma área"
+              onSelect={onSetArea}
+            />
+          )}
         </div>
       </div>
 
       <div className={styles.titleRow}>
-        <label className="kicker">Título *</label>
+        <label className="kicker" htmlFor="wizard-title">
+          Título *
+        </label>
         <input
+          id="wizard-title"
           className="input"
           type="text"
-          defaultValue="Documento exemplo"
-          readOnly
+          value={title}
+          placeholder="Documento exemplo"
+          onChange={(event) => onSetTitle(event.target.value)}
         />
       </div>
 
-      <CodePreviewBanner
-        kicker="Código gerado · próximo em (POP, QUA)"
-        code="POP-QUA-???"
-        caption="≈ POP-QUA-??? · Código final atribuído ao confirmar."
-      />
+      <CodePreviewBanner profileCode={profile?.code ?? null} areaCode={areaCode} />
 
+      {/* TODO(novo-documento:visibility): captured in form state but NOT submitted —
+          controlled_documents has no visibility column today. See
+          wiki/backlog/novo-documento.md#visibility for the backend prereq. */}
       <div className="kicker">Visibilidade *</div>
       <div className={styles.visibilityGrid}>
-        {VISIBILITY_SAMPLES.map((option) => (
-          <SelectableCard
-            key={option.id}
-            selected={Boolean(option.selected)}
-            onSelect={() => {}}
-          >
-            <div className={styles.visibilityCardBody}>
-              <span className={styles.visibilityIconTile}>
-                <Icon name={option.icon} />
-              </span>
-              <div className={styles.visibilityText}>
-                <div className={styles.visibilityLabel}>{option.label}</div>
-                <p className="caption">{option.desc}</p>
+        {VISIBILITY_KEYS.map((key) => {
+          const meta = VISIBILITY_META[key];
+          const selected = visibility === key;
+          return (
+            <SelectableCard
+              key={key}
+              selected={selected}
+              onSelect={() => onSetVisibility(key)}
+            >
+              <div className={styles.visibilityCardBody}>
+                <span className={styles.visibilityIconTile}>
+                  <Icon name={meta.icon} />
+                </span>
+                <div className={styles.visibilityText}>
+                  <div className={styles.visibilityLabel}>{meta.label}</div>
+                  <p className="caption">{meta.description}</p>
+                </div>
+                {selected ? <Icon name="check" /> : null}
               </div>
-              {option.selected ? <Icon name="check" /> : null}
-            </div>
-          </SelectableCard>
-        ))}
+            </SelectableCard>
+          );
+        })}
       </div>
 
-      {/* TODO(novo-documento): conditional sub-controls for visibility=people
-          (invitee chips) and visibility=external (password / watermark / expiry)
-          are deferred to Phase 3c. See worksheet §1.6. */}
+      {visibility === 'people' ? (
+        <PeopleSubcontrols
+          invitees={invitees}
+          onAddInvitee={onAddInvitee}
+          onRemoveInvitee={onRemoveInvitee}
+        />
+      ) : null}
 
-      <WizardFooter stepLabel="Etapa 2 de 4 · Avance para selecionar template" />
+      {visibility === 'external' ? (
+        <ExternalSubcontrols external={external} onSetExternal={onSetExternal} />
+      ) : null}
+
+      <WizardFooter
+        stepLabel={
+          advanceDisabled
+            ? 'Etapa 2 de 4 · Preencha área e título para continuar'
+            : 'Etapa 2 de 4 · Avance para selecionar template'
+        }
+        primaryDisabled={advanceDisabled}
+        onAdvance={onAdvance}
+        onBack={onBack}
+        onCancel={onCancel}
+      />
+    </div>
+  );
+}
+
+type PeopleSubcontrolsProps = {
+  invitees: WizardInvitee[];
+  onAddInvitee: (invitee: WizardInvitee) => void;
+  onRemoveInvitee: (id: string) => void;
+};
+
+function PeopleSubcontrols({ invitees, onAddInvitee, onRemoveInvitee }: PeopleSubcontrolsProps): JSX.Element {
+  // TODO(novo-documento:sharing): invitee list captured but NOT submitted —
+  // share/invite model not yet defined. See
+  // wiki/backlog/novo-documento.md#sharing.
+  return (
+    <div className="card" style={{ marginTop: 'var(--sp-3)' }}>
+      <div className="kicker">Pessoas convidadas</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2)', marginTop: 'var(--sp-2)' }}>
+        {invitees.length === 0 ? (
+          <span className="caption">Nenhuma pessoa convidada ainda.</span>
+        ) : (
+          invitees.map((row) => (
+            <span key={row.id} className="pill">
+              {row.label}{' '}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                aria-label={`Remover ${row.label}`}
+                onClick={() => onRemoveInvitee(row.id)}
+              >
+                ×
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+      <button
+        type="button"
+        className="btn btn-sm"
+        style={{ marginTop: 'var(--sp-2)' }}
+        onClick={() => {
+          const id = `tmp-${Date.now()}`;
+          onAddInvitee({ id, label: 'Convidado (placeholder)' });
+        }}
+      >
+        Adicionar pessoa
+      </button>
+    </div>
+  );
+}
+
+type ExternalSubcontrolsProps = {
+  external: WizardExternalConfig;
+  onSetExternal: (patch: Partial<WizardExternalConfig>) => void;
+};
+
+function ExternalSubcontrols({ external, onSetExternal }: ExternalSubcontrolsProps): JSX.Element {
+  // TODO(novo-documento:sharing): external share config captured but NOT
+  // submitted — share/invite model not yet defined. See
+  // wiki/backlog/novo-documento.md#sharing.
+  return (
+    <div className="card" style={{ marginTop: 'var(--sp-3)' }}>
+      <div className="kicker">Compartilhamento externo</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', marginTop: 'var(--sp-2)' }}>
+        <label>
+          <input
+            type="checkbox"
+            checked={external.passwordRequired}
+            onChange={(event) => onSetExternal({ passwordRequired: event.target.checked })}
+          />{' '}
+          Exigir senha
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={external.watermark}
+            onChange={(event) => onSetExternal({ watermark: event.target.checked })}
+          />{' '}
+          Aplicar marca d’água
+        </label>
+        <label>
+          Expira em (dias)
+          <input
+            className="input"
+            type="number"
+            min={0}
+            value={external.expiresInDays ?? ''}
+            onChange={(event) => {
+              const raw = event.target.value;
+              onSetExternal({ expiresInDays: raw === '' ? null : Number(raw) });
+            }}
+          />
+        </label>
+      </div>
     </div>
   );
 }

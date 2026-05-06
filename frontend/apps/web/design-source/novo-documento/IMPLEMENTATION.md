@@ -351,17 +351,19 @@ Sources: `design-source/selected-wizard.jsx` (Stepper, WizardShell, Footer, Step
 
 ## Phase 3c — State wiring (advisory)
 
-- [ ] `useProfilesQuery` / `useAreasQuery` / `useTemplatesByProfileQuery` wired
-- [ ] Reducer dispatches: `selectProfile`, `setArea`, `setTitle`, `setVisibility`, `setVisibilityDetail`, `selectTemplate`, `setConsent`, `goToStep`
-- [ ] URL `?step=N` sync — `useSearchParams` driving reducer
-- [ ] Pre-fill from URL params (`?profile=POP`) on mount
-- [ ] Submit flow: `createControlledDocument` → on success `createDocument` → `navigate(/documents-v2/:id)` editor
-- [ ] Error UX: `ApiError` + `resolveErrorMessage(code, msg)` + `role="alert"` rendering. Slot-already-created surfaces inline retry on doc POST.
-- [ ] Disabled CTAs: `disabled aria-disabled="true" title="Em breve"` for "Em branco" + older version radios
-- [ ] Loading states: skeletons on profiles / areas / templates lists
-- [ ] Empty states: "Nenhum perfil cadastrado" CTA → `/taxonomy/profiles`; "Nenhuma área" CTA → `/taxonomy/areas`
-- [ ] Semantic HTML: `<button>` only for true buttons; no nested buttons; cards use `<button type="button">` (radio cards)
-- [ ] TODO comment blocks above visibility submit + template-versions render + Em-branco card, all referencing `wiki/backlog/novo-documento.md#<anchor>`
+- [x] `useProfilesQuery` / `useAreasQuery` / `useTemplatesByProfileQuery` wired
+- [x] Reducer dispatches: `selectProfile`, `setArea`, `setTitle`, `setVisibility`, `addInvitee` / `removeInvitee` / `setExternal`, `selectTemplate`, `setConsent`, `goToStep`, `submitStart` / `submitError` / `submitSuccess`
+- [x] URL `?step=N` sync — `useSearchParams` driving reducer
+- [x] Pre-fill from URL params (`?profile=POP`) on mount
+- [x] Submit flow: `createControlledDocument` → on success `createDocument` → `navigate(/documents-v2/:id)` editor
+- [x] Error UX: `ApiError` + `resolveErrorMessage(code, msg)` + `role="alert"` rendering. Slot-already-created surfaces inline retry on doc POST.
+- [x] Disabled CTAs: `disabled aria-disabled="true" title="Em breve"` for "Em branco" + templates without published version
+- [x] Loading states: skeletons on profiles / areas / templates lists
+- [x] Empty states: "Nenhum perfil cadastrado" CTA → `/taxonomy/profiles`; "Nenhuma área" CTA → `/taxonomy/areas`; "Nenhum template publicado" caption
+- [x] Semantic HTML: `<button>` only for true buttons; no nested buttons; cards use `<button type="button">` (radio cards via `SelectableCard`)
+- [x] TODO comment blocks above visibility submit + template-versions render + Em-branco card + invitee + external + slot-rollback + profile-counts, all referencing `wiki/backlog/novo-documento.md#<anchor>`
+
+> Note (deferred to Phase 4 user review): Older-version radios are not rendered as separate radios — only the published version is selectable per worksheet §1.6 (template-versions endpoint not yet shipped). Templates whose `published_version_id` is `null` are rendered disabled with `title="Em breve"`. The "Em breve" disabled treatment for older versions is satisfied at the per-template level rather than per-version.
 
 ---
 
