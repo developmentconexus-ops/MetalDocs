@@ -251,13 +251,14 @@ func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID 
 }
 
 type ListOptions struct {
-	Page        int
-	PageSize    int
-	CreatedBy   string
-	Status      []string
-	AreaCode    string
-	ProfileCode string
-	Q           string
+	Page            int
+	PageSize        int
+	CreatedBy       string
+	Status          []string
+	AreaCode        string
+	ProfileCode     string
+	Q               string
+	IncludeArchived bool
 }
 
 func (o ListOptions) Offset() int {
@@ -281,8 +282,11 @@ func (o ListOptions) Limit() int {
 }
 
 func buildDocumentFilter(tenantID string, opts ListOptions) (whereClause string, args []interface{}) {
-	conds := []string{"tenant_id = $1", "archived_at IS NULL"}
+	conds := []string{"tenant_id = $1"}
 	args = []interface{}{tenantID}
+	if !opts.IncludeArchived {
+		conds = append(conds, "archived_at IS NULL")
+	}
 
 	if opts.CreatedBy != "" {
 		args = append(args, opts.CreatedBy)
