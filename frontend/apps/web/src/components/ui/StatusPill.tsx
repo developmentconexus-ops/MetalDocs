@@ -1,22 +1,32 @@
-import styles from './StatusPill.module.css';
+﻿import styles from './StatusPill.module.css';
 
 export type DocumentStatus =
   | 'draft'
   | 'review'
+  | 'under_review'
   | 'approved'
   | 'frozen'
   | 'rejected'
   | 'archived'
-  | 'finalized';
+  | 'finalized'
+  | 'scheduled'
+  | 'published'
+  | 'superseded'
+  | 'obsolete';
 
 const STATUS_CONFIG: Record<DocumentStatus, { label: string; pillClass: string }> = {
-  draft:     { label: 'Rascunho',   pillClass: 'pill pill-draft' },
-  review:    { label: 'Em revisão', pillClass: 'pill pill-review' },
-  approved:  { label: 'Aprovado',   pillClass: 'pill pill-approved' },
-  frozen:    { label: 'Frozen',     pillClass: 'pill pill-frozen' },
-  rejected:  { label: 'Rejeitado',  pillClass: 'pill pill-rejected' },
-  archived:  { label: 'Arquivado',  pillClass: 'pill pill-archived' },
-  finalized: { label: 'Finalizado', pillClass: 'pill pill-approved' },
+  draft: { label: 'Rascunho', pillClass: 'pill pill-draft' },
+  review: { label: 'Em Revisão', pillClass: 'pill pill-review' },
+  under_review: { label: 'Em Revisão', pillClass: 'pill pill-review' },
+  approved: { label: 'Aprovado', pillClass: 'pill pill-approved' },
+  frozen: { label: 'Agendado', pillClass: 'pill pill-scheduled' },
+  rejected: { label: 'Rejeitado', pillClass: 'pill pill-rejected' },
+  archived: { label: 'Obsoleto', pillClass: 'pill pill-obsolete' },
+  finalized: { label: 'Publicado', pillClass: 'pill pill-published' },
+  scheduled: { label: 'Agendado', pillClass: 'pill pill-scheduled' },
+  published: { label: 'Publicado', pillClass: 'pill pill-published' },
+  superseded: { label: 'Substituído', pillClass: 'pill pill-superseded' },
+  obsolete: { label: 'Obsoleto', pillClass: 'pill pill-obsolete' },
 };
 
 type StatusPillProps = {
