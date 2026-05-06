@@ -1,0 +1,214 @@
+.root {
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+/* ─── Header ──────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sub {
+  margin: var(--sp-1) 0 0;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.close {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: var(--sp-1);
+  line-height: 1;
+  border-radius: var(--r-1);
+  flex-shrink: 0;
+}
+
+.close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ─── Sections ────────────────────────────────────────── */
+.section {
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0 var(--sp-5);
+}
+
+/* ─── Inbox list ──────────────────────────────────────── */
+.inboxList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.inboxItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.inboxItem:last-child {
+  border-bottom: none;
+}
+
+.inboxCode {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.inboxDue {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tone_danger  { color: var(--danger); font-weight: 600; }
+.tone_warning { color: var(--warning); }
+.tone_muted   { color: var(--text-muted); }
+
+.inboxButton {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-2);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.inboxButton:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+}
+
+/* ─── Audit list ──────────────────────────────────────── */
+.auditList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.auditItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand-pale);
+  color: var(--brand);
+  font-size: 0.62rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.avatarSystem {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.auditBody {
+  flex: 1;
+  color: var(--text);
+  min-width: 0;
+}
+
+.auditWho {
+  font-weight: 600;
+}
+
+.auditAction {
+  color: var(--text-soft);
+}
+
+.auditTarget {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.auditTime {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.viewAll {
+  margin-top: var(--sp-2);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  align-self: flex-start;
+}
+
+.viewAll:hover {
+  text-decoration: underline;
+}

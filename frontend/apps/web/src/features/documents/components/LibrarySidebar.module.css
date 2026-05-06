@@ -1,10 +1,12 @@
 .root {
   display: flex;
   flex-direction: column;
-  background: #1c0f12;
-  color: var(--rail-text);
+  background: var(--surface-2);
+  color: var(--text);
   height: 100%;
   overflow-y: auto;
+  font-family: var(--font-sans);
+  border-right: 1px solid var(--border);
 }
 
 /* ─── Header ──────────────────────────────────────────── */
@@ -12,15 +14,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--sp-4) var(--sp-4) var(--sp-3);
-  border-bottom: 1px solid var(--rail-divider);
+  padding: var(--sp-3) var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .headerTitle {
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--rail-text);
+  color: var(--text);
 }
 
 .headerAdd {
@@ -30,9 +32,9 @@
   width: 24px;
   height: 24px;
   border-radius: var(--r-2);
-  border: 1px solid var(--rail-divider);
+  border: 1px solid var(--border);
   background: transparent;
-  color: var(--rail-text-muted);
+  color: var(--text-muted);
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -40,14 +42,14 @@
 }
 
 .headerAdd:hover {
-  background: var(--rail-divider);
-  color: var(--rail-text);
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 /* ─── Search ──────────────────────────────────────────── */
 .searchWrap {
   position: relative;
-  padding: var(--sp-3) var(--sp-3) var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
   flex-shrink: 0;
 }
 
@@ -55,22 +57,23 @@
   width: 100%;
   padding: var(--sp-2) var(--sp-7) var(--sp-2) var(--sp-3);
   border-radius: var(--r-2);
-  border: 1px solid var(--rail-divider);
-  background: rgba(255,255,255,0.05);
-  color: var(--rail-text);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
   font-size: 0.8rem;
   font-family: var(--font-sans);
   outline: none;
-  transition: border-color 0.1s, background 0.1s;
+  transition: border-color 0.1s, box-shadow 0.1s;
+  box-sizing: border-box;
 }
 
 .searchInput::placeholder {
-  color: var(--rail-text-muted);
+  color: var(--text-muted);
 }
 
 .searchInput:focus {
-  border-color: var(--rail-active);
-  background: rgba(255,255,255,0.07);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-pale);
 }
 
 .searchKbd {
@@ -79,7 +82,7 @@
   top: 50%;
   transform: translateY(-50%);
   font-size: 0.65rem;
-  color: var(--rail-text-muted);
+  color: var(--text-faint);
   pointer-events: none;
 }
 
@@ -92,17 +95,17 @@
 }
 
 .sectionLabel {
-  padding: var(--sp-2) var(--sp-2) var(--sp-1);
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3);
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: var(--rail-text-muted);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .divider {
   height: 1px;
-  background: var(--rail-divider);
+  background: var(--border);
   margin: 0 var(--sp-3);
   flex-shrink: 0;
 }
@@ -112,35 +115,38 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 6px var(--sp-2);
+  padding: 5px var(--sp-3);
+  margin: 0 var(--sp-1);
   border-radius: var(--r-2);
   border: none;
   background: transparent;
-  color: var(--rail-text-muted);
+  color: var(--text-soft);
   cursor: pointer;
   font-size: 0.82rem;
   font-family: var(--font-sans);
   text-align: left;
-  width: 100%;
+  width: calc(100% - var(--sp-2));
   transition: background 0.1s, color 0.1s;
 }
 
 .navItem:hover:not(:disabled) {
-  background: rgba(255,255,255,0.06);
-  color: var(--rail-text);
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .navItemActive {
-  background: var(--rail-active);
-  color: var(--rail-text);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: var(--shadow-1);
 }
 
 .navItemActive:hover {
-  background: var(--rail-active);
+  background: var(--surface);
 }
 
 .navItemDisabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -153,13 +159,14 @@
 
 .navBadge {
   font-size: 0.7rem;
-  color: var(--rail-text-muted);
+  color: var(--text-muted);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
 }
 
 .navItemActive .navBadge {
-  color: rgba(232,214,214,0.7);
+  color: var(--text-muted);
 }
 
 /* ─── Status dots ─────────────────────────────────────── */
@@ -170,10 +177,10 @@
   flex-shrink: 0;
 }
 
-.dotDraft    { background: var(--warning); }
-.dotReview   { background: #4a90d9; }
-.dotApproved { background: #2d9e5a; }
-.dotPublished{ background: var(--success); }
+.dotDraft    { background: var(--text-muted); }
+.dotReview   { background: var(--warning); }
+.dotApproved { background: var(--success); }
+.dotPublished{ background: var(--brand); }
 .dotRejected { background: var(--danger); }
 .dotObsolete { background: var(--text-faint); }
 
@@ -184,7 +191,7 @@
   gap: var(--sp-2);
   padding: var(--sp-3) var(--sp-4);
   margin-top: auto;
-  border-top: 1px solid var(--rail-divider);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -198,5 +205,5 @@
 
 .footerText {
   font-size: 0.72rem;
-  color: var(--rail-text-muted);
+  color: var(--text-muted);
 }
