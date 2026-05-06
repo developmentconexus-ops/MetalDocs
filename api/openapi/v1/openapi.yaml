@@ -895,6 +895,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /document-areas/{code}:
     delete:
       summary: Desativa uma area de processo documental
       parameters:
@@ -1715,24 +1716,6 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
         '403':
           description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '400':
-          description: Requisicao invalida ou payload/schema inconsistente para exportacao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado ou template nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '503':
-          description: Servico de renderizacao indisponivel
           content:
             application/json:
               schema:
@@ -2961,24 +2944,64 @@ paths:
       summary: List documents for tenant
       tags: [documents]
       operationId: listDocumentsV2
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+        - name: status
+          in: query
+          description: CSV status filter, also accepts repeated query params
+          schema:
+            type: string
+        - name: areaCode
+          in: query
+          schema:
+            type: string
+        - name: profileCode
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: includeArchived
+          in: query
+          schema:
+            type: boolean
       responses:
         '200':
           description: ok
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  required: [id, name, status, template_version_id, updated_at]
-                  properties:
-                    id: { type: string, format: uuid }
-                    name: { type: string }
-                    status: { type: string, enum: [draft, finalized, archived] }
-                    template_version_id: { type: string, format: uuid }
-                    updated_at: { type: string, format: date-time }
-                    current_revision_id: { type: string, format: uuid }
-        '403': { description: forbidden }
+                $ref: '#/components/schemas/DocumentListResponse'
+        '400':
+          description: Requisicao invalida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '401':
+          description: Nao autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Sem permissao
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
     post:
       summary: Create document from published template
       tags: [documents]
@@ -3025,6 +3048,50 @@ paths:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
+
+  /api/v2/documents/stats:
+    get:
+      summary: Documents stats by status and area
+      tags: [documents]
+      operationId: documentStatsV2
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: areaCode
+          in: query
+          schema:
+            type: string
+        - name: profileCode
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStatsResponse'
+        '400':
+          description: Requisicao invalida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '401':
+          description: Nao autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Sem permissao
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
 
   /api/v2/documents/{id}/session/acquire:
     post:
@@ -3611,6 +3678,87 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DocumentListItem'
+    DocumentListResponse:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+          format: int64
+    DocumentSummary:
+      type: object
+      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, Code]
+      properties:
+        ID:
+          type: string
+        TenantID:
+          type: string
+        TemplateVersionID:
+          type: string
+        Name:
+          type: string
+        Status:
+          type: string
+          enum: [draft, under_review, approved, rejected, scheduled, published, superseded, obsolete]
+        FormDataJSON:
+          type: string
+          format: byte
+        CurrentRevisionID:
+          type: string
+        RevisionVersion:
+          type: integer
+          format: int64
+        ActiveSessionID:
+          type: string
+        ValuesFrozenAt:
+          type: string
+          format: date-time
+          nullable: true
+        ArchivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        CreatedBy:
+          type: string
+        ControlledDocumentID:
+          type: string
+          nullable: true
+        ProfileCodeSnapshot:
+          type: string
+          nullable: true
+        ProcessAreaCodeSnapshot:
+          type: string
+          nullable: true
+        Code:
+          type: string
+    DocumentStatsResponse:
+      type: object
+      required: [byStatus, byArea]
+      properties:
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+        byArea:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
     MetadataFieldRule:
       type: object
       required: [name, type, required]

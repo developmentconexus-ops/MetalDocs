@@ -1553,54 +1553,7 @@ export interface paths {
             };
         };
         post?: never;
-        /** Desativa uma area de processo documental */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    code: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Area desativada */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1792,6 +1745,69 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+                /** @description Nao autenticado */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    };
+                };
+                /** @description Sem permissao */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-areas/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Desativa uma area de processo documental */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    code: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Area desativada */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Requisicao invalida */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    };
                 };
                 /** @description Nao autenticado */
                 401: {
@@ -5169,6 +5185,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/documents/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Documents stats by status and area */
+        get: operations["documentStatsV2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/documents/{id}/session/acquire": {
         parameters: {
             query?: never;
@@ -5851,6 +5884,48 @@ export interface components {
         };
         ListDocumentsResponse: {
             items: components["schemas"]["DocumentListItem"][];
+        };
+        DocumentListResponse: {
+            items: components["schemas"]["DocumentSummary"][];
+            page: number;
+            pageSize: number;
+            /** Format: int64 */
+            total: number;
+        };
+        DocumentSummary: {
+            ID: string;
+            TenantID: string;
+            TemplateVersionID: string;
+            Name: string;
+            /** @enum {string} */
+            Status: "draft" | "under_review" | "approved" | "rejected" | "scheduled" | "published" | "superseded" | "obsolete";
+            /** Format: byte */
+            FormDataJSON: string;
+            CurrentRevisionID: string;
+            /** Format: int64 */
+            RevisionVersion: number;
+            ActiveSessionID: string;
+            /** Format: date-time */
+            ValuesFrozenAt?: string | null;
+            /** Format: date-time */
+            ArchivedAt?: string | null;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+            CreatedBy: string;
+            ControlledDocumentID?: string | null;
+            ProfileCodeSnapshot?: string | null;
+            ProcessAreaCodeSnapshot?: string | null;
+            Code: string;
+        };
+        DocumentStatsResponse: {
+            byStatus: {
+                [key: string]: number;
+            };
+            byArea: {
+                [key: string]: number;
+            };
         };
         MetadataFieldRule: {
             name: string;
@@ -6906,7 +6981,16 @@ export interface operations {
     };
     listDocumentsV2: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                pageSize?: number;
+                /** @description CSV status filter, also accepts repeated query params */
+                status?: string;
+                areaCode?: string;
+                profileCode?: string;
+                q?: string;
+                includeArchived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6919,27 +7003,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        name: string;
-                        /** @enum {string} */
-                        status: "draft" | "finalized" | "archived";
-                        /** Format: uuid */
-                        template_version_id: string;
-                        /** Format: date-time */
-                        updated_at: string;
-                        /** Format: uuid */
-                        current_revision_id?: string;
-                    }[];
+                    "application/json": components["schemas"]["DocumentListResponse"];
                 };
             };
-            /** @description forbidden */
+            /** @description Requisicao invalida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Sem permissao */
             403: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
             };
         };
     };
@@ -6992,6 +7084,57 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    documentStatsV2: {
+        parameters: {
+            query?: {
+                status?: string;
+                areaCode?: string;
+                profileCode?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentStatsResponse"];
+                };
+            };
+            /** @description Requisicao invalida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
             };
         };
     };
