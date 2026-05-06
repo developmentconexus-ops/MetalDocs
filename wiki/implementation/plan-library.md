@@ -2,6 +2,8 @@
 
 > **For agentic workers:** Use `codex:rescue` (Codex) for implementation steps. Tasks marked **[PARALLEL]** within the same Phase can run simultaneously via separate Codex agents (use `nexus:dispatching-parallel-agents`). Tasks marked **[SEQUENTIAL]** must wait for their dependency. **Phase reviewer = Opus** via `nexus:code-reviewer` agent at the end of every Phase before the next Phase starts. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status: Phases 1–4 complete** (branch `claude/thirsty-raman-989031`, 2026-05-06). Phase 5 (verify + wiki) in progress.
+
 **Goal:** Server-side paginated, filterable, statistics-aware Library screen at `/documents`. Backend gains `GET /api/v2/documents` paginated envelope + `GET /api/v2/documents/stats`. Frontend ships `LibraryPage.tsx` with SectionPanel area tree, filter tabs aligned to real Spec 2 8-state model, page-size selector `[10, 20, 50]`, collapsible activity sidebar (default-collapsed, role-gated).
 
 **Architecture:**
