@@ -27,6 +27,7 @@ Companion docs to consult when relevant:
 
 - Read `wiki/architecture/frontend-structure.md` end to end if you have not in the current session. It is short and load-bearing.
 - If the task references a designed screen, read `frontend/apps/web/design-source/<slug>/NOTES.md` and view the `<slug>.html` reference.
+- **Audit the design before implementing.** The `design-source/*.jsx` mockups were AI-generated without domain context. Run the audit from [wiki/concepts/design-workflow-audit.md](../../../wiki/concepts/design-workflow-audit.md) — walk every UI element, verify it maps to real document states / RBAC / personas, record Keep/Cut/Defer in the screen's `NOTES.md`. Cut decorative widgets that imply behavior we don't support. **No TSX before audit.**
 - Locate the right feature folder (`frontend/apps/web/src/features/<domain>/`). The list of domains is in section 1 of the spec.
 
 ### 2. Apply the decision rules

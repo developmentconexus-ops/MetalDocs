@@ -35,6 +35,8 @@ type Service interface {
 	RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
+	ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts application.ListOptions) ([]*domain.Document, int64, error)
+	DocumentStats(ctx context.Context, tenantID, userID string, opts application.ListOptions) (*application.DocumentStats, error)
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error)
 	HeartbeatSession(ctx context.Context, sessionID, userID string) error
@@ -77,6 +79,7 @@ func NewHandlerWithSubmit(svc Service, db *sql.DB, submitSvc approvalSubmitter) 
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v2/documents", h.listDocuments)
+	mux.HandleFunc("GET /api/v2/documents/stats", h.documentStats)
 	mux.HandleFunc("POST /api/v2/documents", h.createDocument)
 
 	mux.HandleFunc("GET /api/v2/documents/{id}", h.getDocument)
@@ -106,6 +109,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
 	mux.HandleFunc("GET /api/v2/documents", h.listDocuments)
+	mux.HandleFunc("GET /api/v2/documents/stats", h.documentStats)
 	mux.HandleFunc("POST /api/v2/documents", h.createDocument)
 
 	mux.HandleFunc("GET /api/v2/documents/{id}", h.getDocument)
@@ -189,24 +193,120 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tenantID := tenantIDFromReq(r)
-	userID := userIDFromReq(r)
-
-	var (
-		docs []domain.Document
-		err  error
-	)
-	if hasRole(r, roleAdmin) {
-		docs, err = h.svc.ListDocuments(r.Context(), tenantID)
-	} else {
-		docs, err = h.svc.ListDocumentsForUser(r.Context(), tenantID, userID)
+	callerUserID := userIDFromReq(r)
+	isAdmin := hasRole(r, roleAdmin)
+	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, err.Error())
+		return
 	}
+
+	items, total, err := h.svc.ListDocumentsPaginated(r.Context(), tenantID, effectiveUserID, opts)
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
 	}
 
-	httpresponse.WriteJSON(w, http.StatusOK, docs)
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
+		"items":    items,
+		"page":     opts.Page,
+		"pageSize": opts.PageSize,
+		"total":    total,
+	})
+}
+
+func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
+	if !hasAnyRole(r, roleAdmin, roleDocumentFiller) {
+		httpErr(w, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	tenantID := tenantIDFromReq(r)
+	callerUserID := userIDFromReq(r)
+	isAdmin := hasRole(r, roleAdmin)
+	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	stats, err := h.svc.DocumentStats(r.Context(), tenantID, effectiveUserID, opts)
+	if err != nil {
+		status, msg := mapErr(err)
+		httpErr(w, status, msg)
+		return
+	}
+
+	httpresponse.WriteJSON(w, http.StatusOK, stats)
+}
+
+func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (application.ListOptions, string, error) {
+	query := r.URL.Query()
+	opts := application.ListOptions{
+		Page:     1,
+		PageSize: 20,
+	}
+
+	if rawPage := strings.TrimSpace(query.Get("page")); rawPage != "" {
+		page, err := strconv.Atoi(rawPage)
+		if err != nil {
+			return opts, "", errors.New("page must be a valid integer")
+		}
+		if page < 1 {
+			return opts, "", errors.New("page must be >= 1")
+		}
+		opts.Page = page
+	}
+
+	if rawPageSize := strings.TrimSpace(query.Get("pageSize")); rawPageSize != "" {
+		pageSize, err := strconv.Atoi(rawPageSize)
+		if err != nil {
+			return opts, "", errors.New("pageSize must be a valid integer")
+		}
+		if pageSize < 1 {
+			return opts, "", errors.New("pageSize must be >= 1")
+		}
+		if pageSize > 50 {
+			return opts, "", errors.New("pageSize must be <= 50")
+		}
+		opts.PageSize = pageSize
+	}
+
+	statusValues := query["status"]
+	if len(statusValues) > 0 {
+		statuses := make([]string, 0, len(statusValues))
+		for _, raw := range statusValues {
+			for _, split := range strings.Split(raw, ",") {
+				s := strings.TrimSpace(split)
+				if s != "" {
+					statuses = append(statuses, s)
+				}
+			}
+		}
+		opts.Status = statuses
+	}
+
+	opts.AreaCode = strings.TrimSpace(query.Get("areaCode"))
+	opts.ProfileCode = strings.TrimSpace(query.Get("profileCode"))
+	opts.Q = strings.TrimSpace(query.Get("q"))
+
+	includeArchived := strings.TrimSpace(query.Get("includeArchived"))
+	if includeArchived != "" {
+		v, err := strconv.ParseBool(includeArchived)
+		if err != nil {
+			return opts, "", errors.New("includeArchived must be a valid boolean")
+		}
+		opts.IncludeArchived = v
+	}
+
+	effectiveUserID := ""
+	if !isAdmin && callerUserID != "" {
+		opts.CreatedBy = callerUserID
+		effectiveUserID = callerUserID
+	}
+
+	return opts, effectiveUserID, nil
 }
 
 func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {

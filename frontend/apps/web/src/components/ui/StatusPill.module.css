@@ -4,3 +4,48 @@
   gap: 4px;
   white-space: nowrap;
 }
+
+:global(.pill-draft) {
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+
+:global(.pill-review) {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+:global(.pill-approved) {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+:global(.pill-rejected) {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+:global(.pill-scheduled) {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+:global(.pill-frozen) {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+:global(.pill-published) {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+:global(.pill-superseded) {
+  color: var(--warning);
+  background: var(--warning-bg);
+}
+
+:global(.pill-obsolete) {
+  color: var(--danger);
+  background: var(--danger-bg);
+}

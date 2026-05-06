@@ -33,6 +33,15 @@ type fakeSvc struct {
 
 	renameErr  error
 	renameName string
+
+	listPaginatedItems []*domain.Document
+	listPaginatedTotal int64
+	listPaginatedErr   error
+	listPaginatedOpts  application.ListOptions
+	listPaginatedUser  string
+
+	statsResult *application.DocumentStats
+	statsErr    error
 }
 
 var _ httphandler.Service = (*fakeSvc)(nil)
@@ -74,6 +83,31 @@ func (f *fakeSvc) ListDocumentsForUser(_ context.Context, _, _ string) ([]domain
 		return []domain.Document{{ID: "doc_1"}}, nil
 	}
 	return f.listForUser, nil
+}
+
+func (f *fakeSvc) ListDocumentsPaginated(_ context.Context, _, userID string, opts application.ListOptions) ([]*domain.Document, int64, error) {
+	f.listPaginatedOpts = opts
+	f.listPaginatedUser = userID
+	if f.listPaginatedErr != nil {
+		return nil, 0, f.listPaginatedErr
+	}
+	if f.listPaginatedItems == nil {
+		return []*domain.Document{{ID: "doc_1"}}, 1, nil
+	}
+	return f.listPaginatedItems, f.listPaginatedTotal, nil
+}
+
+func (f *fakeSvc) DocumentStats(_ context.Context, _, _ string, _ application.ListOptions) (*application.DocumentStats, error) {
+	if f.statsErr != nil {
+		return nil, f.statsErr
+	}
+	if f.statsResult == nil {
+		return &application.DocumentStats{
+			ByStatus: map[string]int64{"draft": 1},
+			ByArea:   map[string]int64{"RH": 1},
+		}, nil
+	}
+	return f.statsResult, nil
 }
 
 func (f *fakeSvc) IsDocumentOwner(_ context.Context, _, _, _ string) (bool, error) {

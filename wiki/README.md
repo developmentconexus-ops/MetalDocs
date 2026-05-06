@@ -1,6 +1,6 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-05
+> **Last verified:** 2026-05-06
 > **Purpose:** Single source of truth for codebase knowledge. Read this first - drill into folders only after.
 
 ## How to use this wiki
@@ -23,14 +23,14 @@
 
 ### Architecture
 - [architecture/system-overview.md](architecture/system-overview.md) - services, ports, end-to-end flow, `internal/platform/httpclient` (M1) (Last verified: 2026-05-05)
-- [architecture/data-model.md](architecture/data-model.md) - Postgres tables, key relationships, document_families (global/is_active), metaldocs_app grants (stub, Last verified: 2026-05-02)
+- [architecture/data-model.md](architecture/data-model.md) - Postgres tables, key relationships, document_families (global/is_active), metaldocs_app grants, two-query LIMIT/OFFSET+COUNT pattern (stub, Last verified: 2026-05-06)
 - [architecture/tech-stack.md](architecture/tech-stack.md) - Go, React, Postgres, MinIO, Gotenberg, eigenpal (stub, Last verified: 2026-05-01)
 - [architecture/deployment.md](architecture/deployment.md) - Docker compose, env vars, dev setup (stub, Last verified: 2026-05-01)
 - **[architecture/frontend-structure.md](architecture/frontend-structure.md) - canonical frontend layout, routing, state, API, design-system rules; comparison baseline for refactor reviews (Last verified: 2026-05-05)**
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval (stub, Last verified: 2026-05-01)
-- [modules/documents.md](modules/documents.md) - document instances, editing flow, session model, API; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-05)
+- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), editing flow, session model, API; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-06)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4 (Last verified: 2026-05-05)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
@@ -52,6 +52,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [concepts/freeze-and-hashing.md](concepts/freeze-and-hashing.md) - content_hash, values_hash, schema_hash, immutability (stub, Last verified: 2026-05-01)
 - [concepts/authz-tiers.md](concepts/authz-tiers.md) - two-tier authz model: tier-1 CapabilityService (HTTP middleware) vs tier-2 authz.Require (in-tx area check); GUC setup, pitfalls (Last verified: 2026-05-03)
 - [concepts/error-ux.md](concepts/error-ux.md) - shared `apiFetch`/`ApiError`/auth-bus/`resolveErrorMessage`; E2 SoD dialog states, E3 finalize toast, E4 global 401 interceptor, `signoff.not_eligible` 403 code (J1) (Last verified: 2026-05-05)
+- [concepts/design-workflow-audit.md](concepts/design-workflow-audit.md) - audit AI-generated `design-source/` mockups vs real document states, RBAC, personas before implementing; record Keep/Cut/Defer in screen NOTES.md (Last verified: 2026-05-06)
 
 ### Tests
 - **[tests/system-acceptance-test.md](tests/system-acceptance-test.md)** — full manual end-to-end acceptance run for regulatory-grade QMS; Groups A–E regression coverage, Routines A0–G, pass/fail rubric (Last verified: 2026-05-04) **Use this for pre-release validation.**

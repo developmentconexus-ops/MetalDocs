@@ -2,9 +2,9 @@ import type { RouteObject } from "react-router-dom";
 
 export const documentsRoutes: RouteObject[] = [
   {
-    path: "documents",
-    handle: { workspaceView: "library" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.LibraryDocumentsPage })),
+    path: 'documents',
+    handle: { workspaceView: 'library' },
+    lazy: () => import('./pages/LibraryPage').then((m) => ({ Component: m.default })),
   },
   {
     path: "documents/all",

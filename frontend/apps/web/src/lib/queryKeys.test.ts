@@ -3,7 +3,7 @@ import { QK } from './queryKeys';
 
 describe('QK', () => {
   it('documents.list returns stable key', () => {
-    expect(QK.documents.list()).toEqual(['documents', 'list']);
+    expect(QK.documents.list()).toEqual(['documents', 'list', {}]);
   });
 
   it('documents.detail includes id', () => {
