@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MetalDocs Design Sources</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0a0a;
+      color: #e8e0df;
+      min-height: 100vh;
+      padding: 40px 32px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+      border-bottom: 1px solid #2a1a1a;
+      padding-bottom: 24px;
+    }
+    .logo {
+      width: 36px; height: 36px;
+      background: #7a1a1a;
+      border-radius: 8px;
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 18px; color: #fff;
+    }
+    h1 { font-size: 22px; font-weight: 600; color: #fff; }
+    .subtitle { font-size: 13px; color: #7a6a6a; margin-top: 2px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #1a0f0f;
+      border: 1px solid #2a1a1a;
+      border-radius: 10px;
+      overflow: hidden;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      flex-direction: column;
+    }
+    .card:hover {
+      border-color: #7a1a1a;
+      background: #1f1212;
+    }
+    .card-preview {
+      height: 120px;
+      background: #140c0c;
+      border-bottom: 1px solid #2a1a1a;
+      display: grid;
+      place-items: center;
+      font-size: 40px;
+      overflow: hidden;
+      position: relative;
+    }
+    .card-preview iframe {
+      width: 1280px;
+      height: 800px;
+      transform-origin: top left;
+      transform: scale(0.1875);
+      pointer-events: none;
+      position: absolute;
+      top: 0; left: 0;
+      border: none;
+    }
+    .card-body { padding: 14px 16px; }
+    .card-label { font-size: 14px; font-weight: 500; color: #e8e0df; margin-bottom: 4px; }
+    .card-path { font-size: 11px; color: #5a4a4a; font-family: monospace; }
+    .card-actions {
+      display: flex; gap: 8px; padding: 0 16px 14px;
+      margin-top: auto;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px; font-weight: 500;
+      text-decoration: none; border: none; cursor: pointer;
+      transition: opacity 0.1s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #7a1a1a; color: #fff; }
+    .btn-secondary { background: #2a1a1a; color: #c0a0a0; }
+    .section-title {
+      font-size: 11px; font-weight: 600; color: #5a4a4a;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin: 32px 0 12px;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">M</div>
+    <div>
+      <h1>Design Sources</h1>
+      <div class="subtitle">Reference screens for implementation comparison</div>
+    </div>
+  </header>
+
+  <div class="section-title">Screens</div>
+  <div class="grid" id="grid"></div>
+
+  <script>
+    const screens = [
+      { label: "Biblioteca (library)", path: "biblioteca/biblioteca.html", emoji: "📚" },
+      { label: "Biblioteca v2", path: "library/screens/01 Biblioteca.html", emoji: "📚" },
+      { label: "Login", path: "login/login.html", emoji: "🔐" },
+      { label: "Preview Login", path: "preview-login.html", emoji: "🔐" },
+      { label: "Preview Login (static)", path: "preview-login-static.html", emoji: "🔐" },
+      { label: "Dashboard", path: "dashboard/dashboard.html", emoji: "🏠" },
+      { label: "Alternativas Início Caixa", path: "alternativas-inicio-caixa/alternativas-inicio-caixa.html", emoji: "📥" },
+      { label: "Caixa Aprovação", path: "caixa-aprovacao/caixa-aprovacao.html", emoji: "✅" },
+      { label: "Detalhe Signoff", path: "detalhe-signoff/detalhe-signoff.html", emoji: "✍️" },
+      { label: "Editor", path: "editor/editor.html", emoji: "✏️" },
+      { label: "Template Editor", path: "template-editor/template-editor.html", emoji: "📝" },
+      { label: "Template Editor (alt)", path: "template-editor/Template Editor.html", emoji: "📝" },
+      { label: "Templates", path: "templates/templates.html", emoji: "📋" },
+      { label: "Catálogo Slots", path: "catalogo-slots/catalogo-slots.html", emoji: "🗂️" },
+      { label: "Novo: Área / Código", path: "novo-area-codigo-visibilidade/novo-area-codigo-visibilidade.html", emoji: "🆕" },
+      { label: "Novo: Confirmação", path: "novo-confirmacao/novo-confirmacao.html", emoji: "🆕" },
+      { label: "Novo: Perfil", path: "novo-perfil/novo-perfil.html", emoji: "🆕" },
+      { label: "Novo: Template", path: "novo-template/novo-template.html", emoji: "🆕" },
+      { label: "MetalDocs Map", path: "MetalDocs Map.html", emoji: "🗺️" },
+      { label: "MetalDocs Redesign", path: "MetalDocs Redesign.html", emoji: "🎨" },
+      { label: "MetalDocs Selected", path: "MetalDocs Selected.html", emoji: "🎨" },
+    ];
+
+    const grid = document.getElementById("grid");
+    screens.forEach(({ label, path, emoji }) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      const encoded = encodeURIComponent(path).replace(/%2F/g, "/");
+      card.innerHTML = `
+        <div class="card-preview">${emoji}</div>
+        <div class="card-body">
+          <div class="card-label">${label}</div>
+          <div class="card-path">${path}</div>
+        </div>
+        <div class="card-actions">
+          <a href="${path}" target="_blank" class="btn btn-primary">Open</a>
+          <button class="btn btn-secondary" onclick="loadPreview(this, '${path.replace(/'/g, "\\'")}')">Preview</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    function loadPreview(btn, path) {
+      const preview = btn.closest(".card").querySelector(".card-preview");
+      preview.innerHTML = `<iframe src="${path}" loading="lazy"></iframe>`;
+      btn.textContent = "Reload";
+    }
+  </script>
+</body>
+</html>

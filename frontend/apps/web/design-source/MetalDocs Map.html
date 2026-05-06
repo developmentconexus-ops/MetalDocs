@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>MetalDocs · Mapa do produto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,400;0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); font-family: var(--font-text); color: var(--text); overflow-y: auto; }
+  .grid { max-width: 1320px; margin: 0 auto; padding: 56px 32px 96px; }
+
+  /* === Section heading === */
+  .area-head {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 16px 0 10px; border-bottom: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .area-head .area-num {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    color: var(--text-faint); letter-spacing: 0.08em;
+  }
+  .area-head .area-title {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.16em;
+  }
+  .area-head .area-meta {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+    color: var(--text-faint); letter-spacing: 0.06em;
+  }
+  .area-head .area-bar {
+    width: 28px; height: 2px; background: var(--brand);
+  }
+
+  /* === Screen cards (uniform width) === */
+  .screen-row {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    margin-bottom: 36px;
+  }
+  .screen-card {
+    text-decoration: none; color: inherit;
+    display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-3); overflow: hidden;
+    transition: all 0.15s ease; position: relative;
+  }
+  .screen-card.is-done:hover {
+    border-color: var(--brand); transform: translateY(-2px);
+    box-shadow: var(--shadow-2);
+  }
+  .screen-card.is-todo {
+    background: transparent; border-style: dashed;
+    border-color: color-mix(in oklch, var(--border) 100%, transparent 0%);
+  }
+  .screen-card.is-todo:hover { border-color: var(--text-muted); }
+
+  /* Thumb */
+  .screen-thumb {
+    height: 168px; background: var(--surface-2);
+    border-bottom: 1px solid var(--border); position: relative; overflow: hidden;
+  }
+  .screen-thumb iframe {
+    width: 1480px; height: 920px; border: 0;
+    transform: scale(0.27); transform-origin: 0 0; pointer-events: none;
+  }
+  .screen-card.is-todo .screen-thumb {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--surface) 0 12px,
+      var(--surface-2) 12px 24px
+    );
+    border-bottom-color: color-mix(in oklch, var(--border) 60%, transparent);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .screen-card.is-todo .placeholder-icon {
+    width: 36px; height: 36px; border: 1.5px dashed var(--text-muted);
+    border-radius: 6px; opacity: 0.45;
+  }
+
+  /* Badge */
+  .badge {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    padding: 3px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; font-family: var(--font-mono);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .badge-done { background: var(--success); color: white; }
+  .badge-done::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: white; }
+  .badge-todo {
+    background: var(--surface-2); color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .badge-todo::before {
+    content: ""; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .badge-priority { background: var(--warning); color: var(--text); }
+
+  /* Card body */
+  .card-body { padding: 14px 16px; }
+  .card-id {
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-faint);
+    letter-spacing: 0.05em; margin-bottom: 4px;
+  }
+  .card-title {
+    font-size: 13.5px; font-weight: 500; line-height: 1.3;
+    color: var(--text); margin-bottom: 4px;
+  }
+  .screen-card.is-todo .card-title { color: var(--text-soft); }
+  .card-desc {
+    font-size: 11.5px; line-height: 1.5; color: var(--text-muted);
+  }
+
+  /* === Hero stats === */
+  .stats-strip {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 0; margin-bottom: 48px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-3); overflow: hidden;
+  }
+  .stat-cell {
+    padding: 18px 22px; border-right: 1px solid var(--border);
+  }
+  .stat-cell:last-child { border-right: 0; }
+  .stat-label {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    color: var(--text-muted); letter-spacing: 0.1em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: var(--font-text); font-size: 28px; font-weight: 600;
+    letter-spacing: -0.02em; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* === Progress bar === */
+  .progress-track {
+    height: 6px; background: var(--surface-2);
+    border-radius: 999px; overflow: hidden;
+    display: flex; gap: 1px;
+  }
+  .progress-fill {
+    background: var(--success); height: 100%;
+  }
+
+  /* Toggle */
+  .filter-bar {
+    display: flex; gap: 8px; align-items: center;
+    margin-bottom: 32px;
+  }
+  .filter-chip {
+    padding: 6px 12px; border-radius: 999px;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.04em; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-soft); transition: all 0.12s;
+  }
+  .filter-chip:hover { border-color: var(--text-muted); }
+  .filter-chip.active {
+    background: var(--text); color: var(--surface); border-color: var(--text);
+  }
+</style>
+</head>
+<body class="palette-wine">
+<div class="grid">
+
+  <!-- HEADER -->
+  <div style="margin-bottom: 32px;">
+    <div class="kicker" style="margin-bottom: 8px;">§ MetalDocs · Arquitetura de telas · v1.1</div>
+    <h1 class="display-1" style="font-size: 44px; letter-spacing: -0.025em; margin-bottom: 14px;">
+      9 áreas, 34 telas mapeadas
+    </h1>
+    <p class="body" style="color: var(--text-muted); max-width: 640px;">
+      Núcleo do produto em <strong style="color: var(--text);">Documentos / Registro / Aprovações</strong>.
+      Authoring em <strong style="color: var(--text);">Templates</strong>. Governança em <strong style="color: var(--text);">Taxonomia / Admin / Sistema</strong>.
+      12 telas aprovadas em hi-fi · 22 a desenhar.
+    </p>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-strip">
+    <div class="stat-cell">
+      <div class="stat-label">Total</div>
+      <div class="stat-value">34</div>
+      <div class="stat-sub">telas mapeadas</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Aprovadas</div>
+      <div class="stat-value" style="color: var(--success);">12</div>
+      <div class="stat-sub">hi-fi · prontas</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">A fazer</div>
+      <div class="stat-value">22</div>
+      <div class="stat-sub">backlog de design</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Áreas</div>
+      <div class="stat-value">9</div>
+      <div class="stat-sub">módulos do produto</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Progresso</div>
+      <div class="stat-value">35<span style="font-size: 16px; color: var(--text-muted); font-weight: 400;">%</span></div>
+      <div class="progress-track" style="margin-top: 10px;">
+        <div class="progress-fill" style="width: 35.3%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTER -->
+  <div class="filter-bar">
+    <span class="caption mono" style="color: var(--text-faint); margin-right: 4px;">Mostrar:</span>
+    <button class="filter-chip active" data-filter="all">Todas · 34</button>
+    <button class="filter-chip" data-filter="done">✓ Aprovadas · 12</button>
+    <button class="filter-chip" data-filter="todo">○ A fazer · 22</button>
+    <span style="flex: 1;"></span>
+    <a href="MetalDocs Selected.html" class="filter-chip" style="text-decoration: none;">Canvas das aprovadas →</a>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 01 · AUTH -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--info);"></span>
+    <span class="area-num">§ 01</span>
+    <span class="area-title">Auth</span>
+    <span class="area-meta">1 / 3 · entrada do sistema</span>
+  </div>
+  <div class="screen-row">
+
+    <a class="screen-card is-done" href="screens/09 Login.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/09 Login.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">01.01 · Login</div>
+        <div class="card-title">Login (SSO + senha)</div>
+        <div class="card-desc">Acesso pré-autenticado, SSO corporativo + fallback senha.</div>
+      </div>
+    </a>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">01.02 · Auth</div>
+        <div class="card-title">Trocar senha (forçada)</div>
+        <div class="card-desc">Primeiro acesso ou senha expirada — política corporativa.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">01.03 · Auth</div>
+        <div class="card-title">Recuperação de senha</div>
+        <div class="card-desc">Fluxo via e-mail corporativo + token expirável.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 02 · INÍCIO -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--brand);"></span>
+    <span class="area-num">§ 02</span>
+    <span class="area-title">Início</span>
+    <span class="area-meta">2 / 3 · landing pós-login</span>
+  </div>
+  <div class="screen-row">
+
+    <a class="screen-card is-done" href="screens/10 Dashboard.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/10 Dashboard.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">02.01 · Início</div>
+        <div class="card-title">Dashboard pessoal</div>
+        <div class="card-desc">Caixa de aprovação + atividade recente + atalhos.</div>
+      </div>
+    </a>
+
+    <a class="screen-card is-done" href="screens/11 Caixa de Aprovacao.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/11 Caixa de Aprovacao.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">02.02 · Início</div>
+        <div class="card-title">Caixa de aprovação</div>
+        <div class="card-desc">Lista única de pendências de signoff (segregação ISO).</div>
+      </div>
+    </a>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">02.03 · Início</div>
+        <div class="card-title">Trilha de auditoria</div>
+        <div class="card-desc">Stream global em tempo real, filtrável por usuário/doc/ação.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 03 · DOCUMENTOS -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--brand);"></span>
+    <span class="area-num">§ 03</span>
+    <span class="area-title">Documentos</span>
+    <span class="area-meta">6 / 8 · núcleo do produto</span>
+  </div>
+  <div class="screen-row">
+
+    <a class="screen-card is-done" href="screens/01 Biblioteca.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/01 Biblioteca.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">03.01 · Documentos</div>
+        <div class="card-title">Biblioteca (table)</div>
+        <div class="card-desc">Acervo controlado, filtros por estado, atividade lateral.</div>
+      </div>
+    </a>
+
+    <a class="screen-card is-done" href="screens/02 Editor.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/02 Editor.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">03.02 · Documentos</div>
+        <div class="card-title">Editor (eigenpal)</div>
+        <div class="card-desc">Foco no papel; metadados e revisões na lateral direita.</div>
+      </div>
+    </a>
+
+    <a class="screen-card is-done" href="screens/03 Novo - Perfil.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/03 Novo - Perfil.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">03.03 · Wizard 1/4</div>
+        <div class="card-title">Novo · Perfil</div>
+        <div class="card-desc">Selecione o tipo (POP, IT, POL, DC...).</div>
+      </div>
+    </a>
+
+    <a class="screen-card is-done" href="screens/04 Novo - Area Codigo Visibilidade.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/04 Novo - Area Codigo Visibilidade.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">03.04 · Wizard 2/4</div>
+        <div class="card-title">Novo · Área, Código & Visibilidade</div>
+        <div class="card-desc">Geração de código + escopo de acesso.</div>
+      </div>
+    </a>
+
+    <a class="screen-card is-done" href="screens/05 Novo - Template.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/05 Novo - Template.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">03.05 · Wizard 3/4</div>
+        <div class="card-title">Novo · Template</div>
+        <div class="card-desc">Escolha do template a clonar.</div>
+      </div>
+    </a>
+
+    <a class="screen-card is-done" href="screens/06 Novo - Confirmacao.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/06 Novo - Confirmacao.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">03.06 · Wizard 4/4</div>
+        <div class="card-title">Novo · Confirmação</div>
+        <div class="card-desc">Revisão final + commit irreversível do código.</div>
+      </div>
+    </a>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-priority">Prioridade</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">03.07 · Documentos</div>
+        <div class="card-title">Detalhe + revisões</div>
+        <div class="card-desc">Tela read-only do documento publicado, com timeline de revisões.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">03.08 · Documentos</div>
+        <div class="card-title">Histórico de versões</div>
+        <div class="card-desc">Comparar duas versões lado a lado (diff de conteúdo).</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 04 · REGISTRO -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--success);"></span>
+    <span class="area-num">§ 04</span>
+    <span class="area-title">Registro</span>
+    <span class="area-meta">1 / 3 · controle de slots & códigos</span>
+  </div>
+  <div class="screen-row">
+
+    <a class="screen-card is-done" href="screens/08 Catalogo de Slots.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/08 Catalogo de Slots.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">04.01 · Registro</div>
+        <div class="card-title">Catálogo de slots</div>
+        <div class="card-desc">Registro por (perfil, área), contadores ativos.</div>
+      </div>
+    </a>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">04.02 · Registro</div>
+        <div class="card-title">Detalhe do slot</div>
+        <div class="card-desc">Histórico de uso, bloqueios, transferência.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">04.03 · Registro</div>
+        <div class="card-title">Contadores por (perfil, área)</div>
+        <div class="card-desc">Visão de saturação para o admin de qualidade.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 05 · TEMPLATES -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--warning);"></span>
+    <span class="area-num">§ 05</span>
+    <span class="area-title">Templates</span>
+    <span class="area-meta">1 / 3 · authoring & lifecycle</span>
+  </div>
+  <div class="screen-row">
+
+    <a class="screen-card is-done" href="screens/07 Templates.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/07 Templates.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">05.01 · Templates</div>
+        <div class="card-title">Lista de templates</div>
+        <div class="card-desc">Templates versionados, vinculados a perfis.</div>
+      </div>
+    </a>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-priority">Prioridade</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">05.02 · Templates</div>
+        <div class="card-title">Authoring de template (eigenpal)</div>
+        <div class="card-desc">Editor de slots reutilizáveis, variáveis, blocos fixos.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">05.03 · Templates</div>
+        <div class="card-title">Versões + lifecycle</div>
+        <div class="card-desc">Draft → review → published → deprecated.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 06 · APROVAÇÕES -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--accent);"></span>
+    <span class="area-num">§ 06</span>
+    <span class="area-title">Aprovações</span>
+    <span class="area-meta">1 / 3 · workflow & signoff</span>
+  </div>
+  <div class="screen-row">
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-priority">Prioridade</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">06.01 · Aprovações</div>
+        <div class="card-title">Caixa de entrada</div>
+        <div class="card-desc">Pendências de aprovação · ISO segregation enforced.</div>
+      </div>
+    </div>
+
+    <a class="screen-card is-done" href="screens/12 Detalhe Signoff.html" target="_blank" data-status="done">
+      <span class="badge badge-done">Aprovada</span>
+      <div class="screen-thumb"><iframe src="screens/12 Detalhe Signoff.html" loading="lazy"></iframe></div>
+      <div class="card-body">
+        <div class="card-id">06.02 · Aprovações</div>
+        <div class="card-title">Detalhe + signoff</div>
+        <div class="card-desc">Documento + diff + assinatura criptográfica.</div>
+      </div>
+    </a>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">06.03 · Aprovações</div>
+        <div class="card-title">Rotas de aprovação (admin)</div>
+        <div class="card-desc">Configurar fluxos por perfil/área (sequencial, paralelo).</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 07 · TAXONOMIA -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--info);"></span>
+    <span class="area-num">§ 07</span>
+    <span class="area-title">Taxonomia</span>
+    <span class="area-meta">0 / 3 · estrutura organizacional</span>
+  </div>
+  <div class="screen-row">
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">07.01 · Taxonomia</div>
+        <div class="card-title">Famílias (global)</div>
+        <div class="card-desc">Famílias de documentos compartilhadas no tenant.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">07.02 · Taxonomia</div>
+        <div class="card-title">Áreas</div>
+        <div class="card-desc">Árvore organizacional. Cada área = escopo de visibilidade.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">07.03 · Taxonomia</div>
+        <div class="card-title">Perfis + binding template</div>
+        <div class="card-desc">CRUD perfil (POP, IT...) e amarração com template default.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 08 · ADMIN -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--text-soft);"></span>
+    <span class="area-num">§ 08</span>
+    <span class="area-title">Admin</span>
+    <span class="area-meta">0 / 5 · usuários & permissões</span>
+  </div>
+  <div class="screen-row">
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">08.01 · Admin</div>
+        <div class="card-title">Usuários online</div>
+        <div class="card-desc">Sessões ativas em tempo real (presence).</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">08.02 · Admin</div>
+        <div class="card-title">CRUD usuários</div>
+        <div class="card-desc">Criar / editar / desativar. Origem SSO ou local.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">08.03 · Admin</div>
+        <div class="card-title">Capabilities</div>
+        <div class="card-desc">Matriz de permissões granulares por papel.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">08.04 · Admin</div>
+        <div class="card-title">Áreas / perfis (membership)</div>
+        <div class="card-desc">Vincular usuários a áreas e perfis (M:N).</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">08.05 · Admin</div>
+        <div class="card-title">Auditoria operacional</div>
+        <div class="card-desc">Logs de ações de admin (sensível, restrita).</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- § 09 · SISTEMA -->
+  <!-- ============================================================ -->
+  <div class="area-head">
+    <span class="area-bar" style="background: var(--text-muted);"></span>
+    <span class="area-num">§ 09</span>
+    <span class="area-title">Sistema</span>
+    <span class="area-meta">0 / 3 · plataforma & ops</span>
+  </div>
+  <div class="screen-row">
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">09.01 · Sistema</div>
+        <div class="card-title">Notificações</div>
+        <div class="card-desc">Inbox + preferências de canal (in-app, e-mail).</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">09.02 · Sistema</div>
+        <div class="card-title">Configurações</div>
+        <div class="card-desc">Tenant settings, branding, política de senhas.</div>
+      </div>
+    </div>
+
+    <div class="screen-card is-todo" data-status="todo">
+      <span class="badge badge-todo">A fazer</span>
+      <div class="screen-thumb"><div class="placeholder-icon"></div></div>
+      <div class="card-body">
+        <div class="card-id">09.03 · Sistema</div>
+        <div class="card-title">Operações (workers, fanout)</div>
+        <div class="card-desc">Status de filas, jobs de fanout PDF, retries.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div style="display: flex; gap: 24px; padding: 24px 0 0; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 32px;">
+    <span>METALDOCS · v1.1</span>
+    <span>12 / 34 aprovadas · 35.3%</span>
+    <span>9 áreas</span>
+    <span style="flex: 1;"></span>
+    <a href="MetalDocs Selected.html" style="color: var(--brand); text-decoration: none;">Canvas das aprovadas →</a>
+    <a href="MetalDocs Redesign.html" style="color: var(--text-soft); text-decoration: none;">Explorações →</a>
+  </div>
+
+</div>
+
+<script>
+  // Filter chips
+  const chips = document.querySelectorAll('.filter-chip[data-filter]');
+  const cards = document.querySelectorAll('.screen-card');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const f = chip.dataset.filter;
+      cards.forEach(card => {
+        const status = card.dataset.status;
+        card.style.display = (f === 'all' || f === status) ? '' : 'none';
+      });
+    });
+  });
+</script>
+</body>
+</html>
