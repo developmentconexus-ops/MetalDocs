@@ -1,7 +1,7 @@
 .root {
   display: grid;
   grid-template-columns: 224px minmax(0, 1fr);
-  min-height: 100%;
+  height: 100%;
 }
 
 .withActivity {
@@ -10,10 +10,9 @@
 
 /* ─── Sidebar ─────────────────────────────────────────── */
 .sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow: hidden;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ─── Main ────────────────────────────────────────────── */
@@ -24,6 +23,16 @@
   padding: var(--sp-6) var(--sp-7) var(--sp-8);
   background: var(--bg);
   min-width: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Prevent flex from shrinking children to fit container —
+   without this, overflow-y: auto never activates because
+   flex-shrink compresses content to exactly clientHeight. */
+.main > * {
+  flex-shrink: 0;
 }
 
 /* ─── Header ──────────────────────────────────────────── */
@@ -69,12 +78,6 @@
   letter-spacing: 0.06em;
   font-size: 0.62rem;
   color: var(--text-muted);
-}
-
-.metaDivider {
-  width: 1px;
-  height: 28px;
-  background: var(--border);
 }
 
 .kicker {
@@ -125,11 +128,6 @@
   border-color: var(--border-strong);
 }
 
-.activityButton:hover {
-  background: var(--surface-2);
-  border-color: var(--border-strong);
-}
-
 /* ─── Table card ──────────────────────────────────────── */
 .tableCard {
   border: 1px solid var(--border);
@@ -141,7 +139,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 130px 110px 72px;
+  grid-template-columns: 140px minmax(0, 1fr) 110px 120px 130px 56px 36px;
   gap: var(--sp-4);
   align-items: center;
   padding: var(--sp-3) var(--sp-5);
@@ -156,7 +154,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 130px 110px 72px;
+  grid-template-columns: 140px minmax(0, 1fr) 110px 120px 130px 56px 36px;
   gap: var(--sp-4);
   align-items: center;
   padding: var(--sp-3) var(--sp-5);
@@ -178,6 +176,11 @@
 
 .row:hover {
   background: var(--brand-pale);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
 }
 
 /* Code as colored link — no chip, plain text */
@@ -202,6 +205,35 @@
 .metaCell {
   color: var(--text-soft);
   font-size: 0.82rem;
+}
+
+.monoCell {
+  font-family: var(--font-mono);
+  font-feature-settings: "zero" 1;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ─── More button ─────────────────────────────────────── */
+.moreBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  transition: background 0.1s, color 0.1s;
+}
+
+.moreBtn:hover {
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .dateCell {
@@ -229,15 +261,6 @@
 }
 
 /* ─── Responsive ──────────────────────────────────────── */
-@media (max-width: 900px) {
-  .withActivity {
-    grid-template-columns: 224px minmax(0, 1fr);
-  }
-  .activityPanel {
-    display: none;
-  }
-}
-
 @media (max-width: 900px) {
   .root,
   .withActivity {
