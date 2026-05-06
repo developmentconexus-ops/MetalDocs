@@ -394,6 +394,50 @@ func (s *Service) ListDocumentsForUser(ctx context.Context, tenantID, userID str
 	return s.repo.ListDocumentsForUser(ctx, tenantID, userID)
 }
 
+type DocumentStats struct {
+	ByStatus map[string]int64 `json:"byStatus"`
+	ByArea   map[string]int64 `json:"byArea"`
+}
+
+func (s *Service) ListDocumentsPaginated(ctx context.Context, tenantID, userID string, opts ListOptions) ([]*domain.Document, int64, error) {
+	if userID != "" {
+		opts.CreatedBy = userID
+	}
+
+	items, err := s.repo.ListDocumentsPaginated(ctx, tenantID, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, err := s.repo.CountDocuments(ctx, tenantID, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return items, total, nil
+}
+
+func (s *Service) DocumentStats(ctx context.Context, tenantID, userID string, opts ListOptions) (*DocumentStats, error) {
+	if userID != "" {
+		opts.CreatedBy = userID
+	}
+
+	byStatus, err := s.repo.StatsByStatus(ctx, tenantID, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	byArea, err := s.repo.StatsByArea(ctx, tenantID, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DocumentStats{
+		ByStatus: byStatus,
+		ByArea:   byArea,
+	}, nil
+}
+
 func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, newName string) error {
 	name := strings.TrimSpace(newName)
 	if name == "" || len(name) > 255 {
