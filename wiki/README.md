@@ -52,6 +52,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [concepts/freeze-and-hashing.md](concepts/freeze-and-hashing.md) - content_hash, values_hash, schema_hash, immutability (stub, Last verified: 2026-05-01)
 - [concepts/authz-tiers.md](concepts/authz-tiers.md) - two-tier authz model: tier-1 CapabilityService (HTTP middleware) vs tier-2 authz.Require (in-tx area check); GUC setup, pitfalls (Last verified: 2026-05-03)
 - [concepts/error-ux.md](concepts/error-ux.md) - shared `apiFetch`/`ApiError`/auth-bus/`resolveErrorMessage`; E2 SoD dialog states, E3 finalize toast, E4 global 401 interceptor, `signoff.not_eligible` 403 code (J1) (Last verified: 2026-05-05)
+- [concepts/design-workflow-audit.md](concepts/design-workflow-audit.md) - audit AI-generated `design-source/` mockups vs real document states, RBAC, personas before implementing; record Keep/Cut/Defer in screen NOTES.md (Last verified: 2026-05-06)
 
 ### Tests
 - **[tests/system-acceptance-test.md](tests/system-acceptance-test.md)** — full manual end-to-end acceptance run for regulatory-grade QMS; Groups A–E regression coverage, Routines A0–G, pass/fail rubric (Last verified: 2026-05-04) **Use this for pre-release validation.**
