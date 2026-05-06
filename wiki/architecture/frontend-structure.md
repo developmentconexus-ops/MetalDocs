@@ -4,15 +4,21 @@
 > **Scope:** Canonical folder layout, naming, routing, state, API, design-system rules for `frontend/apps/web`. Comparison baseline for refactor reviews and the `metaldocs-frontend` skill.
 > **Out of scope:** Backend module layout (see `system-overview.md`), eigenpal internals (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
-> - `frontend/apps/web/src/main.tsx` - mount + provider tree
-> - `frontend/apps/web/src/app/` - root composition (RootProviders, AppRouter, bootstrap)
-> - `frontend/apps/web/src/features/` - one folder per domain
-> - `frontend/apps/web/src/components/ui/` - design-system primitives only
-> - `frontend/apps/web/src/lib/api/` - apiFetch, ApiError, authBus, openapi-fetch wrapper
-> - `frontend/apps/web/src/lib/api-types/` - generated from `api/openapi/v1/openapi.yaml`
-> - `frontend/apps/web/src/styles/tokens.css` - design tokens
-> - `frontend/apps/web/design-source/` - claude.design HTML screen specs (committed reference)
-> - `packages/shared-tokens/` - cross-app design tokens
+> - `frontend/apps/web/src/main.tsx` — mount + provider tree
+> - `frontend/apps/web/src/app/AppRouter.tsx:15` — `createBrowserRouter` router export; public vs. protected route tree
+> - `frontend/apps/web/src/features/shell/pages/AppRoot.tsx:28` — auth guard + session bootstrap
+> - `frontend/apps/web/src/features/shell/components/AppShell.tsx:9` — Rail + AppToolbar + Outlet layout wrapper
+> - `frontend/apps/web/src/features/shell/components/Rail.tsx:41` — 56px dark nav sidebar
+> - `frontend/apps/web/src/features/shell/components/AppToolbar.tsx:7` — 52px top bar (search, notifications, new-doc)
+> - `frontend/apps/web/src/features/shell/components/SectionPanel.tsx:4` — 224px slot panel (Library only)
+> - `frontend/apps/web/src/features/` — one folder per domain
+> - `frontend/apps/web/src/components/ui/` — design-system primitives only
+> - `frontend/apps/web/src/lib/api/` — apiFetch, ApiError, authBus, openapi-fetch wrapper
+> - `frontend/apps/web/src/lib/queryKeys.ts:17` — centralized `QK` constants; all `queryKey` / `invalidateQueries` calls import from here
+> - `frontend/apps/web/src/lib/api-types/` — generated from `api/openapi/v1/openapi.yaml`
+> - `frontend/apps/web/src/styles/tokens.css:2` — Wine-palette design tokens (`--brand-*`, `--rail-*`, `--bg`, `--accent`, …)
+> - `frontend/apps/web/design-source/` — claude.design HTML screen specs (committed reference)
+> - `packages/shared-tokens/` — cross-app design tokens
 
 ---
 
@@ -38,15 +44,29 @@ frontend/apps/web/src/
 │   ├── hooks/                  # plain React hooks
 │   ├── pages/                  # route entry points (one file per route)
 │   ├── queries/                # TanStack Query hooks (useXQuery, useXMutation)
-│   ├── state/                  # zustand stores (domain-scoped)
 │   ├── types.ts                # feature-internal types
 │   ├── routes.tsx              # RouteObject[] export
 │   └── index.ts                # barrel: only public API of the feature
+├── features/shell/             # ← app shell domain (auth guard + layout)
+│   ├── pages/AppRoot.tsx       # auth guard + session bootstrap (wraps all protected routes)
+│   └── components/
+│       ├── AppShell.tsx        # Rail + AppToolbar + Outlet; optional SectionPanel slot
+│       ├── Rail.tsx            # 56px dark nav sidebar (--rail-* tokens)
+│       ├── AppToolbar.tsx      # 52px top bar: search, notifications, new-doc
+│       └── SectionPanel.tsx    # 224px slot panel (Library only, via route handle flag)
 ├── components/
 │   └── ui/                     # design-system primitives ONLY
+│       ├── Icon.tsx            # unified icon wrapper
+│       ├── Avatar.tsx          # user avatar (initials fallback)
+│       ├── CodeChip.tsx        # inline code badge
+│       ├── Logo.tsx            # product logotype
+│       ├── StatusPill.tsx      # document/workflow status badge
+│       ├── StatusPill.module.css
+│       └── index.ts            # barrel export
 ├── lib/
 │   ├── api/                    # apiFetch, ApiError, authBus, openapi-fetch wrapper
 │   ├── api-types/              # generated (never hand-edit)
+│   ├── queryKeys.ts            # centralized QK constants (see §8)
 │   └── types/                  # cross-cutting types only
 ├── store/                      # GLOBAL stores only: ui.store, auth.store
 ├── styles/                     # tokens.css, base.css, document-content.css
@@ -60,6 +80,7 @@ frontend/apps/web/src/
 - `src/api/` (legacy flat API) → migrated into `features/<x>/api/` + `lib/api/`
 - `src/lib.api.ts`, `src/lib.types.ts` (root flat files) → migrated into features and `lib/types/`
 - `src/components/<FeatureName>.tsx` at root → moved into `features/<x>/components/`
+- `features/<x>/state/<x>.store.ts` (feature-scoped zustand) → server state now exclusively in TanStack Query; only `store/auth.store.ts` + `store/ui.store.ts` remain
 
 ---
 
@@ -70,7 +91,7 @@ frontend/apps/web/src/
 3. **API calls go through `lib/api/`.** Always. Use `apiFetch` (handles auth bus, ApiError). Do not call `fetch` directly.
 4. **Types come from `lib/api-types/` (generated).** Do not hand-write request/response shapes that the OpenAPI spec covers.
 5. **Server state = TanStack Query.** Never `useEffect` + local state for fetching. Hooks live in `features/<x>/queries/`.
-6. **UI/local state = `useState`/`useReducer`.** Cross-cutting UI state = global zustand (`store/ui.store.ts`). Domain state spanning components = feature-scoped zustand (`features/<x>/state/`).
+6. **UI/local state = `useState`/`useReducer`.** Cross-cutting UI state = global zustand (`store/ui.store.ts` or `store/auth.store.ts`). **No feature-scoped zustand stores** — server state belongs exclusively in TanStack Query.
 7. **Routing = data routes.** `createBrowserRouter` + per-feature `routes.tsx`. **No `HashRouter`.** **No string-pattern path dispatchers** (e.g., the old `viewFromPath`).
 8. **CSS = CSS Modules** (`<Component>.module.css`). Tokens from `styles/tokens.css` or `@metaldocs/shared-tokens`. No inline styles for theming. No CSS-in-JS libraries.
 9. **No backwards-compat shims.** When migrating, delete legacy files in the same PR. No re-exports. No `// removed` comments. Aligns with project CLAUDE.md.
@@ -85,7 +106,7 @@ frontend/apps/web/src/
 | Component file | `PascalCase.tsx` | `DocumentEditorPage.tsx` |
 | Hook file | `useXxx.ts` | `useDocumentSession.ts` |
 | Query hook | `useXxxQuery.ts` / `useXxxMutation.ts` | `useDocumentQuery.ts` |
-| Store | `<domain>.store.ts` | `documents.store.ts` |
+| Store | `<domain>.store.ts` | `ui.store.ts`, `auth.store.ts` (global only — see §9) |
 | Module barrel | `index.ts` | `features/documents/index.ts` |
 | Types module | `types.ts` | `features/documents/types.ts` |
 | Routes module | `routes.tsx` | `features/documents/routes.tsx` |
@@ -121,21 +142,41 @@ export const documentsRoutes: RouteObject[] = [
 ```
 
 ```ts
-// app/AppRouter.tsx
-const router = createBrowserRouter([
-  { element: <WorkspaceShell />, children: [
-    ...documentsRoutes,
-    ...templatesRoutes,
-    ...approvalRoutes,
-    // ...
-  ]},
-  ...authRoutes,
+// app/AppRouter.tsx  (see frontend/apps/web/src/app/AppRouter.tsx:15)
+export const router = createBrowserRouter([
+  // Public — no Rail, no Toolbar
+  {
+    path: '/login',
+    lazy: () => import('../features/auth/pages/LoginPage').then((m) => ({ Component: m.LoginPage })),
+  },
+  // Protected — AppRoot (auth guard + bootstrap) → AppShell (Rail + AppToolbar + Outlet)
+  {
+    element: <AppRoot />,
+    children: [
+      {
+        lazy: () => import('../features/shell/components/AppShell').then((m) => ({ Component: m.AppShell })),
+        children: [
+          ...documentsRoutes,
+          ...templatesRoutes,
+          ...approvalRoutes,
+          // ...
+          { path: '*', element: <Navigate to="/" replace /> },
+        ],
+      },
+    ],
+  },
 ]);
 ```
 
+Route hierarchy:
+- **Public routes** (e.g., `/login`) — declared at the router root, outside `AppRoot`. No Rail, no Toolbar.
+- **Protected routes** — children of `AppRoot` (`features/shell/pages/AppRoot.tsx:28`), which handles auth guard + session bootstrap. Inside `AppRoot`, `AppShell` (`features/shell/components/AppShell.tsx:9`) renders Rail + AppToolbar + Outlet.
+- **`SectionPanel`** — rendered conditionally inside `AppShell` when a matched route's `handle.sectionPanel === true` (Library screen only).
+
+Rules:
 - Always `createBrowserRouter` (clean URLs). Nginx fallback already wired (`frontend/apps/web/nginx.conf:9`).
 - Lazy-load pages with `lazy: () => import(...)`. Keeps initial bundle small.
-- Route guards via parent `loader` or wrapping element, never via component-level redirects.
+- Auth guard lives in `AppRoot` (component element), not in route `loader`s or individual page components.
 
 ---
 
@@ -172,34 +213,55 @@ export async function getDocument(id: string) {
 ## 8. Server state (TanStack Query)
 
 ```ts
+// lib/queryKeys.ts — centralized constants (frontend/apps/web/src/lib/queryKeys.ts:17)
+export const QK = {
+  documents: {
+    list: () => ['documents', 'list'] as const,
+    detail: (id: string) => ['documents', 'detail', id] as const,
+  },
+  // ...approval, templates, taxonomy, audit, notifications, controlledDocuments
+} as const;
+```
+
+```ts
 // features/documents/queries/useDocumentQuery.ts
+import { QK } from '../../../lib/queryKeys';
+
 export function useDocumentQuery(id: string) {
   return useQuery({
-    queryKey: ["document", id],
+    queryKey: QK.documents.detail(id),
     queryFn: () => getDocument(id),
   });
 }
 ```
 
-- Query keys: array, first element = domain string. `["document", id]`, `["documents", "list", filters]`.
-- Mutations co-located. Invalidate via `queryClient.invalidateQueries({ queryKey: ["document", id] })`.
+```ts
+// invalidation — always use QK, never inline arrays
+queryClient.invalidateQueries({ queryKey: QK.documents.detail(id) });
+```
+
+- **Never inline raw string arrays** as query keys. Import from `lib/queryKeys.ts`. This ensures invalidation consistency across the codebase.
+- Mutations co-located with their query in `features/<x>/queries/`.
 - `QueryClient` instance lives in `app/RootProviders.tsx`. Single instance.
 
 ---
 
 ## 9. Local + domain state (zustand)
 
-- **Global** (`store/ui.store.ts`, `store/auth.store.ts`): only state that is truly cross-domain (active workspace view, current user, sidebar open).
-- **Feature-scoped** (`features/<x>/state/<x>.store.ts`): state spanning multiple components within one feature but not server data.
-- Server data **never** lives in zustand — that is TanStack Query's job.
+- **Global** (`store/ui.store.ts`, `store/auth.store.ts`): the only two valid zustand stores. Covers truly cross-domain state: current user, auth status, global UI flags (sidebar open, active theme).
+- **Feature-scoped zustand stores have been deleted.** `documents.store.ts`, `notifications.store.ts`, `registry.store.ts`, and `templates.store.ts` no longer exist. Do not recreate them.
+- **Server data never lives in zustand.** Use TanStack Query (with `QK` keys) exclusively for all server-derived state.
+- **Component-local state**: `useState` / `useReducer`. If state must span multiple components within one feature, lift to the closest common ancestor or use a context scoped to that subtree.
 
 ---
 
 ## 10. Styling + design tokens
 
-- All visual values come from `styles/tokens.css` or `@metaldocs/shared-tokens`. No magic colors/sizes in component CSS.
-- New tokens: add to `tokens.css` first, document the rationale in commit message.
-- Typography uses `@fontsource/dm-sans` + `@fontsource/dm-mono` already wired in `main.tsx`.
+- All visual values come from `styles/tokens.css` (`frontend/apps/web/src/styles/tokens.css:2`) or `@metaldocs/shared-tokens`. No magic colors/sizes in component CSS.
+- New tokens: add to `tokens.css` first, document the rationale in the commit message.
+- **Typography:** `@fontsource/inter-tight` (sans-serif → `--font-sans`) + `@fontsource/jetbrains-mono` (mono → `--font-mono`). `@fontsource/dm-sans` and `@fontsource/dm-mono` are removed.
+- **Token prefix:** `--brand-*` (e.g., `--brand`, `--brand-deep`, `--brand-soft`, `--brand-pale`) for brand colors. `--vinho-*` prefix is gone. Additional namespaces: `--rail-*` (dark sidebar), `--bg`, `--surface`, `--border`, `--text`, `--accent`, `--success`, `--warning`, `--danger`, `--info`, `--shadow-*`, `--r-*`, `--sp-*`.
+- **Wine palette** (see `tokens.css:2`): deep crimson brand (`#6b1f2a`), dark rail (`#2a1418`), warm background (`#f4eeee`). Components must not hardcode these hex values — always use the token variable.
 - Dark mode (future): tokens flip via `[data-theme="dark"]` selector. Components stay theme-agnostic.
 
 ---
@@ -239,7 +301,7 @@ When implementing:
 
 ## 13. Migration policy (legacy code)
 
-- **No new code in legacy paths** (`src/api/`, `src/lib.api.ts`, `src/lib.types.ts`, `src/components/<FeatureName>*`, `src/store/<domain>.store.ts` for non-global stores).
+- **No new code in legacy paths** (`src/api/`, `src/lib.api.ts`, `src/lib.types.ts`, `src/components/<FeatureName>*`). Feature-scoped zustand stores (`features/<x>/state/<x>.store.ts`) are deleted — do not recreate them.
 - **When you touch a file**, migrate it fully to the canonical location in the same PR. Update all importers. Delete legacy file.
 - **No re-export shims.** No `// moved to X` comments.
 - **Wiki-curator runs after each migration PR** to refresh anchors and `Last verified` stamps.
@@ -261,6 +323,8 @@ When implementing:
 - ❌ String-match path dispatchers (e.g., `if (path.startsWith("/x")) return "view-x"`).
 - ❌ God components (>400 lines). Split.
 - ❌ `useEffect` + `setState` for data fetching. Use TanStack Query.
+- ❌ Inline `queryKey` string arrays. Import from `lib/queryKeys.ts` (`QK.*`).
+- ❌ Feature-scoped zustand stores for server state. Use TanStack Query.
 - ❌ Direct `fetch` calls. Use `lib/api/`.
 - ❌ Hand-written types that mirror OpenAPI shapes. Codegen.
 - ❌ Cross-feature imports from `features/<a>/components/<x>` into `features/<b>/`. If you need it, the component is a primitive — move to `components/ui/` or `features/shared/`.
