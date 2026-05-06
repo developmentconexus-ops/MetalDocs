@@ -38,7 +38,7 @@ export function StatusPill({ status, className }: StatusPillProps) {
   const config = STATUS_CONFIG[status] ?? { label: status, pillClass: 'pill' };
   return (
     <span className={`${config.pillClass} ${styles.pill}${className ? ` ${className}` : ''}`}>
-      <span className="dot" />
+      <span className={styles.dot} />
       {config.label}
     </span>
   );

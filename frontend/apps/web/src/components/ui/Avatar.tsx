@@ -1,9 +1,11 @@
+import styles from './Avatar.module.css';
+
 type AvatarSize = 'sm' | 'md' | 'lg';
 
 type AvatarProps = {
   name: string;
   size?: AvatarSize;
-  /** Optional background override (e.g. hashed-from-name color). Falls back to brand-soft. */
+  /** Optional background override (e.g. hashed-from-name color). Falls back to --brand. */
   color?: string;
 };
 
@@ -16,9 +18,9 @@ function initials(name: string): string {
 }
 
 const sizeClass: Record<AvatarSize, string> = {
-  sm: 'avatar avatar-sm',
-  md: 'avatar',
-  lg: 'avatar avatar-lg',
+  sm: `${styles.avatar} ${styles.sm}`,
+  md: styles.avatar,
+  lg: `${styles.avatar} ${styles.lg}`,
 };
 
 export function Avatar({ name, size = 'md', color }: AvatarProps) {
