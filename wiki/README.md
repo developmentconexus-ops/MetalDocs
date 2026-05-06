@@ -33,13 +33,14 @@
 - **Skill:** `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow + per-screen `IMPLEMENTATION.md` worksheet for landing designed screens right the first time. Spec: `docs/superpowers/specs/2026-05-06-screen-implementation-skill-design.md`. (Last verified: 2026-05-06)
 
 ### Modules (one per backend module / frontend feature)
-- [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval (stub, Last verified: 2026-05-01)
+- [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; `TemplateAuthorPage` now consumes `EditorChrome` (stub, Last verified: 2026-05-06)
 - [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), editing flow, session model, API; `libraryStatus.ts` status-meta pattern, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime` query defaults; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-06)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4 (Last verified: 2026-05-05)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
 - [modules/iam-rbac.md](modules/iam-rbac.md) - capabilities, roles (viewer/editor/author/approver/system_admin) + process-area roles (signer/area_admin/qms_admin), DB-backed CanDo, area-scoped authz.Require, group grants, tenant-scoped role_provider + role_admin_repository (Group B), migration 0162-0166 + 0169 + 0170 (Last verified: 2026-05-03)
-- [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-01)
+- [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-06)
+- [modules/editor-chrome.md](modules/editor-chrome.md) - shared toolbar overlay primitive for eigenpal-based pages; slot API (`left/center/right/alert`), `VersionBadge`, `AutosaveStatus`, eigenpal CSS overrides, design-token coverage; consumed by `TemplateAuthorPage` + `DocumentEditorPage` (Last verified: 2026-05-06)
 - [modules/search.md](modules/search.md) - cross-module search; v2 reader JOINs `controlled_documents` to populate `DocumentCode` (stub, Last verified: 2026-05-01)
 
 #### documents snapshot note

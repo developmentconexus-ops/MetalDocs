@@ -59,6 +59,15 @@ frontend/apps/web/src/
 │       ├── Rail.tsx            # 56px dark nav sidebar (--rail-* tokens)
 │       ├── AppToolbar.tsx      # 52px top bar: search, notifications, new-doc
 │       └── SectionPanel.tsx    # 224px slot panel (Library only, via route handle flag)
+├── features/shared/            # ← cross-feature UI primitives (used by 2+ features)
+│   └── components/
+│       └── editor-chrome/      # toolbar overlay + eigenpal overrides for eigenpal-based pages
+│           ├── EditorChrome.tsx          # wrapper with left/center/right/alert slots
+│           ├── EditorChrome.module.css   # overlay positioning + eigenpal CSS overrides + button primitives
+│           ├── parts/
+│           │   ├── VersionBadge.tsx      # monospace revision chip
+│           │   └── AutosaveStatus.tsx    # idle/saving/saved/error indicator
+│           └── index.ts                  # barrel: EditorChrome, editorChromeStyles, VersionBadge, AutosaveStatus
 ├── components/
 │   └── ui/                     # design-system primitives ONLY
 │       ├── Icon.tsx            # unified icon wrapper
@@ -131,7 +140,10 @@ When adding code, ask in order:
 4. **Is it routing wiring?** → feature owns `routes.tsx`; `app/AppRouter.tsx` composes them.
 5. **Is it global UI state (sidebar open, theme)?** → `store/ui.store.ts`. Otherwise feature-local.
 
-When in doubt: feature-local first. Promote to shared (`components/ui/` or `lib/`) only when a **second** caller appears.
+When in doubt: feature-local first. Promote when a **second** caller appears:
+- Generic UI primitive (domain-agnostic) → `components/ui/`
+- Feature-coupled shared component (has domain context, used by 2+ features) → `features/shared/components/` (e.g. `editor-chrome/`)
+- Generic React hook (no domain dep) → `lib/hooks/`
 
 ---
 

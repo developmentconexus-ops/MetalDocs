@@ -4,7 +4,7 @@
 > **Scope:** Why `{name}` was chosen, what the format implies, comparison with the legacy `{{uuid}}` approach.
 > **Out of scope:** Migration mechanics (see `decisions/0003-token-syntax-migration.md`), placeholder concept overall (see `placeholders.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/templates/v2/TemplateAuthorPage.tsx` — current `` `{${placeholder.name}}` `` insertion
+> - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — current `` `{${placeholder.name}}` `` insertion
 > - `packages/editor-ui/src/MetalDocsEditor.tsx:54` — `templatePlugin` (detects `{name}`)
 
 ---

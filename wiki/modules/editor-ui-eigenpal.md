@@ -1,13 +1,13 @@
 # Module: Editor UI (Eigenpal Integration)
 
-> _Changelog: 2026-04-26 — added note that `applyVariables` is NOT used in writer mode (ADR 0008). 2026-05-04 — DocumentEditorPage consumer updated: isEditable gate, PDF polling wired._
+> _Changelog: 2026-04-26 — added note that `applyVariables` is NOT used in writer mode (ADR 0008). 2026-05-04 — DocumentEditorPage consumer updated: isEditable gate, PDF polling wired. 2026-05-06 — eigenpal CSS overrides moved to `EditorChrome.module.css` (shared primitive); consumer paths updated (no longer under `v2/` sub-folder). 2026-05-06 — `templatePlugin` gated to `template-draft` mode only; `EditorMode` type expanded to three values; document editor layout switched to left rail._
 >
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-06
 > **Scope:** How MetalDocs wraps `@eigenpal/docx-js-editor`, what plugins are registered, autosave wiring, ProseMirror access patterns.
-> **Out of scope:** EigenPal fork internals (see `vendor/eigenpal/README.md` and the fork docs), placeholder semantics (see `concepts/placeholders.md`), template authoring page UX (see `modules/templates-v2.md`).
+> **Out of scope:** EigenPal fork internals (see `vendor/eigenpal/README.md` and the fork docs), placeholder semantics (see `concepts/placeholders.md`), template authoring page UX (see `modules/templates-v2.md`), toolbar overlay + eigenpal CSS overrides (see `modules/editor-chrome.md`), deferred editor backlog items (see `backlog/editor.md`).
 > **Key files:**
-> - `packages/editor-ui/src/MetalDocsEditor.tsx` — main wrapper component
-> - `packages/editor-ui/src/types.ts` — props, ref interface
+> - `packages/editor-ui/src/MetalDocsEditor.tsx:49-59` — plugin list build; `templatePlugin` gate on `mode === 'template-draft'`
+> - `packages/editor-ui/src/types.ts:5` — `EditorMode` type: `'template-draft' | 'document-edit' | 'readonly'`
 > - `packages/editor-ui/src/index.ts` — package public API
 > - `packages/editor-ui/src/plugins/OutlinePlugin.tsx` — heading nav (custom MetalDocs plugin)
 > - `packages/editor-ui/src/plugins/sidebarModelBridge.ts` — sidebar item bridge for placeholders/etc
@@ -23,11 +23,13 @@
 - **Current package source:** controlled fork artifact vendored at `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`.
 - **MetalDocsEditor:** thin React wrapper at `packages/editor-ui/src/MetalDocsEditor.tsx`. Adds:
   - Debounced autosave (1500ms)
-  - Plugin registration order
+  - Plugin registration order (see `templatePlugin` gating below)
   - Imperative `ref` exposing `getDocumentBuffer()` for parent to grab DOCX bytes
 - **Consumers:**
-  - `frontend/apps/web/src/features/templates/v2/TemplateAuthorPage.tsx` (template authoring, mode=editing)
-  - `frontend/apps/web/src/features/documents/v2/DocumentEditorPage.tsx` (document fill-in/view, mode=`document-edit` when `isEditable`, otherwise `readonly`; non-draft docs also show `PDFCell` via `useDocumentPdfStatus`)
+  - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` (template authoring, mode=`template-draft`)
+  - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx` (document fill-in/view, mode=`document-edit` when `isEditable`, otherwise `readonly`; non-draft docs also show `PDFCell` via `useDocumentPdfStatus`)
+
+  Both consumers wrap `MetalDocsEditor` inside `EditorChrome` (see `modules/editor-chrome.md`), which owns the toolbar overlay and all eigenpal CSS overrides.
 
 ## Package contract
 
@@ -43,17 +45,26 @@ The practical rule: if the question is "how does MetalDocs use the editor?", doc
 
 ## Plugin registration
 
-`MetalDocsEditor.tsx:53–58`:
+`MetalDocsEditor.tsx:55-59`:
 ```ts
-const plugins: ReactEditorPlugin[] = [
-  templatePlugin,                                                  // eigenpal native — placeholder detection
-  ...(props.mode !== 'readonly' ? [outlinePlugin] : []),           // headings nav (custom MetalDocs)
+const plugins: EditorPlugin[] = [
+  ...(props.mode === 'template-draft' ? [templatePlugin] : []),    // eigenpal native — only in template authoring
   ...(props.sidebarModel ? [buildSidebarModelPlugin(props.sidebarModel)] : []),  // sidebar bridge
-  ...(props.externalPlugins ?? []),                                // page-specific extras (e.g., filterTransactionGuard)
+  ...(props.externalPlugins ?? []),                                 // page-specific extras (e.g., filterTransactionGuard)
 ];
 ```
 
 Order matters: plugins later in the array can react to earlier plugins' state.
+
+### `templatePlugin` mode gating
+
+`templatePlugin` is now included **only when `mode === 'template-draft'`**. It is skipped for `document-edit` and `readonly` modes.
+
+**Rationale:** `templatePlugin` injects `template-annotation-chip` items into eigenpal's `docx-unified-sidebar`. In template authoring this is the desired behaviour — authors see the token list alongside the canvas. In document editing, documents contain fully-substituted output (no live `{tokens}`), so the sidebar chips are meaningless. With no chips and no comments open, eigenpal collapses the sidebar, centering the canvas — the correct visual outcome for the document editor.
+
+**Comments are unaffected.** Comments are a built-in eigenpal feature wired through `DocxEditor` props (`comments`, `onCommentAdd`, etc.), not through the plugin system. Removing `templatePlugin` does not disable comments.
+
+**Future consideration:** if a feature ever needs template-style annotations inside the document editor, do not simply re-add `templatePlugin` unconditionally. Use CSS to hide `.template-annotation-chip` items instead, to preserve the gating contract. See `backlog/editor.md` — cross-cutting notes.
 
 ## Plugins
 
@@ -69,6 +80,8 @@ Imported from `@eigenpal/docx-js-editor`. Detects docxtemplater tokens (`{name}`
 
 ### `outlinePlugin` (custom MetalDocs)
 Source: `packages/editor-ui/src/plugins/OutlinePlugin.tsx`. Walks the ProseMirror doc tree, finds paragraphs with heading style (`outlineLevel` attr or `styleId` matching `Título1` / `Heading1`), surfaces them as a left panel for navigation.
+
+**Status:** Not currently in the plugins array in `MetalDocsEditor.tsx` (removed in the 2026-05-06 plugin-registration refactor). The source file still exists. Eigenpal's own `docx-outline-nav` button still appears in the canvas via eigenpal internals — the MetalDocs outline panel on top of it is dormant.
 
 **Spike origin:** Verified in eigenpal-spike T7. Module-level `cachedDoc` singleton bug (breaks with multiple editor instances) was fixed at port time via factory pattern + `useMemo` per instance.
 
@@ -86,21 +99,30 @@ Source: `packages/editor-ui/src/plugins/mergefieldPlugin.ts`. Loaded by Vite (pe
 ## Modes
 
 ```ts
-mode: 'editing' | 'readonly'
+// packages/editor-ui/src/types.ts:5
+type EditorMode = 'template-draft' | 'document-edit' | 'readonly';
 ```
 
-Maps to eigenpal's `mode: 'editing' | 'viewing'`. Readonly hides the outline panel and disables autosave.
+MetalDocs uses three modes instead of eigenpal's two (`editing` / `viewing`):
+
+| MetalDocs mode | eigenpal `mode` | `templatePlugin` | Autosave | Consumer |
+|---|---|---|---|---|
+| `template-draft` | `editing` | included | yes | `TemplateAuthorPage` |
+| `document-edit` | `editing` | **skipped** | yes | `DocumentEditorPage` (writer session) |
+| `readonly` | `viewing` | **skipped** | no | `DocumentEditorPage` (no writer session) |
+
+Eigenpal's `outlinePlugin` is no longer in the plugin array (removed in the same pass). The outline nav button shipped by eigenpal itself is still available inside the canvas.
 
 ## Autosave
 
-`MetalDocsEditor.tsx:31–48`. On every editor `onChange`:
+`MetalDocsEditor.tsx:30-47`. On every editor `onChange`:
 1. Debounce 1500ms (`AUTOSAVE_DEBOUNCE_MS`)
 2. Skip if previous save still in flight (`inFlightRef`)
 3. Call `inner.current.save()` → returns DOCX `Uint8Array | null`
 4. Pass buffer to parent via `props.onAutoSave(buf)`
 5. Parent uploads to API/S3
 
-Parent is responsible for handling failures + retry. Editor doesn't surface save state — parent does (via title bar "Saved" badge in `TemplateAuthorPage`).
+Parent is responsible for handling failures + retry. Editor doesn't surface save state — parent does (via `AutosaveStatus` in the `EditorChrome` right slot; see `modules/editor-chrome.md`).
 
 ## Imperative ref
 
@@ -147,7 +169,7 @@ The editor doesn't expose its `EditorView` directly. To do programmatic edits:
 
 ## Common pitfalls
 
-1. **`templatePlugin` only detects `{name}` (single brace).** MetalDocs migrated to this format (2026-04-25). Legacy `{{uuid}}` templates will not get highlighting. See `concepts/placeholders.md`.
+1. **`templatePlugin` only detects `{name}` (single brace) and is only active in `template-draft` mode.** MetalDocs migrated to this format (2026-04-25). Legacy `{{uuid}}` templates will not get highlighting. In document editing the plugin is not loaded at all — see "Plugin registration" above. See `concepts/placeholders.md`.
 2. **Outline panel won't render until `docx-outline-nav` button is clicked.** It's an eigenpal toggle, not a passive plugin display.
 3. **Multiple `MetalDocsEditor` instances** — the spike's outline plugin had a module-level cache bug. Confirmed fixed in our port via factory pattern. If you ever see "second editor sees stale headings", check this regression first.
 4. **Autosave race** — parent must handle 409/etag conflicts itself. The editor doesn't track server state.
@@ -178,6 +200,8 @@ This checklist validates MetalDocs integration only. EigenPal rendering fidelity
 
 - [concepts/placeholders.md](../concepts/placeholders.md) — placeholder schema and `{name}` token format
 - [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md) — approve → freeze → fanout → PDF artifact
-- [modules/templates-v2.md](templates-v2.md) — TemplateAuthorPage consumer
-- [modules/documents.md](documents.md) — DocumentEditorPage consumer
+- [modules/editor-chrome.md](editor-chrome.md) — toolbar overlay primitive + eigenpal CSS overrides (used by both consumers)
+- [modules/templates-v2.md](templates-v2.md) — TemplateAuthorPage consumer (`template-draft` mode)
+- [modules/documents.md](documents.md) — DocumentEditorPage consumer (`document-edit` / `readonly` modes); left-rail layout
+- [backlog/editor.md](../backlog/editor.md) — deferred Metadados, Revisões, Aprovadores sidebar items; cross-cutting note on templatePlugin gating
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md) — T7 outline plugin origin + caveats
