@@ -69,31 +69,20 @@ Grep  OpenAPI types imported (must come from lib/api-types/)
 
 **This phase is not optional.** Code-reading alone misses layout drift, spacing, typography gaps, color substitutions, and missing states. You must do a side-by-side visual comparison.
 
-#### 4a. Detect the dev server
+#### 4a. Dev server ports (fixed, no detection needed)
+
+- **MetalDocs app** → `http://localhost:4174`
+- **Design-source HTML** → `http://localhost:4181/<slug>.html` (already served; do NOT start a new server)
+
+If either URL returns a non-2xx / non-3xx, write in the report: **"Visual comparison skipped — expected servers not responding. Verify `pnpm dev` (app on 4174) and design-source server (4181) are running."** Then skip to Phase 5.
 
 ```bash
-# Try the standard Vite port first, then fallbacks
-for port in 5173 3000 4173 8080; do
-  code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$port 2>/dev/null)
-  if [ "$code" = "200" ] || [ "$code" = "304" ]; then echo "DEV_PORT=$port"; break; fi
-done
+app_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4174 2>/dev/null)
+design_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4181 2>/dev/null)
+echo "app=$app_code design=$design_code"
 ```
 
-If no dev server responds, write in the report: **"Visual comparison skipped — dev server not detected on standard ports. Run `pnpm dev` in `frontend/apps/web` and re-invoke."** Then skip to Phase 5.
-
-#### 4b. Serve the design HTML
-
-Start a temporary HTTP server for the design-source directory so you can screenshot it:
-
-```bash
-# Find a free port and serve
-python -m http.server 19999 --directory "frontend/apps/web/design-source/<slug>" &
-DESIGN_PID=$!
-sleep 1
-echo "DESIGN_PID=$DESIGN_PID"
-```
-
-Design HTML URL: `http://localhost:19999/<slug>.html`
+Design HTML URL: `http://localhost:4181/<slug>.html`
 
 #### 4c. Screenshot each state — design vs implementation
 
@@ -124,13 +113,7 @@ Repeat at **375×812** (mobile):
 - Screenshot both
 - Note mobile-specific gaps (overflow, stacked vs grid, broken nav)
 
-#### 4d. Tear down design server
-
-```bash
-kill $DESIGN_PID 2>/dev/null
-```
-
-#### 4e. Visual findings → report buckets
+#### 4d. Visual findings → report buckets
 
 Visual findings slot into existing buckets:
 - Layout / structure drift → **Major (Visual / tokens)**
@@ -266,7 +249,7 @@ Per `wiki/concepts/error-ux.md`:
 - Token source of truth: `frontend/apps/web/src/styles/tokens.css` + `@metaldocs/shared-tokens` package.
 - Primitives live under `frontend/apps/web/src/components/` (shared) and `frontend/apps/web/src/features/<feature>/components/` (feature-local).
 - Design source HTML files are self-contained with inline `<style>` from `design-source/styles.css` — they render without the app's CSS. Expect the design to look "cleaner" than a half-wired implementation; compare structure and proportions, not pixel-perfect colors.
-- The MetalDocs Vite dev server defaults to port 5173. API is on 8081. Both should be running for a full visual review.
+- MetalDocs app runs on **port 4174**. Design-source HTML server runs on **port 4181**. API is on 8081. All three should be running for a full visual review.
 
 ## When NOT to use this agent
 
