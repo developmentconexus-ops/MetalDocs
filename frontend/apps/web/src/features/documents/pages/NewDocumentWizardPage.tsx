@@ -13,7 +13,6 @@ import {
   INITIAL_STATE,
   canAdvance,
   clampStep,
-  maxReachableStep,
   wizardReducer,
   type WizardState,
   type WizardStep,
@@ -182,14 +181,6 @@ export function NewDocumentWizardPage(): JSX.Element {
     const target = clampStep(step, state);
     dispatch({ type: 'goToStep', step: target });
   }
-
-  // Clamp the current step if state changed (e.g. profile cleared).
-  useEffect(() => {
-    const max = maxReachableStep(state);
-    if (state.step > max) {
-      dispatch({ type: 'goToStep', step: max });
-    }
-  }, [state]);
 
   return (
     <WizardShell currentStep={state.step} onStepClick={onStepClick}>
