@@ -49,14 +49,19 @@ export function NewDocumentWizardPage(): JSX.Element {
 
   const [state, dispatch] = useReducer(wizardReducer, undefined, () => initialStateFromUrl(searchParams));
 
-  // Sync state.step → URL ?step=N
+  // Sync state.step → URL ?step=N. Use updater form so we don't depend on the
+  // referentially-unstable `searchParams` object (re-instantiated every render).
   useEffect(() => {
-    const next = new URLSearchParams(searchParams);
-    if (next.get('step') !== String(state.step)) {
-      next.set('step', String(state.step));
-      setSearchParams(next, { replace: true });
-    }
-  }, [state.step, searchParams, setSearchParams]);
+    setSearchParams(
+      (prev) => {
+        if (prev.get('step') === String(state.step)) return prev;
+        const next = new URLSearchParams(prev);
+        next.set('step', String(state.step));
+        return next;
+      },
+      { replace: true },
+    );
+  }, [state.step, setSearchParams]);
 
   // Server state
   const profilesQuery = useProfilesQuery();
