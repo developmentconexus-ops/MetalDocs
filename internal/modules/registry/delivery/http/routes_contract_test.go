@@ -286,6 +286,73 @@ func TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth(t *testing.T)
 	}
 }
 
+// TestPostControlledDocuments_MissingIdempotencyKey_400: POST to atomic-create
+// endpoint without Idempotency-Key header must return 400 with code IDEMPOTENCY_KEY_REQUIRED.
+func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
+	handler := newTestHandler(nil)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents", nil)
+	req.Header.Set("X-Tenant-ID", "tenant-1")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if body["code"] != "IDEMPOTENCY_KEY_REQUIRED" {
+		t.Fatalf("code = %q, want IDEMPOTENCY_KEY_REQUIRED", body["code"])
+	}
+}
+
+// TestGetPreviewCode_200: GET /api/v2/controlled-documents/preview-code with valid
+// query params returns 200 with profileCode, areaCode, nextSeq, and code fields.
+func TestGetPreviewCode_200(t *testing.T) {
+	handler := newTestHandler(nil)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/preview-code?profileCode=DC&areaCode=RH", nil)
+	req.Header.Set("X-Tenant-ID", "tenant-1")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	for _, field := range []string{"profileCode", "areaCode", "nextSeq", "code"} {
+		if _, ok := body[field]; !ok {
+			t.Errorf("missing field %q in response: %s", field, rec.Body.String())
+		}
+	}
+}
+
+// TestGetPreviewCode_MissingParams_400: GET /api/v2/controlled-documents/preview-code
+// without required query params returns 400.
+func TestGetPreviewCode_MissingParams_400(t *testing.T) {
+	handler := newTestHandler(nil)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/preview-code?profileCode=DC", nil)
+	req.Header.Set("X-Tenant-ID", "tenant-1")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 // TestActiveDocument_NoneExist_Returns404: no active doc and no published revision —
 // must return 404.
 func TestActiveDocument_NoneExist_Returns404(t *testing.T) {
