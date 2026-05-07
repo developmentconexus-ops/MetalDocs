@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchControlledDocuments } from './api/controlledDocuments';
 import type { ControlledDocument } from "./types";
-import { RegistryCreateDialog } from "./RegistryCreateDialog";
 import { RegistryDetailPage } from "./RegistryDetailPage";
 
 type Props = {
@@ -18,7 +17,6 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
   const [error, setError] = useState("");
   const [profileFilter, setProfileFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [showCreate, setShowCreate] = useState(false);
 
   const pathMatch = /^\/registry-v2\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(location.pathname);
   const detailId = pathMatch ? pathMatch[1] : null;
@@ -62,7 +60,7 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 16 }}>Documentos Controlados</h2>
-        <button type="button" onClick={() => setShowCreate(true)} style={{ marginLeft: "auto", padding: "6px 14px" }}>
+        <button type="button" onClick={() => navigate('/documents-v2/new')} style={{ marginLeft: "auto", padding: "6px 14px" }}>
           + Novo
         </button>
       </div>
@@ -129,15 +127,6 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
         </table>
       )}
 
-      {showCreate && (
-        <RegistryCreateDialog
-          onClose={() => setShowCreate(false)}
-          onCreated={() => {
-            setShowCreate(false);
-            void load();
-          }}
-        />
-      )}
     </div>
   );
 }
