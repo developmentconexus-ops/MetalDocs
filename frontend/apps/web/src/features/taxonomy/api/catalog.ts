@@ -1,11 +1,7 @@
 import { request } from "../../../lib/api/client";
-import type { DocumentProfileItem, ProcessAreaItem } from "../../../lib/types";
+import type { DocumentProfileItem } from "../../../lib/types";
 
 type TaxonomyProfileItem = Pick<DocumentProfileItem, "code" | "name" | "description" | "familyCode"> & {
-  archived?: boolean;
-};
-
-type TaxonomyAreaItem = Pick<ProcessAreaItem, "code" | "name" | "description"> & {
   archived?: boolean;
 };
 
@@ -23,14 +19,6 @@ function normalizeDocumentProfile(value: Partial<DocumentProfileItem>): Document
     approvalRequired: Boolean(value.approvalRequired),
     retentionDays: Number(value.retentionDays ?? 0),
     validityDays: Number(value.validityDays ?? 0),
-  };
-}
-
-function normalizeProcessArea(value: ProcessAreaItem): ProcessAreaItem {
-  return {
-    code: value?.code ?? "",
-    name: value?.name ?? value?.code ?? "",
-    description: value?.description ?? "",
   };
 }
 
@@ -52,11 +40,3 @@ export async function listTaxonomyProfiles(): Promise<{ items: DocumentProfileIt
   };
 }
 
-export async function listTaxonomyAreas(): Promise<{ items: ProcessAreaItem[] }> {
-  const response = await request<{ items: TaxonomyAreaItem[] }>("/api/v2/taxonomy/areas");
-  return {
-    items: Array.isArray(response.items)
-      ? response.items.filter((item) => item.archived !== true).map(normalizeProcessArea)
-      : [],
-  };
-}
