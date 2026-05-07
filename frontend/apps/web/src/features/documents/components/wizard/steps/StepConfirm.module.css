@@ -131,12 +131,11 @@
    line 196: { padding: 14, background: 'var(--brand-pale)',
    border: '1px dashed var(--brand-soft)', borderRadius: 'var(--r-2)',
    marginBottom: 22 }.
-   padding 14 → --sp-4 (16). marginBottom 22 → --sp-5 (20).
-   Inner kicker is colored var(--brand); inner ol uses paddingLeft 18,
-   fontSize 12.5, lineHeight 1.7, color var(--text-soft). */
+   margin-top: 4px adds visual breathing room below the previewCard. */
 .nextStepsCallout {
-  padding: var(--sp-4);
-  margin-bottom: var(--sp-5);
+  padding: 14px;
+  margin-top: 4px;
+  margin-bottom: 22px;
   background: var(--brand-pale);
   border: 1px dashed var(--brand-soft);
   border-radius: var(--r-2);
@@ -162,20 +161,33 @@
 
 /* Consent checkbox row. Mirrors selected-wizard.jsx line 206:
    { display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 12.5,
-   color: 'var(--text-soft)', marginBottom: 8 }. gap 10 → --sp-2 (8). */
+   color: 'var(--text-soft)', marginBottom: 8 }. */
 .consentRow {
   display: flex;
   align-items: flex-start;
-  gap: var(--sp-2);
+  gap: 10px;
   margin-bottom: var(--sp-2);
   font-size: 12.5px;
   color: var(--text-soft);
-  text-align: left;
+  width: 100%;
 }
 
-/* Wine-colored checkbox when checked — brand is the MetalDocs wine/burgundy. */
+/* Wine-colored checkbox. accent-color sets fill color on checked state. */
 .consentRow input[type="checkbox"] {
   accent-color: var(--brand);
   margin-top: 2px;
   flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* Reset legacy global "label span" rule (styles.css:118) which sets
+   text-transform:uppercase, font-size:0.72rem, color:var(--muted).
+   That rule targets ALL label>span combos — consent text must be immune. */
+.consentRow span {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: inherit;
+  color: inherit;
+  flex: 1;
+  min-width: 0;
 }
