@@ -40,7 +40,12 @@ button:disabled {
   cursor: not-allowed;
 }
 
-input,
+/* Text-style inputs only. Checkboxes / radios / files / ranges keep
+   browser-native sizing. Previously this was `input, select, textarea`
+   without exclusions; that clobbered every checkbox to width:100% and
+   forced page-level resets in feature CSS Modules (see
+   design-source/novo-documento/artifacts/leakage-probe.md). */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="image"]),
 select,
 textarea {
   width: 100%;
