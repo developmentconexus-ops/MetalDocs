@@ -1,6 +1,6 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
-import { ApiError, resolveErrorMessage } from '../../../../../lib/api';
+import { resolveQueryError } from '../../../../../lib/api';
 import type { TemplateDTO } from '../../../../templates/api/templatesV2';
 import { WizardFooter } from '../WizardShell';
 import styles from './StepTemplate.module.css';
@@ -54,10 +54,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
         </div>
       ) : isError ? (
         <div role="alert" aria-live="assertive" className="card">
-          {resolveErrorMessage(
-            error instanceof ApiError ? error.code : undefined,
-            error instanceof Error ? error.message : undefined,
-          )}
+          {resolveQueryError(error, 'Falha ao carregar templates.')}
           <div>
             <button type="button" className="btn btn-sm" onClick={onRetry}>
               Tentar novamente
