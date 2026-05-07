@@ -1,7 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { listTaxonomyAreas } from '../../taxonomy/api/catalog';
-import { QK } from '../../../lib/queryKeys';
+import { useAreasQuery } from '../queries/useAreasQuery';
 import { LIBRARY_STATUSES, type LibraryFilter } from '../lib/libraryStatus';
 import styles from './LibrarySidebar.module.css';
 
@@ -41,11 +39,8 @@ export function LibrarySidebar({
   onSearchChange,
 }: Props): JSX.Element {
   const navigate = useNavigate();
-  const areasQuery = useQuery({
-    queryKey: QK.taxonomy.areas(),
-    queryFn: listTaxonomyAreas,
-  });
-  const areas = areasQuery.data?.items ?? [];
+  const areasQuery = useAreasQuery();
+  const areas = areasQuery.data ?? [];
 
   return (
     <nav className={styles.root} aria-label="Navegação da biblioteca">
