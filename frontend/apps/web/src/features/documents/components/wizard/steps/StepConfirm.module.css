@@ -79,7 +79,9 @@
 
 /* Doc title. Mirrors selected-wizard.jsx line 176:
    { fontSize: 16, fontWeight: 500, marginBottom: 14 }.
-   marginBottom 14 rounds to --sp-4 (16). */
+   marginBottom 14 rounds to --sp-4 (16).
+   TODO(novo-documento:typography-tokens): raw 16px/500 — no font-size scale
+   in tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
 .docTitle {
   font-size: 16px;
   font-weight: 500;
@@ -89,11 +91,28 @@
 /* 2-col field grid. Mirrors selected-wizard.jsx line 177:
    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
    fontSize: 12 }. */
+/* TODO(novo-documento:typography-tokens): raw 12px — no font-size scale.
+   See wiki/backlog/novo-documento.md#typography-tokens. */
 .fieldGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-2);
   font-size: 12px;
+}
+
+/* Responsive collapse for narrow viewports. */
+@media (max-width: 600px) {
+  .previewCard {
+    grid-template-columns: 1fr;
+  }
+  .fieldGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Inline-style replacement for the consent-form error alert. */
+.errorAlert {
+  margin-top: var(--sp-3);
 }
 
 /* Field row. Mirrors selected-wizard.jsx line 186:
@@ -110,11 +129,6 @@
    { color: 'var(--text-muted)' }. */
 .fieldLabel {
   color: var(--text-muted);
-}
-
-/* Field value. Reference has no extra style — kept empty for symmetry
-   and for Phase 3c hooks if needed. */
-.fieldValue {
 }
 
 /* Dashed brand-pale "what happens" callout. Mirrors selected-wizard.jsx

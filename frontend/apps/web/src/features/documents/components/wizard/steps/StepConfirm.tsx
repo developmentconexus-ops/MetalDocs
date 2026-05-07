@@ -87,7 +87,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
             {summaryFields.map(([label, value]) => (
               <div key={label} className={styles.fieldRow}>
                 <span className={styles.fieldLabel}>{label}</span>
-                <span className={styles.fieldValue}>{value}</span>
+                <span>{value}</span>
               </div>
             ))}
           </div>
@@ -120,13 +120,16 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
           checked={consent}
           onChange={(event) => onConsent(event.target.checked)}
           disabled={submitting}
+          aria-describedby="wizard-consent-desc"
         />
-        Confirmo que entendi que o código <span className="mono">{codePreview}</span> é definitivo e não
-        pode ser reutilizado.
+        <span id="wizard-consent-desc">
+          Confirmo que entendi que o código <span className="mono">{codePreview}</span> é definitivo e não
+          pode ser reutilizado.
+        </span>
       </label>
 
       {error ? (
-        <div role="alert" className="card" style={{ marginTop: 'var(--sp-3)' }}>
+        <div role="alert" aria-live="assertive" className={`card ${styles.errorAlert}`}>
           {error}
         </div>
       ) : null}

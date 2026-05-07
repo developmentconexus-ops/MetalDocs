@@ -3,7 +3,7 @@
 **Branch:** `feature/screen-redesign`
 **Spec:** `docs/superpowers/specs/2026-05-05-screen-redesign-design.md`
 **Design source:** `frontend/apps/web/design-source/`
-**Last updated:** 2026-05-06 · Library ✅
+**Last updated:** 2026-05-07 · Library ✅ · Wizard ✅
 
 ---
 
@@ -23,7 +23,7 @@ Each block gets its own detailed plan in `docs/superpowers/plans/`. Mark complet
 | **Login** | Full-page split layout, auth form, no Rail | `wiki/implementation/plan-login.md` | ✅ Complete |
 | **Library** | Dense document table, stat cards, filter tabs, collapsible activity sidebar, SectionPanel | `wiki/implementation/plan-library.md` | ✅ Complete |
 | **Editor** | Slim doc bar, mini toolbar, paper canvas, metadata sidebar | — | 🔲 Not started |
-| **Wizard** | 4-step stepper, profile/area/visibility/template pickers | — | ⏳ Waiting on Editor |
+| **Wizard** | 4-step stepper, profile/area/visibility/template pickers | — | ✅ Done (UI) — smoke verified 2026-05-07; deferred items in `wiki/backlog/novo-documento.md` |
 | **Templates** | 3-col card grid, mini doc preview | — | ⏳ Waiting on Wizard |
 | **Registry** | Sequence counter grid, controlled documents table | — | ⏳ Waiting on Templates |
 | **Dashboard** | Hero greeting, stat row, pending approvals, shortcuts | — | ⏳ Waiting on Registry |

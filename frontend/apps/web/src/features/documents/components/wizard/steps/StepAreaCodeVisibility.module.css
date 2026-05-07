@@ -76,8 +76,52 @@
 /* Visibility option label (sibling of caption inside .visibilityText).
    Mirrors selected-wizard-v2.jsx line 97:
    { fontSize: 13, fontWeight: 500, marginBottom: 3 }. 3 rounds to --sp-1 (4). */
+/* TODO(novo-documento:typography-tokens): raw 13px/500 — no font-size scale in
+   tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
 .visibilityLabel {
   font-size: 13px;
   font-weight: 500;
   margin-bottom: var(--sp-1);
+}
+
+/* Selected-state for visibility icon-tile. SelectableCard sets
+   data-selected="true" on its wrapper; descendant selector promotes the tile
+   to brand bg + white. */
+:global([data-selected="true"]) .visibilityIconTile {
+  background: var(--brand);
+  color: var(--text-on-brand, #fff);
+}
+
+/* Defer subcontrols (people/external) — rendered disabled per NOTES.md audit:
+   sharing model not yet defined. Visual is grayed-out + aria-disabled, mirroring
+   StepTemplate's "Em branco" treatment. */
+.subcontrolsCard {
+  margin-top: var(--sp-3);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.subcontrolsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.subcontrolsCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+.subcontrolsAddBtn {
+  margin-top: var(--sp-2);
+}
+
+/* Responsive: collapse 2-col grids at narrow viewports. */
+@media (max-width: 600px) {
+  .profileAreaRow {
+    grid-template-columns: 1fr;
+  }
+  .visibilityGrid {
+    grid-template-columns: 1fr;
+  }
 }

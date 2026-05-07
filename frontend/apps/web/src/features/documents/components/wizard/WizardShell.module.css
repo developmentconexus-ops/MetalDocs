@@ -22,3 +22,10 @@
   align-items: center;
   gap: var(--sp-2);
 }
+
+/* Responsive: reduce horizontal padding at narrow viewports. */
+@media (max-width: 600px) {
+  .scrollWrapper {
+    padding: var(--sp-4) var(--sp-4);
+  }
+}

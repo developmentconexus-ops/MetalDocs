@@ -37,6 +37,7 @@ export function SelectableCard({
       title={title}
       aria-label={ariaLabel}
       className={cls}
+      data-selected={selected ? 'true' : undefined}
       onClick={disabled ? undefined : onSelect}
     >
       {children}
