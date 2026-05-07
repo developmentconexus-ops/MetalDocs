@@ -67,10 +67,14 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
       // Reducer guard: empty/whitespace code is not a valid selection.
       // Use clearProfile for the unset path.
       if (!action.code.trim()) return state;
-      // Changing profile invalidates the template choice (templates are filtered by profile).
-      // Title + area are kept (area is global today).
+      // Changing profile invalidates the template choice (templates are filtered
+      // by profile) AND any step that depends on the template (Step 3+ require a
+      // selected templateVersionID). Clamp here so the reducer is self-contained
+      // — no page-level effect needed to reconcile step.
+      const nextStep: WizardStep = state.step > 2 ? 2 : state.step;
       return {
         ...state,
+        step: nextStep,
         profileCode: action.code,
         templateID: null,
         templateVersionID: null,
