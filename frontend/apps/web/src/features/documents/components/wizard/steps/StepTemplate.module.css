@@ -20,14 +20,13 @@
    { width: 60, height: 76, background: 'white',
      boxShadow: '0 2px 6px rgba(0,0,0,0.06)', borderRadius: 2,
      padding: '6px 5px', flexShrink: 0 }.
-   60×76, radius 2px, padding 6/5 are fixed pixel-perfect mini-thumbnail
-   dimensions (per dispatcher allow-list). Background uses --surface
-   (= #ffffff). */
+   overflow:hidden clips content to canvas — no visible gap below last line. */
 .templatePreview {
   width: 60px;
   height: 76px;
   flex-shrink: 0;
   padding: 6px 5px;
+  overflow: hidden;
   background: var(--surface);
   border-radius: 2px;
   box-shadow: var(--shadow-paper-1);
@@ -91,13 +90,12 @@
   color: var(--text-muted);
 }
 
-/* Status dot for the "publicada" pill. The original markup used a global
-   .dot class which does not exist; this is the local replacement. */
+/* Status dot for the "publicada" pill. Matches pill-frozen color: var(--success). */
 .publishedDot {
   display: inline-block;
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--info, currentColor);
+  background: var(--success);
   margin-right: var(--sp-1);
 }
