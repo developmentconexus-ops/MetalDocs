@@ -4,21 +4,20 @@
   margin-bottom: 20px;
 }
 
-/* Form field label kickers: display:block + 6px bottom gap (design line 48/59/71). */
+/* Form field label kickers: display:block + 6px bottom gap. */
 .profileAreaRow :global(label.kicker),
 .titleRow :global(label.kicker) {
   display: block;
   margin-bottom: 6px;
 }
 
-/* Visibility section kicker needs 10px margin (design line 83). */
+/* Visibility section kicker needs 10px margin. */
 .visibilityKicker {
   margin-bottom: 10px;
 }
 
-/* Profile-chip + area select 2-col row. Mirrors selected-wizard-v2.jsx line 46:
-   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16,
-     marginBottom: 18 }. */
+/* Step 2 profile-chip + area select 2-col row (see design-source HTML reference):
+   display:grid, gridTemplateColumns:1fr 1fr, gap:16, marginBottom:18 */
 .profileAreaRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -26,11 +25,9 @@
   margin-bottom: 18px;
 }
 
-/* Surface-2 selected-profile chip row. Mirrors selected-wizard-v2.jsx line 49:
-   { padding: '10px 12px', background: 'var(--surface-2)',
-     border: '1px solid var(--border)', borderRadius: 'var(--r-2)',
-     display: 'flex', alignItems: 'center', gap: 10 }.
-   padding 10/12 rounds to --sp-2/--sp-3; gap 10 rounds to --sp-2. */
+/* Step 2 selected-profile chip row (see design-source HTML reference):
+   padding:10px 12px, background:var(--surface-2), border, borderRadius:var(--r-2),
+   display:flex, alignItems:center, gap:10 */
 .profileChip {
   display: flex;
   align-items: center;
@@ -42,20 +39,19 @@
 }
 
 /* Info column (name + family) grows to push "Trocar" to the right edge.
-   Design: { flex: 1, fontSize: 13 } on the info div. */
+   flex:1, fontSize:13 on the info div. */
 .profileChipInfo {
   flex: 1;
   font-size: 13px;
 }
 
-/* Title row wrapper. Mirrors selected-wizard-v2.jsx line 70: { marginBottom: 18 }. */
+/* Title row wrapper (see design-source HTML reference): marginBottom:18 */
 .titleRow {
   margin-bottom: 18px;
 }
 
-/* Visibility 2x2 grid. Mirrors selected-wizard-v2.jsx line 84:
-   { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
-     marginBottom: 24 }. */
+/* Step 2 visibility 2x2 grid (see design-source HTML reference):
+   gridTemplateColumns:repeat(2,1fr), gap:10, marginBottom:24 */
 .visibilityGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -63,20 +59,17 @@
   margin-bottom: var(--sp-6);
 }
 
-/* Visibility card body (icon-tile + text + check). Mirrors selected-wizard-v2.jsx
-   line 86: { display: 'flex', alignItems: 'flex-start', gap: 10 }.
-   Padding handled by SelectableCard primitive. gap 10 rounds to --sp-2 (8). */
+/* Step 2 visibility card body: icon-tile + text + check (see design-source HTML reference):
+   display:flex, alignItems:flex-start, gap:10 */
 .visibilityCardBody {
   display: flex;
   align-items: flex-start;
   gap: var(--sp-2);
 }
 
-/* Visibility icon tile. Mirrors selected-wizard-v2.jsx line 93:
-   { width: 32, height: 32, background: 'var(--surface-3)',
-     color: 'var(--text-muted)', borderRadius: 6,
-     display: 'grid', placeItems: 'center', flexShrink: 0 }.
-   32×32 is a fixed icon-tile dimension (not spacing). borderRadius 6 → --r-2.
+/* Step 2 visibility icon tile (see design-source HTML reference):
+   32×32, background:var(--surface-3), color:var(--text-muted), borderRadius:6,
+   display:grid, placeItems:center, flexShrink:0.
    TODO(novo-documento): selected state changes background to var(--brand) +
    color white; wired in Phase 3c when SelectableCard exposes selected
    context to children (or via inline className on the tile span). */
@@ -91,15 +84,13 @@
   border-radius: var(--r-2);
 }
 
-/* Visibility text col. Mirrors selected-wizard-v2.jsx line 96:
-   { flex: 1 }. Inner label is 13/500 with 3px bottom margin. */
+/* Visibility text col: flex:1. Inner label is 13/500 with 3px bottom margin. */
 .visibilityText {
   flex: 1;
 }
 
 /* Visibility option label (sibling of caption inside .visibilityText).
-   Mirrors selected-wizard-v2.jsx line 97:
-   { fontSize: 13, fontWeight: 500, marginBottom: 3 }. 3 rounds to --sp-1 (4). */
+   fontSize:13, fontWeight:500, marginBottom:3 */
 /* TODO(novo-documento:typography-tokens): raw 13px/500 — no font-size scale in
    tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
 .visibilityLabel {
