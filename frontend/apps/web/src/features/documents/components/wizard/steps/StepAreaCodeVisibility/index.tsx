@@ -1,13 +1,15 @@
-import { SelectableCard } from '../../../../../components/ui/SelectableCard';
-import { SelectMenu, type SelectMenuOption } from '../../../../../components/ui/SelectMenu';
-import { CodeChip } from '../../../../../components/ui/CodeChip';
-import { Icon } from '../../../../../components/ui/Icon';
-import { resolveQueryError } from '../../../../../lib/api';
-import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
-import { VISIBILITY_KEYS, VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
-import { CodePreviewBanner } from '../CodePreviewBanner';
-import { WizardFooter } from '../WizardFooter';
-import type { WizardExternalConfig, WizardInvitee } from '../../../state/wizard.reducer';
+import { SelectableCard } from '../../../../../../components/ui/SelectableCard';
+import { SelectMenu, type SelectMenuOption } from '../../../../../../components/ui/SelectMenu';
+import { CodeChip } from '../../../../../../components/ui/CodeChip';
+import { Icon } from '../../../../../../components/ui/Icon';
+import { resolveQueryError } from '../../../../../../lib/api';
+import type { DocumentProfile, ProcessArea } from '../../../../../taxonomy/types';
+import { VISIBILITY_KEYS, VISIBILITY_META, type VisibilityKey } from '../../../../lib/visibilityMeta';
+import { CodePreviewBanner } from '../../CodePreviewBanner';
+import { WizardFooter } from '../../WizardFooter';
+import type { WizardExternalConfig, WizardInvitee } from '../../../../state/wizard.reducer';
+import { PeopleSubcontrols } from './PeopleSubcontrols';
+import { ExternalSubcontrols } from './ExternalSubcontrols';
 import styles from './StepAreaCodeVisibility.module.css';
 
 export type StepAreaCodeVisibilityProps = {
@@ -187,99 +189,6 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
         onBack={onBack}
         onCancel={onCancel}
       />
-    </div>
-  );
-}
-
-type PeopleSubcontrolsProps = {
-  invitees: WizardInvitee[];
-  onAddInvitee: (invitee: WizardInvitee) => void;
-  onRemoveInvitee: (id: string) => void;
-};
-
-function PeopleSubcontrols({ invitees, onAddInvitee: _onAddInvitee, onRemoveInvitee: _onRemoveInvitee }: PeopleSubcontrolsProps): JSX.Element {
-  // Defer per NOTES.md audit — share/invite model not yet defined. Rendered
-  // disabled (aria-disabled + grayed) so the UI does not imply unsupported
-  // behavior. See wiki/backlog/novo-documento.md#sharing.
-  return (
-    <div
-      className={`card ${styles.subcontrolsCard}`}
-      role="group"
-      aria-disabled="true"
-      title="Em breve"
-    >
-      <div className="kicker">Pessoas convidadas</div>
-      <div className={styles.subcontrolsRow}>
-        {invitees.length === 0 ? (
-          <span className="caption">Em breve — convite por pessoa.</span>
-        ) : (
-          invitees.map((row) => (
-            <span key={row.id} className="pill">
-              {row.label}{' '}
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                aria-label={`Remover ${row.label}`}
-                disabled
-                aria-disabled="true"
-              >
-                <span aria-hidden="true">×</span>
-              </button>
-            </span>
-          ))
-        )}
-      </div>
-      <button
-        type="button"
-        className={`btn btn-sm ${styles.subcontrolsAddBtn}`}
-        disabled
-        aria-disabled="true"
-        title="Em breve"
-      >
-        Adicionar pessoa
-      </button>
-    </div>
-  );
-}
-
-type ExternalSubcontrolsProps = {
-  external: WizardExternalConfig;
-  onSetExternal: (patch: Partial<WizardExternalConfig>) => void;
-};
-
-function ExternalSubcontrols({ external, onSetExternal: _onSetExternal }: ExternalSubcontrolsProps): JSX.Element {
-  // Defer per NOTES.md audit — external-share model not yet defined. Rendered
-  // disabled. See wiki/backlog/novo-documento.md#sharing.
-  return (
-    <div
-      className={`card ${styles.subcontrolsCard}`}
-      role="group"
-      aria-disabled="true"
-      title="Em breve"
-    >
-      <div className="kicker">Compartilhamento externo</div>
-      <div className={styles.subcontrolsCol}>
-        <label>
-          <input type="checkbox" checked={external.passwordRequired} disabled aria-disabled="true" readOnly />{' '}
-          Exigir senha (em breve)
-        </label>
-        <label>
-          <input type="checkbox" checked={external.watermark} disabled aria-disabled="true" readOnly />{' '}
-          Aplicar marca d’água (em breve)
-        </label>
-        <label>
-          Expira em (dias)
-          <input
-            className="input"
-            type="number"
-            min={0}
-            value={external.expiresInDays ?? ''}
-            disabled
-            aria-disabled="true"
-            readOnly
-          />
-        </label>
-      </div>
     </div>
   );
 }
