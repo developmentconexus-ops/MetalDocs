@@ -1,7 +1,7 @@
 # documents Module
 
-> **Last verified:** 2026-05-06
-> **Scope:** Document instances — library listing, create, edit, autosave, finalize.
+> **Last verified:** 2026-05-07
+> **Scope:** Document instances — library listing, novo-documento wizard (`/documents-v2/new`), edit, autosave, finalize.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/pages/LibraryPage.tsx:36` — `LibraryPage` — server-side paginated table at `/documents`; lazy `useState` init, debounced search, `resolveErrorMessage` error UX
@@ -11,6 +11,7 @@
 > - `frontend/apps/web/src/features/documents/lib/libraryStatus.ts:1` — `LIBRARY_STATUSES` + `LibraryFilter` + `filterToStatus()` — single source of truth for backend status ↔ URL filter ↔ pt-BR label
 > - `frontend/apps/web/src/features/documents/lib/libraryStatus.ts:29` — `LIBRARY_STATUSES` array (6 entries: draft → obsolete)
 > - `frontend/apps/web/src/features/documents/lib/libraryStatus.ts:38` — `filterToStatus()` — maps `LibraryFilter` slug to `DocumentStatus | undefined`
+> - `frontend/apps/web/src/features/documents/lib/visibilityMeta.ts:1` — `VISIBILITY_META` + `VISIBILITY_KEYS` + `VisibilityKey` — SSOT for wizard visibility options (area/people/company/external); icon mapping uses existing `IconName` union (option B); visibility is captured client-side only — no backend field today (see `backlog/novo-documento.md#visibility`)
 > - `frontend/apps/web/src/features/documents/components/AuthorCell.tsx:30` — `AuthorCell` — Avatar + deterministic hashed color + first-name display for document rows
 > - `frontend/apps/web/src/features/documents/components/LibraryFilterTabs.tsx:11` — `LibraryFilterTabs` — iterates `LIBRARY_STATUSES`; prop type tightened to `LibraryFilter`; Filtros/Exportar disabled with `aria-disabled`
 > - `frontend/apps/web/src/features/documents/components/LibrarySidebar.tsx:32` — `LibrarySidebar` — iterates `LIBRARY_STATUSES` for status section
@@ -18,10 +19,18 @@
 > - `frontend/apps/web/src/features/documents/components/PageSizeSelector.tsx:9` — `PageSizeSelector` — 10/20/50 dropdown
 > - `frontend/apps/web/src/features/documents/queries/useLibraryQuery.ts:15` — `useLibraryQuery` — TanStack Query hook; `placeholderData: keepPreviousData` prevents empty flash on page/filter change
 > - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook; `staleTime: 30_000` avoids refetch on every focus
-> - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library) and `/documents-v2/*` (Editor)
+> - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library), `/documents-v2/new` (wizard), and `/documents-v2/:id` (editor)
+> - `frontend/apps/web/src/features/documents/routes.tsx:55` — `documents-v2/new` route: lazy-loads `NewDocumentWizardPage`
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:44` — `NewDocumentWizardPage` — 4-step wizard entry; `useReducer(wizardReducer)` for form state; `?step=1..4` URL param; 2-call submit sequence (slot → doc)
+> - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — stepper chrome + layout shell for all 4 steps
+> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepProfile.tsx:1` — Step 1: profile radio cards; calls `GET /api/v2/taxonomy/profiles`
+> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility.tsx:1` — Step 2: area picker + title + visibility; calls `GET /api/v2/taxonomy/areas`; shows `{profile}-{area}-???` code preview
+> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — Step 3: template selector; calls `GET /api/v2/templates` filtered by profile; only shows templates with `published_version_id`; "Em branco" intentionally disabled
+> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepConfirm.tsx:1` — Step 4: read-only summary + consent checkbox + "Criar documento" trigger
+> - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — inline code preview banner (`{profile}-{area}-???`); server resolves sequence at create time
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:200` — layout root: `<aside class={styles.rail}>` left rail + `<main class={styles.canvas}>` + `EditorChrome` center/right slots; `handleFinalize` catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
 > - `frontend/apps/web/src/features/documents/pages/styles/DocumentEditorPage.module.css:19` — `.rail`, `.railBackBtn`, `.railTip` — design-token-only; mirrors TemplateAuthorPage rail
-> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — step 1: pick controlled document
+> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — legacy step 1: pick controlled document (pre-wizard flow)
 > - `internal/modules/documents/delivery/http/handler.go:76` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
 > - `internal/modules/documents/delivery/http/handler.go:189` — `listDocuments` — paginated `GET /api/v2/documents`; filler auto-scoped server-side
 > - `internal/modules/documents/delivery/http/handler.go:219` — `documentStats` — `GET /api/v2/documents/stats`
@@ -57,11 +66,11 @@ Only `draft` documents can be edited in the editor.
 
 ```
 /documents                 → LibraryPage (server-side paginated document list)
-/documents-v2/new          → DocumentCreatePage (pick controlled document)
+/documents-v2/new          → NewDocumentWizardPage (4-step create wizard)
 /documents-v2/<uuid>       → DocumentEditorPage
 ```
 
-Routes are defined in `features/documents/routes.tsx`.
+Routes are defined in `features/documents/routes.tsx`. The `documents-v2/new` registration is at `routes.tsx:55`.
 
 ## Library Screen (`/documents`)
 
@@ -115,11 +124,25 @@ Wraps any error from a successful HTTP response (2xx with error envelope) into a
 
 Generic hook for debouncing any value. Used by `LibraryPage` for the search input (300 ms). Lives in `lib/hooks/` because it has no domain dependency — reusable across features.
 
-## Create Flow
+## Create Flow — Novo-Documento Wizard
 
-1. `DocumentCreatePage` lists active controlled documents (fetched from `GET /api/v2/registry/controlled-documents?status=active`).
-2. User picks a controlled document + enters a name → `POST /api/v2/documents` → returns `{ document_id }`.
-3. On success: navigate to `/documents-v2/<uuid>` → `DocumentEditorPage`.
+The 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`) replaced the old `DocumentCreatePage` single-step flow. State lives in `useReducer(wizardReducer)`. Step is driven by `?step=1..4` URL param; refreshing retains the step but resets in-memory form state.
+
+| Step | Component | API call |
+|---|---|---|
+| 1 — Profile | `StepProfile` | `GET /api/v2/taxonomy/profiles` |
+| 2 — Area + Title + Visibility | `StepAreaCodeVisibility` | `GET /api/v2/taxonomy/areas` |
+| 3 — Template | `StepTemplate` | `GET /api/v2/templates?profileCode=…` (published only) |
+| 4 — Confirm + Create | `StepConfirm` | 2-call submit: `POST /api/v2/controlled-documents` → `POST /api/v2/documents` |
+
+**2-call submit sequence** (in `handleCreate`, `NewDocumentWizardPage.tsx:112`):
+1. `POST /api/v2/controlled-documents` (slot reservation) — returns the CD with a server-resolved code (e.g. `PROC-02`). Code preview in steps 2–4 shows `{profile}-{area}-???` because no preview endpoint exists.
+2. `POST /api/v2/documents` — clones the selected template version into a new draft document, linked to the CD slot.
+3. Redirect to `/documents-v2/${doc.document_id}`.
+
+**Slot-rollback gap:** if step 2 (`POST /api/v2/documents`) fails after step 1 succeeds, the slot remains in the registry and its sequence number is consumed. No automatic compensation today. See `backlog/novo-documento.md#slot-rollback`.
+
+**Deferred items:** visibility enforcement, blank-template path, profile counts. See `wiki/backlog/novo-documento.md`.
 
 ## Edit Flow (Draft Documents)
 

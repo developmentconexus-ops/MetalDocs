@@ -36,7 +36,7 @@ User policy: **render every designed feature**, even features without backend su
 | Step 2 — People-invite chips (when visibility=people) | Render + interactive | No-op | TODO — needs share model |
 | Step 2 — External: password / watermark / expiry | Render + interactive | No-op | TODO — needs share model |
 | Step 3 — Template cards per profile (real list from `/api/v2/templates?profile=X`) | Render + selectable, default = published version | `template_version_id` sent | — |
-| Step 3 — Prior version radios | Render but **only published version selectable**; older versions grayed + tooltip "Em breve" | Default sent | TODO — needs `GET /api/v2/templates/:id/versions` |
+| Step 3 — Prior version radios | **Simplified:** per-template selection only (no per-version radios). Card is disabled when no published version exists (tooltip "Em breve"). Full per-version radio rows deferred to wiki/backlog/novo-documento.md#template-versions — requires `GET /api/v2/templates/:id/versions` endpoint. | Published version ID sent | TODO — deferred |
 | Step 3 — "Em branco" template option | Render + grayed disabled + tooltip "Em breve" | Not selectable | TODO — needs no-template POST path |
 | Step 4 — Summary card (Perfil / Área / Código / Título / Visibilidade / Template) | Render derived from prior steps | Read-only | — |
 | Step 4 — Author + Created at | Render (`useAuthStore` user + `new Date()`) | Set server-side | — |

@@ -19,17 +19,27 @@
 }
 
 /* Profile name. Mirrors selected-wizard.jsx line 87:
-   { fontSize: 13, fontWeight: 500 }. */
+   { fontSize: 13, fontWeight: 500 }.
+   TODO(novo-documento:typography-tokens): raw 13px/500 — no font-size scale
+   in tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
 .profileName {
   font-size: 13px;
   font-weight: 500;
 }
 
 /* Profile meta row (família · count). Mirrors selected-wizard.jsx line 92:
-   { display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-muted)' }. */
+   { display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-muted)' }.
+   TODO(novo-documento:typography-tokens): raw 11px — no font-size scale. */
 .profileMeta {
   display: flex;
   gap: var(--sp-3);
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Responsive: collapse profile grid at narrow viewports. */
+@media (max-width: 600px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useReducer } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { ApiError, resolveErrorMessage } from '../../../lib/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { createControlledDocument } from '../../registry/api/controlledDocuments';
@@ -81,14 +83,13 @@ export function NewDocumentWizardPage(): JSX.Element {
   );
 
   // If the URL pre-fills `?profile=X` but profile isn't in the loaded list,
-  // wait until profilesQuery resolves; if not present after load, clear it.
+  // wait until profilesQuery resolves; if not present after load, clear it
+  // and clamp the wizard back to step 1 via clearProfile.
   useEffect(() => {
     if (!profilesQuery.data) return;
     if (state.profileCode && !profilesQuery.data.some((p) => p.code === state.profileCode)) {
-      dispatch({ type: 'selectProfile', code: '' });
+      dispatch({ type: 'clearProfile' });
     }
-    // selectProfile with '' is invalid — instead, dispatch a goToStep + reset.
-    // But our reducer accepts any string; we leave this as a no-op safety net.
   }, [profilesQuery.data, state.profileCode]);
 
   function goCancel() {
@@ -108,8 +109,52 @@ export function NewDocumentWizardPage(): JSX.Element {
     }
   }
 
-  // Submit flow — two-call sequence (slot create → doc create)
-  async function handleCreate() {
+  // Submit flow — two-call sequence (slot create → doc create) via useMutation.
+  // TODO(novo-documento:slot-rollback): if doc-create fails after slot-create
+  // succeeds, orphan slot persists + code is consumed. No compensation today.
+  // See wiki/backlog/novo-documento.md#slot-rollback.
+  const createMutation = useMutation({
+    mutationFn: async (input: {
+      profileCode: string;
+      areaCode: string;
+      title: string;
+      templateVersionID: string;
+      ownerUserId: string;
+    }) => {
+      const slot = await createControlledDocument({
+        profileCode: input.profileCode,
+        processAreaCode: input.areaCode,
+        title: input.title,
+        ownerUserId: input.ownerUserId,
+      });
+      const doc = await createDocument({
+        controlled_document_id: slot.id,
+        template_version_id: input.templateVersionID,
+        name: input.title,
+        form_data: {},
+      });
+      return doc;
+    },
+    onMutate: () => {
+      dispatch({ type: 'submitStart' });
+    },
+    onSuccess: (doc) => {
+      dispatch({ type: 'submitSuccess' });
+      navigate(`/documents-v2/${doc.document_id}`);
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError
+          ? resolveErrorMessage(err.code, err.message)
+          : err instanceof Error
+            ? err.message
+            : 'Falha ao criar o documento.';
+      dispatch({ type: 'submitError', message });
+      toast.error(message);
+    },
+  });
+
+  function handleCreate() {
     if (
       !state.profileCode ||
       !state.areaCode ||
@@ -118,41 +163,18 @@ export function NewDocumentWizardPage(): JSX.Element {
     )
       return;
     if (!currentUser?.userId) {
-      dispatch({
-        type: 'submitError',
-        message: 'Aguardando autenticação. Tente novamente em alguns segundos.',
-      });
+      const message = 'Aguardando autenticação. Tente novamente em alguns segundos.';
+      dispatch({ type: 'submitError', message });
+      toast.error(message);
       return;
     }
-    dispatch({ type: 'submitStart' });
-    try {
-      // TODO(novo-documento:slot-rollback): if doc-create fails after slot-create
-      // succeeds, orphan slot persists + code is consumed. No compensation today.
-      // See wiki/backlog/novo-documento.md#slot-rollback.
-      const slot = await createControlledDocument({
-        profileCode: state.profileCode,
-        processAreaCode: state.areaCode,
-        title: state.title.trim(),
-        ownerUserId: currentUser.userId,
-      });
-      const doc = await createDocument({
-        controlled_document_id: slot.id,
-        template_version_id: state.templateVersionID,
-        name: state.title.trim(),
-        form_data: {},
-      });
-      dispatch({ type: 'submitSuccess' });
-      navigate(`/documents-v2/${doc.document_id}`);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        dispatch({ type: 'submitError', message: resolveErrorMessage(err.code, err.message) });
-      } else {
-        dispatch({
-          type: 'submitError',
-          message: err instanceof Error ? err.message : 'Falha ao criar o documento.',
-        });
-      }
-    }
+    createMutation.mutate({
+      profileCode: state.profileCode,
+      areaCode: state.areaCode,
+      title: state.title.trim(),
+      templateVersionID: state.templateVersionID,
+      ownerUserId: currentUser.userId,
+    });
   }
 
   // Allow stepper clicks to navigate back-or-down to reachable steps only.

@@ -1,6 +1,6 @@
 # Module: Registry (Controlled Documents)
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-07
 > **Scope:** Controlled-document catalog — code generation, CRUD routes, active-document lookup (FULL OUTER JOIN for published-only state), frontend registry pages.
 > **Out of scope:** Document versions / editor (see `modules/documents.md`), taxonomy profiles + areas (see `modules/taxonomy.md`), approval (see `modules/approval.md`).
 > **Key files:**
@@ -11,6 +11,7 @@
 > - `frontend/apps/web/src/features/registry/RegistryDetailPage.tsx:27` — detail page; renders published banner + Nova Revisão form when only published revision exists
 > - `frontend/apps/web/src/features/registry/PublishedDownloadCell.tsx:4` — polls PDF status for a published document via `useDocumentPdfStatus`
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — CD list
+> - `frontend/apps/web/src/features/registry/api/controlledDocuments.ts:28` — `createControlledDocument` — `POST /api/v2/controlled-documents`; called by the novo-documento wizard as step 1 of the 2-call create sequence (slot reservation)
 
 ---
 
@@ -94,6 +95,15 @@ export type ActiveDocumentInstance = ActiveDocumentResponse;
 | GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` (FULL OUTER JOIN) |
 | PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteDoc` |
 | PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeDoc` |
+
+## Wizard create sequence (novo-documento)
+
+The novo-documento wizard (`/documents-v2/new`) calls `createControlledDocument` (`features/registry/api/controlledDocuments.ts:28`) as the **first of two sequential POSTs** when the user clicks "Criar documento" on Step 4:
+
+1. `POST /api/v2/controlled-documents` — reserves a CD slot; server assigns and returns the resolved code (e.g. `PROC-02`). The wizard shows `???` as placeholder throughout steps 2–4 because no preview endpoint exists.
+2. `POST /api/v2/documents` — clones the selected template version into a draft document linked to the slot.
+
+If step 2 fails after step 1 succeeds, the slot persists with its sequence number consumed. No automatic rollback today. See `wiki/backlog/novo-documento.md#slot-rollback`.
 
 ## Cross-refs
 

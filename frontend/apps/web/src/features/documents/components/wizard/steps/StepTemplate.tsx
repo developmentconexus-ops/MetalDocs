@@ -53,7 +53,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
           </div>
         </div>
       ) : isError ? (
-        <div role="alert" className="card">
+        <div role="alert" aria-live="assertive" className="card">
           {resolveErrorMessage(
             error instanceof ApiError ? error.code : undefined,
             error instanceof Error ? error.message : undefined,
@@ -102,7 +102,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                       <span className="pill mono">v{template.latest_version}</span>
                       {selectable ? (
                         <span className="pill pill-frozen">
-                          <span className="dot" />
+                          <span className={styles.publishedDot} aria-hidden="true" />
                           publicada
                         </span>
                       ) : (
@@ -139,7 +139,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                 <div className={styles.templateLabelRow}>
                   <span className={styles.templateLabel}>Em branco</span>
                   <span className="pill" title="Em breve">
-                    cuidado
+                    em breve
                   </span>
                 </div>
                 <p className="caption">Começar sem template (em breve).</p>

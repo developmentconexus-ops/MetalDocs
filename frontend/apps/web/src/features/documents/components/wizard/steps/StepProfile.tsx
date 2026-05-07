@@ -48,7 +48,7 @@ export function StepProfile({
           </div>
         </div>
       ) : isError ? (
-        <div role="alert" className="card">
+        <div role="alert" aria-live="assertive" className="card">
           {resolveErrorMessage(
             error instanceof ApiError ? error.code : undefined,
             error instanceof Error ? error.message : undefined,

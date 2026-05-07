@@ -94,7 +94,7 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
               Carregando áreas…
             </div>
           ) : isAreasError ? (
-            <div role="alert">
+            <div role="alert" aria-live="assertive">
               {resolveErrorMessage(
                 areasError instanceof ApiError ? areasError.code : undefined,
                 areasError instanceof Error ? areasError.message : undefined,
@@ -200,16 +200,21 @@ type PeopleSubcontrolsProps = {
   onRemoveInvitee: (id: string) => void;
 };
 
-function PeopleSubcontrols({ invitees, onAddInvitee, onRemoveInvitee }: PeopleSubcontrolsProps): JSX.Element {
-  // TODO(novo-documento:sharing): invitee list captured but NOT submitted —
-  // share/invite model not yet defined. See
-  // wiki/backlog/novo-documento.md#sharing.
+function PeopleSubcontrols({ invitees, onAddInvitee: _onAddInvitee, onRemoveInvitee: _onRemoveInvitee }: PeopleSubcontrolsProps): JSX.Element {
+  // Defer per NOTES.md audit — share/invite model not yet defined. Rendered
+  // disabled (aria-disabled + grayed) so the UI does not imply unsupported
+  // behavior. See wiki/backlog/novo-documento.md#sharing.
   return (
-    <div className="card" style={{ marginTop: 'var(--sp-3)' }}>
+    <div
+      className={`card ${styles.subcontrolsCard}`}
+      role="group"
+      aria-disabled="true"
+      title="Em breve"
+    >
       <div className="kicker">Pessoas convidadas</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2)', marginTop: 'var(--sp-2)' }}>
+      <div className={styles.subcontrolsRow}>
         {invitees.length === 0 ? (
-          <span className="caption">Nenhuma pessoa convidada ainda.</span>
+          <span className="caption">Em breve — convite por pessoa.</span>
         ) : (
           invitees.map((row) => (
             <span key={row.id} className="pill">
@@ -218,9 +223,10 @@ function PeopleSubcontrols({ invitees, onAddInvitee, onRemoveInvitee }: PeopleSu
                 type="button"
                 className="btn btn-ghost btn-sm"
                 aria-label={`Remover ${row.label}`}
-                onClick={() => onRemoveInvitee(row.id)}
+                disabled
+                aria-disabled="true"
               >
-                ×
+                <span aria-hidden="true">×</span>
               </button>
             </span>
           ))
@@ -228,12 +234,10 @@ function PeopleSubcontrols({ invitees, onAddInvitee, onRemoveInvitee }: PeopleSu
       </div>
       <button
         type="button"
-        className="btn btn-sm"
-        style={{ marginTop: 'var(--sp-2)' }}
-        onClick={() => {
-          const id = `tmp-${Date.now()}`;
-          onAddInvitee({ id, label: 'Convidado (placeholder)' });
-        }}
+        className={`btn btn-sm ${styles.subcontrolsAddBtn}`}
+        disabled
+        aria-disabled="true"
+        title="Em breve"
       >
         Adicionar pessoa
       </button>
@@ -246,29 +250,25 @@ type ExternalSubcontrolsProps = {
   onSetExternal: (patch: Partial<WizardExternalConfig>) => void;
 };
 
-function ExternalSubcontrols({ external, onSetExternal }: ExternalSubcontrolsProps): JSX.Element {
-  // TODO(novo-documento:sharing): external share config captured but NOT
-  // submitted — share/invite model not yet defined. See
-  // wiki/backlog/novo-documento.md#sharing.
+function ExternalSubcontrols({ external, onSetExternal: _onSetExternal }: ExternalSubcontrolsProps): JSX.Element {
+  // Defer per NOTES.md audit — external-share model not yet defined. Rendered
+  // disabled. See wiki/backlog/novo-documento.md#sharing.
   return (
-    <div className="card" style={{ marginTop: 'var(--sp-3)' }}>
+    <div
+      className={`card ${styles.subcontrolsCard}`}
+      role="group"
+      aria-disabled="true"
+      title="Em breve"
+    >
       <div className="kicker">Compartilhamento externo</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', marginTop: 'var(--sp-2)' }}>
+      <div className={styles.subcontrolsCol}>
         <label>
-          <input
-            type="checkbox"
-            checked={external.passwordRequired}
-            onChange={(event) => onSetExternal({ passwordRequired: event.target.checked })}
-          />{' '}
-          Exigir senha
+          <input type="checkbox" checked={external.passwordRequired} disabled aria-disabled="true" readOnly />{' '}
+          Exigir senha (em breve)
         </label>
         <label>
-          <input
-            type="checkbox"
-            checked={external.watermark}
-            onChange={(event) => onSetExternal({ watermark: event.target.checked })}
-          />{' '}
-          Aplicar marca d’água
+          <input type="checkbox" checked={external.watermark} disabled aria-disabled="true" readOnly />{' '}
+          Aplicar marca d’água (em breve)
         </label>
         <label>
           Expira em (dias)
@@ -277,10 +277,9 @@ function ExternalSubcontrols({ external, onSetExternal }: ExternalSubcontrolsPro
             type="number"
             min={0}
             value={external.expiresInDays ?? ''}
-            onChange={(event) => {
-              const raw = event.target.value;
-              onSetExternal({ expiresInDays: raw === '' ? null : Number(raw) });
-            }}
+            disabled
+            aria-disabled="true"
+            readOnly
           />
         </label>
       </div>

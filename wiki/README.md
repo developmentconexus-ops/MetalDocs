@@ -1,6 +1,6 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-05-07
 > **Purpose:** Single source of truth for codebase knowledge. Read this first - drill into folders only after.
 
 ## How to use this wiki
@@ -15,6 +15,7 @@
 
 ### Backlog (deferred / intentional stubs)
 - [backlog/library-screen.md](backlog/library-screen.md) — **7 deferred items** for `/documents` Library screen: ActivityPanel inbox + audit wiring, 3 mocked stat cards, Filtros panel, Exportar action. Each item has backend prereq + frontend steps. (Last verified: 2026-05-06)
+- [backlog/novo-documento.md](backlog/novo-documento.md) — **6 deferred items** for the novo-documento wizard (`/documents-v2/new`): visibility enforcement, sequence preview, template versions, blank template, slot rollback, profile counts. (Last verified: 2026-05-07)
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
@@ -34,11 +35,11 @@
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; `TemplateAuthorPage` now consumes `EditorChrome` (stub, Last verified: 2026-05-06)
-- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), editing flow, session model, API; `libraryStatus.ts` status-meta pattern, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime` query defaults; backend module `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-06)
+- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), novo-documento wizard (`/documents-v2/new`, 4-step, 2-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-07)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4 (Last verified: 2026-05-05)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
-- [modules/iam-rbac.md](modules/iam-rbac.md) - capabilities, roles (viewer/editor/author/approver/system_admin) + process-area roles (signer/area_admin/qms_admin), DB-backed CanDo, area-scoped authz.Require, group grants, tenant-scoped role_provider + role_admin_repository (Group B), migration 0162-0166 + 0169 + 0170 (Last verified: 2026-05-03)
+- [modules/iam-rbac.md](modules/iam-rbac.md) - capabilities, roles (viewer/editor/author/approver/system_admin) + process-area roles (signer/area_admin/qms_admin), DB-backed CanDo, area-scoped authz.Require, group grants, tenant-scoped role_provider + role_admin_repository (Group B), migration 0162-0166 + 0169 + 0170; migration 0164 visibility note corrected (Last verified: 2026-05-07)
 - [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-06)
 - [modules/editor-chrome.md](modules/editor-chrome.md) - shared toolbar overlay primitive for eigenpal-based pages; slot API (`left/center/right/alert`), `VersionBadge`, `AutosaveStatus`, eigenpal CSS overrides, design-token coverage; consumed by `TemplateAuthorPage` + `DocumentEditorPage` (Last verified: 2026-05-06)
 - [modules/search.md](modules/search.md) - cross-module search; v2 reader JOINs `controlled_documents` to populate `DocumentCode` (stub, Last verified: 2026-05-01)

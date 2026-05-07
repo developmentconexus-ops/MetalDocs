@@ -86,7 +86,7 @@ The bypass ensures `system_admin` users can act on any area without needing a `u
 |---|---|
 | 0162 | `tenant_id UUID` added to `metaldocs.iam_user_roles` (default `ffffffff-...`) |
 | 0163 | `iam_groups`, `iam_group_members`, `iam_group_roles` tables created |
-| 0164 | `visibility TEXT DEFAULT 'area'` added to `public.documents` (values: public/area/restricted; was mistakenly added to the now-dropped `public.documents_v2` — corrected by migration 0167) |
+| 0164 | `visibility TEXT DEFAULT 'area'` added to `public.documents_v2` (values: public/area/restricted). `documents_v2` was the W1 scaffold table; it was dropped by migration 0168. This column was **never ported** to `public.documents` or `controlled_documents` — no `visibility` column exists in the current schema. The novo-documento wizard captures visibility client-side only. See `backlog/novo-documento.md#visibility`. |
 | 0165 | `role_capabilities` truncated and reseeded with 40 rows covering the 5 canonical roles |
 | 0166 | `admin` → `system_admin`, `reviewer` → `approver` renamed; UNIQUE(tenant_id, user_id) added |
 | 0169 | `role_capabilities` backfill for `signer`, `area_admin`, `qms_admin` (process-area roles left with zero caps by 0165's TRUNCATE); idempotent via `ON CONFLICT DO NOTHING` |

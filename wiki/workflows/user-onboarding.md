@@ -1,6 +1,6 @@
 # Workflow: User Onboarding (End-to-End)
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-07
 > **Note (smoke test 2026-05-01):** Non-admin users require `user_process_areas` entries to exercise approval authz. See "Common pitfalls" below.
 > **Scope:** The full MetalDocs user journey from a brand-new tenant to a published, frozen document with PDF fanout. Written from the user's seat — what to click, in what order, why each step matters. Non-technical: no code, no API endpoints, no DB tables.
 > **Out of scope:** Implementation details (see `modules/*.md`), API reference, deployment.
@@ -11,7 +11,7 @@
 > - `frontend/apps/web/src/features/templates/TemplatesListPage.tsx` — Templates list
 > - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — eigenpal author
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — Documentos Controlados list
-> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx` — wizard
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx` — 4-step novo-documento wizard at `/documents-v2/new` (profile → area/title/visibility → template → confirm + create)
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx` — eigenpal fill-in editor
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada de Aprovação
 

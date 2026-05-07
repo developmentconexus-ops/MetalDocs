@@ -31,6 +31,7 @@ export type WizardState = {
 export type WizardAction =
   | { type: 'goToStep'; step: WizardStep }
   | { type: 'selectProfile'; code: string }
+  | { type: 'clearProfile' }
   | { type: 'setArea'; code: string }
   | { type: 'setTitle'; value: string }
   | { type: 'setVisibility'; key: VisibilityKey }
@@ -62,12 +63,25 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   switch (action.type) {
     case 'goToStep':
       return { ...state, step: action.step, error: null };
-    case 'selectProfile':
+    case 'selectProfile': {
+      // Reducer guard: empty/whitespace code is not a valid selection.
+      // Use clearProfile for the unset path.
+      if (!action.code.trim()) return state;
       // Changing profile invalidates the template choice (templates are filtered by profile).
       // Title + area are kept (area is global today).
       return {
         ...state,
         profileCode: action.code,
+        templateID: null,
+        templateVersionID: null,
+        error: null,
+      };
+    }
+    case 'clearProfile':
+      return {
+        ...state,
+        step: 1,
+        profileCode: null,
         templateID: null,
         templateVersionID: null,
         error: null,

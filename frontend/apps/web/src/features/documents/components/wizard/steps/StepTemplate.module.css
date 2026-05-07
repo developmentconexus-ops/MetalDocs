@@ -90,3 +90,14 @@
 .templateMeta {
   color: var(--text-muted);
 }
+
+/* Status dot for the "publicada" pill. The original markup used a global
+   .dot class which does not exist; this is the local replacement. */
+.publishedDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--info, currentColor);
+  margin-right: var(--sp-1);
+}
