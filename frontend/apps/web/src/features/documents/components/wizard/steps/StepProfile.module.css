@@ -1,21 +1,46 @@
+/* Profile code (id) span. Brand color when card selected, per design:86.
+   Default color inherits from card (var(--text)). */
+.profileCode {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+:global([data-selected="true"]) .profileCode {
+  color: var(--brand);
+}
+
+/* Profile SelectableCard override. Design uses padding:16 all-around and
+   margin-based spacing (header mb:6, caption mb:8). We use flexbox gap:6px
+   with zeroed child margins so flex gap is the sole spacing mechanism.
+   Padding 16px matches design exactly. */
+.profileCard {
+  gap: 6px;
+  padding: var(--sp-4);
+}
+
+/* Zero paragraph margins inside profile cards — flexbox gap handles spacing. */
+.profileCard p {
+  margin: 0;
+}
+
 /* 2-column profile card grid. Mirrors selected-wizard.jsx line 74:
    { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
-     marginBottom: 8 }. gap 10 rounds to --sp-2 (8). */
+     marginBottom: 8 }. gap 10px exact match. */
 .profileGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--sp-2);
+  gap: 10px;
   margin-bottom: var(--sp-2);
 }
 
 /* Profile card header row (code + name + check). Mirrors selected-wizard.jsx
    line 85: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }.
-   marginBottom 6 rounds to --sp-2 (8). */
+   No margin-bottom here — SelectableCard gap (8px) provides inter-row spacing. */
 .profileHeader {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin-bottom: var(--sp-2);
 }
 
 /* Profile name. Mirrors selected-wizard.jsx line 87:

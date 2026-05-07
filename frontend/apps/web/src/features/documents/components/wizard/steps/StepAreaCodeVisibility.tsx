@@ -69,7 +69,7 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
   return (
     <div className="card">
       <div className="kicker">Etapa 2 de 4</div>
-      <h2 className="h2">Área, código e visibilidade</h2>
+      <h2 className={`h2 ${styles.stepH2}`}>Área, código e visibilidade</h2>
 
       <div className={styles.profileAreaRow}>
         <div>
@@ -141,7 +141,7 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
       {/* TODO(novo-documento:visibility): captured in form state but NOT submitted —
           controlled_documents has no visibility column today. See
           wiki/backlog/novo-documento.md#visibility for the backend prereq. */}
-      <div className="kicker">Visibilidade *</div>
+      <div className={`kicker ${styles.visibilityKicker}`}>Visibilidade *</div>
       <div className={styles.visibilityGrid}>
         {VISIBILITY_KEYS.map((key) => {
           const meta = VISIBILITY_META[key];
