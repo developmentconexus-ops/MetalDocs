@@ -3,6 +3,7 @@ package idempotency_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,17 @@ import (
 
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/testsupport/pgtest"
+)
+
+func jsonEqual(a, b []byte) bool {
+	var va, vb any
+	return json.Unmarshal(a, &va) == nil && json.Unmarshal(b, &vb) == nil &&
+		func() bool { ra, _ := json.Marshal(va); rb, _ := json.Marshal(vb); return bytes.Equal(ra, rb) }()
+}
+
+const (
+	testTenantMW = "00000000-0000-4000-8000-000000000010"
+	testActorMW  = "actor-middleware-test"
 )
 
 func withIDs(tenant, actor string) func(http.Handler) http.Handler {
@@ -37,7 +49,7 @@ func handler201(body string) http.Handler {
 func TestMiddleware_MissingHeader_Returns400(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
 	store := idempotency.New(db, "POST /test")
-	h := withIDs("t1", "a1")(idempotency.Require(store, actorFromCtx)(handler201(`{}`)))
+	h := withIDs(testTenantMW, testActorMW)(idempotency.Require(store, actorFromCtx)(handler201(`{}`)))
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{"x":1}`)))
 	h.ServeHTTP(rec, req)
@@ -49,7 +61,7 @@ func TestMiddleware_MissingHeader_Returns400(t *testing.T) {
 func TestMiddleware_InvalidUUID_Returns400(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
 	store := idempotency.New(db, "POST /test")
-	h := withIDs("t1", "a1")(idempotency.Require(store, actorFromCtx)(handler201(`{}`)))
+	h := withIDs(testTenantMW, testActorMW)(idempotency.Require(store, actorFromCtx)(handler201(`{}`)))
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{}`)))
 	req.Header.Set("Idempotency-Key", "not-a-uuid")
@@ -62,7 +74,7 @@ func TestMiddleware_InvalidUUID_Returns400(t *testing.T) {
 func TestMiddleware_FirstCall_RecordsAndPasses(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
 	store := idempotency.New(db, "POST /test")
-	h := withIDs("t1", "a1")(idempotency.Require(store, actorFromCtx)(handler201(`{"id":"1"}`)))
+	h := withIDs(testTenantMW, testActorMW)(idempotency.Require(store, actorFromCtx)(handler201(`{"id":"1"}`)))
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{"x":1}`)))
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rec := httptest.NewRecorder()
@@ -79,7 +91,7 @@ func TestMiddleware_FirstCall_RecordsAndPasses(t *testing.T) {
 		t.Fatalf("replay status: got %d want 201", rec2.Code)
 	}
 	body, _ := io.ReadAll(rec2.Body)
-	if string(body) != `{"id":"1"}` {
+	if !jsonEqual(body, []byte(`{"id":"1"}`)) {
 		t.Fatalf("replay body mismatch: %s", body)
 	}
 }
@@ -87,7 +99,7 @@ func TestMiddleware_FirstCall_RecordsAndPasses(t *testing.T) {
 func TestMiddleware_Conflict_Returns422(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
 	store := idempotency.New(db, "POST /test")
-	h := withIDs("t1", "a1")(idempotency.Require(store, actorFromCtx)(handler201(`{}`)))
+	h := withIDs(testTenantMW, testActorMW)(idempotency.Require(store, actorFromCtx)(handler201(`{}`)))
 	req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte(`{"x":1}`)))
 	req.Header.Set("Idempotency-Key", "22222222-2222-4222-8222-222222222222")
 	h.ServeHTTP(httptest.NewRecorder(), req)
