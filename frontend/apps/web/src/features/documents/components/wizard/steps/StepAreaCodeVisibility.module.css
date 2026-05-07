@@ -1,11 +1,29 @@
+/* Step 2 h2 override: design uses marginBottom 20 (no caption follows).
+   WizardShell global sets 6px (fits step 1 where caption IS next). */
+.stepH2 {
+  margin-bottom: 20px;
+}
+
+/* Form field label kickers: display:block + 6px bottom gap (design line 48/59/71). */
+.profileAreaRow :global(label.kicker),
+.titleRow :global(label.kicker) {
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* Visibility section kicker needs 10px margin (design line 83). */
+.visibilityKicker {
+  margin-bottom: 10px;
+}
+
 /* Profile-chip + area select 2-col row. Mirrors selected-wizard-v2.jsx line 46:
    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16,
-     marginBottom: 18 }. marginBottom 18 rounds to --sp-4 (16). */
+     marginBottom: 18 }. */
 .profileAreaRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-4);
-  margin-bottom: var(--sp-4);
+  margin-bottom: 18px;
 }
 
 /* Surface-2 selected-profile chip row. Mirrors selected-wizard-v2.jsx line 49:
@@ -23,19 +41,18 @@
   border-radius: var(--r-2);
 }
 
-/* Title row wrapper. Mirrors selected-wizard-v2.jsx line 70:
-   { marginBottom: 18 }. 18 rounds to --sp-4 (16). */
+/* Title row wrapper. Mirrors selected-wizard-v2.jsx line 70: { marginBottom: 18 }. */
 .titleRow {
-  margin-bottom: var(--sp-4);
+  margin-bottom: 18px;
 }
 
 /* Visibility 2x2 grid. Mirrors selected-wizard-v2.jsx line 84:
    { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10,
-     marginBottom: 24 }. gap 10 rounds to --sp-2 (8). */
+     marginBottom: 24 }. */
 .visibilityGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--sp-2);
+  gap: 10px;
   margin-bottom: var(--sp-6);
 }
 

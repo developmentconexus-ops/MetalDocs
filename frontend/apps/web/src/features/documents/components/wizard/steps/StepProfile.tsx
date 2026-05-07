@@ -75,9 +75,10 @@ export function StepProfile({
                 key={profile.code}
                 selected={selected}
                 onSelect={() => onSelect(profile.code)}
+                className={styles.profileCard}
               >
                 <div className={styles.profileHeader}>
-                  <span className="mono">{profile.code}</span>
+                  <span className={`mono ${styles.profileCode}`}>{profile.code}</span>
                   <span className={styles.profileName}>{profile.name}</span>
                   {selected ? <Icon name="check" /> : null}
                 </div>

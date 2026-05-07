@@ -2,14 +2,13 @@
    line 164: { display: 'grid', gridTemplateColumns: '120px 1fr', gap: 18,
    padding: 18, background: 'var(--surface-2)',
    border: '1px solid var(--border)', borderRadius: 'var(--r-3)',
-   marginBottom: 18 }.
-   gap/padding/marginBottom 18 round to --sp-4 (16). */
+   marginBottom: 18 }. */
 .previewCard {
   display: grid;
   grid-template-columns: 120px 1fr;
-  gap: var(--sp-4);
-  padding: var(--sp-4);
-  margin-bottom: var(--sp-4);
+  gap: 18px;
+  padding: 18px;
+  margin-bottom: 18px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-3);
@@ -32,13 +31,11 @@
 }
 
 /* Thumbnail top title bar. Mirrors selected-wizard.jsx line 166:
-   { height: 4, background: 'var(--brand)', marginBottom: 6, width: '70%' }.
-   Height 4px is part of the fixed-pixel thumbnail layout.
-   marginBottom 6 rounds to --sp-2 (8). */
+   { height: 4, background: 'var(--brand)', marginBottom: 6, width: '70%' }. */
 .thumbnailTitleBar {
   height: 4px;
   width: 70%;
-  margin-bottom: var(--sp-2);
+  margin-bottom: 6px;
   background: var(--brand);
 }
 
@@ -80,13 +77,12 @@
 
 /* Doc title. Mirrors selected-wizard.jsx line 176:
    { fontSize: 16, fontWeight: 500, marginBottom: 14 }.
-   marginBottom 14 rounds to --sp-4 (16).
    TODO(novo-documento:typography-tokens): raw 16px/500 — no font-size scale
    in tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
 .docTitle {
   font-size: 16px;
   font-weight: 500;
-  margin-bottom: var(--sp-4);
+  margin-bottom: 14px;
 }
 
 /* 2-col field grid. Mirrors selected-wizard.jsx line 177:
@@ -147,18 +143,19 @@
   border-radius: var(--r-2);
 }
 
-/* Kicker inside the callout overrides the utility .kicker color.
-   Mirrors selected-wizard.jsx line 197: { color: 'var(--brand)' }. */
+/* Kicker inside the callout. Mirrors selected-wizard.jsx line 197:
+   { marginBottom: 8, color: 'var(--brand)' }. */
 .nextStepsKicker {
+  margin-bottom: var(--sp-2);
   color: var(--brand);
 }
 
 /* Ordered list inside the callout. Mirrors selected-wizard.jsx line 198:
    { margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7,
-   color: 'var(--text-soft)' }. paddingLeft 18 → --sp-4 (16). */
+   color: 'var(--text-soft)' }. */
 .nextStepsList {
   margin: 0;
-  padding-left: var(--sp-4);
+  padding-left: 18px;
   font-size: 12.5px;
   line-height: 1.7;
   color: var(--text-soft);
