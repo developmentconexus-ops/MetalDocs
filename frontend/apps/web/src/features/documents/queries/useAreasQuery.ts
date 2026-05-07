@@ -7,7 +7,7 @@ const FIVE_MINUTES = 5 * 60 * 1000;
 export function useAreasQuery() {
   return useQuery({
     queryKey: QK.taxonomy.areas(),
-    queryFn: () => fetchAreas(),
+    queryFn: fetchAreas,
     staleTime: FIVE_MINUTES,
   });
 }
