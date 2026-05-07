@@ -41,7 +41,7 @@ func (s *Store) CheckReplay(ctx context.Context, tenantID, actorID, key, payload
 	)
 	err := s.db.QueryRowContext(ctx, `
 		SELECT response_status, response_body, payload_hash
-		  FROM idempotency_keys
+		  FROM metaldocs.idempotency_keys
 		 WHERE tenant_id      = $1
 		   AND actor_user_id  = $2
 		   AND route_template = $3
@@ -56,7 +56,7 @@ func (s *Store) CheckReplay(ctx context.Context, tenantID, actorID, key, payload
 	if err != nil {
 		return nil, err
 	}
-	if storedHash != "" && storedHash != payloadHash {
+	if storedHash != payloadHash {
 		return nil, ErrConflict
 	}
 	return &Replay{Status: status, Body: body}, nil
@@ -66,7 +66,7 @@ func (s *Store) CheckReplay(ctx context.Context, tenantID, actorID, key, payload
 // re-delivery of the same key (e.g. after a network retry) is idempotent.
 func (s *Store) RecordReplay(ctx context.Context, tenantID, actorID, key, payloadHash string, status int, body []byte) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO idempotency_keys
+		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES
 			($1, $2, $3, $4, $5, $6, $7, 'completed', now() + interval '24 hours')
