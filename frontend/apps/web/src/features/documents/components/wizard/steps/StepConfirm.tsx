@@ -4,7 +4,7 @@ import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
 import type { TemplateDTO } from '../../../../templates/api/templatesV2';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
 import { DocPaperPreview } from '../DocPaperPreview';
-import { WizardFooter } from '../WizardShell';
+import { WizardFooter } from '../WizardFooter';
 import styles from './StepConfirm.module.css';
 
 export type StepConfirmProps = {
