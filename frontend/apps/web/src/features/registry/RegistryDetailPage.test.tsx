@@ -9,6 +9,7 @@ vi.mock('./api/controlledDocuments', async (importOriginal) => {
     fetchControlledDocument: vi.fn(),
     fetchActiveDocumentInstance: vi.fn(),
     obsoleteControlledDocument: vi.fn(),
+    createRevision: vi.fn(),
   };
 });
 
@@ -22,10 +23,6 @@ vi.mock('./PublishedDownloadCell', () => ({
   PublishedDownloadCell: ({ documentId }: { documentId: string }) => (
     <div data-testid="published-download-cell">{documentId}</div>
   ),
-}));
-
-vi.mock('../documents/v2/api/documentsV2', () => ({
-  createDocument: vi.fn(),
 }));
 
 import * as api from './api/controlledDocuments';
