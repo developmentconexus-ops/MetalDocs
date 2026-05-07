@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ApiError, resolveErrorMessage } from '../../../lib/api';
+import { resolveQueryError } from '../../../lib/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { createControlledDocument } from '../../registry/api/controlledDocuments';
 import { createDocument } from '../api/documentsV2';
@@ -144,12 +144,7 @@ export function NewDocumentWizardPage(): JSX.Element {
       navigate(`/documents-v2/${doc.document_id}`);
     },
     onError: (err) => {
-      const message =
-        err instanceof ApiError
-          ? resolveErrorMessage(err.code, err.message)
-          : err instanceof Error
-            ? err.message
-            : 'Falha ao criar o documento.';
+      const message = resolveQueryError(err, 'Falha ao criar o documento.');
       dispatch({ type: 'submitError', message });
       toast.error(message);
     },

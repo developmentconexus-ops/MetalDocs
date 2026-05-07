@@ -2,7 +2,7 @@ import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { SelectMenu, type SelectMenuOption } from '../../../../../components/ui/SelectMenu';
 import { CodeChip } from '../../../../../components/ui/CodeChip';
 import { Icon } from '../../../../../components/ui/Icon';
-import { ApiError, resolveErrorMessage } from '../../../../../lib/api';
+import { resolveQueryError } from '../../../../../lib/api';
 import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
 import { VISIBILITY_KEYS, VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
 import { CodePreviewBanner } from '../CodePreviewBanner';
@@ -94,11 +94,8 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
               Carregando áreas…
             </div>
           ) : isAreasError ? (
-            <div role="alert" aria-live="assertive">
-              {resolveErrorMessage(
-                areasError instanceof ApiError ? areasError.code : undefined,
-                areasError instanceof Error ? areasError.message : undefined,
-              )}{' '}
+            <div role="alert" aria-live="assertive" className="card">
+              {resolveQueryError(areasError, 'Falha ao carregar áreas de processo.')}{' '}
               <button type="button" className="btn btn-sm" onClick={onAreasRetry}>
                 Tentar novamente
               </button>
