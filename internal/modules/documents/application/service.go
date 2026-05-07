@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +26,7 @@ type RestoreResult = repository.RestoreResult
 
 type Repository interface {
 	CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
+	CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
 	SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error
@@ -355,6 +357,122 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 
 	s.audit.Write(ctx, cmd.TenantID, cmd.ActorUserID, "document.created", docID, map[string]any{"template_version_id": resolvedTemplateVersionID})
 	return &CreateDocumentResult{DocumentID: docID, InitialRevisionID: revID, SessionID: sessionID}, nil
+}
+
+// cloneIntoTxInput is the internal payload for cloneIntoTx. It mirrors the
+// fields buildDocumentForCreate consumes plus the override-template hint the
+// registry atomic-create path may carry.
+type cloneIntoTxInput struct {
+	TenantID                  string
+	ControlledDocumentID      string
+	ProfileCode               string
+	ProcessAreaCode           string
+	Code                      string
+	OverrideTemplateVersionID *string
+	OwnerUserID               string
+	Name                      string
+	FormData                  json.RawMessage
+}
+
+// cloneIntoTx performs the DB-only portion of CreateDocument inside a
+// caller-owned tx so callers (e.g. registry atomic-create) can compose the CD
+// insert and the document insert in a single transaction.
+//
+// Differences from CreateDocument:
+//   - No S3 rendering (docgen is not invoked).
+//   - No AdoptTempObject / SetRevisionStorageKey — the initial revision keeps
+//     storage_key="". The editor renders on demand at first open.
+//   - No outbox / audit writes — caller decides which side-effects to run
+//     after tx.Commit().
+//
+// All repo calls thread the tx via CreateDocumentTx.
+func (s *Service) cloneIntoTx(ctx context.Context, tx *sql.Tx, in cloneIntoTxInput) (docID string, contentHash string, err error) {
+	if s.profileTemplates == nil {
+		return "", "", errProfileTemplateReaderNotConfigured
+	}
+
+	// Resolve template version: same logic as CreateDocument's resolution
+	// block, but with explicit override hint instead of reading it off the CD.
+	defaultTemplateID, defaultTemplateStatus, err := s.profileTemplates.GetDefaultTemplateVersionID(ctx, in.TenantID, in.ProfileCode)
+	if err != nil {
+		return "", "", err
+	}
+
+	var overrideTemplate *registrydomain.TemplateVersionCandidate
+	if in.OverrideTemplateVersionID != nil && *in.OverrideTemplateVersionID != "" {
+		overrideStatus := "published"
+		overrideTemplate = &registrydomain.TemplateVersionCandidate{
+			ID:          *in.OverrideTemplateVersionID,
+			ProfileCode: in.ProfileCode,
+			Status:      &overrideStatus,
+		}
+	}
+
+	var defaultTemplate *registrydomain.TemplateVersionCandidate
+	if defaultTemplateID != nil {
+		defaultTemplate = &registrydomain.TemplateVersionCandidate{
+			ID:          *defaultTemplateID,
+			ProfileCode: in.ProfileCode,
+			Status:      defaultTemplateStatus,
+		}
+	}
+
+	resolution, err := registrydomain.Resolve(registrydomain.TemplateResolutionInput{
+		ProfileCode:      in.ProfileCode,
+		OverrideTemplate: overrideTemplate,
+		DefaultTemplate:  defaultTemplate,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	resolvedTemplateVersionID := resolution.TemplateVersionID
+
+	docxKey, _, _, err := s.tpl.GetPublishedVersion(ctx, in.TenantID, resolvedTemplateVersionID)
+	if err != nil {
+		return "", "", fmt.Errorf("template lookup: %w", err)
+	}
+
+	// Resolve template snapshot for the same atomicity guarantees as
+	// CreateDocument (C2/C4) — still pure DB reads.
+	var snap domain.TemplateSnapshot
+	var phs []templatesdomain.Placeholder
+	if s.snapshotSvc != nil {
+		snap, phs, err = s.snapshotSvc.ResolveTemplate(ctx, in.TenantID, resolvedTemplateVersionID)
+		if err != nil {
+			return "", "", fmt.Errorf("resolve template snapshot: %w", err)
+		}
+	}
+
+	// content_hash is required by document_revisions but storage_key is empty
+	// at this point. Mirror the docgen-not-configured fallback in
+	// CreateDocument: sha256(docxKey). Kept stable across replays.
+	h := sha256.New()
+	h.Write([]byte(docxKey))
+	contentHash = fmt.Sprintf("%x", h.Sum(nil))
+
+	formDataJSON := in.FormData
+	if len(formDataJSON) == 0 {
+		formDataJSON = json.RawMessage(`{}`)
+	}
+
+	doc := domain.Document{
+		TenantID:                in.TenantID,
+		TemplateVersionID:       resolvedTemplateVersionID,
+		Name:                    in.Name,
+		FormDataJSON:            formDataJSON,
+		CreatedBy:               in.OwnerUserID,
+		ControlledDocumentID:    &in.ControlledDocumentID,
+		ProfileCodeSnapshot:     &in.ProfileCode,
+		ProcessAreaCodeSnapshot: &in.ProcessAreaCode,
+		Code:                    in.Code,
+		TemplateSnapshot:        snap,
+	}
+
+	docID, _, _, err = s.repo.CreateDocumentTx(ctx, tx, &doc, contentHash, phs)
+	if err != nil {
+		return "", "", err
+	}
+	return docID, contentHash, nil
 }
 
 func (s *Service) GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error) {
