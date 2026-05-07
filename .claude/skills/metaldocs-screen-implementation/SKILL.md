@@ -51,9 +51,9 @@ Self-deciding any of the above = skill failure. Pause, append a row to the works
 |---|---|---|---|
 | 0 — Audit | Main agent inline | HARD | `phase0-audit.md` (Keep/Cut/Defer table, user signature) |
 | 1 — Map | Main agent inline | HARD | `phase1-map.md` (worksheet §1 filled, no open questions) |
-| 2 — Pre-flight | Subagent in worktree | HARD | `phase2-preflight.md` (primitive CSS audit + token coverage of reused atoms) |
+| 2 — Pre-flight | Subagent in worktree | HARD | `phase2-preflight.md` (primitive CSS audit + computed-style probe + token coverage + **Global CSS Leakage Map**) |
 | 3a — Structure mirror | Subagent in worktree | HARD | `phase3a-structure.md` (DOM diff vs reference, main agent reviewed) |
-| 3b — Style port | Subagent in worktree | HARD | `phase3b-style.md` + `screenshots/{1440,1024,375}-{ref,impl}.png` + `token-coverage.txt` |
+| 3b — Style port | Subagent in worktree | HARD | `phase3b-style.md` + `screenshots/{1440,1024,375}-{ref,impl}.png` + `token-coverage.txt` + **`parity-diff.md`** (numerical region-by-region) + **`leakage-probe.md`** |
 | 3c — State wiring | Subagent in worktree | soft | checklist in worksheet |
 | 4 — Behavior verify | Main agent inline | HARD | `phase4-behavior.md` (tsc, tests, smoke trace) |
 | 4.5 — Visual review | `frontend-screen-reviewer` agent | HARD | `phase4-review.md` (Critical/Major/Minor report) |
@@ -124,7 +124,9 @@ Main agent reviews `artifacts/phase3a-structure.md` (DOM diff): same tag, same n
 
 Subagent prompt body: `templates/subagent-phase3b.md`. Token map first; missing tokens added in a separate commit. CSS Module uses ONLY tokens — no raw hex, no raw px for spacing.
 
-**HARD requirements added:**
+**The mindset shift this phase enforces.** Past screens shipped visual debt because the implementer optimized for "code works, route renders, looks roughly like the design" and called it done. That is the failure mode. **In Phase 3b, the deliverable is pixel-level visual parity to the design HTML, measured by computed style numbers — not screenshots, not eye-tests, not "feels close".** Behavior wiring is Phase 3c. Functionality is Phase 4. Phase 3b is *only* about visual fidelity. If the kicker has `line-height: normal` instead of `1` and the glyphs visually crowd the dashed border by 1.5px, that IS the bug, and Phase 3b is not done.
+
+**HARD requirements:**
 
 1. **Token coverage report** at `artifacts/token-coverage.txt`:
    ```bash
@@ -138,9 +140,26 @@ Subagent prompt body: `templates/subagent-phase3b.md`. Token map first; missing 
    - Save reference (HTML rendered) + implementation pairs to `artifacts/screenshots/{viewport}-{ref|impl}.png`.
    - Subagent annotates `artifacts/phase3b-style.md` with side-by-side observations per viewport.
 
-3. **User approves the triple-diff.** Subagent does NOT self-mark approved. Main agent shows the user all 6 screenshots and waits for explicit "ok".
+3. **Computed-style parity diff (NEW, HARD).** For every region in the design, the subagent runs the Pixel Parity Playbook §1 snapshot on BOTH the design HTML preview AND the implementation, and writes the numerical diff to `artifacts/parity-diff.md`. Format: `region | field | ref | impl | delta`. Any non-zero delta in spacing/typography/layout fields is a defect — fix in same phase. Empty deltas table = pass.
 
-Without these three, Phase 3c does not start.
+4. **Global CSS leakage probe (NEW, HARD).** For every interactive / form element on the page, the subagent runs Pixel Parity Playbook §2 leakage probe and writes results to `artifacts/leakage-probe.md`. Any unexpected hit from `src/styles.css` → reset in page CSS Module (or scope the global narrower in `styles.css`, separate commit). The known offenders table in `templates/subagent-phase3b.md` is required reading.
+
+5. **User approves the triple-diff.** Subagent does NOT self-mark approved. Main agent shows the user all 6 screenshots, the parity-diff table, and the leakage-probe results, and waits for explicit "ok".
+
+Without all five, Phase 3c does not start.
+
+### The visual-parity loop (when fixes don't stick)
+
+The wizard correction passes wasted hours on "fix → look at screenshot → still wrong → fix again" because the loop never measured. The right loop:
+
+1. **Snapshot impl** with §1 — record numbers.
+2. **Snapshot reference** with §1 on the design preview server — record numbers.
+3. **Diff numerically.** Find the field that's off (`marginBottom`, `lineHeight`, `width`, `flex`).
+4. **Probe rules** with §2 leakage probe — find the rule that's setting the wrong value. Could be CSS Module, could be `styles.css` global, could be primitive cascade.
+5. **Fix the cause, not the symptom.** If a global rule clobbers a checkbox to `width: 100%`, the fix is `width: auto` in the page CSS Module (specific) AND a row in the leakage map (so future screens know).
+6. **Re-snapshot.** Numbers must change. If they didn't, you have a specificity battle — see Pixel Parity Playbook §4.
+
+Eyeballing screenshots between iterations is what kept past loops going for 6+ rounds. Numbers shorten the loop to 2.
 
 ## Phase 3c — State wiring (subagent, worktree)
 
@@ -205,6 +224,11 @@ If you catch yourself thinking any of these, you are about to bypass the skill:
 - Raw hex / px spacing in CSS Module — must use tokens.
 - **Self-grading screenshot diff** — user is the only Phase 3b approver.
 - **Phase 3b artifact missing screenshots at 3 viewports** — phase not done.
+- **Phase 3b artifact missing `parity-diff.md` (numerical diff per region)** — phase not done. Screenshots are not parity proof; computed-style numbers are.
+- **Phase 3b artifact missing `leakage-probe.md`** — phase not done. Global CSS leaks (`input { width: 100% }`, `label span { uppercase }`) clobber primitives invisibly.
+- **"Looks close enough at this viewport"** — visual parity is a numerical diff, not an eye-test. Run §1 snapshot on both sides; deltas must be zero.
+- **Treating "code compiles + route loads + matches the design vibe" as Phase 3b done** — Phase 3b is fidelity. Behavior is 3c. Functionality is 4. Don't conflate.
+- **Iterating on a fix without re-running §1 snapshot** — if computed numbers didn't change, the rule didn't apply. Probe specificity (§4) before adding more code.
 - **Skipping Phase 4.5 reviewer** — phase not done.
 - **Inline-executing a phase that the workflow assigns to a subagent** — bypasses isolation, no audit artifact.
 
@@ -220,5 +244,6 @@ After the run, report:
 
 ## Changelog
 
+- 1.2 (2026-05-07) — Visual-parity-loop refactor. Captures novo-documento wizard correction-loop lessons: agent shipped "code works" but visual gaps survived 6+ correction passes. Root cause: subagent optimized for functionality + screenshot eye-test, not measured visual fidelity. Phase 3b reframed: deliverable is **pixel-level visual parity measured by computed-style numbers**, behavior is 3c, functionality is 4. Two new HARD artifacts: `parity-diff.md` (numerical region-by-region diff) and `leakage-probe.md` (global CSS leakage report). New "Pixel Parity Playbook" in `templates/subagent-phase3b.md` with concrete `mcp__Claude_Preview__preview_eval` snippets (computed-style snapshot, leakage probe via `document.styleSheets`, parent→child inheritance traps, specificity loop, reference parity check). Phase 2 adds Global CSS Leakage Map + primitive computed-style probe. Anti-patterns expanded with "looks close enough", "treating compile+render as parity", "iterating without re-snapshot". Known offenders table in `styles.css` (`input { width: 100% }`, `label span { uppercase }`, browser default `p`/`ol`).
 - 1.1 (2026-05-07) — Iron Law section. Evidence-artifact requirement per phase. Phase 2 primitive CSS audit becomes hard gate. Phase 3b adds token-coverage report + 3-viewport triple-diff + explicit user-approval gate. Phase 4 splits into 4 (behavior) + 4.5 (visual review via `frontend-screen-reviewer` agent). Red flags / rationalizations table. Anti-patterns expanded. Captures wizard-screen lessons.
 - 1.0 (2026-05-06) — initial release. Captures Library screen lessons.

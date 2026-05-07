@@ -113,6 +113,67 @@ Repeat at **375×812** (mobile):
 - Screenshot both
 - Note mobile-specific gaps (overflow, stacked vs grid, broken nav)
 
+#### 4c-bis. Computed-style numerical parity (HARD)
+
+Screenshots catch obvious drift but miss 1–4px gaps that ship as visual debt. Pair every screenshot diff with a numerical computed-style diff using the **Pixel Parity Playbook** in `.claude/skills/metaldocs-screen-implementation/templates/subagent-phase3b.md`.
+
+For every region you flag visually (and for the page's primary layout containers regardless of visual flag), run on BOTH the design preview (4181) and the impl (4174):
+
+```js
+(() => {
+  const el = document.querySelector('<selector>');
+  const cs = getComputedStyle(el);
+  const r = el.getBoundingClientRect();
+  return {
+    box: {w: r.width, h: r.height, x: r.x, y: r.y},
+    spacing: {mt: cs.marginTop, mb: cs.marginBottom, mr: cs.marginRight, ml: cs.marginLeft,
+              pt: cs.paddingTop, pb: cs.paddingBottom, pr: cs.paddingRight, pl: cs.paddingLeft},
+    type: {fs: cs.fontSize, fw: cs.fontWeight, lh: cs.lineHeight, ff: cs.fontFamily, tt: cs.textTransform, ls: cs.letterSpacing},
+    color: {c: cs.color, bg: cs.backgroundColor, b: cs.border, br: cs.borderRadius},
+    layout: {display: cs.display, flex: cs.flex, gap: cs.gap, ai: cs.alignItems, jc: cs.justifyContent}
+  };
+})()
+```
+
+Diff field-by-field. ANY non-zero delta in spacing/type/layout that has no documented reason in `NOTES.md` or backlog → **Major (Visual / numerical parity)** with the field name + ref/impl/delta in the report.
+
+This is what catches cases where the screenshot looks "close enough" but the kicker has `line-height: normal` instead of `1`, or the consent row span has `width: 0` because a global `input { width: 100% }` rule clobbered the checkbox.
+
+#### 4c-ter. Global CSS leakage audit (HARD)
+
+For every form-bearing region (any `input`, `select`, `textarea`, `button`, `label`, `p`, `ol`, `ul` in the page), run leakage probe:
+
+```js
+(() => {
+  const el = document.querySelector('<selector>');
+  const matched = [];
+  for (const sheet of document.styleSheets) {
+    let rules; try { rules = sheet.cssRules; } catch(e) { continue; }
+    for (const r of rules) {
+      if (!r.selectorText) continue;
+      try { if (el.matches(r.selectorText)) matched.push({sel: r.selectorText, css: r.style.cssText}); } catch(e) {}
+    }
+  }
+  return matched;
+})()
+```
+
+If a global rule from `src/styles.css` is hitting the element AND its declarations are not explicitly reset by the page's CSS Module → **Major (Global CSS leakage)**. Known offenders to actively probe regardless of visible defect:
+
+| Selector | Effect |
+|---|---|
+| `input, select, textarea` | `width: 100%; border; background; padding` — clobbers checkboxes/radios |
+| `label span` | uppercase + tiny font — clobbers consent text, helper labels |
+| `p` (default) | `1em 0` margin — adds visual height inside flex |
+| `ol, ul` (default) | 40px padding-inline-start |
+
+#### 4c-quater. Cross-check Phase 3b artifacts
+
+The implementation subagent produces `artifacts/parity-diff.md` and `artifacts/leakage-probe.md`. Read them. Sanity-check:
+- Are all primary regions covered in `parity-diff.md`? Missing region → Major (incomplete artifact).
+- Does the impl actually match the numbers claimed? Spot-check 2–3 entries with the §1 snippet above. Mismatch → Critical (artifact lied).
+- Does `leakage-probe.md` cover the form elements present? Missing form element → Major.
+
 #### 4d. Visual findings → report buckets
 
 Visual findings slot into existing buckets:
@@ -179,8 +240,8 @@ Per `wiki/concepts/error-ux.md`:
 
 #### Bucket definitions
 
-- **Critical**: architectural violations, broken contracts, Cut items present, error UX bypass
-- **Major**: visual gaps (backed by screenshot evidence), primitive CSS drift, missing tokens, missing Keep items, missing a11y
+- **Critical**: architectural violations, broken contracts, Cut items present, error UX bypass, **falsified Phase 3b artifacts** (parity-diff numbers don't match reality)
+- **Major**: visual gaps (backed by **numerical computed-style evidence**, not just screenshots), primitive CSS drift, missing tokens, **unhandled global CSS leakage**, missing Keep items, missing a11y, missing Phase 3b artifact regions
 - **Minor**: copy nits, naming style, suggestions
 
 #### Each issue has exactly:
@@ -235,7 +296,8 @@ Per `wiki/concepts/error-ux.md`:
 
 - **Read-only.** Never edit implementation code. The only file you may write is the review report (only if explicitly asked to save it).
 - **Cite, don't opine.** Every flag references a specific wiki/skill rule by path. No "I'd prefer..." critique.
-- **Visual evidence is required** for any visual/token/responsive finding. If you cannot screenshot it, note the limitation and cite the code line instead.
+- **Visual evidence is required** for any visual/token/responsive finding. Evidence = screenshot **+ numerical computed-style diff** (Pixel Parity Playbook §1). Eye-test alone is not evidence. If you cannot run `preview_eval`, note the limitation and cite the code line instead.
+- **Numbers beat screenshots when they conflict.** If a screenshot looks fine but a computed-style field differs from reference, the field is the defect.
 - **Length cap: 900 lines.** If a phase has zero issues, write "none."
 - **Never invent file:line anchors.** Read the actual file before citing a line.
 - **Never re-run the implementation flow.** You are not the implementer. Non-trivial fixes → recommend re-dispatch of `metaldocs-screen-implementation`.
@@ -243,7 +305,8 @@ Per `wiki/concepts/error-ux.md`:
 
 ## Context / calibration
 
-- The `metaldocs-screen-implementation` skill's Phase 3b (Style port) is the most commonly undercut phase — bias visual checks there.
+- The `metaldocs-screen-implementation` skill's Phase 3b (Style port) is the most commonly undercut phase — bias visual checks there. Skill v1.2 introduced `parity-diff.md` + `leakage-probe.md` artifacts; READ them and cross-check, don't trust.
+- Subagents tend to optimize for "code works + route renders + matches the design vibe" and call Phase 3b done. Your job is to catch that. The wizard correction loop (`/documents-v2/new`) shipped 6+ visual gaps because the loop never measured. Numbers shorten the loop.
 - The Library screen (`design-source/library/`) is the canonical "done right" reference.
 - The `/documents-v2/new` wizard is the canonical "behavior solid, visual drift" reference — common gap: spacing tokens used but design HTML has slightly different layout rhythm.
 - Token source of truth: `frontend/apps/web/src/styles/tokens.css` + `@metaldocs/shared-tokens` package.

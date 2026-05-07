@@ -26,6 +26,13 @@ You are a subagent dispatched in a fresh git worktree to perform Phase 2 (Pre-fl
 
 2. **Primitive fixes/extensions.** For each row in §1.1 marked "extend", apply the change to the existing primitive in `frontend/apps/web/src/components/ui/<Primitive>.tsx` (and module CSS). One commit per primitive: `feat(<primitive>): add <prop> for <SLUG>`.
 
+   **2a. Primitive CSS audit (HARD).** For every REUSED primitive in §1.1, even unmodified ones, audit BEFORE page assembly:
+   - Read primitive's `.module.css`. Every value must be `var(--token)`. Raw hex / raw px (other than `1px` borders, `0`) → fix in same commit and bump primitive owner.
+   - Probe primitive in dev: render a sample, run Pixel Parity Playbook §1 (Computed-style snapshot) and §3 (Parent → child inheritance traps). Verify font / gap / padding match design tokens.
+   - Common primitive drift to look for: `SelectableCard` `gap`/`padding`/`font:inherit` overriding child kicker rules; `Button` `font-family` not matching tokens; `Modal` body padding not using `--sp-*`.
+
+   **2b. Global CSS leakage map (HARD).** Read `frontend/apps/web/src/styles.css` end to end. For every selector that targets a bare element (`input`, `select`, `textarea`, `button`, `p`, `h2`, `label span`, `ol`, `ul`), record the rule in worksheet §2 "Global Leakage Map". Page-assembly subagents will reset these in the page CSS Module if the design uses any of these elements. Without this map, the visual loop will play whack-a-mole. Reference table in `templates/subagent-phase3b.md` "Pixel Parity Playbook §2".
+
 3. **Status-meta SSOT.** Create `frontend/apps/web/src/features/<DOMAIN>/lib/<X>Meta.ts` with the rows from worksheet §1.4. Commit: `feat(<DOMAIN>): add <x>Meta status SSOT`.
 
 4. **New shared atoms.** For each row in §1.2 placed in `components/ui/` or `features/shared/`, create the file (TSX + module CSS). Atom must be self-contained (no domain logic). One commit per atom.
