@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -314,6 +315,51 @@ func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlled
 		return registrydomain.ErrCDNotActive
 	}
 	return s.docs.UpdateStatus(ctx, tenantID, controlledDocumentID, next, s.now().UTC())
+}
+
+type CreateRevisionCmd struct {
+	TenantID          string
+	CDID              string
+	Name              string
+	FormData          map[string]any
+	TemplateVersionID *string
+}
+
+// CreateRevision creates a new document revision for an existing controlled
+// document. It requires a DocumentInitializer to be wired (see WithDocumentInitializer).
+func (s *RegistryService) CreateRevision(ctx context.Context, cmd CreateRevisionCmd) (*registrydomain.DocumentRef, error) {
+	cd, err := s.docs.GetByID(ctx, cmd.TenantID, cmd.CDID)
+	if err != nil {
+		return nil, err
+	}
+	if !cd.IsActive() {
+		return nil, registrydomain.ErrCDNotActive
+	}
+	if s.docInit == nil {
+		return nil, errors.New("registry: document initializer not configured")
+	}
+
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return nil, err
+	}
+	var txErr error
+	defer func() {
+		if txErr != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	ref, txErr := s.docInit.CloneTemplate(ctx, tx, cd, registrydomain.CloneTemplateRequest{
+		TemplateVersionID: cmd.TemplateVersionID,
+		Name:              cmd.Name,
+		FormData:          cmd.FormData,
+	})
+	if txErr != nil {
+		return nil, txErr
+	}
+	txErr = tx.Commit()
+	return ref, txErr
 }
 
 func isReasonValid(reason *string) bool {
