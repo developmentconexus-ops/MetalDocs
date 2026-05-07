@@ -86,15 +86,12 @@ export function NewDocumentWizardPage(): JSX.Element {
     [templates, state.templateID],
   );
 
-  // If the URL pre-fills `?profile=X` but profile isn't in the loaded list,
-  // wait until profilesQuery resolves; if not present after load, clear it
-  // and clamp the wizard back to step 1 via clearProfile.
-  useEffect(() => {
-    if (!profilesQuery.data) return;
-    if (state.profileCode && !profilesQuery.data.some((p) => p.code === state.profileCode)) {
-      dispatch({ type: 'clearProfile' });
-    }
-  }, [profilesQuery.data, state.profileCode]);
+  // Derived: URL pre-filled `?profile=X` but profile is not in the loaded list.
+  // Reconcile via render (show alert + reset) instead of dispatching from an effect.
+  const profileNotFound =
+    profilesQuery.isSuccess &&
+    state.profileCode !== null &&
+    selectedProfile === null;
 
   function goCancel() {
     navigate('/documents-v2');
@@ -189,7 +186,20 @@ export function NewDocumentWizardPage(): JSX.Element {
 
   return (
     <WizardShell currentStep={state.step} onStepClick={onStepClick}>
-      {state.step === 1 && (
+      {state.step === 1 && profileNotFound && (
+        <div className="card" role="alert" aria-live="polite">
+          O perfil pré-selecionado <span className="mono">{state.profileCode}</span> não está mais disponível.
+          {' '}
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => dispatch({ type: 'clearProfile' })}
+          >
+            Limpar seleção
+          </button>
+        </div>
+      )}
+      {state.step === 1 && !profileNotFound && (
         <StepProfile
           profiles={profiles}
           isLoading={profilesQuery.isLoading}
