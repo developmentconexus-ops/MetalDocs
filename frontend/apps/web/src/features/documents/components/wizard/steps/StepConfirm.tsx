@@ -1,10 +1,13 @@
 import { CodeChip } from '../../../../../components/ui/CodeChip';
 import { StatusPill } from '../../../../../components/ui/StatusPill';
 import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
-import type { TemplateDTO } from '../../../../templates/api/templatesV2';
+import type { TemplateDTO } from '../../../../templates';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
-import { WizardFooter } from '../WizardShell';
+import { DocPaperPreview } from '../DocPaperPreview';
+import { WizardFooter } from '../WizardFooter';
 import styles from './StepConfirm.module.css';
+
+type SummaryField = { label: string; value: string };
 
 export type StepConfirmProps = {
   profile: DocumentProfile | null;
@@ -44,19 +47,20 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
   } = props;
 
   const codePreview = `${profile?.code ?? '???'}-${area?.code ?? '???'}-???`;
+  const versionLabel = 'v1'; // first version of a new doc; literal until version-bumping flow exists
   const visibilityLabel = VISIBILITY_META[visibility].label;
   const profileLabel = profile ? `${profile.code} — ${profile.name}` : '—';
   const areaLabel = area ? `${area.code} — ${area.name}` : '—';
   const templateLabel = template ? `${template.name} v${template.latest_version} (publicada)` : '—';
   const createdAtLabel = formatDateTime(createdAt);
 
-  const summaryFields: ReadonlyArray<readonly [string, string]> = [
-    ['Perfil', profileLabel],
-    ['Família', profile?.familyCode ?? '—'],
-    ['Área', areaLabel],
-    ['Visibilidade', visibilityLabel],
-    ['Autor', authorDisplayName || '—'],
-    ['Criado em', createdAtLabel],
+  const summaryFields: ReadonlyArray<SummaryField> = [
+    { label: 'Perfil', value: profileLabel },
+    { label: 'Família', value: profile?.familyCode ?? '—' },
+    { label: 'Área', value: areaLabel },
+    { label: 'Visibilidade', value: visibilityLabel },
+    { label: 'Autor', value: authorDisplayName || '—' },
+    { label: 'Criado em', value: createdAtLabel },
   ];
 
   return (
@@ -68,17 +72,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       </p>
 
       <div className={styles.previewCard}>
-        <div className={styles.docThumbnail}>
-          <div className={styles.thumbnailTitleBar} />
-          <div className={styles.thumbnailCode}>{codePreview} v1</div>
-          {Array.from({ length: 11 }).map((_, idx) => (
-            <div
-              key={idx}
-              className={styles.thumbnailLine}
-              style={{ width: `${55 + (idx * 11) % 38}%` }}
-            />
-          ))}
-        </div>
+        <DocPaperPreview lines={11} code={`${codePreview} ${versionLabel}`} variant="thumbnail" />
         <div>
           <div className={styles.summaryHeaderRow}>
             <CodeChip>{codePreview}</CodeChip>
@@ -87,7 +81,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
           </div>
           <div className={styles.docTitle}>{title || '—'}</div>
           <div className={styles.fieldGrid}>
-            {summaryFields.map(([label, value]) => (
+            {summaryFields.map(({ label, value }) => (
               <div key={label} className={styles.fieldRow}>
                 <span className={styles.fieldLabel}>{label}</span>
                 <span>{value}</span>
@@ -132,7 +126,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       </label>
 
       {error ? (
-        <div role="alert" aria-live="assertive" className={`card ${styles.errorAlert}`}>
+        <div role="alert" aria-live="assertive" aria-atomic="true" className={`card ${styles.errorAlert}`}>
           {error}
         </div>
       ) : null}
@@ -156,11 +150,14 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
   );
 }
 
+const DATE_TIME_FMT = new Intl.DateTimeFormat('pt-BR', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+});
+
 function formatDateTime(date: Date): string {
   try {
-    const d = date.toLocaleDateString('pt-BR');
-    const t = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    return `${d} · ${t}`;
+    return DATE_TIME_FMT.format(date);
   } catch {
     return date.toISOString();
   }

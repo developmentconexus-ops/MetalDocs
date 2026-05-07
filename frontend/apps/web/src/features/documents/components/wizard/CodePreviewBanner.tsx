@@ -5,13 +5,16 @@ export type CodePreviewBannerProps = {
   areaCode: string;
 };
 
-export function CodePreviewBanner({ profileCode, areaCode }: CodePreviewBannerProps): JSX.Element {
-  const profile = profileCode ?? '???';
-  const area = areaCode === '' ? '???' : areaCode;
-  const code = `${profile}-${area}-???`;
+const PLACEHOLDER = '???';
+
+export function CodePreviewBanner({
+  profileCode,
+  areaCode,
+}: CodePreviewBannerProps): JSX.Element {
   const ready = profileCode !== null && areaCode !== '';
+  const code = `${profileCode ?? PLACEHOLDER}-${areaCode || PLACEHOLDER}-${PLACEHOLDER}`;
   const kicker = ready
-    ? `Código gerado · próximo em (${profile}, ${area})`
+    ? `Código gerado · próximo em (${profileCode}, ${areaCode})`
     : 'Código gerado · selecione perfil e área';
 
   return (

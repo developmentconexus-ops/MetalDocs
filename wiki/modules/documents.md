@@ -21,10 +21,10 @@
 > - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook; `staleTime: 30_000` avoids refetch on every focus
 > - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library), `/documents-v2/new` (wizard), and `/documents-v2/:id` (editor)
 > - `frontend/apps/web/src/features/documents/routes.tsx:55` — `documents-v2/new` route: lazy-loads `NewDocumentWizardPage`
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:44` — `NewDocumentWizardPage` — 4-step wizard entry; `useReducer(wizardReducer)` for form state; `?step=1..4` URL param; 2-call submit sequence (slot → doc)
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:43` — `NewDocumentWizardPage` — 4-step wizard entry; `useReducer(wizardReducer)` for form state; `?step=1..4` URL param; 2-call submit sequence (slot → doc); `profileNotFound` derived flag
 > - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — stepper chrome + layout shell for all 4 steps
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepProfile.tsx:1` — Step 1: profile radio cards; calls `GET /api/v2/taxonomy/profiles`
-> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility.tsx:1` — Step 2: area picker + title + visibility; calls `GET /api/v2/taxonomy/areas`; shows `{profile}-{area}-???` code preview
+> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/index.tsx:40` — Step 2: area picker + title + visibility; calls `GET /api/v2/taxonomy/areas`; shows `{profile}-{area}-???` code preview; delegates to `PeopleSubcontrols` / `ExternalSubcontrols`
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — Step 3: template selector; calls `GET /api/v2/templates` filtered by profile; only shows templates with `published_version_id`; "Em branco" intentionally disabled
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepConfirm.tsx:1` — Step 4: read-only summary + consent checkbox + "Criar documento" trigger
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — inline code preview banner (`{profile}-{area}-???`); server resolves sequence at create time
@@ -135,7 +135,7 @@ The 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`) replaced the 
 | 3 — Template | `StepTemplate` | `GET /api/v2/templates?profileCode=…` (published only) |
 | 4 — Confirm + Create | `StepConfirm` | 2-call submit: `POST /api/v2/controlled-documents` → `POST /api/v2/documents` |
 
-**2-call submit sequence** (in `handleCreate`, `NewDocumentWizardPage.tsx:112`):
+**2-call submit sequence** (in `handleCreate`, `NewDocumentWizardPage.tsx:151`):
 1. `POST /api/v2/controlled-documents` (slot reservation) — returns the CD with a server-resolved code (e.g. `PROC-02`). Code preview in steps 2–4 shows `{profile}-{area}-???` because no preview endpoint exists.
 2. `POST /api/v2/documents` — clones the selected template version into a new draft document, linked to the CD slot.
 3. Redirect to `/documents-v2/${doc.document_id}`.

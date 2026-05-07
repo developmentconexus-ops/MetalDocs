@@ -1,6 +1,6 @@
 # Frontend Structure
 
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-05-07
 > **Scope:** Canonical folder layout, naming, routing, state, API, design-system rules for `frontend/apps/web`. Comparison baseline for refactor reviews and the `metaldocs-frontend` skill.
 > **Out of scope:** Backend module layout (see `system-overview.md`), eigenpal internals (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -14,7 +14,7 @@
 > - `frontend/apps/web/src/features/` — one folder per domain
 > - `frontend/apps/web/src/components/ui/` — design-system primitives only
 > - `frontend/apps/web/src/lib/api/` — apiFetch, ApiError, authBus, openapi-fetch wrapper
-> - `frontend/apps/web/src/lib/queryKeys.ts:17` — centralized `QK` constants; all `queryKey` / `invalidateQueries` calls import from here
+> - `frontend/apps/web/src/lib/queryKeys.ts:27` — centralized `QK` constants; all `queryKey` / `invalidateQueries` calls import from here; `QK.templates.byProfile` added
 > - `frontend/apps/web/src/lib/api-types/` — generated from `api/openapi/v1/openapi.yaml`
 > - `frontend/apps/web/src/styles/tokens.css:2` — Wine-palette design tokens (`--brand-*`, `--rail-*`, `--bg`, `--accent`, …)
 > - `frontend/apps/web/design-source/` — claude.design HTML screen specs (committed reference)
@@ -110,7 +110,7 @@ frontend/apps/web/src/
 7. **Routing = data routes.** `createBrowserRouter` + per-feature `routes.tsx`. **No `HashRouter`.** **No string-pattern path dispatchers** (e.g., the old `viewFromPath`).
 8. **CSS = CSS Modules** (`<Component>.module.css`). Tokens from `styles/tokens.css` or `@metaldocs/shared-tokens`. No inline styles for theming. No CSS-in-JS libraries.
 9. **No backwards-compat shims.** When migrating, delete legacy files in the same PR. No re-exports. No `// removed` comments. Aligns with project CLAUDE.md.
-10. **Errors UX.** Use `lib/api/errors.ts` (`ApiError`, `resolveErrorMessage`) and the auth bus per `wiki/concepts/error-ux.md`. Toasts via `sonner`. Never raw `alert`.
+10. **Errors UX.** Use `lib/api/errors.ts` (`ApiError`, `resolveErrorMessage`) and the auth bus per `wiki/concepts/error-ux.md`. For TanStack Query `onError` callbacks use `resolveQueryError(err, fallback)` (`lib/api/resolveQueryError.ts`) — it handles `ApiError`, `Error`, and unknown in one call. Toasts via `sonner`. Never raw `alert`.
 
 ---
 
@@ -231,7 +231,7 @@ export async function getDocument(id: string) {
 ## 8. Server state (TanStack Query)
 
 ```ts
-// lib/queryKeys.ts — centralized constants (frontend/apps/web/src/lib/queryKeys.ts:17)
+// lib/queryKeys.ts — centralized constants (frontend/apps/web/src/lib/queryKeys.ts:27)
 export const QK = {
   documents: {
     list: () => ['documents', 'list'] as const,

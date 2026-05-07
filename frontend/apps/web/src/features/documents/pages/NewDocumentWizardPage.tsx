@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ApiError, resolveErrorMessage } from '../../../lib/api';
+import { resolveQueryError } from '../../../lib/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { createControlledDocument } from '../../registry/api/controlledDocuments';
 import { createDocument } from '../api/documentsV2';
@@ -13,7 +13,6 @@ import {
   INITIAL_STATE,
   canAdvance,
   clampStep,
-  maxReachableStep,
   wizardReducer,
   type WizardState,
   type WizardStep,
@@ -23,8 +22,6 @@ import { StepProfile } from '../components/wizard/steps/StepProfile';
 import { StepAreaCodeVisibility } from '../components/wizard/steps/StepAreaCodeVisibility';
 import { StepTemplate } from '../components/wizard/steps/StepTemplate';
 import { StepConfirm } from '../components/wizard/steps/StepConfirm';
-
-export type NewDocumentWizardPageProps = Record<string, never>;
 
 function parseStepParam(raw: string | null): WizardStep {
   const n = Number(raw);
@@ -50,14 +47,19 @@ export function NewDocumentWizardPage(): JSX.Element {
 
   const [state, dispatch] = useReducer(wizardReducer, undefined, () => initialStateFromUrl(searchParams));
 
-  // Sync state.step → URL ?step=N
+  // Sync state.step → URL ?step=N. Use updater form so we don't depend on the
+  // referentially-unstable `searchParams` object (re-instantiated every render).
   useEffect(() => {
-    const next = new URLSearchParams(searchParams);
-    if (next.get('step') !== String(state.step)) {
-      next.set('step', String(state.step));
-      setSearchParams(next, { replace: true });
-    }
-  }, [state.step, searchParams, setSearchParams]);
+    setSearchParams(
+      (prev) => {
+        if (prev.get('step') === String(state.step)) return prev;
+        const next = new URLSearchParams(prev);
+        next.set('step', String(state.step));
+        return next;
+      },
+      { replace: true },
+    );
+  }, [state.step, setSearchParams]);
 
   // Server state
   const profilesQuery = useProfilesQuery();
@@ -82,15 +84,13 @@ export function NewDocumentWizardPage(): JSX.Element {
     [templates, state.templateID],
   );
 
-  // If the URL pre-fills `?profile=X` but profile isn't in the loaded list,
-  // wait until profilesQuery resolves; if not present after load, clear it
-  // and clamp the wizard back to step 1 via clearProfile.
-  useEffect(() => {
-    if (!profilesQuery.data) return;
-    if (state.profileCode && !profilesQuery.data.some((p) => p.code === state.profileCode)) {
-      dispatch({ type: 'clearProfile' });
-    }
-  }, [profilesQuery.data, state.profileCode]);
+  // Derived: URL pre-filled `?profile=X` but profile is not in the loaded list.
+  // TanStack Query v5 keeps isSuccess=true after first successful fetch (background refetches
+  // use isFetching, not a reset to isSuccess=false), so this condition is stable once true.
+  const profileNotFound =
+    profilesQuery.isSuccess &&
+    state.profileCode !== null &&
+    selectedProfile === null;
 
   function goCancel() {
     navigate('/documents-v2');
@@ -143,12 +143,7 @@ export function NewDocumentWizardPage(): JSX.Element {
       navigate(`/documents-v2/${doc.document_id}`);
     },
     onError: (err) => {
-      const message =
-        err instanceof ApiError
-          ? resolveErrorMessage(err.code, err.message)
-          : err instanceof Error
-            ? err.message
-            : 'Falha ao criar o documento.';
+      const message = resolveQueryError(err, 'Falha ao criar o documento.');
       dispatch({ type: 'submitError', message });
       toast.error(message);
     },
@@ -183,17 +178,22 @@ export function NewDocumentWizardPage(): JSX.Element {
     dispatch({ type: 'goToStep', step: target });
   }
 
-  // Clamp the current step if state changed (e.g. profile cleared).
-  useEffect(() => {
-    const max = maxReachableStep(state);
-    if (state.step > max) {
-      dispatch({ type: 'goToStep', step: max });
-    }
-  }, [state]);
-
   return (
     <WizardShell currentStep={state.step} onStepClick={onStepClick}>
-      {state.step === 1 && (
+      {state.step === 1 && profileNotFound && (
+        <div className="card" role="alert" aria-live="assertive" aria-atomic="true">
+          O perfil pré-selecionado <span className="mono">{state.profileCode}</span> não está mais disponível.
+          {' '}
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => dispatch({ type: 'clearProfile' })}
+          >
+            Limpar seleção
+          </button>
+        </div>
+      )}
+      {state.step === 1 && !profileNotFound && (
         <StepProfile
           profiles={profiles}
           isLoading={profilesQuery.isLoading}

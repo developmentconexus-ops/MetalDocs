@@ -4,7 +4,7 @@
 > **Scope:** Deferred items for the 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
 > **Out of scope:** Library screen deferrals (`backlog/library-screen.md`), editor deferrals (`backlog/editor.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:112` — `handleCreate` — 2-call submit; slot-rollback TODO at :129
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:151` — `handleCreate` — 2-call submit; slot-rollback TODO at :113
 > - `frontend/apps/web/src/features/documents/lib/visibilityMeta.ts:1` — visibility SSOT; top-of-file TODO notes backend prereq
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — blank-template disabled state
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — `???` placeholder for unresolved sequence
@@ -68,7 +68,7 @@
 
 ### slot-rollback {#slot-rollback}
 
-**What:** The 2-call create sequence in `handleCreate` (`NewDocumentWizardPage.tsx:129`) does:
+**What:** The 2-call create sequence in `handleCreate` (`NewDocumentWizardPage.tsx:151`) does:
 1. `POST /api/v2/controlled-documents` — creates and returns a CD slot with a consumed sequence number.
 2. `POST /api/v2/documents` — clones template into a draft doc.
 
@@ -87,3 +87,14 @@ If step 2 fails (network error, template clone error, etc.) **after** step 1 suc
 **Why deferred:** `GET /api/v2/taxonomy/profiles` does not return document counts. Aggregating counts requires a JOIN against `documents` (or `controlled_documents`) which was deferred per the design-workflow audit (2026-05-07) — cost vs value unclear for the initial release.
 
 **Backend prereq:** add `document_count` (or `controlled_document_count`) to the profiles list response.
+
+---
+
+## Follow-ups from major-findings PR (2026-05-07)
+
+- **Typography token cluster** — declare `--fs-1..--fs-7` in `tokens.css`; replace raw `font-size: NNpx` in StepProfile / StepAreaCodeVisibility / StepTemplate / StepConfirm CSS Modules. Estimated 45m.
+- **Kicker variants** — add `.kicker--block` + `.kicker--callout` modifiers in `src/styles.css`; drop `:global(.kicker)` reaches from StepAreaCodeVisibility + StepConfirm modules. Estimated 30m.
+- **InlineAlert primitive** — extract `<InlineAlert role="alert" tone="error|warning|info" message />` in `components/ui/`; replace 4 wizard sites + future Document/Approval flows. Estimated 30m.
+- **ESLint rule** — `no-restricted-syntax` banning inline tuple `queryKey` in `features/**/queries/`. Forces QK registry use. Estimated 30m.
+- **SelectableCardGroup** — wrapper exposing `name value onChange` so future radio-group consumers do not stitch manually. Defer until 2nd consumer appears.
+- **Stepper numeric ids** — `Stepper` primitive currently takes `id: string` for steps; `WizardShell.tsx:35` round-trips `String(currentStep)`. Either accept `id: string | number` in Stepper or wrap the wizard with a typed `<NumericStepper currentStep: number />`. Touches a shared primitive — defer to dedicated PR. Estimated 30m.

@@ -1,8 +1,9 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
-import { ApiError, resolveErrorMessage } from '../../../../../lib/api';
-import type { TemplateDTO } from '../../../../templates/api/templatesV2';
-import { WizardFooter } from '../WizardShell';
+import { resolveQueryError } from '../../../../../lib/api';
+import type { TemplateDTO } from '../../../../templates';
+import { DocPaperPreview } from '../DocPaperPreview';
+import { WizardFooter } from '../WizardFooter';
 import styles from './StepTemplate.module.css';
 
 export type StepTemplateProps = {
@@ -53,11 +54,8 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
           </div>
         </div>
       ) : isError ? (
-        <div role="alert" aria-live="assertive" className="card">
-          {resolveErrorMessage(
-            error instanceof ApiError ? error.code : undefined,
-            error instanceof Error ? error.message : undefined,
-          )}
+        <div role="alert" aria-live="assertive" aria-atomic="true" className="card">
+          {resolveQueryError(error, 'Falha ao carregar templates.')}
           <div>
             <button type="button" className="btn btn-sm" onClick={onRetry}>
               Tentar novamente
@@ -90,16 +88,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                 }}
               >
                 <div className={styles.templateRow}>
-                  <div className={styles.templatePreview}>
-                    <div className={styles.previewTitleBar} />
-                    {Array.from({ length: 7 }).map((_, idx) => (
-                      <div
-                        key={idx}
-                        className={styles.previewLine}
-                        style={{ width: `${55 + (idx * 9) % 35}%` }}
-                      />
-                    ))}
-                  </div>
+                  <DocPaperPreview lines={7} variant="template" />
                   <div className={styles.templateMain}>
                     <div className={styles.templateLabelRow}>
                       <span className={styles.templateLabel}>{template.name}</span>
@@ -136,9 +125,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
             onSelect={() => {}}
           >
             <div className={styles.templateRow}>
-              <div className={styles.templatePreview}>
-                <div className={styles.previewTitleBar} />
-              </div>
+              <DocPaperPreview lines={0} variant="template" />
               <div className={styles.templateMain}>
                 <div className={styles.templateLabelRow}>
                   <span className={styles.templateLabel}>Em branco</span>
