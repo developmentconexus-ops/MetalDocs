@@ -4,8 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { resolveQueryError } from '../../../lib/api';
 import { useAuthStore } from '../../../store/auth.store';
-import { createControlledDocument } from '../../registry/api/controlledDocuments';
-import { createDocument } from '../api/documentsV2';
+import { createControlledDocumentAtomic } from '../../registry/api/controlledDocuments';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../queries/useProfilesQuery';
 import { useTemplatesByProfileQuery } from '../queries/useTemplatesByProfileQuery';
@@ -109,10 +108,6 @@ export function NewDocumentWizardPage(): JSX.Element {
     }
   }
 
-  // Submit flow — two-call sequence (slot create → doc create) via useMutation.
-  // TODO(novo-documento:slot-rollback): if doc-create fails after slot-create
-  // succeeds, orphan slot persists + code is consumed. No compensation today.
-  // See wiki/backlog/novo-documento.md#slot-rollback.
   const createMutation = useMutation({
     mutationFn: async (input: {
       profileCode: string;
@@ -120,27 +115,26 @@ export function NewDocumentWizardPage(): JSX.Element {
       title: string;
       templateVersionID: string;
       ownerUserId: string;
+      idempotencyKey: string;
     }) => {
-      const slot = await createControlledDocument({
-        profileCode: input.profileCode,
-        processAreaCode: input.areaCode,
-        title: input.title,
-        ownerUserId: input.ownerUserId,
-      });
-      const doc = await createDocument({
-        controlled_document_id: slot.id,
-        template_version_id: input.templateVersionID,
-        name: input.title,
-        form_data: {},
-      });
-      return doc;
+      return createControlledDocumentAtomic(
+        {
+          profileCode: input.profileCode,
+          processAreaCode: input.areaCode,
+          title: input.title,
+          ownerUserId: input.ownerUserId,
+          documentName: input.title,
+          templateVersionId: input.templateVersionID,
+        },
+        input.idempotencyKey,
+      );
     },
     onMutate: () => {
       dispatch({ type: 'submitStart' });
     },
-    onSuccess: (doc) => {
+    onSuccess: (result) => {
       dispatch({ type: 'submitSuccess' });
-      navigate(`/documents-v2/${doc.document_id}`);
+      navigate(`/documents-v2/${result.document.id}`);
     },
     onError: (err) => {
       const message = resolveQueryError(err, 'Falha ao criar o documento.');
@@ -163,12 +157,14 @@ export function NewDocumentWizardPage(): JSX.Element {
       toast.error(message);
       return;
     }
+    const idempotencyKey = crypto.randomUUID();
     createMutation.mutate({
       profileCode: state.profileCode,
       areaCode: state.areaCode,
       title: state.title.trim(),
       templateVersionID: state.templateVersionID,
       ownerUserId: currentUser.userId,
+      idempotencyKey,
     });
   }
 
