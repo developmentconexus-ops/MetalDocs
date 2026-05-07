@@ -3,6 +3,7 @@ import { StatusPill } from '../../../../../components/ui/StatusPill';
 import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
 import type { TemplateDTO } from '../../../../templates/api/templatesV2';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
+import { DocPaperPreview } from '../DocPaperPreview';
 import { WizardFooter } from '../WizardShell';
 import styles from './StepConfirm.module.css';
 
@@ -68,17 +69,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       </p>
 
       <div className={styles.previewCard}>
-        <div className={styles.docThumbnail}>
-          <div className={styles.thumbnailTitleBar} />
-          <div className={styles.thumbnailCode}>{codePreview} v1</div>
-          {Array.from({ length: 11 }).map((_, idx) => (
-            <div
-              key={idx}
-              className={styles.thumbnailLine}
-              style={{ width: `${55 + (idx * 11) % 38}%` }}
-            />
-          ))}
-        </div>
+        <DocPaperPreview lines={11} code={`${codePreview} v1`} variant="thumbnail" />
         <div>
           <div className={styles.summaryHeaderRow}>
             <CodeChip>{codePreview}</CodeChip>
