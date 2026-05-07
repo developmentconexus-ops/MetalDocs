@@ -22,4 +22,8 @@ describe('QK', () => {
   it('approval.instance includes documentId', () => {
     expect(QK.approval.instance('doc-1')).toEqual(['approval', 'instance', 'doc-1']);
   });
+
+  it('templates.byProfile includes profile code', () => {
+    expect(QK.templates.byProfile('POP')).toEqual(['templates', 'by-profile', 'POP']);
+  });
 });

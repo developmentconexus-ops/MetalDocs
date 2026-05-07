@@ -48,6 +48,8 @@ export const QK = {
   },
   templates: {
     list: () => ['templates', 'list'] as const,
+    byProfile: (profileCode: string) =>
+      ['templates', 'by-profile', profileCode] as const,
   },
   approval: {
     instance: (documentId: string) =>
