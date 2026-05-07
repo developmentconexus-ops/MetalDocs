@@ -1,6 +1,6 @@
 # Novo-Documento Wizard
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-05-07 (atomic create anchors verified)
 > **Scope:** 4-step document-creation wizard at `/documents-v2/new` — state machine, step components, new primitives (`DocPaperPreview`, `WizardFooter`), sub-controls, and helpers (`resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile`).
 > **Out of scope:** Document Library (`/documents`) — see `modules/documents.md`; editor page after creation — see `modules/documents.md#edit-flow`; approval flow — see `modules/approval.md`; deferred items — see `backlog/novo-documento.md`.
 > **Key files:**
@@ -29,10 +29,9 @@
 
 ## Overview
 
-The 4-step wizard replaces the old `DocumentCreatePage` single-step flow. It creates two backend resources in sequence:
+The 4-step wizard replaces the old `DocumentCreatePage` single-step flow. It creates the controlled-document slot and first draft revision in a **single atomic call**:
 
-1. A **controlled-document slot** (`POST /api/v2/controlled-documents`) — reserves a sequence number and returns the resolved code (e.g. `PROC-02`).
-2. A **draft document** (`POST /api/v2/documents`) — clones the selected template version, linked to the slot.
+`POST /api/v2/controlled-documents` (`Idempotency-Key` required) — inserts the CD row, increments the per-(profile, area) sequence counter, and clones the template into the first draft document revision, all within a single DB transaction. Returns the CD with server-resolved code (e.g. `DC-RH-001`) plus the new document ID.
 
 All wizard form state lives in a single `useReducer(wizardReducer)` call inside `NewDocumentWizardPage`. Step is mirrored to `?step=1..4` in the URL (with `replace: true`) so the browser back button works.
 
@@ -45,7 +44,7 @@ All wizard form state lives in a single `useReducer(wizardReducer)` call inside 
 | 1 — Profile | `StepProfile` | `GET /api/v2/taxonomy/profiles` | `profileCode !== null` |
 | 2 — Area + Title + Visibility | `StepAreaCodeVisibility` | `GET /api/v2/taxonomy/areas` | `areaCode !== ''` and `title.trim() !== ''` |
 | 3 — Template | `StepTemplate` | `GET /api/v2/templates?profileCode=…` | `templateVersionID !== null` |
-| 4 — Confirm + Create | `StepConfirm` | 2-call submit (see below) | `consent && !submitting` |
+| 4 — Confirm + Create | `StepConfirm` | `POST /api/v2/controlled-documents` (atomic) | `consent && !submitting` |
 
 ---
 
@@ -100,15 +99,16 @@ case 'selectProfile': {
 
 ---
 
-## Submit flow (`NewDocumentWizardPage.tsx:115`)
+## Submit flow (`NewDocumentWizardPage.tsx:111`)
 
 ```typescript
-// Simplified — see NewDocumentWizardPage.tsx:115–149
+// Simplified — see NewDocumentWizardPage.tsx:111–144
 const createMutation = useMutation({
   mutationFn: async (input) => {
-    const slot = await createControlledDocument({ ... });  // POST /api/v2/controlled-documents
-    const doc  = await createDocument({ controlled_document_id: slot.id, ... }); // POST /api/v2/documents
-    return doc;
+    return createControlledDocumentAtomic(
+      { profileCode, processAreaCode, title, ownerUserId, documentName, templateVersionId },
+      input.idempotencyKey,  // POST /api/v2/controlled-documents with Idempotency-Key header
+    );
   },
   onError: (err) => {
     const message = resolveQueryError(err, 'Falha ao criar o documento.');
@@ -118,7 +118,7 @@ const createMutation = useMutation({
 });
 ```
 
-**Slot-rollback gap:** if the second POST fails after the first succeeds, the CD slot remains (sequence number consumed). No automatic compensation today. See `wiki/backlog/novo-documento.md#slot-rollback`.
+The `idempotencyKey` is generated via `crypto.randomUUID()` in `handleCreate` (`NewDocumentWizardPage.tsx:160`) immediately before the mutation call. Replay of the same key returns the stored 201 response — safe to retry on network timeout. Orphan slots are structurally impossible (CD + document commit atomically or both roll back). See ADR 0009 and `backlog/novo-documento.md#slot-rollback`.
 
 ---
 
@@ -239,14 +239,14 @@ Added to allow profile-scoped invalidation without busting the full templates li
 
 ## Deferred items
 
-See `wiki/backlog/novo-documento.md` for all 6 deferred items. Short list:
+See `wiki/backlog/novo-documento.md` for all deferred items. Short list (closed items omitted):
 
 - `visibility` — selected value not submitted (no backend column)
-- `sequence-preview` — code shows `{profile}-{area}-???` until post-create
 - `template-versions` — no version picker
-- `blank-template` — disabled (backend requires valid `template_version_id`)
-- `slot-rollback` — no compensation if doc-create fails after slot-create
+- `blank-template` — disabled (backend requires valid `templateVersionId`)
 - `profile-counts` — no document count per profile card
+
+Closed by feat/cd-atomic-create: `sequence-preview` (preview endpoint shipped), `slot-rollback` (atomic create eliminates orphan slots). See ADR 0009.
 
 ---
 

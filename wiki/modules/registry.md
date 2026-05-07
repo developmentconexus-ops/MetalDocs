@@ -1,17 +1,17 @@
 # Module: Registry (Controlled Documents)
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-05-07 (anchors verified against feat/cd-atomic-create)
 > **Scope:** Controlled-document catalog — code generation, CRUD routes, active-document lookup (FULL OUTER JOIN for published-only state), frontend registry pages.
 > **Out of scope:** Document versions / editor (see `modules/documents.md`), taxonomy profiles + areas (see `modules/taxonomy.md`), approval (see `modules/approval.md`).
 > **Key files:**
 > - `internal/modules/registry/delivery/http/routes.go:31` — `activeDocumentResponse` struct — all fields pointer+omitempty (E10 fix)
-> - `internal/modules/registry/delivery/http/routes.go:91` — `getActiveDocument` handler — FULL OUTER JOIN so published-only CDs return 200 with `publishedDocumentId`
+> - `internal/modules/registry/delivery/http/routes.go:144` — `getActiveDocument` handler — FULL OUTER JOIN so published-only CDs return 200 with `publishedDocumentId`
 > - `internal/modules/registry/delivery/http/routes_contract_test.go` — E10 contract tests (3 new cases)
 > - `frontend/apps/web/src/features/registry/api.ts:63` — `ActiveDocumentResponse` interface — all fields optional; `ActiveDocumentInstance` kept as deprecated alias
 > - `frontend/apps/web/src/features/registry/RegistryDetailPage.tsx:27` — detail page; renders published banner + Nova Revisão form when only published revision exists
 > - `frontend/apps/web/src/features/registry/PublishedDownloadCell.tsx:4` — polls PDF status for a published document via `useDocumentPdfStatus`
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — CD list
-> - `frontend/apps/web/src/features/registry/api/controlledDocuments.ts:28` — `createControlledDocument` — `POST /api/v2/controlled-documents`; called by the novo-documento wizard as step 1 of the 2-call create sequence (slot reservation)
+> - `frontend/apps/web/src/features/registry/api/controlledDocuments.ts:45` — `createControlledDocumentAtomic` — `POST /api/v2/controlled-documents` with `Idempotency-Key`; called by the novo-documento wizard for atomic single-call CD + document create
 
 ---
 
@@ -79,7 +79,7 @@ export type ActiveDocumentInstance = ActiveDocumentResponse;
 | Only a published version exists | Green "Revisão publicada" banner + `PublishedDownloadCell` |
 | No active version + CD is active | "Nenhuma revisão ativa" placeholder + **Nova Revisão** inline form |
 
-**Nova Revisão form:** lets the user name a new document and calls `POST /api/v2/documents` (createDocument). On success, navigates to the editor if `onOpenDocumentEditor` prop is set, otherwise reloads the detail page.
+**Nova Revisão form:** lets the user name a new document and calls `POST /api/v2/controlled-documents/{id}/revisions` via `createRevision` (`RegistryDetailPage.tsx:79`). Requires `Idempotency-Key` header (generated via `crypto.randomUUID()` at call site). On success, navigates to the editor if `onOpenDocumentEditor` prop is set, otherwise reloads the detail page.
 
 ## PublishedDownloadCell
 
@@ -87,23 +87,26 @@ export type ActiveDocumentInstance = ActiveDocumentResponse;
 
 ## API routes
 
-| Method | Path | Handler |
-|---|---|---|
-| GET | `/api/v2/controlled-documents` | `listDocs` |
-| POST | `/api/v2/controlled-documents` | `createDoc` |
-| GET | `/api/v2/controlled-documents/{id}` | `getDoc` |
-| GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` (FULL OUTER JOIN) |
-| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteDoc` |
-| PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeDoc` |
+| Method | Path | Handler | Notes |
+|---|---|---|---|
+| GET | `/api/v2/controlled-documents` | `listDocs` | |
+| POST | `/api/v2/controlled-documents` | `atomicCreate` | `Idempotency-Key` required; atomic CD + first revision |
+| GET | `/api/v2/controlled-documents/preview-code` | `previewCode` | `?profileCode=&areaCode=`; read-only peek |
+| POST | `/api/v2/controlled-documents/{id}/revisions` | `createRevision` | `Idempotency-Key` required |
+| GET | `/api/v2/controlled-documents/{id}` | `getDoc` | |
+| GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | FULL OUTER JOIN; published-only returns 200 |
+| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteDoc` | |
+| PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeDoc` | |
 
 ## Wizard create sequence (novo-documento)
 
-The novo-documento wizard (`/documents-v2/new`) calls `createControlledDocument` (`features/registry/api/controlledDocuments.ts:28`) as the **first of two sequential POSTs** when the user clicks "Criar documento" on Step 4:
+The novo-documento wizard (`/documents-v2/new`) calls `createControlledDocumentAtomic` (`features/registry/api/controlledDocuments.ts:45`) as a **single atomic POST** when the user clicks "Criar documento" on Step 4:
 
-1. `POST /api/v2/controlled-documents` — reserves a CD slot; server assigns and returns the resolved code (e.g. `PROC-02`). The wizard shows `???` as placeholder throughout steps 2–4 because no preview endpoint exists.
-2. `POST /api/v2/documents` — clones the selected template version into a draft document linked to the slot.
+`POST /api/v2/controlled-documents` with `Idempotency-Key` — atomically creates the CD slot, increments the per-(profile, area) counter, and inserts the first draft document revision in a single DB transaction. Returns the CD (with server-resolved code e.g. `DC-RH-001`) and the new document ID.
 
-If step 2 fails after step 1 succeeds, the slot persists with its sequence number consumed. No automatic rollback today. See `wiki/backlog/novo-documento.md#slot-rollback`.
+Step 2 (the wizard's preview) shows the live preview code from `GET /api/v2/controlled-documents/preview-code` (see `previewCode` handler at `routes.go:89`).
+
+The legacy two-call sequence and its slot-rollback risk are eliminated. `POST /api/v2/documents` (create from CD) was deleted. See ADR 0009 and `backlog/novo-documento.md#slot-rollback`.
 
 ## Cross-refs
 
