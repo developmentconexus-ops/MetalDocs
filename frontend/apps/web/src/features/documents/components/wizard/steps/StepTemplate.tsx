@@ -2,6 +2,7 @@ import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
 import { resolveQueryError } from '../../../../../lib/api';
 import type { TemplateDTO } from '../../../../templates/api/templatesV2';
+import { DocPaperPreview } from '../DocPaperPreview';
 import { WizardFooter } from '../WizardShell';
 import styles from './StepTemplate.module.css';
 
@@ -87,16 +88,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                 }}
               >
                 <div className={styles.templateRow}>
-                  <div className={styles.templatePreview}>
-                    <div className={styles.previewTitleBar} />
-                    {Array.from({ length: 7 }).map((_, idx) => (
-                      <div
-                        key={idx}
-                        className={styles.previewLine}
-                        style={{ width: `${55 + (idx * 9) % 35}%` }}
-                      />
-                    ))}
-                  </div>
+                  <DocPaperPreview lines={7} variant="template" />
                   <div className={styles.templateMain}>
                     <div className={styles.templateLabelRow}>
                       <span className={styles.templateLabel}>{template.name}</span>
@@ -133,9 +125,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
             onSelect={() => {}}
           >
             <div className={styles.templateRow}>
-              <div className={styles.templatePreview}>
-                <div className={styles.previewTitleBar} />
-              </div>
+              <DocPaperPreview lines={0} variant="template" />
               <div className={styles.templateMain}>
                 <div className={styles.templateLabelRow}>
                   <span className={styles.templateLabel}>Em branco</span>
