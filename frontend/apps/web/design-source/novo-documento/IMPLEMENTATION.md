@@ -51,8 +51,8 @@ See `./NOTES.md` "Audit decision" table — repeats here for completeness.
 
 ### 0.2 Cut list confirmed
 
-- [ ] User reviewed cut list
-- [ ] Cuts recorded in NOTES.md (already in §Audit decision)
+- [x] User reviewed cut list (2026-05-07)
+- [x] Cuts recorded in NOTES.md (already in §Audit decision) (2026-05-07)
 
 ---
 
@@ -383,8 +383,8 @@ pnpm.cmd tsc --noEmit -p tsconfig.build.json
 pnpm test
 ```
 
-- [ ] tsc green
-- [ ] vitest green
+- [x] tsc green (2026-05-07)
+- [x] vitest green (2026-05-07)
 - [ ] Manual smoke
 - [ ] Screenshot diff vs each step HTML
 
