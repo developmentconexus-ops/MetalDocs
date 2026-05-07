@@ -1,3 +1,4 @@
+import { usePreviewCodeQuery } from '../../../registry/queries/usePreviewCodeQuery';
 import styles from './CodePreviewBanner.module.css';
 
 export type CodePreviewBannerProps = {
@@ -11,8 +12,16 @@ export function CodePreviewBanner({
   profileCode,
   areaCode,
 }: CodePreviewBannerProps): JSX.Element {
-  const ready = profileCode !== null && areaCode !== '';
-  const code = `${profileCode ?? PLACEHOLDER}-${areaCode || PLACEHOLDER}-${PLACEHOLDER}`;
+  const effectiveAreaCode = areaCode !== '' ? areaCode : null;
+  const ready = profileCode !== null && effectiveAreaCode !== null;
+  const { data, isLoading } = usePreviewCodeQuery(profileCode, effectiveAreaCode);
+
+  const code = !ready
+    ? `${PLACEHOLDER}-${PLACEHOLDER}-${PLACEHOLDER}`
+    : isLoading
+    ? `${profileCode}-${areaCode}-…`
+    : data?.code ?? `${profileCode}-${areaCode}-${PLACEHOLDER}`;
+
   const kicker = ready
     ? `Código gerado · próximo em (${profileCode}, ${areaCode})`
     : 'Código gerado · selecione perfil e área';
