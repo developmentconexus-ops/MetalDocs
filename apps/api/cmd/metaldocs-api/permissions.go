@@ -185,6 +185,8 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 				return iamdomain.CapDocView, true
 			case method == http.MethodPost && path == "/api/v2/controlled-documents":
 				return iamdomain.CapRegistryCreate, true
+			case method == http.MethodPost && strings.HasSuffix(path, "/revisions"):
+				return iamdomain.CapDocEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/obsolete"):
 				return iamdomain.CapDocEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/supersede"):
