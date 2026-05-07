@@ -204,37 +204,55 @@ func NewPostgresSequenceAllocator(db *sql.DB) *PostgresSequenceAllocator {
 	return &PostgresSequenceAllocator{db: db}
 }
 
-func (a *PostgresSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, profileCode string) error {
-	return a.ensureCounter(ctx, a.db, tenantID, profileCode)
+// EnsureCounter initialises a sequence counter for the given tenant/profile/area combination.
+func (a *PostgresSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, profileCode, areaCode string) error {
+	return a.ensureCounterViaExec(ctx, a.db, tenantID, profileCode, areaCode)
 }
 
-func (a *PostgresSequenceAllocator) ensureCounter(ctx context.Context, execer registrydomain.DBExecutor, tenantID, profileCode string) error {
-	_, err := execer.ExecContext(ctx, `
-		INSERT INTO profile_sequence_counters (tenant_id, profile_code, next_seq)
-		VALUES ($1, $2, 1)
-		ON CONFLICT (tenant_id, profile_code) DO NOTHING`,
-		tenantID, profileCode,
+func (a *PostgresSequenceAllocator) ensureCounterViaExec(ctx context.Context, exec registrydomain.DBExecutor, tenantID, profileCode, areaCode string) error {
+	_, err := exec.ExecContext(ctx, `
+		INSERT INTO cd_sequence_counters (tenant_id, profile_code, process_area_code, next_seq)
+		VALUES ($1, $2, $3, 1)
+		ON CONFLICT (tenant_id, profile_code, process_area_code) DO NOTHING`,
+		tenantID, profileCode, areaCode,
 	)
 	return err
 }
 
-func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx registrydomain.DBExecutor, tenantID, profileCode string) (int, error) {
+// Peek returns the current next_seq value without incrementing it.
+// Returns 1 if no counter exists yet for the given combination.
+func (a *PostgresSequenceAllocator) Peek(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	var next int
+	err := a.db.QueryRowContext(ctx, `
+		SELECT next_seq
+		FROM cd_sequence_counters
+		WHERE tenant_id = $1 AND profile_code = $2 AND process_area_code = $3`,
+		tenantID, profileCode, areaCode,
+	).Scan(&next)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 1, nil
+	}
+	return next, err
+}
+
+// NextAndIncrement atomically increments and returns the next sequence number.
+func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx registrydomain.DBExecutor, tenantID, profileCode, areaCode string) (int, error) {
 	var exec registrydomain.DBExecutor = a.db
 	if tx != nil {
 		exec = tx
 	}
 
-	if err := a.ensureCounter(ctx, exec, tenantID, profileCode); err != nil {
+	if err := a.ensureCounterViaExec(ctx, exec, tenantID, profileCode, areaCode); err != nil {
 		return 0, err
 	}
 
 	var next int
 	if err := exec.QueryRowContext(ctx, `
-		UPDATE profile_sequence_counters
+		UPDATE cd_sequence_counters
 		SET next_seq = next_seq + 1
-		WHERE tenant_id = $1 AND profile_code = $2
+		WHERE tenant_id = $1 AND profile_code = $2 AND process_area_code = $3
 		RETURNING next_seq - 1`,
-		tenantID, profileCode,
+		tenantID, profileCode, areaCode,
 	).Scan(&next); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, registrydomain.ErrSequenceCounterNotFound
