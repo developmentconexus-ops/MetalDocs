@@ -133,12 +133,19 @@
    marginBottom: 22 }.
    margin-top: 4px adds visual breathing room below the previewCard. */
 .nextStepsCallout {
-  padding: 14px;
+  padding: 16px 14px 14px;
   margin-top: 4px;
   margin-bottom: 22px;
   background: var(--brand-pale);
   border: 1px dashed var(--brand-soft);
   border-radius: var(--r-2);
+}
+
+/* Kicker sits flush at top of padding area; uppercase glyphs visually
+   crowd the dashed border. Tighten line-height so 16px padding-top
+   gives a clean gap above the text. */
+.nextStepsCallout :global(.kicker) {
+  line-height: 1;
 }
 
 /* Kicker inside the callout. Mirrors selected-wizard.jsx line 197:
@@ -172,8 +179,16 @@
   width: 100%;
 }
 
-/* Wine-colored checkbox. accent-color sets fill color on checked state. */
+/* Wine-colored checkbox. accent-color sets fill color on checked state.
+   Reset legacy global "input, select, textarea" rule (styles.css:~70) which
+   sets width:100%, border, background, padding — that rule blows the
+   checkbox to fill the whole label, leaving 0 for the span. */
 .consentRow input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
   accent-color: var(--brand);
   margin-top: 2px;
   flex-shrink: 0;

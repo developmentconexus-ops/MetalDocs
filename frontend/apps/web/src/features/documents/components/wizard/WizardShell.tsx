@@ -21,12 +21,14 @@ export function WizardShell({ currentStep, onStepClick, children }: WizardShellP
   return (
     <div className={styles.scrollWrapper}>
       <div className={styles.container}>
-        <div className="kicker">Documentos / Novo</div>
-        <h1 className="display-1">Novo documento controlado</h1>
-        <p className="body">
-          Cada documento recebe um código único{' '}
-          <span className="mono">{`{perfil}-{área}-{seq}`}</span> e clona o template publicado para o perfil.
-        </p>
+        <div className={styles.header}>
+          <div className="kicker">Documentos / Novo</div>
+          <h1 className="display-1">Novo documento controlado</h1>
+          <p className={styles.description}>
+            Cada documento recebe um código único{' '}
+            <span className="mono">{`{perfil}-{área}-{seq}`}</span> e clona o template publicado para o perfil.
+          </p>
+        </div>
         <Stepper
           steps={WIZARD_STEPS}
           current={String(currentStep)}
@@ -61,7 +63,7 @@ export function WizardFooter({
 }: WizardFooterProps): JSX.Element {
   return (
     <>
-      <div className="divider" />
+      <div className={`divider ${styles.footerDivider}`} />
       <div className={styles.footerRow}>
         {showBack ? (
           <button type="button" className="btn" onClick={onBack}>
