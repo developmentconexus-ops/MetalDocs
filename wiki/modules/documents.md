@@ -1,6 +1,6 @@
 # documents Module
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-05-07 (atomic create + slot-rollback notes updated by feat/cd-atomic-create)
 > **Scope:** Document instances — library listing, novo-documento wizard (`/documents-v2/new`), edit, autosave, finalize.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
@@ -30,7 +30,7 @@
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — inline code preview banner (`{profile}-{area}-???`); server resolves sequence at create time
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:200` — layout root: `<aside class={styles.rail}>` left rail + `<main class={styles.canvas}>` + `EditorChrome` center/right slots; `handleFinalize` catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
 > - `frontend/apps/web/src/features/documents/pages/styles/DocumentEditorPage.module.css:19` — `.rail`, `.railBackBtn`, `.railTip` — design-token-only; mirrors TemplateAuthorPage rail
-> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — legacy step 1: pick controlled document (pre-wizard flow)
+> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — **deleted** (feat/cd-atomic-create); replaced by atomic `POST /api/v2/controlled-documents`
 > - `internal/modules/documents/delivery/http/handler.go:76` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
 > - `internal/modules/documents/delivery/http/handler.go:189` — `listDocuments` — paginated `GET /api/v2/documents`; filler auto-scoped server-side
 > - `internal/modules/documents/delivery/http/handler.go:219` — `documentStats` — `GET /api/v2/documents/stats`
@@ -133,14 +133,13 @@ The 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`) replaced the 
 | 1 — Profile | `StepProfile` | `GET /api/v2/taxonomy/profiles` |
 | 2 — Area + Title + Visibility | `StepAreaCodeVisibility` | `GET /api/v2/taxonomy/areas` |
 | 3 — Template | `StepTemplate` | `GET /api/v2/templates?profileCode=…` (published only) |
-| 4 — Confirm + Create | `StepConfirm` | 2-call submit: `POST /api/v2/controlled-documents` → `POST /api/v2/documents` |
+| 4 — Confirm + Create | `StepConfirm` | `POST /api/v2/controlled-documents` (atomic; `Idempotency-Key` required) |
 
-**2-call submit sequence** (in `handleCreate`, `NewDocumentWizardPage.tsx:151`):
-1. `POST /api/v2/controlled-documents` (slot reservation) — returns the CD with a server-resolved code (e.g. `PROC-02`). Code preview in steps 2–4 shows `{profile}-{area}-???` because no preview endpoint exists.
-2. `POST /api/v2/documents` — clones the selected template version into a new draft document, linked to the CD slot.
-3. Redirect to `/documents-v2/${doc.document_id}`.
+**Atomic submit** (in `handleCreate`, `NewDocumentWizardPage.tsx:151`):
+1. `POST /api/v2/controlled-documents` with `Idempotency-Key` header — atomically creates the CD slot and the first draft document revision in a single DB transaction. Returns the CD with a server-resolved code (e.g. `DC-RH-001`).
+2. Redirect to `/documents-v2/${doc.document_id}`.
 
-**Slot-rollback gap:** if step 2 (`POST /api/v2/documents`) fails after step 1 succeeds, the slot remains in the registry and its sequence number is consumed. No automatic compensation today. See `backlog/novo-documento.md#slot-rollback`.
+The legacy two-call sequence (`POST /api/v2/controlled-documents` → `POST /api/v2/documents`) and its slot-rollback risk are eliminated. `POST /api/v2/documents` (create from CD) was deleted. See ADR 0009 and `backlog/novo-documento.md#slot-rollback`.
 
 **Deferred items:** visibility enforcement, blank-template path, profile counts. See `wiki/backlog/novo-documento.md`.
 
@@ -191,7 +190,6 @@ Eigenpal CSS overrides (wine formatting bar, compact title bar, gradient scrollb
 |--------|------|-------------|
 | GET | `/api/v2/documents` | Paginated list; params: `page`, `pageSize` (max 50), `status` (comma-sep or repeated), `areaCode`, `profileCode`, `q`, `includeArchived`. Returns `{items, page, pageSize, total}`. |
 | GET | `/api/v2/documents/stats` | Counts grouped by `{byStatus, byArea}`. Same filter params (minus pagination). |
-| POST | `/api/v2/documents` | Create document from CD |
 | GET | `/api/v2/documents/:id` | Get document metadata |
 | PUT | `/api/v2/documents/:id/name` | Rename |
 | POST | `/api/v2/documents/:id/sessions` | Acquire writer session |
