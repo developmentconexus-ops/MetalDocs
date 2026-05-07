@@ -43,11 +43,14 @@
   gap: var(--sp-2);
 }
 
-/* Profile name. Mirrors selected-wizard.jsx line 87:
-   { fontSize: 13, fontWeight: 500 }.
-   TODO(novo-documento:typography-tokens): raw 13px/500 — no font-size scale
-   in tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
+/* Profile name. Mirrors selected-wizard.jsx line 87: { fontSize: 13, fontWeight: 500 }.
+   flex: 1 grows name → pushes check icon to far right (design: marginLeft:'auto').
+   font-family explicit: SelectableCard is a <button>; explicit beats `font: inherit`
+   for cross-browser reliability.
+   TODO(novo-documento:typography-tokens): raw 13px/500 — no font-size scale. */
 .profileName {
+  flex: 1;
+  font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
 }

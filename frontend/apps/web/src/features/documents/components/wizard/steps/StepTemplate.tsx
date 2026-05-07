@@ -93,7 +93,11 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                   <div className={styles.templatePreview}>
                     <div className={styles.previewTitleBar} />
                     {Array.from({ length: 7 }).map((_, idx) => (
-                      <div key={idx} className={styles.previewLine} />
+                      <div
+                        key={idx}
+                        className={styles.previewLine}
+                        style={{ width: `${55 + (idx * 9) % 35}%` }}
+                      />
                     ))}
                   </div>
                   <div className={styles.templateMain}>

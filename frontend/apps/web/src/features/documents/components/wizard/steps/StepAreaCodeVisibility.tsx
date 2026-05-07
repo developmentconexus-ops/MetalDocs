@@ -76,7 +76,7 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
           <label className="kicker">Perfil selecionado</label>
           <div className={styles.profileChip}>
             <CodeChip>{profile?.code ?? '—'}</CodeChip>
-            <div>
+            <div className={styles.profileChipInfo}>
               <div>{profile?.name ?? '—'}</div>
               <div className="caption">Família: {profile?.familyCode ?? '—'}</div>
             </div>

@@ -55,7 +55,6 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
     ['Família', profile?.familyCode ?? '—'],
     ['Área', areaLabel],
     ['Visibilidade', visibilityLabel],
-    ['Template', templateLabel],
     ['Autor', authorDisplayName || '—'],
     ['Criado em', createdAtLabel],
   ];
@@ -73,7 +72,11 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
           <div className={styles.thumbnailTitleBar} />
           <div className={styles.thumbnailCode}>{codePreview} v1</div>
           {Array.from({ length: 11 }).map((_, idx) => (
-            <div key={idx} className={styles.thumbnailLine} />
+            <div
+              key={idx}
+              className={styles.thumbnailLine}
+              style={{ width: `${55 + (idx * 11) % 38}%` }}
+            />
           ))}
         </div>
         <div>

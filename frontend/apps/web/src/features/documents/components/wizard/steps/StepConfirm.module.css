@@ -18,13 +18,12 @@
    { width: 120, height: 152, background: 'white',
      boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 2,
      padding: '10px 9px' }.
-   120×152, radius 2px, padding 10/9 are fixed pixel-perfect mini-thumbnail
-   dimensions (per dispatcher allow-list). Background uses --surface
-   (= #ffffff). */
+   overflow:hidden clips content to the canvas — no visible gap below last line. */
 .docThumbnail {
   width: 120px;
   height: 152px;
   padding: 10px 9px;
+  overflow: hidden;
   background: var(--surface);
   border-radius: 2px;
   box-shadow: var(--shadow-paper-2);
@@ -171,4 +170,12 @@
   margin-bottom: var(--sp-2);
   font-size: 12.5px;
   color: var(--text-soft);
+  text-align: left;
+}
+
+/* Wine-colored checkbox when checked — brand is the MetalDocs wine/burgundy. */
+.consentRow input[type="checkbox"] {
+  accent-color: var(--brand);
+  margin-top: 2px;
+  flex-shrink: 0;
 }

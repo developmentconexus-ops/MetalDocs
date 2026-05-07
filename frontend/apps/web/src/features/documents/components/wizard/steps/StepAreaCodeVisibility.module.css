@@ -41,6 +41,13 @@
   border-radius: var(--r-2);
 }
 
+/* Info column (name + family) grows to push "Trocar" to the right edge.
+   Design: { flex: 1, fontSize: 13 } on the info div. */
+.profileChipInfo {
+  flex: 1;
+  font-size: 13px;
+}
+
 /* Title row wrapper. Mirrors selected-wizard-v2.jsx line 70: { marginBottom: 18 }. */
 .titleRow {
   margin-bottom: 18px;
