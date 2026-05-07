@@ -23,8 +23,6 @@ import { StepAreaCodeVisibility } from '../components/wizard/steps/StepAreaCodeV
 import { StepTemplate } from '../components/wizard/steps/StepTemplate';
 import { StepConfirm } from '../components/wizard/steps/StepConfirm';
 
-export type NewDocumentWizardPageProps = Record<string, never>;
-
 function parseStepParam(raw: string | null): WizardStep {
   const n = Number(raw);
   if (n === 1 || n === 2 || n === 3 || n === 4) return n;
