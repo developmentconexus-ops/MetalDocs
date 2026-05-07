@@ -80,7 +80,6 @@ func NewHandlerWithSubmit(svc Service, db *sql.DB, submitSvc approvalSubmitter) 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v2/documents", h.listDocuments)
 	mux.HandleFunc("GET /api/v2/documents/stats", h.documentStats)
-	mux.HandleFunc("POST /api/v2/documents", h.createDocument)
 
 	mux.HandleFunc("GET /api/v2/documents/{id}", h.getDocument)
 	mux.HandleFunc("PATCH /api/v2/documents/{id}", h.renameDocument)
@@ -110,7 +109,6 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
 	mux.HandleFunc("GET /api/v2/documents", h.listDocuments)
 	mux.HandleFunc("GET /api/v2/documents/stats", h.documentStats)
-	mux.HandleFunc("POST /api/v2/documents", h.createDocument)
 
 	mux.HandleFunc("GET /api/v2/documents/{id}", h.getDocument)
 	mux.HandleFunc("PATCH /api/v2/documents/{id}", h.renameDocument)
@@ -141,49 +139,6 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 	mux.HandleFunc("POST /api/v2/documents/{id}/comments", h.createComment)
 	mux.HandleFunc("PATCH /api/v2/documents/{id}/comments/{libraryID}", h.updateComment)
 	mux.HandleFunc("DELETE /api/v2/documents/{id}/comments/{libraryID}", h.deleteComment)
-}
-
-func (h *Handler) createDocument(w http.ResponseWriter, r *http.Request) {
-	if !hasAnyRole(r, roleAdmin, roleDocumentFiller) {
-		httpErr(w, http.StatusForbidden, "forbidden")
-		return
-	}
-
-	var req struct {
-		ControlledDocumentID string          `json:"controlled_document_id"`
-		TemplateVersionID    string          `json:"template_version_id"`
-		Name                 string          `json:"name"`
-		FormData             json.RawMessage `json:"form_data"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
-		return
-	}
-
-	res, err := h.svc.CreateDocument(r.Context(), application.CreateDocumentInput{
-		TenantID:             tenantIDFromReq(r),
-		ActorUserID:          userIDFromReq(r),
-		ControlledDocumentID: req.ControlledDocumentID,
-		TemplateVersionID:    req.TemplateVersionID,
-		Name:                 req.Name,
-		FormData:             req.FormData,
-	})
-	if err != nil {
-		status, msg := mapErr(err)
-		if status == http.StatusInternalServerError {
-			_ = err // logged below
-			http.Error(w, `{"error":"`+msg+`","detail":"`+err.Error()+`"}`, status)
-			return
-		}
-		httpErr(w, status, msg)
-		return
-	}
-
-	httpresponse.WriteJSON(w, http.StatusCreated, map[string]string{
-		"document_id":         res.DocumentID,
-		"initial_revision_id": res.InitialRevisionID,
-		"session_id":          res.SessionID,
-	})
 }
 
 func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
