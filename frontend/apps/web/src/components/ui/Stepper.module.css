@@ -1,31 +1,46 @@
+/* Stepper container — boxed card matching design-source/selected-wizard.jsx:9
+   padding:12px 18px, surface bg, border, r-3, margin-bottom:24px.
+   gap:0 because connectors use flex:1 + margin to space themselves. */
 .root {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  gap: 0;
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 12px 18px;
+  margin-bottom: var(--sp-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
   font-family: var(--font-sans);
 }
 
+/* Each li fills horizontal space so connectors can flex. Last child
+   needs no connector so it doesn't grow unnecessarily. */
 .item {
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
+  flex: 1 0 auto;
+}
+
+.item:last-child {
   flex: 0 0 auto;
 }
 
+/* Button wraps dot + label. gap:10px per design. No extra padding —
+   the container provides breathing room. */
 .button {
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: 10px;
   background: transparent;
   border: none;
-  padding: var(--sp-1) var(--sp-2);
+  padding: 0;
   border-radius: var(--r-2);
   font: inherit;
   color: var(--text-soft);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .button:disabled {
@@ -34,67 +49,71 @@
 
 .button:focus-visible {
   outline: 2px solid var(--brand);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
+/* Dot: 22px circle, mono number, 11px. Upcoming state (default). */
 .dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--sp-6);
-  height: var(--sp-6);
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
   border-radius: var(--r-pill);
   border: 1px solid var(--border-strong);
-  background: var(--surface);
+  background: var(--surface-3);
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: 11px;
   font-weight: 600;
-  flex-shrink: 0;
+  font-family: var(--font-mono);
 }
 
 .dotCheck {
-  font-size: 0.85rem;
+  font-size: 11px;
   line-height: 1;
 }
 
+/* Label: upcoming state. */
 .label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
+/* Connector: fills space between steps. flex:1 within .item,
+   margin provides the 14px gap on each side per design. */
 .connector {
-  display: inline-block;
-  width: var(--sp-7);
+  flex: 1;
   height: 1px;
   background: var(--border);
-  flex-shrink: 0;
+  margin: 0 14px;
+  min-width: 12px;
 }
 
-/* Active step */
+/* ── Active step ────────────────────────────────────────────────────── */
+/* Active: filled brand (wine) with white step number. Per user spec:
+   active = current step, wine theme; completed = green success fill. */
 .itemActive .dot {
   background: var(--brand);
-  border-color: var(--brand);
-  color: var(--surface);
+  border: 1.5px solid var(--brand);
+  color: #fff;
 }
 
+/* Active label: full text weight + text color. */
 .itemActive .label {
-  color: var(--brand);
+  color: var(--text);
   font-weight: 600;
 }
 
-/* Completed steps */
+/* ── Completed steps ────────────────────────────────────────────────── */
+/* Completed: filled green (success) with white checkmark. */
 .itemCompleted .dot {
   background: var(--success);
   border-color: var(--success);
-  color: var(--surface);
+  color: #fff;
 }
 
 .itemCompleted .label {
-  color: var(--success);
-}
-
-/* Upcoming steps */
-.itemUpcoming .label {
-  color: var(--text-muted);
+  color: var(--text);
+  font-weight: 400;
 }
