@@ -115,7 +115,8 @@
   border: 1px solid var(--border);
 }
 
-label span,
+/* Legacy label-span rule removed — was too broad (hit ALL label>span combos).
+   Each component now scopes text-transform / font-size explicitly. */
 .card h3,
 .panel-heading .kicker,
 .eyebrow,
