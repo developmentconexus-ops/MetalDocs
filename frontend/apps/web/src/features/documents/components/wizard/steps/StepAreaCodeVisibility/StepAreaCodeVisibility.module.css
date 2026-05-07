@@ -69,10 +69,7 @@
 
 /* Step 2 visibility icon tile (see design-source HTML reference):
    32×32, background:var(--surface-3), color:var(--text-muted), borderRadius:6,
-   display:grid, placeItems:center, flexShrink:0.
-   TODO(novo-documento): selected state changes background to var(--brand) +
-   color white; wired in Phase 3c when SelectableCard exposes selected
-   context to children (or via inline className on the tile span). */
+   display:grid, placeItems:center, flexShrink:0. */
 .visibilityIconTile {
   width: 32px;
   height: 32px;
