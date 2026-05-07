@@ -35,7 +35,7 @@
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; `TemplateAuthorPage` now consumes `EditorChrome` (stub, Last verified: 2026-05-06)
-- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), novo-documento wizard (`/documents-v2/new`, 4-step, 2-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-07)
+- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), novo-documento wizard (`/documents-v2/new`, 4-step, atomic single-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-07)
 - **[modules/novo-documento-wizard.md](modules/novo-documento-wizard.md)** - wizard state machine (`wizardReducer`, `clampStep`, `canAdvance`), step components, `WizardFooter` + `DocPaperPreview` primitives, visibility sub-controls, `resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile` (Last verified: 2026-05-07)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4 (Last verified: 2026-05-05)
@@ -54,7 +54,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 ### Concepts (cross-cutting)
 - [concepts/placeholders.md](concepts/placeholders.md) - **CRITICAL:** fixed 7-token catalog, substitution at freeze; composition system deprecated 2026-04-27 (Last verified: 2026-04-27)
 - [concepts/token-syntax.md](concepts/token-syntax.md) - `{name}` vs `{{uuid}}` - why it matters
-- [concepts/controlled-documents.md](concepts/controlled-documents.md) - code generation, profile binding, sequence counters (stub, Last verified: 2026-05-01)
+- [concepts/controlled-documents.md](concepts/controlled-documents.md) - code generation (`{profile}-{area}-NNN`, 3-digit), atomic create endpoint (`POST /api/v2/controlled-documents`), preview endpoint, idempotency-key requirement, revision endpoint (Last verified: 2026-05-07)
 - [concepts/iso-segregation.md](concepts/iso-segregation.md) - why submitter cannot approve own submit; SoD enforcement points + cross-ref to error-ux (stub, Last verified: 2026-05-04)
 - [concepts/freeze-and-hashing.md](concepts/freeze-and-hashing.md) - content_hash, values_hash, schema_hash, immutability (stub, Last verified: 2026-05-01)
 - [concepts/authz-tiers.md](concepts/authz-tiers.md) - two-tier authz model: tier-1 CapabilityService (HTTP middleware) vs tier-2 authz.Require (in-tx area check); GUC setup, pitfalls (Last verified: 2026-05-03)
@@ -62,7 +62,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [concepts/design-workflow-audit.md](concepts/design-workflow-audit.md) - audit AI-generated `design-source/` mockups vs real document states, RBAC, personas before implementing; record Keep/Cut/Defer in screen NOTES.md (Last verified: 2026-05-06)
 
 ### Tests
-- **[tests/system-acceptance-test.md](tests/system-acceptance-test.md)** — full manual end-to-end acceptance run for regulatory-grade QMS; Groups A–E regression coverage, Routines A0–G, pass/fail rubric (Last verified: 2026-05-04) **Use this for pre-release validation.**
+- **[tests/system-acceptance-test.md](tests/system-acceptance-test.md)** — full manual end-to-end acceptance run for regulatory-grade QMS; Groups A–E regression coverage, Routines A0–G, pass/fail rubric; E12 anchor updated for atomic create (Last verified: 2026-05-07) **Use this for pre-release validation.**
 
 ### Workflows (end-to-end flows)
 - **[workflows/user-onboarding.md](workflows/user-onboarding.md)** - full user journey, non-technical: taxonomy -> template -> profile binding -> CD -> fill-in -> approval -> freeze -> PDF (Last verified: 2026-05-04) **Read for conceptual context; use tests/system-acceptance-test.md for the click-by-click run.**
@@ -77,6 +77,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [decisions/0003-token-syntax-migration.md](decisions/0003-token-syntax-migration.md) - plan to move from `{{uuid}}` -> `{name}` (stub, Last verified: 2026-05-01)
 - [decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) - accept two distinct authz tiers (CapabilityService vs authz.Require); J2 amendment: `document.create` wired via `NewCapabilityChecker`, `permissiveAuthzChecker` removed (Last verified: 2026-05-05)
 - [decisions/0008-placeholder-fixed-catalog.md](decisions/0008-placeholder-fixed-catalog.md) - replace user-fill placeholders with fixed 7-token computed catalog (2026-04-26)
+- [decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md) - atomic CD create + per-area 3-segment numbering + idempotency-key adoption; deletes legacy two-screen wizard flow (2026-05-07)
 
 ### References
 - [references/eigenpal-spike.md](references/eigenpal-spike.md) - pointer to spike repo + key findings (T1-T8)

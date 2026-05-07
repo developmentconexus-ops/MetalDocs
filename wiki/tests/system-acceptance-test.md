@@ -1,6 +1,6 @@
 # System Acceptance Test — MetalDocs QMS
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-07
 > **Scope:** Full end-to-end manual acceptance run for the MetalDocs regulatory-grade QMS. Covers taxonomy bootstrap → template authoring → controlled-document creation → ISO-segregated approval → freeze → PDF fanout → archive. Exercises Groups A–E shipped fixes.
 > **Out of scope:** IAM admin flows (B1/A8), route-stage editing (A7/E8), multi-tenant isolation (B5/B6), Playwright e2e automation (see `references/how-to-run-tests.md`).
 > **Audience:** QA engineers, release approvers, on-call engineers validating a hot-fix deploy.
@@ -8,8 +8,8 @@
 > - `frontend/apps/web/src/features/approval/components/RegistryDetailPanel.tsx:314` — "Submeter para revisão" button label
 > - `frontend/apps/web/src/features/documents/hooks/v2/useDocumentPdfStatus.ts:12-13` — POLL_INTERVAL_MS=3000, TIMEOUT_MS=60000 (E11)
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:181` — isEditable gate: `session.state.phase === 'writer' && docStatus === 'draft'` (E1)
-> - `frontend/apps/web/src/features/registry/RegistryCreateDialog.tsx:203` — "Aguardando..." submit button when auth not ready (E12)
-> - `frontend/apps/web/src/features/registry/RegistryDetailPage.tsx:174` — "Nova Revisão" button (E10)
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:154` — auth gate: early return with "Aguardando autenticação" when `currentUser?.userId` is falsy (E12; `RegistryCreateDialog` deleted)
+> - `frontend/apps/web/src/features/registry/RegistryDetailPage.tsx:170` — "Nova Revisão" button (E10)
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx:98` — area filter first option "Todas as áreas", options from taxonomy (E7)
 > - `internal/modules/documents/repository/repository.go:206,233,892-910` — `archived_at IS NULL` filter (C1)
 
@@ -163,7 +163,7 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 - [ ] Profile: `DC`. Area: `RH`. Title: `Descrição de Cargo — Analista Fiscal`.
 - [ ] Confirm.
 - [ ] **Expected:** new CD with code `DC-RH-001` (or next in sequence).
-- [ ] **E12 regression:** open the dialog immediately after page load (before auth fully resolves) → submit button should be disabled with label **"Aguardando..."**. (`RegistryCreateDialog.tsx:203`)
+- [ ] **E12 regression:** navigate to `/documents-v2/new` immediately after page load (before auth fully resolves) → proceed to Step 4 and click "Criar documento" before `currentUser` resolves → toast should fire with **"Aguardando autenticação. Tente novamente em alguns segundos."** and no POST fired. (`NewDocumentWizardPage.tsx:154`; `RegistryCreateDialog` was deleted by feat/cd-atomic-create)
 
 ### C2. Generate working version
 

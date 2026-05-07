@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -35,6 +36,7 @@ type RegistryService struct {
 	profiles  ProfileReader
 	areas     AreaReader
 	govLogger taxonomydomain.GovernanceLogger
+	docInit   registrydomain.DocumentInitializer
 	now       func() time.Time
 }
 
@@ -50,6 +52,17 @@ type CreateControlledDocumentCmd struct {
 	ManualCodeReason          *string
 	OverrideTemplateVersionID *string
 	OverrideTemplateReason    *string
+	TemplateVersionID         *string
+	DocumentName              string
+	FormData                  map[string]any
+}
+
+// CreateResult is the atomic-create return: the persisted ControlledDocument
+// plus the optional DocumentRef returned by DocumentInitializer (nil when no
+// initializer is wired).
+type CreateResult struct {
+	ControlledDocument *registrydomain.ControlledDocument
+	DocumentRef        *registrydomain.DocumentRef
 }
 
 func NewRegistryService(
@@ -60,6 +73,7 @@ func NewRegistryService(
 	profiles ProfileReader,
 	areas AreaReader,
 	govLogger taxonomydomain.GovernanceLogger,
+	docInit registrydomain.DocumentInitializer,
 ) *RegistryService {
 	if govLogger == nil {
 		panic("registry: governance logger must not be nil")
@@ -72,11 +86,22 @@ func NewRegistryService(
 		profiles:  profiles,
 		areas:     areas,
 		govLogger: govLogger,
+		docInit:   docInit,
 		now:       time.Now,
 	}
 }
 
-func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocumentCmd) (*registrydomain.ControlledDocument, error) {
+// WithDocumentInitializer wires the DocumentInitializer adapter post-construction.
+// Used by the wiring layer to break the registry<->documents module cycle: the
+// registry module is constructed first (because documents needs a
+// RegistryDuplicator), then the documents module is built, then the
+// initializer adapter is injected back here.
+func (s *RegistryService) WithDocumentInitializer(d registrydomain.DocumentInitializer) *RegistryService {
+	s.docInit = d
+	return s
+}
+
+func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocumentCmd) (*CreateResult, error) {
 	profile, err := s.profiles.GetByCode(ctx, cmd.TenantID, cmd.ProfileCode)
 	if err != nil {
 		return nil, err
@@ -136,11 +161,11 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 			}()
 			createTx = tx
 
-			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode)
+			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
 				return nil, err
 			}
-			code = registrydomain.AutoCode(cmd.ProfileCode, next)
+			code = registrydomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
 			sequence = &next
 			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 			if err != nil {
@@ -150,11 +175,11 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 				return nil, registrydomain.ErrCDCodeTaken
 			}
 		} else {
-			next, err := s.seq.NextAndIncrement(ctx, nil, cmd.TenantID, cmd.ProfileCode)
+			next, err := s.seq.NextAndIncrement(ctx, nil, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
 				return nil, err
 			}
-			code = registrydomain.AutoCode(cmd.ProfileCode, next)
+			code = registrydomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
 			sequence = &next
 			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 			if err != nil {
@@ -213,9 +238,21 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 		CreatedAt:                 now,
 		UpdatedAt:                 now,
 	}
+	var docRef *registrydomain.DocumentRef
 	if createTx != nil {
 		if err := s.docs.CreateTx(ctx, createTx, doc); err != nil {
 			return nil, err
+		}
+		if s.docInit != nil {
+			ref, err := s.docInit.CloneTemplate(ctx, createTx, doc, registrydomain.CloneTemplateRequest{
+				TemplateVersionID: cmd.TemplateVersionID,
+				Name:              cmd.DocumentName,
+				FormData:          cmd.FormData,
+			})
+			if err != nil {
+				return nil, err
+			}
+			docRef = ref
 		}
 		if err := createTx.Commit(); err != nil {
 			return nil, err
@@ -234,7 +271,23 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 		}
 	}
 
-	return doc, nil
+	return &CreateResult{ControlledDocument: doc, DocumentRef: docRef}, nil
+}
+
+// PreviewCode returns the next auto-allocated CD code for (profile, area)
+// without consuming the sequence. Used by the wizard's preview endpoint.
+func (s *RegistryService) PreviewCode(ctx context.Context, tenantID, profileCode, areaCode string) (string, error) {
+	next, err := s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+	if err != nil {
+		return "", err
+	}
+	return registrydomain.AutoCode(profileCode, areaCode, next), nil
+}
+
+// PeekSeq returns the next sequence number that NextAndIncrement would
+// allocate for (profile, area). Used by handlers that need the raw integer.
+func (s *RegistryService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 }
 
 func (s *RegistryService) Obsolete(ctx context.Context, tenantID, controlledDocumentID string) error {
@@ -262,6 +315,51 @@ func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlled
 		return registrydomain.ErrCDNotActive
 	}
 	return s.docs.UpdateStatus(ctx, tenantID, controlledDocumentID, next, s.now().UTC())
+}
+
+type CreateRevisionCmd struct {
+	TenantID          string
+	CDID              string
+	Name              string
+	FormData          map[string]any
+	TemplateVersionID *string
+}
+
+// CreateRevision creates a new document revision for an existing controlled
+// document. It requires a DocumentInitializer to be wired (see WithDocumentInitializer).
+func (s *RegistryService) CreateRevision(ctx context.Context, cmd CreateRevisionCmd) (*registrydomain.DocumentRef, error) {
+	cd, err := s.docs.GetByID(ctx, cmd.TenantID, cmd.CDID)
+	if err != nil {
+		return nil, err
+	}
+	if !cd.IsActive() {
+		return nil, registrydomain.ErrCDNotActive
+	}
+	if s.docInit == nil {
+		return nil, errors.New("registry: document initializer not configured")
+	}
+
+	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	if err != nil {
+		return nil, err
+	}
+	var txErr error
+	defer func() {
+		if txErr != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	ref, txErr := s.docInit.CloneTemplate(ctx, tx, cd, registrydomain.CloneTemplateRequest{
+		TemplateVersionID: cmd.TemplateVersionID,
+		Name:              cmd.Name,
+		FormData:          cmd.FormData,
+	})
+	if txErr != nil {
+		return nil, txErr
+	}
+	txErr = tx.Commit()
+	return ref, txErr
 }
 
 func isReasonValid(reason *string) bool {

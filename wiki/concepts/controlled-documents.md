@@ -1,12 +1,12 @@
 # Concept: Controlled Documents
 
-> **Last verified:** 2026-05-04
-> **Status:** Stub. Verify exact code-format string + sequence reset rules against domain code.
-> **Scope:** What a Controlled Document (CD) is, code generation, profile + area binding, sequence counters.
+> **Last verified:** 2026-05-07
+> **Scope:** What a Controlled Document (CD) is, code generation, profile + area binding, sequence counters, atomic create endpoint, preview endpoint.
 > **Key files:**
-> - `internal/modules/registry/` — CD module (verify path)
+> - `internal/modules/registry/` — CD module (registry-owned; hosts atomic create handler)
+> - `internal/platform/idempotency/` — generic `Store` + middleware; used by atomic create + revision endpoints
+> - `internal/modules/registry/repository/cd_sequence_counters.go` — per-(tenant, profile, area) counter table
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — CD list
-> - `frontend/apps/web/src/features/registry/RegistryCreateDialog.tsx:13` — CD create dialog; submit gated on `isAuthReady = !!currentUser?.userId` (E12); author field shows placeholder when auth not ready
 
 ## What it is
 
@@ -29,29 +29,58 @@ Examples:
 - `DC-QUA-001` — first Descrição de Cargo in Qualidade.
 - `POP-PROD-014` — fourteenth Procedimento Operacional in Produção.
 
-Sequence pads with leading zeros (verify width — usually 3 digits).
+Sequence pads to **3 digits** with leading zeros (e.g. `001`, `014`).
 
 ## Sequence rules
 
-- One counter per `(profile, area)` pair.
+- One counter per `(tenant_id, profile_code, process_area_code)` triple, stored in `cd_sequence_counters`.
 - Monotonic — never reused even if a CD is archived.
-- Resets: never (verify).
+- Resets: never.
 
 ## Lifecycle of a CD
 
-1. Created via "Novo Documento Controlado" — code generated, no version yet.
-2. First version generated via "Gerar Documento" — clones from the profile's bound template.
-3. Future revisions create additional versions on the same CD.
+1. Created atomically via `POST /api/v2/controlled-documents` — code generated and first document revision cloned from profile template in a single DB transaction.
+2. Future revisions created via `POST /api/v2/controlled-documents/{id}/revisions`.
 
-The CD itself doesn't have an approval state — its versions do. The CD just owns the code and the version history.
+The CD itself doesn't have an approval state — its document revisions do. The CD just owns the code and the revision history.
 
-## Create dialog auth-gate (E12 — fixed 8f719580)
+## Atomic Create Endpoint
 
-`RegistryCreateDialog` previously allowed the submit button to be clicked before `currentUser` resolved from the auth store, causing a race on first load (empty `ownerUserId`). Fixed by:
+`POST /api/v2/controlled-documents`
 
-- `isAuthReady = !!currentUser?.userId` at `RegistryCreateDialog.tsx:15`.
-- Submit button `disabled={saving || !isAuthReady}` (line 202).
-- Author field shows `"Aguardando autenticação..."` placeholder until ready (line 129).
+**Required header:** `Idempotency-Key: <uuid>`
+
+**Request body:**
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `profileCode` | string | Must match an existing profile |
+| `areaCode` | string | Must match an existing process area |
+| `name` | string | Document name |
+| `templateVersionId` | UUID | Published template version to clone |
+| `ownerUserId` | UUID | Assigned owner |
+
+**Behavior:** Creates the `controlled_documents` row, increments the `cd_sequence_counters` counter, inserts the first `documents` revision (draft), all within a single DB transaction. `storage_key` on the first revision starts empty — the editor renders it on demand.
+
+**Response:** `201 Created` with the CD object (including the server-resolved `code` field). Replay of the same `Idempotency-Key` returns the stored 201 response from `metaldocs.idempotency_keys`.
+
+**Legacy deleted:** `RegistryCreateDialog` and `DocumentCreatePage` were removed. The wizard at `/documents-v2/new` now calls this endpoint directly.
+
+## Preview Endpoint
+
+`GET /api/v2/controlled-documents/preview-code?profileCode=<code>&areaCode=<code>`
+
+Returns the **next** code that would be assigned for the given (profile, area) pair if a document were created now — read-only, no sequence reservation. The actual code is assigned at create time and may differ if another document is created concurrently.
+
+**Response:** `200 OK` with `{ "previewCode": "DC-RH-003" }` (or similar).
+
+## Revision Endpoint
+
+`POST /api/v2/controlled-documents/{id}/revisions`
+
+**Required header:** `Idempotency-Key: <uuid>`
+
+Creates a new document revision on an existing CD. Requires idempotency key (same replay semantics as atomic create).
 
 ---
 

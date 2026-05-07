@@ -74,4 +74,22 @@ describe("apiFetch", () => {
       message: "Erro interno",
     });
   });
+
+  it("sends Idempotency-Key header when idempotencyKey option is supplied", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(makeResponse({}));
+
+    await apiFetch("/api/documents", { method: "POST", idempotencyKey: "uuid-test-1" });
+
+    const callHeaders = vi.mocked(fetch).mock.calls[0][1]?.headers;
+    expect(callHeaders).toMatchObject({ "Idempotency-Key": "uuid-test-1" });
+  });
+
+  it("does not send Idempotency-Key header when idempotencyKey option is omitted", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(makeResponse({}));
+
+    await apiFetch("/api/documents", { method: "POST" });
+
+    const callHeaders = vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string> | undefined;
+    expect(callHeaders?.["Idempotency-Key"]).toBeUndefined();
+  });
 });

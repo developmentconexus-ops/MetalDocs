@@ -1,10 +1,10 @@
 # Backlog: Novo-Documento Wizard
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-05-07 (sequence-preview + slot-rollback closed by feat/cd-atomic-create)
 > **Scope:** Deferred items for the 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
 > **Out of scope:** Library screen deferrals (`backlog/library-screen.md`), editor deferrals (`backlog/editor.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:151` — `handleCreate` — 2-call submit; slot-rollback TODO at :113
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:146` — `handleCreate` — single-call atomic submit via `createControlledDocumentAtomic`
 > - `frontend/apps/web/src/features/documents/lib/visibilityMeta.ts:1` — visibility SSOT; top-of-file TODO notes backend prereq
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — blank-template disabled state
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — `???` placeholder for unresolved sequence
@@ -13,7 +13,7 @@
 
 ## Smoke summary (2026-05-07)
 
-4-step flow smoke-tested. Both POSTs returned 201. Editor opened with server-resolved code `PROC-02`. All items below are **intentional deferrals**, not regressions.
+4-step flow smoke-tested (feat/cd-atomic-create). Single atomic POST returned 201. Editor opened with server-resolved code `PROC-02`. All items below are **intentional deferrals**, not regressions.
 
 ---
 
@@ -34,15 +34,9 @@
 
 ---
 
-### sequence-preview {#sequence-preview}
+### ~~sequence-preview~~ {#sequence-preview} — CLOSED (feat/cd-atomic-create, 2026-05-07)
 
-**What:** Steps 2–4 show a code preview of the form `{profile}-{area}-???`. The `???` is a placeholder because no preview endpoint exists to reserve or estimate the next sequence number without committing it.
-
-**Why deferred:** server resolves the sequence at `POST /api/v2/controlled-documents` create time. A preview would require either a stateless estimation endpoint (race-prone) or a two-phase hold that is out of scope.
-
-**User impact:** preview is informational; the actual code (e.g. `PROC-02`) is visible in the editor after redirect.
-
-**Backend prereq:** `GET /api/v2/controlled-documents/preview-code?profileCode=…&areaCode=…` or similar.
+`GET /api/v2/controlled-documents/preview-code?profileCode=…&areaCode=…` was shipped. Returns next code preview read-only (no reservation). Wizard can now show a live preview instead of `{profile}-{area}-???`. See `concepts/controlled-documents.md` for endpoint details.
 
 ---
 
@@ -60,23 +54,15 @@
 
 **What:** "Em branco" (blank template option) is rendered disabled in Step 3. Selecting it has no effect.
 
-**Why deferred:** creating a document from a blank template requires a true empty-document clone path on the backend (`POST /api/v2/documents` with no `template_version_id`, or a dedicated blank-template sentinel). The backend currently requires a valid `template_version_id`.
+**Why deferred:** creating a document from a blank template requires a true empty-document clone path on the atomic create endpoint. The backend currently requires a valid `templateVersionId` in `POST /api/v2/controlled-documents`.
 
-**Backend prereq:** support `template_version_id: null` in `POST /api/v2/documents`, or seed a blank sentinel template.
+**Backend prereq:** support `templateVersionId: null` in `POST /api/v2/controlled-documents` (atomic create), or seed a blank sentinel template.
 
 ---
 
-### slot-rollback {#slot-rollback}
+### ~~slot-rollback~~ {#slot-rollback} — CLOSED (feat/cd-atomic-create, 2026-05-07)
 
-**What:** The 2-call create sequence in `handleCreate` (`NewDocumentWizardPage.tsx:151`) does:
-1. `POST /api/v2/controlled-documents` — creates and returns a CD slot with a consumed sequence number.
-2. `POST /api/v2/documents` — clones template into a draft doc.
-
-If step 2 fails (network error, template clone error, etc.) **after** step 1 succeeds, the CD slot remains in the registry and its sequence number is permanently consumed. No automatic compensation or rollback exists.
-
-**User impact:** orphan CD slot visible in the registry. Sequence counter gap (e.g. `PROC-02` exists with no document). Manual cleanup by `system_admin` required.
-
-**Backend prereq:** transactional create endpoint that performs both operations atomically, e.g. `POST /api/v2/documents/from-profile` that creates both CD and document in a single DB transaction.
+`POST /api/v2/controlled-documents` now creates the CD slot + first document revision in a single DB transaction. The two-call sequence no longer exists; orphan slots are structurally impossible. The legacy `POST /api/v2/documents` (create from CD) endpoint was deleted. See ADR 0011.
 
 ---
 
