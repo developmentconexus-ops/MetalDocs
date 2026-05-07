@@ -4,7 +4,7 @@
 > **Scope:** Deferred items for the 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
 > **Out of scope:** Library screen deferrals (`backlog/library-screen.md`), editor deferrals (`backlog/editor.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:151` — `handleCreate` — 2-call submit; slot-rollback TODO at :113
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:146` — `handleCreate` — single-call atomic submit via `createControlledDocumentAtomic`
 > - `frontend/apps/web/src/features/documents/lib/visibilityMeta.ts:1` — visibility SSOT; top-of-file TODO notes backend prereq
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — blank-template disabled state
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — `???` placeholder for unresolved sequence
@@ -13,7 +13,7 @@
 
 ## Smoke summary (2026-05-07)
 
-4-step flow smoke-tested. Both POSTs returned 201. Editor opened with server-resolved code `PROC-02`. All items below are **intentional deferrals**, not regressions.
+4-step flow smoke-tested (feat/cd-atomic-create). Single atomic POST returned 201. Editor opened with server-resolved code `PROC-02`. All items below are **intentional deferrals**, not regressions.
 
 ---
 
@@ -54,9 +54,9 @@
 
 **What:** "Em branco" (blank template option) is rendered disabled in Step 3. Selecting it has no effect.
 
-**Why deferred:** creating a document from a blank template requires a true empty-document clone path on the backend (`POST /api/v2/documents` with no `template_version_id`, or a dedicated blank-template sentinel). The backend currently requires a valid `template_version_id`.
+**Why deferred:** creating a document from a blank template requires a true empty-document clone path on the atomic create endpoint. The backend currently requires a valid `templateVersionId` in `POST /api/v2/controlled-documents`.
 
-**Backend prereq:** support `template_version_id: null` in `POST /api/v2/documents`, or seed a blank sentinel template.
+**Backend prereq:** support `templateVersionId: null` in `POST /api/v2/controlled-documents` (atomic create), or seed a blank sentinel template.
 
 ---
 

@@ -1,6 +1,6 @@
 # documents Module
 
-> **Last verified:** 2026-05-07 (atomic create + slot-rollback notes updated by feat/cd-atomic-create)
+> **Last verified:** 2026-05-07
 > **Scope:** Document instances — library listing, novo-documento wizard (`/documents-v2/new`), edit, autosave, finalize.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
@@ -21,7 +21,7 @@
 > - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook; `staleTime: 30_000` avoids refetch on every focus
 > - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library), `/documents-v2/new` (wizard), and `/documents-v2/:id` (editor)
 > - `frontend/apps/web/src/features/documents/routes.tsx:55` — `documents-v2/new` route: lazy-loads `NewDocumentWizardPage`
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:43` — `NewDocumentWizardPage` — 4-step wizard entry; `useReducer(wizardReducer)` for form state; `?step=1..4` URL param; 2-call submit sequence (slot → doc); `profileNotFound` derived flag
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:42` — `NewDocumentWizardPage` — 4-step wizard entry; `useReducer(wizardReducer)` for form state; `?step=1..4` URL param; atomic single-call submit via `createControlledDocumentAtomic`; `profileNotFound` derived flag
 > - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — stepper chrome + layout shell for all 4 steps
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepProfile.tsx:1` — Step 1: profile radio cards; calls `GET /api/v2/taxonomy/profiles`
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/index.tsx:40` — Step 2: area picker + title + visibility; calls `GET /api/v2/taxonomy/areas`; shows `{profile}-{area}-???` code preview; delegates to `PeopleSubcontrols` / `ExternalSubcontrols`
@@ -30,19 +30,19 @@
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — inline code preview banner (`{profile}-{area}-???`); server resolves sequence at create time
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:200` — layout root: `<aside class={styles.rail}>` left rail + `<main class={styles.canvas}>` + `EditorChrome` center/right slots; `handleFinalize` catches `ApiError`, calls `resolveErrorMessage` for toast (E3)
 > - `frontend/apps/web/src/features/documents/pages/styles/DocumentEditorPage.module.css:19` — `.rail`, `.railBackBtn`, `.railTip` — design-token-only; mirrors TemplateAuthorPage rail
-> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx:1` — **deleted** (feat/cd-atomic-create); replaced by atomic `POST /api/v2/controlled-documents`
+> - `frontend/apps/web/src/features/documents/pages/DocumentCreatePage.tsx` — **deleted** (feat/cd-atomic-create); replaced by atomic `POST /api/v2/controlled-documents`
 > - `internal/modules/documents/delivery/http/handler.go:76` — `NewHandlerWithSubmit` — wires db + submitSvc for atomic finalize
-> - `internal/modules/documents/delivery/http/handler.go:189` — `listDocuments` — paginated `GET /api/v2/documents`; filler auto-scoped server-side
-> - `internal/modules/documents/delivery/http/handler.go:219` — `documentStats` — `GET /api/v2/documents/stats`
-> - `internal/modules/documents/delivery/http/handler.go:244` — `parseListOptions` — shared query-param parser; pageSize cap=50 returns 400
+> - `internal/modules/documents/delivery/http/handler.go:144` — `listDocuments` — paginated `GET /api/v2/documents`; filler auto-scoped server-side
+> - `internal/modules/documents/delivery/http/handler.go:174` — `documentStats` — `GET /api/v2/documents/stats`
+> - `internal/modules/documents/delivery/http/handler.go:199` — `parseListOptions` — shared query-param parser; pageSize cap=50 returns 400
 > - `internal/modules/documents/application/service.go:26` — `Repository` interface; includes `ListDocumentsPaginated`, `CountDocuments`, `StatsByStatus`, `StatsByArea`
 > - `internal/modules/documents/application/list_options.go:1` — `ListOptions` type alias (alias for `repository.ListOptions`)
-> - `internal/modules/documents/repository/repository.go:253` — `ListOptions` struct with `IncludeArchived`
-> - `internal/modules/documents/repository/repository.go:284` — `buildDocumentFilter` — shared WHERE builder (list, count, stats)
-> - `internal/modules/documents/repository/repository.go:315` — `ListDocumentsPaginated` — LIMIT/OFFSET query
-> - `internal/modules/documents/repository/repository.go:348` — `CountDocuments` — COUNT(*) with same filter
-> - `internal/modules/documents/repository/repository.go:358` — `StatsByStatus` — GROUP BY status
-> - `internal/modules/documents/repository/repository.go:379` — `StatsByArea` — GROUP BY area
+> - `internal/modules/documents/repository/repository.go:273` — `ListOptions` struct with `IncludeArchived`
+> - `internal/modules/documents/repository/repository.go:304` — `buildDocumentFilter` — shared WHERE builder (list, count, stats)
+> - `internal/modules/documents/repository/repository.go:335` — `ListDocumentsPaginated` — LIMIT/OFFSET query
+> - `internal/modules/documents/repository/repository.go:368` — `CountDocuments` — COUNT(*) with same filter
+> - `internal/modules/documents/repository/repository.go:378` — `StatsByStatus` — GROUP BY status
+> - `internal/modules/documents/repository/repository.go:399` — `StatsByArea` — GROUP BY area
 > - `internal/modules/documents/repository/repository.go:39` — `CreateDocument` INSERT with `MAX(revision_number)+1` auto-increment
 > - `internal/modules/documents/module.go:1` — DI wiring
 
@@ -135,7 +135,7 @@ The 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`) replaced the 
 | 3 — Template | `StepTemplate` | `GET /api/v2/templates?profileCode=…` (published only) |
 | 4 — Confirm + Create | `StepConfirm` | `POST /api/v2/controlled-documents` (atomic; `Idempotency-Key` required) |
 
-**Atomic submit** (in `handleCreate`, `NewDocumentWizardPage.tsx:151`):
+**Atomic submit** (in `handleCreate`, `NewDocumentWizardPage.tsx:146`):
 1. `POST /api/v2/controlled-documents` with `Idempotency-Key` header — atomically creates the CD slot and the first draft document revision in a single DB transaction. Returns the CD with a server-resolved code (e.g. `DC-RH-001`).
 2. Redirect to `/documents-v2/${doc.document_id}`.
 
@@ -219,7 +219,7 @@ Migration 0167 fixed missing columns that were mistakenly added to the now-dropp
 | `content_hash_at_submit` | TEXT | Hash at submission time |
 | `status` | TEXT | Extended CHECK; includes `draft`, `under_review`, `approved`, `published`, etc. |
 
-Migration 0131's unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` now resolves correctly because `controlled_document_id` exists. `CreateDocument` at `repository.go:35` auto-computes `MAX(revision_number)+1` — the previous default-to-1 gap is fixed.
+Migration 0131's unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` now resolves correctly because `controlled_document_id` exists. `CreateDocument` at `repository.go:39` auto-computes `MAX(revision_number)+1` — the previous default-to-1 gap is fixed.
 
 ## Key Types
 
