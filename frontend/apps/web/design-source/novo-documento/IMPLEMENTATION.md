@@ -247,6 +247,14 @@ Subagent receives all 4 step HTMLs + selected-wizard.jsx.
 
 ## Phase 3b — Style port (HARD GATE)
 
+> **Note (grandfathered):** This screen was implemented prior to
+> `metaldocs-screen-implementation` SKILL v1.2, which introduced the
+> `parity-diff.md` HARD artifact. Per the v1.2 changelog and
+> `frontend-code-reviewer` agent calibration, parity-diff is not
+> backfilled here; remaining v1.2 artifacts (token-coverage,
+> screenshots, leakage-probe, phase4-behavior) backfilled on
+> 2026-05-07. Future screens enforce v1.2 in full from Phase 0.
+
 ### 3b.1 Token map
 
 Sources: `design-source/selected-wizard.jsx` (Stepper, WizardShell, Footer, Step1, Step3, Step4) and `design-source/selected-wizard-v2.jsx` (Step2). All values listed are inline `style={{ ... }}` props on the reference JSX.
