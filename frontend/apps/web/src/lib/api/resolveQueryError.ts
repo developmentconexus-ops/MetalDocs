@@ -1,4 +1,5 @@
-import { ApiError, resolveErrorMessage } from './index';
+import { ApiError } from './errors';
+import { resolveErrorMessage } from './errors';
 
 /**
  * Translate an `unknown` error (typically from TanStack Query) into a

@@ -48,7 +48,7 @@ export function StepProfile({
           </div>
         </div>
       ) : isError ? (
-        <div role="alert" aria-live="assertive" className="card">
+        <div role="alert" aria-live="assertive" aria-atomic="true" className="card">
           {resolveQueryError(error, 'Falha ao carregar perfis.')}
           <div>
             <button type="button" className="btn btn-sm" onClick={onRetry}>

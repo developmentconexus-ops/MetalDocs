@@ -85,7 +85,8 @@ export function NewDocumentWizardPage(): JSX.Element {
   );
 
   // Derived: URL pre-filled `?profile=X` but profile is not in the loaded list.
-  // Reconcile via render (show alert + reset) instead of dispatching from an effect.
+  // TanStack Query v5 keeps isSuccess=true after first successful fetch (background refetches
+  // use isFetching, not a reset to isSuccess=false), so this condition is stable once true.
   const profileNotFound =
     profilesQuery.isSuccess &&
     state.profileCode !== null &&
@@ -180,7 +181,7 @@ export function NewDocumentWizardPage(): JSX.Element {
   return (
     <WizardShell currentStep={state.step} onStepClick={onStepClick}>
       {state.step === 1 && profileNotFound && (
-        <div className="card" role="alert" aria-live="polite">
+        <div className="card" role="alert" aria-live="assertive" aria-atomic="true">
           O perfil pré-selecionado <span className="mono">{state.profileCode}</span> não está mais disponível.
           {' '}
           <button

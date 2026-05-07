@@ -4,7 +4,7 @@
 > **Scope:** Deferred items for the 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
 > **Out of scope:** Library screen deferrals (`backlog/library-screen.md`), editor deferrals (`backlog/editor.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:112` — `handleCreate` — 2-call submit; slot-rollback TODO at :129
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:151` — `handleCreate` — 2-call submit; slot-rollback TODO at :113
 > - `frontend/apps/web/src/features/documents/lib/visibilityMeta.ts:1` — visibility SSOT; top-of-file TODO notes backend prereq
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — blank-template disabled state
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — `???` placeholder for unresolved sequence
@@ -68,7 +68,7 @@
 
 ### slot-rollback {#slot-rollback}
 
-**What:** The 2-call create sequence in `handleCreate` (`NewDocumentWizardPage.tsx:129`) does:
+**What:** The 2-call create sequence in `handleCreate` (`NewDocumentWizardPage.tsx:151`) does:
 1. `POST /api/v2/controlled-documents` — creates and returns a CD slot with a consumed sequence number.
 2. `POST /api/v2/documents` — clones template into a draft doc.
 

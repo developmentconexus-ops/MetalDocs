@@ -27,7 +27,7 @@ export function WizardFooter({
       <div className={styles.footerRow}>
         {showBack ? (
           <button type="button" className="btn" onClick={onBack}>
-            ← Voltar
+            <span aria-hidden="true">←</span> Voltar
           </button>
         ) : (
           <button type="button" className="btn" onClick={onCancel}>

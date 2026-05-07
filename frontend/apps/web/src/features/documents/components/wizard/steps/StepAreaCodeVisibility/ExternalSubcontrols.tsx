@@ -24,11 +24,11 @@ export function ExternalSubcontrols({
       <div className="kicker">Compartilhamento externo</div>
       <div className={styles.subcontrolsCol}>
         <label>
-          <input type="checkbox" checked={external.passwordRequired} disabled aria-disabled="true" />{' '}
+          <input type="checkbox" checked={external.passwordRequired} onChange={() => {}} disabled aria-disabled="true" />{' '}
           Exigir senha (em breve)
         </label>
         <label>
-          <input type="checkbox" checked={external.watermark} disabled aria-disabled="true" />{' '}
+          <input type="checkbox" checked={external.watermark} onChange={() => {}} disabled aria-disabled="true" />{' '}
           Aplicar marca d'água (em breve)
         </label>
         <label>

@@ -1,11 +1,13 @@
 import { CodeChip } from '../../../../../components/ui/CodeChip';
 import { StatusPill } from '../../../../../components/ui/StatusPill';
 import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
-import type { TemplateDTO } from '../../../../templates/api/templatesV2';
+import type { TemplateDTO } from '../../../../templates';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
 import { DocPaperPreview } from '../DocPaperPreview';
 import { WizardFooter } from '../WizardFooter';
 import styles from './StepConfirm.module.css';
+
+type SummaryField = { label: string; value: string };
 
 export type StepConfirmProps = {
   profile: DocumentProfile | null;
@@ -51,8 +53,6 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
   const areaLabel = area ? `${area.code} — ${area.name}` : '—';
   const templateLabel = template ? `${template.name} v${template.latest_version} (publicada)` : '—';
   const createdAtLabel = formatDateTime(createdAt);
-
-  type SummaryField = { label: string; value: string };
 
   const summaryFields: ReadonlyArray<SummaryField> = [
     { label: 'Perfil', value: profileLabel },
@@ -126,7 +126,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       </label>
 
       {error ? (
-        <div role="alert" aria-live="assertive" className={`card ${styles.errorAlert}`}>
+        <div role="alert" aria-live="assertive" aria-atomic="true" className={`card ${styles.errorAlert}`}>
           {error}
         </div>
       ) : null}
