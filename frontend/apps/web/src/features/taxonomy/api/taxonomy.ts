@@ -50,8 +50,8 @@ export async function setDefaultTemplate(code: string, req: SetDefaultTemplateRe
 }
 
 export async function archiveProfile(code: string): Promise<void> {
-  return request<void>(`/profiles/${encodeURIComponent(code)}/archive`, {
-    method: "POST",
+  return request<void>(`/profiles/${encodeURIComponent(code)}`, {
+    method: "DELETE",
   });
 }
 
@@ -74,14 +74,14 @@ export async function createArea(req: CreateAreaRequest): Promise<ProcessArea> {
 
 export async function updateArea(code: string, req: UpdateAreaRequest): Promise<ProcessArea> {
   return request<ProcessArea>(`/areas/${encodeURIComponent(code)}`, {
-    method: "PATCH",
+    method: "PUT",
     body: JSON.stringify(req),
   });
 }
 
 export async function archiveArea(code: string): Promise<void> {
-  return request<void>(`/areas/${encodeURIComponent(code)}/archive`, {
-    method: "POST",
+  return request<void>(`/areas/${encodeURIComponent(code)}`, {
+    method: "DELETE",
   });
 }
 
