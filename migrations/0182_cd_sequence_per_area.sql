@@ -6,7 +6,7 @@
 BEGIN;
 
 DROP TABLE IF EXISTS profile_sequence_counters;
-DELETE FROM controlled_documents;
+TRUNCATE TABLE controlled_documents CASCADE;
 
 CREATE TABLE IF NOT EXISTS cd_sequence_counters (
   tenant_id          UUID NOT NULL,
