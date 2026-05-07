@@ -86,7 +86,7 @@ func (a registryControlledDocumentDuplicator) DuplicateControlledDocument(ctx co
 		reason := "Duplicated from existing controlled document"
 		overrideReason = &reason
 	}
-	return a.svc.Create(ctx, registryapp.CreateControlledDocumentCmd{
+	res, err := a.svc.Create(ctx, registryapp.CreateControlledDocumentCmd{
 		TenantID:                  tenantID,
 		ProfileCode:               source.ProfileCode,
 		ProcessAreaCode:           source.ProcessAreaCode,
@@ -97,6 +97,10 @@ func (a registryControlledDocumentDuplicator) DuplicateControlledDocument(ctx co
 		OverrideTemplateVersionID: source.OverrideTemplateVersionID,
 		OverrideTemplateReason:    overrideReason,
 	})
+	if err != nil {
+		return nil, err
+	}
+	return res.ControlledDocument, nil
 }
 
 func main() {
@@ -313,6 +317,12 @@ func main() {
 
 	docMod := documents.New(docDeps)
 	docMod.RegisterRoutes(mux)
+
+	// Wire the documents-side adapter back into the registry service so atomic
+	// CD-create can clone the initial document inside the same tx as the CD
+	// insert. registryModule was constructed before docMod (because docMod
+	// needs RegistryDuplicator), hence the post-construction setter.
+	registryModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
 	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
 	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})

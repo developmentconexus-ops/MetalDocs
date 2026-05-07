@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
@@ -15,10 +17,10 @@ func TestCreate_AutoCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 1}
-	svc := NewRegistryService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger)
+	svc := NewRegistryService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, nil)
 	svc.now = func() time.Time { return time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC) }
 
-	cd, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
 		ProcessAreaCode: "quality",
@@ -29,6 +31,7 @@ func TestCreate_AutoCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	cd := res.ControlledDocument
 	if cd.Code != "PO-QUALITY-001" {
 		t.Fatalf("expected PO-QUALITY-001, got %q", cd.Code)
 	}
@@ -43,9 +46,9 @@ func TestCreate_AutoCode(t *testing.T) {
 func TestCreate_ManualCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
-	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger)
+	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, nil)
 
-	cd, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",
 		ProfileCode:      "po",
 		ProcessAreaCode:  "quality",
@@ -58,6 +61,7 @@ func TestCreate_ManualCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	cd := res.ControlledDocument
 	if cd.Code != "PO-LEG-47" {
 		t.Fatalf("unexpected code: %q", cd.Code)
 	}
@@ -70,7 +74,7 @@ func TestCreate_ManualCode(t *testing.T) {
 }
 
 func TestCreate_ManualCode_MissingReason(t *testing.T) {
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{})
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
@@ -86,7 +90,7 @@ func TestCreate_ManualCode_MissingReason(t *testing.T) {
 }
 
 func TestCreate_ManualCode_ShortReason(t *testing.T) {
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{})
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",
 		ProfileCode:      "po",
@@ -105,7 +109,7 @@ func TestCreate_ManualCode_ShortReason(t *testing.T) {
 func TestCreate_DuplicateCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	repo.codeExists = true
-	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{})
+	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",
@@ -128,7 +132,7 @@ func TestCreate_OverrideTemplate_GovernanceEvent(t *testing.T) {
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger)
+	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, nil)
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -152,7 +156,7 @@ func TestCreate_OverrideTemplate_MissingReason(t *testing.T) {
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{})
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -171,7 +175,7 @@ func TestCreate_OverrideTemplate_MissingReason(t *testing.T) {
 func TestCreate_ProfileArchived(t *testing.T) {
 	archivedAt := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
 	profiles := &fakeProfileReader{item: &taxonomydomain.DocumentProfile{Code: "po", TenantID: "tenant-a", ArchivedAt: &archivedAt}}
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, profiles, &fakeAreaReader{}, &fakeGovernanceLogger{})
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, profiles, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
@@ -189,7 +193,7 @@ func TestCreate_ProfileArchived(t *testing.T) {
 func TestCreate_AreaArchived(t *testing.T) {
 	archivedAt := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
 	areas := &fakeAreaReader{item: &taxonomydomain.ProcessArea{Code: "quality", TenantID: "tenant-a", ArchivedAt: &archivedAt}}
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, areas, &fakeGovernanceLogger{})
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, areas, &fakeGovernanceLogger{}, nil)
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
@@ -321,3 +325,107 @@ func (f *fakeGovernanceLogger) Log(_ context.Context, e taxonomydomain.Governanc
 }
 
 func stringPtr(v string) *string { return &v }
+
+type fakeDocumentInitializer struct {
+	called bool
+	ref    *registrydomain.DocumentRef
+	err    error
+	gotReq registrydomain.CloneTemplateRequest
+	gotCD  *registrydomain.ControlledDocument
+}
+
+func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd *registrydomain.ControlledDocument, req registrydomain.CloneTemplateRequest) (*registrydomain.DocumentRef, error) {
+	f.called = true
+	f.gotReq = req
+	f.gotCD = cd
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.ref, nil
+}
+
+func TestRegistryService_Create_AtomicWithDocument(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+
+	repo := newFakeControlledDocumentRepository()
+	logger := &fakeGovernanceLogger{}
+	seq := &fakeSequenceAllocator{next: 3}
+	docInit := &fakeDocumentInitializer{ref: &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"}}
+
+	svc := NewRegistryService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
+
+	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:        "tenant-a",
+		ProfileCode:     "dc",
+		ProcessAreaCode: "rh",
+		Title:           "HR Policy",
+		OwnerUserID:     "owner-1",
+		ActorUserID:     "actor-1",
+		DocumentName:    "HR Policy v1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.ControlledDocument.Code != "DC-RH-003" {
+		t.Fatalf("expected DC-RH-003, got %q", res.ControlledDocument.Code)
+	}
+	if res.DocumentRef == nil || res.DocumentRef.ID != "doc-xyz" {
+		t.Fatalf("expected DocumentRef.ID=doc-xyz, got %+v", res.DocumentRef)
+	}
+	if !docInit.called {
+		t.Fatalf("expected docInit.CloneTemplate to be called")
+	}
+	if docInit.gotReq.Name != "HR Policy v1" {
+		t.Fatalf("expected DocumentName forwarded, got %q", docInit.gotReq.Name)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestRegistryService_Create_InitializerError_RollsBack(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	mock.ExpectBegin()
+	mock.ExpectRollback()
+
+	repo := newFakeControlledDocumentRepository()
+	docInit := &fakeDocumentInitializer{err: errors.New("clone failed")}
+	svc := NewRegistryService(db, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+
+	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:        "tenant-a",
+		ProfileCode:     "dc",
+		ProcessAreaCode: "rh",
+		Title:           "HR Policy",
+		OwnerUserID:     "owner-1",
+		ActorUserID:     "actor-1",
+		DocumentName:    "HR Policy v1",
+	})
+	if err == nil {
+		t.Fatalf("expected error from initializer, got nil")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations (expected rollback): %v", err)
+	}
+}
+
+func TestRegistryService_PreviewCode_ReturnsFormatted(t *testing.T) {
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 7}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	code, err := svc.PreviewCode(context.Background(), "tenant-a", "DC", "RH")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if code != "DC-RH-007" {
+		t.Fatalf("expected DC-RH-007, got %q", code)
+	}
+}

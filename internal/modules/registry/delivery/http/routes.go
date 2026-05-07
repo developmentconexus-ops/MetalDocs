@@ -63,7 +63,7 @@ func (h *Handler) createDoc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doc, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
+	res, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
 		TenantID:                  tenantIDFromRequest(r),
 		ProfileCode:               strings.TrimSpace(req.ProfileCode),
 		ProcessAreaCode:           strings.TrimSpace(req.ProcessAreaCode),
@@ -80,7 +80,7 @@ func (h *Handler) createDoc(w http.ResponseWriter, r *http.Request) {
 		h.writeDomainError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, doc)
+	httpresponse.WriteJSON(w, http.StatusCreated, res.ControlledDocument)
 }
 
 func (h *Handler) getDoc(w http.ResponseWriter, r *http.Request) {

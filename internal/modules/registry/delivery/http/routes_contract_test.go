@@ -106,6 +106,7 @@ func newTestHandler(db *sql.DB) *Handler {
 		fakeProfileReader{},
 		fakeAreaReader{},
 		fakeGovernanceLogger{},
+		nil,
 	)
 	return NewHandler(svc, db)
 }
@@ -138,6 +139,7 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 		fakeProfileReader{},
 		fakeAreaReader{},
 		fakeGovernanceLogger{},
+		nil,
 	)
 	handler := NewHandler(svc, nil)
 	mux := http.NewServeMux()
