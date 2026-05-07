@@ -113,7 +113,7 @@
    to brand bg + white. */
 :global([data-selected="true"]) .visibilityIconTile {
   background: var(--brand);
-  color: var(--text-on-brand, #fff);
+  color: var(--text-on-brand);
 }
 
 /* Defer subcontrols (people/external) — rendered disabled per NOTES.md audit:
