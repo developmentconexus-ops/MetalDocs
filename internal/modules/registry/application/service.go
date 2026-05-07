@@ -136,11 +136,11 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 			}()
 			createTx = tx
 
-			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode)
+			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
 				return nil, err
 			}
-			code = registrydomain.AutoCode(cmd.ProfileCode, next)
+			code = registrydomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
 			sequence = &next
 			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 			if err != nil {
@@ -150,11 +150,11 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 				return nil, registrydomain.ErrCDCodeTaken
 			}
 		} else {
-			next, err := s.seq.NextAndIncrement(ctx, nil, cmd.TenantID, cmd.ProfileCode)
+			next, err := s.seq.NextAndIncrement(ctx, nil, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
 				return nil, err
 			}
-			code = registrydomain.AutoCode(cmd.ProfileCode, next)
+			code = registrydomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
 			sequence = &next
 			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 			if err != nil {

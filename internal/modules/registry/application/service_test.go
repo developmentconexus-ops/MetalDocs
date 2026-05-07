@@ -29,8 +29,8 @@ func TestCreate_AutoCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cd.Code != "PO-01" {
-		t.Fatalf("expected PO-01, got %q", cd.Code)
+	if cd.Code != "PO-QUALITY-001" {
+		t.Fatalf("expected PO-QUALITY-001, got %q", cd.Code)
 	}
 	if cd.SequenceNum == nil || *cd.SequenceNum != 1 {
 		t.Fatalf("expected sequence 1, got %+v", cd.SequenceNum)
@@ -253,13 +253,17 @@ type fakeSequenceAllocator struct {
 	next int
 }
 
-func (f *fakeSequenceAllocator) NextAndIncrement(_ context.Context, _ registrydomain.DBExecutor, _, _ string) (int, error) {
+func (f *fakeSequenceAllocator) NextAndIncrement(_ context.Context, _ registrydomain.DBExecutor, _, _, _ string) (int, error) {
 	v := f.next
 	f.next++
 	return v, nil
 }
 
-func (f *fakeSequenceAllocator) EnsureCounter(_ context.Context, _, _ string) error {
+func (f *fakeSequenceAllocator) Peek(_ context.Context, _, _, _ string) (int, error) {
+	return f.next, nil
+}
+
+func (f *fakeSequenceAllocator) EnsureCounter(_ context.Context, _, _, _ string) error {
 	return nil
 }
 

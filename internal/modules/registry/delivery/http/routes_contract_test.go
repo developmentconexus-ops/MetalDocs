@@ -49,11 +49,15 @@ func (f fakeRegistryDocs) UpdateStatus(ctx context.Context, tenantID, id string,
 
 type fakeSequenceAllocator struct{}
 
-func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx registrydomain.DBExecutor, tenantID, profileCode string) (int, error) {
+func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx registrydomain.DBExecutor, tenantID, profileCode, areaCode string) (int, error) {
 	return 1, nil
 }
 
-func (f fakeSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, profileCode string) error {
+func (f fakeSequenceAllocator) Peek(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	return 1, nil
+}
+
+func (f fakeSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, profileCode, areaCode string) error {
 	return nil
 }
 

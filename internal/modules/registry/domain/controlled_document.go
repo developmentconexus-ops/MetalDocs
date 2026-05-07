@@ -45,6 +45,9 @@ func (d ControlledDocument) IsActive() bool {
 	return d.Status == CDStatusActive
 }
 
-func AutoCode(profileCode string, seq int) string {
-	return fmt.Sprintf("%s-%02d", strings.ToUpper(profileCode), seq)
+func AutoCode(profileCode, areaCode string, seq int) string {
+	return fmt.Sprintf("%s-%s-%03d",
+		strings.ToUpper(profileCode),
+		strings.ToUpper(areaCode),
+		seq)
 }
