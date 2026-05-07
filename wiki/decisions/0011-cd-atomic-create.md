@@ -1,4 +1,4 @@
-# ADR 0009 — Atomic CD Create + Per-Area Numbering + Idempotency-Key Adoption
+# ADR 0011 — Atomic CD Create + Per-Area Numbering + Idempotency-Key Adoption
 
 > **Status:** Accepted
 > **Date:** 2026-05-07

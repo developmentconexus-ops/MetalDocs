@@ -6,6 +6,8 @@ import { ApiError } from "./errors";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
+export type ApiFetchOptions = RequestInit & { idempotencyKey?: string };
+
 function apiUrl(path: string) {
   if (/^https?:\/\//i.test(path)) return path;
   if (path.startsWith("/api/")) return path;
@@ -13,14 +15,16 @@ function apiUrl(path: string) {
   return `${API_BASE_URL}${path}`;
 }
 
-function withDefaultHeaders(init?: RequestInit): RequestInit | undefined {
+function withDefaultHeaders(init?: ApiFetchOptions): RequestInit | undefined {
   if (!init) return undefined;
+  const { idempotencyKey, ...rest } = init;
   return {
     credentials: "include",
-    ...init,
+    ...rest,
     headers: {
-      ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      ...(init.headers ?? {}),
+      ...(rest.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+      ...(rest.headers ?? {}),
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
   };
 }
@@ -47,9 +51,9 @@ async function assertApiResponse(res: Response) {
   }
 }
 
-export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T>;
-export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
-export async function apiFetch<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T | Response> {
+export async function apiFetch<T>(url: string, init?: ApiFetchOptions): Promise<T>;
+export async function apiFetch(input: RequestInfo | URL, init?: ApiFetchOptions): Promise<Response>;
+export async function apiFetch<T>(input: RequestInfo | URL, init?: ApiFetchOptions): Promise<T | Response> {
   const isRawFetch = input instanceof Request || input instanceof URL;
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   const path = input instanceof Request ? input.url : String(input);

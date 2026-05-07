@@ -62,7 +62,7 @@
 
 ### ~~slot-rollback~~ {#slot-rollback} — CLOSED (feat/cd-atomic-create, 2026-05-07)
 
-`POST /api/v2/controlled-documents` now creates the CD slot + first document revision in a single DB transaction. The two-call sequence no longer exists; orphan slots are structurally impossible. The legacy `POST /api/v2/documents` (create from CD) endpoint was deleted. See ADR 0009.
+`POST /api/v2/controlled-documents` now creates the CD slot + first document revision in a single DB transaction. The two-call sequence no longer exists; orphan slots are structurally impossible. The legacy `POST /api/v2/documents` (create from CD) endpoint was deleted. See ADR 0011.
 
 ---
 

@@ -106,7 +106,7 @@ The novo-documento wizard (`/documents-v2/new`) calls `createControlledDocumentA
 
 Step 2 (the wizard's preview) shows the live preview code from `GET /api/v2/controlled-documents/preview-code` (see `previewCode` handler at `routes.go:89`).
 
-The legacy two-call sequence and its slot-rollback risk are eliminated. `POST /api/v2/documents` (create from CD) was deleted. See ADR 0009 and `backlog/novo-documento.md#slot-rollback`.
+The legacy two-call sequence and its slot-rollback risk are eliminated. `POST /api/v2/documents` (create from CD) was deleted. See ADR 0011 and `backlog/novo-documento.md#slot-rollback`.
 
 ## Cross-refs
 
