@@ -41,8 +41,28 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 	if err != nil {
 		return "", "", "", err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	docID, revID, sessionID, err = r.CreateDocumentTx(ctx, tx, d, initialContentHash, requiredPlaceholders)
+	if err != nil {
+		return "", "", "", err
+	}
+	if err = tx.Commit(); err != nil {
+		return "", "", "", err
+	}
+	return docID, revID, sessionID, nil
+}
 
+// CreateDocumentTx performs the DB-only portion of CreateDocument inside the
+// caller-owned tx: inserts document + initial editor_session + initial
+// revision (storage_key=""), seeds template snapshot columns and required
+// placeholder rows. It does NOT touch S3 (no AdoptTempObject, no
+// SetRevisionStorageKey). Callers that need S3 finalization must do so after
+// tx.Commit() — see Repository.CreateDocument for the standard wrapper.
+func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
 	// Serialise revision_number allocation per (tenant, controlled_document).
 	// pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK.
 	if d.ControlledDocumentID != nil && *d.ControlledDocumentID != "" {
@@ -144,7 +164,7 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 		}
 	}
 
-	return docID, revID, sessionID, tx.Commit()
+	return docID, revID, sessionID, nil
 }
 
 // SetRevisionStorageKey finalizes the initial revision's storage_key after the
