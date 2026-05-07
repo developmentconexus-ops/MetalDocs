@@ -50,8 +50,21 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 		t.Fatalf("insert profile: %v", err)
 	}
 
+	areaCode := "rh"
+	_, err = db.ExecContext(context.Background(), `
+		INSERT INTO metaldocs.document_process_areas
+			(code, tenant_id, name, description)
+		VALUES
+			($1, $2, 'Resources & HR', 'integration test area')
+		ON CONFLICT (tenant_id, code) DO NOTHING`,
+		areaCode, tenantID,
+	)
+	if err != nil {
+		t.Fatalf("insert process area: %v", err)
+	}
+
 	allocator := infrastructure.NewPostgresSequenceAllocator(db)
-	if err := allocator.EnsureCounter(context.Background(), tenantID, profileCode); err != nil {
+	if err := allocator.EnsureCounter(context.Background(), tenantID, profileCode, areaCode); err != nil {
 		t.Fatalf("ensure counter: %v", err)
 	}
 
@@ -64,7 +77,7 @@ func TestSequenceAllocatorNextAndIncrement_Concurrent(t *testing.T) {
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			next, err := allocator.NextAndIncrement(context.Background(), nil, tenantID, profileCode)
+			next, err := allocator.NextAndIncrement(context.Background(), nil, tenantID, profileCode, areaCode)
 			if err != nil {
 				t.Errorf("next and increment: %v", err)
 				return

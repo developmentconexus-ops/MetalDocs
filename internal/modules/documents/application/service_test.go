@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -63,6 +64,13 @@ type fakeRepo struct {
 var _ application.Repository = (*fakeRepo)(nil)
 
 func (f *fakeRepo) CreateDocument(_ context.Context, _ *domain.Document, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
+	if f.createDocErr != nil {
+		return "", "", "", f.createDocErr
+	}
+	return f.createDocIDs[0], f.createDocIDs[1], f.createDocIDs[2], nil
+}
+
+func (f *fakeRepo) CreateDocumentTx(_ context.Context, _ *sql.Tx, _ *domain.Document, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
 	if f.createDocErr != nil {
 		return "", "", "", f.createDocErr
 	}

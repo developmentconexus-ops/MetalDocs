@@ -49,11 +49,15 @@ func (f fakeRegistryDocs) UpdateStatus(ctx context.Context, tenantID, id string,
 
 type fakeSequenceAllocator struct{}
 
-func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx registrydomain.DBExecutor, tenantID, profileCode string) (int, error) {
+func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx registrydomain.DBExecutor, tenantID, profileCode, areaCode string) (int, error) {
 	return 1, nil
 }
 
-func (f fakeSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, profileCode string) error {
+func (f fakeSequenceAllocator) Peek(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	return 1, nil
+}
+
+func (f fakeSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, profileCode, areaCode string) error {
 	return nil
 }
 
@@ -102,6 +106,7 @@ func newTestHandler(db *sql.DB) *Handler {
 		fakeProfileReader{},
 		fakeAreaReader{},
 		fakeGovernanceLogger{},
+		nil,
 	)
 	return NewHandler(svc, db)
 }
@@ -134,6 +139,7 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 		fakeProfileReader{},
 		fakeAreaReader{},
 		fakeGovernanceLogger{},
+		nil,
 	)
 	handler := NewHandler(svc, nil)
 	mux := http.NewServeMux()
@@ -277,6 +283,73 @@ func TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth(t *testing.T)
 	}
 	if body["publishedDocumentId"] != publishedDocID {
 		t.Errorf("publishedDocumentId = %v, want %s", body["publishedDocumentId"], publishedDocID)
+	}
+}
+
+// TestPostControlledDocuments_MissingIdempotencyKey_400: POST to atomic-create
+// endpoint without Idempotency-Key header must return 400 with code IDEMPOTENCY_KEY_REQUIRED.
+func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
+	handler := newTestHandler(nil)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents", nil)
+	req.Header.Set("X-Tenant-ID", "tenant-1")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if body["code"] != "IDEMPOTENCY_KEY_REQUIRED" {
+		t.Fatalf("code = %q, want IDEMPOTENCY_KEY_REQUIRED", body["code"])
+	}
+}
+
+// TestGetPreviewCode_200: GET /api/v2/controlled-documents/preview-code with valid
+// query params returns 200 with profileCode, areaCode, nextSeq, and code fields.
+func TestGetPreviewCode_200(t *testing.T) {
+	handler := newTestHandler(nil)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/preview-code?profileCode=DC&areaCode=RH", nil)
+	req.Header.Set("X-Tenant-ID", "tenant-1")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	for _, field := range []string{"profileCode", "areaCode", "nextSeq", "code"} {
+		if _, ok := body[field]; !ok {
+			t.Errorf("missing field %q in response: %s", field, rec.Body.String())
+		}
+	}
+}
+
+// TestGetPreviewCode_MissingParams_400: GET /api/v2/controlled-documents/preview-code
+// without required query params returns 400.
+func TestGetPreviewCode_MissingParams_400(t *testing.T) {
+	handler := newTestHandler(nil)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/preview-code?profileCode=DC", nil)
+	req.Header.Set("X-Tenant-ID", "tenant-1")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -11,6 +11,7 @@ type DBExecutor interface {
 }
 
 type SequenceAllocator interface {
-	NextAndIncrement(ctx context.Context, tx DBExecutor, tenantID, profileCode string) (int, error)
-	EnsureCounter(ctx context.Context, tenantID, profileCode string) error
+	NextAndIncrement(ctx context.Context, tx DBExecutor, tenantID, profileCode, areaCode string) (int, error)
+	Peek(ctx context.Context, tenantID, profileCode, areaCode string) (int, error)
+	EnsureCounter(ctx context.Context, tenantID, profileCode, areaCode string) error
 }

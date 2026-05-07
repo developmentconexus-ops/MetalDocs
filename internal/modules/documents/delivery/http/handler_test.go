@@ -16,9 +16,6 @@ import (
 )
 
 type fakeSvc struct {
-	createResult *application.CreateDocumentResult
-	createErr    error
-
 	listDocs       []domain.Document
 	listForUser    []domain.Document
 	listErr        error
@@ -47,13 +44,7 @@ type fakeSvc struct {
 var _ httphandler.Service = (*fakeSvc)(nil)
 
 func (f *fakeSvc) CreateDocument(_ context.Context, _ application.CreateDocumentInput) (*application.CreateDocumentResult, error) {
-	if f.createErr != nil {
-		return nil, f.createErr
-	}
-	if f.createResult == nil {
-		return &application.CreateDocumentResult{DocumentID: "doc_1", InitialRevisionID: "rev_1", SessionID: "sess_1"}, nil
-	}
-	return f.createResult, nil
+	return &application.CreateDocumentResult{DocumentID: "doc_1", InitialRevisionID: "rev_1", SessionID: "sess_1"}, nil
 }
 
 func (f *fakeSvc) GetDocument(_ context.Context, _, _ string) (*domain.Document, error) {
@@ -197,34 +188,6 @@ func withAuthHeaders(req *http.Request, roles string) {
 	req.Header.Set("X-Tenant-ID", "tenant_1")
 	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user_1", []iamdomain.Role{}))
 	req.Header.Set("X-User-Roles", roles)
-}
-
-func TestCreateDocument_Happy(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
-
-	body := []byte(`{"controlled_document_id":"cd_1","template_version_id":"tpl_ver_1","name":"Contract","form_data":{"a":1}}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", rr.Code)
-	}
-}
-
-func TestCreateDocument_Forbidden(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
-
-	body := []byte(`{"controlled_document_id":"cd_1","template_version_id":"tpl_ver_1","name":"Contract","form_data":{"a":1}}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents", bytes.NewReader(body))
-	withAuthHeaders(req, "template_author")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", rr.Code)
-	}
 }
 
 func TestListDocuments_Happy(t *testing.T) {

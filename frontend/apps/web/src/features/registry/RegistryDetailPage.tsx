@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, type ActiveDocumentResponse } from './api/controlledDocuments';
+import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, createRevision, type ActiveDocumentResponse } from './api/controlledDocuments';
 import { PublishedDownloadCell } from './PublishedDownloadCell';
 import type { ControlledDocument } from "./types";
 import { RegistryDetailPanel } from '../approval/components/RegistryDetailPanel';
-import { createDocument } from '../documents/api/documentsV2';
 
 type Props = {
   id: string;
@@ -76,16 +75,13 @@ export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) 
     setCreating(true);
     setCreateError("");
     try {
-      const res = await createDocument({
-        controlled_document_id: doc.id,
-        name: newRevisionName.trim(),
-        form_data: {},
-      });
-      if (onOpenDocumentEditor) {
-        onOpenDocumentEditor(res.document_id);
-      } else {
-        await load();
-      }
+      const idempotencyKey = crypto.randomUUID();
+      const res = await createRevision(
+        doc.id,
+        { name: newRevisionName.trim(), formData: {} },
+        idempotencyKey,
+      );
+      if (onOpenDocumentEditor) onOpenDocumentEditor(res.document.id);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Falha ao criar revisão.");
     } finally {

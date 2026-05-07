@@ -52,7 +52,7 @@ func (h *Handler) listDocs(w http.ResponseWriter, r *http.Request) {
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (h *Handler) createDoc(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) atomicCreate(w http.ResponseWriter, r *http.Request) {
 	var req createDocRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
@@ -63,7 +63,7 @@ func (h *Handler) createDoc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doc, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
+	res, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
 		TenantID:                  tenantIDFromRequest(r),
 		ProfileCode:               strings.TrimSpace(req.ProfileCode),
 		ProcessAreaCode:           strings.TrimSpace(req.ProcessAreaCode),
@@ -80,7 +80,56 @@ func (h *Handler) createDoc(w http.ResponseWriter, r *http.Request) {
 		h.writeDomainError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, doc)
+	httpresponse.WriteJSON(w, http.StatusCreated, map[string]any{
+		"controlledDocument": res.ControlledDocument,
+		"document":           res.DocumentRef,
+	})
+}
+
+func (h *Handler) previewCode(w http.ResponseWriter, r *http.Request) {
+	profileCode := strings.TrimSpace(r.URL.Query().Get("profileCode"))
+	areaCode := strings.TrimSpace(r.URL.Query().Get("areaCode"))
+	if profileCode == "" || areaCode == "" {
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "profileCode and areaCode query parameters are required")
+		return
+	}
+	tenantID := tenantIDFromRequest(r)
+	next, err := h.svc.PeekSeq(r.Context(), tenantID, profileCode, areaCode)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
+		"profileCode": strings.ToUpper(profileCode),
+		"areaCode":    strings.ToUpper(areaCode),
+		"nextSeq":     next,
+		"code":        registrydomain.AutoCode(profileCode, areaCode, next),
+	})
+}
+
+func (h *Handler) createRevision(w http.ResponseWriter, r *http.Request) {
+	cdID := r.PathValue("id")
+	var body struct {
+		Name              string         `json:"name"`
+		FormData          map[string]any `json:"formData"`
+		TemplateVersionID *string        `json:"templateVersionId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
+		return
+	}
+	ref, err := h.svc.CreateRevision(r.Context(), application.CreateRevisionCmd{
+		TenantID:          tenantIDFromRequest(r),
+		CDID:              cdID,
+		Name:              body.Name,
+		FormData:          body.FormData,
+		TemplateVersionID: body.TemplateVersionID,
+	})
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusCreated, map[string]any{"document": ref})
 }
 
 func (h *Handler) getDoc(w http.ResponseWriter, r *http.Request) {
@@ -252,11 +301,11 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 }
 
 func tenantIDFromRequest(r *http.Request) string {
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
+	tid := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	if tid == "" {
 		return tenant.DevTenantID
 	}
-	return tenantID
+	return tid
 }
 
 func parseFilter(r *http.Request) (application.CDFilter, error) {
