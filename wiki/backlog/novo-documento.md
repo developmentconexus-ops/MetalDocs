@@ -87,3 +87,14 @@ If step 2 fails (network error, template clone error, etc.) **after** step 1 suc
 **Why deferred:** `GET /api/v2/taxonomy/profiles` does not return document counts. Aggregating counts requires a JOIN against `documents` (or `controlled_documents`) which was deferred per the design-workflow audit (2026-05-07) — cost vs value unclear for the initial release.
 
 **Backend prereq:** add `document_count` (or `controlled_document_count`) to the profiles list response.
+
+---
+
+## Follow-ups from major-findings PR (2026-05-07)
+
+- **Typography token cluster** — declare `--fs-1..--fs-7` in `tokens.css`; replace raw `font-size: NNpx` in StepProfile / StepAreaCodeVisibility / StepTemplate / StepConfirm CSS Modules. Estimated 45m.
+- **Kicker variants** — add `.kicker--block` + `.kicker--callout` modifiers in `src/styles.css`; drop `:global(.kicker)` reaches from StepAreaCodeVisibility + StepConfirm modules. Estimated 30m.
+- **InlineAlert primitive** — extract `<InlineAlert role="alert" tone="error|warning|info" message />` in `components/ui/`; replace 4 wizard sites + future Document/Approval flows. Estimated 30m.
+- **ESLint rule** — `no-restricted-syntax` banning inline tuple `queryKey` in `features/**/queries/`. Forces QK registry use. Estimated 30m.
+- **SelectableCardGroup** — wrapper exposing `name value onChange` so future radio-group consumers do not stitch manually. Defer until 2nd consumer appears.
+- **Stepper numeric ids** — `Stepper` primitive currently takes `id: string` for steps; `WizardShell.tsx:35` round-trips `String(currentStep)`. Either accept `id: string | number` in Stepper or wrap the wizard with a typed `<NumericStepper currentStep: number />`. Touches a shared primitive — defer to dedicated PR. Estimated 30m.
