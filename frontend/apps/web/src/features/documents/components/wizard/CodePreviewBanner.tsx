@@ -13,13 +13,11 @@ export function CodePreviewBanner({ profileCode, areaCode }: CodePreviewBannerPr
   const kicker = ready
     ? `Código gerado · próximo em (${profile}, ${area})`
     : 'Código gerado · selecione perfil e área';
-  const caption = `≈ ${code} · Código final atribuído ao confirmar.`;
 
   return (
     <div className={styles.banner} title="Código final atribuído ao confirmar">
       <div className="kicker">{kicker}</div>
       <div className={`${styles.code} mono`}>{code}</div>
-      <div className="caption">{caption}</div>
     </div>
   );
 }

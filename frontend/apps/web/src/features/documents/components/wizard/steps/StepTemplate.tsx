@@ -77,7 +77,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
           {templates.map((template) => {
             const publishedID = template.published_version_id;
             const selectable = publishedID !== null;
-            const selected = selected_(template.id, publishedID, selectedTemplateID, selectedVersionID);
+            const selected = isTemplateSelected(template.id, publishedID, selectedTemplateID, selectedVersionID);
             return (
               <SelectableCard
                 key={template.id}
@@ -164,7 +164,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
   );
 }
 
-function selected_(
+function isTemplateSelected(
   templateID: string,
   publishedVersionID: string | null,
   selectedTemplateID: string | null,

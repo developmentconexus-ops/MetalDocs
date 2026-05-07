@@ -71,7 +71,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       <div className={styles.previewCard}>
         <div className={styles.docThumbnail}>
           <div className={styles.thumbnailTitleBar} />
-          <div className={`${styles.thumbnailCode} mono`}>{codePreview} v1</div>
+          <div className={styles.thumbnailCode}>{codePreview} v1</div>
           {Array.from({ length: 11 }).map((_, idx) => (
             <div key={idx} className={styles.thumbnailLine} />
           ))}

@@ -76,7 +76,7 @@ export function WizardFooter({
         <span className="caption">{stepLabel}</span>
         <button
           type="button"
-          className={primaryVariant === 'submit' ? 'btn btn-primary' : 'btn btn-primary'}
+          className={primaryVariant === 'submit' ? 'btn btn-success' : 'btn btn-primary'}
           disabled={primaryDisabled}
           onClick={onAdvance}
         >
