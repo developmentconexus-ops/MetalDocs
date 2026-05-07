@@ -118,7 +118,7 @@ const createMutation = useMutation({
 });
 ```
 
-The `idempotencyKey` is generated via `crypto.randomUUID()` in `handleCreate` (`NewDocumentWizardPage.tsx:160`) immediately before the mutation call. Replay of the same key returns the stored 201 response — safe to retry on network timeout. Orphan slots are structurally impossible (CD + document commit atomically or both roll back). See ADR 0009 and `backlog/novo-documento.md#slot-rollback`.
+The `idempotencyKey` is generated via `crypto.randomUUID()` in `handleCreate` (`NewDocumentWizardPage.tsx:160`) immediately before the mutation call. Replay of the same key returns the stored 201 response — safe to retry on network timeout. Orphan slots are structurally impossible (CD + document commit atomically or both roll back). See ADR 0011 and `backlog/novo-documento.md#slot-rollback`.
 
 ---
 
@@ -246,7 +246,7 @@ See `wiki/backlog/novo-documento.md` for all deferred items. Short list (closed 
 - `blank-template` — disabled (backend requires valid `templateVersionId`)
 - `profile-counts` — no document count per profile card
 
-Closed by feat/cd-atomic-create: `sequence-preview` (preview endpoint shipped), `slot-rollback` (atomic create eliminates orphan slots). See ADR 0009.
+Closed by feat/cd-atomic-create: `sequence-preview` (preview endpoint shipped), `slot-rollback` (atomic create eliminates orphan slots). See ADR 0011.
 
 ---
 

@@ -77,7 +77,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [decisions/0003-token-syntax-migration.md](decisions/0003-token-syntax-migration.md) - plan to move from `{{uuid}}` -> `{name}` (stub, Last verified: 2026-05-01)
 - [decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) - accept two distinct authz tiers (CapabilityService vs authz.Require); J2 amendment: `document.create` wired via `NewCapabilityChecker`, `permissiveAuthzChecker` removed (Last verified: 2026-05-05)
 - [decisions/0008-placeholder-fixed-catalog.md](decisions/0008-placeholder-fixed-catalog.md) - replace user-fill placeholders with fixed 7-token computed catalog (2026-04-26)
-- [decisions/0009-cd-atomic-create.md](decisions/0009-cd-atomic-create.md) - atomic CD create + per-area 3-segment numbering + idempotency-key adoption; deletes legacy two-screen wizard flow (2026-05-07)
+- [decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md) - atomic CD create + per-area 3-segment numbering + idempotency-key adoption; deletes legacy two-screen wizard flow (2026-05-07)
 
 ### References
 - [references/eigenpal-spike.md](references/eigenpal-spike.md) - pointer to spike repo + key findings (T1-T8)

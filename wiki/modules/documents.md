@@ -139,7 +139,7 @@ The 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`) replaced the 
 1. `POST /api/v2/controlled-documents` with `Idempotency-Key` header — atomically creates the CD slot and the first draft document revision in a single DB transaction. Returns the CD with a server-resolved code (e.g. `DC-RH-001`).
 2. Redirect to `/documents-v2/${doc.document_id}`.
 
-The legacy two-call sequence (`POST /api/v2/controlled-documents` → `POST /api/v2/documents`) and its slot-rollback risk are eliminated. `POST /api/v2/documents` (create from CD) was deleted. See ADR 0009 and `backlog/novo-documento.md#slot-rollback`.
+The legacy two-call sequence (`POST /api/v2/controlled-documents` → `POST /api/v2/documents`) and its slot-rollback risk are eliminated. `POST /api/v2/documents` (create from CD) was deleted. See ADR 0011 and `backlog/novo-documento.md#slot-rollback`.
 
 **Deferred items:** visibility enforcement, blank-template path, profile counts. See `wiki/backlog/novo-documento.md`.
 
