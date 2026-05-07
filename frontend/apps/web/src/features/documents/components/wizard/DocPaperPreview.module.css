@@ -1,0 +1,61 @@
+/* Thumbnail variant — Step 4 confirm card (120 × 152px).
+   Step 4 doc thumbnail dimensions (see design-source HTML reference) */
+.thumbnail {
+  width: 120px;
+  height: 152px;
+  padding: 10px 9px;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: 2px;
+  box-shadow: var(--shadow-paper-2);
+}
+
+/* Template variant — Step 3 card row (60 × 76px).
+   Step 3 mini-preview dimensions (see design-source HTML reference) */
+.template {
+  width: 60px;
+  height: 76px;
+  flex-shrink: 0;
+  padding: 6px 5px;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: 2px;
+  box-shadow: var(--shadow-paper-1);
+}
+
+/* Top brand title bar — shared element, dimensions differ per variant. */
+.thumbnail .titleBar {
+  height: 4px;
+  width: 70%;
+  margin-bottom: 6px;
+  background: var(--brand);
+}
+
+.template .titleBar {
+  height: 3px;
+  width: 60%;
+  margin-bottom: var(--sp-1);
+  background: var(--brand);
+}
+
+/* Top-right code label — thumbnail only.
+   fontSize 7px is a deliberate paper-aesthetic mini-text. */
+.code {
+  font-size: 7px;
+  font-family: var(--font-mono);
+  margin-bottom: var(--sp-1);
+  color: var(--text-muted);
+}
+
+/* Text-line bar — shared element, color/spacing differ per variant. */
+.thumbnail .line {
+  height: 1.5px;
+  margin-bottom: 3px;
+  background: var(--paper-line);
+}
+
+.template .line {
+  height: 1.5px;
+  margin-bottom: 2.5px;
+  background: var(--border-strong);
+}

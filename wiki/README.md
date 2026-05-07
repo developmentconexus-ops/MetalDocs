@@ -36,6 +36,7 @@
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; `TemplateAuthorPage` now consumes `EditorChrome` (stub, Last verified: 2026-05-06)
 - [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), novo-documento wizard (`/documents-v2/new`, 4-step, 2-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-07)
+- **[modules/novo-documento-wizard.md](modules/novo-documento-wizard.md)** - wizard state machine (`wizardReducer`, `clampStep`, `canAdvance`), step components, `WizardFooter` + `DocPaperPreview` primitives, visibility sub-controls, `resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile` (Last verified: 2026-05-07)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4 (Last verified: 2026-05-05)
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)

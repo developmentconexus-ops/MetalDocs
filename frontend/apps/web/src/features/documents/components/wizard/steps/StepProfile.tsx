@@ -1,8 +1,8 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
-import { ApiError, resolveErrorMessage } from '../../../../../lib/api';
+import { resolveQueryError } from '../../../../../lib/api';
 import type { DocumentProfile } from '../../../../taxonomy/types';
-import { WizardFooter } from '../WizardShell';
+import { WizardFooter } from '../WizardFooter';
 import styles from './StepProfile.module.css';
 
 export type StepProfileProps = {
@@ -48,11 +48,8 @@ export function StepProfile({
           </div>
         </div>
       ) : isError ? (
-        <div role="alert" aria-live="assertive" className="card">
-          {resolveErrorMessage(
-            error instanceof ApiError ? error.code : undefined,
-            error instanceof Error ? error.message : undefined,
-          )}
+        <div role="alert" aria-live="assertive" aria-atomic="true" className="card">
+          {resolveQueryError(error, 'Falha ao carregar perfis.')}
           <div>
             <button type="button" className="btn btn-sm" onClick={onRetry}>
               Tentar novamente

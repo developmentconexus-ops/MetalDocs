@@ -1,8 +1,6 @@
-/* Doc preview-card 2-col grid (thumbnail + summary). Mirrors selected-wizard.jsx
-   line 164: { display: 'grid', gridTemplateColumns: '120px 1fr', gap: 18,
-   padding: 18, background: 'var(--surface-2)',
-   border: '1px solid var(--border)', borderRadius: 'var(--r-3)',
-   marginBottom: 18 }. */
+/* Step 4 doc preview-card 2-col grid: thumbnail + summary (see design-source HTML reference):
+   gridTemplateColumns:120px 1fr, gap:18, padding:18, background:var(--surface-2),
+   border:1px solid var(--border), borderRadius:var(--r-3), marginBottom:18 */
 .previewCard {
   display: grid;
   grid-template-columns: 120px 1fr;
@@ -14,59 +12,8 @@
   border-radius: var(--r-3);
 }
 
-/* Mini doc thumbnail. Mirrors selected-wizard.jsx line 165:
-   { width: 120, height: 152, background: 'white',
-     boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderRadius: 2,
-     padding: '10px 9px' }.
-   overflow:hidden clips content to the canvas — no visible gap below last line. */
-.docThumbnail {
-  width: 120px;
-  height: 152px;
-  padding: 10px 9px;
-  overflow: hidden;
-  background: var(--surface);
-  border-radius: 2px;
-  box-shadow: var(--shadow-paper-2);
-}
-
-/* Thumbnail top title bar. Mirrors selected-wizard.jsx line 166:
-   { height: 4, background: 'var(--brand)', marginBottom: 6, width: '70%' }. */
-.thumbnailTitleBar {
-  height: 4px;
-  width: 70%;
-  margin-bottom: 6px;
-  background: var(--brand);
-}
-
-/* Mono code line inside thumbnail. Mirrors selected-wizard.jsx line 167:
-   { fontSize: 7, fontFamily: 'var(--font-mono)', color: '#888',
-     marginBottom: 4 }.
-   fontSize 7px is a deliberate paper-aesthetic mini-text.
-   marginBottom 4 → --sp-1. The reference uses literal '#888' which is
-   visually equivalent to var(--text-muted) (#8a7575); chose the token. */
-.thumbnailCode {
-  font-size: 7px;
-  font-family: var(--font-mono);
-  margin-bottom: var(--sp-1);
-  color: var(--text-muted);
-}
-
-/* Thumbnail content line bar. Mirrors selected-wizard.jsx line 168:
-   { height: 1.5, background: '#e0d0d0', marginBottom: 3, width: variable }.
-   Height 1.5px and marginBottom 3px are part of the fixed-pixel
-   thumbnail layout (not body spacing). Color uses --paper-line.
-   TODO(novo-documento): reference varies width per line via inline
-   style (`${55 + (k*11) % 38}%`); Phase 3c may restore that variation. */
-.thumbnailLine {
-  height: 1.5px;
-  width: 70%;
-  margin-bottom: 3px;
-  background: var(--paper-line);
-}
-
-/* Summary header row (chip + status + ver). Mirrors selected-wizard.jsx
-   line 171: { display: 'flex', alignItems: 'center', gap: 8,
-   marginBottom: 8 }. */
+/* Step 4 summary header row: chip + status + ver (see design-source HTML reference):
+   display:flex, alignItems:center, gap:8, marginBottom:8 */
 .summaryHeaderRow {
   display: flex;
   align-items: center;
@@ -74,9 +21,8 @@
   margin-bottom: var(--sp-2);
 }
 
-/* Doc title. Mirrors selected-wizard.jsx line 176:
-   { fontSize: 16, fontWeight: 500, marginBottom: 14 }.
-   TODO(novo-documento:typography-tokens): raw 16px/500 — no font-size scale
+/* Doc title (see design-source HTML reference): fontSize:16, fontWeight:500, marginBottom:14 */
+/* TODO(novo-documento:typography-tokens): raw 16px/500 — no font-size scale
    in tokens.css today. See wiki/backlog/novo-documento.md#typography-tokens. */
 .docTitle {
   font-size: 16px;
@@ -84,9 +30,8 @@
   margin-bottom: 14px;
 }
 
-/* 2-col field grid. Mirrors selected-wizard.jsx line 177:
-   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8,
-   fontSize: 12 }. */
+/* Step 4 2-col field grid (see design-source HTML reference):
+   gridTemplateColumns:1fr 1fr, gap:8, fontSize:12 */
 /* TODO(novo-documento:typography-tokens): raw 12px — no font-size scale.
    See wiki/backlog/novo-documento.md#typography-tokens. */
 .fieldGrid {
@@ -111,9 +56,9 @@
   margin-top: var(--sp-3);
 }
 
-/* Field row. Mirrors selected-wizard.jsx line 186:
-   { display: 'flex', justifyContent: 'space-between', padding: '4px 0',
-   borderBottom: '1px dashed var(--border)' }. */
+/* Step 4 field row (see design-source HTML reference):
+   display:flex, justifyContent:space-between, padding:4px 0,
+   borderBottom:1px dashed var(--border) */
 .fieldRow {
   display: flex;
   justify-content: space-between;
@@ -121,17 +66,15 @@
   border-bottom: 1px dashed var(--border);
 }
 
-/* Field label. Mirrors selected-wizard.jsx line 187:
-   { color: 'var(--text-muted)' }. */
+/* Field label (see design-source HTML reference): color:var(--text-muted) */
 .fieldLabel {
   color: var(--text-muted);
 }
 
-/* Dashed brand-pale "what happens" callout. Mirrors selected-wizard.jsx
-   line 196: { padding: 14, background: 'var(--brand-pale)',
-   border: '1px dashed var(--brand-soft)', borderRadius: 'var(--r-2)',
-   marginBottom: 22 }.
-   margin-top: 4px adds visual breathing room below the previewCard. */
+/* Step 4 "what happens" callout (see design-source HTML reference):
+   padding:14, background:var(--brand-pale), border:1px dashed var(--brand-soft),
+   borderRadius:var(--r-2), marginBottom:22.
+   margin-top:4px adds visual breathing room below the previewCard. */
 .nextStepsCallout {
   padding: 16px 14px 14px;
   margin-top: 4px;
@@ -148,16 +91,14 @@
   line-height: 1;
 }
 
-/* Kicker inside the callout. Mirrors selected-wizard.jsx line 197:
-   { marginBottom: 8, color: 'var(--brand)' }. */
+/* Kicker inside the callout: marginBottom:8, color:var(--brand) */
 .nextStepsKicker {
   margin-bottom: var(--sp-2);
   color: var(--brand);
 }
 
-/* Ordered list inside the callout. Mirrors selected-wizard.jsx line 198:
-   { margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.7,
-   color: 'var(--text-soft)' }. */
+/* Step 4 ordered list inside the callout (see design-source HTML reference):
+   margin:0, paddingLeft:18, fontSize:12.5, lineHeight:1.7, color:var(--text-soft) */
 .nextStepsList {
   margin: 0;
   padding-left: 18px;
@@ -166,9 +107,9 @@
   color: var(--text-soft);
 }
 
-/* Consent checkbox row. Mirrors selected-wizard.jsx line 206:
-   { display: 'flex', alignItems: 'flex-start', gap: 10, fontSize: 12.5,
-   color: 'var(--text-soft)', marginBottom: 8 }. */
+/* Consent checkbox row (see design-source HTML reference):
+   display:flex, alignItems:flex-start, gap:10, fontSize:12.5,
+   color:var(--text-soft), marginBottom:8 */
 .consentRow {
   display: flex;
   align-items: flex-start;

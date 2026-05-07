@@ -1,6 +1,6 @@
 # Error UX — Shared HTTP Client & Auth Bus
 
-> **Last verified:** 2026-05-05
+> **Last verified:** 2026-05-07
 > **Branch:** `phase-e-error-ux` (merged into main)
 > **Bugs fixed:** E2, E3, E4
 
@@ -20,7 +20,8 @@ Before this work, error handling was fragmented across features: each had its ow
 | `src/lib/api/errors.ts` | `ApiError` class + `resolveErrorMessage(code, fallback)` |
 | `src/lib/api/errorMessages.ts` | Portuguese error code → message map (30+ codes) |
 | `src/lib/api/authBus.ts` | `auth:expired` CustomEvent bus: `dispatchAuthExpired`, `onAuthExpired` |
-| `src/lib/api/index.ts` | Barrel re-export of all above |
+| `src/lib/api/resolveQueryError.ts` | `resolveQueryError(err, fallback)` — wraps the `ApiError`/`Error`/unknown triad for TanStack Query `onError` callbacks |
+| `src/lib/api/index.ts` | Barrel re-export of all above including `resolveQueryError` |
 | `src/features/auth/useAuthSession.ts` | Registers `auth:expired` listener; stores returnTo; restores on login |
 | `src/features/approval/api/mutationClient.ts` | `ApprovalError extends ApiError`; 401 uses auth-bus; 403 throws with code |
 | `src/features/approval/components/SignoffDialog.tsx` | E2 SoD states: `error_sod_submitter`, `error_sod_duplicate` |
@@ -73,6 +74,29 @@ Key codes:
 - `authz.capability_denied` — insufficient role
 
 Full map: `src/lib/api/errorMessages.ts`
+
+---
+
+## resolveQueryError
+
+```ts
+// src/lib/api/resolveQueryError.ts:10
+function resolveQueryError(err: unknown, fallback: string): string
+```
+
+Convenience wrapper for TanStack Query `onError` callbacks. Replaces the per-callsite `ApiError` instanceof triad:
+
+```ts
+// Before (per-callsite pattern)
+const message = err instanceof ApiError
+  ? resolveErrorMessage(err.code, err.message)
+  : err instanceof Error ? err.message : fallback;
+
+// After
+const message = resolveQueryError(err, fallback);
+```
+
+Re-exported from `lib/api/index.ts`. Used in `NewDocumentWizardPage` (`onError`) and `StepAreaCodeVisibility` (inline areas error). See `modules/novo-documento-wizard.md` for the wizard usage.
 
 ---
 
