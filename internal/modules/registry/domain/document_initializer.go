@@ -18,8 +18,8 @@ type CloneTemplateRequest struct {
 // successful atomic create. The registry stores no document state itself —
 // downstream code uses this to redirect to the editor or to enrich responses.
 type DocumentRef struct {
-	ID          string
-	ContentHash string
+	ID          string `json:"id"`
+	ContentHash string `json:"contentHash"`
 }
 
 // DocumentInitializer is the registry-owned port that the documents module
