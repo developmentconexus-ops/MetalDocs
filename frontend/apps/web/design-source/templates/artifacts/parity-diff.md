@@ -56,10 +56,11 @@
 | columns @ 1440 | 3 | 3 | 0 ✓ |
 | columns @ 1024 | 3 (design has no breakpoint shown) | 2 | impl adds responsive breakpoint — improvement, not defect |
 | columns @ 375 | 1 (single col layout assumed) | 1 | 0 ✓ |
-| gap | 14px | 14px (0.875rem) | 0 ✓ |
+| gap | 14px | 16px (`var(--sp-4)`) | +2 (token-snap, accepted — see below) |
 
 ## Accepted deltas (decorative / token-snap)
 
+- cardGrid gap 14 → 16px: snapped to `--sp-4` (16px). No 14px token exists; +2px below visual threshold.
 - previewArea / body padding 14px → 16px: snapped to `--sp-4` (16px) for token discipline. Visually negligible (+2px), not a parity defect.
 - kicker fontSize 10.5 → 11.2px: primitive uses `0.7rem` (existing token convention). 0.7px delta below visual threshold.
 - card border 1px declared, browser renders 0.8px due to subpixel anti-aliasing at 1440. Source matches; not a CSS defect.

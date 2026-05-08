@@ -24,6 +24,12 @@
   color: var(--text-soft);
 }
 
+.tab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+
 .tabActive {
   color: var(--text);
   font-weight: 500;
