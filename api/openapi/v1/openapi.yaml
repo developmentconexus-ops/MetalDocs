@@ -2828,6 +2828,7 @@ paths:
     get:
       summary: Get template version metadata (docx-v2)
       tags: [templates]
+      operationId: getTemplateVersionV2
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -2838,6 +2839,7 @@ paths:
     post:
       summary: Presign PUT URL for draft .docx upload
       tags: [templates]
+      operationId: presignTemplateDocxUploadUrlV2
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -2855,6 +2857,7 @@ paths:
     post:
       summary: Presign PUT URL for draft schema.json upload
       tags: [templates]
+      operationId: presignTemplateSchemaUploadUrlV2
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -2872,6 +2875,7 @@ paths:
     get:
       summary: Redirect to presigned GET URL for a stored object
       tags: [templates]
+      operationId: redirectSignedUrlV2
       parameters:
         - { in: query, name: key, required: true, schema: { type: string } }
       responses:
@@ -2880,6 +2884,7 @@ paths:
     put:
       summary: Save draft (CAS via expected_lock_version)
       tags: [templates]
+      operationId: saveTemplateDraftV2
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
@@ -2903,6 +2908,7 @@ paths:
     post:
       summary: Publish draft (delegates to docgen-v2 /validate/template)
       tags: [templates]
+      operationId: publishTemplateVersionV2
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
