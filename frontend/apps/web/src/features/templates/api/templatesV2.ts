@@ -1,5 +1,6 @@
 export type VersionStatus = 'draft' | 'in_review' | 'approved' | 'published' | 'obsolete';
 
+import { apiFetch } from '../../../lib/api/client';
 import type { Placeholder, CompositionConfig } from '../placeholder-types';
 export type { Placeholder, CompositionConfig };
 
@@ -126,11 +127,10 @@ export async function listTemplates(params?: {
   }
 
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  const res = await fetch(`/api/v2/templates${suffix}`);
-  const body = await apiJson<{
+  const body = await apiFetch<{
     data: { templates: TemplateDTO[] };
     meta: { limit: number; offset: number };
-  }>(res);
+  }>(`/api/v2/templates${suffix}`);
 
   return {
     templates: body.data.templates,
