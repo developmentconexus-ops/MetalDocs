@@ -108,6 +108,17 @@ Step 2 (the wizard's preview) shows the live preview code from `GET /api/v2/cont
 
 The legacy two-call sequence and its slot-rollback risk are eliminated. `POST /api/v2/documents` (create from CD) was deleted. See ADR 0011 and `backlog/novo-documento.md#slot-rollback`.
 
+## DocumentInitializer port
+
+Registry owns the `DocumentInitializer` interface (`internal/modules/registry/domain/document_initializer.go`). The documents module implements it via `CDDocumentInitializer` (`internal/modules/documents/application/cd_initializer.go`). This is the sole cross-module coupling — registry never imports documents directly.
+
+The port runs inside the caller-owned tx: registry opens the tx, inserts the CD row, calls `CloneTemplate`, and commits. Documents materializes the initial revision (with `storage_key` pointing at the published template docx) atomically in the same tx.
+
+Key files:
+- `internal/modules/registry/domain/document_initializer.go:30` — interface definition
+- `internal/modules/documents/application/cd_initializer.go` — adapter (`CDDocumentInitializer`)
+- `internal/modules/documents/repository/repository.go:73` — `CreateDocumentTx` (DB insert with `initialStorageKey`)
+
 ## Cross-refs
 
 - [concepts/controlled-documents.md](../concepts/controlled-documents.md) — what a CD is, code format

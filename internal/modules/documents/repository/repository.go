@@ -32,10 +32,8 @@ type Repository struct {
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
 // CreateDocument inserts document + initial session + initial revision in one
-// deferrable-FK transaction. The initial revision's storage_key is empty - the
-// caller uploads the .docx to the final content-addressed key via
-// Presigner.AdoptTempObject, then calls SetRevisionStorageKey to finalize.
-// requiredPlaceholders seeds document_placeholder_values rows in the same tx.
+// CreateDocument is the legacy (non-tx) wrapper. Only DuplicateDocument uses it.
+// Atomic flow uses CreateDocumentTx directly with a caller-owned tx.
 func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
 	tx, err := r.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
@@ -177,9 +175,9 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 	return docID, revID, sessionID, nil
 }
 
-// SetRevisionStorageKey finalizes the initial revision's storage_key after the
-// .docx has been copied to its content-addressed final key. Idempotent:
-// succeeds only while storage_key is still empty.
+// SetRevisionStorageKey finalizes storage_key after S3 AdoptTempObject.
+// Legacy pattern — only used by Service.CreateDocument (via DuplicateDocument).
+// Atomic flow sets storage_key in CreateDocumentTx; this method is bypassed.
 func (r *Repository) SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error {
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE document_revisions SET storage_key = $1 WHERE id = $2 AND storage_key = ''`,

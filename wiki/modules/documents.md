@@ -143,6 +143,18 @@ The legacy two-call sequence (`POST /api/v2/controlled-documents` → `POST /api
 
 **Deferred items:** visibility enforcement, blank-template path, profile counts. See `wiki/backlog/novo-documento.md`.
 
+## storage_key lifecycle
+
+`document_revisions.storage_key` points to the S3 object key of the revision's `.docx`:
+
+| Flow | When set | Value |
+|------|----------|-------|
+| Atomic create (CD wizard) | Same tx as revision insert | Published template docx key (template-passthrough) |
+| Legacy create (DuplicateDocument) | Post-tx, after S3 AdoptTempObject | Content-addressed rendered docx key |
+| Editor autosave (commit) | On successful upload commit | New content-addressed key |
+
+The key is never empty after the initial revision is created. `SignedRevisionURL` presigns it directly — no lazy materialization.
+
 ## Edit Flow (Draft Documents)
 
 Entry points:
