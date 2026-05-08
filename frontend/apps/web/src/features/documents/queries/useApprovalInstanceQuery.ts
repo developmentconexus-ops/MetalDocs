@@ -8,7 +8,7 @@ export function useApprovalInstanceQuery(documentId: string) {
     queryFn: () => getApprovalInstance(documentId),
     enabled: Boolean(documentId),
     // 404 = no approval instance; treat as null not error
-    retry: (failureCount, error) => {
+    retry: (failureCount: number, error: unknown) => {
       if ((error as { status?: number }).status === 404) return false;
       return failureCount < 2;
     },

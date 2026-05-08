@@ -1,0 +1,86 @@
+/* DocumentPublishedPage.module.css — Phase 3a skeleton (empty rules). Phase 3b fills values. */
+
+.root {}
+
+/* Hero */
+.hero {}
+.heroBg {}
+.heroGrid {}
+.heroCardWrap {}
+
+/* DocCardMini */
+.docCard {}
+.docCardHeader {}
+.docCardBody {}
+.docCardCode {}
+.docCardType {}
+.docCardSpacer {}
+.docCardDivider {}
+.docCardFooter {}
+.docCardVersion {}
+.docCardDot {}
+
+/* Hero content */
+.heroContent {}
+.heroBadges {}
+.codeChip {}
+.vigeenteBadge {}
+.vigeenteDot {}
+.typeLabel {}
+.heroTitle {}
+.heroActions {}
+.btnPrimary {}
+.btnSecondary {}
+.btnGhost {}
+
+/* Breadcrumb */
+.breadcrumb {}
+.breadcrumbLink {}
+.breadcrumbSep {}
+.breadcrumbCurrent {}
+
+/* Content area */
+.content {}
+
+/* KPI strip */
+.kpiStrip {}
+.kpiCell {}
+.kpiLabel {}
+.kpiValue {}
+.kpiHint {}
+
+/* Sections */
+.section {}
+.sectionHead {}
+.sectionKicker {}
+.sectionTitle {}
+
+/* AboutCard */
+.aboutLayout {}
+.aboutCard {}
+.ownerBanner {}
+.ownerInfo {}
+.ownerName {}
+.ownerMeta {}
+.factsGrid {}
+.factCell {}
+.factIcon {}
+.factContent {}
+.factLabel {}
+.factValue {}
+
+/* SignoffPipeline */
+.signoffCard {}
+.signoffGrid {}
+.signoffConnector {}
+.signoffStage {}
+.signoffPin {}
+.signoffStageName {}
+.signoffActor {}
+.signoffActorName {}
+.signoffActorRole {}
+.signoffWhen {}
+
+/* ObsoleteBanner */
+.obsoleteBanner {}
+.obsoleteStamp {}
