@@ -75,6 +75,12 @@ frontend/apps/web/vite-*.out.log
 # Codex runtime dirs
 .codex-appdata/
 .codex-go-build-cache/
+.clone/
+
+# Claude sub-project and runtime artifacts
+.claude/scheduled_tasks.lock
+frontend/apps/web/.claude/
+frontend/apps/web/design-source/uploads/
 
 # Claude agents config
 .claude/agents/
