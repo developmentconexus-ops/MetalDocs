@@ -1,3 +1,40 @@
-.miniDoc {}
-.miniDocBrand {}
-.miniDocLine {}
+/* Mini doc preview — design source: design-source/screens-2.jsx lines 202-205.
+   Decorative mini-thumbnail; uses raw px for one-off paper-aesthetic dims
+   (80x100 paper, 1.5px line height, 2px paper radius) which have no
+   matching design token and are not reused outside this component. */
+
+.miniDoc {
+  position: absolute;
+  left: 18px;
+  top: 14px;
+  width: 80px;
+  height: 100px;
+  background: #ffffff;
+  box-shadow: var(--shadow-paper-2);
+  border-radius: 2px;
+  padding: 8px 7px;
+}
+
+.miniDocBrand {
+  height: 4px;
+  background: var(--brand);
+  width: 70%;
+  margin-bottom: 5px;
+}
+
+.miniDocLine {
+  height: 1.5px;
+  background: var(--paper-line);
+  margin-bottom: 3px;
+}
+
+/* Per-line widths replicate the design's `60 + (k*7)%35` formula
+   (k = 0..7): 60%, 67%, 74%, 81%, 88%, 95%, 67%, 74%. */
+.miniDocLine:nth-child(2) { width: 60%; }
+.miniDocLine:nth-child(3) { width: 67%; }
+.miniDocLine:nth-child(4) { width: 74%; }
+.miniDocLine:nth-child(5) { width: 81%; }
+.miniDocLine:nth-child(6) { width: 88%; }
+.miniDocLine:nth-child(7) { width: 95%; }
+.miniDocLine:nth-child(8) { width: 67%; }
+.miniDocLine:nth-child(9) { width: 74%; }

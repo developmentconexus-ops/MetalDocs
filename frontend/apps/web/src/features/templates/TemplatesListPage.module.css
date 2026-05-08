@@ -1,4 +1,74 @@
-.page {}
-.content {}
-.newBtn {}
-.cardGrid {}
+/* Templates list page — design source: design-source/screens-2.jsx lines 171-229 */
+
+.page {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+  min-height: 100%;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-7) var(--sp-6);
+}
+
+/* Primary action button rendered inside WorkspaceHeroHeader.action slot.
+   Replicates design `.btn .btn-primary` from design-source/styles.css. */
+.newBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 32px;
+  padding: 0 var(--sp-3);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--brand);
+  color: var(--text-on-brand);
+  border: 1px solid var(--brand-deep);
+  border-radius: var(--r-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.newBtn:hover {
+  background: var(--brand-deep);
+}
+
+.newBtn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+}
+
+@media (max-width: 1024px) {
+  .cardGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.loading,
+.error,
+.empty {
+  padding: var(--sp-7) var(--sp-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.error {
+  color: var(--danger);
+}
