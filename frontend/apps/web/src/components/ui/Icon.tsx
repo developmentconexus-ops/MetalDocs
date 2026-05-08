@@ -5,7 +5,7 @@ export type IconName =
   | 'workflow' | 'taxonomy' | 'users' | 'audit' | 'bell' | 'search'
   | 'plus' | 'chevron' | 'chevdown' | 'filter' | 'list' | 'lock'
   | 'check' | 'x' | 'download' | 'upload' | 'history' | 'link'
-  | 'cog' | 'arrow' | 'sparkle' | 'more';
+  | 'cog' | 'arrow' | 'sparkle' | 'more' | 'eye';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home:     <><path d="M3 10l7-6 7 6"/><path d="M5 9v8h10V9"/></>,
@@ -36,6 +36,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   arrow:    <><path d="M5 10h10M11 6l4 4-4 4"/></>,
   sparkle:  <><path d="M10 3l1.5 4 4 1.5-4 1.5L10 14l-1.5-4L4 8.5l4-1.5z"/></>,
   more:     <><circle cx="5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/></>,
+  eye:      <><circle cx="10" cy="10" r="3"/><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z"/></>,
 };
 
 type IconProps = {
