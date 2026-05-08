@@ -1,6 +1,6 @@
 import styles from './Avatar.module.css';
 
-type AvatarSize = 'sm' | 'md' | 'lg';
+type AvatarSize = 'xs' | 'sm' | 'md' | 'lg';
 
 type AvatarProps = {
   name: string;
@@ -18,6 +18,7 @@ function initials(name: string): string {
 }
 
 const sizeClass: Record<AvatarSize, string> = {
+  xs: `${styles.avatar} ${styles.xs}`,
   sm: `${styles.avatar} ${styles.sm}`,
   md: styles.avatar,
   lg: `${styles.avatar} ${styles.lg}`,
