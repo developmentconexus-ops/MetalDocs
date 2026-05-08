@@ -1,15 +1,64 @@
-.toolbar {}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0 var(--sp-6);
+  height: 48px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
 
-.kicker {}
+.kicker {
+  letter-spacing: 0.1em;
+}
 
-.breadcrumbSep {}
+.breadcrumbSep {
+  color: var(--text-faint);
+  font-size: 0.6875rem;
+}
 
-.breadcrumbTitle {}
+.breadcrumbTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
 
-.spacer {}
+.spacer {
+  flex: 1;
+}
 
-.filtersBtn {}
+.filtersBtn {
+  /* uses global .btn .btn-sm — no extra styles needed */
+}
 
-.viewSwitcher {}
+.viewSwitcher {
+  display: flex;
+  gap: 0;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+}
 
-.viewSwitcherBtn {}
+.viewSwitcherBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 5px var(--sp-3);
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--r-1);
+  transition: all 0.15s ease;
+  font-family: var(--font-sans);
+}
+
+.viewSwitcherBtn[data-active="true"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-1);
+}
