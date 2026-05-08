@@ -4,10 +4,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
+	registryapi "metaldocs/internal/modules/registry/api"
 	"metaldocs/internal/modules/registry/application"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
@@ -15,18 +19,6 @@ import (
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/tenant"
 )
-
-type createDocRequest struct {
-	ProfileCode               string  `json:"profileCode"`
-	ProcessAreaCode           string  `json:"processAreaCode"`
-	DepartmentCode            *string `json:"departmentCode"`
-	Title                     string  `json:"title"`
-	OwnerUserID               string  `json:"ownerUserId"`
-	ManualCode                *string `json:"manualCode"`
-	ManualCodeReason          *string `json:"manualCodeReason"`
-	OverrideTemplateVersionID *string `json:"overrideTemplateVersionId"`
-	OverrideTemplateReason    *string `json:"overrideTemplateReason"`
-}
 
 type activeDocumentResponse struct {
 	DocumentID          *string `json:"documentId,omitempty"`
@@ -52,15 +44,22 @@ func (h *Handler) listDocs(w http.ResponseWriter, r *http.Request) {
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (h *Handler) atomicCreate(w http.ResponseWriter, r *http.Request) {
-	var req createDocRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
+func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params registryapi.AtomicCreateControlledDocumentParams) {
+	var req registryapi.CreateAtomicRequest
+	if err := decodeStrictJSON(r, &req); err != nil {
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
 	}
-	if strings.TrimSpace(req.Title) == "" {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "title is required")
+	if field := missingAtomicCreateField(req); field != "" {
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "field "+field+" is required")
 		return
+	}
+
+	templateVersionID := uuidStringPtr(req.TemplateVersionId)
+	overrideTemplateVersionID := uuidStringPtr(req.OverrideTemplateVersionId)
+	formData := map[string]any(nil)
+	if req.FormData != nil {
+		formData = *req.FormData
 	}
 
 	res, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
@@ -69,12 +68,15 @@ func (h *Handler) atomicCreate(w http.ResponseWriter, r *http.Request) {
 		ProcessAreaCode:           strings.TrimSpace(req.ProcessAreaCode),
 		DepartmentCode:            req.DepartmentCode,
 		Title:                     strings.TrimSpace(req.Title),
-		OwnerUserID:               strings.TrimSpace(req.OwnerUserID),
+		OwnerUserID:               strings.TrimSpace(req.OwnerUserId),
 		ActorUserID:               authn.UserIDFromContext(r.Context()),
 		ManualCode:                req.ManualCode,
 		ManualCodeReason:          req.ManualCodeReason,
-		OverrideTemplateVersionID: req.OverrideTemplateVersionID,
+		OverrideTemplateVersionID: overrideTemplateVersionID,
 		OverrideTemplateReason:    req.OverrideTemplateReason,
+		TemplateVersionID:         templateVersionID,
+		DocumentName:              strings.TrimSpace(req.DocumentName),
+		FormData:                  formData,
 	})
 	if err != nil {
 		h.writeDomainError(w, err)
@@ -84,6 +86,46 @@ func (h *Handler) atomicCreate(w http.ResponseWriter, r *http.Request) {
 		"controlledDocument": res.ControlledDocument,
 		"document":           res.DocumentRef,
 	})
+}
+
+func decodeStrictJSON(r *http.Request, dst any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return errors.New("request body must contain a single JSON value")
+		}
+		return err
+	}
+	return nil
+}
+
+func missingAtomicCreateField(req registryapi.CreateAtomicRequest) string {
+	switch {
+	case strings.TrimSpace(req.DocumentName) == "":
+		return "documentName"
+	case strings.TrimSpace(req.ProfileCode) == "":
+		return "profileCode"
+	case strings.TrimSpace(req.ProcessAreaCode) == "":
+		return "processAreaCode"
+	case strings.TrimSpace(req.Title) == "":
+		return "title"
+	case strings.TrimSpace(req.OwnerUserId) == "":
+		return "ownerUserId"
+	default:
+		return ""
+	}
+}
+
+func uuidStringPtr(id *openapi_types.UUID) *string {
+	if id == nil {
+		return nil
+	}
+	value := id.String()
+	return &value
 }
 
 func (h *Handler) previewCode(w http.ResponseWriter, r *http.Request) {
@@ -261,6 +303,39 @@ func (h *Handler) supersedeDoc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params registryapi.ListControlledDocumentsParams) {
+	h.listDocs(w, r)
+}
+
+func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.Request, params registryapi.PreviewControlledDocumentCodeParams) {
+	h.previewCode(w, r)
+}
+
+func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
+	h.getDoc(w, r)
+}
+
+func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
+	h.getActiveDocument(w, r)
+}
+
+func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
+	h.obsoleteDoc(w, r)
+}
+
+func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params registryapi.CreateControlledDocumentRevisionParams) {
+	r.SetPathValue("id", id.String())
+	h.createRevision(w, r)
+}
+
+func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
+	h.supersedeDoc(w, r)
 }
 
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {

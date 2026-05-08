@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 
 	apiv2 "metaldocs/internal/api/v2"
+	registryapi "metaldocs/internal/modules/registry/api"
 	"metaldocs/internal/modules/registry/application"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
@@ -83,6 +85,42 @@ type fakeGovernanceLogger struct{}
 
 func (f fakeGovernanceLogger) Log(ctx context.Context, e taxonomydomain.GovernanceEvent) error {
 	return nil
+}
+
+type spyRegistryService struct {
+	gotCreate application.CreateControlledDocumentCmd
+}
+
+func (s *spyRegistryService) Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error) {
+	s.gotCreate = cmd
+	return &application.CreateResult{
+		ControlledDocument: &registrydomain.ControlledDocument{ID: "cd-1"},
+		DocumentRef:        &registrydomain.DocumentRef{ID: "doc-1", ContentHash: "hash-1"},
+	}, nil
+}
+
+func (s *spyRegistryService) List(ctx context.Context, tenantID string, filter application.CDFilter) ([]registrydomain.ControlledDocument, error) {
+	return nil, nil
+}
+
+func (s *spyRegistryService) CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*registrydomain.DocumentRef, error) {
+	return nil, nil
+}
+
+func (s *spyRegistryService) Get(ctx context.Context, tenantID, id string) (*registrydomain.ControlledDocument, error) {
+	return nil, registrydomain.ErrCDNotFound
+}
+
+func (s *spyRegistryService) Obsolete(ctx context.Context, tenantID, id string) error {
+	return nil
+}
+
+func (s *spyRegistryService) Supersede(ctx context.Context, tenantID, id string) error {
+	return nil
+}
+
+func (s *spyRegistryService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	return 1, nil
 }
 
 // helpers
@@ -159,6 +197,78 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 	}
 	if apiErr.Code == "" {
 		t.Fatalf("expected non-empty code in API error: %s", rec.Body.String())
+	}
+}
+
+func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
+	handler := &Handler{svc: &spyRegistryService{}}
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents", strings.NewReader(`{
+		"profileCode":"DC",
+		"processAreaCode":"RH",
+		"title":"Policy",
+		"ownerUserId":"user-1"
+	}`))
+	rec := httptest.NewRecorder()
+
+	handler.AtomicCreateControlledDocument(rec, req, registryapi.AtomicCreateControlledDocumentParams{})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "documentName") {
+		t.Fatalf("body %q does not mention documentName", rec.Body.String())
+	}
+}
+
+func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
+	handler := &Handler{svc: &spyRegistryService{}}
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents", strings.NewReader(`{
+		"documentName":"Policy v1",
+		"profileCode":"DC",
+		"processAreaCode":"RH",
+		"title":"Policy",
+		"ownerUserId":"user-1",
+		"evilField":true
+	}`))
+	rec := httptest.NewRecorder()
+
+	handler.AtomicCreateControlledDocument(rec, req, registryapi.AtomicCreateControlledDocumentParams{})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "evilField") {
+		t.Fatalf("body %q does not mention evilField", rec.Body.String())
+	}
+}
+
+func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
+	spy := &spyRegistryService{}
+	handler := &Handler{svc: spy}
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents", strings.NewReader(`{
+		"documentName":"Policy v1",
+		"profileCode":"DC",
+		"processAreaCode":"RH",
+		"title":"Policy",
+		"ownerUserId":"user-1",
+		"templateVersionId":"11111111-1111-1111-1111-111111111111",
+		"formData":{"summary":"hello","count":2}
+	}`))
+	rec := httptest.NewRecorder()
+
+	handler.AtomicCreateControlledDocument(rec, req, registryapi.AtomicCreateControlledDocumentParams{})
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	if spy.gotCreate.DocumentName != "Policy v1" {
+		t.Fatalf("DocumentName = %q, want Policy v1", spy.gotCreate.DocumentName)
+	}
+	if spy.gotCreate.TemplateVersionID == nil || *spy.gotCreate.TemplateVersionID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("TemplateVersionID = %v, want 11111111-1111-1111-1111-111111111111", spy.gotCreate.TemplateVersionID)
+	}
+	if spy.gotCreate.FormData["summary"] != "hello" {
+		t.Fatalf("FormData[summary] = %v, want hello", spy.gotCreate.FormData["summary"])
 	}
 }
 

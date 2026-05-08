@@ -6,16 +6,29 @@ import (
 	"net/http"
 	"strings"
 
+	registryapi "metaldocs/internal/modules/registry/api"
 	"metaldocs/internal/modules/registry/application"
+	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
 
 type tenantContextKey struct{}
 
+type registryService interface {
+	Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error)
+	List(ctx context.Context, tenantID string, filter application.CDFilter) ([]registrydomain.ControlledDocument, error)
+	CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*registrydomain.DocumentRef, error)
+	Get(ctx context.Context, tenantID, id string) (*registrydomain.ControlledDocument, error)
+	Obsolete(ctx context.Context, tenantID, id string) error
+	Supersede(ctx context.Context, tenantID, id string) error
+	PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error)
+}
+
 type Handler struct {
-	svc           *application.RegistryService
+	svc           registryService
 	db            *sql.DB
 	idempCreate   *idempotency.Store
 	idempRevision *idempotency.Store
@@ -56,8 +69,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		return tenantIDFromContext(ctx), authn.UserIDFromContext(ctx)
 	}
 
+	generated := registryapi.ServerInterfaceWrapper{
+		Handler: h,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		},
+	}
+
 	mux.Handle("POST /api/v2/controlled-documents",
-		injectTenant(idempotency.Require(h.idempCreate, actorOf)(http.HandlerFunc(h.atomicCreate))))
+		injectTenant(idempotency.Require(h.idempCreate, actorOf)(http.HandlerFunc(generated.AtomicCreateControlledDocument))))
 	mux.Handle("POST /api/v2/controlled-documents/{id}/revisions",
 		injectTenant(idempotency.Require(h.idempRevision, actorOf)(http.HandlerFunc(h.createRevision))))
 	mux.HandleFunc("GET /api/v2/controlled-documents/preview-code", h.previewCode)
