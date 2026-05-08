@@ -6,9 +6,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	registryapi "metaldocs/internal/modules/registry/api"
@@ -20,17 +20,8 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-type activeDocumentResponse struct {
-	DocumentID          *string `json:"documentId,omitempty"`
-	ApprovalState       *string `json:"approvalState,omitempty"`
-	ContentHash         *string `json:"contentHash,omitempty"`
-	RevisionVersion     *int    `json:"revisionVersion,omitempty"`
-	PublishedDocumentID *string `json:"publishedDocumentId,omitempty"`
-	ApprovalInstanceID  *string `json:"approvalInstanceId,omitempty"`
-}
-
-func (h *Handler) listDocs(w http.ResponseWriter, r *http.Request) {
-	filter, err := parseFilter(r)
+func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params registryapi.ListControlledDocumentsParams) {
+	filter, err := filterFromListParams(params)
 	if err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
@@ -41,7 +32,12 @@ func (h *Handler) listDocs(w http.ResponseWriter, r *http.Request) {
 		h.writeDomainError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+	respItems, err := controlledDocumentResponses(items)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, registryapi.ListControlledDocuments200JSONResponse{Items: respItems})
 }
 
 func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params registryapi.AtomicCreateControlledDocumentParams) {
@@ -128,9 +124,9 @@ func uuidStringPtr(id *openapi_types.UUID) *string {
 	return &value
 }
 
-func (h *Handler) previewCode(w http.ResponseWriter, r *http.Request) {
-	profileCode := strings.TrimSpace(r.URL.Query().Get("profileCode"))
-	areaCode := strings.TrimSpace(r.URL.Query().Get("areaCode"))
+func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.Request, params registryapi.PreviewControlledDocumentCodeParams) {
+	profileCode := strings.TrimSpace(params.ProfileCode)
+	areaCode := strings.TrimSpace(params.AreaCode)
 	if profileCode == "" || areaCode == "" {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "profileCode and areaCode query parameters are required")
 		return
@@ -141,49 +137,73 @@ func (h *Handler) previewCode(w http.ResponseWriter, r *http.Request) {
 		h.writeDomainError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"profileCode": strings.ToUpper(profileCode),
-		"areaCode":    strings.ToUpper(areaCode),
-		"nextSeq":     next,
-		"code":        registrydomain.AutoCode(profileCode, areaCode, next),
+	httpresponse.WriteJSON(w, http.StatusOK, registryapi.PreviewCodeResponse{
+		ProfileCode: strings.ToUpper(profileCode),
+		AreaCode:    strings.ToUpper(areaCode),
+		NextSeq:     next,
+		Code:        registrydomain.AutoCode(profileCode, areaCode, next),
 	})
 }
 
-func (h *Handler) createRevision(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params registryapi.CreateControlledDocumentRevisionParams) {
+	r.SetPathValue("id", id.String())
 	cdID := r.PathValue("id")
-	var body struct {
-		Name              string         `json:"name"`
-		FormData          map[string]any `json:"formData"`
-		TemplateVersionID *string        `json:"templateVersionId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
+	var body registryapi.CreateRevisionRequest
+	if err := decodeStrictJSON(r, &body); err != nil {
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
+	}
+	if field := missingCreateRevisionField(body); field != "" {
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "field "+field+" is required")
+		return
+	}
+	formData := map[string]any(nil)
+	if body.FormData != nil {
+		formData = *body.FormData
 	}
 	ref, err := h.svc.CreateRevision(r.Context(), application.CreateRevisionCmd{
 		TenantID:          tenantIDFromRequest(r),
 		CDID:              cdID,
-		Name:              body.Name,
-		FormData:          body.FormData,
-		TemplateVersionID: body.TemplateVersionID,
+		Name:              strings.TrimSpace(body.Name),
+		FormData:          formData,
+		TemplateVersionID: uuidStringPtr(body.TemplateVersionId),
 	})
 	if err != nil {
 		h.writeDomainError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusCreated, map[string]any{"document": ref})
+	respRef, err := documentRefResponse(ref)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusCreated, registryapi.RevisionResponse{Document: respRef})
 }
 
-func (h *Handler) getDoc(w http.ResponseWriter, r *http.Request) {
+func missingCreateRevisionField(req registryapi.CreateRevisionRequest) string {
+	if strings.TrimSpace(req.Name) == "" {
+		return "name"
+	}
+	return ""
+}
+
+func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
 	doc, err := h.svc.Get(r.Context(), tenantIDFromRequest(r), r.PathValue("id"))
 	if err != nil {
 		h.writeDomainError(w, err)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, doc)
+	resp, err := controlledDocumentResponse(*doc)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
-func (h *Handler) getActiveDocument(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
 	tenantID := tenantIDFromRequest(r)
 	cdID := r.PathValue("id")
 
@@ -250,9 +270,14 @@ SELECT active.id,
 		return
 	}
 
-	var resp activeDocumentResponse
+	var resp registryapi.ActiveDocumentResponse
 	if docID.Valid {
-		resp.DocumentID = &docID.String
+		id, err := uuid.Parse(docID.String)
+		if err != nil {
+			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+			return
+		}
+		resp.DocumentId = &id
 	}
 	if contentHash.Valid {
 		resp.ContentHash = &contentHash.String
@@ -262,10 +287,16 @@ SELECT active.id,
 		resp.RevisionVersion = &v
 	}
 	if approvalState.Valid {
-		resp.ApprovalState = &approvalState.String
+		state := registryapi.ActiveDocumentResponseApprovalState(approvalState.String)
+		resp.ApprovalState = &state
 	}
 	if publishedDocID.Valid {
-		resp.PublishedDocumentID = &publishedDocID.String
+		id, err := uuid.Parse(publishedDocID.String)
+		if err != nil {
+			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+			return
+		}
+		resp.PublishedDocumentId = &id
 	}
 
 	// Fetch in-progress approval instance only when an active doc exists.
@@ -282,14 +313,20 @@ SELECT id::text
 			docID.String, tenantID,
 		).Scan(&approvalInstanceID)
 		if approvalInstanceID.Valid {
-			resp.ApprovalInstanceID = &approvalInstanceID.String
+			id, err := uuid.Parse(approvalInstanceID.String)
+			if err != nil {
+				httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+				return
+			}
+			resp.ApprovalInstanceId = &id
 		}
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, resp)
 }
 
-func (h *Handler) obsoleteDoc(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
 	if err := h.svc.Obsolete(r.Context(), tenantIDFromRequest(r), r.PathValue("id")); err != nil {
 		h.writeDomainError(w, err)
 		return
@@ -297,7 +334,8 @@ func (h *Handler) obsoleteDoc(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) supersedeDoc(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	r.SetPathValue("id", id.String())
 	if err := h.svc.Supersede(r.Context(), tenantIDFromRequest(r), r.PathValue("id")); err != nil {
 		h.writeDomainError(w, err)
 		return
@@ -305,37 +343,68 @@ func (h *Handler) supersedeDoc(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params registryapi.ListControlledDocumentsParams) {
-	h.listDocs(w, r)
+func controlledDocumentResponses(docs []registrydomain.ControlledDocument) ([]registryapi.ControlledDocument, error) {
+	items := make([]registryapi.ControlledDocument, 0, len(docs))
+	for _, doc := range docs {
+		item, err := controlledDocumentResponse(doc)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
 }
 
-func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.Request, params registryapi.PreviewControlledDocumentCodeParams) {
-	h.previewCode(w, r)
+func controlledDocumentResponse(doc registrydomain.ControlledDocument) (registryapi.ControlledDocument, error) {
+	id, err := uuid.Parse(doc.ID)
+	if err != nil {
+		return registryapi.ControlledDocument{}, err
+	}
+	tenantID, err := uuid.Parse(doc.TenantID)
+	if err != nil {
+		return registryapi.ControlledDocument{}, err
+	}
+	overrideTemplateVersionID, err := optionalUUID(doc.OverrideTemplateVersionID)
+	if err != nil {
+		return registryapi.ControlledDocument{}, err
+	}
+	return registryapi.ControlledDocument{
+		Id:                        id,
+		TenantId:                  tenantID,
+		ProfileCode:               doc.ProfileCode,
+		ProcessAreaCode:           doc.ProcessAreaCode,
+		DepartmentCode:            doc.DepartmentCode,
+		Code:                      doc.Code,
+		SequenceNum:               doc.SequenceNum,
+		Title:                     doc.Title,
+		OwnerUserId:               doc.OwnerUserID,
+		OverrideTemplateVersionId: overrideTemplateVersionID,
+		Status:                    registryapi.ControlledDocumentStatus(doc.Status),
+		CreatedAt:                 doc.CreatedAt,
+		UpdatedAt:                 doc.UpdatedAt,
+	}, nil
 }
 
-func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	r.SetPathValue("id", id.String())
-	h.getDoc(w, r)
+func documentRefResponse(ref *registrydomain.DocumentRef) (registryapi.DocumentRef, error) {
+	id, err := uuid.Parse(ref.ID)
+	if err != nil {
+		return registryapi.DocumentRef{}, err
+	}
+	return registryapi.DocumentRef{
+		Id:          id,
+		ContentHash: ref.ContentHash,
+	}, nil
 }
 
-func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	r.SetPathValue("id", id.String())
-	h.getActiveDocument(w, r)
-}
-
-func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	r.SetPathValue("id", id.String())
-	h.obsoleteDoc(w, r)
-}
-
-func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params registryapi.CreateControlledDocumentRevisionParams) {
-	r.SetPathValue("id", id.String())
-	h.createRevision(w, r)
-}
-
-func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	r.SetPathValue("id", id.String())
-	h.supersedeDoc(w, r)
+func optionalUUID(value *string) (*openapi_types.UUID, error) {
+	if value == nil || strings.TrimSpace(*value) == "" {
+		return nil, nil
+	}
+	id, err := uuid.Parse(*value)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
@@ -383,47 +452,57 @@ func tenantIDFromRequest(r *http.Request) string {
 	return tid
 }
 
-func parseFilter(r *http.Request) (application.CDFilter, error) {
-	query := r.URL.Query()
+func filterFromListParams(params registryapi.ListControlledDocumentsParams) (application.CDFilter, error) {
 	filter := application.CDFilter{}
 
-	if value := strings.TrimSpace(query.Get("profileCode")); value != "" {
-		filter.ProfileCode = &value
+	if params.ProfileCode != nil {
+		value := strings.TrimSpace(*params.ProfileCode)
+		if value != "" {
+			filter.ProfileCode = &value
+		}
 	}
-	if value := strings.TrimSpace(query.Get("processAreaCode")); value != "" {
-		filter.ProcessAreaCode = &value
+	if params.ProcessAreaCode != nil {
+		value := strings.TrimSpace(*params.ProcessAreaCode)
+		if value != "" {
+			filter.ProcessAreaCode = &value
+		}
 	}
-	if value := strings.TrimSpace(query.Get("departmentCode")); value != "" {
-		filter.DepartmentCode = &value
+	if params.DepartmentCode != nil {
+		value := strings.TrimSpace(*params.DepartmentCode)
+		if value != "" {
+			filter.DepartmentCode = &value
+		}
 	}
-	if value := strings.TrimSpace(query.Get("ownerUserId")); value != "" {
-		filter.OwnerUserID = &value
+	if params.OwnerUserId != nil {
+		value := strings.TrimSpace(*params.OwnerUserId)
+		if value != "" {
+			filter.OwnerUserID = &value
+		}
 	}
-	if value := strings.TrimSpace(query.Get("q")); value != "" {
-		filter.Query = &value
+	if params.Q != nil {
+		value := strings.TrimSpace(*params.Q)
+		if value != "" {
+			filter.Query = &value
+		}
 	}
-	if value := strings.TrimSpace(query.Get("status")); value != "" {
-		status := registrydomain.CDStatus(value)
-		switch status {
-		case registrydomain.CDStatusActive, registrydomain.CDStatusObsolete, registrydomain.CDStatusSuperseded:
-			filter.Status = &status
-		default:
+	if params.Status != nil {
+		if !params.Status.Valid() {
 			return application.CDFilter{}, errors.New("invalid status value")
 		}
+		status := registrydomain.CDStatus(*params.Status)
+		filter.Status = &status
 	}
-	if value := strings.TrimSpace(query.Get("limit")); value != "" {
-		limit, err := strconv.Atoi(value)
-		if err != nil || limit < 0 {
+	if params.Limit != nil {
+		if *params.Limit < 0 {
 			return application.CDFilter{}, errors.New("invalid limit value")
 		}
-		filter.Limit = limit
+		filter.Limit = *params.Limit
 	}
-	if value := strings.TrimSpace(query.Get("offset")); value != "" {
-		offset, err := strconv.Atoi(value)
-		if err != nil || offset < 0 {
+	if params.Offset != nil {
+		if *params.Offset < 0 {
 			return application.CDFilter{}, errors.New("invalid offset value")
 		}
-		filter.Offset = offset
+		filter.Offset = *params.Offset
 	}
 
 	return filter, nil
