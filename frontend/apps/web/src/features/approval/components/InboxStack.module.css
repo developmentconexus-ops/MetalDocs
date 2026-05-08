@@ -215,5 +215,21 @@
 }
 
 .error {
-  color: var(--danger, #e5534b);
+  color: var(--danger);
+}
+
+/* ─── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .root {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .queueRail {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 220px;
+    overflow-x: auto;
+  }
 }
