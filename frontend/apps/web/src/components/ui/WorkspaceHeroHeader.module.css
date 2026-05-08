@@ -81,6 +81,10 @@
     padding: 1.1rem 1.4rem;
   }
 
+  .headerFlat {
+    padding: 0;
+  }
+
   .headerCompact {
     height: 64px;
     padding: 0 1.4rem;
