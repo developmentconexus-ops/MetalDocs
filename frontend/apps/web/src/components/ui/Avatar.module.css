@@ -5,7 +5,7 @@
   border-radius: 50%;
   font-weight: 700;
   font-size: 0.68rem;
-  color: #fff;
+  color: var(--text-on-brand);
   background: var(--brand);
   flex-shrink: 0;
   width: 28px;
@@ -24,4 +24,11 @@
   width: 36px;
   height: 36px;
   font-size: 0.85rem;
+}
+
+.xs {
+  width: var(--sp-5);
+  height: var(--sp-5);
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
 }
