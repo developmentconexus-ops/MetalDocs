@@ -5048,6 +5048,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/controlled-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List controlled documents */
+        get: operations["listControlledDocuments"];
+        put?: never;
+        /** Atomically create controlled document and initial revision */
+        post: operations["atomicCreateControlledDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/controlled-documents/preview-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview the next auto-generated document code without allocating it */
+        get: operations["previewControlledDocumentCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/controlled-documents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get controlled document by ID */
+        get: operations["getControlledDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/controlled-documents/{id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a new revision for a controlled document */
+        post: operations["createControlledDocumentRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/controlled-documents/{id}/active-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the active document instance for a controlled document */
+        get: operations["getActiveDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/controlled-documents/{id}/obsolete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark controlled document as obsolete */
+        put: operations["obsoleteControlledDocument"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/controlled-documents/{id}/supersede": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark controlled document as superseded */
+        put: operations["supersedeControlledDocument"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/documents": {
         parameters: {
             query?: never;
@@ -6603,6 +6723,83 @@ export interface components {
              */
             MDDM_NATIVE_EXPORT_ROLLOUT_PCT: number;
         };
+        ControlledDocument: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tenantId: string;
+            profileCode: string;
+            processAreaCode: string;
+            departmentCode?: string | null;
+            code: string;
+            sequenceNum?: number | null;
+            title: string;
+            ownerUserId: string;
+            /** Format: uuid */
+            overrideTemplateVersionId?: string | null;
+            /** @enum {string} */
+            status: "active" | "obsolete" | "superseded";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        DocumentRef: {
+            /** Format: uuid */
+            id: string;
+            contentHash: string;
+        };
+        CreateAtomicRequest: {
+            profileCode: string;
+            processAreaCode: string;
+            departmentCode?: string;
+            title: string;
+            ownerUserId: string;
+            documentName: string;
+            /** Format: uuid */
+            templateVersionId?: string;
+            formData?: {
+                [key: string]: unknown;
+            };
+            manualCode?: string;
+            manualCodeReason?: string;
+            /** Format: uuid */
+            overrideTemplateVersionId?: string;
+            overrideTemplateReason?: string;
+        };
+        AtomicCreateResponse: {
+            controlledDocument: components["schemas"]["ControlledDocument"];
+            document: components["schemas"]["DocumentRef"];
+        };
+        CreateRevisionRequest: {
+            name: string;
+            formData?: {
+                [key: string]: unknown;
+            };
+            /** Format: uuid */
+            templateVersionId?: string;
+        };
+        RevisionResponse: {
+            document: components["schemas"]["DocumentRef"];
+        };
+        PreviewCodeResponse: {
+            profileCode: string;
+            areaCode: string;
+            nextSeq: number;
+            code: string;
+        };
+        ActiveDocumentResponse: {
+            /** Format: uuid */
+            documentId?: string;
+            /** @enum {string} */
+            approvalState?: "draft" | "under_review" | "approved" | "scheduled" | "rejected" | "cancelled";
+            contentHash?: string;
+            revisionVersion?: number;
+            /** Format: uuid */
+            publishedDocumentId?: string;
+            /** Format: uuid */
+            approvalInstanceId?: string;
+        };
     };
     responses: never;
     parameters: {
@@ -6976,6 +7173,359 @@ export interface operations {
                         version_id?: string;
                     };
                 };
+            };
+        };
+    };
+    listControlledDocuments: {
+        parameters: {
+            query?: {
+                profileCode?: string;
+                processAreaCode?: string;
+                departmentCode?: string;
+                ownerUserId?: string;
+                q?: string;
+                status?: "active" | "obsolete" | "superseded";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ControlledDocument"][];
+                    };
+                };
+            };
+            /** @description validation_error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    atomicCreateControlledDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAtomicRequest"];
+            };
+        };
+        responses: {
+            /** @description created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtomicCreateResponse"];
+                };
+            };
+            /** @description validation_error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description code_taken or domain conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description template_invalid */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    previewControlledDocumentCode: {
+        parameters: {
+            query: {
+                profileCode: string;
+                areaCode: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewCodeResponse"];
+                };
+            };
+            /** @description validation_error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getControlledDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ControlledDocument"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    createControlledDocumentRevision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"];
+                };
+            };
+            /** @description validation_error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description controlled_document_not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description controlled_document_not_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getActiveDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveDocumentResponse"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description no_active_instance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    obsoleteControlledDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description obsoleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description controlled_document_not_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    supersedeControlledDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description superseded */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description controlled_document_not_active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
