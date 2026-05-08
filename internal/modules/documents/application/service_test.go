@@ -70,7 +70,7 @@ func (f *fakeRepo) CreateDocument(_ context.Context, _ *domain.Document, _ strin
 	return f.createDocIDs[0], f.createDocIDs[1], f.createDocIDs[2], nil
 }
 
-func (f *fakeRepo) CreateDocumentTx(_ context.Context, _ *sql.Tx, _ *domain.Document, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
+func (f *fakeRepo) CreateDocumentTx(_ context.Context, _ *sql.Tx, _ *domain.Document, _, _ string, _ []templatesdomain.Placeholder) (string, string, string, error) {
 	if f.createDocErr != nil {
 		return "", "", "", f.createDocErr
 	}

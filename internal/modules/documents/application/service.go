@@ -26,7 +26,7 @@ type RestoreResult = repository.RestoreResult
 
 type Repository interface {
 	CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
-	CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
+	CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
 	SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error
@@ -380,8 +380,9 @@ type cloneIntoTxInput struct {
 //
 // Differences from CreateDocument:
 //   - No S3 rendering (docgen is not invoked).
-//   - No AdoptTempObject / SetRevisionStorageKey — the initial revision keeps
-//     storage_key="". The editor renders on demand at first open.
+//   - Template-passthrough: storage_key is set to the template's published
+//     docx key atomically with the insert, so the editor opens immediately
+//     on first GET — no lazy materialization, no AdoptTempObject side-effect.
 //   - No outbox / audit writes — caller decides which side-effects to run
 //     after tx.Commit().
 //
@@ -468,7 +469,7 @@ func (s *Service) cloneIntoTx(ctx context.Context, tx *sql.Tx, in cloneIntoTxInp
 		TemplateSnapshot:        snap,
 	}
 
-	docID, _, _, err = s.repo.CreateDocumentTx(ctx, tx, &doc, contentHash, phs)
+	docID, _, _, err = s.repo.CreateDocumentTx(ctx, tx, &doc, contentHash, docxKey, phs)
 	if err != nil {
 		return "", "", err
 	}
@@ -766,71 +767,5 @@ func (s *Service) SignedRevisionURL(ctx context.Context, tenantID, docID, revID 
 	if err != nil {
 		return "", err
 	}
-	if rev.StorageKey == "" {
-		// Atomic-create (registry CD path) leaves the initial revision's
-		// storage_key="" by contract — the editor renders on demand at first
-		// open. Materialize bytes now, then refetch so we presign the freshly
-		// finalized key.
-		if err := s.materializeInitialRevision(ctx, tenantID, docID, rev); err != nil {
-			return "", err
-		}
-		rev, err = s.repo.GetRevision(ctx, docID, revID)
-		if err != nil {
-			return "", err
-		}
-		if rev.StorageKey == "" {
-			return "", fmt.Errorf("revision %s storage_key still empty after render", revID)
-		}
-	}
 	return s.presigner.PresignObjectGET(ctx, rev.StorageKey)
-}
-
-// materializeInitialRevision lazily renders (or template-passthroughs) the
-// docx bytes for an atomic-created document on first editor open and
-// finalizes storage_key. Mirrors the two branches in CreateDocument
-// (service.go:304-359). Concurrent callers race on SetRevisionStorageKey;
-// the winner's key wins, the loser silently observes and refetches.
-func (s *Service) materializeInitialRevision(ctx context.Context, tenantID, docID string, rev *domain.Revision) error {
-	doc, err := s.repo.GetDocument(ctx, tenantID, docID)
-	if err != nil {
-		return err
-	}
-	docxKey, schemaKey, _, err := s.tpl.GetPublishedVersion(ctx, tenantID, doc.TemplateVersionID)
-	if err != nil {
-		return fmt.Errorf("template lookup: %w", err)
-	}
-
-	var finalKey string
-	if s.docgen != nil {
-		tmpKey := fmt.Sprintf("tenants/%s/documents/tmp/%s.docx", tenantID, uuid.New().String())
-		contentHash, _, _, err := s.docgen.RenderDocx(ctx, docxKey, schemaKey, tmpKey, doc.FormDataJSON)
-		if err != nil {
-			return fmt.Errorf("render: %w", err)
-		}
-		cleanupKey := tmpKey
-		defer func() {
-			if cleanupKey != "" {
-				_ = s.presigner.DeleteObject(context.Background(), cleanupKey)
-			}
-		}()
-		finalKey = fmt.Sprintf("tenants/%s/documents/%s/revisions/%s.docx", tenantID, docID, contentHash)
-		if err := s.presigner.AdoptTempObject(ctx, tmpKey, finalKey); err != nil {
-			return fmt.Errorf("adopt tmp: %w", err)
-		}
-		cleanupKey = ""
-	} else {
-		// docgen not configured: point the revision at the template docx
-		// directly. Matches the CreateDocument fallback path.
-		finalKey = docxKey
-	}
-
-	if err := s.repo.SetRevisionStorageKey(ctx, rev.ID, finalKey); err != nil {
-		// Concurrent first-open: a peer already set the key. Caller will
-		// refetch and presign the winner's value, so swallow this race.
-		if strings.Contains(err.Error(), "already has storage_key set") {
-			return nil
-		}
-		return fmt.Errorf("set revision key: %w", err)
-	}
-	return nil
 }
