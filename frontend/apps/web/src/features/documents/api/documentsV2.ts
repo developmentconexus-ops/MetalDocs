@@ -163,3 +163,31 @@ export async function patchComment(
 export async function deleteComment(documentID: string, libraryID: number): Promise<void> {
   await apiFetch<void>(`/api/v2/documents/${documentID}/comments/${libraryID}`, { method: 'DELETE' });
 }
+
+// Approval instance types
+export type SignoffRecord = {
+  actor_user_id: string;  // actually display name snapshot from backend
+  status: 'pending' | 'approved' | 'rejected' | 'abstained';
+  signed_at: string | null;
+  comment: string | null;
+};
+
+export type StageInstance = {
+  stage_id: string;
+  name: string;
+  status: 'pending' | 'approved' | 'rejected' | 'skipped';
+  signoffs: SignoffRecord[];
+};
+
+export type ApprovalInstanceResponse = {
+  id: string;
+  document_id: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  stages: StageInstance[];
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getApprovalInstance(documentId: string): Promise<ApprovalInstanceResponse> {
+  return apiFetch(`/api/v2/documents/${documentId}/approval-instance`);
+}
