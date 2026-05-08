@@ -3,7 +3,7 @@
 **Branch:** `feature/screen-redesign`
 **Spec:** `docs/superpowers/specs/2026-05-05-screen-redesign-design.md`
 **Design source:** `frontend/apps/web/design-source/`
-**Last updated:** 2026-05-08 · Library ✅ · Wizard ✅ · Templates Phase 5 ✅
+**Last updated:** 2026-05-08 · Library ✅ · Wizard ✅ · Templates Phase 5 ✅ · Approval Inbox Phase 5 ✅ · design-source updated with zip v4 (3 new screens, 2 updated, 6 new JSX assets)
 
 ---
 
@@ -26,9 +26,12 @@ Each block gets its own detailed plan in `docs/superpowers/plans/`. Mark complet
 | **Wizard** | 4-step stepper, profile/area/visibility/template pickers | — | ✅ Done (UI) — smoke verified 2026-05-07; deferred items in `wiki/backlog/novo-documento.md` |
 | **Templates** | 3-col card grid, mini doc preview, real API, tab filter, a11y TabBar, `tone="flat"` hero | — | ✅ Done (Phase 5) — list screen verified 2026-05-08; deferred items in `wiki/backlog/templates.md` |
 | **Registry** | Sequence counter grid, controlled documents table | — | 🔲 Not started |
-| **Dashboard** | Hero greeting, stat row, pending approvals, shortcuts | — | ⏳ Waiting on Registry |
-| **Approval Inbox** | Filter strip, multi-select table, pagination | — | ⏳ Waiting on Dashboard |
-| **Signoff Detail** | A4 diff view, approval flow panel, decision form | — | ⏳ Waiting on Approval Inbox |
+| **Dashboard** | Editorial layout (`DashboardEditorial`) — design updated zip v4 | — | ⏳ Waiting on Registry |
+| **Approval Inbox** | Inbox with Foco/Linha-do-tempo views (`InboxStack`/`InboxTimeline`) — design updated zip v4 | — | ✅ Done (Phase 5) — inbox UI verified 2026-05-08; deferred items in `wiki/backlog/caixa-aprovacao.md` |
+| **Signoff Detail** | A4 diff view, approval flow panel, decision form | — | 🔲 Not started |
+| **Documento Publicado** | Published document full view (`PublicadoV5`) | — | 🔲 Not started |
+| **Documento Obsoleto** | Obsolete document variant (`PublicadoV5 obsolete`) | — | 🔲 Not started |
+| **Distribuição** | Fanout/coverage view (`FanoutV5`) | — | 🔲 Not started |
 
 ---
 

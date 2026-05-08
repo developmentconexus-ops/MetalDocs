@@ -17,10 +17,12 @@ export function InboxApprovalCard({ item }: InboxApprovalCardProps) {
             <div className={`${styles.codeVersion} mono`}>{item.code} · {item.version}</div>
             <h2 className={styles.cardTitle}>{item.document_title}</h2>
           </div>
-          <div className={styles.deadlineBlock}>
-            <div className={styles.deadlineLabel}>VENCE EM</div>
-            <div className={styles.deadlineValue}>{item.deadline}</div>
-          </div>
+          {item.urgent && (
+            <div className={styles.deadlineBlock}>
+              <div className={styles.deadlineLabel}>VENCE EM</div>
+              <div className={styles.deadlineValue}>{item.deadline}</div>
+            </div>
+          )}
         </div>
       </div>
       <div className={styles.cardBody}>

@@ -14,7 +14,6 @@ interface Bucket {
 }
 
 function groupByDeadlineBucket(items: RichInboxItem[]): Bucket[] {
-  const now = Date.now();
   const todayEnd = new Date();
   todayEnd.setHours(23, 59, 59, 999);
   const tomorrowEnd = new Date(todayEnd);
@@ -86,7 +85,11 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
                 <div
                   key={i}
                   className={styles.heatmapBar}
-                  style={{ height: `${(v / 9) * 100}%` }}
+                  style={{
+                    height: `${(v / 9) * 100}%`,
+                    opacity: 0.3 + (v / 9) * 0.7,
+                    animationDelay: `${i * 30}ms`,
+                  }}
                   title={`${v} decisões`}
                 />
               ))}
@@ -98,93 +101,113 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
           </div>
         </div>
 
-        {/* Timeline */}
+        {/* Timeline — each bucket is a 2-col grid row: [rail col] [content col] */}
         <div className={styles.timeline}>
-          <div className={styles.timelineRail} aria-hidden="true" />
-
-          {buckets.map((bucket) => (
-            <section key={bucket.label} className={styles.bucketSection}>
-              <div
-                className={`${styles.bucketDot}${bucket.urgent ? ` ${styles.bucketDotUrgent}` : ''}`}
-                aria-hidden="true"
-              />
-              <div className={styles.bucketHeader}>
-                <h2 className={`${styles.bucketLabel}${bucket.urgent ? ` ${styles.bucketLabelUrgent}` : ''}`}>
-                  {bucket.label}
-                </h2>
-                <span className={`${styles.bucketSub} mono`}>{bucket.sub}</span>
-                <span className={styles.spacer} />
-                <span
-                  className={`${styles.bucketCount}${bucket.urgent && bucket.items.length > 0 ? ` ${styles.bucketCountUrgent}` : ''}${bucket.items.length === 0 ? ` ${styles.bucketCountEmpty}` : ''}`}
-                >
-                  {bucket.items.length} docs
-                </span>
+          {buckets.map((bucket, bIdx) => (
+            <div key={bucket.label} className={styles.bucketRow}>
+              {/* Rail column: dot + connecting line — both centered in the same column */}
+              <div className={styles.railCol} aria-hidden="true">
+                <div
+                  className={[
+                    styles.railDot,
+                    bucket.urgent ? styles.railDotUrgent : '',
+                    !bucket.urgent && bucket.items.length > 0 ? styles.railDotFilled : '',
+                  ].filter(Boolean).join(' ')}
+                />
+                {bIdx < buckets.length - 1 && (
+                  <div
+                    className={[
+                      styles.railLine,
+                      bIdx === 0 ? styles.railLineFirst : '',
+                    ].filter(Boolean).join(' ')}
+                  />
+                )}
               </div>
 
-              {bucket.items.length === 0 ? (
-                <div className={styles.emptyBucket}>Nada ainda. Continue assim.</div>
-              ) : (
-                <div className={styles.bucketItems}>
-                  {bucket.items.map((item) => {
-                    const handleClick = () => {
-                      // TODO [BACKLOG: caixa-aprovacao.md]: open doc from timeline
-                    };
-                    return (
-                      <div
-                        key={item.instance_id}
-                        role="button"
-                        tabIndex={0}
-                        className={styles.itemRow}
-                        onClick={handleClick}
-                        onKeyDown={(e) => handleRowKeyDown(e, handleClick)}
-                      >
-                        <div className={styles.itemTime}>
-                          <div className={`${styles.itemTimeValue} mono`}>—</div>
-                          <div className="caption">vence em {item.deadline}</div>
-                        </div>
-                        <div className={styles.itemMeta}>
-                          <div className={styles.itemMetaTop}>
-                            <span className={styles.itemKind}>{item.kind}</span>
-                            <span className={`${styles.itemCode} mono`}>{item.code}</span>
-                          </div>
-                          <div className={styles.itemTitle}>{item.document_title}</div>
-                          <div className={styles.itemAuthLine}>
-                            <Avatar name={item.submitted_by} size="xs" />
-                            <span>{item.submitted_by}</span>
-                            <span className={styles.itemDot}>·</span>
-                            <span>{item.area_code}</span>
-                            <span className={styles.itemDot}>·</span>
-                            <span>{item.changes} alterações</span>
-                          </div>
-                        </div>
-                        <div className={styles.itemSpacer} />
-                        <div className={styles.stageProgress}>
-                          <div className={styles.stageBars}>
-                            <span className={`${styles.stageBar} ${styles.stageBarFilled}${bucket.urgent ? ` ${styles.stageBarUrgent}` : ''}`} />
-                            <span className={`${styles.stageBar} ${styles.stageBarFilled}${bucket.urgent ? ` ${styles.stageBarUrgent}` : ''}`} />
-                            <span className={styles.stageBar} />
-                            <span className={styles.stageBar} />
-                          </div>
-                          <div className={`${styles.stageLabel} caption mono`}>
-                            {item.stage_label}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className={`${styles.reviewBtn} btn btn-primary btn-sm`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // TODO [BACKLOG: caixa-aprovacao.md]: open doc from timeline
-                          }}
-                        >
-                          Revisar →
-                        </button>
-                      </div>
-                    );
-                  })}
+              {/* Content column */}
+              <section className={styles.bucketSection}>
+                <div className={styles.bucketHeader}>
+                  <h2 className={`${styles.bucketLabel}${bucket.urgent ? ` ${styles.bucketLabelUrgent}` : ''}`}>
+                    {bucket.label}
+                  </h2>
+                  <span className={`${styles.bucketSub} mono`}>{bucket.sub}</span>
+                  <span className={styles.spacer} />
+                  <span
+                    className={[
+                      styles.bucketCount,
+                      bucket.urgent && bucket.items.length > 0 ? styles.bucketCountUrgent : '',
+                      bucket.items.length === 0 ? styles.bucketCountEmpty : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    {bucket.items.length} docs
+                  </span>
                 </div>
-              )}
-            </section>
+
+                {bucket.items.length === 0 ? (
+                  <div className={styles.emptyBucket}>Nada ainda. Continue assim.</div>
+                ) : (
+                  <div className={styles.bucketItems}>
+                    {bucket.items.map((item) => {
+                      const handleClick = () => {
+                        // TODO [BACKLOG: caixa-aprovacao.md]: open doc from timeline
+                      };
+                      return (
+                        <div
+                          key={item.instance_id}
+                          role="button"
+                          tabIndex={0}
+                          className={styles.itemRow}
+                          onClick={handleClick}
+                          onKeyDown={(e) => handleRowKeyDown(e, handleClick)}
+                        >
+                          <div className={styles.itemTime}>
+                            <div className={`${styles.itemTimeValue} mono`}>—</div>
+                            <div className="caption">vence em {item.deadline}</div>
+                          </div>
+                          <div className={styles.itemMeta}>
+                            <div className={styles.itemMetaTop}>
+                              <span className={styles.itemKind}>{item.kind}</span>
+                              <span className={`${styles.itemCode} mono`}>{item.code}</span>
+                            </div>
+                            <div className={styles.itemTitle}>{item.document_title}</div>
+                            <div className={styles.itemAuthLine}>
+                              <Avatar name={item.submitted_by} size="xs" />
+                              <span>{item.submitted_by}</span>
+                              <span className={styles.itemDot}>·</span>
+                              <span>{item.area_code}</span>
+                              <span className={styles.itemDot}>·</span>
+                              <span>{item.changes} alterações</span>
+                            </div>
+                          </div>
+                          <div className={styles.itemSpacer} />
+                          <div className={styles.stageProgress}>
+                            <div className={styles.stageBars}>
+                              <span className={`${styles.stageBar} ${styles.stageBarFilled}${bucket.urgent ? ` ${styles.stageBarUrgent}` : ''}`} />
+                              <span className={`${styles.stageBar} ${styles.stageBarFilled}${bucket.urgent ? ` ${styles.stageBarUrgent}` : ''}`} />
+                              <span className={styles.stageBar} />
+                              <span className={styles.stageBar} />
+                            </div>
+                            <div className={`${styles.stageLabel} caption mono`}>
+                              {item.stage_label}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className={`${styles.reviewBtn} btn btn-primary btn-sm`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // TODO [BACKLOG: caixa-aprovacao.md]: open doc from timeline
+                            }}
+                          >
+                            Revisar →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
           ))}
         </div>
       </div>

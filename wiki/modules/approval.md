@@ -1,7 +1,7 @@
 # Module: approval
 
-> **Last verified:** 2026-05-05
-> **Scope:** Approval routes, signoffs, ISO segregation enforcement, eligibility enforcement, freeze trigger.
+> **Last verified:** 2026-05-08
+> **Scope:** Approval routes, signoffs, ISO segregation enforcement, eligibility enforcement, freeze trigger; Caixa de Aprovação inbox UI (`/approvals`).
 > **Out of scope:** Freeze pipeline mechanics (see `workflows/freeze-and-fanout.md`).
 > **Key files:**
 > - `internal/modules/documents/approval/` — backend approval logic
@@ -20,7 +20,13 @@
 > - `internal/modules/documents/approval/http/handler.go:65` — `NewHandler` — accepts `signoffIdempStore` positional param
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
 > - `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:1` — `PostgresSignoffIdempStore`
-> - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx:31` — `InboxPage` component; area filter populated via `fetchAreas()` (E7 — removed hardcoded AREA_OPTIONS)
+> - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx:9` — `InboxPage`; view switcher (stack/timeline), localStorage persistence (`md.inbox.v`), keyboard nav (←/→), mock fallback strategy
+> - `frontend/apps/web/src/features/approval/components/InboxStack.tsx:16` — `InboxStack`; two-panel queue-rail + card area; keyboard event wiring (ArrowLeft/ArrowRight)
+> - `frontend/apps/web/src/features/approval/components/InboxApprovalCard.tsx:10` — `InboxApprovalCard`; urgency variant header, stats grid (author/changes/stage), action buttons (stub)
+> - `frontend/apps/web/src/features/approval/components/InboxTimeline.tsx:63` — `InboxTimeline`; 4-bucket deadline grouping (Hoje/Amanhã/Esta semana/Próximo mês), animated rail, heatmap sparkline (hardcoded — deferred)
+> - `frontend/apps/web/src/features/approval/lib/mockInboxData.ts:7` — `RichInboxItem` type extending `InboxItem`; `MOCK_INBOX_ITEMS`; `enrichInboxItem(item, idx)`
+> - `frontend/apps/web/src/features/approval/queries/useInboxQuery.ts:6` — `useInboxQuery` TanStack Query hook wrapping `listInbox`; uses `QK.inbox(params)`
+> - `frontend/apps/web/src/features/approval/pages/InboxPage.test.tsx:1` — 6 vitest tests: loading, error, empty→mock fallback, API items, localStorage persistence, next/prev nav
 > - `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:7` — `StageDraft` interface; `toDraft` at :49 maps existing stage fields
 > - `frontend/apps/web/src/features/approval/api/approvalTypes.ts:16` — `RouteStage` (includes `required_role`, `required_capability`, `area_code`)
 > - `internal/modules/documents/approval/http/contracts/route.go:119` — `ListStageItem` (includes `RequiredRole`, `RequiredCapability`, `AreaCode`)
@@ -126,6 +132,70 @@ Previously `CreateDocument` did not include `revision_number` in its INSERT (def
 
 **Fixed by migration 0167:** `controlled_document_id` is now present on `public.documents`, and `CreateDocument` at `repository.go:37` computes `COALESCE(MAX(revision_number), 0) + 1` in the same INSERT via a subquery. The unique index `ux_documents_v2_cd_revision ON documents(controlled_document_id, revision_number)` (migration `0131`) now resolves correctly.
 
+## Inbox UI (Caixa de Aprovação)
+
+The `/approvals` route renders `InboxPage`, which implements a two-view inbox for actors with pending signoff decisions.
+
+### Views
+
+**Foco (stack view — default)**
+
+`InboxStack` renders a two-panel layout:
+
+- **Left rail (`aside.queueRail`):** scrollable list of all pending items, each showing code, title, area, deadline, and an urgency dot. Clicking selects the item.
+- **Right card area (`main.cardArea`):** `InboxApprovalCard` for the selected item. Shows urgency-variant header (orange tint when `item.urgent`), summary text, a 3-cell stats grid (author, change count, stage label), and three action buttons (open doc / return / approve). The action buttons are stubs — see `wiki/backlog/caixa-aprovacao.md`.
+
+Counter strip above card area shows `01 / 04` pagination + prev/next buttons.
+
+**Linha do Tempo (timeline view)**
+
+`InboxTimeline` groups items into 4 deadline buckets:
+
+| Bucket | Boundary |
+|---|---|
+| Hoje | deadline ≤ end of today |
+| Amanhã | deadline ≤ end of tomorrow |
+| Esta semana | deadline ≤ today + 7 days |
+| Próximo mês | everything else |
+
+Each bucket is a two-column grid row: an animated rail column (dot + connecting line; urgent dot pulses orange) and a content column with item rows. Item rows show submitter avatar, code, title, change count, stage progress bars, and a "Revisar →" button (stub — deferred in backlog). Empty buckets render "Nada ainda. Continue assim."
+
+A heatmap sparkline widget (14-day decision history) appears in the timeline header. Values are hardcoded — see `wiki/backlog/caixa-aprovacao.md` for real-data backend prereq.
+
+### View switcher + persistence
+
+`InboxPage` reads initial view from `localStorage.getItem('md.inbox.v')`, defaulting to `'stack'`. `handleViewChange` writes back on every switch. The `InboxToolbar` component renders the toggle buttons and calls `onViewChange`.
+
+Known issue: `view` state is typed as `string` instead of `'stack' | 'timeline'` — tracked in backlog.
+
+### Keyboard navigation (stack view only)
+
+`InboxStack` attaches a `keydown` listener to `window`:
+
+- `ArrowLeft` → `onPrev()` (moves to previous queue item)
+- `ArrowRight` → `onNext()` (moves to next queue item)
+- `A` / `D` → stubs (approve / return — deferred)
+
+Listener is removed on unmount. Registered only when `items.length > 0`.
+
+### Mock fallback strategy
+
+`useInboxQuery` wraps `listInbox` via TanStack Query (`QK.inbox(params)`). `InboxPage` applies the fallback:
+
+```
+API data present + non-empty  → enrich each item with MOCK_EXTRAS (positional, wraps)
+API loading or error           → empty list (InboxStack shows loading/error state)
+API returned empty             → MOCK_INBOX_ITEMS (4 canonical mock items)
+```
+
+`enrichInboxItem(item, idx)` in `mockInboxData.ts:89` spreads `MOCK_EXTRAS[idx % 5]` over the API `InboxItem` to fill `RichInboxItem` fields (`code`, `kind`, `deadline`, `urgent`, `summary`, `changes`, `version`, `deadline_at`) that the backend does not yet return. All `TODO [BACKLOG]` comments in `mockInboxData.ts` and the component files track the removal condition.
+
+### Deferred items
+
+See `wiki/backlog/caixa-aprovacao.md` for all 7 deferred items: action button wiring, heatmap real data, timeline click handlers, "Revisar →" cross-view nav, `view` type narrowing, eye icon, `approvalApi.ts` migration to `lib/api/client.ts`.
+
+---
+
 ## See also
 
 - [workflows/user-onboarding.md](../workflows/user-onboarding.md) — Step 8
@@ -133,3 +203,4 @@ Previously `CreateDocument` did not include `revision_number` in its INSERT (def
 - [concepts/iso-segregation.md](../concepts/iso-segregation.md)
 - [concepts/error-ux.md](../concepts/error-ux.md) — SoD dialog states (E2), auth-bus on 401 (E4), shared `ApprovalError`/`ApiError` hierarchy
 - [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md)
+- [backlog/caixa-aprovacao.md](../backlog/caixa-aprovacao.md) — deferred inbox UI items

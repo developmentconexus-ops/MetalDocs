@@ -1,177 +1,148 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InboxPage } from './InboxPage';
+import type { RichInboxItem } from '../lib/mockInboxData';
 
-import * as approvalApi from '../api/approvalApi';
-import * as taxonomyApi from '../../taxonomy/api/taxonomy';
-
-const navigateMock = vi.fn();
-
-vi.mock('../api/approvalApi');
-vi.mock('../../taxonomy/api/taxonomy', () => ({
-  fetchAreas: vi.fn().mockResolvedValue([]),
-}));
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => navigateMock,
+  useNavigate: () => vi.fn(),
 }));
 
-function createDeferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
+vi.mock('../queries/useInboxQuery', () => ({
+  useInboxQuery: vi.fn(),
+}));
+
+import { useInboxQuery } from '../queries/useInboxQuery';
+
+function makeItem(overrides: Partial<RichInboxItem> = {}): RichInboxItem {
+  return {
+    instance_id: 'inst-1',
+    document_id: 'doc-1',
+    controlled_document_id: 'cd-1',
+    document_title: 'POP Limpeza',
+    area_code: 'QUA',
+    submitted_by: 'maria',
+    submitted_at: '2026-04-14T10:00:00.000Z',
+    stage_label: 'Revisão L2',
+    quorum_progress: '1/2',
+    // RichInboxItem mock fields
+    code: 'POP-QUA-0001',
+    kind: 'POP',
+    deadline: '3h 28min',
+    urgent: false,
+    summary: 'Resumo do documento.',
+    changes: 5,
+    version: 'v1.0 → v1.1',
+    deadline_at: '2026-05-09T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function renderPage() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <InboxPage />
+    </QueryClientProvider>,
+  );
 }
 
 describe('InboxPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    // Restore default: areas effect must not throw
-    vi.mocked(taxonomyApi.fetchAreas).mockResolvedValue([]);
+    // Default localStorage clear
+    localStorage.removeItem('md.inbox.v');
   });
 
-  it('loading state', () => {
-    const deferred = createDeferred<{ items: []; total: number }>();
-    vi.mocked(approvalApi.listInbox).mockReturnValue(deferred.promise);
+  it('loading state shows Carregando', () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+    } as unknown as ReturnType<typeof useInboxQuery>);
 
-    render(<InboxPage />);
-
+    renderPage();
     expect(screen.getByText('Carregando...')).toBeTruthy();
   });
 
-  it('empty state', async () => {
-    vi.mocked(approvalApi.listInbox).mockResolvedValue({ items: [], total: 0 });
+  it('error state shows error alert', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    } as unknown as ReturnType<typeof useInboxQuery>);
 
-    render(<InboxPage />);
-
+    renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Nada pendente para revisão.')).toBeTruthy();
+      expect(screen.getByRole('alert')).toBeTruthy();
+      expect(screen.getByText('Erro ao carregar aprovações.')).toBeTruthy();
     });
   });
 
-  it('renders 3 rows with correct columns', async () => {
-    vi.mocked(approvalApi.listInbox).mockResolvedValue({
-      total: 3,
-      items: [
-        {
-          instance_id: 'inst-1',
-          document_id: 'doc-1',
-          controlled_document_id: 'cd-1',
-          document_title: 'POP Limpeza',
-          area_code: 'JUR',
-          submitted_by: 'maria',
-          submitted_at: '2026-04-14T10:00:00.000Z',
-          stage_label: 'Revisão Jurídica',
-          quorum_progress: '1/2',
-        },
-        {
-          instance_id: 'inst-2',
-          document_id: 'doc-2',
-          controlled_document_id: 'cd-2',
-          document_title: 'Manual Segurança',
-          area_code: 'RH',
-          submitted_by: 'ana',
-          submitted_at: '2026-04-14T11:00:00.000Z',
-          stage_label: 'Revisão RH',
-          quorum_progress: '0/1',
-        },
-        {
-          instance_id: 'inst-3',
-          document_id: 'doc-3',
-          controlled_document_id: 'cd-3',
-          document_title: 'Instrução Técnica',
-          area_code: 'ENG',
-          submitted_by: 'joao',
-          submitted_at: '2026-04-14T12:00:00.000Z',
-          stage_label: 'Validação Engenharia',
-          quorum_progress: '2/3',
-        },
-      ],
-    });
+  it('empty API response falls back to MOCK_INBOX_ITEMS (4 items)', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [], total: 0 },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useInboxQuery>);
 
-    render(<InboxPage />);
+    renderPage();
+    // Mock fallback has 4 items — counter shows 01 / 04
+    await waitFor(() => {
+      expect(screen.getByText('01 / 04')).toBeTruthy();
+    });
+  });
+
+  it('renders queue items from API data', async () => {
+    const item1 = makeItem({ instance_id: 'i1', document_title: 'POP Limpeza', code: 'POP-QUA-0001' });
+    const item2 = makeItem({ instance_id: 'i2', document_title: 'Manual Segurança', code: 'IT-PROD-0002' });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(useInboxQuery).mockReturnValue({ data: { items: [item1, item2], total: 2 }, isLoading: false, isError: false } as any);
+
+    renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('POP Limpeza')).toBeTruthy();
+      expect(screen.getAllByText('POP Limpeza').length).toBeGreaterThan(0);
       expect(screen.getByText('Manual Segurança')).toBeTruthy();
-      expect(screen.getByText('Instrução Técnica')).toBeTruthy();
-      expect(screen.getByText('Revisão Jurídica')).toBeTruthy();
     });
   });
 
-  it('click row calls navigate to /documents/:id', async () => {
-    vi.mocked(approvalApi.listInbox).mockResolvedValue({
-      total: 1,
-      items: [
-        {
-          instance_id: 'inst-1',
-          document_id: 'doc-1',
-          controlled_document_id: 'cd-1',
-          document_title: 'Documento A',
-          area_code: 'JUR',
-          submitted_by: 'maria',
-          submitted_at: '2026-04-14T10:00:00.000Z',
-          stage_label: 'Revisão Jurídica',
-          quorum_progress: '1/1',
-        },
-      ],
-    });
+  it('view switcher persists to localStorage', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [], total: 0 },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useInboxQuery>);
 
-    render(<InboxPage />);
+    renderPage();
 
-    const rowCell = await screen.findByText('Documento A');
-    fireEvent.click(rowCell.closest('tr') as HTMLElement);
+    const timelineBtn = screen.getByText('Linha do tempo');
+    fireEvent.click(timelineBtn);
 
-    expect(navigateMock).toHaveBeenCalledWith('/registry-v2/cd-1');
+    expect(localStorage.getItem('md.inbox.v')).toBe('timeline');
   });
 
-  it('filter by area re-fetches', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(taxonomyApi.fetchAreas).mockResolvedValue([{ code: 'JUR', name: 'Jurídico', archived: false } as any]);
-    vi.mocked(approvalApi.listInbox).mockResolvedValue({ items: [], total: 0 });
-    render(<InboxPage />);
+  it('next/prev navigation updates counter', async () => {
+    const items = [
+      makeItem({ instance_id: 'i1', document_title: 'Doc 1' }),
+      makeItem({ instance_id: 'i2', document_title: 'Doc 2' }),
+    ];
 
-    await waitFor(() => {
-      expect(vi.mocked(approvalApi.listInbox)).toHaveBeenCalledWith({
-        area_code: undefined,
-        offset: 0,
-        limit: 20,
-      });
-    });
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items, total: 2 },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useInboxQuery>);
 
-    // Wait for areas to load so 'JUR' option exists before firing change
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: /JUR/i })).toBeTruthy();
-    });
+    renderPage();
 
-    fireEvent.change(screen.getByLabelText('Área'), { target: { value: 'JUR' } });
+    await waitFor(() => expect(screen.getByText('01 / 02')).toBeTruthy());
 
-    await waitFor(() => {
-      expect(vi.mocked(approvalApi.listInbox)).toHaveBeenCalledWith({
-        area_code: 'JUR',
-        offset: 0,
-        limit: 20,
-      });
-    });
-  });
+    const nextBtn = screen.getByText('próximo →');
+    fireEvent.click(nextBtn);
 
-  it('populates area filter from fetchAreas, not hardcoded list', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(taxonomyApi.fetchAreas).mockResolvedValue([
-      { code: 'OPS', name: 'Operações', archived: false } as any,
-      { code: 'QA', name: 'Qualidade', archived: false } as any,
-    ]);
-    vi.mocked(approvalApi.listInbox).mockResolvedValue({ items: [], total: 0 });
-
-    render(<InboxPage />);
-
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: /Todas as áreas/i })).toBeTruthy();
-    });
-    expect(screen.getByRole('option', { name: /OPS — Operações/ })).toBeTruthy();
-    expect(screen.getByRole('option', { name: /QA — Qualidade/ })).toBeTruthy();
-    expect(screen.queryByRole('option', { name: /JUR/ })).toBeNull();
+    expect(screen.getByText('02 / 02')).toBeTruthy();
   });
 });
