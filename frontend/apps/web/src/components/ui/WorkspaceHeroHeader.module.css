@@ -36,6 +36,21 @@
   min-width: 420px;
 }
 
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.action {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
 .title {
   margin: 0;
   font-size: 2rem;
