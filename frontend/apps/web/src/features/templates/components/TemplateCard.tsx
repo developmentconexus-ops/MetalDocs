@@ -10,13 +10,26 @@ type TemplateCardProps = {
   status: Extract<DocumentStatus, "published" | "draft" | "archived">;
   author: string;
   updated: string;
+  onClick?: () => void;
 };
 
-export function TemplateCard({ title, version, status, author, updated }: TemplateCardProps) {
+export function TemplateCard({ title, version, status, author, updated, onClick }: TemplateCardProps) {
   const firstName = author.split(" ")[0];
 
   return (
-    <div className={styles.card}>
+    <div
+      className={styles.card}
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && onClick) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      aria-label={`Abrir template ${title}`}
+    >
       <div className={styles.previewArea}>
         <MiniDocPreview />
         <div className={styles.badges}>

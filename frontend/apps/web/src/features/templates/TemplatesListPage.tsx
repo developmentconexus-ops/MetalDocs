@@ -3,6 +3,8 @@ import { Icon } from "../../components/ui/Icon";
 import { TabBar, type TabBarItem } from "../../components/ui/TabBar";
 import { WorkspaceHeroHeader } from "../../components/ui/WorkspaceHeroHeader";
 import { TemplateCard } from "./components/TemplateCard";
+import { useTemplatesQuery } from "./queries/useTemplatesQuery";
+import { resolveQueryError } from "../../lib/api/resolveQueryError";
 import styles from "./TemplatesListPage.module.css";
 
 export type TemplatesListPageProps = {
@@ -12,33 +14,44 @@ export type TemplatesListPageProps = {
 
 type TabKey = "all" | "published" | "draft" | "archived";
 
-type MockTemplate = {
-  id: string;
-  title: string;
-  version: string;
-  status: "published" | "draft" | "archived";
-  author: string;
-  updated: string;
-};
+function formatRelative(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days === 0) return "hoje";
+  if (days === 1) return "ontem";
+  if (days < 30) return `${days} dias atrás`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} ${months === 1 ? "mês" : "meses"} atrás`;
+  const years = Math.floor(days / 365);
+  return `${years} ${years === 1 ? "ano" : "anos"} atrás`;
+}
 
-const MOCK_TEMPLATES: MockTemplate[] = [
-  { id: "1", title: "POP — Procedimento Operacional", version: "v3.2", status: "published", author: "Juliana Prado", updated: "12 dias atrás" },
-  { id: "2", title: "DC — Descrição de Cargo", version: "v2.0", status: "published", author: "Marina Silveira", updated: "2 meses atrás" },
-  { id: "3", title: "POL — Política", version: "v1.4", status: "published", author: "André Lima", updated: "5 dias atrás" },
-  { id: "4", title: "IT — Instrução de Trabalho", version: "v4.1", status: "published", author: "Bruno Mendes", updated: "1 mês atrás" },
-  { id: "5", title: "CHK — Checklist Operacional", version: "v0.4", status: "draft", author: "Camila Tavares", updated: "ontem" },
-  { id: "6", title: "FORM — Formulário Antigo", version: "v1.0", status: "archived", author: "Rafael Costa", updated: "1 ano atrás" },
-];
-
-export function TemplatesListPage(_props: TemplatesListPageProps) {
+export function TemplatesListPage(props: TemplatesListPageProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const { data, isLoading, isError, error } = useTemplatesQuery();
+
+  const templates = (data?.templates ?? []).map((dto) => ({
+    id: dto.id,
+    title: dto.name,
+    version: `v${dto.latest_version}`,
+    status: (dto.archived_at
+      ? "archived"
+      : dto.published_version_id
+      ? "published"
+      : "draft") as "published" | "draft" | "archived",
+    author: dto.created_by,
+    updated: formatRelative(dto.created_at),
+    latestVersion: dto.latest_version,
+  }));
 
   const tabs: TabBarItem[] = [
-    { key: "all", label: "Todos", count: MOCK_TEMPLATES.length },
-    { key: "published", label: "Publicados", count: MOCK_TEMPLATES.filter((t) => t.status === "published").length },
-    { key: "draft", label: "Rascunhos", count: MOCK_TEMPLATES.filter((t) => t.status === "draft").length },
-    { key: "archived", label: "Arquivados", count: MOCK_TEMPLATES.filter((t) => t.status === "archived").length },
+    { key: "all", label: "Todos", count: templates.length },
+    { key: "published", label: "Publicados", count: templates.filter((t) => t.status === "published").length },
+    { key: "draft", label: "Rascunhos", count: templates.filter((t) => t.status === "draft").length },
+    { key: "archived", label: "Arquivados", count: templates.filter((t) => t.status === "archived").length },
   ];
+
+  const filtered = activeTab === "all" ? templates : templates.filter((t) => t.status === activeTab);
 
   return (
     <div className={styles.page}>
@@ -49,7 +62,7 @@ export function TemplatesListPage(_props: TemplatesListPageProps) {
           title="Layouts reutilizáveis"
           subtitle="Versionados, aprovados, publicados. Vinculados a perfis para clonagem em novos documentos."
           action={
-            <button type="button" className={styles.newBtn}>
+            <button type="button" className={styles.newBtn} onClick={() => props.onCreate()}>
               <Icon name="plus" size={13} />
               Novo template
             </button>
@@ -63,18 +76,37 @@ export function TemplatesListPage(_props: TemplatesListPageProps) {
           ariaLabel="Filtro de templates"
         />
 
-        <div className={styles.cardGrid}>
-          {MOCK_TEMPLATES.map((tpl) => (
-            <TemplateCard
-              key={tpl.id}
-              title={tpl.title}
-              version={tpl.version}
-              status={tpl.status}
-              author={tpl.author}
-              updated={tpl.updated}
-            />
-          ))}
-        </div>
+        {isLoading && (
+          <div className={styles.loading}>Carregando templates...</div>
+        )}
+
+        {isError && (
+          <div className={styles.error} role="alert">
+            {resolveQueryError(error, "Erro ao carregar templates.")}
+          </div>
+        )}
+
+        {!isLoading && !isError && filtered.length === 0 && (
+          <div className={styles.empty}>
+            Nenhum template{activeTab !== "all" ? ` ${activeTab}` : ""} encontrado.
+          </div>
+        )}
+
+        {!isLoading && !isError && filtered.length > 0 && (
+          <div className={styles.cardGrid}>
+            {filtered.map((tpl) => (
+              <TemplateCard
+                key={tpl.id}
+                title={tpl.title}
+                version={tpl.version}
+                status={tpl.status}
+                author={tpl.author}
+                updated={tpl.updated}
+                onClick={() => props.onOpenTemplate(tpl.id, tpl.latestVersion)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
