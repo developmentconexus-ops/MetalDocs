@@ -183,15 +183,11 @@ func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeM
 	return mux
 }
 
-func createBody(key, visibility string) []byte {
+func createBody(key string) []byte {
 	req := map[string]any{
-		"doc_type_code": "CONTRACT",
-		"key":           key,
-		"name":          "Contract Template",
-		"description":   "Default contract",
-		"areas":         []string{"legal"},
-		"visibility":    visibility,
-		"approver_role": "approver",
+		"key":         key,
+		"name":        "Contract Template",
+		"description": "Default contract",
 	}
 	raw, _ := json.Marshal(req)
 	return raw
@@ -216,7 +212,7 @@ func TestCreateTemplate_Happy(t *testing.T) {
 
 	mux := newMux(t, authz, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewReader(createBody("contract-default", "public")))
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewReader(createBody("contract-default")))
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -250,11 +246,11 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	}
 }
 
-func TestCreateTemplate_InvalidVisibility(t *testing.T) {
+func TestCreateTemplate_RejectUnknownField(t *testing.T) {
 	repo := newFakeRepo()
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewReader(createBody("contract-default", "weird")))
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewBufferString(`{"key":"contract-default","name":"Contract Template","visibility":"weird"}`))
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -271,8 +267,8 @@ func TestCreateTemplate_InvalidVisibility(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Error.Code != "invalid_visibility" {
-		t.Fatalf("expected error.code=invalid_visibility, got %q", out.Error.Code)
+	if out.Error.Code != "invalid_body" {
+		t.Fatalf("expected error.code=invalid_body, got %q", out.Error.Code)
 	}
 }
 
@@ -280,7 +276,7 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	repo := newFakeRepo()
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	first := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewReader(createBody("contract-default", "public")))
+	first := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewReader(createBody("contract-default")))
 	withHeaders(first)
 	firstRR := httptest.NewRecorder()
 	mux.ServeHTTP(firstRR, first)
@@ -288,7 +284,7 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		t.Fatalf("expected first request 201, got %d body=%s", firstRR.Code, firstRR.Body.String())
 	}
 
-	second := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewReader(createBody("contract-default", "public")))
+	second := httptest.NewRequest(http.MethodPost, "/api/v2/templates", bytes.NewReader(createBody("contract-default")))
 	withHeaders(second)
 	secondRR := httptest.NewRecorder()
 	mux.ServeHTTP(secondRR, second)
