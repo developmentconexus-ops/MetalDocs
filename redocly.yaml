@@ -1,0 +1,10 @@
+apis:
+  metaldocs@v1:
+    root: api/openapi/v1/openapi.yaml
+
+# Lint catches NEW issues. Pre-existing categories (133 errors at time of
+# introduction) are silenced here pending a dedicated cleanup ticket.
+rules:
+  operation-summary: off
+  security-defined: off
+  struct: off
