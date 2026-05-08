@@ -1,10 +1,16 @@
 # documents Module
 
-> **Last verified:** 2026-05-07
-> **Scope:** Document instances — library listing, novo-documento wizard (`/documents-v2/new`), edit, autosave, finalize.
+> **Last verified:** 2026-05-08
+> **Scope:** Document instances — library listing, novo-documento wizard (`/documents-v2/new`), document-published view (`/documents/:documentId`), edit, autosave, finalize.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/pages/LibraryPage.tsx:36` — `LibraryPage` — server-side paginated table at `/documents`; lazy `useState` init, debounced search, `resolveErrorMessage` error UX
+> - `frontend/apps/web/src/features/documents/pages/DocumentPublishedPage.tsx:45` — `DocumentPublishedPage` — read-only published/approved document view at `/documents/:documentId`; hero + KPI strip + sign-off chain + version timeline + related docs + comments; roles gate for "Iniciar revisão"
+> - `frontend/apps/web/src/features/documents/components/DocumentVersionTimeline.tsx:4` — `DocumentVersionTimeline` / `VersionEntry` — hover-interactive horizontal version timeline with pulse animation on current pin; accepts `VersionEntry[]`; placeholder data until revision-list endpoint exists
+> - `frontend/apps/web/src/features/documents/queries/useDocumentDetailQuery.ts:5` — `useDocumentDetailQuery` — TanStack Query hook; reuses `QK.documents.detail(id)` key + `getDocument` fn
+> - `frontend/apps/web/src/features/documents/queries/useApprovalInstanceQuery.ts:5` — `useApprovalInstanceQuery` — TanStack Query hook; 404 treated as null (no instance), not error; uses `QK.approval.instance(documentId)`
+> - `frontend/apps/web/src/features/documents/lib/documentDetailMeta.ts:1` — `formatPublishedAt` / `formatSignedAt` / `formatShortDate` / `resolveProfileLabel` / `resolveAreaLabel` / `SIGNOFF_STATUS_META` — date formatters + signoff display config SSOT for DocumentPublishedPage
+> - `frontend/apps/web/src/features/documents/api/documentsV2.ts:168` — `SignoffRecord`, `StageInstance`, `ApprovalInstanceResponse` types; `getApprovalInstance` fn (`GET /api/v2/documents/:id/approval-instance`)
 > - `frontend/apps/web/src/features/documents/api/library.ts:34` — `fetchLibrary` — `GET /api/v2/documents` typed client; `asApiError` wrapper ensures all errors surface as `ApiError`
 > - `frontend/apps/web/src/features/documents/api/library.ts:46` — `fetchLibraryStats` — `GET /api/v2/documents/stats` typed client
 > - `frontend/apps/web/src/features/documents/api/library.ts:28` — `asApiError` — wraps any 2xx-envelope error into a real `ApiError` so `resolveErrorMessage` works downstream
@@ -19,7 +25,8 @@
 > - `frontend/apps/web/src/features/documents/components/PageSizeSelector.tsx:9` — `PageSizeSelector` — 10/20/50 dropdown
 > - `frontend/apps/web/src/features/documents/queries/useLibraryQuery.ts:15` — `useLibraryQuery` — TanStack Query hook; `placeholderData: keepPreviousData` prevents empty flash on page/filter change
 > - `frontend/apps/web/src/features/documents/queries/useLibraryStatsQuery.ts:5` — `useLibraryStatsQuery` — TanStack Query hook; `staleTime: 30_000` avoids refetch on every focus
-> - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library), `/documents-v2/new` (wizard), and `/documents-v2/:id` (editor)
+> - `frontend/apps/web/src/features/documents/routes.tsx:1` — route definitions for `/documents` (Library), `/documents/:documentId` (published view), `/documents-v2/new` (wizard), and `/documents-v2/:id` (editor)
+> - `frontend/apps/web/src/features/documents/routes.tsx:50` — `documents/:documentId` route: lazy-loads `DocumentPublishedPage`
 > - `frontend/apps/web/src/features/documents/routes.tsx:55` — `documents-v2/new` route: lazy-loads `NewDocumentWizardPage`
 > - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:42` — `NewDocumentWizardPage` — 4-step wizard entry; `useReducer(wizardReducer)` for form state; `?step=1..4` URL param; atomic single-call submit via `createControlledDocumentAtomic`; `profileNotFound` derived flag
 > - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — stepper chrome + layout shell for all 4 steps
@@ -45,6 +52,8 @@
 > - `internal/modules/documents/repository/repository.go:399` — `StatsByArea` — GROUP BY area
 > - `internal/modules/documents/repository/repository.go:39` — `CreateDocument` INSERT with `MAX(revision_number)+1` auto-increment
 > - `internal/modules/documents/module.go:1` — DI wiring
+> - `internal/modules/documents/api/api.gen.go:1` — oapi-codegen bootstrap (generated; DO NOT EDIT); handler migration deferred — see `wiki/backlog/contract-first-followups.md`
+> - `migrations/0183_documents_name_not_empty.sql:27` — `documents.name NOT NULL + CHECK length(trim(name)) > 0`; backfills from `controlled_documents.title`
 
 ## Overview
 
@@ -62,15 +71,20 @@ Only `draft` documents can be edited in the editor.
 **Backend module path:** `internal/modules/documents/` (renamed from `documents_v2` in migration batch 0167/0168)
 **Table:** `public.documents`
 
+**Codegen status:** Bootstrap only. `internal/modules/documents/api/api.gen.go` is generated from the spec (commit `81e7ec23`) but handler migration is deferred due to spec-handler drift (missing spec ops for `renameDocument`, `duplicateDocument`, comments CRUD; orphaned spec ops with no handler). See `wiki/backlog/contract-first-followups.md` for the gap inventory and migration template. Compare: `registry` and `templates_v2` modules are fully migrated — see `wiki/architecture/api-contract.md`.
+
 ## Frontend Routing
 
 ```
 /documents                 → LibraryPage (server-side paginated document list)
+/documents/:documentId     → DocumentPublishedPage (read-only published/approved document view)
 /documents-v2/new          → NewDocumentWizardPage (4-step create wizard)
 /documents-v2/<uuid>       → DocumentEditorPage
 ```
 
-Routes are defined in `features/documents/routes.tsx`. The `documents-v2/new` registration is at `routes.tsx:55`.
+Routes are defined in `features/documents/routes.tsx`. The `documents/:documentId` registration is at `routes.tsx:50`. The `documents-v2/new` registration is at `routes.tsx:55`.
+
+**Route ordering note:** The `documents/:documentId` catch-all route is declared after all `documents/all`, `documents/area/:areaCode`, `documents/type/:profileCode`, `documents/doc/:documentId`, `documents/mine`, and `documents/recent` fixed-segment routes. React Router matches by specificity (fixed segments over params), so the published-view route is only reached for bare `documents/<uuid>` paths.
 
 ## Library Screen (`/documents`)
 
@@ -196,6 +210,45 @@ Slot assignment inside `EditorChrome`:
 
 Eigenpal CSS overrides (wine formatting bar, compact title bar, gradient scrollbar) live in `EditorChrome.module.css`; `DocumentEditorPage.module.css` covers only page-level rail + canvas layout (`.rail`, `.railBackBtn`, `.railTip`, `.canvas`).
 
+## Published Document View (`/documents/:documentId`)
+
+`DocumentPublishedPage` (`features/documents/pages/DocumentPublishedPage.tsx:45`) is the read-only view for any document that has a `published` or `approved` status. It is also the default detail URL for all document IDs.
+
+**Data sources (two parallel queries):**
+
+| Query hook | Key | API call | On 404 |
+|---|---|---|---|
+| `useDocumentDetailQuery` | `QK.documents.detail(id)` | `GET /api/v2/documents/:id` | Error state |
+| `useApprovalInstanceQuery` | `QK.approval.instance(id)` | `GET /api/v2/documents/:id/approval-instance` | Treated as `null`, not error |
+
+**Page sections:**
+
+1. **ObsoleteBanner** — `role="alert"` banner rendered only when `status === 'obsolete'`.
+2. **Hero** — breadcrumb (area pending backlog), DocCardMini, document title, action bar (Visualizar / Baixar PDF / Iniciar revisão / Copiar link).
+3. **KPI strip** — Versão atual, Cobertura, Próxima revisão, Páginas. Last three are `—` pending backend fields (see `wiki/backlog/documento-publicado.md`).
+4. **Sobre (§01)** — owner banner (`created_by` + `formatPublishedAt(approval.updated_at)`), facts grid (Tipo / Área — both `—` pending `profile_code`/`area_code` in `DocumentResponse`).
+5. **Cadeia de aprovação (§02)** — sign-off chain from `approval.stages`; each `StageInstance` renders a pin with stage name, actor avatar, and `formatSignedAt(signoff.signed_at)`. Connector bar spans first-to-last pin centers.
+6. **Histórico de versões (§03)** — `<DocumentVersionTimeline>` with `PLACEHOLDER_VERSIONS` until `GET /api/v2/documents/:id/revisions` exists.
+7. **Documentos relacionados (§04)** — `PLACEHOLDER_RELATED` until relationship model exists.
+8. **Discussão interna (§05)** — `PLACEHOLDER_COMMENTS` until display-side comments architecture decided.
+
+**RBAC gate (Iniciar revisão):**
+
+```typescript
+// DocumentPublishedPage.tsx:99
+const canInitiateRevision =
+  user != null &&
+  user.roles.some((r) => ['admin', 'editor', 'qms_admin', 'area_admin'].includes(r));
+```
+
+Refinement deferred until `DocumentResponse` exposes `controlled_document_id` — see backlog.
+
+**Date formatting SSOT:** `features/documents/lib/documentDetailMeta.ts:1` — `formatPublishedAt`, `formatSignedAt`, `formatShortDate`, `resolveProfileLabel`, `resolveAreaLabel`, `SIGNOFF_STATUS_META`. Do not inline date logic in the page.
+
+**`DocumentVersionTimeline`** (`features/documents/components/DocumentVersionTimeline.tsx:16`) — hover/focus-driven horizontal version rail. Accepts `VersionEntry[]`. Default-selected pin = `current: true` entry (or last if none). Keyframe animation (`fadeInUp`) lives in `DocumentVersionTimeline.module.css`; `timeline-marker-pulse` keyframe SSOT is in `TimelineRail.module.css`.
+
+**Deferred items:** See `wiki/backlog/documento-publicado.md` — revision list endpoint, relationship model, comments architecture, PDF download, coverage KPI, `area_code`/`profile_code`/`controlled_document_id` in `DocumentResponse`.
+
 ## API Endpoints (Backend)
 
 | Method | Path | Description |
@@ -211,6 +264,7 @@ Eigenpal CSS overrides (wine formatting bar, compact title bar, gradient scrollb
 | POST | `/api/v2/documents/:id/finalize` | Finalize: atomically draft → under_review + create approval instance (HTTP 201, body `{"instanceId":"<uuid>"}`) |
 | POST | `/api/v2/documents/:id/duplicate` | Duplicate document |
 | GET | `/api/v2/documents/:id/view` | Signed PDF view URL |
+| GET | `/api/v2/documents/:id/approval-instance` | Latest approval instance for a document; returns `ApprovalInstanceResponse` with `stages[].signoffs[]`; 404 if none |
 | GET | `/api/v2/documents/:id/checkpoints` | List checkpoints |
 | POST | `/api/v2/documents/:id/checkpoints` | Create checkpoint |
 | POST | `/api/v2/documents/:id/checkpoints/:cid/restore` | Restore checkpoint |

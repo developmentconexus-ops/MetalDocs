@@ -1,6 +1,6 @@
 # Frontend Structure
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-05-08
 > **Scope:** Canonical folder layout, naming, routing, state, API, design-system rules for `frontend/apps/web`. Comparison baseline for refactor reviews and the `metaldocs-frontend` skill.
 > **Out of scope:** Backend module layout (see `system-overview.md`), eigenpal internals (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -150,12 +150,15 @@ When in doubt: feature-local first. Promote when a **second** caller appears:
 ## 6. Routing
 
 ```ts
-// features/documents/routes.tsx
+// features/documents/routes.tsx (illustrative subset — see actual file for full list)
 import type { RouteObject } from "react-router-dom";
 
 export const documentsRoutes: RouteObject[] = [
-  { path: "/documents", lazy: () => import("./pages/DocumentsHubPage") },
-  { path: "/documents/:id", lazy: () => import("./pages/DocumentEditorPage") },
+  { path: "documents", lazy: () => import("./pages/LibraryPage") },
+  // fixed-segment sub-routes first (all/area/:x/type/:x/doc/:x/mine/recent)
+  { path: "documents/:documentId", lazy: () => import("./pages/DocumentPublishedPage") },
+  { path: "documents-v2/new",      lazy: () => import("./pages/NewDocumentWizardPage") },
+  { path: "documents-v2/:documentID", lazy: () => import("./pages/DocumentEditorRoutePage") },
 ];
 ```
 
@@ -286,6 +289,13 @@ queryClient.invalidateQueries({ queryKey: QK.documents.detail(id) });
 
 ## 11. Design-source intake
 
+**Implemented screens (design-source → feature slice):**
+
+| Slug | Route | Feature slice | Status |
+|---|---|---|---|
+| `caixa-aprovacao` | `/approvals` | `features/approval/` | Implemented (Phase 3c); 7 deferred items |
+| `documento-publicado` | `/documents/:documentId` | `features/documents/pages/DocumentPublishedPage` | Implemented (Phases 0–3c); 9 deferred items |
+
 Screens designed in claude.design land in `frontend/apps/web/design-source/<screen-slug>/`:
 
 - `<slug>.html` — original export (read-only reference)
@@ -356,5 +366,6 @@ When implementing:
 - `wiki/concepts/error-ux.md` — apiFetch, ApiError, auth-bus contract
 - `wiki/modules/editor-ui-eigenpal.md` — editor integration
 - `wiki/architecture/system-overview.md` — services + ports
+- `wiki/architecture/api-contract.md` — OpenAPI spec, oapi-codegen backend codegen, frontend `gen:api` script, CI drift guard
 - `wiki/decisions/` — architecture decision records
 - `frontend/apps/web/design-source/README.md` — screen intake protocol (added with Block 0)

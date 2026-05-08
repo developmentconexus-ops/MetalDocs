@@ -1,7 +1,7 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-07
-> **Purpose:** Single source of truth for codebase knowledge. Read this first - drill into folders only after.
+> **Last verified:** 2026-05-08
+> **Purpose:** Single source of truth for codebase knowledge. Read this first — drill into folders only after.
 
 ## How to use this wiki
 
@@ -18,6 +18,7 @@
 - [backlog/novo-documento.md](backlog/novo-documento.md) — **6 deferred items** for the novo-documento wizard (`/documents-v2/new`): visibility enforcement, sequence preview, template versions, blank template, slot rollback, profile counts. (Last verified: 2026-05-07)
 - [backlog/templates.md](backlog/templates.md) — **5 deferred items** for Templates List screen: `updated_at` field on `TemplateDTO`, `created_by` → display name, card gap delta (14px vs token), mobile tab clipping at 375px, `formatRelative` promotion to `lib/utils/`. (Last verified: 2026-05-08)
 - [backlog/caixa-aprovacao.md](backlog/caixa-aprovacao.md) — **7 deferred items** for Caixa de Aprovação screen (`/approvals`): action button wiring (signoff/return/open-doc), heatmap real data, timeline click handlers, "Revisar →" cross-view nav, `view` type narrowing, eye icon, `approvalApi.ts` migration to `lib/api/client.ts`. (Last verified: 2026-05-08)
+- [backlog/documento-publicado.md](backlog/documento-publicado.md) — **9 deferred items** for Documento Publicado screen (`/documents/:documentId`): revision list endpoint, relationship model, comments architecture, PDF download, coverage KPI, `area_code`/`profile_code`/`controlled_document_id` in `DocumentResponse`, "Iniciar revisão" mutation wiring. (Last verified: 2026-05-08)
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
@@ -32,12 +33,13 @@
 - [architecture/data-model.md](architecture/data-model.md) - Postgres tables, key relationships, document_families (global/is_active), metaldocs_app grants, two-query LIMIT/OFFSET+COUNT pattern (stub, Last verified: 2026-05-06)
 - [architecture/tech-stack.md](architecture/tech-stack.md) - Go, React, Postgres, MinIO, Gotenberg, eigenpal (stub, Last verified: 2026-05-01)
 - [architecture/deployment.md](architecture/deployment.md) - Docker compose, env vars, dev setup (stub, Last verified: 2026-05-01)
-- **[architecture/frontend-structure.md](architecture/frontend-structure.md) - canonical frontend layout, routing, state, API, design-system rules; `lib/hooks/` added; `Avatar` color prop; comparison baseline for refactor reviews (Last verified: 2026-05-06)**
+- **[architecture/frontend-structure.md](architecture/frontend-structure.md) - canonical frontend layout, routing, state, API, design-system rules; `lib/hooks/` added; `Avatar` color prop; comparison baseline for refactor reviews (Last verified: 2026-05-08)**
+- **[architecture/api-contract.md](architecture/api-contract.md) - spec-as-source-of-truth via OpenAPI 3.0.3; oapi-codegen v2 backend codegen per module; openapi-typescript v7 frontend codegen; runtime enforcement gaps (unknown-fields, required-fields); DB invariant floor (migration 0183); CI drift guard; per-module migration status table (Last verified: 2026-05-08)**
 - **Skill:** `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow + per-screen `IMPLEMENTATION.md` worksheet for landing designed screens right the first time. Spec: `docs/superpowers/specs/2026-05-06-screen-implementation-skill-design.md`. (Last verified: 2026-05-06)
 
 ### Modules (one per backend module / frontend feature)
 - [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; List screen (`/templates-v2`) wired to real API with tab filter + loading/error/empty states; `WorkspaceHeroHeader tone="flat"` pattern; `TabBar` WAI-ARIA a11y; `TemplateAuthorPage` consumes `EditorChrome` (Last verified: 2026-05-08)
-- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), novo-documento wizard (`/documents-v2/new`, 4-step, atomic single-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-07)
+- [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), DocumentPublishedPage (`/documents/:documentId`, Phases 0–3c), novo-documento wizard (`/documents-v2/new`, 4-step, atomic single-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `documentDetailMeta.ts` date-formatter SSOT, `DocumentVersionTimeline`, `useDocumentDetailQuery`, `useApprovalInstanceQuery`, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents`; codegen bootstrap only — handler migration deferred (see `backlog/contract-first-followups.md`); migration 0183 adds `name NOT NULL + CHECK` (Last verified: 2026-05-08)
 - **[modules/novo-documento-wizard.md](modules/novo-documento-wizard.md)** - wizard state machine (`wizardReducer`, `clampStep`, `canAdvance`), step components, `WizardFooter` + `DocPaperPreview` primitives, visibility sub-controls, `resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile` (Last verified: 2026-05-07)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [modules/approval.md](modules/approval.md) - approval routes, signoffs, ISO segregation, eligibility enforcement (J1), idempotency store, SoD error states (E2), known gaps E4; Caixa de Aprovação inbox UI (`/approvals`): `InboxStack`/`InboxTimeline` two-view pattern, mock fallback strategy, keyboard nav, view persistence (Last verified: 2026-05-08)
@@ -80,6 +82,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) - accept two distinct authz tiers (CapabilityService vs authz.Require); J2 amendment: `document.create` wired via `NewCapabilityChecker`, `permissiveAuthzChecker` removed (Last verified: 2026-05-05)
 - [decisions/0008-placeholder-fixed-catalog.md](decisions/0008-placeholder-fixed-catalog.md) - replace user-fill placeholders with fixed 7-token computed catalog (2026-04-26)
 - [decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md) - atomic CD create + per-area 3-segment numbering + idempotency-key adoption; deletes legacy two-screen wizard flow (2026-05-07)
+- [decisions/0012-contract-first-api.md](decisions/0012-contract-first-api.md) - adopt spec-as-source-of-truth via oapi-codegen; root cause of `documents.name` empty-name bug; migration scope; residual risks for non-migrated modules (2026-05-08)
 
 ### References
 - [references/eigenpal-spike.md](references/eigenpal-spike.md) - pointer to spike repo + key findings (T1-T8)
@@ -88,6 +91,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [references/how-to-run-tests.md](references/how-to-run-tests.md) - Go tests, frontend vitest, e2e playwright (stub, Last verified: 2026-05-01)
 - [references/local-dev-startup.md](references/local-dev-startup.md) - **START HERE** - PS script, port, credentials, common mistakes
 - [references/local-dev-credentials.md](references/local-dev-credentials.md) - admin login details, DB access
+- [references/oapi-codegen.md](references/oapi-codegen.md) - how to regenerate, vendor-mode `GOFLAGS=-mod=mod` requirement, add a new module, include-tags filter (Last verified: 2026-05-08)
 
 ### Glossary
 - [GLOSSARY.md](GLOSSARY.md) - placeholder, zone (deprecated), fanout, freeze, eigenpal, controlled doc, profile, etc.
