@@ -46,7 +46,7 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 			_ = tx.Rollback()
 		}
 	}()
-	docID, revID, sessionID, err = r.CreateDocumentTx(ctx, tx, d, initialContentHash, requiredPlaceholders)
+	docID, revID, sessionID, err = r.CreateDocumentTx(ctx, tx, d, initialContentHash, "", requiredPlaceholders)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -58,11 +58,21 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 
 // CreateDocumentTx performs the DB-only portion of CreateDocument inside the
 // caller-owned tx: inserts document + initial editor_session + initial
-// revision (storage_key=""), seeds template snapshot columns and required
-// placeholder rows. It does NOT touch S3 (no AdoptTempObject, no
-// SetRevisionStorageKey). Callers that need S3 finalization must do so after
-// tx.Commit() — see Repository.CreateDocument for the standard wrapper.
-func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
+// revision, seeds template snapshot columns and required placeholder rows.
+//
+// initialStorageKey:
+//   - "" for the legacy CreateDocument flow, where the caller must finalize
+//     storage_key after S3 AdoptTempObject (the rendered docx key is content-
+//     addressed and only known post-render).
+//   - the template's published docx key for the registry atomic-create flow,
+//     which uses template-passthrough — no render side-effect, safe to write
+//     atomically with the document/revision insert so the editor opens
+//     immediately on first GET.
+//
+// It does NOT touch S3. Callers that need S3 finalization (overwriting
+// storage_key with a rendered key) must do so after tx.Commit() via
+// SetRevisionStorageKey.
+func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
 	// Serialise revision_number allocation per (tenant, controlled_document).
 	// pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK.
 	if d.ControlledDocumentID != nil && *d.ControlledDocumentID != "" {
@@ -110,8 +120,8 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO document_revisions (document_id, parent_revision_id, session_id, storage_key, content_hash, form_data_snapshot)
-		 VALUES ($1, NULL, $2, '', $3, $4) RETURNING id`,
-		docID, sessionID, initialContentHash, d.FormDataJSON,
+		 VALUES ($1, NULL, $2, $3, $4, $5) RETURNING id`,
+		docID, sessionID, initialStorageKey, initialContentHash, d.FormDataJSON,
 	).Scan(&revID); err != nil {
 		return "", "", "", fmt.Errorf("insert revision: %w", err)
 	}
