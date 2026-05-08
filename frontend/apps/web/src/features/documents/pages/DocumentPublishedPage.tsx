@@ -59,15 +59,15 @@ export function DocumentPublishedPage() {
             <h1 className={styles.heroTitle}>Procedimento de Bloqueio e Etiquetagem (LOTO)</h1>
 
             <div className={styles.heroActions}>
-              <button className={styles.btnPrimary} type="button">
+              <button className="btn btn-primary btn-lg" type="button">
                 <Icon name="eye" size={15} />
                 Visualizar documento
               </button>
-              <button className={styles.btnSecondary} type="button">
+              <button className="btn" type="button">
                 <Icon name="arrow" size={13} />
                 Iniciar revisão
               </button>
-              <button className={styles.btnGhost} type="button">
+              <button className="btn btn-ghost" type="button">
                 <Icon name="link" size={13} />
                 Copiar link
               </button>

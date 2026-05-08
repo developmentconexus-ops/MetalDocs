@@ -1,0 +1,40 @@
+Token coverage check — DocumentPublishedPage.module.css
+Run: Get-Content DocumentPublishedPage.module.css | Select-String '#[0-9a-fA-F]{3,8}|rgb\(|rgba\(' | Where-Object { $_ -notmatch 'var\(--' }
+Result: (no output — PASS)
+
+All colors use var(--token) references. No raw hex or rgb() values present.
+
+Tokens used:
+  --bg
+  --brand-pale
+  --surface
+  --border
+  --brand
+  --text-muted
+  --font-mono
+  --brand-deep
+  --text-on-brand
+  --text-soft
+  --success
+  --text
+  --r-pill
+  --success-bg
+  --r-1
+  --shadow-doc-card   (NEW — added to tokens.css)
+  --r-2
+  --r-3
+  --surface-2
+  --text-faint
+  --success            (reused for connector + dot)
+  --shadow-success     (NEW — added to tokens.css)
+  --danger
+  --shadow-danger      (NEW — added to tokens.css)
+  --overlay-white-65   (NEW — added to tokens.css)
+
+New tokens added to tokens.css:
+  --shadow-doc-card: 20px 20px 48px rgba(74, 33, 33, 0.16), 4px 4px 14px rgba(74, 33, 33, 0.10)
+  --shadow-success: 0 2px 8px rgba(26, 107, 53, 0.30)
+  --shadow-danger: 0 8px 32px rgba(200, 54, 74, 0.20)
+  --overlay-white-65: rgba(255, 255, 255, 0.65)
+
+Spacing: all values in rem (no raw px except 1px borders, 0 values, and 2px/5px which are sub-token micro-values with no token equivalent).
