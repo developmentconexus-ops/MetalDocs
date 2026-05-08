@@ -31,6 +31,19 @@ Pick up when:
 4. Migrate handlers per registry pattern (commits `c968b8e0`, `9fccd8e7`).
 5. Update `apps/api/cmd/metaldocs-api/main.go` to register `<x>api.HandlerWithOptions`.
 
+## Documents module — handler ↔ spec gaps
+
+Bootstrap landed (commit `81e7ec23`) — codegen wired, `internal/modules/documents/api/api.gen.go` produced. Handler migration NOT done because of pre-existing drift between spec and handlers:
+
+**Handlers with no spec op (need spec authoring before migration):**
+- `renameDocument` — PATCH or PUT on document name
+- `duplicateDocument` — clone-from-existing
+- `listComments`, `createComment`, `updateComment`, `deleteComment` — `/api/v2/documents/{id}/comments` CRUD
+
+**Spec ops with no handler (need impl OR spec removal):**
+- `createDocumentV2` — POST /api/v2/documents
+- `renderDocumentPDF` — POST/GET on documents render
+
 ## Central wiring TODO
 
 `apps/api/cmd/metaldocs-api/main.go` may still reference the pre-codegen handler registration for `registry`, `documents`, `templates`. After Phase 5 lands:
