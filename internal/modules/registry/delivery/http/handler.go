@@ -79,11 +79,11 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v2/controlled-documents",
 		injectTenant(idempotency.Require(h.idempCreate, actorOf)(http.HandlerFunc(generated.AtomicCreateControlledDocument))))
 	mux.Handle("POST /api/v2/controlled-documents/{id}/revisions",
-		injectTenant(idempotency.Require(h.idempRevision, actorOf)(http.HandlerFunc(h.createRevision))))
-	mux.HandleFunc("GET /api/v2/controlled-documents/preview-code", h.previewCode)
-	mux.HandleFunc("GET /api/v2/controlled-documents", h.listDocs)
-	mux.HandleFunc("GET /api/v2/controlled-documents/{id}", h.getDoc)
-	mux.HandleFunc("GET /api/v2/controlled-documents/{id}/active-document", h.getActiveDocument)
-	mux.HandleFunc("PUT /api/v2/controlled-documents/{id}/obsolete", h.obsoleteDoc)
-	mux.HandleFunc("PUT /api/v2/controlled-documents/{id}/supersede", h.supersedeDoc)
+		injectTenant(idempotency.Require(h.idempRevision, actorOf)(http.HandlerFunc(generated.CreateControlledDocumentRevision))))
+	mux.HandleFunc("GET /api/v2/controlled-documents/preview-code", generated.PreviewControlledDocumentCode)
+	mux.HandleFunc("GET /api/v2/controlled-documents", generated.ListControlledDocuments)
+	mux.HandleFunc("GET /api/v2/controlled-documents/{id}", generated.GetControlledDocument)
+	mux.HandleFunc("GET /api/v2/controlled-documents/{id}/active-document", generated.GetActiveDocument)
+	mux.HandleFunc("PUT /api/v2/controlled-documents/{id}/obsolete", generated.ObsoleteControlledDocument)
+	mux.HandleFunc("PUT /api/v2/controlled-documents/{id}/supersede", generated.SupersedeControlledDocument)
 }
