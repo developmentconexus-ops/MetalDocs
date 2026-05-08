@@ -1,4 +1,5 @@
 import { apiFetch, ApiError } from "../../../lib/api";
+import type { components, operations } from "../../../lib/api-types";
 import type { ControlledDocument } from "../types";
 
 const BASE = "/api/v2/controlled-documents";
@@ -25,22 +26,8 @@ export async function fetchControlledDocument(id: string): Promise<ControlledDoc
   return apiFetch<ControlledDocument>(`${BASE}/${encodeURIComponent(id)}`);
 }
 
-export interface CreateAtomicRequest {
-  profileCode: string;
-  processAreaCode: string;
-  title: string;
-  ownerUserId: string;
-  documentName: string;
-  templateVersionId?: string;
-  formData?: Record<string, unknown>;
-  manualCode?: string;
-  manualCodeReason?: string;
-}
-
-export interface AtomicCreateResponse {
-  controlledDocument: ControlledDocument;
-  document: { id: string; contentHash: string };
-}
+export type CreateAtomicRequest = components["schemas"]["CreateAtomicRequest"];
+export type AtomicCreateResponse = components["schemas"]["AtomicCreateResponse"];
 
 export async function createControlledDocumentAtomic(
   req: CreateAtomicRequest,
@@ -54,15 +41,8 @@ export async function createControlledDocumentAtomic(
   });
 }
 
-export interface CreateRevisionRequest {
-  name: string;
-  formData?: Record<string, unknown>;
-  templateVersionId?: string;
-}
-
-export interface RevisionResponse {
-  document: { id: string; contentHash: string };
-}
+export type CreateRevisionRequest = components["schemas"]["CreateRevisionRequest"];
+export type RevisionResponse = components["schemas"]["RevisionResponse"];
 
 export async function createRevision(
   cdID: string,
@@ -80,12 +60,7 @@ export async function createRevision(
   );
 }
 
-export interface PreviewCodeResponse {
-  profileCode: string;
-  areaCode: string;
-  nextSeq: number;
-  code: string;
-}
+export type PreviewCodeResponse = components["schemas"]["PreviewCodeResponse"];
 
 export async function previewCode(
   profileCode: string,
@@ -109,16 +84,7 @@ export async function supersedeControlledDocument(id: string): Promise<void> {
   });
 }
 
-// All fields are optional — the backend may return only publishedDocumentId
-// when the controlled document has no active draft (published-only state, E10).
-export interface ActiveDocumentResponse {
-  documentId?: string;
-  approvalState?: string;
-  contentHash?: string;
-  revisionVersion?: number;
-  publishedDocumentId?: string;
-  approvalInstanceId?: string;
-}
+export type ActiveDocumentResponse = components["schemas"]["ActiveDocumentResponse"];
 
 /** @deprecated use ActiveDocumentResponse */
 export type ActiveDocumentInstance = ActiveDocumentResponse;
