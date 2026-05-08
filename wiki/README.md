@@ -16,6 +16,7 @@
 ### Backlog (deferred / intentional stubs)
 - [backlog/library-screen.md](backlog/library-screen.md) — **7 deferred items** for `/documents` Library screen: ActivityPanel inbox + audit wiring, 3 mocked stat cards, Filtros panel, Exportar action. Each item has backend prereq + frontend steps. (Last verified: 2026-05-06)
 - [backlog/novo-documento.md](backlog/novo-documento.md) — **6 deferred items** for the novo-documento wizard (`/documents-v2/new`): visibility enforcement, sequence preview, template versions, blank template, slot rollback, profile counts. (Last verified: 2026-05-07)
+- [backlog/templates.md](backlog/templates.md) — **5 deferred items** for Templates List screen: `updated_at` field on `TemplateDTO`, `created_by` → display name, card gap delta (14px vs token), mobile tab clipping at 375px, `formatRelative` promotion to `lib/utils/`. (Last verified: 2026-05-08)
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
@@ -34,7 +35,7 @@
 - **Skill:** `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow + per-screen `IMPLEMENTATION.md` worksheet for landing designed screens right the first time. Spec: `docs/superpowers/specs/2026-05-06-screen-implementation-skill-design.md`. (Last verified: 2026-05-06)
 
 ### Modules (one per backend module / frontend feature)
-- [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; `TemplateAuthorPage` now consumes `EditorChrome` (stub, Last verified: 2026-05-06)
+- [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; List screen (`/templates-v2`) wired to real API with tab filter + loading/error/empty states; `WorkspaceHeroHeader tone="flat"` pattern; `TabBar` WAI-ARIA a11y; `TemplateAuthorPage` consumes `EditorChrome` (Last verified: 2026-05-08)
 - [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), novo-documento wizard (`/documents-v2/new`, 4-step, atomic single-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-07)
 - **[modules/novo-documento-wizard.md](modules/novo-documento-wizard.md)** - wizard state machine (`wizardReducer`, `clampStep`, `canAdvance`), step components, `WizardFooter` + `DocPaperPreview` primitives, visibility sub-controls, `resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile` (Last verified: 2026-05-07)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
