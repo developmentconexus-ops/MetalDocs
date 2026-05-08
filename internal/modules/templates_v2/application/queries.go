@@ -56,3 +56,7 @@ func (s *Service) GetDocxURL(ctx context.Context, cmd GetDocxURLCmd) (string, er
 	}
 	return s.presign.PresignGET(ctx, v.DocxStorageKey, docxDownloadTTL)
 }
+
+func (s *Service) PresignStoredObject(ctx context.Context, key string) (string, error) {
+	return s.presign.PresignGET(ctx, key, docxDownloadTTL)
+}

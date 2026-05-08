@@ -21,6 +21,38 @@ type PresignAutosaveResult struct {
 	ExpiresAt  time.Time
 }
 
+type PresignTemplateUploadCmd struct {
+	TenantID, ActorUserID, TemplateID string
+	VersionNumber                     int
+	StorageKey                        string
+}
+
+func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplateUploadCmd) (*PresignAutosaveResult, error) {
+	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+		return nil, err
+	}
+	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	if err != nil {
+		return nil, err
+	}
+	if version.Status != domain.VersionStatusDraft {
+		return nil, domain.ErrInvalidStateTransition
+	}
+	key := cmd.StorageKey
+	if key == "" {
+		key = version.DocxStorageKey
+	}
+	url, err := s.presign.PresignPUT(ctx, key, autosaveUploadTTL)
+	if err != nil {
+		return nil, err
+	}
+	return &PresignAutosaveResult{
+		UploadURL:  url,
+		StorageKey: key,
+		ExpiresAt:  s.clock.Now().Add(autosaveUploadTTL),
+	}, nil
+}
+
 func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (*PresignAutosaveResult, error) {
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, err
@@ -50,6 +82,48 @@ type CommitAutosaveCmd struct {
 	TenantID, ActorUserID, TemplateID string
 	VersionNumber                     int
 	ExpectedContentHash               string
+}
+
+type SaveTemplateDraftCmd struct {
+	TenantID, ActorUserID, TemplateID string
+	VersionNumber                     int
+	ExpectedLockVersion               int
+	DocxStorageKey                    string
+	SchemaStorageKey                  string
+	DocxContentHash                   string
+	SchemaContentHash                 string
+}
+
+func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCmd) error {
+	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+		return err
+	}
+	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	if err != nil {
+		return err
+	}
+	if version.Status != domain.VersionStatusDraft {
+		return domain.ErrInvalidStateTransition
+	}
+	version.DocxStorageKey = cmd.DocxStorageKey
+	version.ContentHash = cmd.DocxContentHash
+	if err := s.repo.UpdateVersion(ctx, version); err != nil {
+		return err
+	}
+	return s.repo.AppendAudit(ctx, &domain.AuditEvent{
+		TenantID:   cmd.TenantID,
+		TemplateID: cmd.TemplateID,
+		VersionID:  &version.ID,
+		ActorID:    cmd.ActorUserID,
+		Action:     domain.AuditSaved,
+		Details: map[string]any{
+			"docx_content_hash":   cmd.DocxContentHash,
+			"schema_content_hash": cmd.SchemaContentHash,
+			"schema_storage_key":  cmd.SchemaStorageKey,
+			"expected_lock":       cmd.ExpectedLockVersion,
+		},
+		OccurredAt: s.clock.Now(),
+	})
 }
 
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*domain.TemplateVersion, error) {

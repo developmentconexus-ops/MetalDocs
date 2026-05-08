@@ -250,6 +250,69 @@ type ArchiveCmd struct {
 	TenantID, ActorUserID, TemplateID string
 }
 
+type PublishTemplateVersionCmd struct {
+	TenantID, ActorUserID, TemplateID string
+	VersionNumber                     int
+	DocxKey                           string
+	SchemaKey                         string
+}
+
+type PublishTemplateVersionResult struct {
+	PublishedVersion *domain.TemplateVersion
+	NextDraft        *domain.TemplateVersion
+}
+
+func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplateVersionCmd) (*PublishTemplateVersionResult, error) {
+	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
+	if err != nil {
+		return nil, err
+	}
+	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	if err != nil {
+		return nil, err
+	}
+	if version.Status != domain.VersionStatusDraft {
+		return nil, domain.ErrInvalidStateTransition
+	}
+
+	now := s.clock.Now()
+	version.Status = domain.VersionStatusPublished
+	version.DocxStorageKey = cmd.DocxKey
+	version.PublishedAt = &now
+	version.ApprovedAt = &now
+	if err := s.repo.ObsoletePreviousPublished(ctx, cmd.TemplateID, version.ID); err != nil {
+		return nil, err
+	}
+	template.PublishedVersionID = &version.ID
+	if err := s.repo.UpdateTemplate(ctx, template); err != nil {
+		return nil, err
+	}
+	if err := s.repo.UpdateVersion(ctx, version); err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
+		TenantID:   cmd.TenantID,
+		TemplateID: cmd.TemplateID,
+		VersionID:  &version.ID,
+		ActorID:    cmd.ActorUserID,
+		Action:     domain.AuditPublished,
+		Details:    map[string]any{"schema_key": cmd.SchemaKey},
+		OccurredAt: now,
+	}); err != nil {
+		return nil, err
+	}
+
+	next, err := s.CreateNextVersion(ctx, CreateVersionCmd{
+		TenantID:    cmd.TenantID,
+		ActorUserID: cmd.ActorUserID,
+		TemplateID:  cmd.TemplateID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &PublishTemplateVersionResult{PublishedVersion: version, NextDraft: next}, nil
+}
+
 func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.Template, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
