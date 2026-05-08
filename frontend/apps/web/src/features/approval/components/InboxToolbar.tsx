@@ -30,7 +30,7 @@ export function InboxToolbar({ view, onViewChange }: Props) {
       <span className={styles.breadcrumbSep}>›</span>
       <span className={styles.breadcrumbTitle}>Caixa de entrada</span>
       <span className={styles.spacer} />
-      <button type="button" className={`${styles.filtersBtn} btn btn-sm`} disabled aria-disabled="true">
+      <button type="button" className={`${styles.filtersBtn} btn btn-sm`} disabled aria-disabled="true" title="Em breve">
         <Icon name="filter" size={13} /> Filtros
       </button>
       <div className={styles.viewSwitcher}>
