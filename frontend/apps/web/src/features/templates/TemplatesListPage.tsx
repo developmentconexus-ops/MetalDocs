@@ -44,6 +44,7 @@ export function TemplatesListPage(_props: TemplatesListPageProps) {
     <div className={styles.page}>
       <div className={styles.content}>
         <WorkspaceHeroHeader
+          tone="flat"
           kicker="Templates"
           title="Layouts reutilizáveis"
           subtitle="Versionados, aprovados, publicados. Vinculados a perfis para clonagem em novos documentos."

@@ -10,11 +10,13 @@ type WorkspaceHeroHeaderProps = {
   onSearchQueryChange?: (value: string) => void;
   action?: ReactNode;
   variant?: "default" | "compact";
+  tone?: "banner" | "flat";
 };
 
 export function WorkspaceHeroHeader(props: WorkspaceHeroHeaderProps) {
   const isCompact = props.variant === "compact";
-  const headerClassName = `${styles.header} ${isCompact ? styles.headerCompact : ""}`.trim();
+  const isFlat = props.tone === "flat";
+  const headerClassName = `${styles.header} ${isCompact ? styles.headerCompact : ""} ${isFlat ? styles.headerFlat : ""}`.trim();
   const heroClassName = `${styles.hero} ${isCompact ? styles.heroCompact : ""}`.trim();
   const titleClassName = `${styles.title} ${isCompact ? styles.titleCompact : ""}`.trim();
   const hasSearch = props.searchQuery !== undefined && props.onSearchQueryChange !== undefined;

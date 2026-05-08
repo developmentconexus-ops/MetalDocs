@@ -9,6 +9,12 @@
   padding: 0 3.4rem;
 }
 
+.headerFlat {
+  background: transparent;
+  border-bottom: none;
+  padding: 0;
+}
+
 .hero {
   display: flex;
   align-items: center;
