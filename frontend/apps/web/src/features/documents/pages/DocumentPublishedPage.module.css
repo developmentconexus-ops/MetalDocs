@@ -1,86 +1,513 @@
-/* DocumentPublishedPage.module.css — Phase 3a skeleton (empty rules). Phase 3b fills values. */
+/* DocumentPublishedPage.module.css — Phase 3b style port */
 
-.root {}
+/* ─── Root ─────────────────────────────────────────────────────────────── */
 
-/* Hero */
-.hero {}
-.heroBg {}
-.heroGrid {}
-.heroCardWrap {}
+.root {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+}
 
-/* DocCardMini */
-.docCard {}
-.docCardHeader {}
-.docCardBody {}
-.docCardCode {}
-.docCardType {}
-.docCardSpacer {}
-.docCardDivider {}
-.docCardFooter {}
-.docCardVersion {}
-.docCardDot {}
+/* ─── Obsolete banner (overlay, hidden by default) ──────────────────────── */
 
-/* Hero content */
-.heroContent {}
-.heroBadges {}
-.codeChip {}
-.vigeenteBadge {}
-.vigeenteDot {}
-.typeLabel {}
-.heroTitle {}
-.heroActions {}
-.btnPrimary {}
-.btnSecondary {}
-.btnGhost {}
+.obsoleteBanner {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  display: none;
+}
 
-/* Breadcrumb */
-.breadcrumb {}
-.breadcrumbLink {}
+.obsoleteStamp {
+  transform: rotate(-8deg);
+  border: 6px solid var(--danger);
+  color: var(--danger);
+  padding: 0.875rem 2.25rem;
+  font-family: var(--font-mono);
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: var(--overlay-white-65);
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-danger);
+}
+
+/* ─── Hero ───────────────────────────────────────────────────────────────── */
+
+.hero {
+  padding: var(--sp-7) var(--sp-9) var(--sp-8);
+  background: linear-gradient(180deg, var(--brand-pale) 0%, var(--surface) 100%);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--brand) 1px, transparent 1px),
+    linear-gradient(90deg, var(--brand) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+}
+
+/* ─── Breadcrumb ─────────────────────────────────────────────────────────── */
+
+.breadcrumb {
+  margin-bottom: var(--sp-6);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.breadcrumbLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.breadcrumbCurrent {
+  color: var(--text);
+}
+
+/* breadcrumbSep inherits color from breadcrumb (text-muted) */
 .breadcrumbSep {}
-.breadcrumbCurrent {}
 
-/* Content area */
-.content {}
+/* ─── Hero grid ──────────────────────────────────────────────────────────── */
 
-/* KPI strip */
-.kpiStrip {}
-.kpiCell {}
-.kpiLabel {}
-.kpiValue {}
-.kpiHint {}
+.heroGrid {
+  display: grid;
+  grid-template-columns: 13.125rem 1fr;
+  gap: var(--sp-8);
+  align-items: center;
+  position: relative;
+}
 
-/* Sections */
+.heroCardWrap {
+  display: flex;
+  justify-content: center;
+}
+
+/* ─── DocCardMini ────────────────────────────────────────────────────────── */
+
+.docCard {
+  width: 10.5rem;
+  height: 14rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-doc-card);
+  transform: perspective(75rem) rotateY(-12deg) rotateX(4deg);
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.docCardHeader {
+  height: 2.25rem;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+  display: flex;
+  align-items: center;
+  padding: 0 0.875rem;
+  color: var(--text-on-brand);
+  font-family: var(--font-mono);
+  font-size: 0.59375rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.docCardBody {
+  flex: 1;
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.docCardCode {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  color: var(--brand-deep);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: var(--sp-1);
+}
+
+.docCardType {
+  font-size: 0.59375rem;
+  color: var(--text-soft);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+.docCardSpacer {
+  flex: 1;
+}
+
+.docCardDivider {
+  height: 1px;
+  background: var(--border);
+  margin-bottom: var(--sp-2);
+}
+
+.docCardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.docCardVersion {
+  font-size: 0.59375rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.docCardDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+/* ─── Hero content ───────────────────────────────────────────────────────── */
+
+.heroContent {}
+
+.heroBadges {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0.875rem;
+}
+
+.codeChip {
+  display: inline-flex;
+  align-items: center;
+  height: 1.5rem;
+  padding: 0 0.6875rem;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--brand);
+  border: 1px solid var(--brand-pale);
+  font-size: 0.71875rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.vigeenteBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 1.375rem;
+  padding: 0 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vigeenteDot {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.typeLabel {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 40rem;
+  text-wrap: balance;
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+/* ─── Content area ───────────────────────────────────────────────────────── */
+
+.content {
+  padding: var(--sp-7) var(--sp-9) 5rem;
+  max-width: 73.75rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
+/* ─── KPI strip ──────────────────────────────────────────────────────────── */
+
+.kpiStrip {
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+
+.kpiCell {
+  padding: 1.125rem 1.375rem;
+}
+
+.kpiLabel {
+  font-size: 0.59375rem;
+  margin-bottom: var(--sp-2);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.kpiValue {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+  font-family: var(--font-mono);
+  margin-bottom: var(--sp-1);
+}
+
+.kpiHint {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+/* ─── Sections ───────────────────────────────────────────────────────────── */
+
 .section {}
-.sectionHead {}
-.sectionKicker {}
-.sectionTitle {}
 
-/* AboutCard */
-.aboutLayout {}
-.aboutCard {}
-.ownerBanner {}
-.ownerInfo {}
-.ownerName {}
-.ownerMeta {}
-.factsGrid {}
-.factCell {}
-.factIcon {}
-.factContent {}
-.factLabel {}
-.factValue {}
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 1.125rem;
+}
 
-/* SignoffPipeline */
-.signoffCard {}
-.signoffGrid {}
-.signoffConnector {}
-.signoffStage {}
-.signoffPin {}
-.signoffStageName {}
-.signoffActor {}
-.signoffActorName {}
-.signoffActorRole {}
-.signoffWhen {}
+.sectionKicker {
+  font-size: 0.59375rem;
+  margin-bottom: var(--sp-1);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
 
-/* ObsoleteBanner */
-.obsoleteBanner {}
-.obsoleteStamp {}
+.sectionTitle {
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+/* ─── AboutCard ──────────────────────────────────────────────────────────── */
+
+.aboutLayout {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.aboutCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+
+.ownerBanner {
+  padding: 1.125rem 1.375rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ownerInfo {
+  flex: 1;
+}
+
+.ownerName {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ownerMeta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.factsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.factCell {
+  padding: 0.875rem 1.375rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.factCell:nth-child(odd) {
+  border-right: 1px solid var(--border);
+}
+
+.factIcon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--r-2);
+  background: var(--brand-pale);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.factContent {
+  min-width: 0;
+  flex: 1;
+}
+
+.factLabel {
+  font-size: 0.5625rem;
+  margin-bottom: 0.125rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.factValue {
+  font-size: 0.78125rem;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── SignoffPipeline ────────────────────────────────────────────────────── */
+
+.signoffCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: 1.5rem 1.5rem 1.375rem;
+}
+
+.signoffGrid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+}
+
+.signoffConnector {
+  position: absolute;
+  top: 1.125rem;
+  left: 16.66%;
+  right: 16.66%;
+  height: 2px;
+  background: var(--success);
+  border-radius: 1px;
+}
+
+.signoffStage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 var(--sp-2);
+}
+
+.signoffPin {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--success);
+  color: var(--text-on-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid var(--surface);
+  box-shadow: var(--shadow-success);
+  margin-bottom: 0.875rem;
+  z-index: 2;
+}
+
+.signoffStageName {
+  font-size: 0.5625rem;
+  margin-bottom: var(--sp-2);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.signoffActor {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+
+.signoffActorName {
+  font-size: 0.8125rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.signoffActorRole {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-1);
+}
+
+.signoffWhen {
+  font-family: var(--font-mono);
+  font-size: 0.65625rem;
+  color: var(--text-faint);
+}
