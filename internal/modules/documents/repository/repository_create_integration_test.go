@@ -6,6 +6,7 @@ package repository_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"metaldocs/internal/modules/documents/domain"
@@ -187,5 +188,55 @@ func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	}
 	if secondRevision != 2 {
 		t.Fatalf("second revision_number = %d, want 2", secondRevision)
+	}
+}
+
+// TestCreateDocument_RejectsEmptyName verifies the documents_name_not_empty
+// CHECK constraint blocks rows with empty/whitespace-only name values.
+func TestCreateDocument_RejectsEmptyName(t *testing.T) {
+	ctx := context.Background()
+	db, schema := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`SET search_path TO %q`, schema)); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+
+	tenantID := testdb.DeterministicID(t, "tenant")
+	actorID := testdb.DeterministicID(t, "actor")
+	templateVersionID := testdb.DeterministicID(t, "template-version")
+	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
+
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO controlled_documents (
+			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
+		) VALUES (
+			$1::uuid, $2::uuid, 'po', 'quality', 'PO-EMPTY-CHECK',
+			'Empty Name Check CD', $3::uuid, 'active'
+		)`,
+		controlledDocumentID, tenantID, actorID,
+	); err != nil {
+		t.Fatalf("seed controlled_documents: %v", err)
+	}
+
+	profileCode := "po"
+	processAreaCode := "quality"
+	repo := repository.New(db)
+
+	doc := &domain.Document{
+		TenantID:                tenantID,
+		TemplateVersionID:       templateVersionID,
+		Name:                    "",
+		FormDataJSON:            []byte(`{}`),
+		CreatedBy:               actorID,
+		ControlledDocumentID:    &controlledDocumentID,
+		ProfileCodeSnapshot:     &profileCode,
+		ProcessAreaCodeSnapshot: &processAreaCode,
+		Code:                    "PO-EMPTY-CHECK",
+	}
+
+	_, _, _, err := repo.CreateDocument(ctx, doc, "hash", nil)
+	if err == nil || !strings.Contains(err.Error(), "documents_name_not_empty") {
+		t.Fatalf("expected CHECK violation documents_name_not_empty, got: %v", err)
 	}
 }
