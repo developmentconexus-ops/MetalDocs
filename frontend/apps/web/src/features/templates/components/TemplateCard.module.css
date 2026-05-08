@@ -1,9 +1,81 @@
-.card {}
-.previewArea {}
-.badges {}
-.body {}
-.title {}
-.divider {}
-.footer {}
-.author {}
-.time {}
+/* Template card — design source: design-source/screens-2.jsx lines 199-225 */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.previewArea {
+  position: relative;
+  height: 110px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-4);
+  overflow: hidden;
+}
+
+.badges {
+  position: absolute;
+  right: var(--sp-4);
+  top: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+}
+
+.body {
+  padding: var(--sp-4);
+}
+
+.title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin: 0 0 var(--sp-2);
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  width: 100%;
+  margin: var(--sp-3) 0;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.author {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-muted);
+}

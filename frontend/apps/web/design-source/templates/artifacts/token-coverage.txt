@@ -1,0 +1,19 @@
+src/features/templates/TemplatesListPage.module.css:23:  height: 32px;
+src/features/templates/TemplatesListPage.module.css:26:  font-size: 13px;
+src/features/templates/TemplatesListPage.module.css:51:@media (max-width: 1024px) {
+src/features/templates/TemplatesListPage.module.css:57:@media (max-width: 640px) {
+src/features/templates/TemplatesListPage.module.css:69:  font-size: 13px;
+src/features/templates/components/TemplateCard.module.css:25:  height: 110px;
+src/features/templates/components/TemplateCard.module.css:48:  font-size: 14px;
+src/features/templates/components/TemplateCard.module.css:71:  font-size: 12px;
+src/features/templates/components/TemplateCard.module.css:78:  font-size: 11px;
+src/features/templates/components/MiniDocPreview.module.css:8:  left: 18px;
+src/features/templates/components/MiniDocPreview.module.css:9:  top: 14px;
+src/features/templates/components/MiniDocPreview.module.css:10:  width: 80px;
+src/features/templates/components/MiniDocPreview.module.css:11:  height: 100px;
+src/features/templates/components/MiniDocPreview.module.css:12:  background: #ffffff;
+src/features/templates/components/MiniDocPreview.module.css:15:  padding: 8px 7px;
+src/features/templates/components/MiniDocPreview.module.css:19:  height: 4px;
+src/features/templates/components/MiniDocPreview.module.css:22:  margin-bottom: 5px;
+src/features/templates/components/MiniDocPreview.module.css:26:  height: 1.5px;
+src/features/templates/components/MiniDocPreview.module.css:28:  margin-bottom: 3px;
