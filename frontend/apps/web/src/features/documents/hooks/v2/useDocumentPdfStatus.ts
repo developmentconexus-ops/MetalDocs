@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { apiFetch } from '../../../../lib/api';
 
 export type PDFStatus = 'pending' | 'ready' | 'failed';
 type ViewResponse = { pdf_status: PDFStatus; pdf_url?: string };
@@ -26,20 +27,13 @@ export function useDocumentPdfStatus(documentID: string, enabled: boolean): Docu
 
     const poll = async () => {
       try {
-        const res = await fetch(`/api/v2/documents/${encodeURIComponent(documentID)}/view`);
+        const v = await apiFetch<ViewResponse>(
+          `/api/v2/documents/${encodeURIComponent(documentID)}/view`,
+        );
         if (cancelled) return;
-        if (res.ok) {
-          const v = (await res.json()) as ViewResponse;
-          if (cancelled) return;
-          setData({ status: v.pdf_status, url: v.pdf_url });
-          if (v.pdf_status === 'ready' || v.pdf_status === 'failed') return;
-        }
-        if (Date.now() - startedAt.current > TIMEOUT_MS) {
-          if (!cancelled) setData({ status: 'failed' });
-          return;
-        }
+        setData({ status: v.pdf_status, url: v.pdf_url });
+        if (v.pdf_status === 'ready' || v.pdf_status === 'failed') return;
       } catch {
-        // network glitch — retry next tick
         if (Date.now() - startedAt.current > TIMEOUT_MS) {
           if (!cancelled) setData({ status: 'failed' });
           return;

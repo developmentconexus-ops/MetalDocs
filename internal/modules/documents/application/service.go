@@ -215,6 +215,10 @@ func buildDocumentForCreate(cmd CreateDocumentInput, cd *registrydomain.Controll
 	}
 }
 
+// CreateDocument is the legacy (non-atomic) create path. It renders via docgen,
+// uploads to S3, and audits asynchronously. Only called by DuplicateDocument.
+// The atomic flow (cloneIntoTx) sets storage_key in the same tx — no S3 side-effect.
+// TODO: when duplicate-document migrates to atomic flow, delete this + repo.CreateDocument + SetRevisionStorageKey.
 func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (res *CreateDocumentResult, err error) {
 	if strings.TrimSpace(cmd.ControlledDocumentID) == "" {
 		return nil, ErrControlledDocumentRequired

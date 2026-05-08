@@ -29,7 +29,6 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 	tenantID := envOrDefault("METALDOCS_E2E_TENANT_ID", "00000000-0000-0000-0000-000000000001")
 	userID := envOrDefault("METALDOCS_E2E_USER_ID", "e2e-user")
 	userRoles := envOrDefault("METALDOCS_E2E_USER_ROLES", "admin,document_filler,reviewer,approver")
-	templateVersionID := envOrDefault("METALDOCS_E2E_TEMPLATE_VERSION_ID", "11111111-1111-1111-1111-111111111111")
 	routeID := envOrDefault("METALDOCS_E2E_ROUTE_ID", "22222222-2222-2222-2222-222222222222")
 	contentHash := strings.Repeat("a", 64)
 
@@ -38,30 +37,61 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 	var submitETag string
 	var stageIDs []string
 
-	// 1) POST /api/v2/documents -> create document
-	t.Run("CreateDocument", func(t *testing.T) {
+	// 1) POST /api/v2/controlled-documents -> atomic create (CD + document)
+	t.Run("CreateControlledDocument", func(t *testing.T) {
 		body := map[string]any{
-			"template_version_id": templateVersionID,
-			"name":                fmt.Sprintf("E2E Happy %d", time.Now().UnixNano()),
-			"form_data":           map[string]any{},
+			"profileCode":     "PO",
+			"processAreaCode": "quality",
+			"title":           fmt.Sprintf("E2E Happy %d", time.Now().UnixNano()),
+			"ownerUserId":     userID,
 		}
 
-		resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v2/documents", body, map[string]string{
-			"X-Tenant-ID":  tenantID,
-			"X-User-ID":    userID,
-			"X-User-Roles": userRoles,
+		resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v2/controlled-documents", body, map[string]string{
+			"X-Tenant-ID":     tenantID,
+			"X-User-ID":       userID,
+			"X-User-Roles":    userRoles,
+			"Idempotency-Key": fmt.Sprintf("e2e-create-%d", time.Now().UnixNano()),
 		})
 		if resp.StatusCode != http.StatusCreated {
-			t.Fatalf("create document status=%d body=%s", resp.StatusCode, raw)
+			t.Fatalf("atomic create status=%d body=%s", resp.StatusCode, raw)
 		}
 
 		var payload map[string]any
 		if err := json.Unmarshal([]byte(raw), &payload); err != nil {
 			t.Fatalf("decode create response: %v", err)
 		}
-		documentID = asString(payload["document_id"])
+
+		docRef, _ := payload["document"].(map[string]any)
+		if docRef == nil {
+			t.Fatalf("missing document ref in create response: %s", raw)
+		}
+		documentID = asString(docRef["id"])
 		if documentID == "" {
-			t.Fatalf("missing document_id in create response: %s", raw)
+			t.Fatalf("missing document.id in create response: %s", raw)
+		}
+	})
+
+	// 1b) GET /api/v2/documents/{id} and verify storage_key is populated
+	t.Run("VerifyStorageKeyViaDB", func(t *testing.T) {
+		db := openOptionalDirectDB(t)
+		if db == nil {
+			t.Skip("DATABASE_URL/METALDOCS_DATABASE_URL not set; skipping storage_key verification")
+		}
+		defer db.Close()
+
+		var storageKey string
+		if err := db.QueryRowContext(context.Background(), `
+			SELECT COALESCE(r.storage_key, '')
+			  FROM metaldocs.document_revisions r
+			 WHERE r.document_id = $1::uuid
+			 ORDER BY r.created_at DESC
+			 LIMIT 1`,
+			documentID,
+		).Scan(&storageKey); err != nil {
+			t.Fatalf("query revision storage_key: %v", err)
+		}
+		if storageKey == "" {
+			t.Fatalf("expected non-empty storage_key on first revision of atomic-created document %s", documentID)
 		}
 	})
 

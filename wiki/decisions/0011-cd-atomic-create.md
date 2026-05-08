@@ -8,7 +8,7 @@
 > **Key files:**
 > - `internal/modules/registry/` — atomic create handler; owns the `POST /api/v2/controlled-documents` route
 > - `internal/platform/idempotency/` — generic `Store` + HTTP middleware; consumed by create + revision routes
-> - `internal/modules/registry/repository/cd_sequence_counters.go` — per-(tenant, profile_code, process_area_code) counter
+> - `internal/modules/registry/infrastructure/repository.go` — per-(tenant, profile_code, process_area_code) counter and CD CRUD queries
 > - `internal/modules/documents/` — exposes `CreateDocumentTx(*sql.Tx, ...)` port consumed by registry at create time
 
 ## Context

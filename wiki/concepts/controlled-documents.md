@@ -5,7 +5,7 @@
 > **Key files:**
 > - `internal/modules/registry/` — CD module (registry-owned; hosts atomic create handler)
 > - `internal/platform/idempotency/` — generic `Store` + middleware; used by atomic create + revision endpoints
-> - `internal/modules/registry/repository/cd_sequence_counters.go` — per-(tenant, profile, area) counter table
+> - `internal/modules/registry/infrastructure/repository.go` — per-(tenant, profile_code, process_area_code) counter and CD CRUD queries
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — CD list
 
 ## What it is
