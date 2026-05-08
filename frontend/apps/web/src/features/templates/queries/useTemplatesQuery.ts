@@ -6,5 +6,6 @@ export function useTemplatesQuery() {
   return useQuery({
     queryKey: QK.templates.list(),
     queryFn: () => listTemplates(),
+    staleTime: 60_000,
   });
 }

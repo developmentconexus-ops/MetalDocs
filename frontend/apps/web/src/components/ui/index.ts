@@ -8,3 +8,6 @@ export { Stepper } from './Stepper';
 export type { StepperProps, StepperStep } from './Stepper';
 export { SelectableCard } from './SelectableCard';
 export type { SelectableCardProps } from './SelectableCard';
+export { TabBar } from './TabBar';
+export type { TabBarItem } from './TabBar';
+export { WorkspaceHeroHeader } from './WorkspaceHeroHeader';
