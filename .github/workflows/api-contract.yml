@@ -1,0 +1,51 @@
+name: api-contract
+
+on:
+  pull_request:
+    paths:
+      - 'api/openapi/**'
+      - '**/api.gen.go'
+      - 'frontend/apps/web/src/lib/api-types/**'
+      - 'frontend/apps/web/package.json'
+      - 'frontend/apps/web/package-lock.json'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/api-contract.yml'
+      - 'redocly.yaml'
+  push:
+    branches: [main]
+
+jobs:
+  backend-codegen-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: 1.25.x, cache: true }
+      - name: API codegen drift check (backend)
+        run: |
+          go generate ./...
+          git diff --exit-code -- '**/api.gen.go' || (echo "::error::Run 'go generate ./...' and commit"; exit 1)
+
+  frontend-codegen-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20.11.0, cache: npm, cache-dependency-path: frontend/apps/web/package-lock.json }
+      - run: npm ci
+        working-directory: frontend/apps/web
+      - name: API codegen drift check (frontend)
+        run: |
+          cd frontend/apps/web
+          npm run gen:api
+          git diff --exit-code -- src/lib/api-types/ || (echo "::error::Run 'npm run gen:api' in frontend/apps/web and commit"; exit 1)
+
+  openapi-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20.11.0 }
+      - name: OpenAPI lint
+        run: npx --yes @redocly/cli@latest lint api/openapi/v1/openapi.yaml
