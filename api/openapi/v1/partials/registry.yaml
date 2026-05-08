@@ -1,0 +1,288 @@
+paths:
+  /api/v2/controlled-documents:
+    get:
+      summary: List controlled documents
+      tags: [registry]
+      operationId: listControlledDocuments
+      parameters:
+        - name: profileCode
+          in: query
+          schema: { type: string }
+        - name: processAreaCode
+          in: query
+          schema: { type: string }
+        - name: departmentCode
+          in: query
+          schema: { type: string }
+        - name: ownerUserId
+          in: query
+          schema: { type: string }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, obsolete, superseded] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ControlledDocument'
+        '400': { description: validation_error }
+        '401': { description: unauthenticated }
+        '403': { description: forbidden }
+    post:
+      summary: Atomically create controlled document and initial revision
+      tags: [registry]
+      operationId: atomicCreateControlledDocument
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAtomicRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AtomicCreateResponse'
+        '400': { description: validation_error }
+        '401': { description: unauthenticated }
+        '409': { description: code_taken or domain conflict }
+        '422': { description: template_invalid }
+
+  /api/v2/controlled-documents/preview-code:
+    get:
+      summary: Preview the next auto-generated document code without allocating it
+      tags: [registry]
+      operationId: previewControlledDocumentCode
+      parameters:
+        - name: profileCode
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+        - name: areaCode
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewCodeResponse'
+        '400': { description: validation_error }
+        '401': { description: unauthenticated }
+
+  /api/v2/controlled-documents/{id}:
+    get:
+      summary: Get controlled document by ID
+      tags: [registry]
+      operationId: getControlledDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ControlledDocument'
+        '401': { description: unauthenticated }
+        '404': { description: not_found }
+
+  /api/v2/controlled-documents/{id}/revisions:
+    post:
+      summary: Create a new revision for a controlled document
+      tags: [registry]
+      operationId: createControlledDocumentRevision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRevisionRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevisionResponse'
+        '400': { description: validation_error }
+        '401': { description: unauthenticated }
+        '404': { description: controlled_document_not_found }
+        '409': { description: controlled_document_not_active }
+
+  /api/v2/controlled-documents/{id}/active-document:
+    get:
+      summary: Get the active document instance for a controlled document
+      tags: [registry]
+      operationId: getActiveDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveDocumentResponse'
+        '401': { description: unauthenticated }
+        '404': { description: no_active_instance }
+
+  /api/v2/controlled-documents/{id}/obsolete:
+    put:
+      summary: Mark controlled document as obsolete
+      tags: [registry]
+      operationId: obsoleteControlledDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: obsoleted }
+        '401': { description: unauthenticated }
+        '404': { description: not_found }
+        '409': { description: controlled_document_not_active }
+
+  /api/v2/controlled-documents/{id}/supersede:
+    put:
+      summary: Mark controlled document as superseded
+      tags: [registry]
+      operationId: supersedeControlledDocument
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: superseded }
+        '401': { description: unauthenticated }
+        '404': { description: not_found }
+        '409': { description: controlled_document_not_active }
+
+components:
+  schemas:
+    ControlledDocument:
+      type: object
+      required: [id, tenantId, profileCode, processAreaCode, code, title, ownerUserId, status, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, format: uuid }
+        profileCode: { type: string }
+        processAreaCode: { type: string }
+        departmentCode: { type: string, nullable: true }
+        code: { type: string }
+        sequenceNum: { type: integer, nullable: true }
+        title: { type: string }
+        ownerUserId: { type: string }
+        overrideTemplateVersionId: { type: string, format: uuid, nullable: true }
+        status: { type: string, enum: [active, obsolete, superseded] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    DocumentRef:
+      type: object
+      required: [id, contentHash]
+      properties:
+        id: { type: string, format: uuid }
+        contentHash: { type: string }
+
+    CreateAtomicRequest:
+      type: object
+      required: [profileCode, processAreaCode, title, ownerUserId, documentName]
+      properties:
+        profileCode: { type: string, minLength: 1 }
+        processAreaCode: { type: string, minLength: 1 }
+        departmentCode: { type: string }
+        title: { type: string, minLength: 1 }
+        ownerUserId: { type: string, minLength: 1 }
+        documentName: { type: string, minLength: 1 }
+        templateVersionId: { type: string, format: uuid }
+        formData: { type: object, additionalProperties: true }
+        manualCode: { type: string }
+        manualCodeReason: { type: string }
+        overrideTemplateVersionId: { type: string, format: uuid }
+        overrideTemplateReason: { type: string }
+
+    AtomicCreateResponse:
+      type: object
+      required: [controlledDocument, document]
+      properties:
+        controlledDocument:
+          $ref: '#/components/schemas/ControlledDocument'
+        document:
+          $ref: '#/components/schemas/DocumentRef'
+
+    CreateRevisionRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        formData: { type: object, additionalProperties: true }
+        templateVersionId: { type: string, format: uuid }
+
+    RevisionResponse:
+      type: object
+      required: [document]
+      properties:
+        document:
+          $ref: '#/components/schemas/DocumentRef'
+
+    PreviewCodeResponse:
+      type: object
+      required: [profileCode, areaCode, nextSeq, code]
+      properties:
+        profileCode: { type: string }
+        areaCode: { type: string }
+        nextSeq: { type: integer, minimum: 1 }
+        code: { type: string }
+
+    ActiveDocumentResponse:
+      type: object
+      properties:
+        documentId: { type: string, format: uuid }
+        approvalState: { type: string, enum: [draft, under_review, approved, scheduled, rejected, cancelled] }
+        contentHash: { type: string }
+        revisionVersion: { type: integer, minimum: 1 }
+        publishedDocumentId: { type: string, format: uuid }
+        approvalInstanceId: { type: string, format: uuid }
