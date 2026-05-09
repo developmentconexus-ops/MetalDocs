@@ -17,6 +17,11 @@ export const templatesRoutes: RouteObject[] = [
     lazy: () => import("./pages/TemplatesListRoutePage"),
   },
   {
+    path: "templates-v2/new",
+    handle: { workspaceView: "templates-v2" },
+    lazy: () => import("./pages/TemplateWizardPage"),
+  },
+  {
     path: "templates-v2/:templateId/versions/:versionNum",
     handle: { workspaceView: "templates-v2", editMode: true },
     lazy: () => import("./pages/TemplateAuthorRoutePage"),
