@@ -1,14 +1,14 @@
 # Novo-Documento Wizard
 
-> **Last verified:** 2026-05-07 (atomic create anchors verified)
+> **Last verified:** 2026-05-09
 > **Scope:** 4-step document-creation wizard at `/documents-v2/new` — state machine, step components, new primitives (`DocPaperPreview`, `WizardFooter`), sub-controls, and helpers (`resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile`).
 > **Out of scope:** Document Library (`/documents`) — see `modules/documents.md`; editor page after creation — see `modules/documents.md#edit-flow`; approval flow — see `modules/approval.md`; deferred items — see `backlog/novo-documento.md`.
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:43` — wizard entry point; `useReducer(wizardReducer)` + URL step sync + `useMutation` submit
 > - `frontend/apps/web/src/features/documents/state/wizard.reducer.ts:62` — `wizardReducer` — pure reducer; `selectProfile` clamps step; `clampStep` / `maxReachableStep` / `canAdvance` exported
 > - `frontend/apps/web/src/features/documents/state/__tests__/wizard.reducer.test.ts:1` — vitest unit suite for reducer + helpers
-> - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — stepper chrome + layout shell
-> - `frontend/apps/web/src/features/documents/components/wizard/WizardFooter.tsx:14` — shared footer row (Back/Cancel + primary CTA); reuses `WizardShell.module.css` tokens
+> - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — doc-wizard adapter wrapping `features/shared/components/wizard/WizardShell`; supplies hardcoded 4-step copy and converts `WizardStepNumber` (1–4) to Stepper string IDs
+> - `frontend/apps/web/src/features/shared/components/wizard/WizardFooter.tsx:16` — shared footer row (Back/Cancel + primary CTA); promoted from documents wizard in Phase 2; used by both document and template wizards
 > - `frontend/apps/web/src/features/documents/components/wizard/DocPaperPreview.tsx:18` — decorative paper-preview tile; `lines`, `code`, `variant` props
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepProfile.tsx:1` — Step 1: profile radio cards
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/index.tsx:40` — Step 2: area + title + visibility; delegates to `PeopleSubcontrols` / `ExternalSubcontrols`
@@ -17,7 +17,7 @@
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — Step 3: template selector; filters to `published_version_id` only
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepConfirm.tsx:1` — Step 4: read-only summary + consent + submit
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — `{profile}-{area}-???` preview banner
-> - `frontend/apps/web/src/features/documents/queries/useProfilesQuery.ts:6` — profiles query; `STALE_FIVE_MINUTES`
+> - `frontend/apps/web/src/features/taxonomy/queries/useProfilesQuery.ts:7` — profiles query; `STALE_FIVE_MINUTES`; moved from documents queries in Phase 5 (template wizard reuse)
 > - `frontend/apps/web/src/features/documents/queries/useAreasQuery.ts:1` — areas query; `STALE_FIVE_MINUTES`
 > - `frontend/apps/web/src/features/documents/queries/useTemplatesByProfileQuery.ts:6` — templates by profile; `QK.templates.byProfile`
 > - `frontend/apps/web/src/features/documents/queries/_constants.ts:2` — `STALE_FIVE_MINUTES = 5 * 60 * 1000`
@@ -140,7 +140,7 @@ When true (URL `?profile=X` but X is not in the loaded list), Step 1 renders an 
 
 ## New primitives (major-findings refactor)
 
-### `WizardFooter` (`wizard/WizardFooter.tsx:14`)
+### `WizardFooter` (`features/shared/components/wizard/WizardFooter.tsx:16`)
 
 Shared footer row extracted from step components. Renders the Back/Cancel button on the left and the primary CTA on the right. Uses `WizardShell.module.css` tokens (`footerDivider`, `footerRow`).
 

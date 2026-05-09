@@ -1,6 +1,6 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-08
+> **Last verified:** 2026-05-09
 > **Purpose:** Single source of truth for codebase knowledge. Read this first — drill into folders only after.
 
 ## How to use this wiki
@@ -19,6 +19,7 @@
 - [backlog/templates.md](backlog/templates.md) — **5 deferred items** for Templates List screen: `updated_at` field on `TemplateDTO`, `created_by` → display name, card gap delta (14px vs token), mobile tab clipping at 375px, `formatRelative` promotion to `lib/utils/`. (Last verified: 2026-05-08)
 - [backlog/caixa-aprovacao.md](backlog/caixa-aprovacao.md) — **7 deferred items** for Caixa de Aprovação screen (`/approvals`): action button wiring (signoff/return/open-doc), heatmap real data, timeline click handlers, "Revisar →" cross-view nav, `view` type narrowing, eye icon, `approvalApi.ts` migration to `lib/api/client.ts`. (Last verified: 2026-05-08)
 - [backlog/documento-publicado.md](backlog/documento-publicado.md) — **9 deferred items** for Documento Publicado screen (`/documents/:documentId`): revision list endpoint, relationship model, comments architecture, PDF download, coverage KPI, `area_code`/`profile_code`/`controlled_document_id` in `DocumentResponse`, "Iniciar revisão" mutation wiring. (Last verified: 2026-05-08)
+- [backlog/novo-template-wizard.md](backlog/novo-template-wizard.md) — **2 deferred items + 4 stub steps** for Template Creation Wizard (`/templates-v2/new`): `template-counts` aggregate endpoint, `chk-disabled` hardcode; Steps 2–5 (Identidade/Estrutura/Permissões/Confirmação) not yet implemented. (Last verified: 2026-05-09)
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
@@ -38,7 +39,7 @@
 - **Skill:** `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow + per-screen `IMPLEMENTATION.md` worksheet for landing designed screens right the first time. Spec: `docs/superpowers/specs/2026-05-06-screen-implementation-skill-design.md`. (Last verified: 2026-05-06)
 
 ### Modules (one per backend module / frontend feature)
-- [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; List screen (`/templates-v2`) wired to real API with tab filter + loading/error/empty states; `WorkspaceHeroHeader tone="flat"` pattern; `TabBar` WAI-ARIA a11y; `TemplateAuthorPage` consumes `EditorChrome` (Last verified: 2026-05-08)
+- [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; List screen (`/templates-v2`) wired to real API with tab filter + loading/error/empty states; `WorkspaceHeroHeader tone="flat"` pattern; `TabBar` WAI-ARIA a11y; `TemplateAuthorPage` consumes `EditorChrome`; Creation wizard (`/templates-v2/new`) Step 1 (Escopo/profile picker) implemented; Steps 2–5 stub (Last verified: 2026-05-09)
 - [modules/documents.md](modules/documents.md) - document instances, Library screen (`/documents`), DocumentPublishedPage (`/documents/:documentId`, Phases 0–3c), novo-documento wizard (`/documents-v2/new`, 4-step, atomic single-call create), editing flow, session model, API; `libraryStatus.ts` status-meta, `visibilityMeta.ts` SSOT, `documentDetailMeta.ts` date-formatter SSOT, `DocumentVersionTimeline`, `useDocumentDetailQuery`, `useApprovalInstanceQuery`, `asApiError` wrapper, `AuthorCell`, debounced search, `keepPreviousData`/`staleTime`; backend `internal/modules/documents/`, table `public.documents`; codegen bootstrap only — handler migration deferred (see `backlog/contract-first-followups.md`); migration 0183 adds `name NOT NULL + CHECK` (Last verified: 2026-05-08)
 - **[modules/novo-documento-wizard.md](modules/novo-documento-wizard.md)** - wizard state machine (`wizardReducer`, `clampStep`, `canAdvance`), step components, `WizardFooter` + `DocPaperPreview` primitives, visibility sub-controls, `resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile` (Last verified: 2026-05-07)
 - [modules/taxonomy.md](modules/taxonomy.md) - document families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)

@@ -1,6 +1,6 @@
 # Frontend Structure
 
-> **Last verified:** 2026-05-08
+> **Last verified:** 2026-05-09
 > **Scope:** Canonical folder layout, naming, routing, state, API, design-system rules for `frontend/apps/web`. Comparison baseline for refactor reviews and the `metaldocs-frontend` skill.
 > **Out of scope:** Backend module layout (see `system-overview.md`), eigenpal internals (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -61,13 +61,16 @@ frontend/apps/web/src/
 │       └── SectionPanel.tsx    # 224px slot panel (Library only, via route handle flag)
 ├── features/shared/            # ← cross-feature UI primitives (used by 2+ features)
 │   └── components/
-│       └── editor-chrome/      # toolbar overlay + eigenpal overrides for eigenpal-based pages
-│           ├── EditorChrome.tsx          # wrapper with left/center/right/alert slots
-│           ├── EditorChrome.module.css   # overlay positioning + eigenpal CSS overrides + button primitives
-│           ├── parts/
-│           │   ├── VersionBadge.tsx      # monospace revision chip
-│           │   └── AutosaveStatus.tsx    # idle/saving/saved/error indicator
-│           └── index.ts                  # barrel: EditorChrome, editorChromeStyles, VersionBadge, AutosaveStatus
+│       ├── editor-chrome/      # toolbar overlay + eigenpal overrides for eigenpal-based pages
+│       │   ├── EditorChrome.tsx          # wrapper with left/center/right/alert slots
+│       │   ├── EditorChrome.module.css   # overlay positioning + eigenpal CSS overrides + button primitives
+│       │   ├── parts/
+│       │   │   ├── VersionBadge.tsx      # monospace revision chip
+│       │   │   └── AutosaveStatus.tsx    # idle/saving/saved/error indicator
+│       │   └── index.ts                  # barrel: EditorChrome, editorChromeStyles, VersionBadge, AutosaveStatus
+│       └── wizard/             # shared wizard chrome (used by document + template wizards)
+│           ├── WizardShell.tsx           # parameterized wizard layout: kicker/title/description/Stepper/children
+│           └── WizardFooter.tsx          # shared footer: stepLabel/primaryDisabled/showBack/onAdvance/onBack/onCancel
 ├── components/
 │   └── ui/                     # design-system primitives ONLY
 │       ├── Icon.tsx            # unified icon wrapper
