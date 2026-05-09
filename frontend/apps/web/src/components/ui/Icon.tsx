@@ -5,7 +5,8 @@ export type IconName =
   | 'workflow' | 'taxonomy' | 'users' | 'audit' | 'bell' | 'search'
   | 'plus' | 'chevron' | 'chevdown' | 'filter' | 'list' | 'lock'
   | 'check' | 'x' | 'download' | 'upload' | 'history' | 'link'
-  | 'cog' | 'arrow' | 'sparkle' | 'more' | 'eye';
+  | 'cog' | 'arrow' | 'sparkle' | 'more' | 'eye' | 'edit'
+  | 'calendar' | 'clock' | 'shield' | 'mail' | 'chevron-right' | 'chevron-left';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   home:     <><path d="M3 10l7-6 7 6"/><path d="M5 9v8h10V9"/></>,
@@ -37,6 +38,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
   sparkle:  <><path d="M10 3l1.5 4 4 1.5-4 1.5L10 14l-1.5-4L4 8.5l4-1.5z"/></>,
   more:     <><circle cx="5" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/></>,
   eye:      <><circle cx="10" cy="10" r="3"/><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6z"/></>,
+  edit:          <><path d="M4 16l1-4L13 4l3 3-8 8-4 1z"/><path d="M13 4l3 3"/></>,
+  calendar:      <><rect x="3" y="4" width="14" height="14" rx="1"/><path d="M3 9h14M7 3v2M13 3v2"/></>,
+  clock:         <><circle cx="10" cy="10" r="7"/><path d="M10 6v5l3 2"/></>,
+  shield:        <><path d="M10 3l7 3v5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V6l7-3z"/></>,
+  mail:          <><rect x="2" y="5" width="16" height="12" rx="1"/><path d="M2 6l8 6 8-6"/></>,
+  'chevron-right': <><path d="M7 4l6 6-6 6"/></>,
+  'chevron-left':  <><path d="M13 4l-6 6 6 6"/></>,
 };
 
 type IconProps = {
