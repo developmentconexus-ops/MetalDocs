@@ -49,12 +49,17 @@ export const documentsRoutes: RouteObject[] = [
   {
     path: 'documents/:documentId',
     handle: { workspaceView: 'library' },
-    lazy: () => import('./pages/DocumentPublishedPage').then(m => ({ Component: m.DocumentPublishedPage })),
-  },
-  {
-    path: 'documents/:documentId/distribution',
-    handle: { workspaceView: 'library' },
-    lazy: () => import('./pages/DocumentDistributionPage').then(m => ({ Component: m.DocumentDistributionPage })),
+    lazy: () => import('./pages/DocumentDetailLayout').then(m => ({ Component: m.DocumentDetailLayout })),
+    children: [
+      {
+        index: true,
+        lazy: () => import('./pages/DocumentPublishedPage').then(m => ({ Component: m.DocumentPublishedPage })),
+      },
+      {
+        path: 'distribution',
+        lazy: () => import('./pages/DocumentDistributionPage').then(m => ({ Component: m.DocumentDistributionPage })),
+      },
+    ],
   },
   {
     path: "documents-v2/new",
