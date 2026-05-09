@@ -1,0 +1,95 @@
+.hero {
+  flex-shrink: 0;
+  padding: var(--sp-7) var(--sp-9) var(--sp-8);
+  background: linear-gradient(180deg, var(--brand-pale) 0%, var(--surface) 100%);
+  border-bottom: calc(var(--sp-1) / 4) solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--brand) calc(var(--sp-1) / 4), transparent calc(var(--sp-1) / 4)),
+    linear-gradient(90deg, var(--brand) calc(var(--sp-1) / 4), transparent calc(var(--sp-1) / 4));
+  background-size: var(--sp-7) var(--sp-7);
+}
+
+.breadcrumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-6);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.breadcrumbLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.breadcrumbLink:hover {
+  color: var(--text);
+}
+
+.breadcrumbSep {
+  flex-shrink: 0;
+}
+
+.heroGrid {
+  position: relative;
+  display: grid;
+  grid-template-columns: calc(var(--sp-9) * 3.75) 1fr;
+  gap: var(--sp-8);
+  align-items: center;
+}
+
+.heroDocCard {
+  min-width: 0;
+}
+
+.heroContent {
+  min-width: 0;
+}
+
+.heroBadges {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.heroTitle {
+  font-size: var(--font-size-2xl);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  margin: 0 0 var(--sp-3);
+  font-weight: 600;
+  color: var(--text);
+  max-width: calc(var(--sp-9) * 11.43);
+  text-wrap: balance;
+}
+
+.heroSubtitle {
+  font-size: var(--font-size-md);
+  line-height: 1.55;
+  color: var(--text-soft);
+  margin: 0 0 var(--sp-5);
+  max-width: calc(var(--sp-9) * 10.36);
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
