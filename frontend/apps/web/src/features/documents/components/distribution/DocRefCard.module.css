@@ -1,10 +1,85 @@
-.card { }
-.headerStrip { }
-.body { }
-.code { }
-.typeShort { }
-.spacer { }
-.divider { }
-.footer { }
-.version { }
-.statusDot { }
+/* ── DocRefCard — 3-D document thumbnail in hero ────────── */
+.card {
+  width: 168px;
+  height: 224px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-1);
+  box-shadow: var(--shadow-doc-card);
+  transform: perspective(1200px) rotateY(-12deg) rotateX(4deg);
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.headerStrip {
+  height: 36px;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--text-on-brand);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  font-weight: 500;
+  border-radius: var(--r-1) var(--r-1) 0 0;
+}
+
+.body {
+  flex: 1;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--brand-deep);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+
+.typeShort {
+  font-size: var(--font-size-2xs);
+  color: var(--text-soft);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin-bottom: var(--sp-2);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.version {
+  font-size: var(--font-size-2xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.statusDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
