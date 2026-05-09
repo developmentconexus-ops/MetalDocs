@@ -5,6 +5,7 @@ import {
   templateWizardReducer,
   initialTemplateWizardState,
   type TemplateWizardStep,
+  type ScopeType,
 } from '../state/templateWizard.reducer';
 import { WizardShell } from '../../shared/components/wizard/WizardShell';
 import type { StepperStep } from '../../../components/ui/Stepper';
@@ -51,6 +52,10 @@ export function TemplateWizardPage(): JSX.Element {
 
   const profilesQuery = useProfilesQuery();
 
+  function handleSelectScopeType(scopeType: ScopeType) {
+    dispatch({ type: 'SET_SCOPE_TYPE', scopeType });
+  }
+
   function handleSelectProfile(code: string) {
     dispatch({ type: 'SET_PROFILE', code });
   }
@@ -68,6 +73,13 @@ export function TemplateWizardPage(): JSX.Element {
     dispatch({ type: 'GO_TO_STEP', step: n });
   }
 
+  // Step 1 advance requires:
+  //   - scope type chosen AND
+  //   - if profile scope: a profile selected
+  const step1Disabled =
+    state.scopeType === null ||
+    (state.scopeType === 'profile' && state.profileCode === null);
+
   return (
     <WizardShell
       kicker="Templates / Novo"
@@ -84,6 +96,8 @@ export function TemplateWizardPage(): JSX.Element {
     >
       {state.step === 1 && (
         <StepScope
+          scopeType={state.scopeType}
+          onSelectScopeType={handleSelectScopeType}
           profiles={profilesQuery.data ?? []}
           isLoading={profilesQuery.isLoading}
           isError={profilesQuery.isError}
@@ -92,7 +106,7 @@ export function TemplateWizardPage(): JSX.Element {
           onSelect={handleSelectProfile}
           onAdvance={handleAdvance}
           onCancel={handleCancel}
-          advanceDisabled={state.profileCode === null}
+          advanceDisabled={step1Disabled}
           onRetry={() => void profilesQuery.refetch()}
         />
       )}

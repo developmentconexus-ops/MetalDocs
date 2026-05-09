@@ -38,12 +38,17 @@ func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request) {
 	if req.Description != nil {
 		description = *req.Description
 	}
+	docTypeCode := ""
+	if req.DocTypeCode != nil {
+		docTypeCode = strings.TrimSpace(*req.DocTypeCode)
+	}
 	res, err := h.svc.CreateTemplate(r.Context(), application.CreateTemplateCmd{
 		TenantID:     tenantID,
 		ActorUserID:  actorID,
 		Key:          strings.TrimSpace(req.Key),
 		Name:         strings.TrimSpace(req.Name),
 		Description:  description,
+		DocTypeCode:  docTypeCode,
 		Visibility:   domain.VisibilityPublic,
 		ApproverRole: "approver",
 	})

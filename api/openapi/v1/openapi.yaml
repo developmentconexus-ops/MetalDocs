@@ -2814,6 +2814,7 @@ paths:
                 key: { type: string }
                 name: { type: string }
                 description: { type: string }
+                doc_type_code: { type: string, description: "Profile code (e.g. DC, POP). Omit or null for generic templates." }
       responses:
         '201':
           description: created
