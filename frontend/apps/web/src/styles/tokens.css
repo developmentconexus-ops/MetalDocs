@@ -73,4 +73,19 @@
   /* Spacing */
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
   --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 40px; --sp-9: 56px;
+
+  /* Avatar sizes */
+  --avatar-xs: 20px;
+  --avatar-sm: 22px;
+  --avatar-md: 28px;
+  --avatar-lg: 36px;
+
+  /* Font sizes */
+  --font-size-2xs: 9.5px;
+  --font-size-xs:  11px;
+  --font-size-sm:  12.5px;
+  --font-size-md:  14px;
+  --font-size-lg:  22px;
+  --font-size-xl:  32px;
+  --font-size-2xl: 36px;
 }
