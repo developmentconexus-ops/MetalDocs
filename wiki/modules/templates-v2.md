@@ -1,8 +1,8 @@
 # Module: templates-v2
 
-> **Last verified:** 2026-05-08
-> **Status:** Partial. List screen complete (Phase 5). Author/versioning pages TBD.
-> **Scope:** Template authoring, versioning, approval, publishing; Templates List screen (`/templates-v2`).
+> **Last verified:** 2026-05-09
+> **Status:** Partial. List screen complete (Phase 5). Creation wizard Step 1 complete. Steps 2–5 stub. Author/versioning pages TBD.
+> **Scope:** Template authoring, versioning, approval, publishing; Templates List screen (`/templates-v2`); Template creation wizard (`/templates-v2/new`).
 > **Out of scope:** Document fill-in (see `modules/documents.md`), eigenpal editor wiring (see `modules/editor-ui-eigenpal.md`), toolbar overlay + eigenpal CSS overrides (see `modules/editor-chrome.md`).
 > **Key files:**
 > - `internal/modules/templates_v2/` — backend module
@@ -12,10 +12,38 @@
 > - `frontend/apps/web/src/features/templates/components/MiniDocPreview.tsx:1` — decorative A4 thumbnail (8 placeholder lines)
 > - `frontend/apps/web/src/components/ui/WorkspaceHeroHeader.tsx:13` — `tone?: "banner" | "flat"` prop; `.headerFlat` strips card chrome (transparent bg, no border-bottom, padding 0)
 > - `frontend/apps/web/src/components/ui/TabBar.tsx:17` — roving tabIndex (`tabIndex={isActive ? 0 : -1}`), Arrow/Home/End keyboard nav per WAI-ARIA tablist spec
-> - `frontend/apps/web/src/features/templates/TemplateCreateDialog.tsx` — new template dialog
+> - `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1` — creation wizard; `useReducer(templateWizardReducer)` + URL sync `?step=N`; `export { TemplateWizardPage as Component }` for React Router lazy
+> - `frontend/apps/web/src/features/templates/state/templateWizard.reducer.ts:1` — wizard reducer; `TemplateWizardStep = 1|2|3|4|5`; actions: `GO_TO_STEP | SET_PROFILE | RESET`
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepScope.tsx:1` — Step 1: profile picker; `DISABLED_PROFILES = new Set(['CHK'])` with TODO for API flag
+> - `frontend/apps/web/src/features/taxonomy/queries/useProfilesQuery.ts:1` — shared profiles query (used by both documents and templates wizards)
+> - `frontend/apps/web/src/features/shared/components/wizard/WizardShell.tsx:1` — parameterized wizard chrome; `kicker/title/description/steps/currentStep/children`
+> - `frontend/apps/web/src/features/shared/components/wizard/WizardFooter.tsx:1` — shared footer; `stepLabel/primaryDisabled/showBack/onAdvance/onBack/onCancel`
+> - `frontend/apps/web/src/features/templates/TemplateCreateDialog.tsx` — new template dialog (superseded by wizard, kept for rollback)
 > - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — eigenpal author; consumes `EditorChrome` for toolbar overlay
 > - `frontend/apps/web/src/features/templates/VersionActionPanel.tsx` — lifecycle transitions
-> - `frontend/apps/web/design-source/templates/artifacts/` — phase 0–5 implementation artifacts
+> - `frontend/apps/web/design-source/templates/artifacts/` — phase 0–5 implementation artifacts (list screen)
+> - `frontend/apps/web/design-source/novo-template-escopo/artifacts/` — phase 0–5 implementation artifacts (creation wizard)
+
+## Template Creation Wizard
+
+**Route:** `/templates-v2/new`
+**Page:** `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1`
+
+5-step wizard using the same `WizardShell` + `WizardFooter` shared primitives as the document creation wizard.
+
+### State management
+
+`useReducer(templateWizardReducer, initialState, urlInitializer)` — URL-sync pattern: `useEffect` on `state.step` writes `?step=N` back; lazy initializer reads it on mount. Same pattern as doc wizard.
+
+### Step 1 — Escopo (profile picker)
+
+Profile cards from `useProfilesQuery` (taxonomy). CHK hardcoded as disabled until Checklist feature ships — see `wiki/backlog/novo-template-wizard.md#chk-disabled`.
+
+### Steps 2–5
+
+Stubs — not yet implemented. See `wiki/backlog/novo-template-wizard.md`.
+
+---
 
 ## Templates List screen
 

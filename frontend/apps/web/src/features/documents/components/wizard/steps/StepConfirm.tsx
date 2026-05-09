@@ -4,7 +4,7 @@ import type { DocumentProfile, ProcessArea } from '../../../../taxonomy/types';
 import type { TemplateDTO } from '../../../../templates';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
 import { DocPaperPreview } from '../DocPaperPreview';
-import { WizardFooter } from '../WizardFooter';
+import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
 import styles from './StepConfirm.module.css';
 
 type SummaryField = { label: string; value: string };

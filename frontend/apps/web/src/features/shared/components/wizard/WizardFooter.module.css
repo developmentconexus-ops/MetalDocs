@@ -8,5 +8,11 @@
 }
 
 .footerDivider {
-  margin: 0 -32px var(--sp-5);
+  margin: 0 calc(-1 * var(--sp-7)) var(--sp-5);
+}
+
+@media (max-width: 600px) {
+  .footerDivider {
+    margin: 0 calc(-1 * var(--sp-4)) var(--sp-5);
+  }
 }

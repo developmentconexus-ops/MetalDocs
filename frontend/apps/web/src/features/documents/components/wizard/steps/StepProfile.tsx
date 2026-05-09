@@ -2,7 +2,7 @@ import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
 import { resolveQueryError } from '../../../../../lib/api';
 import type { DocumentProfile } from '../../../../taxonomy/types';
-import { WizardFooter } from '../WizardFooter';
+import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
 import styles from './StepProfile.module.css';
 
 export type StepProfileProps = {

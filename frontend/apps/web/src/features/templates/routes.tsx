@@ -17,7 +17,7 @@ export const templatesRoutes: RouteObject[] = [
     lazy: () => import("./pages/TemplatesListRoutePage"),
   },
   {
-    path: "templates-v2/novo",
+    path: "templates-v2/new",
     handle: { workspaceView: "templates-v2" },
     lazy: () => import("./pages/TemplateWizardPage"),
   },
@@ -25,11 +25,5 @@ export const templatesRoutes: RouteObject[] = [
     path: "templates-v2/:templateId/versions/:versionNum",
     handle: { workspaceView: "templates-v2", editMode: true },
     lazy: () => import("./pages/TemplateAuthorRoutePage"),
-  },
-  {
-    // Phase 3a: route stub — Phase 3c wires wizard state
-    path: "templates-v2/novo",
-    handle: { workspaceView: "templates-v2" },
-    lazy: () => import("./pages/TemplateWizardPage"),
   },
 ];

@@ -57,7 +57,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: var(--bg-muted, #f0f0f0);
+  background: var(--surface-3);
   color: var(--text-muted);
   padding: 2px 6px;
   border-radius: 4px;
