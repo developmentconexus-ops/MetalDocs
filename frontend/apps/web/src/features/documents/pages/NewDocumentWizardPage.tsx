@@ -6,7 +6,7 @@ import { resolveQueryError } from '../../../lib/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { createControlledDocumentAtomic } from '../../registry/api/controlledDocuments';
 import { useAreasQuery } from '../queries/useAreasQuery';
-import { useProfilesQuery } from '../queries/useProfilesQuery';
+import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useTemplatesByProfileQuery } from '../queries/useTemplatesByProfileQuery';
 import {
   INITIAL_STATE,

@@ -1,0 +1,88 @@
+/* Page-scroll wrapper. Mirrors selected-wizard.jsx WizardShell outer div
+   (line 31): { flex: 1, overflow: 'auto', background: 'var(--bg)',
+   padding: '32px 28px' }. */
+.scrollWrapper {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+  padding: var(--sp-7) var(--sp-7);
+}
+
+/* Max-width content container. Mirrors selected-wizard.jsx WizardShell inner div
+   (line 32): { maxWidth: 880, margin: '0 auto' }. */
+.container {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+/* Header block: kicker + h1 + description paragraph above the stepper.
+   Mirrors selected-wizard.jsx inline margins: kicker mb:6, h1 mb:4,
+   p mb:28 + color:text-muted. */
+.header {
+  margin-bottom: 0;
+}
+
+.header :global(.kicker) {
+  margin-bottom: 6px;
+}
+
+.header :global(.display-1) {
+  margin-bottom: var(--sp-1);
+}
+
+.description {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0 0 28px;
+}
+
+/* Wizard step cards: generous padding matching design (28px var(--sp-7)).
+   Overrides global .card { padding:1rem }. */
+.container > :global(.card) {
+  padding: 28px var(--sp-7);
+}
+
+/* Step card internal spacing. Mirrors design inline margins:
+   kicker mb:8, h2 mb:6, caption (intro) mb:24. Only targets
+   direct children to avoid cascading into nested cards/grids. */
+.container > :global(.card) > :global(.kicker) {
+  margin-bottom: var(--sp-2);
+}
+
+.container > :global(.card) > :global(.h2) {
+  margin-bottom: 6px;
+}
+
+.container > :global(.card) > :global(.caption) {
+  margin-bottom: var(--sp-5);
+}
+
+/* Footer row. Mirrors selected-wizard.jsx Footer (line 47):
+   { display: 'flex', alignItems: 'center', gap: 10 }. */
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Footer divider bleeds to card edges to match design:
+   margin: '0 -var(--sp-7) 20px' (negative horizontal = card horizontal padding). */
+.footerDivider {
+  margin: 0 calc(-1 * var(--sp-7)) var(--sp-5);
+}
+
+/* Responsive: reduce horizontal padding at narrow viewports. */
+@media (max-width: 600px) {
+  .scrollWrapper {
+    padding: var(--sp-4) var(--sp-4);
+  }
+
+  .container > :global(.card) {
+    padding: var(--sp-4) var(--sp-4);
+  }
+
+  .footerDivider {
+    margin: 0 calc(-1 * var(--sp-4)) var(--sp-5);
+  }
+}
