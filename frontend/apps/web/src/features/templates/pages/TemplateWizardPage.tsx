@@ -6,7 +6,7 @@ import {
   initialTemplateWizardState,
   type TemplateWizardStep,
 } from '../state/templateWizard.reducer';
-import { TemplateWizardShell } from '../components/wizard/TemplateWizardShell';
+import { WizardShell } from '../../shared/components/wizard/WizardShell';
 import type { StepperStep } from '../../../components/ui/Stepper';
 import { StepScope } from '../components/wizard/steps/StepScope';
 
@@ -69,7 +69,15 @@ export function TemplateWizardPage(): JSX.Element {
   }
 
   return (
-    <TemplateWizardShell
+    <WizardShell
+      kicker="Templates / Novo"
+      title="Novo template reutilizável"
+      description={
+        <>
+          Templates publicados ficam disponíveis para autores criarem novos documentos. Use placeholders{' '}
+          <span className="mono">{'{{campo}}'}</span> para campos dinâmicos.
+        </>
+      }
       steps={TPL_STEPS}
       currentStep={String(state.step)}
       onStepClick={handleStepClick}
@@ -94,7 +102,7 @@ export function TemplateWizardPage(): JSX.Element {
           <p className="caption">Em construção — próximas etapas a implementar.</p>
         </div>
       )}
-    </TemplateWizardShell>
+    </WizardShell>
   );
 }
 
