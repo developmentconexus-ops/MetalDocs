@@ -1,0 +1,12 @@
+/* WizardFooter.module.css — Phase 3a stubs, Phase 3b ports styles.
+   Mirrors footerRow / footerDivider from documents WizardShell.module.css. */
+
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footerDivider {
+  margin: 0 -32px var(--sp-5);
+}

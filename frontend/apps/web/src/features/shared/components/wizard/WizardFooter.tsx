@@ -1,4 +1,6 @@
-import styles from './WizardShell.module.css';
+// Shared WizardFooter — used by document and template wizards.
+// Extracted from features/documents/components/wizard/WizardFooter.tsx (Phase 2 promotion).
+import styles from './WizardFooter.module.css';
 
 export type WizardFooterProps = {
   stepLabel: string;
