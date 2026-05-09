@@ -1,11 +1,11 @@
 .root {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  border-radius: 10px;
+  gap: var(--sp-2);
+  border-radius: var(--r-5);
   border: 1px solid var(--border);
   background: var(--surface);
-  padding: 0.2rem 0.7rem;
+  padding: var(--sp-1) var(--sp-3);
   min-width: 380px;
   max-width: 620px;
   width: 100%;
