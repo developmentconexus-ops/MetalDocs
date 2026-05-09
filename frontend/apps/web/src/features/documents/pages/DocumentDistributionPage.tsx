@@ -1,4 +1,5 @@
 import { Icon } from '../../../components/ui/Icon';
+import { DocumentHero } from '../components/DocumentHero';
 import { DocRefCard } from '../components/distribution/DocRefCard';
 import { KPIStrip } from '../components/distribution/KPIStrip';
 import { DonutCard } from '../components/distribution/DonutCard';
@@ -31,85 +32,47 @@ function SectionHeader({
 export function DocumentDistributionPage() {
   return (
     <div className={styles.page}>
-      {/* Hero */}
-      <header className={styles.hero}>
-        <div className={styles.heroOverlay} />
-
-        {/* Breadcrumb */}
-        <div className={styles.breadcrumb}>
-          <a href="#" className={styles.breadcrumbLink}>Biblioteca</a>
-          <Icon name="chevron-right" size={10} className={styles.breadcrumbSep} />
-          <a href="#" className={styles.breadcrumbLink}>SSMA</a>
-          <Icon name="chevron-right" size={10} className={styles.breadcrumbSep} />
-          <a href="#" className={styles.breadcrumbLink}>PR-EHS-014</a>
-          <Icon name="chevron-right" size={10} className={styles.breadcrumbSep} />
-          <span>Distribuição</span>
-        </div>
-
-        {/* Hero grid: doc card + content */}
-        <div className={styles.heroGrid}>
-          <div>
-            <DocRefCard />
-          </div>
-
-          <div className={styles.heroContent}>
-            <div className={styles.heroBadges}>
-              <span className={styles.codeBadge}>PR-EHS-014 · v3.2</span>
-              <span className={styles.deadlineBadge}>
-                <span className={styles.deadlineDot} />
-                Vence em 8 dias
-              </span>
-              <span className={styles.sectionBadge}>§03.05 · Fanout</span>
-            </div>
-
-            <h1 className={styles.heroTitle}>Distribuição &amp; cobertura de leitura</h1>
-
-            <p className={styles.heroSubtitle}>
-              Procedimento de Bloqueio e Etiquetagem (LOTO) · publicado em 12 mar 2026 · 14:32.
-              Reconhecimento obrigatório por assinatura para todas as 248 pessoas alcançadas.
-            </p>
-
-            <div className={styles.heroCtas}>
-              <button
-                type="button"
-                aria-disabled="true"
-                title="Em breve"
-                className={styles.ctaDisabled}
-              >
-                <Icon name="mail" size={15} />
-                Lembrete em massa
-              </button>
-              <button
-                type="button"
-                aria-disabled="true"
-                title="Em breve"
-                className={styles.ctaDisabled}
-              >
-                <Icon name="download" size={13} />
-                Exportar relatório
-              </button>
-              <button
-                type="button"
-                aria-disabled="true"
-                title="Em breve"
-                className={styles.ctaDisabled}
-              >
-                <Icon name="users" size={13} />
-                Adicionar destinatários
-              </button>
-              <button
-                type="button"
-                aria-disabled="true"
-                title="Em breve"
-                className={styles.ctaDisabled}
-              >
-                <Icon name="cog" size={13} />
-                Política de fanout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <DocumentHero
+        breadcrumbItems={[
+          { label: 'Biblioteca', href: '#' },
+          { label: 'SSMA', href: '#' },
+          { label: 'PR-EHS-014', href: '#' },
+          { label: 'Distribuição' },
+        ]}
+        docCard={<DocRefCard />}
+        badges={
+          <>
+            <span className={styles.codeBadge}>PR-EHS-014 · v3.2</span>
+            <span className={styles.deadlineBadge}>
+              <span className={styles.deadlineDot} />
+              Vence em 8 dias
+            </span>
+            <span className={styles.sectionBadge}>§03.05 · Fanout</span>
+          </>
+        }
+        title="Distribuição & cobertura de leitura"
+        subtitle="Procedimento de Bloqueio e Etiquetagem (LOTO) · publicado em 12 mar 2026 · 14:32. Reconhecimento obrigatório por assinatura para todas as 248 pessoas alcançadas."
+        actions={
+          <>
+            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+              <Icon name="mail" size={15} />
+              Lembrete em massa
+            </button>
+            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+              <Icon name="download" size={13} />
+              Exportar relatório
+            </button>
+            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+              <Icon name="users" size={13} />
+              Adicionar destinatários
+            </button>
+            <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
+              <Icon name="cog" size={13} />
+              Política de fanout
+            </button>
+          </>
+        }
+      />
 
       {/* Main content */}
       <main className={styles.main}>
