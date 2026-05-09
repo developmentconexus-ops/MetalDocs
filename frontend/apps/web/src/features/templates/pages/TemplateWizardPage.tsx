@@ -30,4 +30,6 @@ export function TemplateWizardPage(): JSX.Element {
   );
 }
 
+export { TemplateWizardPage as Component };
+
 export default TemplateWizardPage;

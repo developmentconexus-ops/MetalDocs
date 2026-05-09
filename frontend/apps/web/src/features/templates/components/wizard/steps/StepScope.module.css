@@ -1,13 +1,97 @@
-/* StepScope.module.css — Phase 3a stubs, Phase 3b ports styles. */
+/* StepScope.module.css — Phase 3b style port.
+ *
+ * Token map (design inline → token used):
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Design value         Token / raw       Notes
+ * ─────────────────────────────────────────────────────────────────────────────
+ * profileGrid gap 10px   raw 10px        No --sp-2-5; StepProfile uses same raw
+ * profileGrid mb 8px     var(--sp-2)     sp-2 = 8px ✓
+ * profileCard gap 6px    raw 6px         No token; StepProfile uses same raw
+ * profileCard padding 16px var(--sp-4)  sp-4 = 16px ✓ (overrides SelectableCard default)
+ * profileHeader gap 8px  var(--sp-2)     sp-2 = 8px ✓
+ * profileMeta gap 12px   var(--sp-3)     sp-3 = 12px ✓
+ * profileMeta color      var(--text-muted) token ✓
+ * profileCode font 13px  raw 13px        No fz token; TODO(novo-template-wizard:typography-tokens)
+ * profileName font 13px  raw 13px        same
+ * profileMeta font 11px  raw 11px        same
+ *
+ * kicker/h2/caption margins: already handled by WizardShell.module.css rules
+ *   .container > :global(.card) > :global(.kicker/h2/caption).
+ *   No additional scoping needed here.
+ *
+ * SelectableCard already sets: display:flex, flex-direction:column, align-items:stretch,
+ *   gap:var(--sp-2), padding:var(--sp-4), border, border-radius, background, color,
+ *   text-align:left, cursor. profileCard only overrides gap and padding to match design.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 
-.profileGrid { }
+/* 2-column profile card grid. Mirrors template-wizard.jsx TplStep1 line:
+   { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 8 }.
+   gap 10px: no token (StepProfile.module.css uses same raw value). */
+.profileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: var(--sp-2);
+}
 
-.profileCard { }
+/* Profile SelectableCard override. Design uses padding:16 all-around and
+   gap-based spacing. gap 6px for inter-row spacing within card (no token).
+   Padding var(--sp-4) matches design exactly. */
+.profileCard {
+  gap: 6px;
+  padding: var(--sp-4);
+}
 
-.profileHeader { }
+/* Zero paragraph margins inside profile cards — flexbox gap handles spacing. */
+.profileCard p {
+  margin: 0;
+}
 
-.profileCode { }
+/* Profile card header row (code + name + check icon). Mirrors template-wizard.jsx:
+   { display: 'flex', alignItems: 'center', gap: 8 }.
+   No margin-bottom — SelectableCard gap (6px) provides inter-row spacing. */
+.profileHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
 
-.profileName { }
+/* Profile code (id) span. Brand color when card selected, per design.
+   Default color inherits from card (var(--text)).
+   TODO(novo-template-wizard:typography-tokens): raw 13px — no font-size scale. */
+.profileCode {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
 
-.profileMeta { }
+:global([data-selected="true"]) .profileCode {
+  color: var(--brand);
+}
+
+/* Profile name span. flex:1 grows name → pushes badges/check to far right.
+   TODO(novo-template-wizard:typography-tokens): raw 13px — no font-size scale. */
+.profileName {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Profile meta row (família · count). Mirrors template-wizard.jsx:
+   { display: 'flex', gap: 12, fontSize: 11, color: 'var(--text-muted)' }.
+   TODO(novo-template-wizard:typography-tokens): raw 11px — no font-size scale. */
+.profileMeta {
+  display: flex;
+  gap: var(--sp-3);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Responsive: collapse profile grid at narrow viewports. */
+@media (max-width: 600px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+}
