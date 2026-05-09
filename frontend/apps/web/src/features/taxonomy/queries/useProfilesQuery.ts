@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchProfiles } from '../api/taxonomy';
 import { QK } from '../../../lib/queryKeys';
-import { STALE_FIVE_MINUTES } from './constants';
+
+const STALE_FIVE_MINUTES = 5 * 60 * 1000;
 
 export function useProfilesQuery() {
   return useQuery({
