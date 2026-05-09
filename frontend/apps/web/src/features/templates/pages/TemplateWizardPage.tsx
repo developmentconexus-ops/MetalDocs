@@ -1,6 +1,6 @@
 // Phase 3a: structure mirror only — no state, no handlers, no queries.
 // Phase 3c wires state management and navigation.
-import { WizardShell, type WizardShellStep } from '../../../shared/components/wizard/WizardShell';
+import { WizardShell, type WizardShellStep } from '../../shared/components/wizard/WizardShell';
 import { StepScope } from '../components/wizard/steps/StepScope';
 
 const TPL_STEPS: WizardShellStep[] = [
