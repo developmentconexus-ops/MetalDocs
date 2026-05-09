@@ -1,0 +1,8 @@
+# Token coverage check — StepScope.module.css
+# Command: grep -En '#[0-9a-fA-F]{3,8}|rgb\(' src/features/templates/components/wizard/steps/StepScope.module.css | grep -v 'var(--'
+# Result: (empty — PASS)
+#
+# No raw hex or rgb() values found in StepScope.module.css.
+# Raw px values present (10px, 6px, 13px, 11px) are spacing/typography
+# values with no token coverage — same pattern as StepProfile.module.css.
+# These are logged with TODO comments for the typography-tokens milestone.
