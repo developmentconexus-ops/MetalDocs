@@ -77,6 +77,7 @@ export function StepScope({
                 key={profile.code}
                 selected={selected}
                 disabled={isDisabled}
+                title={isDisabled ? 'Em breve' : undefined}
                 onSelect={() => onSelect(profile.code)}
                 className={styles.profileCard}
               >

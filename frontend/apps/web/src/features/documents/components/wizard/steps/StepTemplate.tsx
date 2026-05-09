@@ -3,7 +3,7 @@ import { Icon } from '../../../../../components/ui/Icon';
 import { resolveQueryError } from '../../../../../lib/api';
 import type { TemplateDTO } from '../../../../templates';
 import { DocPaperPreview } from '../DocPaperPreview';
-import { WizardFooter } from '../WizardFooter';
+import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
 import styles from './StepTemplate.module.css';
 
 export type StepTemplateProps = {
