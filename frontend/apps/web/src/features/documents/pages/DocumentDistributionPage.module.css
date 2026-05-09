@@ -6,73 +6,6 @@
   background: var(--bg);
 }
 
-/* ── Hero ────────────────────────────────────────────────── */
-.hero {
-  flex-shrink: 0;
-  padding: var(--sp-7) var(--sp-9) var(--sp-8);
-  background: linear-gradient(180deg, var(--brand-pale) 0%, var(--surface) 100%);
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-}
-
-.heroOverlay {
-  position: absolute;
-  inset: 0;
-  opacity: 0.04;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--brand) 1px, transparent 1px),
-    linear-gradient(90deg, var(--brand) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-
-/* Breadcrumb */
-.breadcrumb {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-6);
-  font-size: var(--font-size-xs);
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.breadcrumbLink {
-  color: inherit;
-  text-decoration: none;
-}
-
-.breadcrumbLink:hover {
-  color: var(--text);
-}
-
-.breadcrumbSep {
-  flex-shrink: 0;
-}
-
-/* Hero grid */
-.heroGrid {
-  position: relative;
-  display: grid;
-  grid-template-columns: 210px 1fr;
-  gap: var(--sp-8);
-  align-items: center;
-}
-
-.heroContent {
-  /* flex column is implicit — no explicit layout needed */
-}
-
-.heroBadges {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-4);
-}
 
 .codeBadge {
   display: inline-flex;
@@ -121,31 +54,6 @@
   text-transform: uppercase;
 }
 
-.heroTitle {
-  font-size: var(--font-size-2xl);
-  line-height: 1.1;
-  letter-spacing: -0.025em;
-  margin: 0 0 var(--sp-3);
-  font-weight: 600;
-  color: var(--text);
-  max-width: 640px;
-  text-wrap: balance;
-}
-
-.heroSubtitle {
-  font-size: 14.5px;
-  line-height: 1.55;
-  color: var(--text-soft);
-  margin: 0 0 22px;
-  max-width: 580px;
-}
-
-.heroCtas {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  flex-wrap: wrap;
-}
 
 .ctaDisabled {
   /* btn appearance */
