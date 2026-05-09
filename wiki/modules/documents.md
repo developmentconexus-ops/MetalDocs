@@ -1,6 +1,6 @@
 # documents Module
 
-> **Last verified:** 2026-05-08
+> **Last verified:** 2026-05-09
 > **Scope:** Document instances — library listing, novo-documento wizard (`/documents-v2/new`), document-published view (`/documents/:documentId`), edit, autosave, finalize.
 > **Out of scope:** Template authoring (see `modules/templates-v2.md`), approval routes (`modules/approval.md`), PDF fanout (`modules/render-fanout.md`).
 > **Key files:**
@@ -29,7 +29,7 @@
 > - `frontend/apps/web/src/features/documents/routes.tsx:50` — `documents/:documentId` route: lazy-loads `DocumentPublishedPage`
 > - `frontend/apps/web/src/features/documents/routes.tsx:55` — `documents-v2/new` route: lazy-loads `NewDocumentWizardPage`
 > - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:42` — `NewDocumentWizardPage` — 4-step wizard entry; `useReducer(wizardReducer)` for form state; `?step=1..4` URL param; atomic single-call submit via `createControlledDocumentAtomic`; `profileNotFound` derived flag
-> - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — stepper chrome + layout shell for all 4 steps
+> - `frontend/apps/web/src/features/documents/components/wizard/WizardShell.tsx:1` — doc-wizard adapter: wraps `features/shared/components/wizard/WizardShell` with hardcoded doc-wizard steps/copy; converts `WizardStepNumber` (1–4) to Stepper string IDs
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepProfile.tsx:1` — Step 1: profile radio cards; calls `GET /api/v2/taxonomy/profiles`
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepAreaCodeVisibility/index.tsx:40` — Step 2: area picker + title + visibility; calls `GET /api/v2/taxonomy/areas`; shows `{profile}-{area}-???` code preview; delegates to `PeopleSubcontrols` / `ExternalSubcontrols`
 > - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — Step 3: template selector; calls `GET /api/v2/templates` filtered by profile; only shows templates with `published_version_id`; "Em branco" intentionally disabled
