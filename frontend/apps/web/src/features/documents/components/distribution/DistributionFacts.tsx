@@ -1,14 +1,19 @@
 import { Icon } from '../../../../components/ui/Icon';
+import { MOCK_DISTRIBUTION } from '../../lib/distributionMeta';
 import styles from './DistributionFacts.module.css';
 
+const { publishedAtFull, deadlineFull, daysLeft, policy, channel, remindersSent, remindersScheduled, byArea, people } = MOCK_DISTRIBUTION;
+
+const uniqueRoles = new Set(people.map(p => p.role)).size;
+
 const FACTS = [
-  { icon: 'calendar' as const, label: 'Distribuído em',    value: '12 mar 2026 · 14:32', mono: false, hint: '',                     tone: ''        },
-  { icon: 'clock'    as const, label: 'Prazo',             value: '22 mar 2026 · 23:59', mono: false, hint: '8 dias restantes',      tone: 'warning' },
-  { icon: 'shield'   as const, label: 'Política',          value: 'Reconhecimento obrigatório (assinatura)', mono: false, hint: '', tone: ''        },
-  { icon: 'mail'     as const, label: 'Canal',             value: 'E-mail + portal interno', mono: false, hint: '',                 tone: ''        },
-  { icon: 'bell'     as const, label: 'Lembretes enviados',value: '2',                   mono: true,  hint: 'próximo: 20 mar · 08:00', tone: ''    },
-  { icon: 'users'    as const, label: 'Grupos',            value: '8 áreas · 11 cargos', mono: false, hint: '',                     tone: ''        },
-] as const;
+  { icon: 'calendar' as const, label: 'Distribuído em',    value: publishedAtFull,                      mono: false, hint: '',                                  tone: ''        },
+  { icon: 'clock'    as const, label: 'Prazo',             value: deadlineFull,                          mono: false, hint: `${daysLeft} dias restantes`,        tone: 'warning' },
+  { icon: 'shield'   as const, label: 'Política',          value: policy,                               mono: false, hint: '',                                  tone: ''        },
+  { icon: 'mail'     as const, label: 'Canal',             value: channel,                              mono: false, hint: '',                                  tone: ''        },
+  { icon: 'bell'     as const, label: 'Lembretes enviados',value: String(remindersSent),                mono: true,  hint: `próximo: ${remindersScheduled}`,    tone: ''        },
+  { icon: 'users'    as const, label: 'Grupos',            value: `${byArea.length} áreas · ${uniqueRoles} cargos`, mono: false, hint: '',                      tone: ''        },
+];
 
 export function DistributionFacts() {
   return (

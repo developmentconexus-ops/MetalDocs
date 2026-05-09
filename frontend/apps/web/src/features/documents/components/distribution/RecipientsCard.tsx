@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Avatar } from '../../../../components/ui/Avatar';
 import { SearchBar } from '../../../../components/ui/SearchBar';
 import { TabBar } from '../../../../components/ui/TabBar';
 import { Icon } from '../../../../components/ui/Icon';
+import { useDebouncedValue } from '../../../../lib/hooks/useDebouncedValue';
 import { MOCK_DISTRIBUTION, RECIPIENT_TABS } from '../../lib/distributionMeta';
 import styles from './RecipientsCard.module.css';
 
@@ -19,23 +21,35 @@ const STATUS_LABEL: Record<string, string> = {
   overdue: 'Em atraso',
 };
 
-// Placeholder: show first 4 rows from mock data
-const SAMPLE_ROWS = MOCK_DISTRIBUTION.people.slice(0, 4);
-
 export function RecipientsCard() {
+  const [activeTab, setActiveTab] = useState<string>('pending');
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const filtered = MOCK_DISTRIBUTION.people.filter(p => {
+    const statusKey = p.overdue ? 'overdue' : p.status;
+    const tabMatch = activeTab === 'all' || statusKey === activeTab;
+    const q = debouncedSearch.toLowerCase();
+    const searchMatch = !q || p.who.toLowerCase().includes(q) || p.area.toLowerCase().includes(q) || p.role.toLowerCase().includes(q);
+    return tabMatch && searchMatch;
+  });
+
+  const allSelected = filtered.length > 0 && filtered.every(p => selectedIds.has(p.who));
+
   return (
     <div className={styles.card}>
       {/* Filter bar */}
       <div className={styles.filterBar}>
         <TabBar
           tabs={RECIPIENT_TABS}
-          activeKey="pending"
-          onTabChange={() => undefined}
+          activeKey={activeTab}
+          onTabChange={setActiveTab}
           ariaLabel="Filtrar destinatários"
         />
         <SearchBar
-          value=""
-          onChange={() => undefined}
+          value={search}
+          onChange={setSearch}
           placeholder="Filtrar por nome, área, cargo…"
           ariaLabel="Filtrar destinatários"
         />
@@ -48,7 +62,15 @@ export function RecipientsCard() {
       {/* Column header row */}
       <div className={styles.headerRow}>
         <span className={styles.colCheck}>
-          <input type="checkbox" readOnly className={styles.checkbox} />
+          <input
+            type="checkbox"
+            className={styles.checkbox}
+            checked={allSelected}
+            onChange={() => {
+              if (allSelected) setSelectedIds(new Set());
+              else setSelectedIds(new Set(filtered.map(p => p.who)));
+            }}
+          />
         </span>
         <span className={styles.colRecipient}>Destinatário</span>
         <span className={styles.colArea}>Área</span>
@@ -58,16 +80,25 @@ export function RecipientsCard() {
         <span className={styles.colActions} />
       </div>
 
-      {/* Sample rows */}
-      {SAMPLE_ROWS.map((p, i) => {
+      {/* Filtered rows */}
+      {filtered.map((p, i) => {
         const statusKey = p.overdue ? 'overdue' : p.status;
         return (
           <div
             key={p.who}
-            className={`${styles.recipientRow} ${i < SAMPLE_ROWS.length - 1 ? styles.recipientRowBorder : ''}`}
+            className={`${styles.recipientRow} ${i < filtered.length - 1 ? styles.recipientRowBorder : ''}`}
           >
             <span className={styles.colCheck}>
-              <input type="checkbox" readOnly className={styles.checkbox} />
+              <input
+                type="checkbox"
+                className={styles.checkbox}
+                checked={selectedIds.has(p.who)}
+                onChange={() => setSelectedIds(prev => {
+                  const next = new Set(prev);
+                  next.has(p.who) ? next.delete(p.who) : next.add(p.who);
+                  return next;
+                })}
+              />
             </span>
             <div className={styles.colRecipient}>
               <Avatar name={p.who} size="sm" />
@@ -88,10 +119,10 @@ export function RecipientsCard() {
             </span>
             <span className={styles.colWhen}>{p.when}</span>
             <div className={styles.colActions}>
-              <button type="button" className={styles.actionBtn} title="Enviar lembrete">
+              <button type="button" className={styles.actionBtn} aria-disabled="true" title="Em breve">
                 <Icon name="mail" size={11} />
               </button>
-              <button type="button" className={styles.actionBtn} title="Ver perfil">
+              <button type="button" className={styles.actionBtn} aria-disabled="true" title="Em breve">
                 <Icon name="more" size={11} />
               </button>
             </div>
@@ -102,7 +133,7 @@ export function RecipientsCard() {
       {/* Pagination footer */}
       <div className={styles.paginationFooter}>
         <span className={styles.paginationCount}>
-          Mostrando <strong>4</strong> de <strong>248</strong> destinatários
+          Mostrando <strong>{filtered.length}</strong> de <strong>{MOCK_DISTRIBUTION.people.length}</strong> destinatários
         </span>
         <span className={styles.paginationNav}>
           <button type="button" className={styles.paginationBtn}>
