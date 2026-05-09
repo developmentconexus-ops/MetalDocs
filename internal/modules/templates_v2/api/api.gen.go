@@ -289,6 +289,7 @@ type RedirectSignedUrlV2Params struct {
 // CreateTemplateV2JSONBody defines parameters for CreateTemplateV2.
 type CreateTemplateV2JSONBody struct {
 	Description *string `json:"description,omitempty"`
+	DocTypeCode *string `json:"doc_type_code,omitempty"`
 	Key         string  `json:"key"`
 	Name        string  `json:"name"`
 }

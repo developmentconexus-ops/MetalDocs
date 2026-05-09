@@ -1,12 +1,47 @@
-/* Profile code span. Brand color when card selected. */
-.profileCode {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
+/* ── Scope type cards (generic vs profile) ── */
+
+/* 2-column grid for the two scope choice cards. */
+.scopeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: var(--sp-4);
 }
 
-:global([data-selected="true"]) .profileCode {
-  color: var(--brand);
+/* SelectableCard override for scope cards. */
+.scopeCard {
+  gap: 6px;
+  padding: var(--sp-4);
+}
+
+.scopeCard p {
+  margin: 0;
+}
+
+/* Header row: label + optional check icon. */
+.scopeHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.scopeLabel {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ── Profile section (shown when scopeType === 'profile') ── */
+
+.profileSection {
+  margin-bottom: var(--sp-2);
+}
+
+/* 2-column grid for profile cards. */
+.profileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
 /* SelectableCard override: padding + gap. */
@@ -20,19 +55,22 @@
   margin: 0;
 }
 
-/* 2-column grid (mirrors doc wizard StepProfile). */
-.profileGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: var(--sp-2);
-}
-
 /* Profile card header row: code + name + check. */
 .profileHeader {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+}
+
+/* Profile code span. Brand color when card selected. */
+.profileCode {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+:global([data-selected="true"]) .profileCode {
+  color: var(--brand);
 }
 
 /* Profile name. flex:1 grows name and pushes check icon right. */
@@ -64,6 +102,7 @@
 }
 
 @media (max-width: 600px) {
+  .scopeGrid,
   .profileGrid {
     grid-template-columns: 1fr;
   }
