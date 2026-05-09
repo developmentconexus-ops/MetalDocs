@@ -27,7 +27,7 @@
 }
 
 .header :global(.display-1) {
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-1);
 }
 
 .description {
@@ -37,10 +37,10 @@
   margin: 0 0 28px;
 }
 
-/* Wizard step cards: generous padding matching design (28px 32px).
+/* Wizard step cards: generous padding matching design (28px var(--sp-7)).
    Overrides global .card { padding:1rem }. */
 .container > :global(.card) {
-  padding: 28px 32px;
+  padding: 28px var(--sp-7);
 }
 
 /* Step card internal spacing. Mirrors design inline margins:
@@ -67,9 +67,9 @@
 }
 
 /* Footer divider bleeds to card edges to match design:
-   margin: '0 -32px 20px' (negative horizontal = card horizontal padding). */
+   margin: '0 -var(--sp-7) 20px' (negative horizontal = card horizontal padding). */
 .footerDivider {
-  margin: 0 -32px var(--sp-5);
+  margin: 0 calc(-1 * var(--sp-7)) var(--sp-5);
 }
 
 /* Responsive: reduce horizontal padding at narrow viewports. */
