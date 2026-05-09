@@ -1,12 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchProfiles } from '../../taxonomy/api/taxonomy';
-import { QK } from '../../../lib/queryKeys';
-import { STALE_FIVE_MINUTES } from './_constants';
-
-export function useProfilesQuery() {
-  return useQuery({
-    queryKey: QK.taxonomy.profiles(),
-    queryFn: () => fetchProfiles(),
-    staleTime: STALE_FIVE_MINUTES,
-  });
-}
+// Re-export from taxonomy — the query wraps taxonomy API and belongs there.
+// Kept as a shim so existing mocks in test files continue to work unchanged.
+export { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
