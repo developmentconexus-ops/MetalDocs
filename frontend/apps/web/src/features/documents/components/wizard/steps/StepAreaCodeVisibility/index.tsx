@@ -6,7 +6,7 @@ import { resolveQueryError } from '../../../../../../lib/api';
 import type { DocumentProfile, ProcessArea } from '../../../../../taxonomy/types';
 import { VISIBILITY_KEYS, VISIBILITY_META, type VisibilityKey } from '../../../../lib/visibilityMeta';
 import { CodePreviewBanner } from '../../CodePreviewBanner';
-import { WizardFooter } from '../../WizardFooter';
+import { WizardFooter } from '../../../../../shared/components/wizard/WizardFooter';
 import type { WizardExternalConfig, WizardInvitee } from '../../../../state/wizard.reducer';
 import { PeopleSubcontrols } from './PeopleSubcontrols';
 import { ExternalSubcontrols } from './ExternalSubcontrols';
