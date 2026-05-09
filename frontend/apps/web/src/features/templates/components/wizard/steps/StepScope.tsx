@@ -39,7 +39,7 @@ export function StepScope({
       <div className="kicker">Etapa 1 de 5</div>
       <h2 className="h2">Escopo do template</h2>
       <p className="caption">
-        O perfil define a sequência de codificação e as regras de revisão. Esta escolha não pode ser alterada depois.
+        Templates podem ser genéricos para um perfil (POP, IT, etc.) ou derivar de um documento específico já publicado.
       </p>
 
       {isLoading ? (
