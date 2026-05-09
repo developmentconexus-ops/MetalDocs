@@ -2,7 +2,7 @@ import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
 import { resolveQueryError } from '../../../../../lib/api';
 import type { DocumentProfile } from '../../../../taxonomy/types';
-import { TemplateWizardFooter } from '../TemplateWizardFooter';
+import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
 import styles from './StepScope.module.css';
 
 // TODO(novo-template-wizard:chk-disabled): CHK disabled until Checklist feature ships.
@@ -37,7 +37,7 @@ export function StepScope({
   return (
     <div className="card">
       <div className="kicker">Etapa 1 de 5</div>
-      <h2 className="h2">Qual o perfil de documento deste template?</h2>
+      <h2 className="h2">Escopo do template</h2>
       <p className="caption">
         O perfil define a sequência de codificação e as regras de revisão. Esta escolha não pode ser alterada depois.
       </p>
@@ -107,7 +107,7 @@ export function StepScope({
         </div>
       )}
 
-      <TemplateWizardFooter
+      <WizardFooter
         stepLabel={
           selectedCode === null
             ? 'Etapa 1 de 5 · Selecione um perfil para continuar'
