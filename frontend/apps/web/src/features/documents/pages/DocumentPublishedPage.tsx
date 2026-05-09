@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import { Avatar } from '../../../components/ui/Avatar';
 import { CodeChip } from '../../../components/ui/CodeChip';
+import { DocumentHero } from '../components/DocumentHero';
 import { DocumentVersionTimeline } from '../components/DocumentVersionTimeline';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
@@ -138,80 +139,70 @@ export function DocumentPublishedPage() {
       )}
 
       {/* Hero */}
-      <header className={styles.hero}>
-        <div className={styles.heroBg} />
-
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
-          <a href="/documents" className={styles.breadcrumbLink}>Biblioteca</a>
-          <Icon name="chevron" size={10} className={styles.breadcrumbSep} />
-          {/* TODO(backlog): wire area breadcrumb once DocumentResponse includes area_code */}
-          <span className={styles.breadcrumbLink}>—</span>
-          <Icon name="chevron" size={10} className={styles.breadcrumbSep} />
-          <span className={styles.breadcrumbCurrent}>{code}</span>
-        </nav>
-
-        {/* Hero grid: DocCardMini + content */}
-        <div className={styles.heroGrid}>
-          <div className={styles.heroCardWrap}>
-            <div className={styles.docCard}>
-              {/* TODO(backlog): show area label once DocumentResponse includes area_code */}
-              <div className={styles.docCardHeader}>—</div>
-              <div className={styles.docCardBody}>
-                <div className={styles.docCardCode}>{code}</div>
-                {/* TODO(backlog): show profile label once DocumentResponse includes profile_code */}
-                <div className={styles.docCardType}>—</div>
-                <div className={styles.docCardSpacer} />
-                <div className={styles.docCardDivider} />
-                <div className={styles.docCardFooter}>
-                  <span className={styles.docCardVersion}>{versionLabel}</span>
-                  <span className={styles.docCardDot} />
-                </div>
+      <DocumentHero
+        breadcrumbItems={[
+          { label: 'Biblioteca', href: '/documents' },
+          { label: '—' },
+          { label: code },
+        ]}
+        docCard={
+          <div className={styles.docCard}>
+            {/* TODO(backlog): show area label once DocumentResponse includes area_code */}
+            <div className={styles.docCardHeader}>—</div>
+            <div className={styles.docCardBody}>
+              <div className={styles.docCardCode}>{code}</div>
+              {/* TODO(backlog): show profile label once DocumentResponse includes profile_code */}
+              <div className={styles.docCardType}>—</div>
+              <div className={styles.docCardSpacer} />
+              <div className={styles.docCardDivider} />
+              <div className={styles.docCardFooter}>
+                <span className={styles.docCardVersion}>{versionLabel}</span>
+                <span className={styles.docCardDot} />
               </div>
             </div>
           </div>
-
-          <div className={styles.heroContent}>
-            <div className={styles.heroBadges}>
-              <CodeChip className={styles.codeChip}>{code}</CodeChip>
-              <span className={styles.vigenteBadge}>
-                <span className={styles.vigenteDot} />
-                {versionLabel} · vigente
-              </span>
-              {/* TODO(backlog): resolve profile_code → human label once DocumentResponse includes profile_code */}
-              <span className={styles.typeLabel}>—</span>
-            </div>
-
-            <h1 className={styles.heroTitle}>{docName}</h1>
-
-            <div className={styles.heroActions}>
-              <button className="btn btn-primary btn-lg" type="button" onClick={handleView}>
-                <Icon name="eye" size={15} />
-                Visualizar documento
-              </button>
-              {/* TODO(backlog): wire PDF download — GET /api/v2/documents/:id/pdf */}
-              <button className="btn" type="button" aria-disabled="true" title="Em breve">
-                <Icon name="download" size={13} />
-                Baixar PDF
-              </button>
-              {/* TODO(backlog): wire POST /api/v2/controlled-documents/:cdId/revisions */}
-              <button
-                className="btn"
-                type="button"
-                aria-disabled={!canInitiateRevision}
-                title={canInitiateRevision ? undefined : 'Sem permissão para iniciar revisão'}
-              >
-                <Icon name="edit" size={13} />
-                Iniciar revisão
-              </button>
-              <button className="btn btn-ghost" type="button" onClick={handleCopyLink}>
-                <Icon name={linkCopied ? 'check' : 'link'} size={13} />
-                {linkCopied ? 'Link copiado!' : 'Copiar link'}
-              </button>
-            </div>
+        }
+        badges={
+          <>
+            <CodeChip className={styles.codeChip}>{code}</CodeChip>
+            <span className={styles.vigenteBadge}>
+              <span className={styles.vigenteDot} />
+              {versionLabel} · vigente
+            </span>
+            {/* TODO(backlog): resolve profile_code → human label once DocumentResponse includes profile_code */}
+            <span className={styles.typeLabel}>—</span>
+          </>
+        }
+        title={docName ?? code}
+        subtitle={publishedAt ? <span>publicado em {publishedAt}</span> : null}
+        actions={
+          <div className={styles.heroActions}>
+            <button className="btn btn-primary btn-lg" type="button" onClick={handleView}>
+              <Icon name="eye" size={15} />
+              Visualizar documento
+            </button>
+            {/* TODO(backlog): wire PDF download — GET /api/v2/documents/:id/pdf */}
+            <button className="btn" type="button" aria-disabled="true" title="Em breve">
+              <Icon name="download" size={13} />
+              Baixar PDF
+            </button>
+            {/* TODO(backlog): wire POST /api/v2/controlled-documents/:cdId/revisions */}
+            <button
+              className="btn"
+              type="button"
+              aria-disabled={!canInitiateRevision}
+              title={canInitiateRevision ? undefined : 'Sem permissão para iniciar revisão'}
+            >
+              <Icon name="edit" size={13} />
+              Iniciar revisão
+            </button>
+            <button className="btn btn-ghost" type="button" onClick={handleCopyLink}>
+              <Icon name={linkCopied ? 'check' : 'link'} size={13} />
+              {linkCopied ? 'Link copiado!' : 'Copiar link'}
+            </button>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {/* Content area */}
       <div className={styles.content}>
