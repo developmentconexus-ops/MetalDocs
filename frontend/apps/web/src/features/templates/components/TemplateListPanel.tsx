@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   listTemplates,
-  createTemplate,
   editPublished,
   cloneTemplate,
   deleteDraft,
@@ -51,7 +50,6 @@ export function TemplateListPanel({ profileCode }: TemplateListPanelProps) {
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [templates, setTemplates] = useState<TemplateListItemDTO[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
   async function fetchTemplates() {
@@ -71,18 +69,6 @@ export function TemplateListPanel({ profileCode }: TemplateListPanelProps) {
     void fetchTemplates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileCode]);
-
-  async function handleCreate() {
-    setCreating(true);
-    try {
-      const draft = await createTemplate(profileCode, "Novo template");
-      navigate(buildTemplateEditorPath({ profileCode, templateKey: draft.templateKey }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar template.");
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function handleAction(template: TemplateListItemDTO, action: string) {
     try {
@@ -143,8 +129,8 @@ export function TemplateListPanel({ profileCode }: TemplateListPanelProps) {
           <button data-testid="template-import-open-btn" type="button" className="ghost-button" onClick={() => setShowImport(true)}>
             Importar
           </button>
-          <button data-testid="template-create-btn" type="button" onClick={() => void handleCreate()} disabled={creating}>
-            {creating ? "Criando..." : "Novo template"}
+          <button data-testid="template-create-btn" type="button" onClick={() => navigate('/templates-v2/new')}>
+            Novo template
           </button>
         </span>
       </div>
