@@ -1,0 +1,70 @@
+/* Profile code span. Brand color when card selected. */
+.profileCode {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+:global([data-selected="true"]) .profileCode {
+  color: var(--brand);
+}
+
+/* SelectableCard override: padding + gap. */
+.profileCard {
+  gap: 6px;
+  padding: var(--sp-4);
+}
+
+/* Zero paragraph margins — flex gap handles spacing. */
+.profileCard p {
+  margin: 0;
+}
+
+/* 2-column grid (mirrors doc wizard StepProfile). */
+.profileGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: var(--sp-2);
+}
+
+/* Profile card header row: code + name + check. */
+.profileHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* Profile name. flex:1 grows name and pushes check icon right. */
+.profileName {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Profile meta row: familia · template count. */
+.profileMeta {
+  display: flex;
+  gap: var(--sp-3);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* "em breve" badge for disabled profiles. */
+.disabledBadge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--bg-muted, #f0f0f0);
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+@media (max-width: 600px) {
+  .profileGrid {
+    grid-template-columns: 1fr;
+  }
+}
