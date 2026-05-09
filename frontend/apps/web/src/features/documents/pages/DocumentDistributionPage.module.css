@@ -1,24 +1,223 @@
-.page { }
-.hero { }
-.heroGrid { }
-.heroOverlay { }
-.breadcrumb { }
-.breadcrumbLink { }
-.breadcrumbSep { }
-.heroContent { }
-.heroBadges { }
-.codeBadge { }
-.deadlineBadge { }
-.deadlineDot { }
-.sectionBadge { }
-.heroTitle { }
-.heroSubtitle { }
-.heroCtas { }
-.ctaDisabled { }
-.main { }
-.section { }
-.sectionHeader { }
-.sectionKicker { }
-.sectionTitle { }
-.sectionAside { }
-.twoCol { }
+/* ── Page shell ─────────────────────────────────────────── */
+.page {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* ── Hero ────────────────────────────────────────────────── */
+.hero {
+  flex-shrink: 0;
+  padding: var(--sp-7) var(--sp-9) var(--sp-8);
+  background: linear-gradient(180deg, var(--brand-pale) 0%, var(--surface) 100%);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--brand) 1px, transparent 1px),
+    linear-gradient(90deg, var(--brand) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-6);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.breadcrumbLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.breadcrumbLink:hover {
+  color: var(--text);
+}
+
+.breadcrumbSep {
+  flex-shrink: 0;
+}
+
+/* Hero grid */
+.heroGrid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: var(--sp-8);
+  align-items: center;
+}
+
+.heroContent {
+  /* flex column is implicit — no explicit layout needed */
+}
+
+.heroBadges {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.codeBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--brand);
+  border: 1px solid var(--brand-pale);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.deadlineBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 10px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.deadlineDot {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sectionBadge {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  font-size: var(--font-size-2xl);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  margin: 0 0 var(--sp-3);
+  font-weight: 600;
+  color: var(--text);
+  max-width: 640px;
+  text-wrap: balance;
+}
+
+.heroSubtitle {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text-soft);
+  margin: 0 0 22px;
+  max-width: 580px;
+}
+
+.heroCtas {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.ctaDisabled {
+  /* btn appearance */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 36px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-2);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* ── Main content area ──────────────────────────────────── */
+.main {
+  flex: 1;
+  padding: var(--sp-7) var(--sp-9) var(--sp-8);
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+/* ── Section header ─────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.sectionKicker {
+  font-size: var(--font-size-2xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.sectionTitle {
+  font-size: 17px;
+  line-height: 1.2;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.sectionAside {
+  font-size: 12px;
+  color: var(--brand);
+  text-decoration: none;
+}
+
+/* ── Two-column layout (§01) ────────────────────────────── */
+.twoCol {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--sp-5);
+}

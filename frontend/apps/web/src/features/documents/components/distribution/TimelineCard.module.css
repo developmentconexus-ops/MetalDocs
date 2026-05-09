@@ -1,8 +1,51 @@
-.card { }
-.header { }
-.subtitle { }
-.legend { }
-.legendChip { }
-.legendLine { }
-.legendDash { }
-.svg { }
+/* ── TimelineCard — cumulative ack line chart ───────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  padding: var(--sp-5) var(--sp-5);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--sp-2);
+}
+
+.subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.legendChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legendLine {
+  width: 16px;
+  height: 2px;
+  background: var(--brand);
+  flex-shrink: 0;
+}
+
+.legendDash {
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed var(--text-faint);
+  flex-shrink: 0;
+}
+
+.svg {
+  width: 100%;
+  display: block;
+}
