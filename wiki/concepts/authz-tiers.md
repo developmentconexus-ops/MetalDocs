@@ -1,8 +1,8 @@
 # Authz Tiers
 
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-10
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
-> **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam-rbac.md`.
+> **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md` (full architecture) or `wiki/modules/iam-rbac.md` (predecessor stub).
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo`
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require`
@@ -38,3 +38,9 @@ MetalDocs has **two authorization tiers**.
 
 - Forgetting to set `metaldocs.actor_id`/`metaldocs.tenant_id` GUCs before calling `authz.Require` → returns typed sentinel errors `authz.ErrActorContextMissing` or `authz.ErrTenantContextMissing` (defined in `internal/modules/iam/authz/context.go:13`). GUC helpers use `current_setting(..., true)` (`missing_ok=true`), so Postgres does not panic on unset GUCs — the helper returns the typed error instead. Set via `SET LOCAL metaldocs.actor_id = '<userID>'` at start of tx.
 - Assigning a tenant role via IAM admin UI does NOT grant area access. Area grants live in `user_process_areas`.
+
+## See also
+
+- [`wiki/modules/iam.md §5.4`](../modules/iam.md) — `AuthorizationService`: a third, resource-aware authz surface (SoD + `ResourceCtx`); not wired in production as of 2026-05-10
+- [`wiki/modules/iam-tech-debt.md T-003`](../modules/iam-tech-debt.md) — debt item for the unwired `AuthorizationService`
+- [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) — ADR rationale for the two-tier design

@@ -3,7 +3,7 @@
 > **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected)
 > **Last verified:** 2026-05-10
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
-> **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam-rbac.md`.
+> **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md` (successor) or `wiki/modules/iam-rbac.md` (predecessor stub).
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo` implementation
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require` implementation; system_admin bypass at :58
@@ -83,3 +83,7 @@ Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.m
 - Audit 2026-05-03 — bugs B1-B6 (`wiki/bugs/audit-2026-05-03.md` lines 111-136)
 - Audit 2026-05-04 — bug J2 (`wiki/bugs/audit-2026-05-04.md`)
 - Tests: `internal/modules/iam/infrastructure/postgres/role_admin_repository_test.go`, `tests/integration/iam/tenant_isolation_test.go`
+
+## See also
+
+- [`wiki/modules/iam.md`](../modules/iam.md) — full Arc42 + C4 living architecture doc for `internal/modules/iam`; §5.4 covers the third authz surface (`AuthorizationService`)
