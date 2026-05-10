@@ -78,7 +78,7 @@ func (sh *strictHandler) {{.OperationId}}(w http.ResponseWriter, r *http.Request
 {{end}}
 ```
 
-- **UNCERTAIN � insufficient evidence** that pure template logic alone can robustly parse arbitrary nested `x-authz-area` objects without helper funcs; practical implementation may need generated helper Go code or constrained extension schema.
+- **UNCERTAIN � insufficient evidence** that pure template logic alone can robustly parse arbitrary nested `x-authz-area` objects without helper funcs; practical implementation may need generated helper Go code or constrained extension schema.
 
 ## D
 - **Template ABI stability across upgrades:**
@@ -96,7 +96,7 @@ func (sh *strictHandler) {{.OperationId}}(w http.ResponseWriter, r *http.Request
 - **Known upstream warnings/discussions relevant to override risk:**
   - Custom templates are supported, but filenames must match exactly (`README`, user-templates section).
   - Remote template sourcing is flagged as reproducibility risk and planned to be disabled-by-default in future (`issue #1564`: https://github.com/oapi-codegen/oapi-codegen/issues/1564).
-  - No direct upstream statement found saying �do not override templates�; risk conclusion is based on maintenance mechanics + SemVer caveats above.
+  - No direct upstream statement found saying �do not override templates�; risk conclusion is based on maintenance mechanics + SemVer caveats above.
 
 ## E
 - **Recommendation: approach #2 (embedded-spec + post-process wrapper generation)** for the long-lived Track D requirement.
@@ -127,3 +127,21 @@ func (sh *strictHandler) {{.OperationId}}(w http.ResponseWriter, r *http.Request
 - Upstream issue/discussion URLs:
   - https://github.com/oapi-codegen/oapi-codegen/issues/1564
   - https://github.com/oapi-codegen/oapi-codegen/issues
+
+---
+
+## Addendum — 2026-05-10 — Codegen rejected entirely
+
+After implementing approach #2 as a Plan 1 Task 7 spike (`cmd/authzgen`), three discoveries flipped the recommendation:
+
+1. **`authz.Require` signature mismatch.** Real signature is `Require(ctx context.Context, tx *sql.Tx, capability, areaCode string)` (`internal/modules/iam/authz/authz.go:44`). The proposed wrapper sits at the `StrictServerInterface` boundary — **before** the transaction opens — so it cannot supply `tx`. The wrapper-vs-tx architectural mismatch was not visible at feasibility time because the brief assumed a hypothetical `internal/platform/authz` package with a no-tx signature; the real package lives at `internal/modules/iam/authz` and is tx-coupled by design.
+
+2. **Postgres tripwire is the real enforcer.** `migrations/0142b_role_capabilities_v2_enforce.sql:138-172` installs a trigger that reads `metaldocs.asserted_caps` GUC on every mutation and raises `ErrCapabilityNotAsserted` if the required cap is absent. The GUC is set inside `authz.Require` (`set_config('metaldocs.asserted_caps', ..., true)`). This means the static enforcement guarantee already exists at the database layer — generating a Go wrapper duplicates the check, adds a maintenance surface, and provides zero additional safety against drift.
+
+3. **Industry pattern is lint + runtime, not codegen.** Stripe, GitHub, AWS IAM enforce authz at runtime (middleware + DB-layer guards) and verify presence statically via linters / call-graph audits. None ship per-operation authz wrappers as generated code. The codegen approach was an unnecessary novelty.
+
+**Revised recommendation: drop codegen entirely.** Replace with two CI lint rules (`authz-call-present` + `tripwire-pairing`) that read the OpenAPI spec, locate the matching Go handler, and AST-grep for the expected `authz.Require` call. ~80 LOC of lint Go vs ~600 LOC of generator + golden tests + per-module Makefile + drift CI.
+
+Spec §4.5 updated to reflect this. Plan 1 Task 7 deleted; Plan 1 Task 8 expanded to cover both lint rules.
+
+The codegen `cmd/authzgen` files written during the spike were deleted before commit.
