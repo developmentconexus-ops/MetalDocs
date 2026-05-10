@@ -1,0 +1,204 @@
+/* Step 5 - Confirmacao - template wizard */
+
+.intro {
+  /* WizardShell container selector overrides caption margin; !important restores design 24px */
+  margin-bottom: var(--sp-6) !important;
+}
+
+/* Wizard step h2: design uses 20px; global .h2 is 22px. */
+.stepTitle {
+  font-size: 20px; /* design-exact */
+  margin-bottom: 6px; /* design-exact */
+}
+
+.previewCard {
+  display: grid;
+  grid-template-columns: 120px 1fr; /* design-exact */
+  gap: 18px; /* design-exact */
+  padding: 18px; /* design-exact */
+  background: var(--surface-2);
+  border: 1px solid var(--border); /* design-exact */
+  border-radius: var(--r-3);
+  margin-bottom: 18px; /* design-exact */
+}
+
+.thumb {
+  width: 120px; /* design-exact */
+  height: 152px; /* design-exact */
+  background: var(--surface);
+  box-shadow: var(--shadow-paper-2);
+  border-radius: 2px; /* design-exact */
+  padding: var(--sp-2);
+  overflow: hidden;
+}
+
+.thumbHeader {
+  height: 4px; /* design-exact */
+  background: var(--brand);
+  width: 70%; /* design-exact */
+  margin-bottom: 6px; /* design-exact */
+}
+
+.thumbCode {
+  font-family: var(--font-mono);
+  font-size: 7px; /* design-exact */
+  color: var(--text-muted);
+  margin-bottom: 4px; /* design-exact */
+}
+
+.thumbLine {
+  height: 1.5px; /* design-exact */
+  margin-bottom: 3px; /* design-exact */
+  border-radius: 1px; /* design-exact */
+  background: var(--paper-line);
+}
+
+.thumbLine:nth-of-type(3) {
+  width: 55%;
+}
+
+.thumbLine:nth-of-type(4) {
+  width: 66%;
+}
+
+.thumbLine:nth-of-type(5) {
+  width: 77%;
+}
+
+.thumbLine:nth-of-type(6) {
+  width: 88%;
+}
+
+.thumbLine:nth-of-type(7) {
+  width: 61%;
+}
+
+.thumbLine:nth-of-type(8) {
+  width: 72%;
+}
+
+.thumbLine:nth-of-type(9) {
+  width: 83%;
+}
+
+.thumbLine:nth-of-type(10) {
+  width: 56%;
+}
+
+.thumbLine:nth-of-type(11) {
+  width: 67%;
+}
+
+.thumbLine:nth-of-type(12) {
+  width: 78%;
+}
+
+.thumbLine:nth-of-type(13) {
+  width: 89%;
+}
+
+.thumbLineHighlight {
+  background: var(--brand-soft);
+  opacity: 0.7;
+}
+
+.previewBody {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* design-exact */
+  margin-bottom: 8px; /* design-exact */
+  flex-wrap: wrap;
+}
+
+.headerRow :global(.code-chip) {
+  font-size: var(--font-size-sm);
+  padding: 3px 9px; /* design-exact */
+}
+
+.headerRow :global(.pill) {
+  background: transparent;
+}
+
+.templateName {
+  font-size: 16px; /* design-exact */
+  font-weight: 500;
+  margin-bottom: 14px; /* design-exact */
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px; /* design-exact */
+  font-size: 12px; /* design-exact */
+}
+
+.metaRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: 4px 0; /* design-exact */
+  border-bottom: 1px dashed var(--border); /* design-exact */
+}
+
+.metaLabel {
+  color: var(--text-muted);
+}
+
+.metaValue {
+  color: var(--text);
+  text-align: right;
+}
+
+.confirmBlock {
+  padding: 14px; /* design-exact */
+  background: var(--brand-pale);
+  border: 1px dashed var(--brand-soft); /* design-exact */
+  border-radius: var(--r-2);
+  margin-bottom: 22px; /* design-exact */
+}
+
+.confirmKicker {
+  margin-bottom: 8px; /* design-exact */
+  color: var(--brand);
+}
+
+.confirmList {
+  margin: 0;
+  padding-left: 18px; /* design-exact */
+  font-size: 12.5px; /* design-exact */
+  line-height: 1.7;
+  color: var(--text-soft);
+}
+
+.checkLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: var(--font-size-sm);
+  color: var(--text-soft);
+  margin-bottom: var(--sp-2);
+  cursor: pointer;
+}
+
+/* Override global `input { width: 100% }` leakage from styles.css */
+.checkLabel input {
+  width: auto;
+  margin-top: 2px; /* design-exact */
+  flex-shrink: 0;
+}
+
+@media (max-width: 40rem) {
+  .previewCard {
+    grid-template-columns: 1fr;
+  }
+
+  .metaGrid {
+    grid-template-columns: 1fr;
+  }
+}
