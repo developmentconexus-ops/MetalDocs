@@ -1,11 +1,12 @@
 # Modules
 
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-05-10
 > **Scope:** Per-module deep dives. One file per backend module / frontend feature area.
 
 - [editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal integration layer (Last verified: 2026-05-06)
 - [editor-chrome.md](editor-chrome.md) — shared toolbar overlay + eigenpal CSS overrides for eigenpal-based pages; slot API, `VersionBadge`, `AutosaveStatus`; consumed by templates + documents (Last verified: 2026-05-06)
-- [templates-v2.md](templates-v2.md) — template authoring, versioning, approval; List screen + creation wizard Steps 1–4 (Step 5 stub); mocked DOCX flow + mocked permissions roles/areas/counts (Last verified: 2026-05-09)
+- [templates-v2.md](templates-v2.md) — template authoring, versioning, approval; List screen + creation wizard Steps 1–5; reducer SSOT (`selectMaxReachableStep` + auto-clamp); mocked DOCX flow + mocked permissions roles/areas/counts; Step 5 visual-only submit (Last verified: 2026-05-10)
+- [frontend-primitives.md](frontend-primitives.md) — generic `components/ui/` primitives: `SelectableCard` (forwardRef) + `useRovingRadioGroup` hook (Last verified: 2026-05-10)
 - [documents.md](documents.md) — document instances, Library screen, editing flow, session model, API; `libraryStatus.ts` status-meta, `AuthorCell`, `asApiError`, debounced search, `keepPreviousData`/`staleTime`; `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-06)
 - [registry.md](registry.md) — controlled-document catalog, code generation, active-document FULL OUTER JOIN (E10), registry detail page, PublishedDownloadCell (Last verified: 2026-05-04)
 - [taxonomy.md](taxonomy.md) — families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
