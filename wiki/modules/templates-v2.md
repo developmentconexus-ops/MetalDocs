@@ -1,7 +1,7 @@
 # Module: templates-v2
 
-> **Last verified:** 2026-05-09
-> **Status:** Partial. List screen complete (Phase 5). Creation wizard Steps 1–4 complete (Step 3 mocked DOCX flow, Step 4 mocked roles/areas/counts). Step 5 stub. Author/versioning pages TBD.
+> **Last verified:** 2026-05-10
+> **Status:** Partial. List screen complete (Phase 5). Creation wizard Steps 1–5 complete (Step 3 mocked DOCX flow, Step 4 mocked roles/areas/counts, Step 5 visual-only submit). Author/versioning pages TBD.
 > **Scope:** Template authoring, versioning, approval, publishing; Templates List screen (`/templates-v2`); Template creation wizard (`/templates-v2/new`).
 > **Out of scope:** Document fill-in (see `modules/documents.md`), eigenpal editor wiring (see `modules/editor-ui-eigenpal.md`), toolbar overlay + eigenpal CSS overrides (see `modules/editor-chrome.md`).
 > **Key files:**
@@ -12,8 +12,8 @@
 > - `frontend/apps/web/src/features/templates/components/MiniDocPreview.tsx:1` — decorative A4 thumbnail (8 placeholder lines)
 > - `frontend/apps/web/src/components/ui/WorkspaceHeroHeader.tsx:13` — `tone?: "banner" | "flat"` prop; `.headerFlat` strips card chrome (transparent bg, no border-bottom, padding 0)
 > - `frontend/apps/web/src/components/ui/TabBar.tsx:17` — roving tabIndex (`tabIndex={isActive ? 0 : -1}`), Arrow/Home/End keyboard nav per WAI-ARIA tablist spec
-> - `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1` — creation wizard; `useReducer(templateWizardReducer)` + URL sync `?step=N`; `selectedProfile` derived via `useMemo` from profiles query; defensive guard sends `?step=2` without scope back to step 1; Step 3 branch wired with advance gate (`step3Disabled`); Step 4 branch wired with `step4Disabled` (`permissionsMode==='roles' && selectedRoleIds.length===0`); back/forward preserves all state; `export { TemplateWizardPage as Component }` for React Router lazy
-> - `frontend/apps/web/src/features/templates/state/templateWizard.reducer.ts:1` — wizard reducer; `TemplateWizardStep = 1|2|3|4|5`; `ScopeType = 'generic' | 'profile'`; `StartingPoint = 'docx' | 'blank'`; `PermissionsMode = 'roles' | 'areas' | 'all'`; state fields: `step`, `scopeType`, `profileCode`, `name`, `description`, `startingPoint`, `selectedDocxName`, `selectedDocxSize`, `permissionsMode`, `selectedRoleIds`, `selectedAreaIds`; actions: `GO_TO_STEP | SET_SCOPE_TYPE | SET_PROFILE | SET_NAME | SET_DESCRIPTION | SET_STARTING_POINT | SET_SELECTED_DOCX | CLEAR_SELECTED_DOCX | SET_PERMISSIONS_MODE | TOGGLE_ROLE_ID | TOGGLE_AREA_ID`
+> - `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1` — creation wizard; `useReducer(templateWizardReducer)` + URL sync `?step=N`; `selectedProfile` derived via `useMemo` from profiles query; defensive guard sends `?step=2` without scope back to step 1; `advanceDisabled = selectMaxReachableStep(state) <= state.step` is the single advance gate passed to every step (no per-step disabled vars); Step 5 (`StepConfirmation`) receives no `advanceDisabled` — its gate is the internal checkbox; `handleSubmit` mocked (`navigate('/templates-v2')`); back/forward preserves all state; `export { TemplateWizardPage as Component }` for React Router lazy
+> - `frontend/apps/web/src/features/templates/state/templateWizard.reducer.ts:1` — wizard reducer SSOT; public `templateWizardReducer` wraps private `reduceCore` with auto-clamp: after every action, `selectMaxReachableStep(next)` is evaluated and `step` is clamped down if it exceeds the max (prevents URL-injection into a future step); exported `selectMaxReachableStep(state): TemplateWizardStep` encodes all advance-gate logic (step 1 requires `scopeType`, step 2 requires `name ≥ 3`, step 3 requires `startingPoint` + docx when applicable, step 4 requires ≥1 role when `permissionsMode==='roles'`); `TemplateWizardStep = 1|2|3|4|5`; `ScopeType = 'generic' | 'profile'`; `StartingPoint = 'docx' | 'blank'`; `PermissionsMode = 'roles' | 'areas' | 'all'`; `initialState.permissionsMode = 'all'`; actions: `GO_TO_STEP | SET_SCOPE_TYPE | SET_PROFILE | SET_NAME | SET_DESCRIPTION | SET_STARTING_POINT | SET_SELECTED_DOCX | CLEAR_SELECTED_DOCX | SET_PERMISSIONS_MODE | TOGGLE_ROLE_ID | TOGGLE_AREA_ID`
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepScope.tsx:1` — Step 1: profile picker; `DISABLED_PROFILES = new Set(['CHK'])` with TODO for API flag
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.tsx:1` — Step 2: name + description fields; mocked code preview; scope recap row with "Trocar" back to Step 1
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.module.css:1` — Step 2 CSS; `.descriptionInput` overrides global `.input { height: 32px }` with `height: auto; min-height: 72px` (see `concepts/css-leakage-offenders.md`)
@@ -32,6 +32,8 @@
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.module.css:1` — Step 4 CSS; `.modeSegmented`, `.modeTab`, `.modeTabActive`, `.roleGrid`, `.areaGrid`, `.roleCard`, `.areaCard`, `.cardSelected`, `.coverageSummary`
 > - `frontend/apps/web/design-source/novo-template-estrutura/` — design source dir for creation wizard Step 3 (Estrutura)
 > - `frontend/apps/web/design-source/novo-template-permissoes/` — design source dir for creation wizard Step 4 (Permissões)
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepConfirmation.tsx:1` — Step 5: review card (thumb + meta grid) + confirmation checkbox; `HIGHLIGHTED_THUMB_LINES` Set drives alternating decorative line pattern; `confirmed` local state gates "Criar e abrir editor →"; `handleSubmit` currently calls `onSubmit()` which navigates to list (mocked — see `backlog/novo-template-wizard.md#confirmacao-backend-submit`)
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepConfirmation.module.css:1` — Step 5 CSS; `.previewCard`, `.thumb`, `.thumbHeader`, `.thumbCode`, `.thumbLine`, `.thumbLineHighlight`, `.previewBody`, `.headerRow`, `.templateName`, `.metaGrid`, `.metaRow`, `.metaLabel`, `.metaValue`, `.confirmBlock`, `.confirmKicker`, `.confirmList`, `.checkLabel`
 
 ## Template Creation Wizard
 
@@ -43,6 +45,8 @@
 ### State management
 
 `useReducer(templateWizardReducer, initialState, urlInitializer)` — URL-sync pattern: `useEffect` on `state.step` writes `?step=N` back; lazy initializer reads it on mount. Same pattern as doc wizard.
+
+**Reducer SSOT (commit bf2f6571):** `templateWizardReducer` is a thin wrapper around private `reduceCore`. After every action, it calls `selectMaxReachableStep(next)` and auto-clamps `step` down if it exceeds the max. This eliminates per-step disabled state in the page — the page computes `advanceDisabled = selectMaxReachableStep(state) <= state.step` once and passes it to every step component. `selectMaxReachableStep` is the single source of truth for all advance-gate logic.
 
 ### Step 1 — Escopo (profile picker)
 
@@ -76,7 +80,7 @@ Profile cards from `useProfilesQuery` (taxonomy). CHK hardcoded as disabled unti
 - `docx` — opens native file picker (hidden `<input type="file" accept=".docx">`triggered via card click). On selection: `SET_SELECTED_DOCX(name, size)` stores filename + bytes in reducer. File is NOT uploaded at this step.
 - `blank` — selects immediately; dispatches `SET_STARTING_POINT('blank')` and clears any docx state.
 
-**Advance gate:** `step3Disabled = startingPoint === null || (startingPoint === 'docx' && selectedDocxName === null)`. WizardFooter label is context-aware: "Selecione um .docx para continuar" vs "Escolha um ponto de partida" vs "Pronto para avançar".
+**Advance gate:** driven by `selectMaxReachableStep` (reducer SSOT) — page passes `advanceDisabled` computed from the selector. Step 3 blocks when `startingPoint === null` or `startingPoint === 'docx' && selectedDocxName === null`. WizardFooter label is context-aware: "Selecione um .docx para continuar" vs "Escolha um ponto de partida" vs "Pronto para avançar".
 
 **Substituir flow:** button dispatches `CLEAR_SELECTED_DOCX`, then immediately re-triggers the hidden file input so picker re-opens without an intermediate cleared state.
 
@@ -95,7 +99,7 @@ Profile cards from `useProfilesQuery` (taxonomy). CHK hardcoded as disabled unti
 - `areas` — show area cards (QUA, PROD, MAN…); empty selection is valid per design. Mocked user counts — see `wiki/backlog/novo-template-wizard.md#permissions-area-counts`.
 - `all` — company-wide; no selection required. Mocked total count (`COMPANY_USER_COUNT = 340`) — see `wiki/backlog/novo-template-wizard.md#permissions-user-count`.
 
-**Advance gate:** `step4Disabled = permissionsMode === 'roles' && selectedRoleIds.length === 0`. Footer label is `'Selecione ao menos um perfil'` when blocked.
+**Advance gate:** driven by `selectMaxReachableStep` (reducer SSOT) — page passes `advanceDisabled`. Step 4 blocks when `permissionsMode === 'roles' && selectedRoleIds.length === 0`. Footer label is `'Selecione ao menos um perfil'` when blocked.
 
 **Coverage summary:** Derived client-side from mocked counts. Roles mode: sum of `count` for each selected role. Areas mode: sum of `count` for each selected area. All mode: `COMPANY_USER_COUNT`.
 
@@ -107,7 +111,21 @@ Profile cards from `useProfilesQuery` (taxonomy). CHK hardcoded as disabled unti
 
 ### Step 5 — Confirmação
 
-Stub — not yet implemented. Placeholder card rendered; will submit `POST /api/v2/templates` with full wizard state. See `wiki/backlog/novo-template-wizard.md`.
+**Shipped 2026-05-10.** Component: `StepConfirmation.tsx`. Submit is mocked — real API wiring deferred. See `wiki/backlog/novo-template-wizard.md#confirmacao-backend-submit`.
+
+**Review card layout:** two-column (`thumb` | `previewBody`). Left thumb: decorative A4-shaped mini preview with header stripe, code label (`TPL-{PROFILE}-001` or `TPL-GEN-001` mocked — same backlog as Step 2 `next-code-preview`), and 11 alternating placeholder lines (`HIGHLIGHTED_THUMB_LINES = Set([1,4,7,10])`). Right body: `code-chip` + `StatusPill status="draft"` + version pill; template name; meta grid (Perfil, Familia, Origem, Permissoes, Autor).
+
+**Confirmation checkbox:** local `confirmed` state. `WizardFooter primaryDisabled={!confirmed}` — CTA "Criar e abrir editor →" only enabled when checked. Footer label changes between `'Etapa 5 de 5 · Confirme para continuar'` and `'Etapa 5 de 5 · Tudo pronto para criar'`.
+
+**Submit handler:** `handleSubmit` in `StepConfirmation.tsx` calls `onSubmit()` (prop from `TemplateWizardPage`) — currently `navigate('/templates-v2')` with no API call. See `wiki/backlog/novo-template-wizard.md#confirmacao-backend-submit`.
+
+**Meta values derived from wizard state (all client-side):**
+- `perfilValue` — `{profileCode}—{profile.name}` or `'Generico'`
+- `origemValue` — `selectedDocxName` or `'Em branco'`
+- `permissoesValue` — `'Toda a empresa'` / `'{n} area(s) selecionada(s)'` / `'{n} perfil(s) selecionado(s)'`
+- `autorValue` — `useAuthStore((s) => s.user?.displayName)`
+
+**No `advanceDisabled` prop (YAGNI strip, commit a91ce046).** `StepConfirmation` does not accept `advanceDisabled` — it never needs an external gate. The sole gate is the internal `confirmed` checkbox wired directly to `WizardFooter primaryDisabled`. Keeping the prop would have been dead code from day 1.
 
 ---
 
