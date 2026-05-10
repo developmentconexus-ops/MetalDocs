@@ -403,17 +403,17 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 
 ## 11. Risks & Technical Debt
 
-Pointer-only. Body in [`wiki/modules/iam-tech-debt.md`](iam-tech-debt.md).
+Pointer-only. Body in [`wiki/modules/iam-tech-debt.md`](iam-tech-debt.md). Severity rubric (concrete triggers) lives in the register, not here.
 
 Summary counts:
-- Critical: 1
-- Major: 7
-- Minor: 4
+- Critical: 2
+- Major: 5
+- Minor: 5
 
-Top 3:
+Top 3 (by severity, then by blast-radius):
 1. T-001 — Dual capability namespaces (`Cap*` strings vs typed `Capability`) risk drift between docs/approval/templates and IAM tier-1. Critical.
-2. T-002 — Two area-membership write surfaces (`area_membership/` pkg via SECURITY DEFINER funcs vs `UserAreaRepository` direct DML). Major.
-3. T-007 — Governance logger wired with `nil` in `main.go:217`; grant/revoke history never recorded. Major.
+2. T-005 — `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not emit `recordAudit`; role assignments missing from ISO 9001 audit trail. Critical.
+3. T-002 — Two area-membership write surfaces (`area_membership/` pkg via SECURITY DEFINER funcs vs `UserAreaRepository` direct DML). Major.
 
 Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
