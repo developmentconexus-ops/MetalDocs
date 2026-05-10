@@ -1,7 +1,7 @@
 # Module: templates-v2
 
 > **Last verified:** 2026-05-10
-> **Status:** Partial. List screen complete (Phase 5). Creation wizard Steps 1–5 complete (Step 3 mocked DOCX flow, Step 4 mocked roles/areas/counts, Step 5 visual-only submit). Author/versioning pages TBD.
+> **Status:** Partial. List screen complete (Phase 5). Creation wizard Steps 1–5 complete (Step 3 mocked DOCX flow, Step 4 mocked roles/areas/counts, Step 5 visual-only submit). Template Editor rebuilt 2026-05-10 (rename `TemplateAuthorPage` → `TemplateEditorPage`, mirror `DocumentEditorPage` layout, add outline panel via eigenpal `getAgentContext`).
 > **Scope:** Template authoring, versioning, approval, publishing; Templates List screen (`/templates-v2`); Template creation wizard (`/templates-v2/new`).
 > **Out of scope:** Document fill-in (see `modules/documents.md`), eigenpal editor wiring (see `modules/editor-ui-eigenpal.md`), toolbar overlay + eigenpal CSS overrides (see `modules/editor-chrome.md`).
 > **Key files:**
@@ -23,7 +23,12 @@
 > - `frontend/apps/web/src/features/shared/components/wizard/WizardShell.tsx:1` — parameterized wizard chrome; `kicker/title/description/steps/currentStep/children`
 > - `frontend/apps/web/src/features/shared/components/wizard/WizardFooter.tsx:1` — shared footer; `stepLabel/primaryDisabled/showBack/onAdvance/onBack/onCancel`
 > - `frontend/apps/web/src/features/templates/TemplateCreateDialog.tsx` — new template dialog (superseded by wizard, kept for rollback)
-> - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — eigenpal author; consumes `EditorChrome` for toolbar overlay
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:1` — eigenpal author (renamed from `TemplateAuthorPage` 2026-05-10); inner rail (back / variables / outline) + `PlaceholderCatalogPanel` or `TemplateOutlinePanel` + `EditorChrome` overlay; `submitForReview` + `importDocx` errors funnel through `ApiError` + `resolveErrorMessage`; pt-BR copy throughout (`Submeter para revisão`, `Importar .docx`, `Salvando…/Salvo/Falha ao salvar`)
+> - `frontend/apps/web/src/features/templates/pages/styles/TemplateEditorPage.module.css:1` — page CSS (tokens-only); rail, panel rules, alert variants (`alertError`, `alertSuccess`)
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorRoutePage.tsx:1` — route entry (renamed from `TemplateAuthorRoutePage`); URL `/templates-v2/:templateId/versions/:versionNum`
+> - `frontend/apps/web/src/features/templates/TemplateOutlinePanel.tsx:1` — read-only headings panel (`Heading[]` from `readHeadings`); empty-state copy "Aplique estilos de título…"; `data-level` attribute drives indent
+> - `frontend/apps/web/src/features/templates/lib/readHeadings.ts:1` — derives `Heading[]` from eigenpal `agent.getAgentContext().outline` (`ParagraphOutline[]` filtered by `isHeading`); levels clamped 1..6; safe against missing `getAgent`/`getAgentContext`
+> - `frontend/apps/web/src/features/templates/api/templatesV2.ts:240` — `submitForReview` now uses `apiFetch` (throws `ApiError`)
 > - `frontend/apps/web/src/features/templates/VersionActionPanel.tsx` — lifecycle transitions
 > - `frontend/apps/web/design-source/templates/artifacts/` — phase 0–5 implementation artifacts (list screen)
 > - `frontend/apps/web/design-source/novo-template-escopo/artifacts/` — phase 0–5 implementation artifacts (creation wizard Step 1)
@@ -192,14 +197,53 @@ Re-authoring → create a new version (e.g. `v2 draft`); previous published vers
 
 TBD — extract from `internal/modules/templates_v2/transport/` (or equivalent).
 
-## Editor chrome
+## Template Editor screen (rebuilt 2026-05-10)
 
-`TemplateAuthorPage` wraps `MetalDocsEditor` inside `<EditorChrome>`, passing:
-- `left` — back button + sidebar toggle icons
-- `center` — template title + `VersionBadge` + `StatusPill`
-- `right` — `AutosaveStatus` + submit action
+**Route:** `/templates-v2/:templateId/versions/:versionNum`
+**Page:** `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:1`
 
-Eigenpal CSS overrides (wine formatting bar, compact title bar, gradient scrollbar) live in `EditorChrome.module.css`, not in `TemplateAuthorPage.module.css`. The page CSS module covers only rails, side panel, and canvas layout (~155 lines).
+Mirrors `DocumentEditorPage` layout (narrower scope — templates have placeholders + outline, no document-instance metadata):
+
+```
+[ AppShell Rail 56px ] [ Inner rail 48px ] [ optional 280px panel ] [ canvas + EditorChrome overlay ]
+```
+
+### Inner rail icons
+
+| Icon | Action | Notes |
+|---|---|---|
+| ← Voltar | `onBack()` → `/templates-v2` | Brand-bg back button (mirrors `DocumentEditorPage`) |
+| Variáveis | toggles `PlaceholderCatalogPanel` | Default-active (`leftActive='variables'` initial); detected vs available token UI |
+| Estrutura | toggles `TemplateOutlinePanel` | Reads `agent.getAgentContext().outline` via `readHeadings`; empty state when no headings |
+
+Only one panel is open at a time (`leftActive: 'variables' | 'outline' | null`). Clicking the active icon closes the panel.
+
+### EditorChrome wiring
+
+- `center` — template name + dot · "Template" · `VersionBadge` (`vN`) · `StatusPill` (mapped from `VersionStatus`)
+- `right` — `AutosaveStatus` (pt-BR labels: `''/Salvando…/Salvo/Falha ao salvar`) + (when `isDraft`) `Importar .docx` + `Submeter para revisão`
+- `alert` — success (`role="status"`, `.alertSuccess`) or error (`role="alert"`, `.alertError`); CSS Module classes — no inline styles
+
+### Error UX
+
+`submitForReview` and `autosave.importDocx` errors run through a local `resolveError(err, fallback)` helper that funnels `ApiError → resolveErrorMessage(code, message)`, then `Error.message`, then a pt-BR fallback. Same triad documented in `wiki/concepts/error-ux.md`.
+
+### Outline derivation
+
+`readHeadings(editorRef)` walks `agent.getAgentContext().outline` (eigenpal `ParagraphOutline[]`) and emits `Heading[] = { id, level: 1..6, text }`. Headings refresh on editor change (debounced 600ms) and on initial editor-content-ready effect. No new backend endpoint — pure eigenpal-native surface. Future enhancements (click-to-scroll, drag-reorder, persisted panel state) tracked in `wiki/backlog/template-editor.md`.
+
+### Cuts (intentional, see `wiki/backlog/template-editor.md`)
+
+- No right sidebar (templates have no `EditorMetaSidebar`-equivalent metadata).
+- No design-source toolbar — eigenpal's built-in toolbar wins (Decision A, mirrors `DocumentEditorPage`).
+- No `layout`/`media`/`search` rail icons — never shipped, dropped from legacy `TemplateAuthorPage`.
+- No version-history / comments panels — backend gaps.
+
+Eigenpal CSS overrides (wine formatting bar, compact title bar, gradient scrollbar) live in `EditorChrome.module.css`, not in `TemplateEditorPage.module.css`. The page CSS module covers only rail, panel border, alert variants, and canvas layout (~150 lines, tokens-only).
+
+### Implementation artifacts
+
+`frontend/apps/web/design-source/template-editor/artifacts/` — `phase0-audit.md`, `phase1-map.md`, `phase2-preflight.md` (Heavy tier).
 
 ## See also
 

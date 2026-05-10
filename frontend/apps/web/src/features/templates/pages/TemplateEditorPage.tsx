@@ -3,42 +3,58 @@ import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-js-editor/react';
 import { createEmptyDocument } from '@eigenpal/docx-js-editor/core';
-import { filterTransactionGuard } from '../../editor-adapters/filter-transaction-guard';
-import { type TemplateSchemas, type VersionDTO, submitForReview } from './api/templatesV2';
-import { useTemplateDraft } from './hooks/useTemplateDraft';
-import { useTemplateAutosave } from './hooks/useTemplateAutosave';
-import { useTemplateSchemas } from './hooks/useTemplateSchemas';
-import { VersionActionPanel } from './VersionActionPanel';
-import { PlaceholderCatalogPanel } from './PlaceholderCatalogPanel';
-import { fetchPlaceholderCatalog, type PlaceholderCatalogEntry } from './api/catalog';
+import { filterTransactionGuard } from '../../../editor-adapters/filter-transaction-guard';
+import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/templatesV2';
+import { useTemplateDraft } from '../hooks/useTemplateDraft';
+import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
+import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
+import { VersionActionPanel } from '../VersionActionPanel';
+import { PlaceholderCatalogPanel } from '../PlaceholderCatalogPanel';
+import { TemplateOutlinePanel } from '../TemplateOutlinePanel';
+import { readHeadings, type Heading } from '../lib/readHeadings';
+import { fetchPlaceholderCatalog, type PlaceholderCatalogEntry } from '../api/catalog';
 import {
   EditorChrome,
   editorChromeStyles,
   VersionBadge,
   AutosaveStatus,
   type AutosaveState,
-} from '../shared/components/editor-chrome';
-import { StatusPill, type DocumentStatus } from '../../components/ui';
-import styles from './TemplateAuthorPage.module.css';
+} from '../../shared/components/editor-chrome';
+import { StatusPill, type DocumentStatus } from '../../../components/ui';
+import { ApiError, resolveErrorMessage } from '../../../lib/api';
+import styles from './styles/TemplateEditorPage.module.css';
 
-export type TemplateAuthorPageProps = {
+export type TemplateEditorPageProps = {
   templateId: string;
   versionNum: number;
   onNavigateToVersion?: (templateId: string, versionNum: number) => void;
   onBack?: () => void;
 };
 
-type RailItem = {
-  key: string;
-  tip: string;
-  kbd?: string;
-  icon: JSX.Element;
-  soon?: boolean;
-};
+type LeftPanel = 'variables' | 'outline' | null;
 
 const VARIABLE_SYNC_DEBOUNCE_MS = 400;
+const OUTLINE_REFRESH_DEBOUNCE_MS = 600;
 
-export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion: _nav, onBack }: TemplateAuthorPageProps) {
+const AUTOSAVE_LABELS_PT = {
+  idle: '',
+  saving: 'Salvando…',
+  saved: 'Salvo',
+  error: 'Falha ao salvar',
+};
+
+function resolveError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) return resolveErrorMessage(err.code, err.message);
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
+export function TemplateEditorPage({
+  templateId,
+  versionNum,
+  onNavigateToVersion: _nav,
+  onBack,
+}: TemplateEditorPageProps) {
   const draft = useTemplateDraft(templateId, versionNum);
   const autosave = useTemplateAutosave(templateId, versionNum);
   const schemaState = useTemplateSchemas(templateId, versionNum);
@@ -46,19 +62,24 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
   const fileInputRef = useRef<HTMLInputElement>(null);
   const schemaSnapshotRef = useRef<string | null>(null);
   const variableSyncTimerRef = useRef<number | null>(null);
+  const outlineSyncTimerRef = useRef<number | null>(null);
   const blankDoc = useMemo(() => createEmptyDocument(), []);
   const editorPlugins = useMemo(() => [filterTransactionGuard()], []);
+
   const [submitting, setSubmitting] = useState(false);
-  const [submitErr, setSubmitErr] = useState<string | null>(null);
-  const [importing, setImporting] = React.useState(false);
-  const [importErr, setImportErr] = React.useState<string | null>(null);
+  const [submitMsg, setSubmitMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importErr, setImportErr] = useState<string | null>(null);
   const [liveVersion, setLiveVersion] = useState<VersionDTO | null>(null);
-  const [leftActive, setLeftActive] = useState<string | null>('variables');
+  const [leftActive, setLeftActive] = useState<LeftPanel>('variables');
   const [localSchemas, setLocalSchemas] = useState<TemplateSchemas | null>(null);
   const [catalog, setCatalog] = useState<PlaceholderCatalogEntry[]>([]);
+  const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
+  const [headings, setHeadings] = useState<Heading[]>([]);
+
   useEffect(() => { void fetchPlaceholderCatalog().then(setCatalog); }, []);
   const catalogByKey = useMemo(() => new Map(catalog.map((c) => [c.key, c])), [catalog]);
-  const [detectedVariables, setDetectedVariables] = useState<string[]>([]);
+
   const currentVersion = liveVersion ?? draft.version ?? null;
   const isDraft = currentVersion?.status === 'draft';
 
@@ -79,41 +100,40 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
         resolverKey: name,
       };
     });
-    setLocalSchemas((prev) => {
-      if (!prev) return prev;
-      return { ...prev, placeholders };
-    });
+    setLocalSchemas((prev) => (prev ? { ...prev, placeholders } : prev));
   }, [isDraft, catalogByKey]);
+
+  const syncOutline = useCallback(() => {
+    setHeadings(readHeadings(editorRef));
+  }, []);
 
   const handleEditorChange = useCallback(() => {
     editorRef.current?.save().then((buffer) => {
-      if (buffer) {
-        queueDocx(buffer);
-      }
-    }).catch(() => {
-      // ignore autosave buffer serialization errors
-    });
+      if (buffer) queueDocx(buffer);
+    }).catch(() => { /* ignore autosave serialization errors */ });
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
     variableSyncTimerRef.current = window.setTimeout(syncPlaceholdersFromDocument, VARIABLE_SYNC_DEBOUNCE_MS);
-  }, [queueDocx, syncPlaceholdersFromDocument]);
+    if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
+    outlineSyncTimerRef.current = window.setTimeout(syncOutline, OUTLINE_REFRESH_DEBOUNCE_MS);
+  }, [queueDocx, syncPlaceholdersFromDocument, syncOutline]);
 
-  useEffect(() => {
-    return () => {
-      if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
-    };
+  useEffect(() => () => {
+    if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
+    if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
   }, []);
 
-  useEffect(() => {
-    setLiveVersion(draft.version ?? null);
-  }, [draft.version]);
+  useEffect(() => { setLiveVersion(draft.version ?? null); }, [draft.version]);
 
-  // Sync detected tokens on load: runs once when catalog + draft content are both ready.
+  // Sync detected tokens + outline once catalog + draft content are both ready.
   const editorContentReady = draft.version != null && catalog.length > 0;
   useEffect(() => {
     if (!editorContentReady) return;
-    const timer = window.setTimeout(syncPlaceholdersFromDocument, 600);
-    return () => window.clearTimeout(timer);
-  }, [editorContentReady, syncPlaceholdersFromDocument]);
+    const t = window.setTimeout(() => {
+      syncPlaceholdersFromDocument();
+      syncOutline();
+    }, OUTLINE_REFRESH_DEBOUNCE_MS);
+    return () => window.clearTimeout(t);
+  }, [editorContentReady, syncPlaceholdersFromDocument, syncOutline]);
 
   useEffect(() => {
     if (!schemaState.schemas) return;
@@ -128,18 +148,13 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     const timer = window.setTimeout(() => {
       void schemaState.save(localSchemas).then(() => {
         schemaSnapshotRef.current = nextSnapshot;
-      }).catch(() => {
-        // ignore schema save errors here; hook exposes error state
-      });
+      }).catch(() => { /* hook surfaces error state */ });
     }, 400);
     return () => window.clearTimeout(timer);
   }, [isDraft, localSchemas, schemaState]);
 
-  // Eigenpal closes its popovers on any capture-phase scroll event. Scrolling
-  // inside its own listbox (e.g. to reach font size 48) triggers the close.
-  // Swallow scroll events that originate inside an eigenpal dropdown before
-  // their capture listener sees them — this effect mounts before the editor's,
-  // so our listener runs first in the capture order.
+  // Eigenpal closes its popovers on capture-phase scroll. Swallow scroll
+  // originating inside its dropdowns so font-size lists remain interactive.
   useEffect(() => {
     const guard = (e: Event) => {
       const t = e.target as Element | null;
@@ -153,15 +168,15 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
   }, []);
 
   async function handleSubmitForReview() {
-    setSubmitErr(null);
+    setSubmitMsg(null);
     setSubmitting(true);
     try {
       if (autosave.hasPending()) await autosave.flush();
       const updated = await submitForReview(templateId, versionNum);
       setLiveVersion(updated);
-      setSubmitErr('Submitted for review.');
-    } catch (e) {
-      setSubmitErr(e instanceof Error ? e.message : String(e));
+      setSubmitMsg({ kind: 'success', text: 'Enviado para revisão.' });
+    } catch (err) {
+      setSubmitMsg({ kind: 'error', text: resolveError(err, 'Falha ao submeter para revisão.') });
     } finally {
       setSubmitting(false);
     }
@@ -176,18 +191,21 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     try {
       await autosave.importDocx(await file.arrayBuffer());
       draft.refetch();
-      setImporting(false);
     } catch (err) {
-      setImportErr(err instanceof Error ? err.message : String(err));
+      setImportErr(resolveError(err, 'Falha ao importar arquivo .docx.'));
+    } finally {
       setImporting(false);
     }
   }
 
-  if (draft.loading || (schemaState.loading && !localSchemas)) return <div className={styles.loading}>Loading template...</div>;
+  if (draft.loading || (schemaState.loading && !localSchemas)) {
+    return <div className={styles.loading}>Carregando template…</div>;
+  }
   if (draft.error) return <div role="alert" className={styles.error}>{draft.error}</div>;
-  if (schemaState.error && !localSchemas) return <div role="alert" className={styles.error}>{schemaState.error}</div>;
+  if (schemaState.error && !localSchemas) {
+    return <div role="alert" className={styles.error}>{schemaState.error}</div>;
+  }
 
-  // Map template VersionDTO.status onto the shared StatusPill DocumentStatus.
   const versionStatus: DocumentStatus | null = (() => {
     const s = currentVersion?.status;
     if (!s) return null;
@@ -202,72 +220,78 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
     autosave.status === 'saved' ? 'saved' :
     'idle';
 
-  const leftRailItems: (RailItem | { divider: true })[] = [
-    { key: 'variables', tip: 'Variables',       icon: IconBraces },
-    { divider: true },
-    { key: 'layout',    tip: 'Layout',           icon: IconLayout, soon: true },
-    { key: 'media',     tip: 'Media',            icon: IconImage,  soon: true },
-    { key: 'search',    tip: 'Find',  kbd: '⌘F', icon: IconSearch, soon: true },
-  ];
+  const togglePanel = (key: 'variables' | 'outline') =>
+    setLeftActive((prev) => (prev === key ? null : key));
+
   return (
-    <div className={styles.page}>
+    <div className={styles.page} data-editor-root>
       <div className={styles.body}>
-        <aside className={`${styles.rail} ${styles.railLeft}`}>
+        <aside className={styles.rail}>
           {onBack && (
             <>
-              <button className={styles.railBackBtn} onClick={onBack} aria-label="Voltar para templates">
-                {IconChevronLeft}
-                <span className={styles.railTip}>Templates</span>
+              <button
+                type="button"
+                className={styles.railBackBtn}
+                onClick={onBack}
+                aria-label="Voltar"
+              >
+                {ICON_CHEVRON_LEFT}
+                <span className={styles.railTip}>Voltar</span>
               </button>
               <div className={styles.railDivider} />
             </>
           )}
-          {leftRailItems.map((it, i) =>
-            'divider' in it ? (
-              <div key={`d${i}`} className={styles.railDivider} />
-            ) : (
-              <button
-                key={it.key}
-                type="button"
-                aria-label={it.tip}
-                disabled={it.soon}
-                className={`${styles.railBtn} ${leftActive === it.key ? styles.isActive : ''}`}
-                onClick={() => setLeftActive(leftActive === it.key ? null : it.key)}
-              >
-                {it.icon}
-                <span className={styles.railTip}>{it.tip}{it.kbd ? `  ${it.kbd}` : ''}{it.soon ? ' (soon)' : ''}</span>
-              </button>
-            )
-          )}
+          <button
+            type="button"
+            aria-label="Variáveis"
+            aria-pressed={leftActive === 'variables'}
+            className={`${styles.railBtn} ${leftActive === 'variables' ? styles.isActive : ''}`}
+            onClick={() => togglePanel('variables')}
+          >
+            {ICON_BRACES}
+            <span className={styles.railTip}>Variáveis</span>
+          </button>
+          <button
+            type="button"
+            aria-label="Estrutura"
+            aria-pressed={leftActive === 'outline'}
+            className={`${styles.railBtn} ${leftActive === 'outline' ? styles.isActive : ''}`}
+            onClick={() => togglePanel('outline')}
+          >
+            {ICON_OUTLINE}
+            <span className={styles.railTip}>Estrutura</span>
+          </button>
         </aside>
 
         {leftActive === 'variables' && (
           <PlaceholderCatalogPanel detected={detectedVariables} />
+        )}
+        {leftActive === 'outline' && (
+          <TemplateOutlinePanel headings={headings} />
         )}
 
         <main className={styles.canvas}>
           <EditorChrome
             center={
               <>
-                <span className={editorChromeStyles.docTitle}>{draft.template?.name ?? 'Untitled template'}</span>
+                <span className={editorChromeStyles.docTitle}>
+                  {draft.template?.name ?? 'Template sem nome'}
+                </span>
                 <span className={editorChromeStyles.docSep}>·</span>
                 <span className={editorChromeStyles.docMeta}>Template</span>
-                <VersionBadge>{`REV${String(versionNum).padStart(2, '0')}`}</VersionBadge>
+                <VersionBadge>{`v${versionNum}`}</VersionBadge>
                 {versionStatus && <StatusPill status={versionStatus} />}
               </>
             }
             right={
               <>
-                <AutosaveStatus
-                  status={autosaveState}
-                  labels={{ idle: '', saving: 'Saving…', saved: 'Saved', error: 'Save failed' }}
-                />
+                <AutosaveStatus status={autosaveState} labels={AUTOSAVE_LABELS_PT} />
                 {isDraft && (
                   <>
                     <input
                       ref={fileInputRef}
-                      type='file'
-                      accept='.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                      type="file"
+                      accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       style={{ display: 'none' }}
                       onChange={handleImportFile}
                     />
@@ -285,22 +309,22 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
                       onClick={() => void handleSubmitForReview()}
                       disabled={submitting}
                     >
-                      {IconSend} {submitting ? 'Enviando…' : 'Solicitar Revisão'}
+                      {submitting ? 'Enviando…' : 'Submeter para revisão'}
                     </button>
                   </>
                 )}
               </>
             }
             alert={
-              submitErr ? (
+              submitMsg ? (
                 <div
-                  role="alert"
-                  style={{ color: submitErr === 'Submitted for review.' ? '#065f46' : '#dc2626' }}
+                  role={submitMsg.kind === 'error' ? 'alert' : 'status'}
+                  className={submitMsg.kind === 'error' ? styles.alertError : styles.alertSuccess}
                 >
-                  {submitErr}
+                  {submitMsg.text}
                 </div>
               ) : importErr ? (
-                <div role="alert" style={{ color: '#dc2626' }}>{importErr}</div>
+                <div role="alert" className={styles.alertError}>{importErr}</div>
               ) : undefined
             }
           >
@@ -316,7 +340,6 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
             />
           </EditorChrome>
         </main>
-
       </div>
 
       {currentVersion && ['in_review', 'approved', 'published'].includes(currentVersion.status) && (
@@ -329,9 +352,9 @@ export function TemplateAuthorPage({ templateId, versionNum, onNavigateToVersion
   );
 }
 
-/* Inline SVG icons, Lucide-style */
+/* Inline SVG icons (Lucide-style). Kept colocated — single-use. */
 
-const svgBase = {
+const SVG_BASE = {
   width: 18,
   height: 18,
   viewBox: '0 0 24 24',
@@ -342,40 +365,26 @@ const svgBase = {
   strokeLinejoin: 'round' as const,
 };
 
-const IconSend = (
-  <svg {...svgBase} width={14} height={14}><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
-);
-const IconLayout = (
-  <svg {...svgBase}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
-);
-const IconImage = (
-  <svg {...svgBase}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></svg>
-);
-const IconOutline = (
-  <svg {...svgBase}><path d="M21 12h-8" /><path d="M21 6h-8" /><path d="M21 18h-8" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></svg>
-);
-const IconSearch = (
-  <svg {...svgBase}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
-);
-const IconBraces = (
-  <svg {...svgBase}><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1" /><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" /></svg>
-);
-const IconChevronLeft = (
-  <svg {...svgBase} width={14} height={14}><path d="M15 18l-6-6 6-6" /></svg>
-);
-const IconFileDoc = (
-  <svg width={12} height={12} viewBox="0 0 15 15" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 2h6.5L12 4.5V13H3V2z" />
-    <path d="M9.5 2v2.5H12" />
-    <path d="M5 7h5M5 9.5h5M5 12h3" />
+const ICON_BRACES = (
+  <svg {...SVG_BASE}>
+    <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1" />
+    <path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />
   </svg>
 );
-const IconMenu = (
-  <svg {...svgBase} width={16} height={16}><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /></svg>
+
+const ICON_OUTLINE = (
+  <svg {...SVG_BASE}>
+    <path d="M21 12h-8" />
+    <path d="M21 6h-8" />
+    <path d="M21 18h-8" />
+    <path d="M3 6h.01" />
+    <path d="M3 12h.01" />
+    <path d="M3 18h.01" />
+  </svg>
 );
-const IconHistory = (
-  <svg {...svgBase} width={16} height={16}><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 15" /></svg>
-);
-const IconShare = (
-  <svg {...svgBase} width={16} height={16}><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
+
+const ICON_CHEVRON_LEFT = (
+  <svg {...SVG_BASE} width={14} height={14}>
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
 );

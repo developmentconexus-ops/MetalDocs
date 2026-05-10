@@ -238,14 +238,10 @@ export async function getDocxURL(templateId: string, versionNum: number): Promis
 }
 
 export async function submitForReview(templateId: string, versionNum: number): Promise<VersionDTO> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/submit`, {
-    method: 'POST',
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
-  }
-  const data = (await res.json()) as { data: { version: VersionDTO } };
+  const data = await apiFetch<{ data: { version: VersionDTO } }>(
+    `/api/v2/templates/${templateId}/versions/${versionNum}/submit`,
+    { method: 'POST' },
+  );
   return data.data.version;
 }
 

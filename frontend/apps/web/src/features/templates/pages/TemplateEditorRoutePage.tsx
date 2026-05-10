@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { TemplateAuthorPage } from "../TemplateAuthorPage";
+import { TemplateEditorPage } from "./TemplateEditorPage";
 
 export function Component() {
   const navigate = useNavigate();
@@ -11,10 +11,12 @@ export function Component() {
   }
 
   return (
-    <TemplateAuthorPage
+    <TemplateEditorPage
       templateId={templateId}
       versionNum={parsedVersion}
-      onNavigateToVersion={(nextTemplateId, nextVersionNum) => navigate(`/templates-v2/${nextTemplateId}/versions/${nextVersionNum}`)}
+      onNavigateToVersion={(nextTemplateId, nextVersionNum) =>
+        navigate(`/templates-v2/${nextTemplateId}/versions/${nextVersionNum}`)
+      }
       onBack={() => navigate("/templates-v2")}
     />
   );

@@ -1,6 +1,6 @@
 /* =========================================================
    EditorChrome — shared toolbar/wrapper for eigenpal editors
-   Used by TemplateAuthorPage and DocumentEditorPage.
+   Used by TemplateEditorPage and DocumentEditorPage.
    Renders 3 absolute-positioned overlays atop eigenpal's
    40px title bar, plus eigenpal styling overrides scoped
    to .wrapper :global(.ep-root).
