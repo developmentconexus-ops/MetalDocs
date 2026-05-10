@@ -1,5 +1,7 @@
 # Module: iam-rbac
 
+> **Superseded by [`iam.md`](iam.md)** — this stub remains as a redirect until backlog row R-014 retires it.
+
 > **Last verified:** 2026-05-03
 > **Scope:** Capabilities, roles, area-scoped grants, DB-backed authorization.
 > **Out of scope:** Authentication mechanism (login, sessions) — see `wiki/references/local-dev-credentials.md`.

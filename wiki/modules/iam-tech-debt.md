@@ -1,0 +1,119 @@
+# Tech Debt Register — iam
+
+> Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
+
+**Last verified:** 2026-05-10
+
+## Severity scale
+
+- **Critical** — correctness / security / compliance break
+- **Major** — measurable impact or blocks another module
+- **Minor** — code-smell, missing tests, undocumented public symbol
+
+## Items
+
+### T-001 · Dual capability namespaces
+- **Severity:** critical
+- **Surface:** `internal/modules/iam/domain/capabilities.go:4-19` (16 string consts `CapDocView`, `CapDocCreate`, …) and `internal/modules/iam/domain/model.go:16-20` (5 typed `Capability` consts `CapDocumentView`, `CapDocumentCreate`, `CapDocumentEdit`, `CapWorkflowReview`, `CapWorkflowApprove`)
+- **Observation:** Two parallel capability namespaces exist with overlapping semantics. `domain/capabilities.go` defines `doc.view` / `doc.create` / `doc.edit`; `domain/model.go` defines `document.view` / `document.create` / `document.edit` plus `workflow.review` / `workflow.approve`. The `role_capabilities` DB table (migration 0165) seeds the `doc.*` / `template.*` / `registry.*` / `taxonomy.*` / `membership.*` / `route.*` / `user.*` namespace from `capabilities.go`. The typed `Capability` constants from `model.go` are imported by `internal/modules/documents/application/fillin_authz.go:9` and `apps/api/internal/wiring/documents.go:7`.
+- **Evidence:** `_artifacts/01-surface.md` rows 120-152; `_artifacts/03-deps.md` §2 (documents importers).
+- **Linked backlog row:** `backlog/iam-refactor.md#R-001`
+- **Linked ADR:** missing-ADR (no decision recording why two namespaces coexist)
+
+### T-002 · Two area-membership write surfaces
+- **Severity:** major
+- **Surface:** `internal/modules/iam/area_membership/area_membership.go:53,65,77` (free `Grant`/`Revoke`/`List` taking `*sql.Tx`, calling `metaldocs.grant_area_membership` / `revoke_area_membership` SECURITY DEFINER funcs) vs `internal/modules/iam/application/area_membership_service.go:49,108` (`AreaMembershipService.Grant`/`Revoke`) calling `UserAreaRepository.GrantAtomic` (`infrastructure/postgres/user_area_repository.go:90`) with direct DML
+- **Observation:** Two implementations of the same use case exist with different semantics. The v2 HTTP route at `/api/v2/iam/area-memberships` (POST) uses the application-service + repo path (artifact 02-flow-grant-membership). The `area_membership/` package is wired into none of the routes registered in `main.go` (per artifact 03 §3 DI touchpoints) — its callers are not in the IAM module. SECURITY DEFINER funcs `metaldocs.grant_area_membership` reads `metaldocs.actor_id` GUC; the direct-DML path does not.
+- **Evidence:** `_artifacts/01-surface.md` (both surfaces); `_artifacts/04-persistence.md` §5 (tripwire pairing rows for both); `_artifacts/03-deps.md` §3.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-002`
+- **Linked ADR:** missing-ADR
+
+### T-003 · `AuthorizationService` is a third authz surface, unused in production
+- **Severity:** major
+- **Surface:** `internal/modules/iam/application/authorization.go:42` (`AuthorizationService`), `:49` (`NewAuthorizationService`), `:81` (`Check(ctx, userID, tenantID, capability, ResourceCtx) error`); plus `ErrSoDViolation` `:16`, `TemplateAuthorChecker` iface `:33`, `AccessPolicy` `:24`, `WithAuthzCache` `:74`
+- **Observation:** `AuthorizationService` exposes resource-aware authz (`ResourceCtx`) with SoD probing — distinct from tier-1 (`CapabilityService.CanDo`) and tier-2 (`authz.Require`). It is not wired in `apps/api/cmd/metaldocs-api/main.go` (artifact 03 §3 lists 8 DI touchpoints; none constructs `AuthorizationService`). The benchmark (`application/authorization_bench_test.go`) and unit test (`authorization_test.go`) exercise it in isolation. Three authz surfaces compete; only two are live.
+- **Evidence:** `_artifacts/01-surface.md` rows 68-79; `_artifacts/03-deps.md` §3 (no constructor call).
+- **Linked backlog row:** `backlog/iam-refactor.md#R-003`
+- **Linked ADR:** missing-ADR
+
+### T-004 · IAM mutations have neither tier-2 nor tripwire enforcement
+- **Severity:** major
+- **Surface:** `infrastructure/postgres/role_admin_repository.go:33,72` (`UpsertUserAndAssignRole`, `ReplaceUserRoles` on `iam_user_roles`); `infrastructure/postgres/user_area_repository.go:51,75,90` (`Insert`, `CloseActive`, `GrantAtomic` on `user_process_areas`); `area_membership/area_membership.go:53,65` (`Grant`, `Revoke` via SECURITY DEFINER funcs)
+- **Observation:** All IAM-owned mutating tables (`iam_user_roles`, `user_process_areas`, `iam_users`) are guarded by tier-1 middleware only. `authz.Require(...)` is called by none of these repository methods (artifact 04 §5 — all rows "Authz.Require called? = NO"). The Postgres tripwire `enforce_capability_asserted` is attached to `public.approval_instances` and `public.approval_signoffs` only (`migrations/0142b_role_capabilities_v2_enforce.sql:200-209`), not to any IAM-owned table. The defense-in-depth pattern (IP-004 in `references/industry-patterns-index.md`) is therefore single-layer for IAM admin writes.
+- **Evidence:** `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` §IP-004.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-004`
+- **Linked ADR:** [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) (documents tiers but does not address IAM-table coverage)
+
+### T-005 · Admin role upsert does not emit audit events
+- **Severity:** major
+- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:316` (`handleUserRoleUpsert`) and `:457` (`recordAudit`)
+- **Observation:** `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not call `recordAudit` between request validation and response (artifact 02-flow-upsert-user-role §6). The audit sink is wired (`auditdomain.Writer` passed into `NewAdminHandler` at `main.go:182`; sink impl at `internal/modules/audit/infrastructure/postgres/writer.go:20`). Other admin ops do call `recordAudit`; this one does not. Compliance impact: role changes are not in the audit trail for the regulated QMS use case.
+- **Evidence:** `_artifacts/02-flow-upsert-user-role.md` §6; `_artifacts/03-deps.md` §1 (audit OUT edge).
+- **Linked backlog row:** `backlog/iam-refactor.md#R-005`
+- **Linked ADR:** missing-ADR (audit-emission policy not formalised)
+
+### T-006 · IAM error envelope is not RFC 9457
+- **Severity:** major
+- **Surface:** `internal/modules/iam/delivery/http/middleware.go:129` (`writeAPIError` emits `{error:{code,message,details,trace_id}}`); `internal/modules/iam/delivery/http/routes_memberships.go:137` (`writeMembershipAPIError` emits `{code,message}`)
+- **Observation:** `wiki/architecture/api-design-system.md` (Last verified 2026-05-10) names RFC 9457 Problem+JSON as the canonical error envelope. IAM uses two non-9457 shapes. No `type` URI, no `title`, no `status` field, no `errors[]` extension for validation. Documents module is migrating to the RFC 9457 envelope; IAM is not on the path yet.
+- **Evidence:** middleware.go:129 (verified by main agent read); routes_memberships.go:137 (artifact 02-flow-list-memberships §5); `_artifacts/05-industry.md` §IP-001.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-006`
+- **Linked ADR:** missing-ADR (per-module 9457 rollout sequencing not recorded)
+
+### T-007 · `MembershipGovernanceLogger` wired with `nil` in production
+- **Severity:** major
+- **Surface:** `apps/api/cmd/metaldocs-api/main.go:217` (`NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)`); consumer at `internal/modules/iam/application/area_membership_service.go:79,101`
+- **Observation:** The second argument to `NewAreaMembershipService` is the `MembershipGovernanceLogger`. In production wiring it is `nil`. The service nil-checks before calling (`area_membership_service.go:79`), so grant/revoke produce no governance log. For the SECURITY DEFINER path (`area_membership/area_membership.go`), governance events ARE written by the SQL function itself (artifact 04 §5 note). The two write paths therefore emit different governance trails.
+- **Evidence:** main.go:217 (verified by main agent read); artifact 02-flow-grant-membership §6.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-007`
+- **Linked ADR:** missing-ADR
+
+### T-008 · `CachedRoleProvider` not invalidated on group membership writes
+- **Severity:** minor
+- **Surface:** `internal/modules/iam/application/cached_role_provider.go:65` (`InvalidateUser`); admin write site `application/admin_service.go:42`
+- **Observation:** `CachedRoleProvider.RolesByUserID` is invalidated after `AdminService.UpsertUserAndAssignRole` and `ReplaceUserRoles`. There is no admin route or service method that mutates `iam_group_members` / `iam_group_roles` in the IAM module today, so no live invalidation gap exists. If such routes are added, group changes will not invalidate the role cache. Recorded as latent debt.
+- **Evidence:** `_artifacts/01-surface.md` rows for `CachedRoleProvider`; `_artifacts/03-deps.md` (no group-write site).
+- **Linked backlog row:** `backlog/iam-refactor.md#R-008`
+- **Linked ADR:** missing-ADR
+
+### T-009 · `ErrCapabilityDenied` exists in two packages with different shapes
+- **Severity:** minor
+- **Surface:** `internal/modules/iam/application/capability_service.go:10` (sentinel `error` var) vs `internal/modules/iam/authz/authz.go:11` (struct type with `(e).Error()` method `:17`)
+- **Observation:** Both packages export `ErrCapabilityDenied` under the same name with different shapes. Consumers must qualify: `iamapp.ErrCapabilityDenied` is a sentinel suitable for `errors.Is`; `authz.ErrCapabilityDenied` is a typed error carrying capability/area context. Confused naming has already surfaced in `internal/modules/documents/delivery/http/handler.go:17` which imports the sentinel variant (artifact 03 §2).
+- **Evidence:** `_artifacts/01-surface.md` rows 85, 93-95; `_artifacts/03-deps.md` §2.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-009`
+- **Linked ADR:** missing-ADR
+
+### T-010 · `auth` module imports `iam/domain.Role` — bidirectional dependency
+- **Severity:** minor
+- **Surface:** `internal/modules/auth/application/service.go:18`, `internal/modules/auth/delivery/http/middleware.go:10`, `internal/modules/auth/domain/model.go:6`, `internal/modules/auth/infrastructure/memory/repository.go:10` (all import `iamdomain.Role`); IAM imports `auth/domain` from `internal/modules/iam/delivery/http/admin_handler.go:13`
+- **Observation:** IAM depends on auth (for `ManagedUser` types) AND auth depends on IAM (for `Role` enum). The dependency is non-circular today because IAM-→auth lives in `delivery/http/` (admin handler) and auth-→IAM lives in `domain` and lower. If admin_handler types ever migrate up, the cycle becomes hard. Documented for future structural moves.
+- **Evidence:** `_artifacts/03-deps.md` §1 + §2.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-010`
+- **Linked ADR:** missing-ADR
+
+### T-011 · Tenant-scoping rule lacks standalone ADR
+- **Severity:** minor
+- **Surface:** Multiple — migrations 0130, 0162, 0163; repository code at `role_provider.go:19`, `role_admin_repository.go:20,33,72`
+- **Observation:** The convention "every IAM-owned table carries `tenant_id` and every repo method filters by it" was enforced by Group B fix (audit 2026-05-03 B5/B6) but does not have a dedicated ADR. ADR 0007 references migration 0162 in its "Key files" but does not author the tenancy rule.
+- **Evidence:** `_artifacts/04-persistence.md` §1 (all tables); `wiki/decisions/0007-two-tier-authz.md` Key files; `wiki/bugs/audit-2026-05-03.md` B5/B6.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-011`
+- **Linked ADR:** missing-ADR
+
+### T-012 · `RoleCapabilities` map duplicates `role_capabilities` table
+- **Severity:** minor
+- **Surface:** `internal/modules/iam/domain/role_capabilities.go:3` (`RoleCapabilitiesVersion = 2`) and `:5` (`var RoleCapabilities map[Role][]Capability`); DB seed in migration 0165 (40 rows in `metaldocs.role_capabilities`); drift check in `application/startup.go:15` `CheckRoleCapabilitiesVersion`
+- **Observation:** The role↔capability mapping exists in two places: an in-process Go map (`RoleCapabilities`, using the typed `Capability` namespace from T-001) and the DB `role_capabilities` table (using the string namespace from T-001). The boot-time drift check compares versions, but the data shapes are not directly compared. The in-process map is read by `AuthorizationService` (T-003); the DB table is read by `CapabilityService.CanDo` (`capability_service.go:31`). Two sources of truth.
+- **Evidence:** `_artifacts/01-surface.md` rows 152-156; `capability_service.go:31` SQL joins `metaldocs.role_capabilities`.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-012`
+- **Linked ADR:** missing-ADR
+
+---
+
+## Coverage stats (computed at compose time)
+
+- Public symbols undocumented: 129 / 129 most lack Go doc comments (only `CapabilityService.CanDo`, `CachedRoleProvider`, `InvalidateUser`, `RoleProvider`, `RoleAdminRepository`, `MustActorID`, `MustTenantID`, `ErrActorContextMissing`, `ErrTenantContextMissing`, `ReplaceUserRoles` (pg) carry doc comments per `_artifacts/01-surface.md`). Counted as 1 collective minor (no separate TD row; addressed by R-013 in backlog).
+- Operations missing C4 placement: 0 / 11 (all 11 in §5.3 + Container diagram)
+- Cross-deps missing in §5/§8: 0 / 22 (5 OUT + 17 IN named in §8.4 / §3.2)
+- State transitions missing in §6: 0 / 2 (grant_membership + upsert_user_role both traced)
+- Decisions without ADR link: 8 — T-001, T-002, T-003, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012 each marked missing-ADR
