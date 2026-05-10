@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import {
   templateWizardReducer,
+  selectMaxReachableStep,
   initialTemplateWizardState,
   type TemplateWizardStep,
   type ScopeType,
@@ -24,8 +25,6 @@ const TPL_STEPS: StepperStep[] = [
   { id: '5', label: 'Confirmação' },
 ];
 
-const NAME_MIN = 3;
-
 function parseStepParam(raw: string | null): TemplateWizardStep {
   const n = Number(raw);
   if (n === 1 || n === 2 || n === 3 || n === 4 || n === 5) return n;
@@ -40,15 +39,20 @@ export function TemplateWizardPage(): JSX.Element {
     undefined,
     () => {
       // Initial state has no scope chosen. Clamp deep-links beyond Step 1
-      // to Step 1 — avoids a one-frame paint of placeholder content before
+      // to Step 1 â€” avoids a one-frame paint of placeholder content before
       // the defensive effect runs.
       const parsed = parseStepParam(searchParams.get('step'));
       const safeStep = initialTemplateWizardState.scopeType === null ? 1 : parsed;
       return { ...initialTemplateWizardState, step: safeStep };
     },
   );
+  const goToStep = useCallback((step: TemplateWizardStep) => {
+    dispatch({ type: 'GO_TO_STEP', step });
+  }, []);
+  const maxReachableStep = selectMaxReachableStep(state);
+  const advanceDisabled = maxReachableStep <= state.step;
 
-  // Sync state.step → URL ?step=N
+  // Sync state.step â†’ URL ?step=N
   useEffect(() => {
     setSearchParams(
       (prev) => {
@@ -83,38 +87,6 @@ export function TemplateWizardPage(): JSX.Element {
     dispatch({ type: 'SET_PROFILE', code });
   }
 
-  function handleAdvanceFromStep1() {
-    dispatch({ type: 'GO_TO_STEP', step: 2 });
-  }
-
-  function handleAdvanceFromStep2() {
-    dispatch({ type: 'GO_TO_STEP', step: 3 });
-  }
-
-  function handleAdvanceFromStep3() {
-    dispatch({ type: 'GO_TO_STEP', step: 4 });
-  }
-
-  function handleAdvanceFromStep4() {
-    dispatch({ type: 'GO_TO_STEP', step: 5 });
-  }
-
-  function handleBackToStep1() {
-    dispatch({ type: 'GO_TO_STEP', step: 1 });
-  }
-
-  function handleBackToStep2() {
-    dispatch({ type: 'GO_TO_STEP', step: 2 });
-  }
-
-  function handleBackToStep3() {
-    dispatch({ type: 'GO_TO_STEP', step: 3 });
-  }
-
-  function handleBackToStep4() {
-    dispatch({ type: 'GO_TO_STEP', step: 4 });
-  }
-
   function handleSubmit() {
     navigate('/templates-v2');
   }
@@ -124,32 +96,8 @@ export function TemplateWizardPage(): JSX.Element {
   }
 
   function handleStepClick(id: string) {
-    const n = Number(id) as TemplateWizardStep;
-    dispatch({ type: 'GO_TO_STEP', step: n });
+    goToStep(parseStepParam(id));
   }
-
-  // Step 1 advance requires:
-  //   - scope type chosen AND
-  //   - if profile scope: a profile selected
-  const step1Disabled =
-    state.scopeType === null ||
-    (state.scopeType === 'profile' && state.profileCode === null);
-
-  // Step 2 advance requires non-empty trimmed name (≥3 chars).
-  const step2Disabled = state.name.trim().length < NAME_MIN;
-
-  // Step 3 advance requires:
-  //   - starting point chosen AND
-  //   - if 'docx': a file selected (mocked).
-  const step3Disabled =
-    state.startingPoint === null ||
-    (state.startingPoint === 'docx' && state.selectedDocxName === null);
-
-  // Step 4 advance requires:
-  //   - if mode='roles': at least one role selected
-  //   - modes 'areas' and 'all' are always valid (empty areas = valid per design)
-  const step4Disabled =
-    state.permissionsMode === 'roles' && state.selectedRoleIds.length === 0;
 
   return (
     <WizardShell
@@ -175,9 +123,9 @@ export function TemplateWizardPage(): JSX.Element {
           error={profilesQuery.error}
           selectedCode={state.profileCode}
           onSelect={handleSelectProfile}
-          onAdvance={handleAdvanceFromStep1}
+          onAdvance={() => goToStep(2)}
           onCancel={handleCancel}
-          advanceDisabled={step1Disabled}
+          advanceDisabled={advanceDisabled}
           onRetry={() => void profilesQuery.refetch()}
         />
       )}
@@ -191,10 +139,10 @@ export function TemplateWizardPage(): JSX.Element {
           onChangeDescription={(value) =>
             dispatch({ type: 'SET_DESCRIPTION', value })
           }
-          onAdvance={handleAdvanceFromStep2}
-          onBack={handleBackToStep1}
-          onChangeScope={handleBackToStep1}
-          advanceDisabled={step2Disabled}
+          onAdvance={() => goToStep(3)}
+          onBack={() => goToStep(1)}
+          onChangeScope={() => goToStep(1)}
+          advanceDisabled={advanceDisabled}
         />
       )}
       {state.step === 3 && state.scopeType !== null && (
@@ -209,9 +157,9 @@ export function TemplateWizardPage(): JSX.Element {
             dispatch({ type: 'SET_SELECTED_DOCX', name, size })
           }
           onClearDocx={() => dispatch({ type: 'CLEAR_SELECTED_DOCX' })}
-          onAdvance={handleAdvanceFromStep3}
-          onBack={handleBackToStep2}
-          advanceDisabled={step3Disabled}
+          onAdvance={() => goToStep(4)}
+          onBack={() => goToStep(2)}
+          advanceDisabled={advanceDisabled}
         />
       )}
       {state.step === 4 && state.scopeType !== null && (
@@ -224,16 +172,14 @@ export function TemplateWizardPage(): JSX.Element {
           }
           onToggleRole={(id) => dispatch({ type: 'TOGGLE_ROLE_ID', id })}
           onToggleArea={(id) => dispatch({ type: 'TOGGLE_AREA_ID', id })}
-          onAdvance={handleAdvanceFromStep4}
-          onBack={handleBackToStep3}
-          advanceDisabled={step4Disabled}
+          onAdvance={() => goToStep(5)}
+          onBack={() => goToStep(3)}
+          advanceDisabled={advanceDisabled}
         />
       )}
       {state.step === 5 && state.scopeType !== null && (
         <StepConfirmation
           name={state.name}
-          description={state.description}
-          scopeType={state.scopeType}
           selectedProfile={
             selectedProfile
               ? {
@@ -249,7 +195,7 @@ export function TemplateWizardPage(): JSX.Element {
           permissionsMode={state.permissionsMode}
           selectedRoleIds={state.selectedRoleIds}
           selectedAreaIds={state.selectedAreaIds}
-          onBack={handleBackToStep4}
+          onBack={() => goToStep(4)}
           onSubmit={handleSubmit}
         />
       )}

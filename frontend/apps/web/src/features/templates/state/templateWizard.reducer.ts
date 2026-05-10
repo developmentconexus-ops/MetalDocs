@@ -55,6 +55,15 @@ export function templateWizardReducer(
   state: TemplateWizardState,
   action: TemplateWizardAction,
 ): TemplateWizardState {
+  const next = reduceCore(state, action);
+  const max = selectMaxReachableStep(next);
+  return next.step > max ? { ...next, step: max } : next;
+}
+
+function reduceCore(
+  state: TemplateWizardState,
+  action: TemplateWizardAction,
+): TemplateWizardState {
   switch (action.type) {
     case 'SET_SCOPE_TYPE':
       return {
@@ -102,4 +111,18 @@ export function templateWizardReducer(
     default:
       return state;
   }
+}
+
+export function selectMaxReachableStep(
+  state: TemplateWizardState,
+): TemplateWizardStep {
+  if (state.scopeType === null) return 1;
+  if (state.scopeType === 'profile' && state.profileCode === null) return 1;
+  if (state.name.trim().length < 3) return 2;
+  if (state.startingPoint === null) return 3;
+  if (state.startingPoint === 'docx' && state.selectedDocxName === null)
+    return 3;
+  if (state.permissionsMode === 'roles' && state.selectedRoleIds.length === 0)
+    return 4;
+  return 5;
 }
