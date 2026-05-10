@@ -3,6 +3,7 @@ import type { paths } from '../api-types';
 import { traceRequestEnd, traceRequestStart } from "../observability/apiTrace";
 import { dispatchAuthExpired } from "./authBus";
 import { ApiError } from "./errors";
+import { parseProblem } from "./problem";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
@@ -32,10 +33,15 @@ function withDefaultHeaders(init?: ApiFetchOptions): RequestInit | undefined {
 async function assertApiResponse(res: Response) {
   if (res.status === 401) {
     dispatchAuthExpired(window.location.pathname + window.location.search);
-    throw new ApiError("authn.expired", 401, "Sessão expirada");
+    throw ApiError.fromLegacy("authn.expired", 401, "Sessão expirada");
   }
 
   if (!res.ok) {
+    const problem = await parseProblem(res.clone());
+    if (problem) {
+      throw new ApiError(problem);
+    }
+
     let body: { error?: { code?: string; message?: string; details?: unknown } } | undefined;
 
     try {
@@ -47,7 +53,8 @@ async function assertApiResponse(res: Response) {
     const code = body?.error?.code ?? `http_${res.status}`;
     const message = body?.error?.message ?? "Erro interno";
 
-    throw new ApiError(code, res.status, message, body?.error?.details);
+    console.warn("[api] legacy error envelope from", res.url);
+    throw ApiError.fromLegacy(code, res.status, message, body?.error?.details);
   }
 }
 
@@ -96,3 +103,4 @@ export async function requestBlob(path: string, init?: RequestInit): Promise<Blo
 }
 
 export const api = createClient<paths>({ fetch: apiFetch });
+
