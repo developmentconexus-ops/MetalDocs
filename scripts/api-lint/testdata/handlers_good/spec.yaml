@@ -1,0 +1,37 @@
+openapi: 3.0.3
+info:
+  title: handlers
+  version: 1.0.0
+paths:
+  /widgets:
+    post:
+      operationId: createWidget
+      security:
+        - bearerAuth: []
+      x-authz-area:
+        source: body
+        field: area_code
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          description: denied
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string

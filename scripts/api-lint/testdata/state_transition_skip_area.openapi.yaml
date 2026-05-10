@@ -1,0 +1,31 @@
+openapi: 3.0.3
+info:
+  title: transition-skip
+  version: 1.0.0
+paths:
+  /widgets/{id}/publish:
+    post:
+      operationId: publishWidget
+      security:
+        - bearerAuth: []
+      x-authz-skip-area: migration-safe
+      responses:
+        '204':
+          description: done
+        '403':
+          description: denied
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string
