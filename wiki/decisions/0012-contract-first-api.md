@@ -78,3 +78,5 @@ Principles:
 
 - `wiki/architecture/api-contract.md` — operational reference: codegen commands, wiring pattern, module status table, how to add a new module
 - `wiki/backlog/contract-first-followups.md` — deferred items and migration template
+- [`wiki/modules/documents.md`](../modules/documents.md) — documents module: codegen bootstrap-only status; handler migration blocked by spec drift
+- [`wiki/modules/documents-tech-debt.md T-002`](../modules/documents-tech-debt.md#t-002--openapi-spec-drift-on-apiv2documents-routes) — spec/handler drift detail: ops without spec, spec ops without handler, missing `operationId` on `finalizeDocument`

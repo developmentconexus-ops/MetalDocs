@@ -33,6 +33,8 @@ Pick up when:
 
 ## Documents module — handler ↔ spec gaps
 
+> See also: [`wiki/modules/documents-tech-debt.md T-002`](../modules/documents-tech-debt.md#t-002--openapi-spec-drift-on-apiv2documents-routes) — canonical tech-debt record with evidence anchors for all spec/handler drift items below.
+
 Bootstrap landed (commit `81e7ec23`) — codegen wired, `internal/modules/documents/api/api.gen.go` produced. Handler migration NOT done because of pre-existing drift between spec and handlers:
 
 **Handlers with no spec op (need spec authoring before migration):**

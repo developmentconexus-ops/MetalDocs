@@ -23,6 +23,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Evidence:** `_artifacts/01-surface.md` rows 120-152; `_artifacts/03-deps.md` §2 (documents importers).
 - **Linked backlog row:** `backlog/iam-refactor.md#R-001`
 - **Linked ADR:** missing-ADR (no decision recording why two namespaces coexist)
+- **Consumer cross-ref:** `wiki/modules/documents-tech-debt.md#t-008` — documents module straddles both namespaces; closure here unblocks documents R-008
 
 ### T-002 · Two area-membership write surfaces
 - **Severity:** major
@@ -64,6 +65,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Evidence:** middleware.go:129 (verified by main agent read); routes_memberships.go:137 (artifact 02-flow-list-memberships §5); `_artifacts/05-industry.md` §IP-001.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-006`
 - **Linked ADR:** missing-ADR (per-module 9457 rollout sequencing not recorded)
+- **Consumer cross-ref:** `wiki/modules/documents-tech-debt.md#t-001` — documents module has the same debt; migrating in parallel is recommended to amortize the `httpresponse.WriteProblem` adoption cost
 
 ### T-007 · `MembershipGovernanceLogger` wired with `nil` in production
 - **Severity:** major
@@ -88,6 +90,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Evidence:** `_artifacts/01-surface.md` rows 85, 93-95; `_artifacts/03-deps.md` §2.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-009`
 - **Linked ADR:** missing-ADR
+- **Consumer cross-ref:** `wiki/modules/documents.md#81-authentication--authorization` — documents handler imports the sentinel variant; closure here resolves the straddle at `handler.go:17`
 
 ### T-010 · `auth` module imports `iam/domain.Role` — bidirectional dependency
 - **Severity:** minor

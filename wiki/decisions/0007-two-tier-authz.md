@@ -1,6 +1,6 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected)
+> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected); cross-linked documents consumer 2026-05-10
 > **Last verified:** 2026-05-10
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.
@@ -87,3 +87,4 @@ Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.m
 ## See also
 
 - [`wiki/modules/iam.md`](../modules/iam.md) — full Arc42 + C4 living architecture doc for `internal/modules/iam`; §5.4 covers the third authz surface (`AuthorizationService`)
+- [`wiki/modules/documents.md §8.1`](../modules/documents.md#81-authentication--authorization) — documents consumer: tier-1 role gate, tier-2 `authz.Require("doc.submit", …)`, `CapabilityChecker` adapter (`wiring/documents.go:24`), tripwire on approval tables; gap T-003 (no trigger on `documents` table itself)
