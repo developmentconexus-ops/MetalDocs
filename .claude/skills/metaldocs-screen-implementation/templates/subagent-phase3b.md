@@ -1,51 +1,45 @@
-# Subagent prompt — Phase 3b Style port
+# Subagent prompt — Phase 3b Style port (Heavy tier)
 
-You are a subagent dispatched in a fresh git worktree to perform Phase 3b (Style port) of the MetalDocs screen-implementation workflow. Phase 3a produced the TSX skeleton + empty CSS Module. Your job is to port styles from the reference HTML to the CSS Module using design tokens only.
+Fresh git worktree subagent. Phase 3a (main agent inline) produced the TSX skeleton + empty CSS Module. Port styles using tokens only.
 
-## Inputs (substitute at dispatch time)
+## Inputs
 
-- Worksheet path: `frontend/apps/web/design-source/<SLUG>/IMPLEMENTATION.md`
-- CSS Module to fill: `frontend/apps/web/src/features/<DOMAIN>/pages/<PAGENAME>.module.css`
-- Tokens file: `frontend/apps/web/src/styles/tokens.css`
-- Shared tokens (if any): `@metaldocs/shared-tokens`
-- Reference HTML: full inline (substituted at dispatch — see below)
-- Reference screenshot: `frontend/apps/web/design-source/<SLUG>/<SLUG>.png`
-
-## Reference HTML (substituted at dispatch)
-
-```html
-<!-- DISPATCHER: paste full contents of design-source/<SLUG>/<SLUG>.html here -->
-```
+- Worksheet: `frontend/apps/web/design-source/<SLUG>/IMPLEMENTATION.md`
+- CSS Module: `frontend/apps/web/src/features/<DOMAIN>/pages/<PAGENAME>.module.css`
+- Tokens: `frontend/apps/web/src/styles/tokens.css`
+- Reference HTML: `frontend/apps/web/design-source/<SLUG>/<SLUG>.html` (read yourself, do NOT inline)
+- Reference screenshot: `<SLUG>.png`
 
 ## Steps
 
-1. **Extract every CSS rule** from the reference HTML — `<style>` block + any inline `style=`. Build a flat list of (selector, property, value) tuples.
+1. **Token map** in worksheet §3b.1. Find matching token for every value (color/spacing/radius/font/shadow). No match within ±5% = missing.
 
-2. **Build the token map** in worksheet §3b.1. For every value (color, spacing, radius, font-size, font-weight, line-height, shadow):
-   - Find the matching token in `frontend/apps/web/src/styles/tokens.css`. Record `--existing-token`.
-   - If no match within ±5% (color hue, spacing px), it is a **missing token**.
+2. **Add missing tokens.** One commit: `feat(tokens): add <list> for <SLUG>`.
 
-3. **Add missing tokens.** For each missing-token row:
-   - Add the token to `frontend/apps/web/src/styles/tokens.css`.
-   - Commit: `feat(tokens): add <--token-name> for <SLUG>`. One commit covers all missing tokens for this screen if they land together.
-   - Update worksheet to point at the new token.
+3. **Port rules** to CSS Module. `var(--token)` only. Raw px allowed only for `1px` borders / `0`.
 
-4. **Port the rules** to the CSS Module. Rules:
-   - Use `var(--token)` for every value. NO raw hex. NO raw px for spacing. Raw px allowed only for `1px` borders and `0` values.
-   - Keep selectors as CSS Module class references.
-   - Preserve the order of rules from the reference for diff readability.
+4. **Token coverage check:**
+   ```bash
+   cd frontend/apps/web
+   grep -REn '#[0-9a-fA-F]{3,8}|rgb\(|[0-9]+px' src/features/<DOMAIN>/pages/<PAGENAME>.module.css | grep -v 'var(--' | grep -vE '\b(0|1)px\b' > design-source/<SLUG>/artifacts/token-coverage.txt
+   ```
+   Empty = pass.
 
-5. **Visual diff — measured, not eyeballed.** Run dev server, open route, capture screenshots at 1440 / 1024 / 375. Then run the **Computed-Style Parity Loop** (see "Pixel Parity Playbook" below). Eyeballing screenshots misses spec violations that show up only as `marginBottom: 0px` vs `8px` in computed style. Always inspect computed numbers, not pixels.
+5. **Parity-diff (HARD).** Run dev server. Pixel Parity Playbook §1 snapshot on impl AND design HTML. Per region → `parity-diff.md`:
+   ```
+   region | field | ref | impl | delta
+   ```
+   Any non-zero delta in spacing/typography/layout → fix and re-snapshot. Empty deltas = pass.
 
-6. **Global CSS leakage scan (HARD).** Before declaring done, for every interactive element on the page (`input`, `select`, `textarea`, `button`, `label span`, `p`, `h2`, `h3`), enumerate its `getMatchedCSSRules` equivalent (iterate `document.styleSheets`) and confirm no global rule from `src/styles.css` is overriding the CSS Module rule. Common offenders documented in Pixel Parity Playbook §2. Any leak → fix in CSS Module via `width: auto; padding: 0; border: none; background: none;` resets, OR scope the global rule narrower in `styles.css` (separate commit). Log finding in worksheet §3b.
+6. **Multi-viewport screenshots (1440 / 1024 / 375)** → `artifacts/screenshots/{viewport}-{ref,impl}.png`. Heavy tier always captures all three (media queries present by definition).
 
-7. Update worksheet §3b items with `[x]`. Mark "User approved screenshot diff" as `[ ]` — only the user marks this one, NOT you.
+7. **Leakage probe (conditional).** If page renders any `<input>`/`<select>`/`<textarea>`/`<label>` → Playbook §2 probe → `leakage-probe.md`. Otherwise note "no form inputs, skipped".
+
+8. **NO self-approval.** Worksheet "User approved" stays `[ ]`. User marks.
 
 ## Pixel Parity Playbook
 
-Use these `mcp__Claude_Preview__preview_eval` patterns. The numbers, not screenshots, are the truth.
-
-### §1 Computed-style snapshot per region
+### §1 Computed-style snapshot
 
 ```js
 (() => {
@@ -58,12 +52,10 @@ Use these `mcp__Claude_Preview__preview_eval` patterns. The numbers, not screens
               pt: cs.paddingTop, pb: cs.paddingBottom, pr: cs.paddingRight, pl: cs.paddingLeft},
     type: {fs: cs.fontSize, fw: cs.fontWeight, lh: cs.lineHeight, ff: cs.fontFamily, tt: cs.textTransform, ls: cs.letterSpacing},
     color: {c: cs.color, bg: cs.backgroundColor, b: cs.border, br: cs.borderRadius},
-    layout: {display: cs.display, flex: cs.flex, flexDir: cs.flexDirection, gap: cs.gap, ai: cs.alignItems, jc: cs.justifyContent, of: cs.overflow}
+    layout: {display: cs.display, flex: cs.flex, flexDir: cs.flexDirection, gap: cs.gap, ai: cs.alignItems, jc: cs.justifyContent}
   };
 })()
 ```
-
-Compare impl-side output against design-source served on the design preview server. Any mismatch in spacing/type/layout → fix.
 
 ### §2 Global-rule leakage probe
 
@@ -82,62 +74,39 @@ Compare impl-side output against design-source served on the design preview serv
 })()
 ```
 
-Known offenders in `src/styles.css` to actively probe for on every form-bearing screen:
+Known offenders in `src/styles.css`:
 
-| Selector | Effect | Reset in CSS Module |
+| Selector | Effect | Reset |
 |---|---|---|
-| `input, select, textarea` | `width: 100%; border; background; padding` — clobbers checkboxes, radios, segmented controls | `width: auto; padding: 0; border: none; background: none; border-radius: 0;` |
-| `button, input, select, textarea` | `font: inherit` — fine, but be aware |  — |
-| `label span` (legacy) | uppercase + tiny | `text-transform: none; letter-spacing: normal; font-size: inherit; color: inherit;` on the local span |
-| browser default `p` | `margin: 1em 0` — adds visual height inside flex | `.<scope> p { margin: 0; }` |
-| browser default `ol, ul` | `padding-inline-start: 40px` | reset to design value |
+| `input, select, textarea` | width/border/bg/padding clobber | `width: auto; padding: 0; border: none; background: none; border-radius: 0;` |
+| `label span` (legacy) | uppercase | `text-transform: none; letter-spacing: normal; font-size: inherit;` |
+| `p` browser default | `margin: 1em 0` | `.<scope> p { margin: 0; }` |
+| `ol, ul` browser default | `padding-inline-start: 40px` | reset to design value |
 
-If you find a NEW global-rule leak, add a row to this table in the skill (separate commit) so the next run catches it.
+New leak found → add row in separate commit.
 
-### §3 Parent → child inheritance traps
+### §3 Specificity loop (when fix doesn't apply)
 
-Primitives like `SelectableCard`, `Button`, `Modal` apply `gap`, `padding`, `font`, `align-items` that combine with the child's own rules. The child often gets *double* spacing.
+If `.foo { line-height: 1 }` set but computed shows `normal`:
+- Class is global → wrap `:global(.kicker)`.
+- Higher-specificity rule wins → add specificity (`.parent .foo`).
+- Last resort: `!important` with comment.
 
-For every primitive used by the page, snapshot:
-- Primitive's `gap`, `padding`, `flex-direction`.
-- Inside child, what spacing primitives add. Then decide which side owns spacing — usually primitive owns container padding/gap, child owns nothing on its outermost element.
+Re-run §1 snapshot. Numbers must change.
 
-If child has its own `margin`/`padding` on root, that often means double spacing. Move spacing to ONE side.
+## Output (`phase3b-style.md`, ≤30 lines)
 
-### §4 Specificity loop (when a fix appears not to apply)
-
-If you set `.foo { line-height: 1 }` and computed style still shows `normal`, the rule did not apply. Causes:
-- Class is global (`.kicker` from styles.css) but selector wraps it as a CSS Module class. Use `:global(.kicker)`.
-- Higher-specificity rule wins. Add specificity (`.parent .foo`, or `:global(...)`).
-- Source-order tie. Add `!important` only as last resort and document why.
-
-Verify by re-running §1 snapshot. Numbers must change.
-
-### §5 Reference parity check
-
-For each region in the design HTML:
-
-1. Render `<slug>.html` in the design preview server, run §1 snapshot.
-2. Render the impl page, run §1 snapshot.
-3. Diff fields. Any spacing/type field that differs is a defect — fix BEFORE declaring Phase 3b done.
-
-The §5 diff is what proves visual parity. A screenshot eye-test does not.
-
-## Output
-
-- Tokens commit (if any): `feat(tokens): add <list> for <SLUG>`.
-- Style commit: `feat(<DOMAIN>): style port for <SLUG>`.
-- Report: token map summary, missing tokens added, dev URL, **§5 reference parity diff (numerical, per region)**, **§2 leakage probe results**.
-
-## Output
-
-- Tokens commit (if any): `feat(tokens): add <list> for <SLUG>`.
-- Style commit: `feat(<DOMAIN>): style port for <SLUG>`.
-- Report: token map summary, missing tokens added, dev URL, side-by-side notes.
+- Tokens commit hash
+- Style commit hash
+- Token coverage: empty/non-empty
+- Parity-diff: zero deltas (or list residuals + reason)
+- Leakage probe: ran/skipped + findings
+- Viewports captured
+- Dev URL
 
 ## Hard rules
 
-- No raw hex outside `tokens.css`.
-- No raw px for spacing in CSS Module.
-- If a design value has no clear token match, STOP — log to worksheet Open Questions, ask user whether to add a new token or use the closest existing.
-- Do NOT mark "user approved screenshot diff" yourself.
+- No raw hex / spacing px in CSS Module.
+- Stop on token mismatch (ask main agent).
+- No tsc.
+- No self-approval of parity.

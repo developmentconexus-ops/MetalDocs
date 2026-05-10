@@ -1,0 +1,109 @@
+/* Step 2 — Identidade · template wizard */
+
+/* ── Recap row (profile + version) ── */
+
+/* Two-column side-by-side layout. */
+.recapRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.recapField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.recapBox {
+  padding: 10px var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.recapMeta {
+  flex: 1;
+  font-size: 13px;
+}
+
+.recapName {
+  font-weight: 500;
+}
+
+.versionLabel {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.versionHint {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Form fields ── */
+
+.field {
+  margin-bottom: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.fieldHint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.nameInput {
+  height: 38px;
+  font-size: var(--font-size-md);
+}
+
+.descriptionInput {
+  font-size: 13px;
+  padding: 10px;
+  resize: vertical;
+  font-family: inherit;
+  /* Override global .input { height: 32px } — let rows attr drive height. */
+  height: auto;
+  min-height: 72px;
+}
+
+/* ── Code preview card ── */
+
+.codePreview {
+  padding: var(--sp-4);
+  background: var(--brand-pale);
+  border: 1px dashed var(--brand-soft);
+  border-radius: var(--r-3);
+  margin-bottom: var(--sp-4);
+}
+
+.codePreviewKicker {
+  margin-bottom: 6px;
+  color: var(--brand);
+}
+
+.codePreviewValue {
+  /* design-exact: 26px sits between --font-size-lg (22px) and --font-size-xl (32px); no
+     matching token. Backlog: wiki/backlog/novo-template-wizard.md (font-size-hero). */
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--brand);
+  letter-spacing: 0.02em;
+}
+
+.codePreviewHint {
+  margin-top: var(--sp-1);
+  /* design-exact: 12px (no exact token; --font-size-xs=11px, --font-size-sm=12.5px) */
+  font-size: 12px;
+  color: var(--text-muted);
+}

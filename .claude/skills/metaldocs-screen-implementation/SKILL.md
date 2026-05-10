@@ -1,171 +1,126 @@
 ---
 name: metaldocs-screen-implementation
-description: Use this skill when implementing a designed screen from `frontend/apps/web/design-source/<slug>/` into the MetalDocs feature-sliced frontend. Triggers on phrases like "implement screen X", "build the <slug> page from design", "wire up the design at design-source/<slug>", or any task that references a `design-source/<slug>/` directory with HTML + screenshot. ALWAYS run BEFORE writing any TSX or CSS for the screen. Enforces a 7-phase workflow with HARD GATES gated on evidence artifacts (audit log, token coverage report, 3-viewport screenshot diff, behavior trace, reviewer report). Captures lessons from Library screen + novo-documento wizard (CSS audit, primitive drift, status-meta SSOT, semantic HTML, error UX, no hydration flash, mock TODO trail, structure-mirror + style-port fidelity, visual parity vs design HTML). Use alongside `metaldocs-frontend`.
+description: Use this skill when implementing a designed screen from `frontend/apps/web/design-source/<slug>/` into the MetalDocs feature-sliced frontend. Triggers on phrases like "implement screen X", "build the <slug> page from design", "wire up the design at design-source/<slug>", or any task that references a `design-source/<slug>/` directory with HTML + screenshot. ALWAYS run BEFORE writing any TSX or CSS for the screen. Tiered workflow (Light / Heavy) gated on evidence artifacts. Captures lessons from Library screen, novo-documento wizard, and templates wizard.
 ---
 
 # MetalDocs Screen Implementation
 
-This skill drives the implementation of a designed screen from concept to merge-ready code on the first pass.
+Drives a designed screen from concept to merge-ready code on the first pass.
 
 ## The Iron Law
 
 ```
 NO PHASE PROGRESSION WITHOUT EVIDENCE ARTIFACT
-NO INLINE BYPASS OF SUBAGENT PHASES
 NO SELF-GRADED VISUAL PARITY
+USER IS THE ONLY VISUAL APPROVER
 ```
 
-Each phase produces a named artifact under `frontend/apps/web/design-source/<slug>/artifacts/`. If the artifact is missing or empty, the phase is **incomplete**, regardless of how the code looks.
-
-This rule exists because the past two screens (Library, novo-documento wizard) shipped with visual gaps despite "feeling done." The pattern in both: main agent executed phases inline, skipped primitive CSS audit, self-graded the screenshot diff, and called Phase 3b complete without artifacts. Result: visual debt that took multiple correction passes to fix. The artifact requirement makes that bypass impossible.
-
-Violating the letter of this skill is violating its spirit.
-
-## Why this skill exists
-
-The Library screen (`/documents`) and the novo-documento wizard (`/documents-v2/new`) both shipped after multiple correction passes. Recurring failures: skipped primitive CSS audits, status-meta sprawl across files, invalid HTML semantics (`<button>` inside `<button>`), error UX bypass (raw `alert`), hydration flash on persisted state, mock data without a TODO trail, primitives drifting from design tokens, and "looks close enough" passing as Phase 3b done. This skill structures the work so those failures get caught before they ship.
-
-Spec: `docs/superpowers/specs/2026-05-06-screen-implementation-skill-design.md`
+Each phase produces an artifact under `design-source/<slug>/artifacts/`. Missing artifact = phase not done.
 
 ## Pre-requisite skill
 
-`metaldocs-frontend` (`.claude/skills/metaldocs-frontend/SKILL.md`) is the architecture rulebook — feature-sliced layout, TanStack Query for server state, OpenAPI codegen for types, CSS Modules + tokens, no `HashRouter`, no legacy paths. This skill builds on top. Load it first.
+Load `metaldocs-frontend` first — feature-sliced layout, TanStack Query, OpenAPI codegen, CSS Modules + tokens, no `HashRouter`, no legacy paths.
+
+## Tier classification (FIRST ACTION)
+
+After Phase 0+1, classify the screen. **Default to Light unless any Heavy trigger fires.**
+
+| Tier | Triggers | Workflow |
+|---|---|---|
+| **Light** | Reuses existing primitives only · ≤100 lines new CSS · no new component placed in `components/ui/` or `features/shared/` · no breakpoint-specific layout (single-column responsive OK) · no form inputs needing leakage probe | Phase 2 + **combined Phase 3** + Phase 4 + Phase 4.5 (1 subagent) |
+| **Heavy** | Any: new shared primitive · new responsive layout (`@media` rule) · multiple regions with distinct typography · form-heavy with ≥3 inputs · novel interaction (drag, virtual list, etc.) | Phase 2 + Phase 3a + 3b + 3c + Phase 4 + Phase 4.5 (4 subagents) |
+
+Tier choice goes in `IMPLEMENTATION.md` header. If unsure, ask the user once: "Light tier OK for this screen?" with the trigger checklist.
 
 ## Hard rule: ask, don't assume
 
-Stop and ask the user when:
+Stop when: backend shape ambiguous, design element unmapped to state/role, two valid placements, status enum unclear, design vs semantic-HTML conflict, missing token. One topic per pause.
 
-- Backend endpoint missing or shape ambiguous (Phase 1.6)
-- Design element doesn't map to a known document state, role, or persona (Phase 0)
-- Two valid component placements exist (Phase 1.2)
-- Status / enum value meaning unclear (Phase 1.4)
-- Design HTML conflicts with semantic HTML rules (Phase 3a)
-- Token missing with no clear existing match (Phase 3b)
-- Mock data fallback would hide unknown behavior
+## Workflow (both tiers)
 
-Self-deciding any of the above = skill failure. Pause, append a row to the worksheet `Open Questions Log`, wait for the user. One topic per pause — no batched dumps.
-
-## Workflow
-
-| Phase | Executor | Gate | Required artifact (in `artifacts/`) |
+| Phase | Executor | Tier | Artifact |
 |---|---|---|---|
-| 0 — Audit | Main agent inline | HARD | `phase0-audit.md` (Keep/Cut/Defer table, user signature) |
-| 1 — Map | Main agent inline | HARD | `phase1-map.md` (worksheet §1 filled, no open questions) |
-| 2 — Pre-flight | Subagent in worktree | HARD | `phase2-preflight.md` (primitive CSS audit + computed-style probe + token coverage + **Global CSS Leakage Map**) |
-| 3a — Structure mirror | Subagent in worktree | HARD | `phase3a-structure.md` (DOM diff vs reference, main agent reviewed) |
-| 3b — Style port | Subagent in worktree | HARD | `phase3b-style.md` + `screenshots/{1440,1024,375}-{ref,impl}.png` + `token-coverage.txt` + **`parity-diff.md`** (numerical region-by-region) + **`leakage-probe.md`** |
-| 3c — State wiring | Subagent in worktree | soft | checklist in worksheet |
-| 4 — Behavior verify | Main agent inline | HARD | `phase4-behavior.md` (tsc, tests, smoke trace) |
-| 4.5 — Visual review | `frontend-screen-reviewer` agent | HARD | `phase4-review.md` (Critical/Major/Minor report) |
-| 5 — Document | Main agent + `wiki-curator` | soft | wiki diff summary |
-
-**Missing artifact = phase not done.** No exceptions for "it's a small screen" or "I already verified manually."
+| 0 — Audit | Main inline | both | `phase0-audit.md` (Keep/Cut/Defer + user OK) |
+| 1 — Map | Main inline | both | `phase1-map.md` |
+| 2 — Pre-flight | Subagent worktree | both | `phase2-preflight.md` |
+| 3 — Combined (struct+style+state) | Subagent worktree | **Light** | `phase3-combined.md` + `parity-diff.md` + screenshots |
+| 3a — Structure mirror | Main inline | **Heavy** | `phase3a-structure.md` (DOM diff) |
+| 3b — Style port | Subagent worktree | **Heavy** | `phase3b-style.md` + `parity-diff.md` + `leakage-probe.md` (if forms) + screenshots |
+| 3c — State wiring | Subagent worktree | **Heavy** | checklist in worksheet |
+| 4 — Behavior verify | Main inline | both | `phase4-behavior.md` (tsc + tests + smoke) |
+| 4.5 — Visual review | `frontend-screen-reviewer` | both | `phase4-review.md` |
+| 5 — Document | Main + `wiki-curator` | both | wiki diff |
 
 ## Run sequence
 
-1. Read `frontend/apps/web/design-source/<slug>/NOTES.md` and view `<slug>.html` + `<slug>.png`.
-2. `mkdir frontend/apps/web/design-source/<slug>/artifacts` (and `artifacts/screenshots`).
-3. Copy `templates/IMPLEMENTATION.md` to `frontend/apps/web/design-source/<slug>/IMPLEMENTATION.md`. Fill the header.
-4. Run Phase 0 with the user → `artifacts/phase0-audit.md`.
-5. Run Phase 1 with the user → `artifacts/phase1-map.md`.
-6. Dispatch Phase 2 subagent (`templates/subagent-phase2.md`) → `artifacts/phase2-preflight.md`.
-7. Dispatch Phase 3a subagent (`templates/subagent-phase3a.md`) → `artifacts/phase3a-structure.md`. Main agent reviews DOM diff.
-8. Dispatch Phase 3b subagent (`templates/subagent-phase3b.md`) → `artifacts/phase3b-style.md` + screenshots + token-coverage. **User approves screenshot triple-diff.**
-9. Dispatch Phase 3c subagent (`templates/subagent-phase3c.md`).
-10. Run Phase 4 in main session → `artifacts/phase4-behavior.md`.
-11. Dispatch `frontend-screen-reviewer` agent → `artifacts/phase4-review.md`. Address Critical + Major before merge.
-12. Run Phase 5 doc handoff → dispatch `wiki-curator`.
+1. Read `design-source/<slug>/NOTES.md`, view `<slug>.html` + `<slug>.png`.
+2. `mkdir design-source/<slug>/artifacts/screenshots`.
+3. Copy `templates/IMPLEMENTATION.md` → `design-source/<slug>/IMPLEMENTATION.md`. Fill header (slug, tier, date).
+4. Phase 0 with user → `phase0-audit.md`.
+5. Phase 1 with user → `phase1-map.md`. **Classify tier here.**
+6. Dispatch Phase 2 subagent (`templates/subagent-phase2.md`) → `phase2-preflight.md`.
+7. **If Light:** dispatch combined Phase 3 (`templates/subagent-phase3-combined.md`). User approves screenshots + parity-diff. Skip 3a/3b/3c.
+8. **If Heavy:** Phase 3a inline (mirror DOM in TSX skeleton), then Phase 3b subagent, then Phase 3c subagent.
+9. Phase 4 main session → `phase4-behavior.md`.
+10. Phase 4.5 `frontend-screen-reviewer` → `phase4-review.md`. Resolve Critical+Major before merge.
+11. Phase 5: wiki update + dispatch `wiki-curator`.
 
-## Phase 0 — Audit (HARD GATE)
+## Phase 0 — Audit
 
-Goal: every UI element in the design has a real reason to exist. Cut decoration that implies behavior we do not support.
+Every UI element maps to (state/role/persona/data) → Keep/Cut/Defer. Show cut list to user. Cross-ref `wiki/concepts/design-workflow-audit.md`.
 
-Steps:
+## Phase 1 — Map
 
-1. Open `NOTES.md` if it exists; if not, audit the HTML directly.
-2. For every region/component in the HTML, fill `IMPLEMENTATION.md` §0.1: element → maps to (state/role/persona/data) → Keep/Cut/Defer → reason. Cross-ref `wiki/concepts/design-workflow-audit.md`.
-3. Show the cut list to the user, get explicit confirmation. Update `NOTES.md` with the confirmed cut list.
-4. Write `artifacts/phase0-audit.md` with the Keep/Cut/Defer table and user-confirmation timestamp.
+1.1 backward primitive scan (grep `components/ui/`, `features/shared/`).
+1.2 forward placement decision tree (generic→`components/ui/`, multi-feature→`features/shared/`, domain→`features/<domain>/components/`).
+1.3 component tree.
+1.4 status/enum SSOT (`features/<domain>/lib/<x>Meta.ts`).
+1.5 state design (server=TanStack, persisted=lazy initializer, debounced=`useDebouncedValue`).
+1.6 backend contract (existing vs needed; needed→mock + `wiki/backlog/<screen>.md` row).
+1.7 **tier classification.**
+1.8 user checkpoint.
 
-## Phase 1 — Map (HARD GATE)
+## Phase 2 — Pre-flight (subagent)
 
-Steps:
+`templates/subagent-phase2.md`. Codegen + status-meta + new shared atoms + route stub.
 
-1. **1.1 Reusability scan — backward.** Grep `frontend/apps/web/src/components/ui/` and `frontend/apps/web/src/features/shared/`. For each design element, fill the worksheet table — primitive in use / extension needed / missing.
-2. **1.2 Reusability scan — forward.** Classify NEW components with placement decision tree: generic → `components/ui/`, multi-feature → `features/shared/`, domain → `features/<domain>/components/`.
-3. **1.3 Decomposition.** Component tree using primitives from 1.1 + new from 1.2.
-4. **1.4 Status/enum meta SSOT.** One file: `features/<domain>/lib/<x>Meta.ts`.
-5. **1.5 State design.** Server (TanStack Query), local (`useState`), persisted (lazy initializer required), debounced inputs (`lib/hooks/useDebouncedValue`).
-6. **1.6 Backend contract.** Existing vs needed endpoints. For "needed" → mock fallback strategy + backlog file `wiki/backlog/<screen>.md`.
-7. **1.7 Checkpoint.** User reviews reusability classifications + backend contract. No open Phase-1 questions.
-8. Write `artifacts/phase1-map.md` summarizing the worksheet.
+**Primitive audit cache:** if a primitive was audited in another screen within the last 14 days (check `wiki/modules/frontend-primitives.md` `Last verified` stamps), skip re-audit and link to the prior `phase2-preflight.md`. Otherwise audit per primitive: tokens-only, drift vs design HTML.
 
-## Phase 2 — Pre-flight (subagent, worktree, HARD GATE)
+No tsc in Phase 2 (saves ~30s × subagent boots; tsc runs in Phase 4).
 
-Subagent prompt body: `templates/subagent-phase2.md`. Mechanical given filled worksheet.
+## Phase 3 (Light, combined subagent)
 
-**HARD requirement: Primitive CSS audit.** Before assembling the page, the subagent audits each REUSED primitive (from §1.1) against design tokens and against the reference HTML's expectation:
+`templates/subagent-phase3-combined.md`. Single subagent does:
 
-- Read each primitive's CSS Module + style file.
-- For every value (color, spacing, radius, font-size, shadow, line-height): is it a `var(--token)`? If not, flag.
-- Compare primitive's visual against the design HTML usage. Drift = primitive needs fix BEFORE page assembly.
+1. Mirror design HTML structure into TSX (same tags, same nesting, same DOM order).
+2. Port styles to CSS Module — tokens only (`token-coverage.txt` empty).
+3. Wire state (queries, error UX with `role="alert"`, four states, lazy `useState(() => readStored())`, semantic HTML — no `<button>` in `<button>`).
+4. **Parity-diff at single viewport (1440)** — Pixel Parity Playbook §1 snapshot on impl + reference; numerical diff to `parity-diff.md`. Empty deltas = pass.
+5. **Skip leakage-probe unless any `<input>`/`<select>`/`<textarea>`/`<label>` rendered.** If forms present: run §2 probe → `leakage-probe.md`.
+6. **Skip multi-viewport screenshots unless any `@media` rule needed.** Single 1440 ref+impl pair otherwise.
 
-Subagent commits separately for: codegen, **primitive CSS fixes**, status-meta file, new shared atoms, route stub.
+User approves parity-diff (and screenshots). No self-grading.
 
-Output to `artifacts/phase2-preflight.md`: list of primitives audited, fixes made, residual drift accepted (with reason + user sign-off), tokens added.
+## Phase 3a (Heavy only) — Structure mirror, INLINE
 
-## Phase 3a — Structure mirror (subagent, worktree, HARD GATE)
+Main agent now writes the TSX skeleton + CSS Module skeleton with class names mirroring design HTML. No subagent boot. Compare DOM tree to reference HTML; mismatch = fix. Append DOM diff to `phase3a-structure.md`.
 
-Subagent prompt body: `templates/subagent-phase3a.md`. Prompt includes the full `<slug>.html` content inline. Output: TSX skeleton + CSS Module skeleton with class names mirroring design HTML class names. No logic.
+## Phase 3b (Heavy) — Style port (subagent)
 
-Main agent reviews `artifacts/phase3a-structure.md` (DOM diff): same tag, same nesting depth, same DOM order. Mismatch → block + send back.
+`templates/subagent-phase3b.md`. Tokens-only, missing tokens added in separate commit.
 
-## Phase 3b — Style port (subagent, worktree, HARD GATE)
+**HARD requirements (Heavy):**
+- `token-coverage.txt` empty (grep raw hex / px from page CSS Module).
+- `parity-diff.md` numerical region-by-region — empty deltas.
+- 3-viewport screenshots (1440, 1024, 375) — only because Heavy implies media queries.
+- `leakage-probe.md` — only if form inputs rendered.
+- User approves.
 
-Subagent prompt body: `templates/subagent-phase3b.md`. Token map first; missing tokens added in a separate commit. CSS Module uses ONLY tokens — no raw hex, no raw px for spacing.
+## Phase 3c (Heavy) — State wiring (subagent)
 
-**The mindset shift this phase enforces.** Past screens shipped visual debt because the implementer optimized for "code works, route renders, looks roughly like the design" and called it done. That is the failure mode. **In Phase 3b, the deliverable is pixel-level visual parity to the design HTML, measured by computed style numbers — not screenshots, not eye-tests, not "feels close".** Behavior wiring is Phase 3c. Functionality is Phase 4. Phase 3b is *only* about visual fidelity. If the kicker has `line-height: normal` instead of `1` and the glyphs visually crowd the dashed border by 1.5px, that IS the bug, and Phase 3b is not done.
+`templates/subagent-phase3c.md`. Query hooks, `ApiError` + `resolveErrorMessage`, `aria-disabled` + `title="Em breve"`, four states, `:focus-visible` outline.
 
-**HARD requirements:**
-
-1. **Token coverage report** at `artifacts/token-coverage.txt`:
-   ```bash
-   # Run from frontend/apps/web/
-   grep -REn '#[0-9a-fA-F]{3,8}|rgb\(|[0-9]+px' src/features/<domain>/pages/<Page>.module.css | grep -v 'var(--' | grep -vE '\b(0|1)px\b' > artifacts/token-coverage.txt
-   ```
-   Empty file = pass. Non-empty = subagent fixes before reporting done.
-
-2. **Three-viewport screenshot triple-diff:**
-   - 1440 (desktop), 1024 (tablet), 375 (mobile).
-   - Save reference (HTML rendered) + implementation pairs to `artifacts/screenshots/{viewport}-{ref|impl}.png`.
-   - Subagent annotates `artifacts/phase3b-style.md` with side-by-side observations per viewport.
-
-3. **Computed-style parity diff (NEW, HARD).** For every region in the design, the subagent runs the Pixel Parity Playbook §1 snapshot on BOTH the design HTML preview AND the implementation, and writes the numerical diff to `artifacts/parity-diff.md`. Format: `region | field | ref | impl | delta`. Any non-zero delta in spacing/typography/layout fields is a defect — fix in same phase. Empty deltas table = pass.
-
-4. **Global CSS leakage probe (NEW, HARD).** For every interactive / form element on the page, the subagent runs Pixel Parity Playbook §2 leakage probe and writes results to `artifacts/leakage-probe.md`. Any unexpected hit from `src/styles.css` → reset in page CSS Module (or scope the global narrower in `styles.css`, separate commit). The known offenders table in `templates/subagent-phase3b.md` is required reading.
-
-5. **User approves the triple-diff.** Subagent does NOT self-mark approved. Main agent shows the user all 6 screenshots, the parity-diff table, and the leakage-probe results, and waits for explicit "ok".
-
-Without all five, Phase 3c does not start.
-
-### The visual-parity loop (when fixes don't stick)
-
-The wizard correction passes wasted hours on "fix → look at screenshot → still wrong → fix again" because the loop never measured. The right loop:
-
-1. **Snapshot impl** with §1 — record numbers.
-2. **Snapshot reference** with §1 on the design preview server — record numbers.
-3. **Diff numerically.** Find the field that's off (`marginBottom`, `lineHeight`, `width`, `flex`).
-4. **Probe rules** with §2 leakage probe — find the rule that's setting the wrong value. Could be CSS Module, could be `styles.css` global, could be primitive cascade.
-5. **Fix the cause, not the symptom.** If a global rule clobbers a checkbox to `width: 100%`, the fix is `width: auto` in the page CSS Module (specific) AND a row in the leakage map (so future screens know).
-6. **Re-snapshot.** Numbers must change. If they didn't, you have a specificity battle — see Pixel Parity Playbook §4.
-
-Eyeballing screenshots between iterations is what kept past loops going for 6+ rounds. Numbers shorten the loop to 2.
-
-## Phase 3c — State wiring (subagent, worktree)
-
-Subagent prompt body: `templates/subagent-phase3c.md`. Wire query hooks, error UX (`ApiError` + `resolveErrorMessage` + `role="alert"`), disabled CTAs (`aria-disabled` + `title="Em breve"`), all four states (loading/empty/error/success), lazy `useState(() => readStored())`, `useDebouncedValue`. Semantic HTML: no `<button>` in `<button>`; non-button rows use `<div role="button" tabIndex={0} onClick onKeyDown>` with `:focus-visible` outline.
-
-## Phase 4 — Behavior verify (main agent, HARD GATE)
+## Phase 4 — Behavior verify
 
 ```bash
 cd frontend/apps/web
@@ -173,77 +128,58 @@ pnpm.cmd tsc --noEmit -p tsconfig.build.json
 pnpm test
 ```
 
-Both must be green. Then run `pnpm dev` and walk the manual smoke steps recorded in §4 of the worksheet — every interactive path, every state, every keyboard route.
+Both green. `pnpm dev` → walk smoke steps. Write `phase4-behavior.md` (tsc + tests + smoke trace + console errors).
 
-Write `artifacts/phase4-behavior.md`: tsc result, test result, smoke trace (step → expected → observed), any console errors.
+## Phase 4.5 — Visual review
 
-## Phase 4.5 — Visual review (`frontend-screen-reviewer` agent, HARD GATE)
-
-Dispatch the `frontend-screen-reviewer` agent (`.claude/agents/frontend-screen-reviewer.md`) with:
-- Slug
-- Implemented page path
-- Worksheet path
-- Phase 3b screenshots path
-
-Agent returns `artifacts/phase4-review.md` bucketed Critical / Major / Minor. **Resolve every Critical and every Major before merge.** Minor items go to backlog.
-
-If reviewer reports zero issues, that is fine — but the artifact must still exist.
+Dispatch `frontend-screen-reviewer` with slug, page path, worksheet path, screenshots path. Resolve every Critical+Major before merge. Minor → backlog.
 
 ## Phase 5 — Document
 
-1. Update `wiki/modules/<domain>.md` — bump `Last verified`, fix `Key files:` line anchors, record any new patterns introduced.
-2. If any item from §1.6 was deferred, create or update `wiki/backlog/<screen>.md`.
-3. Dispatch the `wiki-curator` agent.
-4. PR description references the worksheet path + reviewer report.
+Update `wiki/modules/<domain>.md` (bump `Last verified`, fix anchors). Dispatch `wiki-curator`.
 
-## Red flags — STOP and follow process
+## Subagent prompt diet
 
-If you catch yourself thinking any of these, you are about to bypass the skill:
+- Cap subagent prompt at ~800 tokens. No inline HTML — point to file path.
+- Subagent reads design HTML itself.
+- Phase 2/3 subagents do NOT run tsc (saves boots × tsc cost).
+- Artifact body: ≤30 lines, bullets, no prose paragraphs.
+
+## Red flags — STOP
 
 | Thought | Reality |
 |---|---|
-| "Small screen, I'll just do it inline" | Inline = no artifact = no audit trail. Use the subagents. |
-| "Primitive already exists, skip the audit" | Primitives drift. The drift IS the bug. Audit. |
-| "Looks close enough at this viewport" | Visual parity is at 3 viewports, side-by-side. Not "close enough". |
-| "I'll mark Phase 3b done, user can review later" | User approval IS the gate. No approval = phase open. |
-| "Token doesn't exist, I'll inline `#fafafa`" | Tokens-only. Add the token in a separate commit. |
-| "Reviewer agent is overhead, the code is fine" | Self-grading is the failure mode that produced 2 visual-debt screens. Dispatch the reviewer. |
-| "Behavior works, that's enough for Phase 4" | Phase 4 is behavior. Phase 4.5 is visual. Both required. |
-| "I'll fix Major findings post-merge" | Critical + Major before merge. Minor → backlog. |
+| "I'll bump to Heavy because I'm not sure" | Default Light; trigger checklist is binary. Pick by trigger fire, not by feel. |
+| "Skip parity-diff, screenshot looks fine" | Eyeballs lie. Numbers don't. Run §1 snapshot. |
+| "Primitive was just audited, audit again" | Cache rule: 14-day fresh skip. Read prior `phase2-preflight.md`. |
+| "Inline 3a even on Heavy is faster" | Heavy 3a IS inline now. Heavy uses subagent only for 3b+3c. |
+| "Run tsc in subagent for safety" | tsc only in Phase 4. Subagent tsc duplicates work. |
+| "Mock data without TODO" | TODO + `wiki/backlog/<screen>.md` row. Always. |
+| "Self-grade Phase 3 visual" | User is sole approver. |
 
 ## Anti-patterns (instant rewrite)
 
-- Skipping Phase 0 audit because the design "looks fine".
-- Building a local component that already exists in `components/ui/` or `features/shared/`.
-- Status meta inlined in two or more files.
-- `<button>` inside `<button>` to add a row click target.
+- Skipping Phase 0 audit.
+- Building a primitive that already exists.
+- Status meta in 2+ files.
+- `<button>` in `<button>`.
 - Raw `alert()` for errors.
-- Synchronous `useState(initial)` reading from `localStorage` (causes hydration flash) — must use lazy `useState(() => readStored())`.
-- Mock data without a TODO comment block + matching `wiki/backlog/<screen>.md` row.
-- Restructuring the design HTML in TSX ("I think this nesting is cleaner").
-- Raw hex / px spacing in CSS Module — must use tokens.
-- **Self-grading screenshot diff** — user is the only Phase 3b approver.
-- **Phase 3b artifact missing screenshots at 3 viewports** — phase not done.
-- **Phase 3b artifact missing `parity-diff.md` (numerical diff per region)** — phase not done. Screenshots are not parity proof; computed-style numbers are.
-- **Phase 3b artifact missing `leakage-probe.md`** — phase not done. Global CSS leaks (`input { width: 100% }`, `label span { uppercase }`) clobber primitives invisibly.
-- **"Looks close enough at this viewport"** — visual parity is a numerical diff, not an eye-test. Run §1 snapshot on both sides; deltas must be zero.
-- **Treating "code compiles + route loads + matches the design vibe" as Phase 3b done** — Phase 3b is fidelity. Behavior is 3c. Functionality is 4. Don't conflate.
-- **Iterating on a fix without re-running §1 snapshot** — if computed numbers didn't change, the rule didn't apply. Probe specificity (§4) before adding more code.
-- **Skipping Phase 4.5 reviewer** — phase not done.
-- **Inline-executing a phase that the workflow assigns to a subagent** — bypasses isolation, no audit artifact.
+- Synchronous `useState(initial)` from `localStorage` (hydration flash) — must be lazy.
+- Mock data without TODO + backlog row.
+- Restructuring design HTML in TSX.
+- Raw hex / px in CSS Module.
+- Self-grading screenshot diff.
+- Iterating fix without re-running §1 snapshot.
+- Skipping 4.5 reviewer.
+- Heavy-tier ceremony on a Light screen.
 
 ## Output expectations
 
-After the run, report:
-
-1. Files changed (with paths).
-2. Reusability classifications and why each new component landed where it did.
-3. Worksheet path + artifacts directory listing.
-4. Verify status: tsc, tests, manual smoke (Phase 4), reviewer Critical/Major/Minor counts (Phase 4.5).
-5. Wiki impact (which docs updated; backlog file if any; whether `wiki-curator` was dispatched).
+After run, report: files changed · reusability classifications · tier · worksheet + artifacts listing · tsc/tests/smoke status · reviewer Critical/Major/Minor counts · wiki impact.
 
 ## Changelog
 
-- 1.2 (2026-05-07) — Visual-parity-loop refactor. Captures novo-documento wizard correction-loop lessons: agent shipped "code works" but visual gaps survived 6+ correction passes. Root cause: subagent optimized for functionality + screenshot eye-test, not measured visual fidelity. Phase 3b reframed: deliverable is **pixel-level visual parity measured by computed-style numbers**, behavior is 3c, functionality is 4. Two new HARD artifacts: `parity-diff.md` (numerical region-by-region diff) and `leakage-probe.md` (global CSS leakage report). New "Pixel Parity Playbook" in `templates/subagent-phase3b.md` with concrete `mcp__Claude_Preview__preview_eval` snippets (computed-style snapshot, leakage probe via `document.styleSheets`, parent→child inheritance traps, specificity loop, reference parity check). Phase 2 adds Global CSS Leakage Map + primitive computed-style probe. Anti-patterns expanded with "looks close enough", "treating compile+render as parity", "iterating without re-snapshot". Known offenders table in `styles.css` (`input { width: 100% }`, `label span { uppercase }`, browser default `p`/`ol`).
-- 1.1 (2026-05-07) — Iron Law section. Evidence-artifact requirement per phase. Phase 2 primitive CSS audit becomes hard gate. Phase 3b adds token-coverage report + 3-viewport triple-diff + explicit user-approval gate. Phase 4 splits into 4 (behavior) + 4.5 (visual review via `frontend-screen-reviewer` agent). Red flags / rationalizations table. Anti-patterns expanded. Captures wizard-screen lessons.
-- 1.0 (2026-05-06) — initial release. Captures Library screen lessons.
+- 1.3 (2026-05-09) — **Tier system (Light / Heavy).** Captures templates wizard lessons: 4 subagent boots × small Light-tier screen wasted ~50% tokens. Light tier collapses Phase 3a/3b/3c into 1 combined subagent (`subagent-phase3-combined.md`). Heavy tier moves Phase 3a inline (no subagent boot for trivial DOM mirror). Conditional artifacts: parity-diff at single viewport for Light, multi-viewport only when `@media` rule present, leakage-probe only when form inputs rendered. Primitive audit cache: 14-day skip via `Last verified` stamp. Subagent prompt diet (≤800 tok, no inline HTML, no tsc). Artifact diet (≤30 lines, bullets). Target: ~85 tool calls + 1 subagent boot for Light tier (down from ~175 + 4).
+- 1.2 (2026-05-07) — Visual-parity-loop refactor. `parity-diff.md` + `leakage-probe.md` HARD artifacts. Pixel Parity Playbook.
+- 1.1 (2026-05-07) — Iron Law. Phase 4.5 reviewer split.
+- 1.0 (2026-05-06) — initial release.
