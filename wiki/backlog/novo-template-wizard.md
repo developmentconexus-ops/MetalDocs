@@ -79,11 +79,38 @@
 
 ---
 
+### permissions-roles-api
+**Context:** Step 4 (Permissões) "Por funções" mode shows personnel role cards (QUA-INSP, QUA-ANA, etc.) with user counts. All mocked.
+**Blocked by:** No personnel/roles endpoint. Taxonomy API exposes document-type profiles (POP, IT, etc.) — not user roles.
+**File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.tsx` (`MOCK_ROLES` constant)
+**TODO tag:** `TODO(novo-template-wizard:permissions-roles-api)`
+**Resolution:** When a user-roles/personas endpoint ships, replace `MOCK_ROLES` with `useRolesQuery()`. Wire loading + error states.
+
+---
+
+### permissions-area-counts
+**Context:** Step 4 "Por área" mode shows area cards with user count per area (28, 89, 34…). Counts are mocked.
+**Blocked by:** No user-count-per-area aggregate endpoint.
+**File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.tsx` (`MOCK_AREAS` constant)
+**TODO tag:** `TODO(novo-template-wizard:permissions-area-counts)`
+**Resolution:** Replace mock counts with real aggregate when API ships. Area names can come from existing `useAreasQuery`.
+
+---
+
+### permissions-user-count
+**Context:** Step 4 "Todos" mode shows "~340 usuários ativos". Mocked constant.
+**Blocked by:** No company-wide active user count endpoint.
+**File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.tsx` (`COMPANY_USER_COUNT` constant)
+**TODO tag:** `TODO(novo-template-wizard:permissions-user-count)`
+**Resolution:** Replace `COMPANY_USER_COUNT` with API-fetched total when endpoint ships.
+
+---
+
 ## Steps not yet implemented
 
 | Step | Name | Status |
 |---|---|---|
 | 2 | Identidade | **Done** (2026-05-09) |
 | 3 | Estrutura | **Done** (2026-05-09) — mocked DOCX flow; real upload + placeholder extract deferred (see backlog items above) |
-| 4 | Permissões | Stub |
+| 4 | Permissões | **Done** (2026-05-09) — mocked roles/areas/counts; real API deferred (see backlog items above) |
 | 5 | Confirmação | Stub — submits to `POST /api/v2/templates` |

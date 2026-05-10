@@ -6,12 +6,14 @@ import {
   initialTemplateWizardState,
   type TemplateWizardStep,
   type ScopeType,
+  type PermissionsMode,
 } from '../state/templateWizard.reducer';
 import { WizardShell } from '../../shared/components/wizard/WizardShell';
 import type { StepperStep } from '../../../components/ui/Stepper';
 import { StepScope } from '../components/wizard/steps/StepScope';
 import { StepIdentity } from '../components/wizard/steps/StepIdentity';
 import { StepStructure } from '../components/wizard/steps/StepStructure';
+import { StepPermissions } from '../components/wizard/steps/StepPermissions';
 
 const TPL_STEPS: StepperStep[] = [
   { id: '1', label: 'Perfil' },
@@ -92,12 +94,20 @@ export function TemplateWizardPage(): JSX.Element {
     dispatch({ type: 'GO_TO_STEP', step: 4 });
   }
 
+  function handleAdvanceFromStep4() {
+    dispatch({ type: 'GO_TO_STEP', step: 5 });
+  }
+
   function handleBackToStep1() {
     dispatch({ type: 'GO_TO_STEP', step: 1 });
   }
 
   function handleBackToStep2() {
     dispatch({ type: 'GO_TO_STEP', step: 2 });
+  }
+
+  function handleBackToStep3() {
+    dispatch({ type: 'GO_TO_STEP', step: 3 });
   }
 
   function handleCancel() {
@@ -125,6 +135,12 @@ export function TemplateWizardPage(): JSX.Element {
   const step3Disabled =
     state.startingPoint === null ||
     (state.startingPoint === 'docx' && state.selectedDocxName === null);
+
+  // Step 4 advance requires:
+  //   - if mode='roles': at least one role selected
+  //   - modes 'areas' and 'all' are always valid (empty areas = valid per design)
+  const step4Disabled =
+    state.permissionsMode === 'roles' && state.selectedRoleIds.length === 0;
 
   return (
     <WizardShell
@@ -189,10 +205,25 @@ export function TemplateWizardPage(): JSX.Element {
           advanceDisabled={step3Disabled}
         />
       )}
-      {state.step >= 4 && (
+      {state.step === 4 && state.scopeType !== null && (
+        <StepPermissions
+          permissionsMode={state.permissionsMode}
+          selectedRoleIds={state.selectedRoleIds}
+          selectedAreaIds={state.selectedAreaIds}
+          onSetMode={(mode: PermissionsMode) =>
+            dispatch({ type: 'SET_PERMISSIONS_MODE', mode })
+          }
+          onToggleRole={(id) => dispatch({ type: 'TOGGLE_ROLE_ID', id })}
+          onToggleArea={(id) => dispatch({ type: 'TOGGLE_AREA_ID', id })}
+          onAdvance={handleAdvanceFromStep4}
+          onBack={handleBackToStep3}
+          advanceDisabled={step4Disabled}
+        />
+      )}
+      {state.step === 5 && (
         <div className="card">
-          <div className="kicker">Etapa {state.step} de 5</div>
-          <p className="caption">Em construção — próximas etapas a implementar.</p>
+          <div className="kicker">Etapa 5 de 5</div>
+          <p className="caption">Em construção — Confirmação a implementar.</p>
         </div>
       )}
     </WizardShell>
