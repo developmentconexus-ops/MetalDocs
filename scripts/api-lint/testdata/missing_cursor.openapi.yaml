@@ -1,0 +1,56 @@
+openapi: 3.0.3
+info:
+  title: missing-cursor
+  version: 1.0.0
+paths:
+  /widgets:
+    get:
+      operationId: listWidgets
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListWidgetsResponse'
+        '400':
+          description: bad
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string
+    Page:
+      type: object
+      properties:
+        next_cursor:
+          type: string
+        has_more:
+          type: boolean
+    ListWidgetsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+        page:
+          $ref: '#/components/schemas/Page'
