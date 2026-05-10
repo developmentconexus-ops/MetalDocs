@@ -12,4 +12,5 @@
 - [taxonomy.md](taxonomy.md) — families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
 - [approval.md](approval.md) — routes, signoffs, ISO segregation; known gaps D4/E4/outbox (Last verified: 2026-05-03)
 - render-fanout.md — TBD (Last verified: 2026-05-04)
-- [iam-rbac.md](iam-rbac.md) — capabilities, roles, DB-backed CanDo, system_admin bypass, group grants (Last verified: 2026-05-03)
+- [iam.md](iam.md) — IAM module (Arc42 + C4): capabilities, roles, area memberships, tier-1 `CapabilityService.CanDo`, tier-2 `authz.Require`, Postgres tripwire, system_admin bypass, group grants (Last verified: 2026-05-10)
+- [iam-tech-debt.md](iam-tech-debt.md) — IAM tech-debt register (T-001..T-012) (Last verified: 2026-05-10)

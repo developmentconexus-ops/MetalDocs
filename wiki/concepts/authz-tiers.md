@@ -2,7 +2,7 @@
 
 > **Last verified:** 2026-05-10
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
-> **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md` (full architecture) or `wiki/modules/iam-rbac.md` (predecessor stub).
+> **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md`.
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo`
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require`

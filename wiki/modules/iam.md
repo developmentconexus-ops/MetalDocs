@@ -1,6 +1,6 @@
 # Module: iam
 
-> Living architecture doc. Shape: Arc42 + C4 + ADR cross-links. Supersedes `wiki/modules/iam-rbac.md` (predecessor stub; same scope, narrower depth).
+> Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
 **Last verified:** 2026-05-10 · **Owner:** unassigned · **Status:** active (partial contract-first; partial defense-in-depth)
 
@@ -443,9 +443,8 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 - Modules: [`modules/approval.md`](approval.md) (tier-2 consumer), [`modules/documents.md`](documents.md) (tier-2 consumer), [`modules/templates-v2.md`](templates-v2.md) (context consumer)
 - Backlog: [`backlog/iam-refactor.md`](../backlog/iam-refactor.md)
 - Tech debt: [`iam-tech-debt.md`](iam-tech-debt.md)
-- Predecessor (superseded): [`iam-rbac.md`](iam-rbac.md) — to be retired in next commit
 - Source artifacts: [`iam/_artifacts/00-context.md`](iam/_artifacts/00-context.md) through [`05-industry.md`](iam/_artifacts/05-industry.md)
 
 ## Changelog
 
-- 2026-05-10 — initial publish; supersedes `iam-rbac.md`. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.
+- 2026-05-10 — initial publish; supersedes retired `iam-rbac.md` stub. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.

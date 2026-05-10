@@ -15,7 +15,7 @@
 
 ## C
 
-**Capability** - Permission unit (e.g., `doc.view`, `doc.edit`, `template.approve`). 16 constants defined in `internal/modules/iam/domain/capabilities.go`. Granted per role; checked DB-side by `CapabilityService.CanDo`. See `modules/iam-rbac.md`.
+**Capability** - Permission unit (e.g., `doc.view`, `doc.edit`, `template.approve`). 16 constants defined in `internal/modules/iam/domain/capabilities.go`. Granted per role; checked DB-side by `CapabilityService.CanDo`. See `modules/iam.md`.
 
 **CD / Controlled Document** - A document instance bound to a profile + identified by an auto-generated code (e.g., `E2E-0001`). Lives in `controlled_documents` table.
 
