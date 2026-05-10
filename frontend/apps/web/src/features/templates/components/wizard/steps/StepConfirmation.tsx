@@ -6,8 +6,6 @@ import styles from './StepConfirmation.module.css';
 
 export type StepConfirmationProps = {
   name: string;
-  description: string;
-  scopeType: 'generic' | 'profile' | null;
   selectedProfile: { code: string; name: string; family: string } | null;
   profileCode: string | null;
   startingPoint: 'docx' | 'blank' | null;
@@ -24,8 +22,6 @@ const HIGHLIGHTED_THUMB_LINES = new Set([1, 4, 7, 10]);
 
 export function StepConfirmation({
   name,
-  description,
-  scopeType,
   selectedProfile,
   profileCode,
   startingPoint,
@@ -36,9 +32,6 @@ export function StepConfirmation({
   onBack,
   onSubmit,
 }: StepConfirmationProps): JSX.Element {
-  void description;
-  void scopeType;
-
   const [confirmed, setConfirmed] = useState(false);
   const user = useAuthStore((s) => s.user);
 
