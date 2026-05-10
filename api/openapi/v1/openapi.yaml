@@ -5372,3 +5372,23 @@ components:
         revisionVersion: { type: integer, minimum: 1 }
         publishedDocumentId: { type: string, format: uuid }
         approvalInstanceId: { type: string, format: uuid }
+    FieldError:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string, description: 'JSON pointer or dot path' }
+        code: { type: string }
+        message: { type: string }
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, description: 'Machine-readable code from canonical taxonomy' }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
