@@ -39,7 +39,7 @@ export function TemplateWizardPage(): JSX.Element {
     undefined,
     () => {
       // Initial state has no scope chosen. Clamp deep-links beyond Step 1
-      // to Step 1 â€” avoids a one-frame paint of placeholder content before
+      // to Step 1 — avoids a one-frame paint of placeholder content before
       // the defensive effect runs.
       const parsed = parseStepParam(searchParams.get('step'));
       const safeStep = initialTemplateWizardState.scopeType === null ? 1 : parsed;
@@ -52,7 +52,7 @@ export function TemplateWizardPage(): JSX.Element {
   const maxReachableStep = selectMaxReachableStep(state);
   const advanceDisabled = maxReachableStep <= state.step;
 
-  // Sync state.step â†’ URL ?step=N
+  // Sync state.step → URL ?step=N
   useEffect(() => {
     setSearchParams(
       (prev) => {

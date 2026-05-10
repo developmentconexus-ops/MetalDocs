@@ -32,6 +32,11 @@ export function useRovingRadioGroup({
 }: RovingRadioGroupConfig): RovingRadioGroupResult {
   const refs = useRef<Array<HTMLElement | null>>([]);
 
+  // Trim stale refs when item count shrinks; safe — refs are not state.
+  if (refs.current.length > count) {
+    refs.current.length = count;
+  }
+
   const onKeyDown = useCallback<KeyboardEventHandler<HTMLElement>>(
     (event) => {
       if (count <= 0) return;
