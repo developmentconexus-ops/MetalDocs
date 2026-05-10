@@ -6,9 +6,13 @@
 
 ## Severity scale
 
-- **Critical** — correctness / security / compliance break
-- **Major** — measurable impact or blocks another module
-- **Minor** — code-smell, missing tests, undocumented public symbol
+Rubric (concrete triggers) lives in `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Summary:
+
+- **Critical** — authn/authz bypass · regulated audit-trail gap · multi-tenant data leak · data-loss path · contract violation downstream depends on · schema/version drift the boot check is supposed to catch but does not.
+- **Major** — defense-in-depth single-point gap · governance/observability sink nil on regulated path · duplicated write surfaces with different semantics · documented contract not yet followed by this module · cross-module dep that blocks another module's clean refactor.
+- **Minor** — symbol collision · missing doc comments · latent (no current consumer) · non-circular bidirectional dep · missing standalone ADR for already-enforced rule.
+
+When triggers overlap: pick the highest matching tier and justify in the row's `Observation`.
 
 ## Items
 
@@ -45,9 +49,10 @@
 - **Linked ADR:** [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) (documents tiers but does not address IAM-table coverage)
 
 ### T-005 · Admin role upsert does not emit audit events
-- **Severity:** major
+- **Severity:** critical
+- **Severity rationale:** triggers Critical rubric — "regulated audit-trail gap: a mutation on an ISO 9001 / QMS / regulated path is not written to the audit sink." Role assignment is the privileged op an external auditor inspects first; absence from the trail is a compliance break, not a service degradation.
 - **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:316` (`handleUserRoleUpsert`) and `:457` (`recordAudit`)
-- **Observation:** `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not call `recordAudit` between request validation and response (artifact 02-flow-upsert-user-role §6). The audit sink is wired (`auditdomain.Writer` passed into `NewAdminHandler` at `main.go:182`; sink impl at `internal/modules/audit/infrastructure/postgres/writer.go:20`). Other admin ops do call `recordAudit`; this one does not. Compliance impact: role changes are not in the audit trail for the regulated QMS use case.
+- **Observation:** `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not call `recordAudit` between request validation and response (artifact 02-flow-upsert-user-role §6). The audit sink is wired (`auditdomain.Writer` passed into `NewAdminHandler` at `main.go:182`; sink impl at `internal/modules/audit/infrastructure/postgres/writer.go:20`). Other admin ops do call `recordAudit`; this one does not.
 - **Evidence:** `_artifacts/02-flow-upsert-user-role.md` §6; `_artifacts/03-deps.md` §1 (audit OUT edge).
 - **Linked backlog row:** `backlog/iam-refactor.md#R-005`
 - **Linked ADR:** missing-ADR (audit-emission policy not formalised)
@@ -112,8 +117,8 @@
 
 ## Coverage stats (computed at compose time)
 
-- Public symbols undocumented: 129 / 129 most lack Go doc comments (only `CapabilityService.CanDo`, `CachedRoleProvider`, `InvalidateUser`, `RoleProvider`, `RoleAdminRepository`, `MustActorID`, `MustTenantID`, `ErrActorContextMissing`, `ErrTenantContextMissing`, `ReplaceUserRoles` (pg) carry doc comments per `_artifacts/01-surface.md`). Counted as 1 collective minor (no separate TD row; addressed by R-013 in backlog).
+- Public symbols undocumented: 119 / 129 (10 carry doc comments per `_artifacts/01-surface.md`: `CapabilityService.CanDo`, `CachedRoleProvider`, `InvalidateUser`, `RoleProvider`, `RoleAdminRepository`, `MustActorID`, `MustTenantID`, `ErrActorContextMissing`, `ErrTenantContextMissing`, `ReplaceUserRoles` pg). Collective gap addressed by R-013 in backlog.
 - Operations missing C4 placement: 0 / 11 (all 11 in §5.3 + Container diagram)
 - Cross-deps missing in §5/§8: 0 / 22 (5 OUT + 17 IN named in §8.4 / §3.2)
 - State transitions missing in §6: 0 / 2 (grant_membership + upsert_user_role both traced)
-- Decisions without ADR link: 8 — T-001, T-002, T-003, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012 each marked missing-ADR
+- Decisions without ADR link: 12 occurrences across 11 distinct rows — T-001, T-002, T-003, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012 each marked `missing-ADR` (T-004 references ADR 0007 with explicit "does not address IAM-table coverage" note, also counted as a partial-link case).
