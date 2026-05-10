@@ -1,6 +1,7 @@
 export type TemplateWizardStep = 1 | 2 | 3 | 4 | 5;
 export type ScopeType = 'generic' | 'profile';
 export type StartingPoint = 'docx' | 'blank';
+export type PermissionsMode = 'roles' | 'areas' | 'all';
 
 export type TemplateWizardState = {
   step: TemplateWizardStep;
@@ -17,6 +18,10 @@ export type TemplateWizardState = {
    *  (backlog: step3-docx-upload, step3-editor-handoff). */
   selectedDocxName: string | null;
   selectedDocxSize: number | null;
+  /** Step 4 — Permissões */
+  permissionsMode: PermissionsMode;
+  selectedRoleIds: string[];
+  selectedAreaIds: string[];
 };
 
 export const initialTemplateWizardState: TemplateWizardState = {
@@ -28,6 +33,9 @@ export const initialTemplateWizardState: TemplateWizardState = {
   startingPoint: null,
   selectedDocxName: null,
   selectedDocxSize: null,
+  permissionsMode: 'roles',
+  selectedRoleIds: [],
+  selectedAreaIds: [],
 };
 
 export type TemplateWizardAction =
@@ -38,6 +46,9 @@ export type TemplateWizardAction =
   | { type: 'SET_STARTING_POINT'; value: StartingPoint }
   | { type: 'SET_SELECTED_DOCX'; name: string; size: number }
   | { type: 'CLEAR_SELECTED_DOCX' }
+  | { type: 'SET_PERMISSIONS_MODE'; mode: PermissionsMode }
+  | { type: 'TOGGLE_ROLE_ID'; id: string }
+  | { type: 'TOGGLE_AREA_ID'; id: string }
   | { type: 'GO_TO_STEP'; step: TemplateWizardStep };
 
 export function templateWizardReducer(
@@ -70,6 +81,22 @@ export function templateWizardReducer(
       return { ...state, selectedDocxName: action.name, selectedDocxSize: action.size };
     case 'CLEAR_SELECTED_DOCX':
       return { ...state, selectedDocxName: null, selectedDocxSize: null };
+    case 'SET_PERMISSIONS_MODE':
+      return { ...state, permissionsMode: action.mode };
+    case 'TOGGLE_ROLE_ID':
+      return {
+        ...state,
+        selectedRoleIds: state.selectedRoleIds.includes(action.id)
+          ? state.selectedRoleIds.filter((id) => id !== action.id)
+          : [...state.selectedRoleIds, action.id],
+      };
+    case 'TOGGLE_AREA_ID':
+      return {
+        ...state,
+        selectedAreaIds: state.selectedAreaIds.includes(action.id)
+          ? state.selectedAreaIds.filter((id) => id !== action.id)
+          : [...state.selectedAreaIds, action.id],
+      };
     case 'GO_TO_STEP':
       return { ...state, step: action.step };
     default:

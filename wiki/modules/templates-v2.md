@@ -1,7 +1,7 @@
 # Module: templates-v2
 
 > **Last verified:** 2026-05-09
-> **Status:** Partial. List screen complete (Phase 5). Creation wizard Steps 1–3 complete (Step 3 mocked DOCX flow). Steps 4–5 stub. Author/versioning pages TBD.
+> **Status:** Partial. List screen complete (Phase 5). Creation wizard Steps 1–4 complete (Step 3 mocked DOCX flow, Step 4 mocked roles/areas/counts). Step 5 stub. Author/versioning pages TBD.
 > **Scope:** Template authoring, versioning, approval, publishing; Templates List screen (`/templates-v2`); Template creation wizard (`/templates-v2/new`).
 > **Out of scope:** Document fill-in (see `modules/documents.md`), eigenpal editor wiring (see `modules/editor-ui-eigenpal.md`), toolbar overlay + eigenpal CSS overrides (see `modules/editor-chrome.md`).
 > **Key files:**
@@ -12,8 +12,8 @@
 > - `frontend/apps/web/src/features/templates/components/MiniDocPreview.tsx:1` — decorative A4 thumbnail (8 placeholder lines)
 > - `frontend/apps/web/src/components/ui/WorkspaceHeroHeader.tsx:13` — `tone?: "banner" | "flat"` prop; `.headerFlat` strips card chrome (transparent bg, no border-bottom, padding 0)
 > - `frontend/apps/web/src/components/ui/TabBar.tsx:17` — roving tabIndex (`tabIndex={isActive ? 0 : -1}`), Arrow/Home/End keyboard nav per WAI-ARIA tablist spec
-> - `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1` — creation wizard; `useReducer(templateWizardReducer)` + URL sync `?step=N`; `selectedProfile` derived via `useMemo` from profiles query; defensive guard sends `?step=2` without scope back to step 1; Step 3 branch wired with advance gate (`step3Disabled`); back/forward preserves all state; `export { TemplateWizardPage as Component }` for React Router lazy
-> - `frontend/apps/web/src/features/templates/state/templateWizard.reducer.ts:1` — wizard reducer; `TemplateWizardStep = 1|2|3|4|5`; `ScopeType = 'generic' | 'profile'`; `StartingPoint = 'docx' | 'blank'`; state fields: `step`, `scopeType`, `profileCode`, `name`, `description`, `startingPoint`, `selectedDocxName`, `selectedDocxSize`; actions: `GO_TO_STEP | SET_SCOPE_TYPE | SET_PROFILE | SET_NAME | SET_DESCRIPTION | SET_STARTING_POINT | SET_SELECTED_DOCX | CLEAR_SELECTED_DOCX`
+> - `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1` — creation wizard; `useReducer(templateWizardReducer)` + URL sync `?step=N`; `selectedProfile` derived via `useMemo` from profiles query; defensive guard sends `?step=2` without scope back to step 1; Step 3 branch wired with advance gate (`step3Disabled`); Step 4 branch wired with `step4Disabled` (`permissionsMode==='roles' && selectedRoleIds.length===0`); back/forward preserves all state; `export { TemplateWizardPage as Component }` for React Router lazy
+> - `frontend/apps/web/src/features/templates/state/templateWizard.reducer.ts:1` — wizard reducer; `TemplateWizardStep = 1|2|3|4|5`; `ScopeType = 'generic' | 'profile'`; `StartingPoint = 'docx' | 'blank'`; `PermissionsMode = 'roles' | 'areas' | 'all'`; state fields: `step`, `scopeType`, `profileCode`, `name`, `description`, `startingPoint`, `selectedDocxName`, `selectedDocxSize`, `permissionsMode`, `selectedRoleIds`, `selectedAreaIds`; actions: `GO_TO_STEP | SET_SCOPE_TYPE | SET_PROFILE | SET_NAME | SET_DESCRIPTION | SET_STARTING_POINT | SET_SELECTED_DOCX | CLEAR_SELECTED_DOCX | SET_PERMISSIONS_MODE | TOGGLE_ROLE_ID | TOGGLE_AREA_ID`
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepScope.tsx:1` — Step 1: profile picker; `DISABLED_PROFILES = new Set(['CHK'])` with TODO for API flag
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.tsx:1` — Step 2: name + description fields; mocked code preview; scope recap row with "Trocar" back to Step 1
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.module.css:1` — Step 2 CSS; `.descriptionInput` overrides global `.input { height: 32px }` with `height: auto; min-height: 72px` (see `concepts/css-leakage-offenders.md`)
@@ -28,7 +28,10 @@
 > - `frontend/apps/web/design-source/templates/artifacts/` — phase 0–5 implementation artifacts (list screen)
 > - `frontend/apps/web/design-source/novo-template-escopo/artifacts/` — phase 0–5 implementation artifacts (creation wizard Step 1)
 > - `frontend/apps/web/design-source/novo-template-identidade/artifacts/` — phase 0–5 implementation artifacts (creation wizard Step 2)
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.tsx:1` — Step 4: three-mode segmented control (`roles` | `areas` | `all`); ARIA radiogroup with roving tabindex; role/area card grids (`role="checkbox"` + `aria-checked`); coverage summary row (mocked counts); advance gated on `roles` mode requiring ≥1 selection
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.module.css:1` — Step 4 CSS; `.modeSegmented`, `.modeTab`, `.modeTabActive`, `.roleGrid`, `.areaGrid`, `.roleCard`, `.areaCard`, `.cardSelected`, `.coverageSummary`
 > - `frontend/apps/web/design-source/novo-template-estrutura/` — design source dir for creation wizard Step 3 (Estrutura)
+> - `frontend/apps/web/design-source/novo-template-permissoes/` — design source dir for creation wizard Step 4 (Permissões)
 
 ## Template Creation Wizard
 
@@ -83,9 +86,28 @@ Profile cards from `useProfilesQuery` (taxonomy). CHK hardcoded as disabled unti
 
 **Deferred backlog items:** `step3-docx-upload` (presigned upload post-create), `step3-placeholder-extract` (token extraction endpoint), `step3-editor-handoff` (redirect after Step 5 create). See `wiki/backlog/novo-template-wizard.md`.
 
-### Steps 4–5
+### Step 4 — Permissões (visibility scope)
 
-Stubs — not yet implemented. See `wiki/backlog/novo-template-wizard.md`.
+**Shipped 2026-05-09.** Component: `StepPermissions.tsx`.
+
+**Three modes (segmented control, ARIA radiogroup):**
+- `roles` — show role cards (QUA-INSP, PROD-OP, etc.); at least one must be selected to advance. Mocked via `MOCK_ROLES` — see `wiki/backlog/novo-template-wizard.md#permissions-roles-api`.
+- `areas` — show area cards (QUA, PROD, MAN…); empty selection is valid per design. Mocked user counts — see `wiki/backlog/novo-template-wizard.md#permissions-area-counts`.
+- `all` — company-wide; no selection required. Mocked total count (`COMPANY_USER_COUNT = 340`) — see `wiki/backlog/novo-template-wizard.md#permissions-user-count`.
+
+**Advance gate:** `step4Disabled = permissionsMode === 'roles' && selectedRoleIds.length === 0`. Footer label is `'Selecione ao menos um perfil'` when blocked.
+
+**Coverage summary:** Derived client-side from mocked counts. Roles mode: sum of `count` for each selected role. Areas mode: sum of `count` for each selected area. All mode: `COMPANY_USER_COUNT`.
+
+**Keyboard nav:** mode segmented control uses roving tabindex (ArrowLeft/ArrowRight) matching WAI-ARIA APG radiogroup pattern. Same approach as `TabBar` used on the list screen.
+
+**State preservation:** back to Step 3 preserves `permissionsMode` + `selectedRoleIds` + `selectedAreaIds`.
+
+**Phase 0 cuts:** no area-admin preselection, no "inherited from profile" badge, no user-search within roles. All deferred — no backend support.
+
+### Step 5 — Confirmação
+
+Stub — not yet implemented. Placeholder card rendered; will submit `POST /api/v2/templates` with full wizard state. See `wiki/backlog/novo-template-wizard.md`.
 
 ---
 
