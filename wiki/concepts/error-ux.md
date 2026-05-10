@@ -1,6 +1,8 @@
 # Error UX — Shared HTTP Client & Auth Bus
 
-> **Last verified:** 2026-05-07
+> **Migration note.** The legacy `ApiErrorEnvelope` shape documented below (`{ error: { code, message } }`) will be replaced by RFC 9457 Problem in Plan 2. See [`architecture/api-design-system.md`](../architecture/api-design-system.md) for the incoming contract.
+
+> **Last verified:** 2026-05-10
 > **Branch:** `phase-e-error-ux` (merged into main)
 > **Bugs fixed:** E2, E3, E4
 
@@ -97,6 +99,8 @@ const message = resolveQueryError(err, fallback);
 ```
 
 Re-exported from `lib/api/index.ts`. Used in `NewDocumentWizardPage` (`onError`) and `StepAreaCodeVisibility` (inline areas error). See `modules/novo-documento-wizard.md` for the wizard usage.
+
+Additional callsite: `TemplateEditorPage` (`frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx`) uses a local `resolveError(err, fallback)` helper that funnels `ApiError → resolveErrorMessage(code, message)` for both `submitForReview` and `importDocx` errors. `submitForReview` specifically routes through `apiFetch` (wired at `frontend/apps/web/src/features/templates/api/templatesV2.ts:240`) which throws `ApiError` on non-ok responses. Error codes relevant to review submission (e.g. `authz.capability_denied`, future `template.review_gap`) would resolve via the shared `errorMessages` map. See `wiki/backlog/template-editor.md#submitForReview-error-codes` for deferred error-code coverage.
 
 ---
 
