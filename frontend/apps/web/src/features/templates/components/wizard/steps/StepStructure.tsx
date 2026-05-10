@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react';
+import { useRovingRadioGroup } from '../../../../../components/ui/useRovingRadioGroup';
 import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
 import type { StartingPoint } from '../../../state/templateWizard.reducer';
 import styles from './StepStructure.module.css';
@@ -34,6 +35,14 @@ export function StepStructure({
 }: StepStructureProps): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileInputId = useId();
+  const startIndex = startingPoint === 'docx' ? 0 : startingPoint === 'blank' ? 1 : -1;
+  const startGroup = useRovingRadioGroup({
+    count: 2,
+    selectedIndex: startIndex,
+    onSelect: (newIndex) => onSelectStartingPoint(newIndex === 0 ? 'docx' : 'blank'),
+    orientation: 'horizontal',
+    ariaLabel: 'Ponto de partida do template',
+  });
 
   // TODO(novo-template-wizard:step3-docx-upload): replace with real presigned upload
   // when wizard ordering allows mid-flow create. Backlog: wiki/backlog/novo-template-wizard.md.
@@ -64,12 +73,9 @@ export function StepStructure({
       </p>
 
       {/* Two starting points — radiogroup (mutex selection) */}
-      <div
-        className={styles.startingPointGrid}
-        role="radiogroup"
-        aria-label="Ponto de partida do template"
-      >
+      <div className={styles.startingPointGrid} {...startGroup.groupProps}>
         <button
+          {...startGroup.getItemProps(0)}
           type="button"
           role="radio"
           aria-checked={startingPoint === 'docx'}
@@ -95,6 +101,7 @@ export function StepStructure({
         </button>
 
         <button
+          {...startGroup.getItemProps(1)}
           type="button"
           role="radio"
           aria-checked={startingPoint === 'blank'}

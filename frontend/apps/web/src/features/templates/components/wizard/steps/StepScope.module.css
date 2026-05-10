@@ -37,6 +37,10 @@
   margin-bottom: var(--sp-2);
 }
 
+.profileSectionKicker {
+  margin-bottom: var(--sp-2);
+}
+
 /* 2-column grid for profile cards. */
 .profileGrid {
   display: grid;

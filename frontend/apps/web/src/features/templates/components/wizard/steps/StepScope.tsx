@@ -1,4 +1,5 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
+import { useRovingRadioGroup } from '../../../../../components/ui/useRovingRadioGroup';
 import { Icon } from '../../../../../components/ui/Icon';
 import { resolveQueryError } from '../../../../../lib/api';
 import type { DocumentProfile } from '../../../../taxonomy/types';
@@ -39,6 +40,26 @@ export function StepScope({
   advanceDisabled,
   onRetry,
 }: StepScopeProps): JSX.Element {
+  const scopeIndex = scopeType === 'generic' ? 0 : scopeType === 'profile' ? 1 : -1;
+  const scopeGroup = useRovingRadioGroup({
+    count: 2,
+    selectedIndex: scopeIndex,
+    onSelect: (newIndex) => onSelectScopeType(newIndex === 0 ? 'generic' : 'profile'),
+    orientation: 'horizontal',
+    ariaLabel: 'Tipo de escopo do template',
+  });
+  const profileIndex = profiles.findIndex((profile) => profile.code === selectedCode);
+  const profileGroup = useRovingRadioGroup({
+    count: profiles.length,
+    selectedIndex: profileIndex,
+    onSelect: (newIndex) => {
+      const profile = profiles[newIndex];
+      if (profile) onSelect(profile.code);
+    },
+    orientation: 'both',
+    ariaLabel: 'Perfil do template',
+  });
+
   return (
     <div className="card">
       <div className="kicker">Etapa 1 de 5</div>
@@ -48,8 +69,9 @@ export function StepScope({
       </p>
 
       {/* Scope type choice */}
-      <div className={styles.scopeGrid}>
+      <div className={styles.scopeGrid} {...scopeGroup.groupProps}>
         <SelectableCard
+          {...scopeGroup.getItemProps(0)}
           selected={scopeType === 'generic'}
           onSelect={() => onSelectScopeType('generic')}
           className={styles.scopeCard}
@@ -62,6 +84,7 @@ export function StepScope({
         </SelectableCard>
 
         <SelectableCard
+          {...scopeGroup.getItemProps(1)}
           selected={scopeType === 'profile'}
           onSelect={() => onSelectScopeType('profile')}
           className={styles.scopeCard}
@@ -77,7 +100,7 @@ export function StepScope({
       {/* Profile grid — only when profile scope selected */}
       {scopeType === 'profile' && (
         <div className={styles.profileSection}>
-          <div className="kicker" style={{ marginBottom: 8 }}>Selecione o perfil</div>
+          <div className={`kicker ${styles.profileSectionKicker}`}>Selecione o perfil</div>
 
           {isLoading ? (
             <div className={styles.profileGrid} aria-busy="true">
@@ -102,13 +125,14 @@ export function StepScope({
               </a>
             </div>
           ) : (
-            <div className={styles.profileGrid}>
-              {profiles.map((profile) => {
+            <div className={styles.profileGrid} {...profileGroup.groupProps}>
+              {profiles.map((profile, idx) => {
                 const isDisabled = DISABLED_PROFILES.has(profile.code);
                 const selected = selectedCode === profile.code;
                 return (
                   <SelectableCard
                     key={profile.code}
+                    {...profileGroup.getItemProps(idx)}
                     selected={selected}
                     disabled={isDisabled}
                     title={isDisabled ? 'Em breve' : undefined}
