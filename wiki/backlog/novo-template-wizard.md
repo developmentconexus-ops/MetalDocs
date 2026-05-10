@@ -106,6 +106,15 @@
 
 ---
 
+### confirmacao-backend-submit
+**Context:** Step 5 (Confirmação) "Criar e abrir editor →" CTA is mocked — calls `navigate('/templates-v2')` without hitting the API.
+**Blocked by:** `POST /api/v2/templates` requires a `key` field (see `key-generation` backlog item above). Permissions (roles/areas from Step 4) and structure (docx from Step 3) also have no API endpoints yet.
+**File:** `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (`handleSubmit`)
+**TODO tag:** `TODO(novo-template-wizard:confirmacao-backend-submit)` (also in `StepConfirmation.tsx`)
+**Resolution:** After `key-generation` UX is decided, replace `handleSubmit` with a `useMutation` call to `POST /api/v2/templates { key, name, description }`. On success, redirect to editor (see `step3-editor-handoff`). Wire permissions + structure upload in same handoff flow.
+
+---
+
 ## Steps not yet implemented
 
 | Step | Name | Status |
@@ -113,4 +122,4 @@
 | 2 | Identidade | **Done** (2026-05-09) |
 | 3 | Estrutura | **Done** (2026-05-09) — mocked DOCX flow; real upload + placeholder extract deferred (see backlog items above) |
 | 4 | Permissões | **Done** (2026-05-09) — mocked roles/areas/counts; real API deferred (see backlog items above) |
-| 5 | Confirmação | Stub — submits to `POST /api/v2/templates` |
+| 5 | Confirmação | **Done** (2026-05-10) — visual only; submit mocked → navigate('/templates-v2'). Backlog: `confirmacao-backend-submit` |

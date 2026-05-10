@@ -1,0 +1,15 @@
+- Files written:
+  - `src/features/templates/components/wizard/steps/StepConfirmation.tsx`
+  - `src/features/templates/components/wizard/steps/StepConfirmation.module.css`
+  - `src/features/templates/pages/TemplateWizardPage.tsx`
+  - `design-source/novo-template-confirmacao/artifacts/phase3-combined.md`
+  - `design-source/novo-template-confirmacao/artifacts/parity-diff.md`
+  - `design-source/novo-template-confirmacao/artifacts/leakage-probe.md`
+- Design-exact values preserved: stepTitle 20px; preview card 120px columns, 18px gap/padding; thumb 120x152, 2px radius; thumb header 4px/70%/6px; thumb code 7px/4px; thumb lines 1.5px/3px; header row 8px; template name 16px/14px; meta grid 8px/12px; confirm block 14px/22px; confirm list 18px/12.5px; checkbox margin 2px.
+- State wiring summary: Step 5 reads identity, scope/profile, starting point, docx name, permissions mode, selected ids, and selectedProfile from `TemplateWizardPage`; mocked submit navigates to `/templates-v2`.
+- Leakage probe result: `.input { width: 100%; }` exists globally; no broad `label { display: block; }` rule found. Module overrides `.checkLabel input { width: auto; }`.
+- Smoke trace:
+  - Step 4 advance dispatches `GO_TO_STEP` 5.
+  - Step 5 renders preview metadata from reducer state.
+  - Primary button is disabled until confirmation checkbox is checked.
+  - Confirmed primary invokes mocked submit and navigates to `/templates-v2`.

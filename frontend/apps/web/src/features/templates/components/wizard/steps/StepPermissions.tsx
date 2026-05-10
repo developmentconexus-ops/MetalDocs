@@ -33,9 +33,9 @@ const MOCK_AREAS = [
 const COMPANY_USER_COUNT = 340;
 
 const MODE_TABS = [
-  { id: 'roles' as const, label: 'Por funções', desc: 'Perfis específicos' },
-  { id: 'areas' as const, label: 'Por área', desc: 'Departamentos' },
   { id: 'all' as const, label: 'Todos', desc: 'Empresa inteira' },
+  { id: 'areas' as const, label: 'Por área', desc: 'Departamentos' },
+  { id: 'roles' as const, label: 'Por funções', desc: 'Perfis específicos' },
 ];
 
 // ─── Props ────────────────────────────────────────────────────────────────────

@@ -33,7 +33,7 @@ export const initialTemplateWizardState: TemplateWizardState = {
   startingPoint: null,
   selectedDocxName: null,
   selectedDocxSize: null,
-  permissionsMode: 'roles',
+  permissionsMode: 'all',
   selectedRoleIds: [],
   selectedAreaIds: [],
 };

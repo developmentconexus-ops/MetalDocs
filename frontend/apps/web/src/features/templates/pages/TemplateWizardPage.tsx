@@ -14,6 +14,7 @@ import { StepScope } from '../components/wizard/steps/StepScope';
 import { StepIdentity } from '../components/wizard/steps/StepIdentity';
 import { StepStructure } from '../components/wizard/steps/StepStructure';
 import { StepPermissions } from '../components/wizard/steps/StepPermissions';
+import { StepConfirmation } from '../components/wizard/steps/StepConfirmation';
 
 const TPL_STEPS: StepperStep[] = [
   { id: '1', label: 'Perfil' },
@@ -108,6 +109,14 @@ export function TemplateWizardPage(): JSX.Element {
 
   function handleBackToStep3() {
     dispatch({ type: 'GO_TO_STEP', step: 3 });
+  }
+
+  function handleBackToStep4() {
+    dispatch({ type: 'GO_TO_STEP', step: 4 });
+  }
+
+  function handleSubmit() {
+    navigate('/templates-v2');
   }
 
   function handleCancel() {
@@ -220,11 +229,29 @@ export function TemplateWizardPage(): JSX.Element {
           advanceDisabled={step4Disabled}
         />
       )}
-      {state.step === 5 && (
-        <div className="card">
-          <div className="kicker">Etapa 5 de 5</div>
-          <p className="caption">Em construção — Confirmação a implementar.</p>
-        </div>
+      {state.step === 5 && state.scopeType !== null && (
+        <StepConfirmation
+          name={state.name}
+          description={state.description}
+          scopeType={state.scopeType}
+          selectedProfile={
+            selectedProfile
+              ? {
+                  code: selectedProfile.code,
+                  name: selectedProfile.name,
+                  family: selectedProfile.familyCode,
+                }
+              : null
+          }
+          profileCode={state.profileCode}
+          startingPoint={state.startingPoint}
+          selectedDocxName={state.selectedDocxName}
+          permissionsMode={state.permissionsMode}
+          selectedRoleIds={state.selectedRoleIds}
+          selectedAreaIds={state.selectedAreaIds}
+          onBack={handleBackToStep4}
+          onSubmit={handleSubmit}
+        />
       )}
     </WizardShell>
   );
