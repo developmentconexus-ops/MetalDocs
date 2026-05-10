@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useMemo, useReducer } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import {
@@ -10,6 +10,8 @@ import {
 import { WizardShell } from '../../shared/components/wizard/WizardShell';
 import type { StepperStep } from '../../../components/ui/Stepper';
 import { StepScope } from '../components/wizard/steps/StepScope';
+import { StepIdentity } from '../components/wizard/steps/StepIdentity';
+import { StepStructure } from '../components/wizard/steps/StepStructure';
 
 const TPL_STEPS: StepperStep[] = [
   { id: '1', label: 'Perfil' },
@@ -18,6 +20,8 @@ const TPL_STEPS: StepperStep[] = [
   { id: '4', label: 'Permissões' },
   { id: '5', label: 'Confirmação' },
 ];
+
+const NAME_MIN = 3;
 
 function parseStepParam(raw: string | null): TemplateWizardStep {
   const n = Number(raw);
@@ -31,10 +35,14 @@ export function TemplateWizardPage(): JSX.Element {
   const [state, dispatch] = useReducer(
     templateWizardReducer,
     undefined,
-    () => ({
-      ...initialTemplateWizardState,
-      step: parseStepParam(searchParams.get('step')),
-    }),
+    () => {
+      // Initial state has no scope chosen. Clamp deep-links beyond Step 1
+      // to Step 1 — avoids a one-frame paint of placeholder content before
+      // the defensive effect runs.
+      const parsed = parseStepParam(searchParams.get('step'));
+      const safeStep = initialTemplateWizardState.scopeType === null ? 1 : parsed;
+      return { ...initialTemplateWizardState, step: safeStep };
+    },
   );
 
   // Sync state.step → URL ?step=N
@@ -50,7 +58,19 @@ export function TemplateWizardPage(): JSX.Element {
     );
   }, [state.step, setSearchParams]);
 
+  // Defensive: if URL says ?step=2 but no scope chosen yet, send back to Step 1.
+  useEffect(() => {
+    if (state.step !== 1 && state.scopeType === null) {
+      dispatch({ type: 'GO_TO_STEP', step: 1 });
+    }
+  }, [state.step, state.scopeType]);
+
   const profilesQuery = useProfilesQuery();
+
+  const selectedProfile = useMemo(() => {
+    if (state.scopeType !== 'profile' || !state.profileCode) return null;
+    return profilesQuery.data?.find((p) => p.code === state.profileCode) ?? null;
+  }, [state.scopeType, state.profileCode, profilesQuery.data]);
 
   function handleSelectScopeType(scopeType: ScopeType) {
     dispatch({ type: 'SET_SCOPE_TYPE', scopeType });
@@ -60,7 +80,23 @@ export function TemplateWizardPage(): JSX.Element {
     dispatch({ type: 'SET_PROFILE', code });
   }
 
-  function handleAdvance() {
+  function handleAdvanceFromStep1() {
+    dispatch({ type: 'GO_TO_STEP', step: 2 });
+  }
+
+  function handleAdvanceFromStep2() {
+    dispatch({ type: 'GO_TO_STEP', step: 3 });
+  }
+
+  function handleAdvanceFromStep3() {
+    dispatch({ type: 'GO_TO_STEP', step: 4 });
+  }
+
+  function handleBackToStep1() {
+    dispatch({ type: 'GO_TO_STEP', step: 1 });
+  }
+
+  function handleBackToStep2() {
     dispatch({ type: 'GO_TO_STEP', step: 2 });
   }
 
@@ -79,6 +115,16 @@ export function TemplateWizardPage(): JSX.Element {
   const step1Disabled =
     state.scopeType === null ||
     (state.scopeType === 'profile' && state.profileCode === null);
+
+  // Step 2 advance requires non-empty trimmed name (≥3 chars).
+  const step2Disabled = state.name.trim().length < NAME_MIN;
+
+  // Step 3 advance requires:
+  //   - starting point chosen AND
+  //   - if 'docx': a file selected (mocked).
+  const step3Disabled =
+    state.startingPoint === null ||
+    (state.startingPoint === 'docx' && state.selectedDocxName === null);
 
   return (
     <WizardShell
@@ -104,13 +150,46 @@ export function TemplateWizardPage(): JSX.Element {
           error={profilesQuery.error}
           selectedCode={state.profileCode}
           onSelect={handleSelectProfile}
-          onAdvance={handleAdvance}
+          onAdvance={handleAdvanceFromStep1}
           onCancel={handleCancel}
           advanceDisabled={step1Disabled}
           onRetry={() => void profilesQuery.refetch()}
         />
       )}
-      {state.step !== 1 && (
+      {state.step === 2 && state.scopeType !== null && (
+        <StepIdentity
+          scopeType={state.scopeType}
+          selectedProfile={selectedProfile}
+          name={state.name}
+          description={state.description}
+          onChangeName={(value) => dispatch({ type: 'SET_NAME', value })}
+          onChangeDescription={(value) =>
+            dispatch({ type: 'SET_DESCRIPTION', value })
+          }
+          onAdvance={handleAdvanceFromStep2}
+          onBack={handleBackToStep1}
+          onChangeScope={handleBackToStep1}
+          advanceDisabled={step2Disabled}
+        />
+      )}
+      {state.step === 3 && state.scopeType !== null && (
+        <StepStructure
+          startingPoint={state.startingPoint}
+          selectedDocxName={state.selectedDocxName}
+          selectedDocxSize={state.selectedDocxSize}
+          onSelectStartingPoint={(value) =>
+            dispatch({ type: 'SET_STARTING_POINT', value })
+          }
+          onSelectDocx={(name, size) =>
+            dispatch({ type: 'SET_SELECTED_DOCX', name, size })
+          }
+          onClearDocx={() => dispatch({ type: 'CLEAR_SELECTED_DOCX' })}
+          onAdvance={handleAdvanceFromStep3}
+          onBack={handleBackToStep2}
+          advanceDisabled={step3Disabled}
+        />
+      )}
+      {state.step >= 4 && (
         <div className="card">
           <div className="kicker">Etapa {state.step} de 5</div>
           <p className="caption">Em construção — próximas etapas a implementar.</p>

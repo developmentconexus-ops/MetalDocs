@@ -1,0 +1,452 @@
+.page {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg);
+}
+
+/* ─── Hero ─────────────────────────────────────────────────────── */
+
+.hero {
+  background: linear-gradient(135deg, var(--brand-deep) 0%, var(--brand) 65%, var(--brand-soft) 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
+  padding: var(--sp-8) 3rem var(--sp-9);
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.4) 1px, transparent 1px);
+  background-size: 32px 32px;
+  animation: bgPan 30s linear infinite;
+  pointer-events: none;
+}
+
+.heroDecorNum {
+  position: absolute;
+  right: -1.25rem;
+  top: -1.875rem;
+  font-size: 20rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.04);
+  line-height: 1;
+  font-family: var(--font-sans);
+  letter-spacing: -0.05em;
+  pointer-events: none;
+  user-select: none;
+}
+
+.heroContent {
+  position: relative;
+  max-width: 61.25rem;
+}
+
+.heroKicker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.heroKickerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.heroLiveTime {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.heroTitle {
+  font-size: 4rem;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+  color: white;
+  margin-bottom: var(--sp-5);
+  text-wrap: pretty;
+}
+
+.heroTitleName {
+  font-style: italic;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.heroSubtitle {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 400;
+  margin-top: var(--sp-3);
+  color: rgba(255, 255, 255, 0.75);
+  letter-spacing: -0.02em;
+}
+
+.heroSubtitleAccent {
+  color: var(--accent);
+  font-weight: 600;
+  position: relative;
+}
+
+.heroSubtitleAccentUnderline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+.heroStats {
+  display: flex;
+  gap: 1.75rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.statPill {
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  padding-left: var(--sp-4);
+}
+
+.statPillLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: var(--sp-1);
+}
+
+.statPillValue {
+  font-size: 1.375rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+.statPillSub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-mono);
+}
+
+/* ─── Body ──────────────────────────────────────────────────────── */
+
+.body {
+  padding: var(--sp-8) 3rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.75rem;
+}
+
+/* ─── Lead column (pending approvals) ──────────────────────────── */
+
+.leadColumn {
+  grid-column: span 2;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  padding-bottom: var(--sp-3);
+  border-bottom: 2px solid var(--text);
+}
+
+.sectionTitle {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text);
+}
+
+.sectionCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ─── Pending items ─────────────────────────────────────────────── */
+
+.pendingItem {
+  display: grid;
+  grid-template-columns: 3.75rem 1fr auto;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-1);
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.pendingItem:hover {
+  background: var(--surface-2);
+}
+
+.itemRank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding-top: var(--sp-1);
+}
+
+.itemRankNum {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.itemRankKind {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+.itemCode {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--brand);
+  margin-bottom: var(--sp-1);
+}
+
+.itemTitle {
+  font-size: 1.1875rem;
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+  font-weight: 600;
+  margin-bottom: var(--sp-1);
+  color: var(--text);
+  text-wrap: pretty;
+}
+
+.itemMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.itemMetaSep {
+  color: var(--text-faint);
+}
+
+.itemDeadline {
+  text-align: right;
+  padding-top: var(--sp-1);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.itemDeadlineLabel {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.itemDeadlineUrgent {
+  color: var(--accent);
+}
+
+.itemDeadlineNormal {
+  color: var(--text-soft);
+}
+
+.itemUrgentDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: var(--sp-1);
+  vertical-align: middle;
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+.reviewBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-1) var(--sp-3);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--text);
+  color: var(--surface);
+  border: none;
+  border-radius: var(--r-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reviewBtn:hover {
+  opacity: 0.85;
+}
+
+.reviewBtn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Empty / loading / error states */
+.stateBox {
+  padding: var(--sp-8) var(--sp-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.stateError {
+  color: var(--danger);
+}
+
+.emptyIcon {
+  font-size: 2rem;
+  margin-bottom: var(--sp-3);
+  display: block;
+}
+
+/* ─── Sidebar ───────────────────────────────────────────────────── */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.sideSection {
+  /* inherits sectionHeader */
+}
+
+/* Stats (§ SEU PULSO) */
+.statRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.statRowInfo {
+  flex: 1;
+}
+
+.statRowLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+
+.statRowValue {
+  font-size: 1.375rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+
+/* Activity (§ MURMÚRIOS) */
+.activityList {
+  position: relative;
+  padding-left: var(--sp-4);
+}
+
+.activityLine {
+  position: absolute;
+  left: var(--sp-1);
+  top: var(--sp-1);
+  bottom: var(--sp-1);
+  width: 1px;
+  background: var(--border);
+}
+
+.activityItem {
+  position: relative;
+  margin-bottom: var(--sp-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.activityDot {
+  position: absolute;
+  left: calc(var(--sp-4) * -1);
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--text);
+}
+
+.activityWho {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.activityCode {
+  font-family: var(--font-mono);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.activityTime {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.liveBadge {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.liveDot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+/* ─── Animations ────────────────────────────────────────────────── */
+
+@keyframes bgPan {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 40px; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}

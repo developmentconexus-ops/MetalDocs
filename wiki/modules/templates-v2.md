@@ -1,7 +1,7 @@
 # Module: templates-v2
 
 > **Last verified:** 2026-05-09
-> **Status:** Partial. List screen complete (Phase 5). Creation wizard Step 1 complete. Steps 2–5 stub. Author/versioning pages TBD.
+> **Status:** Partial. List screen complete (Phase 5). Creation wizard Steps 1–3 complete (Step 3 mocked DOCX flow). Steps 4–5 stub. Author/versioning pages TBD.
 > **Scope:** Template authoring, versioning, approval, publishing; Templates List screen (`/templates-v2`); Template creation wizard (`/templates-v2/new`).
 > **Out of scope:** Document fill-in (see `modules/documents.md`), eigenpal editor wiring (see `modules/editor-ui-eigenpal.md`), toolbar overlay + eigenpal CSS overrides (see `modules/editor-chrome.md`).
 > **Key files:**
@@ -12,9 +12,13 @@
 > - `frontend/apps/web/src/features/templates/components/MiniDocPreview.tsx:1` — decorative A4 thumbnail (8 placeholder lines)
 > - `frontend/apps/web/src/components/ui/WorkspaceHeroHeader.tsx:13` — `tone?: "banner" | "flat"` prop; `.headerFlat` strips card chrome (transparent bg, no border-bottom, padding 0)
 > - `frontend/apps/web/src/components/ui/TabBar.tsx:17` — roving tabIndex (`tabIndex={isActive ? 0 : -1}`), Arrow/Home/End keyboard nav per WAI-ARIA tablist spec
-> - `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1` — creation wizard; `useReducer(templateWizardReducer)` + URL sync `?step=N`; `export { TemplateWizardPage as Component }` for React Router lazy
-> - `frontend/apps/web/src/features/templates/state/templateWizard.reducer.ts:1` — wizard reducer; `TemplateWizardStep = 1|2|3|4|5`; actions: `GO_TO_STEP | SET_PROFILE`
+> - `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx:1` — creation wizard; `useReducer(templateWizardReducer)` + URL sync `?step=N`; `selectedProfile` derived via `useMemo` from profiles query; defensive guard sends `?step=2` without scope back to step 1; Step 3 branch wired with advance gate (`step3Disabled`); back/forward preserves all state; `export { TemplateWizardPage as Component }` for React Router lazy
+> - `frontend/apps/web/src/features/templates/state/templateWizard.reducer.ts:1` — wizard reducer; `TemplateWizardStep = 1|2|3|4|5`; `ScopeType = 'generic' | 'profile'`; `StartingPoint = 'docx' | 'blank'`; state fields: `step`, `scopeType`, `profileCode`, `name`, `description`, `startingPoint`, `selectedDocxName`, `selectedDocxSize`; actions: `GO_TO_STEP | SET_SCOPE_TYPE | SET_PROFILE | SET_NAME | SET_DESCRIPTION | SET_STARTING_POINT | SET_SELECTED_DOCX | CLEAR_SELECTED_DOCX`
 > - `frontend/apps/web/src/features/templates/components/wizard/steps/StepScope.tsx:1` — Step 1: profile picker; `DISABLED_PROFILES = new Set(['CHK'])` with TODO for API flag
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.tsx:1` — Step 2: name + description fields; mocked code preview; scope recap row with "Trocar" back to Step 1
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.module.css:1` — Step 2 CSS; `.descriptionInput` overrides global `.input { height: 32px }` with `height: auto; min-height: 72px` (see `concepts/css-leakage-offenders.md`)
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepStructure.tsx:1` — Step 3: two starting-point cards (`docx` | `blank`); hidden `<input type="file">` triggered by card click; mocked file selection (filename + bytes echo, no upload); `Substituir` clears + re-opens picker; switching to `blank` clears docx state; advance gated on `startingPoint !== null && (startingPoint !== 'docx' || selectedDocxName !== null)`
+> - `frontend/apps/web/src/features/templates/components/wizard/steps/StepStructure.module.css:1` — Step 3 CSS; `.startingPointGrid`, `.startingPointCard`, `.selected`, `.fileRow`, `.fileInput` (visually hidden), `formatBytes` helper inline
 > - `frontend/apps/web/src/features/taxonomy/queries/useProfilesQuery.ts:1` — shared profiles query (used by both documents and templates wizards)
 > - `frontend/apps/web/src/features/shared/components/wizard/WizardShell.tsx:1` — parameterized wizard chrome; `kicker/title/description/steps/currentStep/children`
 > - `frontend/apps/web/src/features/shared/components/wizard/WizardFooter.tsx:1` — shared footer; `stepLabel/primaryDisabled/showBack/onAdvance/onBack/onCancel`
@@ -22,7 +26,9 @@
 > - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — eigenpal author; consumes `EditorChrome` for toolbar overlay
 > - `frontend/apps/web/src/features/templates/VersionActionPanel.tsx` — lifecycle transitions
 > - `frontend/apps/web/design-source/templates/artifacts/` — phase 0–5 implementation artifacts (list screen)
-> - `frontend/apps/web/design-source/novo-template-escopo/artifacts/` — phase 0–5 implementation artifacts (creation wizard)
+> - `frontend/apps/web/design-source/novo-template-escopo/artifacts/` — phase 0–5 implementation artifacts (creation wizard Step 1)
+> - `frontend/apps/web/design-source/novo-template-identidade/artifacts/` — phase 0–5 implementation artifacts (creation wizard Step 2)
+> - `frontend/apps/web/design-source/novo-template-estrutura/` — design source dir for creation wizard Step 3 (Estrutura)
 
 ## Template Creation Wizard
 
@@ -39,7 +45,45 @@
 
 Profile cards from `useProfilesQuery` (taxonomy). CHK hardcoded as disabled until Checklist feature ships — see `wiki/backlog/novo-template-wizard.md#chk-disabled`.
 
-### Steps 2–5
+### Step 2 — Identidade (name + description)
+
+**Shipped 2026-05-09.** Component: `StepScope.tsx` → `StepIdentity.tsx`.
+
+**Inputs:**
+- `nome` (required, ≥ 3 chars trimmed) — max 120 chars, `aria-required`
+- `descrição` (optional) — `<textarea rows={3}`, max 500 chars
+
+**Advance guard:** `state.name.trim().length < 3` disables the primary button. Label changes to "Informe o nome para continuar" when blocked.
+
+**Scope recap row:** shows the selected profile (`code-chip` + name + family) or "Genérico" for generic scope. "Trocar" and "Voltar" both dispatch `GO_TO_STEP(1)` — scope + profile state is preserved.
+
+**Code preview (mocked):** `TPL-{PROFILE_UPPER|GEN}-XXX`. No real `next-code` endpoint yet — see `wiki/backlog/novo-template-wizard.md#next-code-preview`. When endpoint ships, replace with `useNextTemplateCodeQuery(profileCode)`.
+
+**Version label:** static `v1.0` — first version is always v1.0; increments on publish.
+
+**CSS note:** `StepIdentity.module.css:.descriptionInput` must override the global `.input { height: 32px }` rule (set `height: auto; min-height: 72px`). Any future step with a `<textarea>` must apply the same override. See `wiki/concepts/css-leakage-offenders.md`.
+
+**Defensive guard (page level):** if URL is `?step=2` but `scopeType === null` (e.g. deep-link or refresh), `TemplateWizardPage` dispatches `GO_TO_STEP(1)` immediately via `useEffect`.
+
+### Step 3 — Estrutura (starting point)
+
+**Shipped 2026-05-09.** Component: `StepStructure.tsx`. DOCX upload is mocked — real upload deferred to post-create editor handoff.
+
+**Two starting points (card selection):**
+- `docx` — opens native file picker (hidden `<input type="file" accept=".docx">`triggered via card click). On selection: `SET_SELECTED_DOCX(name, size)` stores filename + bytes in reducer. File is NOT uploaded at this step.
+- `blank` — selects immediately; dispatches `SET_STARTING_POINT('blank')` and clears any docx state.
+
+**Advance gate:** `step3Disabled = startingPoint === null || (startingPoint === 'docx' && selectedDocxName === null)`. WizardFooter label is context-aware: "Selecione um .docx para continuar" vs "Escolha um ponto de partida" vs "Pronto para avançar".
+
+**Substituir flow:** button dispatches `CLEAR_SELECTED_DOCX`, then immediately re-triggers the hidden file input so picker re-opens without an intermediate cleared state.
+
+**State preservation:** back to Step 2 preserves `startingPoint` + `selectedDocxName` + `selectedDocxSize`. Forward (advance) navigates to Step 4 stub.
+
+**Phase 0 cuts (confirmed):** placeholder chips block, auto-fill flag, file metadata processing time (`147 KB · processado em 1.2s`), info banner. All cut — no backend support. See `wiki/backlog/novo-template-wizard.md#step3-placeholder-extract`.
+
+**Deferred backlog items:** `step3-docx-upload` (presigned upload post-create), `step3-placeholder-extract` (token extraction endpoint), `step3-editor-handoff` (redirect after Step 5 create). See `wiki/backlog/novo-template-wizard.md`.
+
+### Steps 4–5
 
 Stubs — not yet implemented. See `wiki/backlog/novo-template-wizard.md`.
 

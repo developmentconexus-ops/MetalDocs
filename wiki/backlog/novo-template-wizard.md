@@ -26,13 +26,64 @@
 
 ---
 
+### next-code-preview
+**Context:** Step 2 (Identidade) shows code preview card "TPL-POP-009".
+**Blocked by:** No `GET /api/v2/templates/next-code?profile=<CODE>` endpoint. Currently mocked client-side as `TPL-{PROFILE}-XXX` (placeholder digits).
+**File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.tsx`
+**TODO tag:** `TODO(novo-template-wizard:next-code-preview)`
+**Resolution:** When endpoint ships, replace mock with `useNextTemplateCodeQuery(profileCode)`. Show loading + error states.
+
+---
+
+### key-generation
+**Context:** Backend `POST /api/v2/templates` requires `key` field (unique identifier). Design has no key input — derived auto from name.
+**Blocked by:** No design decision on key UX. Auto-slug from name is fragile (collisions, edits break links).
+**File:** Step 5 (Confirmação) submit handler — `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx`
+**TODO tag:** `TODO(novo-template-wizard:key-generation)`
+**Resolution:** Either (a) add advanced "Identificador técnico" field with auto-suggest + manual override, or (b) backend generates key from name server-side. Decide before Step 5 implementation.
+
+---
+
+### font-size-hero
+**Context:** Step 2 code preview value uses raw `font-size: 26px` — sits between `--font-size-lg` (22px) and `--font-size-xl` (32px). No matching token.
+**File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.module.css` (`.codePreviewValue`)
+**TODO tag:** `TODO(novo-template-wizard:font-size-hero)` — captured as `/* design-exact */` comment in CSS.
+**Resolution:** Either (a) add `--font-size-hero: 26px` to `tokens.css` if 26px is a recurring hero-numeric pattern, or (b) accept as design-exact magic number for this single use.
+
+---
+
+### step3-docx-upload
+**Context:** Step 3 lets user pick `.docx` as starting point. Real upload requires presigned URL flow — but template `id`+`n` only exist after Step 5 create.
+**Blocked by:** Wizard ordering — `POST /api/v2/templates` runs at Step 5. Upload flow `POST /api/v2/templates/{id}/{n}/docx-upload-url` then PUT then `PUT /draft` happens **after** create.
+**File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepStructure.tsx`
+**TODO tag:** `TODO(novo-template-wizard:step3-docx-upload)`
+**Resolution:** Step 3 currently captures `selectedDocxName` + `selectedDocxSize` only (filename echo, no upload). After Step 5 create, if `startingPoint === 'docx'`, redirect to editor with `?import=<file-blob-ref>` so editor performs presigned upload + draft save. Or stage file in IndexedDB between Step 3 and Step 5.
+
+---
+
+### step3-placeholder-extract
+**Context:** Original design showed 7 placeholder chips after upload. Cut from impl.
+**Blocked by:** No backend endpoint extracts tokens without publishing. `POST /publish` returns `missing_tokens` / `orphan_tokens` but is destructive.
+**File:** N/A (cut at Phase 0).
+**TODO tag:** `TODO(novo-template-wizard:step3-placeholder-extract)`
+**Resolution:** Add `POST /api/v2/templates/{id}/{n}/extract-tokens` that runs docgen-v2's parser without publishing. Then Step 3 can preview placeholders inline. Auto-fill flag also requires schema metadata not yet defined — design separately.
+
+---
+
+### step3-editor-handoff
+**Context:** After Step 5 create, user expects to land in editor (esp. for `'blank'` start, where there's no real docx to import).
+**Blocked by:** No editor flow defined for templates wizard handoff. Today, `/templates-v2/new` Step 5 just calls create and (presumably) redirects to list.
+**File:** `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (Step 5 submit handler — not yet implemented).
+**TODO tag:** `TODO(novo-template-wizard:step3-editor-handoff)`
+**Resolution:** After successful create, redirect to `/templates-v2/<id>/edit?import=<blob-ref|blank>` based on `startingPoint`. Editor handles real upload (docx case) or stub-blank schema.json (blank case).
+
+---
+
 ## Steps not yet implemented
 
-Steps 2–5 of the wizard are stubs (placeholder "Em breve" content). Track implementation in separate tasks.
-
-| Step | Name | Notes |
+| Step | Name | Status |
 |---|---|---|
-| 2 | Identidade | Name, description, version prefix |
-| 3 | Estrutura | Block sections configuration |
-| 4 | Permissões | Visibility / approval workflow |
-| 5 | Confirmação | Summary + `POST /api/v2/templates` |
+| 2 | Identidade | **Done** (2026-05-09) |
+| 3 | Estrutura | **Done** (2026-05-09) — mocked DOCX flow; real upload + placeholder extract deferred (see backlog items above) |
+| 4 | Permissões | Stub |
+| 5 | Confirmação | Stub — submits to `POST /api/v2/templates` |

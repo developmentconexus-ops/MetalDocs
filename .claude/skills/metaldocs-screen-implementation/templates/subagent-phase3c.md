@@ -78,19 +78,10 @@ Single commit: `feat(<DOMAIN>): wire <SLUG> state and error UX`. Report:
 - Mock data blocks (list with TODO + backlog refs)
 - Semantic HTML check pass/fail
 
-## Verify before reporting done
-
-```bash
-cd frontend/apps/web
-pnpm.cmd tsc --noEmit -p tsconfig.build.json
-pnpm test
-```
-
-Both green. If red, fix before reporting done.
-
 ## Hard rules
 
 - Never use raw `alert()`. Errors flow through `ApiError` + `resolveErrorMessage` + `role="alert"` only.
 - Never `useState(readStored())` — must be `useState(() => readStored())`.
 - Never wire a CTA without a corresponding backlog row when the backend is missing.
 - Never invent endpoint shapes. If §1.6 says "needed" and shape is unspecified, STOP and ask main agent.
+- No tsc/tests in subagent — Phase 4 main session runs them.

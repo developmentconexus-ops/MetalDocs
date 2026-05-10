@@ -105,51 +105,108 @@
     </div>
   </header>
 
-  <div class="section-title">Screens</div>
-  <div class="grid" id="grid"></div>
+  <div id="sections"></div>
 
   <script>
-    const screens = [
-      { label: "Biblioteca (library)", path: "biblioteca/biblioteca.html", emoji: "📚" },
-      { label: "Biblioteca v2", path: "library/screens/01 Biblioteca.html", emoji: "📚" },
-      { label: "Login", path: "login/login.html", emoji: "🔐" },
-      { label: "Preview Login", path: "preview-login.html", emoji: "🔐" },
-      { label: "Preview Login (static)", path: "preview-login-static.html", emoji: "🔐" },
-      { label: "Dashboard", path: "dashboard/dashboard.html", emoji: "🏠" },
-      { label: "Alternativas Início Caixa", path: "alternativas-inicio-caixa/alternativas-inicio-caixa.html", emoji: "📥" },
-      { label: "Caixa Aprovação", path: "caixa-aprovacao/caixa-aprovacao.html", emoji: "✅" },
-      { label: "Detalhe Signoff", path: "detalhe-signoff/detalhe-signoff.html", emoji: "✍️" },
-      { label: "Editor", path: "editor/editor.html", emoji: "✏️" },
-      { label: "Template Editor", path: "template-editor/template-editor.html", emoji: "📝" },
-      { label: "Template Editor (alt)", path: "template-editor/Template Editor.html", emoji: "📝" },
-      { label: "Templates", path: "templates/templates.html", emoji: "📋" },
-      { label: "Catálogo Slots", path: "catalogo-slots/catalogo-slots.html", emoji: "🗂️" },
-      { label: "Novo: Área / Código", path: "novo-area-codigo-visibilidade/novo-area-codigo-visibilidade.html", emoji: "🆕" },
-      { label: "Novo: Confirmação", path: "novo-confirmacao/novo-confirmacao.html", emoji: "🆕" },
-      { label: "Novo: Perfil", path: "novo-perfil/novo-perfil.html", emoji: "🆕" },
-      { label: "Novo: Template", path: "novo-template/novo-template.html", emoji: "🆕" },
-      { label: "MetalDocs Map", path: "MetalDocs Map.html", emoji: "🗺️" },
-      { label: "MetalDocs Redesign", path: "MetalDocs Redesign.html", emoji: "🎨" },
-      { label: "MetalDocs Selected", path: "MetalDocs Selected.html", emoji: "🎨" },
+    const sections = [
+      {
+        title: "Auth",
+        screens: [
+          { label: "Login", path: "login/login.html", emoji: "🔐" },
+          { label: "Preview Login", path: "preview-login.html", emoji: "🔐" },
+          { label: "Preview Login (static)", path: "preview-login-static.html", emoji: "🔐" },
+        ],
+      },
+      {
+        title: "Home / Inbox",
+        screens: [
+          { label: "Dashboard", path: "dashboard/dashboard.html", emoji: "🏠" },
+          { label: "Alternativas Início Caixa", path: "alternativas-inicio-caixa/alternativas-inicio-caixa.html", emoji: "📥" },
+          { label: "Caixa Aprovação", path: "caixa-aprovacao/caixa-aprovacao.html", emoji: "✅" },
+          { label: "Detalhe Signoff", path: "detalhe-signoff/detalhe-signoff.html", emoji: "✍️" },
+        ],
+      },
+      {
+        title: "Library / Catalog",
+        screens: [
+          { label: "Biblioteca", path: "biblioteca/biblioteca.html", emoji: "📚" },
+          { label: "Biblioteca v2", path: "library/screens/01 Biblioteca.html", emoji: "📚" },
+          { label: "Catálogo Slots", path: "catalogo-slots/catalogo-slots.html", emoji: "🗂️" },
+          { label: "Distribuição", path: "distribuicao/distribuicao.html", emoji: "📤" },
+        ],
+      },
+      {
+        title: "Documents",
+        screens: [
+          { label: "Documento Publicado", path: "documento-publicado/documento-publicado.html", emoji: "📄" },
+          { label: "Documento Obsoleto", path: "documento-obsoleto/documento-obsoleto.html", emoji: "🗄️" },
+          { label: "Editor", path: "editor/editor.html", emoji: "✏️" },
+        ],
+      },
+      {
+        title: "Novo Documento Wizard",
+        screens: [
+          { label: "Novo: Área / Código", path: "novo-area-codigo-visibilidade/novo-area-codigo-visibilidade.html", emoji: "🆕" },
+          { label: "Novo: Perfil", path: "novo-perfil/novo-perfil.html", emoji: "🆕" },
+          { label: "Novo: Confirmação", path: "novo-confirmacao/novo-confirmacao.html", emoji: "🆕" },
+        ],
+      },
+      {
+        title: "Templates",
+        screens: [
+          { label: "Templates", path: "templates/templates.html", emoji: "📋" },
+          { label: "Template Editor", path: "template-editor/template-editor.html", emoji: "📝" },
+          { label: "Template Editor (alt)", path: "template-editor/Template Editor.html", emoji: "📝" },
+        ],
+      },
+      {
+        title: "Novo Template Wizard (5 steps)",
+        screens: [
+          { label: "Novo Template (overview)", path: "novo-template/novo-template.html", emoji: "🆕" },
+          { label: "1 · Escopo", path: "novo-template-escopo/novo-template-escopo.html", emoji: "1️⃣" },
+          { label: "2 · Identidade", path: "novo-template-identidade/novo-template-identidade.html", emoji: "2️⃣" },
+          { label: "3 · Estrutura", path: "novo-template-estrutura/novo-template-estrutura.html", emoji: "3️⃣" },
+          { label: "4 · Permissões", path: "novo-template-permissoes/novo-template-permissoes.html", emoji: "4️⃣" },
+          { label: "5 · Confirmação", path: "novo-template-confirmacao/novo-template-confirmacao.html", emoji: "5️⃣" },
+        ],
+      },
+      {
+        title: "Maps / Overviews",
+        screens: [
+          { label: "MetalDocs Map", path: "MetalDocs Map.html", emoji: "🗺️" },
+          { label: "MetalDocs Redesign", path: "MetalDocs Redesign.html", emoji: "🎨" },
+          { label: "MetalDocs Selected", path: "MetalDocs Selected.html", emoji: "🎨" },
+        ],
+      },
     ];
 
-    const grid = document.getElementById("grid");
-    screens.forEach(({ label, path, emoji }) => {
-      const card = document.createElement("div");
-      card.className = "card";
-      const encoded = encodeURIComponent(path).replace(/%2F/g, "/");
-      card.innerHTML = `
-        <div class="card-preview">${emoji}</div>
-        <div class="card-body">
-          <div class="card-label">${label}</div>
-          <div class="card-path">${path}</div>
-        </div>
-        <div class="card-actions">
-          <a href="${path}" target="_blank" class="btn btn-primary">Open</a>
-          <button class="btn btn-secondary" onclick="loadPreview(this, '${path.replace(/'/g, "\\'")}')">Preview</button>
-        </div>
-      `;
-      grid.appendChild(card);
+    const root = document.getElementById("sections");
+    sections.forEach(({ title, screens }) => {
+      const h = document.createElement("div");
+      h.className = "section-title";
+      h.textContent = title;
+      root.appendChild(h);
+
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      root.appendChild(grid);
+
+      screens.forEach(({ label, path, emoji }) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="card-preview">${emoji}</div>
+          <div class="card-body">
+            <div class="card-label">${label}</div>
+            <div class="card-path">${path}</div>
+          </div>
+          <div class="card-actions">
+            <a href="${path}" target="_blank" class="btn btn-primary">Open</a>
+            <button class="btn btn-secondary" onclick="loadPreview(this, '${path.replace(/'/g, "\\'")}')">Preview</button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
     });
 
     function loadPreview(btn, path) {
