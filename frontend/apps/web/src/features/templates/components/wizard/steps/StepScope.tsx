@@ -133,6 +133,7 @@ export function StepScope({
                   <SelectableCard
                     key={profile.code}
                     {...profileGroup.getItemProps(idx)}
+                    {...(isDisabled ? { tabIndex: -1 } : {})}
                     selected={selected}
                     disabled={isDisabled}
                     title={isDisabled ? 'Em breve' : undefined}
