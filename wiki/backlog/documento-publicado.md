@@ -111,3 +111,17 @@ No review-due-date field in the document or controlled-document model.
 ### KPI: Páginas
 
 No page count or file size field in API response.
+
+---
+
+### `documentDetailMeta` formatter audit (drift hotfix 2026-05-10)
+
+`DocumentPublishedPage.tsx:11` imported `formatPublishedAt` / `formatSignedAt` / `formatShortDate` from `lib/documentDetailMeta.ts`, but commit `bf2cd5fe` shipped only `resolveProfileLabel`, `resolveAreaLabel`, `SIGNOFF_STATUS_META`. Module-eval SyntaxError blanked `/documents/:id`. Hotfix added the 3 formatters as Intl pt-BR pure helpers (long / short-numeric / datetime, em-dash fallback on null/Invalid Date).
+
+Followups:
+- audit other `wiki/modules/documents.md` Key files anchors for similar drift (claimed but unshipped)
+- add Vitest coverage for the 3 formatters (timezone-stable inputs, null/undefined/invalid)
+- consider promoting Intl formatters to `lib/utils/formatDate.ts` if reused outside this feature
+- dispatch `wiki-curator` to re-stamp `Last verified` and trim claims that don't match code
+
+Cause: wiki documented planned exports as shipped without verification. Drift policy violated.

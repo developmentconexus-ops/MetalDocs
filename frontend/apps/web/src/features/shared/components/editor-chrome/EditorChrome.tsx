@@ -26,7 +26,7 @@ export type EditorChromeProps = {
  *    eigenpal's 40px title bar
  *  - optional alert banner
  *
- * Used by templates/TemplateAuthorPage and documents/DocumentEditorPage.
+ * Used by templates/TemplateEditorPage and documents/DocumentEditorPage.
  */
 export function EditorChrome({ left, center, right, alert, children, className }: EditorChromeProps) {
   return (

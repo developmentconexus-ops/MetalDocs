@@ -1,7 +1,7 @@
 /* =========================================================
-   MetalDocs Template Author — Swiss / Minimal
-   Toolbar/eigenpal styling lives in features/shared/components/editor-chrome.
-   This file owns only the page layout + left rail + side panel.
+   MetalDocs Template Editor — mirrors DocumentEditorPage idiom.
+   Inner rail (48px) + optional 280px panel + canvas + EditorChrome overlay.
+   Tokens-only — no raw hex, no raw px outside icon sizing.
    ========================================================= */
 
 .page {
@@ -18,7 +18,7 @@
   font-size: 13px;
 }
 
-/* ---------- Body grid: rail | canvas ---------- */
+/* ---------- Body grid: rail | (panel) | canvas ---------- */
 .body {
   display: flex;
   flex: 1;
@@ -27,7 +27,7 @@
   overflow: hidden;
 }
 
-/* ---------- Rails ---------- */
+/* ---------- Inner rail ---------- */
 .rail {
   background: var(--surface);
   display: flex;
@@ -37,8 +37,8 @@
   gap: 2px;
   width: var(--rail-w);
   flex: 0 0 var(--rail-w);
+  border-right: 1px solid var(--border);
 }
-.railLeft  { border-right: 1px solid var(--border); }
 
 .railBtn {
   position: relative;
@@ -54,11 +54,18 @@
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease;
 }
+
 .railBtn:hover { background: var(--surface-2); color: var(--text); }
+.railBtn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 .railBtn.isActive {
   background: var(--brand-pale);
   color: var(--brand);
 }
+
 .railBtn.isActive::before {
   content: "";
   position: absolute;
@@ -83,7 +90,7 @@
   top: 50%;
   transform: translateY(-50%);
   background: var(--text);
-  color: #fff;
+  color: var(--surface);
   font-size: 11px;
   padding: 4px 8px;
   border-radius: var(--r-1);
@@ -93,7 +100,9 @@
   transition: opacity 150ms ease;
   z-index: 30;
 }
-.railBtn:hover .railTip { opacity: 1; }
+
+.railBtn:hover .railTip,
+.railBackBtn:hover .railTip { opacity: 1; }
 
 .railBackBtn {
   position: relative;
@@ -105,70 +114,23 @@
   background: var(--brand);
   border: 0;
   border-radius: var(--r-2);
-  color: #fff;
+  color: var(--surface);
   cursor: pointer;
   transition: background 150ms ease;
   flex-shrink: 0;
 }
+
 .railBackBtn:hover { background: var(--brand-soft); }
-.railBackBtn .railTip { left: calc(100% + 10px); }
-
-/* ---------- Side panel (variables / catalog) ---------- */
-.sidePanel {
-  display: flex;
-  flex-direction: column;
-  width: 280px;
-  flex: 0 0 280px;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  padding: var(--sp-3);
-  background: var(--surface);
-}
-
-.panelSection {
-  margin-bottom: var(--sp-4);
-}
-
-.panelHeader {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.6;
-  margin-bottom: var(--sp-2);
-}
-
-.addBtn {
-  width: 100%;
-  padding: var(--sp-2);
-  border: 1px dashed var(--border);
-  border-radius: var(--r-2);
-  background: transparent;
-  color: var(--text-soft);
-  cursor: pointer;
-  font-size: 12px;
-}
-.addBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.addManualBtn {
-  padding: 6px;
-  color: var(--text-muted);
-  font-size: 11.5px;
-}
-
-.chipList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: var(--sp-2);
+.railBackBtn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 /* ---------- Canvas (single scroll host) ---------- */
 .canvas {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-width: 0;
   min-height: 0;
   background: var(--surface-2);
@@ -181,6 +143,7 @@
   color: var(--text-muted);
   font-size: 13px;
 }
+
 .error {
   padding: var(--sp-4) var(--sp-5);
   color: var(--danger);
@@ -191,7 +154,20 @@
   font-size: 13px;
 }
 
+/* ---------- Inline alert (chrome alert slot) ---------- */
+.alertError {
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+.alertSuccess {
+  color: var(--success);
+  font-size: 12.5px;
+}
+
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .railBtn { transition: none; }
+  .railBtn,
+  .railBackBtn,
+  .railTip { transition: none; }
 }
