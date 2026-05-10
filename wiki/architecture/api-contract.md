@@ -1,5 +1,7 @@
 # API Contract (Spec-as-Source-of-Truth)
 
+> **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
+
 > **Last verified:** 2026-05-08
 > **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, per-module migration status.
 > **Out of scope:** Auth/IAM mechanics (`modules/iam-rbac.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md §7`).

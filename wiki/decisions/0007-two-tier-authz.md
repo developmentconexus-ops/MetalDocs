@@ -1,7 +1,7 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring)
-> **Last verified:** 2026-05-05
+> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected)
+> **Last verified:** 2026-05-10
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam-rbac.md`.
 > **Key files:**
@@ -55,6 +55,18 @@ Treat the two services as **distinct tiers** with explicit responsibilities, not
 
 Documents module wiring was also lifted out of `main.go` into `apps/api/internal/wiring/documents.go` as part of this change (god-file reduction).
 
+## Amendment — Codegen rejected (2026-05-10)
+
+A `cmd/authzgen` spike was evaluated as a way to wrap `authz.Require` calls per operation from the OpenAPI spec. Rejected because:
+
+1. `authz.Require` is tx-coupled (`internal/modules/iam/authz/authz.go:44` takes `*sql.Tx`). The proposed wrapper sits at the StrictServerInterface boundary — before the transaction opens — so it cannot supply tx.
+2. The Postgres tripwire trigger (`migrations/0142b_role_capabilities_v2_enforce.sql:138-172`) reads the `metaldocs.asserted_caps` GUC on every mutation and rejects if the cap is absent. The static enforcement guarantee already exists at the database layer; codegen would duplicate the check with zero additional safety.
+3. Industry pattern (Stripe, GitHub, AWS IAM) is lint + runtime, not generated per-op authz wrappers.
+
+Replaced with two CI lint rules: `authz-call-present` (every op with `x-authz-area` has a matching `authz.Require` call in the handler) and `tripwire-pairing` (every mutating SQL statement in repositories pairs with an `authz.Require` call). Implemented in `scripts/api-lint/code_rules.go`.
+
+Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.md`.
+
 ## References
 
 - `internal/modules/iam/application/capability_service.go` — tier 1
@@ -63,6 +75,8 @@ Documents module wiring was also lifted out of `main.go` into `apps/api/internal
 - `internal/modules/iam/infrastructure/postgres/role_provider.go` — tenant-scoped `RolesByUserID` (Group B fix)
 - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go` — tenant-scoped admin ops, DELETE-then-INSERT (Group B fix)
 - `apps/api/internal/wiring/documents.go:24` — `NewCapabilityChecker` adapter (J2 fix)
+- `scripts/api-lint/code_rules.go` — `authz-call-present` + `tripwire-pairing` lint rules (codegen-rejection amendment)
+- Migration 0142b — Postgres tripwire trigger (`enforce_capability_asserted`) on `approval_instances` + `approval_signoffs`
 - Migration 0162 — added `tenant_id` to `iam_user_roles`
 - Migration 0165 — reseeded `role_capabilities`
 - Migration 0170 (`migrations/0170_dev_approver_role_correction.sql`) — corrects dev approver role after 0166 over-promotion
