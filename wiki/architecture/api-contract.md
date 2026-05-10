@@ -4,7 +4,7 @@
 
 > **Last verified:** 2026-05-08
 > **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, per-module migration status.
-> **Out of scope:** Auth/IAM mechanics (`modules/iam-rbac.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md §7`).
+> **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md §7`).
 > **Key files:**
 > - `api/openapi/v1/openapi.yaml:1` — single source of truth; OpenAPI 3.0.3
 > - `redocly.yaml:1` — lint config (pre-existing rule suppressions documented inline)

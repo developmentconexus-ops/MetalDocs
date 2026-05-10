@@ -44,6 +44,6 @@ If a route has multiple stages with the same approver, the approver can sign off
 ## See also
 
 - [modules/approval.md](../modules/approval.md)
-- [modules/iam-rbac.md](../modules/iam-rbac.md)
+- [modules/iam.md](../modules/iam.md)
 - [workflows/user-onboarding.md](../workflows/user-onboarding.md) — Step 8 (D2 in smoke routine validates this)
 - [concepts/error-ux.md](error-ux.md) — Portuguese error messages for `sod.submitter_cannot_sign` / `sod.cross_stage_duplicate`; E2 SoD dialog states in `SignoffDialog`

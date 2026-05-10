@@ -41,5 +41,5 @@
 ## See also
 
 - [vision/product-vision.md](product-vision.md)
-- [modules/iam-rbac.md](../modules/iam-rbac.md) — capabilities that gate each role
+- [modules/iam.md](../modules/iam.md) — capabilities that gate each role
 - [concepts/iso-segregation.md](../concepts/iso-segregation.md) — segregation of duties enforcement

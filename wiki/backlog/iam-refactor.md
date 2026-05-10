@@ -35,11 +35,11 @@
 | R-011 | Author ADR for "tenant-scoping rule" — every IAM table has `tenant_id`, every repo method filters by it; cite Group B fix as origin | T-011 | XS | Minor | — | — | open | — |
 | R-012 | Add a CI check that compares the in-process `RoleCapabilities` map against the seeded DB rows (not just count) | T-012 | M | Minor | R-001 | — | open | — |
 | R-013 | Add Go doc comments to the public surface in IAM (cap-prefix consts, `domain/port.go` interfaces, `delivery/http/admin_handler.go` request structs) — bulk-doc PR | (collective coverage gap) | M | Minor | — | — | open | — |
-| R-014 | Retire `wiki/modules/iam-rbac.md` (predecessor stub) — replace with redirect note pointing at `wiki/modules/iam.md`; update `wiki/README.md` line 51 | (doc cleanup, no TD) | XS | Minor | — | — | open | — |
+| R-014 | Retire `wiki/modules/iam-rbac.md` (predecessor stub) — file deleted; inbound links repointed to `wiki/modules/iam.md`; README index updated | (doc cleanup, no TD) | XS | Minor | — | — | merged | (in-commit doc-only) |
 
 ## Notes
 
 - `L`-effort rows: R-004 splits into (a) wire `authz.Require` in IAM repos, (b) write the trigger-attach migration, (c) update consumers / contract tests. Open as a tracking issue first.
 - R-001 unblocks R-004 and R-012; pull from the top.
-- R-014 is the only doc-only row; do it in the same commit as publish if the user confirms retiring `iam-rbac.md`.
+- R-014 was the only doc-only row; merged in the publish follow-up commit after user confirmation.
 - When a row merges: bump `status` to `merged`, link PR, remove the linked `T-NNN` row from the register in the same commit.

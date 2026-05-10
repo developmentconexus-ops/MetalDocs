@@ -3,7 +3,7 @@
 > **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected)
 > **Last verified:** 2026-05-10
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
-> **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md` (successor) or `wiki/modules/iam-rbac.md` (predecessor stub).
+> **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo` implementation
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require` implementation; system_admin bypass at :58
