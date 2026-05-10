@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { forwardRef } from 'react';
+import type { KeyboardEventHandler, ReactNode } from 'react';
 import styles from './SelectableCard.module.css';
 
 export type SelectableCardProps = {
@@ -9,17 +10,24 @@ export type SelectableCardProps = {
   className?: string;
   title?: string;
   ariaLabel?: string;
+  tabIndex?: number;
+  onKeyDown?: KeyboardEventHandler<HTMLButtonElement>;
 };
 
-export function SelectableCard({
-  selected,
-  onSelect,
-  children,
-  disabled = false,
-  className,
-  title,
-  ariaLabel,
-}: SelectableCardProps): JSX.Element {
+export const SelectableCard = forwardRef<HTMLButtonElement, SelectableCardProps>(function SelectableCard(
+  {
+    selected,
+    onSelect,
+    children,
+    disabled = false,
+    className,
+    title,
+    ariaLabel,
+    tabIndex,
+    onKeyDown,
+  },
+  ref,
+): JSX.Element {
   const stateClass = disabled
     ? styles.disabled
     : selected
@@ -29,6 +37,7 @@ export function SelectableCard({
 
   return (
     <button
+      ref={ref}
       type="button"
       role="radio"
       aria-checked={selected}
@@ -36,6 +45,8 @@ export function SelectableCard({
       disabled={disabled}
       title={title}
       aria-label={ariaLabel}
+      tabIndex={tabIndex}
+      onKeyDown={onKeyDown}
       className={cls}
       data-selected={selected ? 'true' : undefined}
       onClick={disabled ? undefined : onSelect}
@@ -43,4 +54,4 @@ export function SelectableCard({
       {children}
     </button>
   );
-}
+});
