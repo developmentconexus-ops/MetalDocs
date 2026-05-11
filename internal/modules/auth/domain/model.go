@@ -26,6 +26,7 @@ type Identity struct {
 type Session struct {
 	SessionID  string
 	UserID     string
+	TenantID   string
 	CreatedAt  time.Time
 	ExpiresAt  time.Time
 	RevokedAt  *time.Time
@@ -91,6 +92,7 @@ type BootstrapAdminParams struct {
 
 type CurrentUser struct {
 	UserID             string           `json:"userId"`
+	TenantID           string           `json:"tenantId"`
 	Username           string           `json:"username"`
 	Email              string           `json:"email,omitempty"`
 	DisplayName        string           `json:"displayName"`
