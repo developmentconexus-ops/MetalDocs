@@ -196,14 +196,16 @@ func main() {
 	iamAdminHandler.RegisterRoutes(mux)
 
 	taxonomyModule := taxonomy.New(taxonomy.Dependencies{
-		DB:         deps.SQLDB,
-		TplChecker: taxonomyinfra.NewTemplateVersionChecker(deps.SQLDB),
+		DB:          deps.SQLDB,
+		TplChecker:  taxonomyinfra.NewTemplateVersionChecker(deps.SQLDB),
+		AuditWriter: deps.AuditWriter,
 	})
 	taxonomyModule.RegisterRoutes(mux)
 
 	registryModule := registry.New(registry.Dependencies{
-		DB:     deps.SQLDB,
-		Logger: slog.Default(),
+		DB:          deps.SQLDB,
+		Logger:      slog.Default(),
+		AuditWriter: deps.AuditWriter,
 	})
 	registryModule.RegisterRoutes(mux)
 	if deps.SQLDB != nil {
