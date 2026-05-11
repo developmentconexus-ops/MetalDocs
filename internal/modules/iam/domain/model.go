@@ -28,7 +28,9 @@ const (
 	CapTemplateApprove Capability = "template.approve"
 	CapTemplatePublish Capability = "template.publish"
 
-	CapRegistryCreate   Capability = "registry.create"
+	CapRegistryCreate    Capability = "registry.create"
+	CapRegistryObsolete  Capability = "registry.obsolete"
+	CapRegistrySupersede Capability = "registry.supersede"
 	CapTaxonomyManage   Capability = "taxonomy.manage"
 	CapMembershipManage Capability = "membership.manage"
 	CapRouteManage      Capability = "route.manage"
