@@ -60,3 +60,23 @@ func TestPermissionResolver(t *testing.T) {
 		})
 	}
 }
+func TestPermissionResolver_TaxonomyFamiliesPATCH_RequiresTaxonomyManage(t *testing.T) {
+	resolver := newPermissionResolver()
+	cap, ok := resolver(http.MethodPatch, "/api/v2/taxonomy/families/PROC")
+	if !ok {
+		t.Fatal("PATCH /taxonomy/families/{code}: resolver returned ok=false, want true")
+	}
+	if cap != iamdomain.CapTaxonomyManage {
+		t.Fatalf("PATCH /taxonomy/families: cap = %v, want CapTaxonomyManage", cap)
+	}
+}
+func TestPermissionResolver_TaxonomyAreasPATCH_RequiresTaxonomyManage(t *testing.T) {
+	resolver := newPermissionResolver()
+	cap, ok := resolver(http.MethodPatch, "/api/v2/taxonomy/areas/QA")
+	if !ok {
+		t.Fatal("PATCH /taxonomy/areas/{code}: resolver returned ok=false, want true")
+	}
+	if cap != iamdomain.CapTaxonomyManage {
+		t.Fatalf("PATCH /taxonomy/areas: cap = %v, want CapTaxonomyManage", cap)
+	}
+}

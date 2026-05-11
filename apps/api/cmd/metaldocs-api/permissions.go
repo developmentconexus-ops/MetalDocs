@@ -167,7 +167,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 			switch method {
 			case http.MethodGet:
 				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPut, http.MethodDelete:
+			case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
 		}
@@ -175,7 +175,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 			switch method {
 			case http.MethodGet:
 				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPut, http.MethodDelete:
+			case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
 		}
