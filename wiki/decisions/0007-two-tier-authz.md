@@ -88,3 +88,4 @@ Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.m
 
 - [`wiki/modules/iam.md`](../modules/iam.md) — full Arc42 + C4 living architecture doc for `internal/modules/iam`; §5.4 covers the third authz surface (`AuthorizationService`)
 - [`wiki/modules/documents.md §8.1`](../modules/documents.md#81-authentication--authorization) — documents consumer: tier-1 role gate, tier-2 `authz.Require("doc.submit", …)`, `CapabilityChecker` adapter (`wiring/documents.go:24`), tripwire on approval tables; gap T-003 (no trigger on `documents` table itself)
+- [`wiki/modules/auth.md`](../modules/auth.md) — canonical auth module doc; §8.1 covers how auth's middleware injects `iamdomain.WithAuthContext` so tier-1 and tier-2 checks have an actor; tier-0 session enforcement sits here, upstream of both authz tiers

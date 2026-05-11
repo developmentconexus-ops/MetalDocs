@@ -15,3 +15,5 @@
 - render-fanout.md — TBD (Last verified: 2026-05-04)
 - [iam.md](iam.md) — IAM module (Arc42 + C4): capabilities, roles, area memberships, tier-1 `CapabilityService.CanDo`, tier-2 `authz.Require`, Postgres tripwire, system_admin bypass, group grants (Last verified: 2026-05-10)
 - [iam-tech-debt.md](iam-tech-debt.md) — IAM tech-debt register (T-001..T-012) (Last verified: 2026-05-10)
+- [auth.md](auth.md) — auth module (Arc42 + C4): session cookie authn, bcrypt, per-account lockout, HMAC-signed opaque tokens, ManagedUser admin ops; 2 Critical / 3 Major / 7 Minor tech-debt items (Last verified: 2026-05-10)
+- [auth-tech-debt.md](auth-tech-debt.md) — auth tech-debt register (T-001..T-012) (Last verified: 2026-05-10)
