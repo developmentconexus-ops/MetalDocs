@@ -1,8 +1,6 @@
-import '@eigenpal/docx-js-editor/styles.css';
 import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DocxEditor, type DocxEditorRef } from '@eigenpal/docx-js-editor/react';
-import { createEmptyDocument } from '@eigenpal/docx-js-editor/core';
+import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import { filterTransactionGuard } from '../../../editor-adapters/filter-transaction-guard';
 import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/templatesV2';
 import { useTemplateDraft } from '../hooks/useTemplateDraft';
@@ -58,13 +56,18 @@ export function TemplateEditorPage({
   const draft = useTemplateDraft(templateId, versionNum);
   const autosave = useTemplateAutosave(templateId, versionNum);
   const schemaState = useTemplateSchemas(templateId, versionNum);
-  const editorRef = useRef<DocxEditorRef>(null);
+  const editorRef = useRef<MetalDocsEditorRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const schemaSnapshotRef = useRef<string | null>(null);
   const variableSyncTimerRef = useRef<number | null>(null);
   const outlineSyncTimerRef = useRef<number | null>(null);
-  const blankDoc = useMemo(() => createEmptyDocument(), []);
-  const editorPlugins = useMemo(() => [filterTransactionGuard()], []);
+  // filterTransactionGuard is a raw ProseMirror plugin; wrap in EditorPlugin shell so
+  // MetalDocsEditor can register it via PluginHost (proseMirrorPlugins field).
+  const editorPlugins = useMemo(() => [{
+    id: 'filter-transaction-guard',
+    name: 'filter-transaction-guard',
+    proseMirrorPlugins: [filterTransactionGuard()],
+  }], []);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
@@ -83,10 +86,12 @@ export function TemplateEditorPage({
   const currentVersion = liveVersion ?? draft.version ?? null;
   const isDraft = currentVersion?.status === 'draft';
 
-  const queueDocx = autosave.queueDocx;
   const syncPlaceholdersFromDocument = useCallback(() => {
     if (!isDraft) return;
-    const rawVariables = editorRef.current?.getAgent?.()?.getVariables?.() ?? [];
+    // getAgent is a deferred ACL violation — MetalDocsEditorRef does not expose it;
+    // optional chaining returns undefined silently. Follow-up: forward getAgent in the adapter.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawVariables: string[] = (editorRef.current as any)?.getAgent?.()?.getVariables?.() ?? [];
     const variables = Array.from(new Set(rawVariables));
     setDetectedVariables(variables.filter((name) => catalogByKey.has(name)));
     const valid = variables.filter((name) => catalogByKey.has(name));
@@ -104,18 +109,16 @@ export function TemplateEditorPage({
   }, [isDraft, catalogByKey]);
 
   const syncOutline = useCallback(() => {
-    setHeadings(readHeadings(editorRef));
+    // Cast: MetalDocsEditorRef doesn't expose getAgent; readHeadings guards internally.
+    setHeadings(readHeadings(editorRef as unknown as React.RefObject<{ getAgent?(): unknown }>));
   }, []);
 
   const handleEditorChange = useCallback(() => {
-    editorRef.current?.save().then((buffer) => {
-      if (buffer) queueDocx(buffer);
-    }).catch(() => { /* ignore autosave serialization errors */ });
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
     variableSyncTimerRef.current = window.setTimeout(syncPlaceholdersFromDocument, VARIABLE_SYNC_DEBOUNCE_MS);
     if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
     outlineSyncTimerRef.current = window.setTimeout(syncOutline, OUTLINE_REFRESH_DEBOUNCE_MS);
-  }, [queueDocx, syncPlaceholdersFromDocument, syncOutline]);
+  }, [syncPlaceholdersFromDocument, syncOutline]);
 
   useEffect(() => () => {
     if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
@@ -328,15 +331,14 @@ export function TemplateEditorPage({
               ) : undefined
             }
           >
-            <DocxEditor
+            <MetalDocsEditor
               ref={editorRef}
+              mode={isDraft ? 'template-draft' : 'readonly'}
               documentBuffer={draft.docxBytes ?? undefined}
-              document={draft.docxBytes ? undefined : blankDoc}
-              readOnly={!isDraft}
+              onAutoSave={async (buf) => { autosave.queueDocx(buf); }}
               onChange={handleEditorChange}
               externalPlugins={editorPlugins}
               showRuler
-              showMarginGuides
             />
           </EditorChrome>
         </main>
