@@ -1,7 +1,8 @@
 -- 0184_auth_sessions_tenant_id.sql
 -- Bind each session to the tenant chosen at login. Backfills existing rows
--- using the user's lone IAM role tenant; rows where the user has no role (or
--- multiple) fall through to DevTenantID so dev/test data continues to resolve.
+-- using the user's lone IAM role tenant; rows where the user has no role
+-- fall through to DevTenantID. Multi-tenant users (>1 role) are set to
+-- DevTenantID AND immediately revoked — see migration 0185 for existing DBs.
 
 BEGIN;
 
@@ -18,8 +19,17 @@ FROM (
 ) sub
 WHERE s.user_id = sub.user_id AND s.tenant_id IS NULL;
 
+-- Multi-tenant users cannot be unambiguously bound; set sentinel + revoke.
+-- Zero-tenant users (dev bootstrap) get sentinel only (no revocation).
 UPDATE metaldocs.auth_sessions
-SET tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+SET tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    revoked_at = CASE
+      WHEN user_id IN (
+        SELECT user_id FROM metaldocs.iam_user_roles
+        GROUP BY user_id HAVING COUNT(DISTINCT tenant_id) > 1
+      ) THEN NOW()
+      ELSE NULL
+    END
 WHERE tenant_id IS NULL;
 
 ALTER TABLE metaldocs.auth_sessions
