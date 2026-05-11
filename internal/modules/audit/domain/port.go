@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -14,16 +15,19 @@ type Event struct {
 	ResourceID   string
 	PayloadJSON  string
 	TraceID      string
+	TenantID     string
 }
 
 type ListEventsQuery struct {
 	ResourceType string
 	ResourceID   string
+	TenantID     string
 	Limit        int
 }
 
 type Writer interface {
 	Record(ctx context.Context, event Event) error
+	RecordTx(ctx context.Context, tx *sql.Tx, event Event) error
 }
 
 type Reader interface {

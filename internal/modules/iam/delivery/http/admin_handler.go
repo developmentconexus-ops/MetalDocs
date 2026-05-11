@@ -126,7 +126,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	}
 	recentEvents := []auditdomain.Event{}
 	if h.auditReader != nil {
-		events, err := h.auditReader.ListEvents(r.Context(), auditdomain.ListEventsQuery{Limit: 25})
+		events, err := h.auditReader.ListEvents(r.Context(), auditdomain.ListEventsQuery{Limit: 25, TenantID: tenantID})
 		if err != nil {
 			log.Printf("iam admin: list audit events failed: %v", err)
 			writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events", traceID)
@@ -455,6 +455,10 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 	if h.audit == nil {
 		return
 	}
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		return
+	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return
@@ -468,6 +472,7 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 		ResourceID:   userID,
 		PayloadJSON:  string(payloadJSON),
 		TraceID:      requestTraceID(r),
+		TenantID:     tenantID,
 	}); err != nil {
 		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
 	}
