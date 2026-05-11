@@ -83,7 +83,10 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		ctx := authdomain.WithCurrentUser(r.Context(), currentUser)
 		ctx = iamdomain.WithAuthContext(ctx, currentUser.UserID, currentUser.Roles)
 		ctx = platformtenant.WithTenantID(ctx, currentUser.TenantID)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		r2 := r.WithContext(ctx)
+		r2.Header = r2.Header.Clone()
+		r2.Header.Del("X-Tenant-ID")
+		next.ServeHTTP(w, r2)
 	})
 }
 
