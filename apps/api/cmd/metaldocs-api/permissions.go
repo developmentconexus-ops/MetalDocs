@@ -10,7 +10,7 @@ import (
 )
 
 func newPermissionResolver() iamdelivery.PermissionResolver {
-	return func(method, path string) (string, bool) {
+	return func(method, path string) (iamdomain.Capability, bool) {
 		if path == "/api/v1/health/live" || path == "/api/v1/health/ready" {
 			return "", false
 		}
@@ -25,22 +25,22 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 			return iamdomain.CapUserManage, true
 		}
 		if method == http.MethodGet && path == "/api/v1/search/documents" {
-			return iamdomain.CapDocView, true
+			return iamdomain.CapDocumentView, true
 		}
 		if method == http.MethodGet && path == "/api/v1/notifications" {
-			return iamdomain.CapDocView, true
+			return iamdomain.CapDocumentView, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/notifications/") && strings.HasSuffix(path, "/read") {
-			return iamdomain.CapDocView, true
+			return iamdomain.CapDocumentView, true
 		}
 		if (method == http.MethodGet || method == http.MethodPut) && path == "/api/v1/access-policies" {
 			return iamdomain.CapMembershipManage, true
 		}
 		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/transitions") {
-			return iamdomain.CapDocSubmit, true
+			return iamdomain.CapDocumentSubmit, true
 		}
 		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/approvals") {
-			return iamdomain.CapDocView, true
+			return iamdomain.CapDocumentView, true
 		}
 		if method == http.MethodPost && path == "/api/v1/iam/users" {
 			return iamdomain.CapUserManage, true
@@ -69,7 +69,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v1/document-profiles") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case http.MethodPost, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
@@ -77,7 +77,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v1/process-areas") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case http.MethodPost, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
@@ -85,7 +85,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v1/document-subjects") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case http.MethodPost, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
@@ -120,45 +120,45 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v2/documents") {
 			switch {
 			case method == http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case method == http.MethodPost && path == "/api/v2/documents":
-				return iamdomain.CapDocCreate, true
+				return iamdomain.CapDocumentCreate, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/finalize"):
-				return iamdomain.CapDocSignoff, true
+				return iamdomain.CapDocumentSignoff, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/archive"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/session/force-release"):
 				return iamdomain.CapMembershipManage, true
 			case method == http.MethodPost && strings.Contains(path, "/session/"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/autosave/"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/checkpoints/") && strings.HasSuffix(path, "/restore"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/checkpoints"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/export/pdf"):
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case method == http.MethodPut && strings.Contains(path, "/placeholders/"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPatch:
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/submit"):
-				return iamdomain.CapDocSubmit, true
+				return iamdomain.CapDocumentSubmit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/signoff"):
-				return iamdomain.CapDocSignoff, true
+				return iamdomain.CapDocumentSignoff, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/cancel"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodGet && strings.HasSuffix(path, "/approval-instance"):
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/reconstruct"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/taxonomy/profiles") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
@@ -166,7 +166,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v2/taxonomy/areas") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case http.MethodPost, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
@@ -174,7 +174,7 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v2/taxonomy/families") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case http.MethodPost, http.MethodPut, http.MethodDelete:
 				return iamdomain.CapTaxonomyManage, true
 			}
@@ -182,15 +182,15 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v2/controlled-documents") {
 			switch {
 			case method == http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case method == http.MethodPost && path == "/api/v2/controlled-documents":
 				return iamdomain.CapRegistryCreate, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/revisions"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/obsolete"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/supersede"):
-				return iamdomain.CapDocEdit, true
+				return iamdomain.CapDocumentEdit, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/iam/area-memberships") {
@@ -202,9 +202,9 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		if strings.HasPrefix(path, "/api/v2/approval/") {
 			switch method {
 			case http.MethodGet:
-				return iamdomain.CapDocView, true
+				return iamdomain.CapDocumentView, true
 			case http.MethodPost, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapDocSubmit, true
+				return iamdomain.CapDocumentSubmit, true
 			}
 		}
 

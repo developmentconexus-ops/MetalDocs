@@ -12,6 +12,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/iam/authz"
 )
 
@@ -82,7 +83,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 		_ = tx.Rollback()
 		return SubmitResult{}, fmt.Errorf("submit: load document area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, "doc.submit", areaCode); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode); err != nil {
 		_ = tx.Rollback()
 		return SubmitResult{}, err
 	}
