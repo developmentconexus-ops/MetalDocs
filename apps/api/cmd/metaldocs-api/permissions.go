@@ -207,6 +207,9 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 				return iamdomain.CapDocumentSubmit, true
 			}
 		}
+		if method == http.MethodGet && path == "/api/v1/audit/events" {
+			return iamdomain.CapAuditRead, true
+		}
 
 		return "", false
 	}
