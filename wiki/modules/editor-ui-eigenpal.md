@@ -2,7 +2,7 @@
 
 > Living architecture doc. Replaces the prior integration stub. Shape: Arc42 (12 sections) + C4 (Context + Container) Mermaid diagrams + ADR links.
 >
-> **Last verified:** 2026-05-10 · **Owner:** unassigned · **Status:** active (FE adapter, one production consumer)
+> **Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (FE adapter, two production consumers)
 
 ---
 
@@ -22,7 +22,7 @@
 
 | Rank | Goal | How verified |
 |---|---|---|
-| 1 | Seam isolation — no `@eigenpal/docx-js-editor` import outside `packages/editor-ui/` | Repo-wide grep. Currently violated by `TemplateEditorPage.tsx:4` — see T-002 |
+| 1 | Seam isolation — no `@eigenpal/docx-js-editor` import outside `packages/editor-ui/` | Repo-wide grep. Violation resolved 2026-05-11 (commit `60fa5473`) — `TemplateEditorPage` migrated to `MetalDocsEditor`; target now met |
 | 2 | Tokens stay literal in writer mode — no client-side `applyVariables` call | Source grep `applyVariables` in `MetalDocsEditor.tsx` returns 0; freeze pipeline owns substitution. See `concepts/placeholders.md` |
 | 3 | No save races — only one save in flight per editor instance | `inFlightRef` guard at `MetalDocsEditor.tsx:35`; covered by `MetalDocsEditor.mount.test.tsx` |
 
@@ -39,7 +39,7 @@
 ## 2. Architecture Constraints
 
 - Runtime: React 18.2 (peer dep), TypeScript 5.4, ESM-only.
-- Sole runtime library coupling: `@eigenpal/docx-js-editor`, currently pinned to `0.2.0` via `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (path declared in three `package.json` files — see T-001 for status).
+- Sole runtime library coupling: `@eigenpal/docx-js-editor`, currently pinned to `0.2.0` via `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (path declared in three `package.json` files — T-001 resolved 2026-05-11, tarball restored in Plan 3).
 - Token syntax: `{name}` single-brace eigenpal-native only. Legacy `{{uuid}}` removed 2026-04-25; see `wiki/decisions/0003-token-syntax-migration.md`.
 - Substitution boundary: writer never substitutes. All token resolution is server-side at freeze. Driver: ADR 0008 + `concepts/placeholders.md`.
 - No HTTP, no DB, no migrations.
@@ -57,7 +57,7 @@ C4Context
     System_Boundary(b1, "MetalDocs frontend") {
         System(adapter, "editor-ui-eigenpal", "Adapter package (wraps eigenpal)")
         System(docPage, "DocumentEditorPage", "Document writer page")
-        System(tplPage, "TemplateEditorPage", "Template authoring page (bypasses adapter)")
+        System(tplPage, "TemplateEditorPage", "Template authoring page")
         System(chrome, "EditorChrome", "Toolbar overlay + eigenpal CSS overrides")
     }
     System_Ext(eigenpal, "@eigenpal/docx-js-editor", "External DOCX WYSIWYG (ProseMirror)")
@@ -66,7 +66,7 @@ C4Context
     Rel(author, tplPage, "Authors templates")
     Rel(docPage, adapter, "Mounts MetalDocsEditor")
     Rel(docPage, chrome, "Wraps editor")
-    Rel(tplPage, eigenpal, "Mounts DocxEditor directly — drift (T-002)")
+    Rel(tplPage, adapter, "Mounts MetalDocsEditor")
     Rel(tplPage, chrome, "Wraps editor")
     Rel(adapter, eigenpal, "Renders, registers plugins")
     Rel(adapter, docs, "DOCX bytes via onAutoSave callback")
@@ -79,9 +79,8 @@ Authors expect a Word-like editor that does not silently change the document. Th
 ### 3.2 Technical Context
 
 Inbound:
-- One production mount: `DocumentEditorPage.tsx:241`.
+- Two production mounts: `DocumentEditorPage.tsx:238`, `TemplateEditorPage.tsx:334`.
 - Type-only imports of `Comment` from `useDocumentComments` and its tests.
-- Direct-eigenpal IN-edge from `TemplateEditorPage` — see T-002.
 
 Outbound:
 - `@eigenpal/docx-js-editor` (`DocxEditor`, `PluginHost`, `templatePlugin`, type exports).
@@ -132,7 +131,8 @@ C4Container
 |---|---|---|---|
 | `packages/editor-ui/src/MetalDocsEditor.tsx:9` | `MetalDocsEditor` | React component | Adapter component; mounts `<PluginHost><DocxEditor/></PluginHost>` |
 | `packages/editor-ui/src/types.ts:5` | `EditorMode` | type | `'template-draft' \| 'document-edit' \| 'readonly'` |
-| `packages/editor-ui/src/types.ts:7` | `MetalDocsEditorProps` | interface | Wrapper props (mode, buffer, comments, autosave, …) |
+| `packages/editor-ui/src/types.ts:7` | `MetalDocsEditorProps` | interface | Wrapper props (mode, buffer, comments, autosave, `onChange`, …) |
+| `packages/editor-ui/src/types.ts:30` | `MetalDocsEditorProps.onChange` | optional prop | `onChange?: () => void` — lightweight synchronous change notification fired before the autosave debounce; distinct from the internal eigenpal→wrapper `onChange` that triggers the autosave debounce |
 | `packages/editor-ui/src/types.ts:29` | `MetalDocsEditorRef` | interface | `getDocumentBuffer`, `focus` |
 | `packages/editor-ui/src/index.ts:3` | `Comment` | type re-export | From `@eigenpal/docx-js-editor`; one type source for `documents` module |
 | `packages/editor-ui/src/plugins/sidebarModelBridge.ts:26` | `buildSidebarModelPlugin` | function | Eigenpal `EditorPlugin` factory; renders `Used / Missing / Orphan / Errors` sections |
@@ -275,7 +275,7 @@ The wrapper emits no logs and no metrics. Eigenpal handles its own console outpu
 
 ### 8.7 Anti-Corruption Layer
 
-The adapter's central job is to be the only file that imports `@eigenpal/docx-js-editor` from outside the package. Currently violated by `TemplateEditorPage.tsx:4-5` — see T-002. The rule has no ADR yet (T-008).
+The adapter's central job is to be the only file that imports `@eigenpal/docx-js-editor` from outside the package. Violation by `TemplateEditorPage` resolved 2026-05-11 (commit `60fa5473`) — both consumer pages now mount `MetalDocsEditor`. The rule has no ADR yet (T-008).
 
 ---
 
@@ -295,7 +295,7 @@ The adapter's central job is to be the only file that imports `@eigenpal/docx-js
 
 | Goal | Scenario | Pass criteria |
 |---|---|---|
-| Seam isolation | `grep -r "@eigenpal/docx-js-editor" frontend/apps/web/src` outside type-only positions | Returns only `TemplateEditorPage.tsx` (current violation, T-002); target: zero |
+| Seam isolation | `grep -r "@eigenpal/docx-js-editor" frontend/apps/web/src` outside type-only positions | Returns zero results — target met (T-002 resolved 2026-05-11) |
 | Tokens stay literal | Author types `{doc_code}`, autosaves, refreshes page | Stored DOCX still contains the literal string `{doc_code}` — no substitution in the buffer |
 | Single in-flight save | Burst of 10 keystrokes within 1s | Exactly one `save()` invocation after debounce; no overlapping `cb(buf)` calls |
 | Readonly is non-mutating | Mount `mode='readonly'`, fire `onChange` programmatically | `handleChange` early-returns at line 31; no `onAutoSave` invocation |
@@ -306,21 +306,21 @@ The adapter's central job is to be the only file that imports `@eigenpal/docx-js
 
 Pointer-only. Body in `wiki/modules/editor-ui-eigenpal-tech-debt.md`. Severity rubric (concrete triggers) is in the same file; do not invent local definitions.
 
-- Critical: 1
-- Major: 2
+- Critical: 0
+- Major: 0
 - Minor: 5
 
 Coverage stats (computed at compose time):
-- Public symbols undocumented: 0 / 9
+- Public symbols undocumented: 0 / 10
 - Operations missing C4 placement: 0 / 0 (no HTTP)
 - Cross-deps missing in §5/§8: 0 / 5
 - State transitions missing in §6: 0 / 0 (no state machine)
 - Decisions without ADR link: 6
 
 Top 3 (by severity, then by blast-radius):
-1. T-001 — vendored eigenpal tarball absent from `main`; fresh installs across `packages/editor-ui`, `apps/docgen-v2`, and `frontend/apps/web` fail. See tech-debt §T-001.
-2. T-002 — `TemplateEditorPage` bypasses the wrapper; the Anti-Corruption Layer holds for one of two consumer pages, halving the rule's value. See tech-debt §T-002.
-3. T-003 — `templatePlugin.wiring.test.tsx` asserts behavior the production code no longer exhibits; either green-by-accident or red-and-ignored. See tech-debt §T-003.
+1. T-004 — `createOutlinePlugin` exported but not registered; public surface advertises a plugin with no current consumer. See tech-debt §T-004.
+2. T-005 — `mergefieldPlugin.ts` filename misnames its contents; confusing for future maintainers. See tech-debt §T-005.
+3. T-006 — `onLockLost` prop declared but never wired; consumers passing it receive no callback. See tech-debt §T-006.
 
 ---
 
@@ -341,11 +341,13 @@ Top 3 (by severity, then by blast-radius):
 - ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0003-token-syntax-migration.md`, `wiki/decisions/0008-placeholder-fixed-catalog.md`
 - Concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`
 - Sibling module: `wiki/modules/editor-chrome.md` (overlay + eigenpal CSS overrides; consumes wrapper output)
-- Consumers: `wiki/modules/documents.md` (DocumentEditorPage); `wiki/modules/templates-v2.md` (TemplateEditorPage — currently drifted; T-002)
+- Consumers: `wiki/modules/documents.md` (DocumentEditorPage); `wiki/modules/templates-v2.md` (TemplateEditorPage — migrated to adapter 2026-05-11)
 - References: `wiki/references/eigenpal-spike.md`, `wiki/references/eigenpal-controlled-package.md`
 - Backlog: `wiki/backlog/editor-ui-eigenpal-refactor.md`
 - Tech debt: `wiki/modules/editor-ui-eigenpal-tech-debt.md`
 
 ## Changelog (this doc)
 
+- 2026-05-11 — Plan 11: T-002 closed — `TemplateEditorPage` migrated to `MetalDocsEditor` (commit `60fa5473`); T-003 closed — `templatePlugin.wiring.test.tsx` rewritten to 5 correct assertions gated on `template-draft` mode (commit `ce6d809a`). `onChange` prop added to `MetalDocsEditorProps` (commit `cae6da02`). §1.2 goal-1 updated; C4 context diagram updated; §3.2 IN-edges updated; §5.2 surface table extended; §8.7 ACL note updated; §10 seam-isolation row updated; §11 counts + Top 3 recomputed. Consumer anchor `TemplateEditorPage.tsx:334` added.
+- 2026-05-11 — Sync pass (Plan 3): bumped Last verified; §2 vendor note updated (T-001 resolved — tarball restored); §11 Top 3 list updated to reflect T-001 closure (T-002 now #1, T-003 #2, T-004 #3).
 - 2026-05-10 — Replaced integration stub with Arc42 + C4 living doc. Surfaced 1C/2M/5m debt items; documented vendored-tarball gap (T-001), wrapper-bypass drift (T-002), stale test (T-003). Two missing-ADR rows for the gating rule and the wrapper-only boundary.

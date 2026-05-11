@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/editor-chrome.md`](editor-chrome.md). Lists known gaps as facts. **Debt only — no fix prescriptions.** Fixes live in [`wiki/backlog/editor-chrome-refactor.md`](../backlog/editor-chrome-refactor.md).
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Severity scale
 
@@ -10,12 +10,12 @@ Rubric per `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`
 
 ## Items
 
-### T-001 · Autosave 4-state visual cannot represent `dirty / stale / session_lost`
-- **Severity:** major
-- **Surface:** `frontend/apps/web/src/features/shared/components/editor-chrome/parts/AutosaveStatus.tsx:3` (`AutosaveState` is 4-value union) ↔ `frontend/apps/web/src/features/documents/hooks/v2/useDocumentAutosave.ts:5` (`AutosaveStatus` is 7-value union); collapse at `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:184`
-- **Observation:** The component's exported state enum has 4 values. The documents autosave hook's state enum has 7. The consumer page's adapter ternary maps `'dirty' | 'stale' | 'session_lost'` to `'idle'`, which renders as the green `Salvo` dot — identical to a successful save. A user whose document session was force-released by the server sees the same visual state as a user whose last edit was committed.
+### T-001 · Autosave 4-state visual cannot represent `dirty / stale / session_lost` — **RESOLVED 2026-05-11**
+- **Severity:** major → **resolved**
+- **Surface:** `frontend/apps/web/src/features/shared/components/editor-chrome/parts/AutosaveStatus.tsx:3` (`AutosaveState` widened to 7-value union); `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:185` (ternary-collapse removed — direct passthrough).
+- **Resolution (2026-05-11, commit `c2a43abd`):** `AutosaveState` union extended to `'idle' | 'dirty' | 'saving' | 'saved' | 'stale' | 'session_lost' | 'error'`. `DocumentEditorPage` ternary that mapped `dirty/stale/session_lost` → `idle` removed; `autosaveState` is now a direct assignment from `autosave.status`. All 7 states render with distinct pt-BR labels and icons in `AutosaveStatus`. RTL tests covering all 7 states added in commit `29994d7a` (`EditorChrome.test.tsx`).
 - **Evidence:** `_artifacts/02-flow-autosave.md §2–3`; `_artifacts/01-surface.md §2`; `_artifacts/03-deps.md §2 (name collision)`.
-- **Linked backlog row:** [`backlog/editor-chrome-refactor.md#R-001`](../backlog/editor-chrome-refactor.md)
+- **Linked backlog row:** [`backlog/editor-chrome-refactor.md#R-001`](../backlog/editor-chrome-refactor.md) (closed)
 - **Linked ADR:** missing-ADR
 
 ### T-002 · `AutosaveStatus` lacks `role="status"` / `aria-live="polite"`
@@ -90,4 +90,4 @@ Rubric per `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`
 - Operations missing C4 placement: 0 / 0 (no HTTP ops)
 - Cross-deps missing in §5/§8: 0 / 7 OUT + 2 IN (per `_artifacts/03-deps.md`)
 - State transitions missing in §6: 0 / 1 (autosave state machine is in §6.2)
-- Decisions without ADR link: 8 (T-001, T-002, T-004, T-005, T-006, T-007, T-008, T-009 → all `missing-ADR`); T-003 links ADR 0001 as parent
+- Decisions without ADR link: 7 (T-002, T-004, T-005, T-006, T-007, T-008, T-009 → all `missing-ADR`); T-003 links ADR 0001 as parent; T-001 resolved

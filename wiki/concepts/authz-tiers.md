@@ -42,6 +42,5 @@ MetalDocs has **two authorization tiers**.
 ## See also
 
 - [`wiki/modules/auth.md`](../modules/auth.md) — canonical auth module doc; §8.1 covers the session-enforcement layer that is upstream of both authz tiers; middleware at `internal/modules/auth/delivery/http/middleware.go:47` injects `iamdomain.WithAuthContext` so tier-1 and tier-2 checks have an actor in context
-- [`wiki/modules/iam.md §5.4`](../modules/iam.md) — `AuthorizationService`: a third, resource-aware authz surface (SoD + `ResourceCtx`); not wired in production as of 2026-05-10
-- [`wiki/modules/iam-tech-debt.md T-003`](../modules/iam-tech-debt.md) — debt item for the unwired `AuthorizationService`
+- [`wiki/modules/iam.md`](../modules/iam.md) — full Arc42 + C4 doc for `internal/modules/iam`; two live authz tiers documented in §8.1 (AuthorizationService deleted in Plan 4 — T-003 closed)
 - [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) — ADR rationale for the two-tier design

@@ -19,7 +19,7 @@
 | R-009 | Validate `NOT VALID` FKs on `submitted_by` and `actor_user_id` | T-009 | XS | minor | — | — | open | — |
 | R-010 | Add Go doc comments to exported approval symbols | T-010 | M | minor | — | — | open | — |
 | R-011 | Remove `WithMembershipContext` in favor of `setAuthzGUC` | T-011 | XS | minor | — | — | open | — |
-| R-012 | Decide iam `AuthorizationService` adoption vs deletion (cross-module) | T-012 | M | minor | iam T-003 | — | open | — |
+| R-012 | Close approval-tech-debt T-012 — iam `AuthorizationService` deleted Plan 4; update cross-module debt row; no adoption path needed | T-012 | XS | minor | — | — | open | — |
 
 ## Notes
 

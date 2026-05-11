@@ -22,20 +22,20 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-001` (closed)
 - **Linked ADR:** `wiki/decisions/0001-eigenpal-adoption.md`
 
-### T-002 · TemplateEditorPage bypasses the `MetalDocsEditor` wrapper
-- **Severity:** major
-- **Surface:** `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:4-5,61,331` — imports `DocxEditor` directly from `@eigenpal/docx-js-editor/react` and `createEmptyDocument` from `@eigenpal/docx-js-editor/core`. Holds `useRef<DocxEditorRef>` rather than `MetalDocsEditorRef`.
-- **Observation:** The adapter package's stated purpose (ADR 0001 + `wiki/modules/editor-ui-eigenpal.md`) is to centralize the seam between MetalDocs and `@eigenpal/docx-js-editor`. One of the two pages that should consume the seam reaches past it. Consequence: any wrapper-level concern (autosave debounce, plugin gating, ref shape, future telemetry) ships only for `DocumentEditorPage`. The existing wiki names `TemplateEditorPage` as a consumer; current code contradicts that.
-- **Evidence:** Grep results in `_artifacts/03-deps.md` IN-edges table; `MetalDocsEditor` is referenced in 6 files under `features/documents/` and 0 under `features/templates/`.
-- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-002`
-- **Linked ADR:** missing-ADR (the rule "Anti-Corruption Layer between MetalDocs and eigenpal" is implied by ADR 0001 but never given its own decision record; see T-008).
+### T-002 · TemplateEditorPage bypasses the `MetalDocsEditor` wrapper — **RESOLVED 2026-05-11**
+- **Severity:** major → **resolved**
+- **Surface:** `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — previously imported `DocxEditor` directly from `@eigenpal/docx-js-editor/react`.
+- **Resolution (2026-05-11, commit `60fa5473`):** `TemplateEditorPage` migrated to `MetalDocsEditor`. Direct `@eigenpal/docx-js-editor` imports removed; `useRef<MetalDocsEditorRef>` now used. Repo-wide grep `@eigenpal/docx-js-editor` in `frontend/apps/web/src` returns zero outside type-only positions. Anti-Corruption Layer now holds for both consumer pages.
+- **Evidence:** `_artifacts/03-deps.md` IN-edges table (updated).
+- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-002` (closed)
+- **Linked ADR:** missing-ADR (see T-008 — the rule still lacks its own ADR)
 
-### T-003 · `templatePlugin.wiring.test.tsx` asserts pre-gating contract
-- **Severity:** major
-- **Surface:** `packages/editor-ui/test/templatePlugin.wiring.test.tsx:29-34,36-55`
-- **Observation:** Test expects `templatePlugin` to be included when `<MetalDocsEditor mode="document-edit" />`. Current production code (`MetalDocsEditor.tsx:56`) gates the plugin to `mode === 'template-draft'` and would yield `data-plugins='0'` for `document-edit` with no sidebar model. The test is out of sync with the 2026-05-06 plugin-gating refactor (per `editor-ui-eigenpal.md` changelog). Either the test currently fails or has been silently neutralized (no green/red signal recorded in the wiki).
-- **Evidence:** `_artifacts/02-flow-plugin-registration.md` "Stale wiring spec" subsection; source comparison `MetalDocsEditor.tsx:55-59` vs `templatePlugin.wiring.test.tsx:30-34`.
-- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-003`
+### T-003 · `templatePlugin.wiring.test.tsx` asserts pre-gating contract — **RESOLVED 2026-05-11**
+- **Severity:** major → **resolved**
+- **Surface:** `packages/editor-ui/test/templatePlugin.wiring.test.tsx`
+- **Resolution (2026-05-11, commit `ce6d809a`):** Test rewritten to 5 correct assertions gated on `template-draft` mode, aligned with the 2026-05-06 plugin-gating refactor. `document-edit` path asserts `data-plugins='0'` for `templatePlugin`. No stale contract survives.
+- **Evidence:** `_artifacts/02-flow-plugin-registration.md` "Stale wiring spec" subsection (now stale-free).
+- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-003` (closed)
 - **Linked ADR:** missing-ADR (see T-007 for the gating rule itself)
 
 ### T-004 · `createOutlinePlugin` exported but not registered
@@ -73,7 +73,7 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 ### T-008 · No ADR for Anti-Corruption Layer / wrapper-only consumption rule
 - **Severity:** minor
 - **Surface:** `packages/editor-ui/` as a whole; rule implied by ADR 0001 § Consequences ("All editor-related code consolidates in `packages/editor-ui/`"), `wiki/references/eigenpal-controlled-package.md` § "What belongs in MetalDocs docs".
-- **Observation:** No ADR explicitly mandates that all `@eigenpal/docx-js-editor` access in `frontend/apps/web` goes through `@metaldocs/editor-ui`. T-002 (TemplateEditorPage bypass) is the live consequence of this gap.
+- **Observation:** No ADR explicitly mandates that all `@eigenpal/docx-js-editor` access in `frontend/apps/web` goes through `@metaldocs/editor-ui`. T-002 (TemplateEditorPage bypass) was a consequence of this gap — now resolved; the rule still lacks a formal decision record.
 - **Evidence:** `_artifacts/03-deps.md` direct-eigenpal IN-edges table.
 - **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-008`
 - **Linked ADR:** missing-ADR
@@ -86,4 +86,4 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 - Operations missing C4 placement: 0 / 0 (no HTTP)
 - Cross-deps missing in §5/§8: 0 / 5
 - State transitions missing in §6: 0 / 0 (no state machine)
-- Decisions without ADR link: 4 / 8 (T-002, T-003, T-007, T-008 each carry a `missing-ADR` row; two ADRs would cover all four — one for `templatePlugin` mode gating, one for the wrapper-only consumption boundary)
+- Decisions without ADR link: 2 / 8 (T-007, T-008 each carry a `missing-ADR` row; two ADRs would cover both — one for `templatePlugin` mode gating, one for the wrapper-only consumption boundary; T-002 and T-003 resolved)
