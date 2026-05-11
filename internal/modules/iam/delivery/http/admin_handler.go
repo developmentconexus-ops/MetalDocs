@@ -459,7 +459,7 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 	if err != nil {
 		return
 	}
-	_ = h.audit.Record(r.Context(), auditdomain.Event{
+	if err := h.audit.Record(r.Context(), auditdomain.Event{
 		ID:           "evt_" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", ""),
 		OccurredAt:   time.Now().UTC(),
 		ActorID:      authenticatedActor(r),
@@ -468,7 +468,9 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 		ResourceID:   userID,
 		PayloadJSON:  string(payloadJSON),
 		TraceID:      requestTraceID(r),
-	})
+	}); err != nil {
+		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
+	}
 }
 
 func parseRoles(items []string) ([]iamdomain.Role, bool) {
