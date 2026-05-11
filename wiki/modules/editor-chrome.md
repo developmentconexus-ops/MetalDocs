@@ -3,7 +3,7 @@
 > Living architecture doc. Arc42 (12 sections) + C4 Container/Component diagrams.
 > Supersedes the prior stub (slot-API note, eigenpal-overrides bullet list).
 
-**Last verified:** 2026-05-10 · **Owner:** unassigned (frontend) · **Status:** active
+**Last verified:** 2026-05-11 · **Owner:** unassigned (frontend) · **Status:** active
 
 > **Scope:** Shared React primitive that wraps an eigenpal editor canvas, projects a custom toolbar via 3 absolute overlays, and applies MetalDocs visual contract to eigenpal DOM via scoped `:global(.ep-root ...)` CSS overrides. Mounted by `TemplateEditorPage` and `DocumentEditorPage`.
 > **Out of scope:** Eigenpal internals (see [modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md)), template authoring business logic (see [modules/templates_v2.md](templates_v2.md) and [modules/templates-v2.md](templates-v2.md)), document editor business logic (see [modules/documents.md](documents.md)), placeholder rendering (see [concepts/placeholders.md](../concepts/placeholders.md)).
@@ -11,10 +11,11 @@
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.tsx:31` — `EditorChrome` component + `EditorChromeProps` slot API + `editorChromeStyles` re-export
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.module.css:1` — wrapper, overlay layout, button/text primitives, 17 eigenpal `:global` overrides
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/VersionBadge.tsx:13` — monospace brand chip
-> - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/AutosaveStatus.tsx:28` — 4-state autosave indicator
+> - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/AutosaveStatus.tsx:28` — 7-state autosave indicator
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/index.ts:1` — barrel
-> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:274` — consumer A (template authoring; uses center + right + alert)
-> - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:217` — consumer B (document edit/readonly; uses center + right)
+> - `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.test.tsx:1` — 28 RTL tests (slot truthy-collapse, 7-state autosave, aria-live, VersionBadge)
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:277` — consumer A (template authoring; uses center + right + alert)
+> - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:214` — consumer B (document edit/readonly; uses center + right)
 
 ---
 
@@ -82,7 +83,7 @@ C4Context
 A template author or document editor sees a consistent toolbar regardless of which surface they are on: same title typography, same autosave indicator, same primary action button styling. The chrome carries no business meaning — it is the frame around the editor.
 
 ### 3.2 Technical Context
-Inbound: 2 page-level JSX mount sites (`TemplateEditorPage.tsx:274`, `DocumentEditorPage.tsx:217`).
+Inbound: 2 page-level JSX mount sites (`TemplateEditorPage.tsx:277`, `DocumentEditorPage.tsx:214`).
 Outbound: 3 CSS modules + global `styles/tokens.css` (design-token var lookups) + descendant-selector coupling to eigenpal DOM.
 
 ---
@@ -104,7 +105,7 @@ C4Component
     Container_Boundary(mod, "editor-chrome (features/shared/components/editor-chrome/)") {
         Component(ec, "EditorChrome", "React fn component", "wrapper + 3 overlays + alert; eigenpal CSS overrides scoped here")
         Component(vb, "VersionBadge", "React fn component", "monospace brand chip")
-        Component(as, "AutosaveStatus", "React fn component", "4-state visual: idle/saving/saved/error")
+        Component(as, "AutosaveStatus", "React fn component", "7-state visual: idle/dirty/saving/saved/stale/session_lost/error")
         Component(css, "EditorChrome.module.css", "CSS Module", "wrapper, overlays, button/text primitives, 17 :global eigenpal overrides")
     }
     System_Ext(tok, "styles/tokens.css", "design tokens")
@@ -122,8 +123,8 @@ C4Component
 | `EditorChrome.tsx:31` | `EditorChrome` | exported component | Wrapper + 3 absolute overlays + alert banner |
 | `EditorChrome.tsx:47` | `editorChromeStyles` | exported const (re-export of CSS Module) | Consumer access to `.iconBtn / .ghostBtn / .primaryBtn / .docTitle / .docSep / .docMeta` |
 | `parts/VersionBadge.tsx:13` | `VersionBadge` | exported component | Monospace brand chip |
-| `parts/AutosaveStatus.tsx:3` | `AutosaveState` | exported type | `'idle' \| 'saving' \| 'saved' \| 'error'` |
-| `parts/AutosaveStatus.tsx:28` | `AutosaveStatus` | exported component | 4-state visual indicator |
+| `parts/AutosaveStatus.tsx:3` | `AutosaveState` | exported type | `'idle' \| 'dirty' \| 'saving' \| 'saved' \| 'stale' \| 'session_lost' \| 'error'` |
+| `parts/AutosaveStatus.tsx:28` | `AutosaveStatus` | exported component | 7-state visual indicator; `role="status"` + `aria-live` (assertive for error/session_lost, polite otherwise) |
 | `index.ts` | barrel | — | re-exports the 6 above |
 
 ### 5.3 HTTP operations
@@ -169,8 +170,7 @@ sequenceDiagram
     participant P as DocumentEditorPage
     participant A as AutosaveStatus
     H->>P: status: 'idle'|'dirty'|'saving'|'saved'|'stale'|'session_lost'|'error' (7 states)
-    P->>P: autosaveState ternary collapses to 4-state AutosaveState (line 184)
-    Note over P: 'dirty', 'stale', 'session_lost' → 'idle' (rendered as "Salvo")
+    P->>P: autosaveState = autosave.status (direct 1:1 passthrough, line 185)
     P->>A: <AutosaveStatus status={autosaveState}/>
     A->>A: branch on status; render dot+label or check SVG
 ```
@@ -181,10 +181,13 @@ State transitions inside `AutosaveStatus`:
 
 | From | To | Trigger | Authz cap |
 |---|---|---|---|
-| `idle` | `saving` | parent prop change (user edits + 15s debounce flushes) | n/a |
+| `idle` | `dirty` | parent prop change (user keystroke before debounce fires) | n/a |
+| `dirty` | `saving` | parent prop change (debounce fires, upload starts) | n/a |
 | `saving` | `saved` | parent prop change (commit 2xx) | n/a |
 | `saving` | `error` | parent prop change (commit 4xx/5xx) | n/a |
-| any | `idle` | parent prop change (or 7→4 collapse swallows `dirty/stale/session_lost`) | n/a |
+| any | `stale` | parent prop change (server signals newer revision exists) | n/a |
+| any | `session_lost` | parent prop change (writer session force-released by server) | n/a |
+| any | `idle` | parent prop change (reset after session recovery or page remount) | n/a |
 
 Failure modes — n/a (no error envelope at this layer).
 
@@ -215,7 +218,7 @@ Ships as part of the `frontend/apps/web` Vite bundle. No separate artifact, no e
 ## 8. Cross-cutting Concepts
 
 ### 8.1 Authentication & Authorization
-n/a — primitive renders whatever JSX consumers pass. Role-gating of actions (e.g. "Submeter para revisão" disabled when not draft) lives in the consumer pages (`TemplateEditorPage.tsx:289`, `DocumentEditorPage.tsx:233`). Chrome enforces nothing.
+n/a — primitive renders whatever JSX consumers pass. Role-gating of actions (e.g. "Submeter para revisão" disabled when not draft) lives in the consumer pages (`TemplateEditorPage.tsx:314`, `DocumentEditorPage.tsx:230`). Chrome enforces nothing.
 
 ### 8.2 Error envelope
 n/a — no HTTP responses. Consumer pages use `alert` slot to surface error banners.
@@ -260,7 +263,7 @@ Coupling is exclusively CSS via `:global(.ep-root ...)` descendant selectors. Th
 |---|---|---|
 | Visual contract holds | Render `TemplateEditorPage` + `DocumentEditorPage` against eigenpal 0.2.0 | overlay positions match design-source mockups; wine formatting bar tinted; gradient scrollbar visible |
 | Domain-agnostic API | Chrome accepts `ReactNode` slots only | `EditorChromeProps` does not import any template/document type — verified by `_artifacts/01-surface.md §2` |
-| Autosave state visible | Adapter ternary keeps `saving / saved / error / idle` distinguishable | manual: trigger save, observe pulsing dot then check; 7→4 collapse documented as T-001 |
+| Autosave state visible | All 7 states passed through directly; `AutosaveStatus` renders each with distinct icon/label | manual: trigger save, observe pulsing dot then check; 7-state union resolved as of T-001 closure (2026-05-11) |
 
 ---
 
@@ -269,13 +272,13 @@ Coupling is exclusively CSS via `:global(.ep-root ...)` descendant selectors. Th
 Pointer-only. Full register: [editor-chrome-tech-debt.md](editor-chrome-tech-debt.md). Severity rubric concrete triggers live there.
 
 - Critical: 0
-- Major: 4
+- Major: 3
 - Minor: 5
 
 Top 3 (by severity, then by blast-radius):
-1. Autosave 4-state visual cannot represent `dirty / stale / session_lost` — user sees `Salvo` while session is lost on document editor — see tech-debt T-001
-2. `AutosaveStatus` has no `aria-live` — assistive-tech users get no save-state feedback on a regulated-document editor — see tech-debt T-002
-3. Eigenpal coupling fragility — 17 `:global` selectors anchored on `data-testid` + hardcoded SVG hex, all `!important`, no version guard — see tech-debt T-003
+1. `AutosaveStatus` has no `aria-live` — assistive-tech users get no save-state feedback on a regulated-document editor — see tech-debt T-002
+2. Eigenpal coupling fragility — 17 `:global` selectors anchored on `data-testid` + hardcoded SVG hex, all `!important`, no version guard — see tech-debt T-003
+3. Zero test coverage on a primitive used by two editor pages — **partially resolved** (EditorChrome.test.tsx: 28 RTL tests added 2026-05-11); visual-regression and eigenpal-selector survival still absent — see tech-debt T-004
 
 ---
 
@@ -302,4 +305,5 @@ Top 3 (by severity, then by blast-radius):
 
 ## Changelog (this doc)
 
+- 2026-05-11 — T-001 closed: `AutosaveState` widened from 4 to 7 states (`dirty`, `stale`, `session_lost` added); `DocumentEditorPage` ternary-collapse removed — direct passthrough at line 185 (commit `c2a43abd`). `EditorChrome.test.tsx` added (28 RTL tests, commit `29994d7a`). Updated §5 Key Files, §5.2 surface table, §6.2 flow + state transitions, §8.1 line anchors, §10 quality row, §11 counts + Top 3. Consumer line anchors updated (TemplateEditorPage.tsx:277, DocumentEditorPage.tsx:214).
 - 2026-05-10 — initial Arc42 + C4 publish; supersedes the prior slot-API stub. Codex blocked on Phase 1; surface scan run manually. Phase 5 industry comparison recorded as n/a — backend-focused index has no rows applicable to a presentation primitive.

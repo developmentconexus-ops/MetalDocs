@@ -370,7 +370,7 @@ GUC writes by Go (`_artifacts/04-persistence.md` §3):
 - `setAuthzGUC` writes `metaldocs.tenant_id` + `metaldocs.actor_id` (`application/authz_guc.go:12,15`).
 - Reject branch + cancel path write `metaldocs.cancel_in_progress` (`decision_service.go:334`, `cancel_service.go:111`) — whitelisted by `enforce_document_transition` (`migrations/0144_cancel_state.sql:61`) to permit `under_review → draft`.
 
-The iam-side `AuthorizationService` (`internal/modules/iam/application/authorization.go`) is unwired and not consumed here — see iam-tech-debt T-003 and approval-tech-debt T-012 for cross-module pointer.
+The iam-side `AuthorizationService` was deleted in Plan 4 (T-003 closed). Approval did not import it; SoD is enforced via `domain/sod.go:CheckSoD` called from `decision_service.go`. See approval-tech-debt T-012 for the cross-module tracking row.
 
 ### 8.2 Error envelope
 
