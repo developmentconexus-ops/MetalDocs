@@ -683,8 +683,8 @@ func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied; got %v", err)
 	}
-	if denied.Capability != "doc.signoff" {
-		t.Errorf("capability = %q; want %q", denied.Capability, "doc.signoff")
+	if denied.Capability != "document.signoff" {
+		t.Errorf("capability = %q; want %q", denied.Capability, "document.signoff")
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on denied capability; got %d", len(emitter.Events))
