@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
@@ -100,13 +103,22 @@ WHERE tenant_id = $1`
 }
 
 func (r *ProfileRepository) Create(ctx context.Context, p *domain.DocumentProfile) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin create profile tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check Create profile: %w", err)
+	}
 	const q = `
 INSERT INTO metaldocs.document_profiles
     (code, tenant_id, family_code, name, description, alias, review_interval_days, default_template_version_id, owner_user_id, editable_by_role, archived_at)
 VALUES
     ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 
-	_, err := r.db.ExecContext(
+	if _, err := tx.ExecContext(
 		ctx,
 		q,
 		p.Code,
@@ -120,11 +132,22 @@ VALUES
 		stringPtrToNull(p.OwnerUserID),
 		p.EditableByRole,
 		p.ArchivedAt,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *ProfileRepository) Update(ctx context.Context, p *domain.DocumentProfile) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin update profile tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check Update profile: %w", err)
+	}
 	const q = `
 UPDATE metaldocs.document_profiles
 SET family_code = $1,
@@ -138,7 +161,7 @@ SET family_code = $1,
     archived_at = $9
 WHERE tenant_id = $10 AND code = $11`
 
-	result, err := r.db.ExecContext(
+	result, err := tx.ExecContext(
 		ctx,
 		q,
 		p.FamilyCode,
@@ -160,7 +183,7 @@ WHERE tenant_id = $10 AND code = $11`
 	if rowsAffected == 0 {
 		return domain.ErrProfileNotFound
 	}
-	return nil
+	return tx.Commit()
 }
 
 type AreaRepository struct {
@@ -251,13 +274,22 @@ WHERE tenant_id = $1`
 }
 
 func (r *AreaRepository) Create(ctx context.Context, a *domain.ProcessArea) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin create area tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check Create area: %w", err)
+	}
 	const q = `
 INSERT INTO metaldocs.document_process_areas
     (code, tenant_id, name, description, parent_code, owner_user_id, default_approver_role, archived_at)
 VALUES
     ($1, $2, $3, $4, $5, $6, $7, $8)`
 
-	_, err := r.db.ExecContext(
+	if _, err := tx.ExecContext(
 		ctx,
 		q,
 		a.Code,
@@ -268,11 +300,22 @@ VALUES
 		stringPtrToNull(a.OwnerUserID),
 		stringPtrToNull(a.DefaultApproverRole),
 		a.ArchivedAt,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *AreaRepository) Update(ctx context.Context, a *domain.ProcessArea) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin update area tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check Update area: %w", err)
+	}
 	const q = `
 UPDATE metaldocs.document_process_areas
 SET name = $1,
@@ -283,7 +326,7 @@ SET name = $1,
     archived_at = $6
 WHERE tenant_id = $7 AND code = $8`
 
-	result, err := r.db.ExecContext(
+	result, err := tx.ExecContext(
 		ctx,
 		q,
 		a.Name,
@@ -302,7 +345,7 @@ WHERE tenant_id = $7 AND code = $8`
 	if rowsAffected == 0 {
 		return domain.ErrAreaNotFound
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID, code string) ([]string, error) {
