@@ -80,3 +80,25 @@ func TestPermissionResolver_TaxonomyAreasPATCH_RequiresTaxonomyManage(t *testing
 		t.Fatalf("PATCH /taxonomy/areas: cap = %v, want CapTaxonomyManage", cap)
 	}
 }
+
+func TestPermissionResolver_RegistryObsolete_RequiresRegistryObsoleteCap(t *testing.T) {
+	r := newPermissionResolver()
+	cap, ok := r(http.MethodPut, "/api/v2/controlled-documents/some-id/obsolete")
+	if !ok {
+		t.Fatal("PUT .../obsolete: resolver returned ok=false")
+	}
+	if cap != iamdomain.CapRegistryObsolete {
+		t.Fatalf("PUT .../obsolete: cap = %v, want CapRegistryObsolete", cap)
+	}
+}
+
+func TestPermissionResolver_RegistrySupersede_RequiresRegistrySupersedeCAP(t *testing.T) {
+	r := newPermissionResolver()
+	cap, ok := r(http.MethodPut, "/api/v2/controlled-documents/some-id/supersede")
+	if !ok {
+		t.Fatal("PUT .../supersede: resolver returned ok=false")
+	}
+	if cap != iamdomain.CapRegistrySupersede {
+		t.Fatalf("PUT .../supersede: cap = %v, want CapRegistrySupersede", cap)
+	}
+}
