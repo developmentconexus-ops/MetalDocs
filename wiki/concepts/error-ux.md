@@ -2,6 +2,8 @@
 
 > **Migration note.** The legacy `ApiErrorEnvelope` shape documented below (`{ error: { code, message } }`) will be replaced by RFC 9457 Problem in Plan 2. See [`architecture/api-design-system.md`](../architecture/api-design-system.md) for the incoming contract.
 
+> **Audit envelope note.** `GET /api/v1/audit/events` emits the same legacy `{error:{code,message,details,trace_id}}` envelope on errors (audit T-002 in [`modules/audit-tech-debt.md`](../modules/audit-tech-debt.md)). The success body is `{"items":[...]}` — not a `data` wrapper. See [`modules/audit.md §8.2`](../modules/audit.md) for the full envelope spec.
+
 > **Last verified:** 2026-05-10
 > **Branch:** `phase-e-error-ux` (merged into main)
 > **Bugs fixed:** E2, E3, E4

@@ -468,6 +468,7 @@ Top 3 (by severity, then blast radius):
 - Tech debt: `wiki/modules/documents-tech-debt.md`
 - Iam cross-refs: `wiki/modules/iam-tech-debt.md` T-001 (namespaces), T-006 (RFC 9457), T-009 (`ErrCapabilityDenied`)
 - Auth cross-ref: [`wiki/modules/auth.md §8.8`](auth.md) — `authdomain.CurrentUserFromContext` is the IN-edge this module reads after middleware injection; §8.1 of auth.md covers the middleware that sets the context value
+- See also: [`modules/audit.md`](audit.md) — documents emits audit events via `documentsV2AuditAdapter` (`main.go:445-479`); T-005 (rename outside tx) and T-007 (latent consumer port) are the open gaps in the consumer-side register
 - Research artifacts: `wiki/modules/documents/_artifacts/00-context.md` … `06-selfreview.md`
 
 ## Changelog (this doc)
