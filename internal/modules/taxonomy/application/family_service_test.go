@@ -56,7 +56,7 @@ func (r *fakeFamilyRepo) HasActiveProfiles(_ context.Context, familyCode string)
 
 func TestFamilyService_Create(t *testing.T) {
 	repo := newFakeFamilyRepo()
-	svc := NewFamilyService(repo)
+	svc := NewFamilyService(repo, nil)
 
 	f := &domain.DocumentFamily{Code: "policy", Name: "Policy"}
 	if err := svc.Create(context.Background(), f); err != nil {
@@ -78,7 +78,7 @@ func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	repo.families["policy"] = &domain.DocumentFamily{Code: "policy", IsActive: true}
 	repo.activeProfiles["policy"] = true
-	svc := NewFamilyService(repo)
+	svc := NewFamilyService(repo, nil)
 
 	if err := svc.Deactivate(context.Background(), "policy"); err != domain.ErrFamilyHasProfiles {
 		t.Fatalf("want ErrFamilyHasProfiles, got %v", err)
@@ -88,7 +88,7 @@ func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 func TestFamilyService_Deactivate_OK(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	repo.families["orphan"] = &domain.DocumentFamily{Code: "orphan", IsActive: true}
-	svc := NewFamilyService(repo)
+	svc := NewFamilyService(repo, nil)
 
 	if err := svc.Deactivate(context.Background(), "orphan"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -102,7 +102,7 @@ func TestFamilyService_Deactivate_OK(t *testing.T) {
 func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	repo.families["policy"] = &domain.DocumentFamily{Code: "policy", Name: "Old", IsActive: false}
-	svc := NewFamilyService(repo)
+	svc := NewFamilyService(repo, nil)
 
 	if _, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "policy", Name: "New"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -118,7 +118,7 @@ func TestFamilyService_Update_PreservesIsActive(t *testing.T) {
 
 func TestFamilyService_Update_NotFound(t *testing.T) {
 	repo := newFakeFamilyRepo()
-	svc := NewFamilyService(repo)
+	svc := NewFamilyService(repo, nil)
 	_, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "missing", Name: "X"})
 	if err != domain.ErrFamilyNotFound {
 		t.Fatalf("want ErrFamilyNotFound, got %v", err)
