@@ -26,7 +26,7 @@
 | P0 | 3 | Supply-chain unblock + tenant resolution platform fix | PR2 (tenant platform), PR3 (module sweep) | done 2026-05-11 |
 | P1 | 4 | Capability namespace collapse + IAM dual-surface consolidation | 8 commits | done 2026-05-11 |
 | P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | ~3 | pending |
-| P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | ~5 | pending |
+| P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
 | P2 | 6 | Audit-trail completeness sweep + audit-module hardening | ~7 | pending |
 | P3 | 7 | RFC 9457 envelope rollout | ~9 | pending |
 | P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | pending |
@@ -73,7 +73,7 @@
 - **Closes:** iam T-004/R-004; documents T-003/R-003; registry T-001/R-001, T-004/R-004; taxonomy T-003/R-003, T-006/R-006, T-013/R-013; templates_v2 T-001/R-001, T-002/R-002, T-004/R-004.
 - **Critical rows closed:** 6 (registry T-001, taxonomy T-003, templates_v2 T-001/T-002/T-004 — T-002 needs tenant-scoped getters from Plan 3 + tier-2 enforcement here).
 - **Blockers:** Plan 4 (stable cap names).
-- **Status:** pending.
+- **Status:** done 2026-05-11. Commits: `0dba5589` (CapRegistryObsolete/Supersede), `37cbcc7b` (PATCH taxonomy routes), `aa6d96a7` (obsolete/supersede cap routing), `1ab62d49` (migration 0187), `b9192b95` (IAM role_admin tier-2), `70aeccd2` (IAM user_area tier-2), `8b565d67` (documents tier-2), `2e156721` (registry tier-2), `d26ac392` (taxonomy tier-2), `4cd03873` (templates_v2 tier-2 + T-002 + T-004 + real authz wire), `fdcf90e7` (migration 0188). Spec: `docs/superpowers/specs/2026-05-11-plan-05-tripwire.md`.
 
 ## Plan 6 · Audit-trail completeness sweep + audit-module hardening
 
@@ -103,13 +103,14 @@
 - **Blockers:** Plan 7 (error schema referenced by every spec).
 - **Status:** pending.
 
-## Plan 9 · Transactional + idempotency hardening
+## Plan 9 · Transactional + idempotency hardening + template workflow alignment
 
-- **Goal:** Atomic multi-step writes. HTTP `Idempotency-Key` adopted on POST create/mutate. Optimistic-lock enforced.
+- **Goal:** Atomic multi-step writes. HTTP `Idempotency-Key` adopted on POST create/mutate. Optimistic-lock enforced. Template version lifecycle aligned to document 4-stage workflow (`draft → under_review → approved → published`).
 - **Touches:** `internal/modules/auth/application/service.go:305` (wrap CreateUser); `internal/modules/documents/delivery/http/handler.go:316` (read header + integrate `internal/platform/idempotency`); `internal/modules/templates_v2/application/lifecycle.go:265` (wrap publish chain in tx + check `ExpectedLockVersion`) + autosave `UpdateVersion` `WHERE lock_version = $X`; `internal/modules/taxonomy/application/family_service.go:48` (wrap Deactivate + add tenant predicate on `HasActiveProfiles`); `migrations/<next>_placeholder_revision_fk_fix.sql` (documents T-009).
-- **Closes:** auth T-004/R-004; documents T-006/R-006, T-009/R-009; templates_v2 T-007/R-007, T-009/R-009, T-010/R-010; taxonomy T-007/R-007, T-011/R-011.
+  - **Template workflow alignment:** split `Service.Approve` (`lifecycle.go:159`) into `Review(ctx, ReviewCmd)` + `Approve(ctx, ApproveCmd)` — `Approve` currently handles both paths via `hasReviewer` flag, which conflates reviewer and approver roles. Add `VersionStatusUnderReview` state to `domain.VersionStatus` enum. New service method `Review` checks `CapTemplateReview` + SoD against author. Add `CapTemplateReview Capability = "template.review"` to `internal/modules/iam/domain/model.go`. Seed `template.review` in a migration for approver + system_admin roles. HTTP route: `POST /api/v2/templates/{id}/versions/{n}/review` (add to handler + openapi spec). Update state machine: `draft → [submit] → under_review → [review] → approved → [publish/approve] → published`. Remove `hasReviewer` conditional from `Approve`; reviewer step is now always a distinct service call.
+- **Closes:** auth T-004/R-004; documents T-006/R-006, T-009/R-009; templates_v2 T-007/R-007, T-009/R-009, T-010/R-010; taxonomy T-007/R-007, T-011/R-011; templates_v2 workflow-alignment (new backlog row).
 - **Critical rows closed:** 0 (all Major).
-- **Blockers:** none hard.
+- **Blockers:** Plan 5 (authz wiring on templates must land first so Review method gets cap-checked on arrival).
 - **Status:** pending.
 
 ## Plan 10 · Legacy purge + rename sweep
