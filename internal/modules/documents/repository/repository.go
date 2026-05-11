@@ -244,6 +244,23 @@ func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, docID, na
 	return tx.Commit()
 }
 
+func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, docID, name string) error {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return fmt.Errorf("update document name: authz check: %w", err)
+	}
+	res, err := tx.ExecContext(ctx,
+		`UPDATE documents SET name=$2, updated_at=now() WHERE id=$1 AND tenant_id=$3`,
+		docID, name, tenantID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,

@@ -30,6 +30,7 @@ type Repository interface {
 	SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
 	UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error
+	UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, docID, name string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
 	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error)
@@ -80,6 +81,7 @@ type FormValidator interface {
 
 type Audit interface {
 	Write(ctx context.Context, tenantID, actorID, action, docID string, meta any)
+	WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error
 }
 
 // RegistryReader loads a ControlledDocument for validation at create time.
@@ -108,6 +110,12 @@ type Service struct {
 	caps               CapabilityChecker
 	profileTemplates   ProfileDefaultTemplateReader
 	snapshotSvc        *SnapshotService
+	db                 *sql.DB
+}
+
+func (s *Service) WithDB(db *sql.DB) *Service {
+	s.db = db
+	return s
 }
 
 func New(r Repository, d DocgenRenderer, p Presigner, t TemplateReader, fv FormValidator, a Audit) *Service {
@@ -573,11 +581,25 @@ func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, n
 	if doc.Status != domain.DocStatusDraft {
 		return domain.ErrInvalidStateTransition
 	}
-	if err := s.repo.UpdateDocumentName(ctx, tenantID, docID, name); err != nil {
+	if s.db == nil {
+		if err := s.repo.UpdateDocumentName(ctx, tenantID, docID, name); err != nil {
+			return err
+		}
+		s.audit.Write(ctx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name})
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("rename document: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := s.repo.UpdateDocumentNameTx(ctx, tx, tenantID, docID, name); err != nil {
 		return err
 	}
-	s.audit.Write(ctx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name})
-	return nil
+	if err := s.audit.WriteTx(ctx, tx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name}); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Service) IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error) {

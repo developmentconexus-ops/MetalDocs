@@ -97,6 +97,13 @@ func (f *fakeRepo) UpdateDocumentName(_ context.Context, tenantID, docID, name s
 	return f.renameErr
 }
 
+func (f *fakeRepo) UpdateDocumentNameTx(_ context.Context, _ *sql.Tx, tenantID, docID, name string) error {
+	f.renameTenantID = tenantID
+	f.renameDocID = docID
+	f.renameName = name
+	return f.renameErr
+}
+
 func (f *fakeRepo) ListDocuments(_ context.Context, _ string) ([]domain.Document, error) {
 	return f.listReturn, nil
 }
@@ -312,6 +319,12 @@ type noopAudit struct {
 func (n *noopAudit) Write(_ context.Context, _, _, action, _ string, _ any) {
 	n.calls++
 	n.lastAction = action
+}
+
+func (n *noopAudit) WriteTx(_ context.Context, _ *sql.Tx, _, _, action, _ string, _ any) error {
+	n.calls++
+	n.lastAction = action
+	return nil
 }
 
 func TestCreateDocument_OK(t *testing.T) {

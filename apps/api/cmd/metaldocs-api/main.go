@@ -156,7 +156,7 @@ func main() {
 	auditHandler := auditdelivery.NewHandler(auditService)
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB))
 	searchHandler := searchdelivery.NewHandler(searchService)
-	authHandler := authdelivery.NewHandler(authService)
+	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
 	healthHandler := observability.NewHealthHandler(deps.StatusProvider)
 
 	var capabilityService *iamapp.CapabilityService
@@ -326,7 +326,7 @@ func main() {
 	registryModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
 	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
-	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
+	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB).WithAudit(deps.AuditWriter), tv2Presigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
 	tv2AuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
@@ -474,6 +474,31 @@ type documentsV2AuditAdapter struct {
 
 func newDocumentsV2AuditAdapter(writer auditdomain.Writer) *documentsV2AuditAdapter {
 	return &documentsV2AuditAdapter{writer: writer}
+}
+
+func (a *documentsV2AuditAdapter) WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error {
+	if a == nil || a.writer == nil {
+		return nil
+	}
+	payload := map[string]any{"tenant_id": tenantID}
+	if meta != nil {
+		payload["meta"] = meta
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		raw = []byte("{}")
+	}
+	return a.writer.RecordTx(ctx, tx, auditdomain.Event{
+		ID:           uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      actorID,
+		Action:       action,
+		ResourceType: "document",
+		ResourceID:   docID,
+		PayloadJSON:  string(raw),
+		TraceID:      "trace-local",
+		TenantID:     tenantID,
+	})
 }
 
 func (a *documentsV2AuditAdapter) Write(ctx context.Context, tenantID, actorID, action, docID string, meta any) {
