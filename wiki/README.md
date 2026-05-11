@@ -28,6 +28,7 @@
 - [backlog/approval-refactor.md](backlog/approval-refactor.md) — approval refactor backlog (12 rows, R-001..R-012: RFC-9457 envelope, OpenAPI spec gap, substring classifier 500→409, deprecated PDF dispatcher, inbox snapshot drift, cancel/cutover tripwire audit, infra naming, document_v2_id suffix, NOT VALID FKs, undocumented symbols, dual GUC helpers, unwired iam AuthorizationService) (Last verified: 2026-05-10)
 - [backlog/audit-refactor.md](backlog/audit-refactor.md) — audit refactor backlog (12 rows, R-001..R-012) (Last verified: 2026-05-10)
 - [backlog/editor-ui-eigenpal-refactor.md](backlog/editor-ui-eigenpal-refactor.md) — editor-ui-eigenpal refactor backlog (10 rows R-001..R-010 incl. 2 `maint:` rows; R-001 restore tarball, R-002 migrate `TemplateEditorPage` to adapter, R-003 rewrite wiring test, R-004..R-010 minor/maint cleanup) (Last verified: 2026-05-10)
+- [backlog/editor-chrome-refactor.md](backlog/editor-chrome-refactor.md) — editor-chrome refactor backlog (9 rows R-001..R-009, one-to-one with T-001..T-009: autosave state widening, aria-live, selector guard, baseline tests, token gaps, typed style re-export, pointer-events contract, missing-ADR, slot truthy-collapse) (Last verified: 2026-05-10)
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
