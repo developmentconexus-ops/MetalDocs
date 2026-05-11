@@ -16,8 +16,8 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ## Items
 
-### T-001 · Dual capability namespaces
-- **Severity:** critical
+### T-001 · Dual capability namespaces — CLOSED 2026-05-11 (Plan 4)
+- **Severity:** critical (closed)
 - **Surface:** `internal/modules/iam/domain/capabilities.go:4-19` (16 string consts `CapDocView`, `CapDocCreate`, …) and `internal/modules/iam/domain/model.go:16-20` (5 typed `Capability` consts `CapDocumentView`, `CapDocumentCreate`, `CapDocumentEdit`, `CapWorkflowReview`, `CapWorkflowApprove`)
 - **Observation:** Two parallel capability namespaces exist with overlapping semantics. `domain/capabilities.go` defines `doc.view` / `doc.create` / `doc.edit`; `domain/model.go` defines `document.view` / `document.create` / `document.edit` plus `workflow.review` / `workflow.approve`. The `role_capabilities` DB table (migration 0165) seeds the `doc.*` / `template.*` / `registry.*` / `taxonomy.*` / `membership.*` / `route.*` / `user.*` namespace from `capabilities.go`. The typed `Capability` constants from `model.go` are imported by `internal/modules/documents/application/fillin_authz.go:9` and `apps/api/internal/wiring/documents.go:7`.
 - **Evidence:** `_artifacts/01-surface.md` rows 120-152; `_artifacts/03-deps.md` §2 (documents importers).
@@ -25,16 +25,16 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked ADR:** missing-ADR (no decision recording why two namespaces coexist)
 - **Consumer cross-ref:** `wiki/modules/documents-tech-debt.md#t-008` — documents module straddles both namespaces; closure here unblocks documents R-008
 
-### T-002 · Two area-membership write surfaces
-- **Severity:** major
+### T-002 · Two area-membership write surfaces — CLOSED 2026-05-11 (Plan 4)
+- **Severity:** major (closed)
 - **Surface:** `internal/modules/iam/area_membership/area_membership.go:53,65,77` (free `Grant`/`Revoke`/`List` taking `*sql.Tx`, calling `metaldocs.grant_area_membership` / `revoke_area_membership` SECURITY DEFINER funcs) vs `internal/modules/iam/application/area_membership_service.go:49,108` (`AreaMembershipService.Grant`/`Revoke`) calling `UserAreaRepository.GrantAtomic` (`infrastructure/postgres/user_area_repository.go:90`) with direct DML
 - **Observation:** Two implementations of the same use case exist with different semantics. The v2 HTTP route at `/api/v2/iam/area-memberships` (POST) uses the application-service + repo path (artifact 02-flow-grant-membership). The `area_membership/` package is wired into none of the routes registered in `main.go` (per artifact 03 §3 DI touchpoints) — its callers are not in the IAM module. SECURITY DEFINER funcs `metaldocs.grant_area_membership` reads `metaldocs.actor_id` GUC; the direct-DML path does not.
 - **Evidence:** `_artifacts/01-surface.md` (both surfaces); `_artifacts/04-persistence.md` §5 (tripwire pairing rows for both); `_artifacts/03-deps.md` §3.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · `AuthorizationService` is a third authz surface, unused in production
-- **Severity:** major
+### T-003 · `AuthorizationService` is a third authz surface, unused in production — CLOSED 2026-05-11 (Plan 4)
+- **Severity:** major (closed)
 - **Surface:** `internal/modules/iam/application/authorization.go:42` (`AuthorizationService`), `:49` (`NewAuthorizationService`), `:81` (`Check(ctx, userID, tenantID, capability, ResourceCtx) error`); plus `ErrSoDViolation` `:16`, `TemplateAuthorChecker` iface `:33`, `AccessPolicy` `:24`, `WithAuthzCache` `:74`
 - **Observation:** `AuthorizationService` exposes resource-aware authz (`ResourceCtx`) with SoD probing — distinct from tier-1 (`CapabilityService.CanDo`) and tier-2 (`authz.Require`). It is not wired in `apps/api/cmd/metaldocs-api/main.go` (artifact 03 §3 lists 8 DI touchpoints; none constructs `AuthorizationService`). The benchmark (`application/authorization_bench_test.go`) and unit test (`authorization_test.go`) exercise it in isolation. Three authz surfaces compete; only two are live.
 - **Evidence:** `_artifacts/01-surface.md` rows 68-79; `_artifacts/03-deps.md` §3 (no constructor call).
@@ -83,8 +83,8 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked backlog row:** `backlog/iam-refactor.md#R-008`
 - **Linked ADR:** missing-ADR
 
-### T-009 · `ErrCapabilityDenied` exists in two packages with different shapes
-- **Severity:** minor
+### T-009 · `ErrCapabilityDenied` exists in two packages with different shapes — CLOSED 2026-05-11 (Plan 4)
+- **Severity:** minor (closed)
 - **Surface:** `internal/modules/iam/application/capability_service.go:10` (sentinel `error` var) vs `internal/modules/iam/authz/authz.go:11` (struct type with `(e).Error()` method `:17`)
 - **Observation:** Both packages export `ErrCapabilityDenied` under the same name with different shapes. Consumers must qualify: `iamapp.ErrCapabilityDenied` is a sentinel suitable for `errors.Is`; `authz.ErrCapabilityDenied` is a typed error carrying capability/area context. Confused naming has already surfaced in `internal/modules/documents/delivery/http/handler.go:17` which imports the sentinel variant (artifact 03 §2).
 - **Evidence:** `_artifacts/01-surface.md` rows 85, 93-95; `_artifacts/03-deps.md` §2.
@@ -108,8 +108,8 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked backlog row:** `backlog/iam-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
 
-### T-012 · `RoleCapabilities` map duplicates `role_capabilities` table
-- **Severity:** minor
+### T-012 · `RoleCapabilities` map duplicates `role_capabilities` table — CLOSED 2026-05-11 (Plan 4)
+- **Severity:** minor (closed)
 - **Surface:** `internal/modules/iam/domain/role_capabilities.go:3` (`RoleCapabilitiesVersion = 2`) and `:5` (`var RoleCapabilities map[Role][]Capability`); DB seed in migration 0165 (40 rows in `metaldocs.role_capabilities`); drift check in `application/startup.go:15` `CheckRoleCapabilitiesVersion`
 - **Observation:** The role↔capability mapping exists in two places: an in-process Go map (`RoleCapabilities`, using the typed `Capability` namespace from T-001) and the DB `role_capabilities` table (using the string namespace from T-001). The boot-time drift check compares versions, but the data shapes are not directly compared. The in-process map is read by `AuthorizationService` (T-003); the DB table is read by `CapabilityService.CanDo` (`capability_service.go:31`). Two sources of truth.
 - **Evidence:** `_artifacts/01-surface.md` rows 152-156; `capability_service.go:31` SQL joins `metaldocs.role_capabilities`.
@@ -118,10 +118,10 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ---
 
-## Coverage stats (computed at compose time)
+## Coverage stats (updated 2026-05-11 post-Plan 4)
 
-- Public symbols undocumented: 119 / 129 (10 carry doc comments per `_artifacts/01-surface.md`: `CapabilityService.CanDo`, `CachedRoleProvider`, `InvalidateUser`, `RoleProvider`, `RoleAdminRepository`, `MustActorID`, `MustTenantID`, `ErrActorContextMissing`, `ErrTenantContextMissing`, `ReplaceUserRoles` pg). Collective gap addressed by R-013 in backlog.
+- Public symbols undocumented: ~97 / ~107 (Plan 4 deleted authorization.go (~12), startup.go (1), role_capabilities.go (2), area_membership.go (~7) = ~22 symbols removed; 10 documented symbols unchanged). Collective gap addressed by R-013 in backlog.
 - Operations missing C4 placement: 0 / 11 (all 11 in §5.3 + Container diagram)
 - Cross-deps missing in §5/§8: 0 / 22 (5 OUT + 17 IN named in §8.4 / §3.2)
 - State transitions missing in §6: 0 / 2 (grant_membership + upsert_user_role both traced)
-- Decisions without ADR link: 12 occurrences across 11 distinct rows — T-001, T-002, T-003, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012 each marked `missing-ADR` (T-004 references ADR 0007 with explicit "does not address IAM-table coverage" note, also counted as a partial-link case).
+- Decisions without ADR link: 7 occurrences — T-005, T-006, T-007, T-008, T-010, T-011 marked `missing-ADR`; T-004 partial-link (ADR 0007 exists but does not address IAM-table coverage). T-001/T-002/T-003/T-009/T-012 closed by Plan 4 (ADR-TODO stubs per Plan 13).

@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Severity scale
 
@@ -66,8 +66,8 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** none yet — latent
 - **Linked ADR:** missing-ADR
 
-### T-008 · Capability namespace straddle: typed `iamdomain.Capability` vs. string `"doc.submit"`
-- **Severity:** minor
+### T-008 · Capability namespace straddle: typed `iamdomain.Capability` vs. string `"doc.submit"` — CLOSED 2026-05-11 (Plan 4)
+- **Severity:** minor (closed)
 - **Surface:** `internal/modules/documents/application/fillin_authz.go:9` (typed import) · `internal/modules/documents/approval/application/submit_service.go:85` (`authz.Require(ctx, tx, "doc.submit", areaCode)`)
 - **Observation:** Documents consumes both capability surfaces — typed `iamdomain.Capability` consts in fillin authz and string `"doc.*"` capabilities through the tripwire path. Cross-references `iam` T-001 (dual capability namespaces).
 - **Evidence:** `_artifacts/00-context.md`; `wiki/modules/iam-tech-debt.md` T-001.
@@ -98,4 +98,4 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - Operations missing C4 placement: 0 / 22 (all routes in `_artifacts/01-surface.md` appear in §5.1 Container view or §5.3 HTTP table).
 - Cross-deps missing in §5/§8: 0 / 25 (all 14 OUT + 11 IN edges from `_artifacts/03-deps.md` appear in §3.2 or §5).
 - State transitions missing in §6: 0 / 5 (draft → under_review → approved → published → superseded/obsolete + rejected branch all tabled).
-- Decisions without ADR link: 5 / 10 (T-004, T-005, T-007, T-008, T-009 flagged missing-ADR).
+- Decisions without ADR link: 4 / 9 (T-004, T-005, T-007, T-009 flagged missing-ADR; T-008 closed by Plan 4).

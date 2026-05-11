@@ -22,18 +22,18 @@
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
-| R-001 | Collapse capability namespaces to a single `Capability` typed enum sourced from `domain/capabilities.go`; remove the `Cap*` typed consts in `domain/model.go` | T-001 | M | Critical | — | — | open | — |
-| R-002 | Pick one area-membership write path: route the v2 HTTP service through `area_membership/` (SECURITY DEFINER) OR delete `area_membership/` and centralise on `UserAreaRepository.GrantAtomic` with explicit governance-event INSERT | T-002 | M | Major | R-007 | — | open | — |
-| R-003 | Wire `AuthorizationService` into the consumer that needs SoD (documents/approval) or delete it; resolve `ErrSoDViolation` ownership (IAM vs approval) | T-003 | M | Major | — | — | open | — |
+| R-001 | Collapse capability namespaces to a single typed `iamdomain.Capability` enum (winner per `roadmap.md:17`); delete `domain/capabilities.go` and reseed `role_capabilities` to `document.*` | T-001 | M | Critical | — | — | merged | Plan 4 (2026-05-11, commit 3a227642) |
+| R-002 | Pick one area-membership write path: delete `area_membership/` Go wrapper, centralise on `UserAreaRepository.GrantAtomic`; SECURITY DEFINER SQL funcs stay for e2e seed / integration tests | T-002 | M | Major | R-007 | — | merged | Plan 4 (2026-05-11, commit a66a8d62) |
+| R-003 | Delete unwired `AuthorizationService` (third authz surface); Plan 5 wires tier-2 `authz.Require` per module instead | T-003 | M | Major | — | — | merged | Plan 4 (2026-05-11, commit 8da32dbf) |
 | R-004 | Attach `enforce_capability_asserted` trigger to IAM-owned mutating tables (`iam_user_roles`, `user_process_areas`, `iam_users`) — new migration; first wire `authz.Require` in the corresponding repo methods | T-004 | L | Major | R-001 | — | open | — |
 | R-005 | Emit `auditdomain.Writer.Record` from `handleUserRoleUpsert` (and any other admin op missing audit) — match the call pattern in handlers that already do | T-005 | S | Critical | — | — | open | — |
 | R-006 | Migrate IAM error envelopes (middleware + membership handler) to RFC 9457 Problem+JSON; add `metaldocs.authz.forbidden` and `metaldocs.iam.*` Problem `type` URIs | T-006 | M | Major | — | — | open | — |
 | R-007 | Implement and wire a real `MembershipGovernanceLogger` (Postgres `governance_events` writer) at `main.go:217` | T-007 | S | Major | — | — | open | — |
 | R-008 | Add `CachedRoleProvider.InvalidateGroup(groupID)` + wire it into the (future) group-write site; cover with unit test | T-008 | S | Minor | (deferred until group writes exist) | — | open | — |
-| R-009 | Rename one of the `ErrCapabilityDenied` symbols (e.g. `authz.ErrCapDenied` retains struct shape; `iamapp.ErrCapabilityDenied` stays sentinel) | T-009 | XS | Minor | — | — | open | — |
+| R-009 | Rename `authz.ErrCapabilityDenied` → `authz.ErrCapDenied` (struct kept); `iamapp.ErrCapabilityDenied` sentinel preserved | T-009 | XS | Minor | — | — | merged | Plan 4 (2026-05-11, commit ec7d151a) |
 | R-010 | Move `iamdomain.Role` to a neutral package (e.g. `internal/platform/iam-types`) so neither IAM nor auth depends on the other for the enum | T-010 | M | Minor | — | — | open | — |
 | R-011 | Author ADR for "tenant-scoping rule" — every IAM table has `tenant_id`, every repo method filters by it; cite Group B fix as origin | T-011 | XS | Minor | — | — | open | — |
-| R-012 | Add a CI check that compares the in-process `RoleCapabilities` map against the seeded DB rows (not just count) | T-012 | M | Minor | R-001 | — | open | — |
+| R-012 | Delete in-process `RoleCapabilities` map + `RoleCapabilitiesVersion` + `CheckRoleCapabilitiesVersion`; DB `role_capabilities` is single source of truth | T-012 | M | Minor | R-001 | — | merged | Plan 4 (2026-05-11, commit 0cd2e75d) |
 | R-013 | Add Go doc comments to the public surface in IAM (cap-prefix consts, `domain/port.go` interfaces, `delivery/http/admin_handler.go` request structs) — bulk-doc PR | maint:doc-cleanup | M | Minor | — | — | open | — |
 | R-014 | Retire `wiki/modules/iam-rbac.md` (predecessor stub) — file deleted; inbound links repointed to `wiki/modules/iam.md`; README index updated | maint:doc-cleanup | XS | Minor | — | — | merged | (in-commit doc-only) |
 

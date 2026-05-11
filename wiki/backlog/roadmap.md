@@ -24,7 +24,7 @@
 | Prio | Plan | Title | PRs | Status |
 |------|------|-------|-----|--------|
 | P0 | 3 | Supply-chain unblock + tenant resolution platform fix | PR2 (tenant platform), PR3 (module sweep) | done 2026-05-11 |
-| P1 | 4 | Capability namespace collapse + IAM dual-surface consolidation | ~4 | pending |
+| P1 | 4 | Capability namespace collapse + IAM dual-surface consolidation | 8 commits | done 2026-05-11 |
 | P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | ~3 | pending |
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | ~5 | pending |
 | P2 | 6 | Audit-trail completeness sweep + audit-module hardening | ~7 | pending |
@@ -55,7 +55,7 @@
 - **Closes:** iam T-001/R-001, T-002/R-002, T-003/R-003, T-009/R-009, T-012/R-012; documents T-008/R-008.
 - **Critical rows closed:** 1 (iam T-001).
 - **Blockers:** none hard; requires DB migration to rename seeded cap rows.
-- **Status:** pending.
+- **Status:** done 2026-05-11. Commits: `3a227642` (typed Capability + consumers), `4ccf2d57` (migration 0186), `8da32dbf` (delete AuthorizationService), `0cd2e75d` (delete RoleCapabilities map), `ec7d151a` (rename authz.ErrCapabilityDenied → ErrCapDenied), `af6fdf6d` (test repair), `a66a8d62` (delete area_membership/ Go wrapper). Spec: `docs/superpowers/specs/2026-05-11-plan-04-capability-namespace.md`.
 
 ## Plan 11 · Editor frontend stabilization (parallel to Plan 4)
 
