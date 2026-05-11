@@ -476,6 +476,7 @@ Top 3 (by severity, then by blast-radius):
 - Related concepts: `wiki/concepts/iso-segregation.md`, `wiki/concepts/authz-tiers.md`, `wiki/concepts/error-ux.md`, `wiki/concepts/placeholders.md` (revision lifecycle)
 - Related workflows: `wiki/workflows/approval.md`, `wiki/workflows/freeze-and-fanout.md`
 - Related modules: `wiki/modules/documents.md`, `wiki/modules/auth.md`, `wiki/modules/iam.md`, `wiki/modules/iam-tech-debt.md`
+- Template authoring upstream: [`wiki/modules/templates_v2.md`](templates_v2.md) — §8.7 / §1.1 defines `author_id`, `reviewer_id`, `approver_id` columns as the SoD probe surface; `TemplateAuthorChecker` in `iam.AuthorizationService` reads these to enforce submitter ≠ approver identity
 - See also: [`modules/audit.md`](audit.md) — approval does not emit `audit.*` action strings today (no `approval.*` entries in the action catalogue); governance events go to `governance_events` table in the same tx instead. Latent gap if a separate regulated audit trail is required. See `wiki/modules/audit.md` §3 C4 context.
 - Backlog: `wiki/backlog/approval-refactor.md`, `wiki/backlog/caixa-aprovacao.md` (frontend deferred items)
 - Tech debt: `wiki/modules/approval-tech-debt.md`

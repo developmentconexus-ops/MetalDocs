@@ -462,6 +462,7 @@ Top 3 (by severity, then blast radius):
 
 - Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0011-cd-atomic-create.md`, `wiki/decisions/0012-contract-first-api.md`
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`
+- Upstream template publisher: [`wiki/modules/templates_v2.md`](templates_v2.md) — publishes the `template_version` rows (with `placeholder_schema`) that documents instantiates from; `documents` snapshots `placeholder_schema` at create time (§8.7 of that doc)
 - Frontend counterpart: `frontend/apps/web/src/features/documents/` — Library, Wizard, Editor, Published view (see `wiki/architecture/frontend-structure.md`)
 - Predecessor stub: `wiki/modules/documents-v2.md` — DEPRECATED, retired by R-100
 - Backlog: `wiki/backlog/documents-refactor.md`, `wiki/backlog/contract-first-followups.md`

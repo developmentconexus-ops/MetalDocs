@@ -14,6 +14,7 @@
 ## Index
 
 ### Backlog (deferred / intentional stubs)
+- [backlog/templates_v2-refactor.md](backlog/templates_v2-refactor.md) — templates_v2 refactor backlog (16 rows: R-001..R-014 code-quality / authz / spec / envelope / schema items; R-100 retire `templates-v2.md` predecessor; R-101 rename module dir + route prefix) (Last verified: 2026-05-10)
 - [backlog/library-screen.md](backlog/library-screen.md) — **7 deferred items** for `/documents` Library screen: ActivityPanel inbox + audit wiring, 3 mocked stat cards, Filtros panel, Exportar action. Each item has backend prereq + frontend steps. (Last verified: 2026-05-06)
 - [backlog/novo-documento.md](backlog/novo-documento.md) — **6 deferred items** for the novo-documento wizard (`/documents-v2/new`): visibility enforcement, sequence preview, template versions, blank template, slot rollback, profile counts. (Last verified: 2026-05-07)
 - [backlog/templates.md](backlog/templates.md) — **5 deferred items** for Templates List screen: `updated_at` field on `TemplateDTO`, `created_by` → display name, card gap delta (14px vs token), mobile tab clipping at 375px, `formatRelative` promotion to `lib/utils/`. (Last verified: 2026-05-08)
@@ -46,7 +47,10 @@
 - **Skill:** `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow + per-screen `IMPLEMENTATION.md` worksheet for landing designed screens right the first time. Spec: `docs/superpowers/specs/2026-05-06-screen-implementation-skill-design.md`. (Last verified: 2026-05-06)
 
 ### Modules (one per backend module / frontend feature)
-- [modules/templates-v2.md](modules/templates-v2.md) - template authoring, schemas, versioning, approval; List screen (`/templates-v2`) wired to real API with tab filter + loading/error/empty states; `WorkspaceHeroHeader tone="flat"` pattern; `TabBar` WAI-ARIA a11y; `TemplateEditorPage` consumes `EditorChrome` (rebuilt 2026-05-10 from `TemplateAuthorPage`, adds outline panel); Creation wizard (`/templates-v2/new`) Steps 1–5 (Escopo + Identidade + Estrutura + Permissões + Confirmação) implemented — reducer SSOT (`selectMaxReachableStep` + auto-clamp wrapper); single `advanceDisabled` gate; Step 3 mocked DOCX flow, Step 4 mocked roles/areas/counts, Step 5 visual-only submit, `StepConfirmation` YAGNI-stripped (`advanceDisabled` prop removed), real API deferred (Last verified: 2026-05-10)
+- **[modules/templates_v2.md](modules/templates_v2.md)** - **Arc42 + C4 living doc** — templates_v2 backend: authoring lifecycle (`draft → in_review → approved → published → obsolete`), 20 HTTP routes, placeholder catalog enforcement, SoD probing, MinIO presigned upload/download, `documents` downstream snapshot contract; §8.8 placeholder catalog enforcement; §8.7 SoD / author identity surface; companion tech-debt register + refactor backlog linked below (Last verified: 2026-05-10)
+- [modules/templates_v2-tech-debt.md](modules/templates_v2-tech-debt.md) - templates_v2 tech-debt register (14 items: 4 Critical / 6 Major / 4 Minor — T-001 authz not applied, T-002 tenant guard gap, T-003 SoD gap on SubmitForReview, T-004 SoD gap on Publish, T-005 legacy error envelope, T-006 partial codegen, T-007 parallel audit sink, T-008 resolver registry unwired, plus 6 additional items) (Last verified: 2026-05-10)
+- [modules/templates-v2.md](modules/templates-v2.md) - (predecessor — retire pending R-100) frontend-heavy doc: template authoring screens, List screen, Creation wizard Steps 1–5, `TemplateEditorPage`, `EditorChrome` wiring (Last verified: 2026-05-10)
+- `modules/templates_v2/_artifacts/00-context.md` … `06-selfreview.md` — research artifacts (index-only; do not link from other docs)
 - [modules/frontend-primitives.md](modules/frontend-primitives.md) - generic `components/ui/` primitives: `SelectableCard` (forwardRef card button, `role="radio"`, idle/selected/disabled CSS states) + `useRovingRadioGroup` hook (ARIA radiogroup roving-tabIndex, orientation config, programmatic focus) (Last verified: 2026-05-10)
 - [modules/documents.md](modules/documents.md) - **Arc42 + C4 living doc** — document instance lifecycle (`draft → under_review → approved → published → superseded|obsolete`); §5 C4 Container view; §6 finalize trace (trigger `enforce_snapshot_on_submit_trg`); §8.1 two-tier authz + Postgres tripwire; §8.7 placeholder snapshot + freeze; `CreateDocumentTx` port; `internal/modules/documents/`, table `public.documents`; codegen bootstrap only (ADR 0012); companion tech-debt register + refactor backlog linked below (Last verified: 2026-05-10)
 - [modules/documents-tech-debt.md](modules/documents-tech-debt.md) - documents tech-debt register (10 items: T-001 RFC 9457 envelope major; T-002 spec/handler drift critical; T-003 missing tripwire on documents table major; T-004 duplicate route registration minor; T-005 rename audit outside tx major; T-006 finalize idempotency gap major; T-007 audit port latent minor; T-008 capability namespace straddle minor; T-009 placeholder FK wrong target major; T-010 snapshot trigger semantics minor) (Last verified: 2026-05-10)
@@ -61,7 +65,7 @@
 - [modules/auth-tech-debt.md](modules/auth-tech-debt.md) - auth tech-debt register (12 items: T-001 LegacyHeader bypass Critical; T-002 audit-trail gap Critical; T-003 RFC 9457 envelope Major; T-004 non-atomic CreateUser Major; T-005 IP rate-limit absent Major; T-006..T-012 Minor) (Last verified: 2026-05-10)
 - **[modules/audit.md](modules/audit.md)** - Arc42 + C4 living doc — append-only event sink (`metaldocs.audit_events`), `Writer`/`Reader` port+adapter, `GET /api/v1/audit/events`; consumers: iam, documents, auth (gap); 2 Critical / 4 Major / 6 Minor tech-debt items; companion register + refactor backlog linked below (Last verified: 2026-05-10)
 - [modules/audit-tech-debt.md](modules/audit-tech-debt.md) - audit tech-debt register (12 items: T-001 unauthenticated list endpoint Critical; T-002 legacy error envelope Critical; T-003..T-006 Major; T-007..T-012 Minor) (Last verified: 2026-05-10)
-- [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-06)
+- [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-10)
 - [modules/editor-chrome.md](modules/editor-chrome.md) - shared toolbar overlay primitive for eigenpal-based pages; slot API (`left/center/right/alert`), `VersionBadge`, `AutosaveStatus`, eigenpal CSS overrides, design-token coverage; consumed by `TemplateEditorPage` + `DocumentEditorPage` (Last verified: 2026-05-10)
 - [modules/search.md](modules/search.md) - cross-module search; v2 reader JOINs `controlled_documents` to populate `DocumentCode` (stub, Last verified: 2026-05-01)
 
@@ -72,8 +76,8 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 `public.documents_v2` was the W1 scaffold table (migration 0103); dropped by migration 0168. Use `public.documents` for all queries.
 
 ### Concepts (cross-cutting)
-- [concepts/placeholders.md](concepts/placeholders.md) - **CRITICAL:** fixed 7-token catalog, substitution at freeze; composition system deprecated 2026-04-27 (Last verified: 2026-04-27)
-- [concepts/token-syntax.md](concepts/token-syntax.md) - `{name}` vs `{{uuid}}` - why it matters
+- [concepts/placeholders.md](concepts/placeholders.md) - **CRITICAL:** fixed 7-token catalog, substitution at freeze; composition system deprecated 2026-04-27; links to templates_v2 §8.8 for backend enforcement (Last verified: 2026-05-10)
+- [concepts/token-syntax.md](concepts/token-syntax.md) - `{name}` vs `{{uuid}}` - why it matters (Last verified: 2026-05-10)
 - [concepts/controlled-documents.md](concepts/controlled-documents.md) - code generation (`{profile}-{area}-NNN`, 3-digit), atomic create endpoint (`POST /api/v2/controlled-documents`), preview endpoint, idempotency-key requirement, revision endpoint (Last verified: 2026-05-07)
 - [concepts/iso-segregation.md](concepts/iso-segregation.md) - why submitter cannot approve own submit; SoD enforcement points + cross-ref to error-ux (stub, Last verified: 2026-05-04)
 - [concepts/freeze-and-hashing.md](concepts/freeze-and-hashing.md) - content_hash, values_hash, schema_hash, immutability (stub, Last verified: 2026-05-01)
@@ -93,7 +97,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [workflows/freeze-and-fanout.md](workflows/freeze-and-fanout.md) - approve -> freeze -> fanout -> PDF artifact
 
 ### Decisions (ADRs)
-- [decisions/0001-eigenpal-adoption.md](decisions/0001-eigenpal-adoption.md) - why we picked eigenpal over CKEditor/BlockNote
+- [decisions/0001-eigenpal-adoption.md](decisions/0001-eigenpal-adoption.md) - why we picked eigenpal over CKEditor/BlockNote; affected modules section links templates_v2 (Last verified: 2026-05-10)
 - [decisions/0002-zone-purge.md](decisions/0002-zone-purge.md) - why we removed editable zones (2026-04-25)
 - [decisions/0003-token-syntax-migration.md](decisions/0003-token-syntax-migration.md) - plan to move from `{{uuid}}` -> `{name}` (stub, Last verified: 2026-05-01)
 - [decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) - accept two distinct authz tiers (CapabilityService vs authz.Require); J2 amendment: `document.create` wired via `NewCapabilityChecker`, `permissiveAuthzChecker` removed (Last verified: 2026-05-05)
