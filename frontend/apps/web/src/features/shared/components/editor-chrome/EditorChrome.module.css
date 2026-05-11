@@ -23,7 +23,7 @@
   position: absolute;
   top: 0;
   left: var(--sp-3);
-  height: 40px;
+  height: var(--sp-8); /* 40px — matches eigenpal title bar */
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -34,7 +34,7 @@
   position: absolute;
   top: 0;
   left: 50%;
-  height: 40px;
+  height: var(--sp-8); /* 40px — matches eigenpal title bar */
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -42,7 +42,7 @@
   z-index: 60;
   pointer-events: none;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 13px; /* TODO:token — between --font-size-sm (12.5px) and --font-size-md (14px) */
   font-family: var(--font-sans);
 }
 
@@ -53,7 +53,7 @@
   position: absolute;
   top: 0;
   right: var(--sp-2);
-  height: 40px;
+  height: var(--sp-8); /* 40px — matches eigenpal title bar */
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -62,12 +62,12 @@
 
 .overlayAlert {
   position: absolute;
-  top: 40px;
+  top: var(--sp-8); /* 40px — sits directly below eigenpal title bar */
   left: 0;
   right: 0;
   z-index: 100;
-  padding: 6px var(--sp-5);
-  font-size: 12.5px;
+  padding: 6px var(--sp-5); /* TODO:token — 6px has no --sp token (--sp-1=4px, --sp-2=8px) */
+  font-size: var(--font-size-sm); /* 12.5px */
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
@@ -75,7 +75,7 @@
 /* ---------- Title text inside overlayCenter ---------- */
 
 .docTitle {
-  font-size: 15px;
+  font-size: 15px; /* TODO:token — no exact token (--font-size-md=14px, --font-size-lg=22px) */
   font-weight: 600;
   color: var(--text);
   overflow: hidden;
@@ -92,7 +92,7 @@
 .docMeta {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 12px;
+  font-size: 12px; /* TODO:token — no exact token (--font-size-xs=11px, --font-size-sm=12.5px) */
 }
 
 /* ---------- Button primitives ---------- */
@@ -101,8 +101,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 26px; /* TODO:token — no icon-size token yet */
+  height: 26px; /* TODO:token — no icon-size token yet */
   padding: 0;
   background: transparent;
   border: 1px solid var(--border);
@@ -118,13 +118,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 26px;
+  height: 26px; /* TODO:token — no button-height token (--avatar-sm=22px, --avatar-md=28px near-miss) */
   padding: 0 var(--sp-3);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--r-2);
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 12px; /* TODO:token — no exact token (--font-size-xs=11px, --font-size-sm=12.5px) */
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -138,13 +138,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--sp-1);
-  height: 26px;
+  height: 26px; /* TODO:token — no button-height token */
   padding: 0 var(--sp-3);
   background: var(--brand);
   border: 0;
   border-radius: var(--r-2);
   color: #fff;
-  font-size: 12px;
+  font-size: 12px; /* TODO:token — no exact token (--font-size-xs=11px, --font-size-sm=12.5px) */
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
@@ -153,6 +153,18 @@
 }
 .primaryBtn:hover:not(:disabled) { background: var(--brand-soft); }
 .primaryBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* --- Eigenpal coupling pin ---------------------------------------------
+   The :global(.ep-root ...) overrides below target eigenpal data-testid
+   attributes and SVG fills as shipped by
+     vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz
+   On any eigenpal version bump:
+     1. Re-run the manual smoke checklist in
+        wiki/references/eigenpal-controlled-package.md
+     2. Re-verify every selector matches at least one node in the
+        rendered DOM of TemplateEditorPage + DocumentEditorPage.
+     3. Update this pin comment to the new version.
+   --------------------------------------------------------------------- */
 
 /* ===== Eigenpal overrides — scoped to .wrapper :global(.ep-root) ===== */
 
@@ -207,7 +219,7 @@
   height: 28px !important;
   min-width: 56px !important;
   min-height: 28px !important;
-  padding: 4px !important;
+  padding: var(--sp-1) !important; /* 4px */
   visibility: visible !important;
   pointer-events: auto !important;
 }
