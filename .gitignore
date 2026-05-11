@@ -4,6 +4,7 @@ node_modules/
 metaldocs-api.exe
 metaldocs-api-local.exe
 metaldocs-api-local.exe~
+api-lint.exe
 api_err.log
 api_out.log
 .env
