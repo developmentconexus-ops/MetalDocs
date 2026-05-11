@@ -307,8 +307,8 @@ func TestSubmitRevisionForReview_CapabilityDenied(t *testing.T) {
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied; got %v", err)
 	}
-	if denied.Capability != "doc.submit" {
-		t.Errorf("capability = %q; want %q", denied.Capability, "doc.submit")
+	if denied.Capability != "document.submit" {
+		t.Errorf("capability = %q; want %q", denied.Capability, "document.submit")
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on denied capability; got %d", len(emitter.Events))

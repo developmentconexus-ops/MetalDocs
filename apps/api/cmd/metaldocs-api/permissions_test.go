@@ -41,7 +41,7 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "v2 taxonomy families list", method: http.MethodGet, path: "/api/v2/taxonomy/families", wantCap: iamdomain.CapDocumentView, wantGuard: true},
 		{name: "v2 taxonomy families create", method: http.MethodPost, path: "/api/v2/taxonomy/families", wantCap: iamdomain.CapTaxonomyManage, wantGuard: true},
 		{name: "v2 controlled-documents create", method: http.MethodPost, path: "/api/v2/controlled-documents", wantCap: iamdomain.CapRegistryCreate, wantGuard: true},
-		{name: "v2 controlled-documents revisions create", method: http.MethodPost, path: "/api/v2/controlled-documents/cd-1/revisions", wantCap: iamdomain.CapDocEdit, wantGuard: true},
+		{name: "v2 controlled-documents revisions create", method: http.MethodPost, path: "/api/v2/controlled-documents/cd-1/revisions", wantCap: iamdomain.CapDocumentEdit, wantGuard: true},
 		{name: "v2 controlled-documents preview-code", method: http.MethodGet, path: "/api/v2/controlled-documents/preview-code", wantCap: iamdomain.CapDocumentView, wantGuard: true},
 	}
 
