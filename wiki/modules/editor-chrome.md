@@ -1,6 +1,6 @@
 # Module: EditorChrome (Shared Editor Primitive)
 
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-05-10
 > **Scope:** The `EditorChrome` shared component — purpose, slot API, sub-parts, eigenpal style overrides, design-token coverage, and how consuming pages use it.
 > **Out of scope:** Eigenpal internals (see `modules/editor-ui-eigenpal.md`), template authoring business logic (see `modules/templates-v2.md`), document editing business logic (see `modules/documents.md`).
 > **Key files:**
@@ -9,14 +9,14 @@
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/VersionBadge.tsx:13` — `VersionBadge` component (monospace chip)
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/AutosaveStatus.tsx:28` — `AutosaveStatus` component (pulsing dot / check / error)
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/index.ts:1` — public barrel (`EditorChrome`, `editorChromeStyles`, `VersionBadge`, `AutosaveStatus`, types)
-> - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx:1` — consumer 1 (template authoring)
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:1` — consumer 1 (template authoring)
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:1` — consumer 2 (document editor)
 
 ---
 
 ## Why this exists
 
-`TemplateAuthorPage` and `DocumentEditorPage` both mount eigenpal (`DocxEditor` / `MetalDocsEditor`) and overlay a custom toolbar atop eigenpal's native 40px title bar. Before this primitive, the two pages were evolving independently: templates had a richer toolbar (status pill, version badge, wine formatting bar, gradient scrollbar) while the doc editor was catching up. Per the `metaldocs-frontend` skill rule — _"used by 2+ features → `features/shared/`"_ — the overlay pattern was extracted into `EditorChrome`.
+`TemplateEditorPage` and `DocumentEditorPage` both mount eigenpal (`DocxEditor` / `MetalDocsEditor`) and overlay a custom toolbar atop eigenpal's native 40px title bar. Before this primitive, the two pages were evolving independently: templates had a richer toolbar (status pill, version badge, wine formatting bar, gradient scrollbar) while the doc editor was catching up. Per the `metaldocs-frontend` skill rule — _"used by 2+ features → `features/shared/`"_ — the overlay pattern was extracted into `EditorChrome`.
 
 Benefits:
 - Eigenpal CSS overrides (compact title bar, wine tint, gradient scrollbar) live in one place — no per-page duplication or drift.
@@ -135,9 +135,9 @@ No hardcoded colors, no magic pixel values outside the `--sp-*` / `--r-*` system
 
 ## Consumers
 
-### `TemplateAuthorPage`
+### `TemplateEditorPage`
 
-Source: `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx`. Uses `<EditorChrome left={...} center={...} right={...}>` with:
+Source: `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx`. Uses `<EditorChrome left={...} center={...} right={...}>` with:
 - `left`: back button + sidebar toggle icons (`.iconBtn`)
 - `center`: template title + `VersionBadge` + `StatusPill`
 - `right`: `AutosaveStatus` + submit action (`.primaryBtn`)
@@ -167,7 +167,8 @@ The intermediate `EditorDocBar.tsx` + `EditorDocBar.module.css` were deleted whe
 ## Cross-refs
 
 - [modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal wrapper (`MetalDocsEditor`); this primitive wraps the output of that layer
-- [modules/templates-v2.md](templates-v2.md) — `TemplateAuthorPage` consumer
+- [modules/templates-v2.md](templates-v2.md) — `TemplateEditorPage` consumer (frontend doc)
+- [modules/templates_v2.md](templates_v2.md) — backend module the editor chrome surfaces authoring UX for (Arc42 doc)
 - [modules/documents.md](documents.md) — `DocumentEditorPage` consumer; `StatusPill` 8-state catalog
 - [architecture/frontend-structure.md](../architecture/frontend-structure.md) — `features/shared/` placement rule
 - [styles/tokens.css](../../frontend/apps/web/src/styles/tokens.css) — design token definitions

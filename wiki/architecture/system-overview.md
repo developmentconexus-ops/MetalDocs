@@ -71,7 +71,7 @@ Shared packages:
 
 ## Data flow: template authoring -> document -> freeze
 
-1. **Author** opens `TemplateAuthorPage` -> loads schema + body DOCX
+1. **Author** opens `TemplateEditorPage` -> loads schema + body DOCX
 2. Edits in eigenpal editor -> autosave (1500ms debounce) -> `PUT /templates/{id}/versions/{v}/body` (DOCX bytes) + schema PUT
 3. Author submits -> `POST /templates/{id}/versions/{v}/submit` -> status=in_review
 4. Reviewer approves -> `POST /approve` -> status=approved

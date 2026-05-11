@@ -3,12 +3,12 @@
 > _Changelog: 2026-04-26 — rewritten for fixed-catalog model (ADR 0008); dropped legacy fill-in workflow content._
 > _Changelog: 2026-04-27 — composition system deprecated, UI removed (Phase 1)._
 >
-> **Last verified:** 2026-05-03
+> **Last verified:** 2026-05-10
 > **Scope:** What a placeholder is, the fixed 7-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
 > - `packages/editor-ui/src/MetalDocsEditor.tsx:54` — eigenpal `templatePlugin` wired here
-> - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — catalog panel, auto-detect via `getVariables()`
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — catalog panel, auto-detect via `getVariables()` (renamed from `TemplateAuthorPage` 2026-05-10)
 > - `frontend/apps/web/src/features/templates/placeholder-types.ts` — `CatalogPlaceholder` type
 > - `internal/modules/templates_v2/application/validate_placeholders.go` — `ValidatePlaceholders` rejects non-catalog names
 > - `internal/modules/render/fanout/` — server-side substitution at freeze/finalize (Go)
@@ -42,7 +42,7 @@ All tokens are **computed** — no user input is required. There is no fill-in p
 
 1. Template author types `{token}` directly in the DOCX inside the editor (or in Word desktop).
 2. Eigenpal's `templatePlugin` auto-detects the token, highlights it orange, and lists it as a chip in the sidebar.
-3. `TemplateAuthorPage` reads `editorRef.current.getAgent().getVariables()` after each editor change and auto-saves detected names as `computed` entries in the template schema.
+3. `TemplateEditorPage` reads `editorRef.current.getAgent().getVariables()` after each editor change and auto-saves detected names as `computed` entries in the template schema.
 4. The catalog panel shows what each detected token resolves to.
 5. Non-catalog names are rejected by `ValidatePlaceholders` when the schema is saved.
 
@@ -58,6 +58,8 @@ Substitution happens exclusively at **finalize/freeze** via the existing server 
 3. The frozen DOCX (with resolved values) is archived and rendered to PDF.
 
 ## Storage format
+
+> Finalize flow trace (trigger enforcement at `UPDATE documents SET status='under_review'`): see [`wiki/modules/documents.md §6.3`](../modules/documents.md#63-finalizedocument-state-transition----post-apiv2documentsidfinalize).
 
 `placeholder_schema_snapshot` in the `documents` table stores the placeholder schema as **eigenpal-native format**: a raw JSON array.
 
@@ -99,6 +101,7 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - [modules/render-fanout.md](../modules/render-fanout.md) — server substitution code
 - [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
+- [modules/templates_v2.md §8.8](../modules/templates_v2.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
 
 ## Composition system (deprecated 2026-04-27)
 
@@ -122,4 +125,4 @@ Backend untouched:
 
 Future: when standardized blocks (revision history table, approval signatures) genuinely need to return, implement as **rich-content resolvers** — `{revision_history_table}` resolver returns OOXML table. User drops the placeholder where they want it in the eigenpal editor. One mental model: everything is a placeholder.
 
-**Last verified:** 2026-05-03
+**Last verified:** 2026-05-10

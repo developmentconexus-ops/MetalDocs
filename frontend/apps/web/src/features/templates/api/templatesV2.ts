@@ -97,11 +97,6 @@ export async function createTemplate(cmd: {
   name: string;
   description?: string;
   doc_type_code?: string;
-  areas?: string[];
-  visibility?: string;
-  specific_areas?: string[];
-  approver_role?: string;
-  reviewer_role?: string | null;
 }): Promise<{ template: TemplateDTO; version: VersionDTO }> {
   const res = await fetch('/api/v2/templates', {
     method: 'POST',

@@ -193,6 +193,16 @@
   flex-shrink: 0;
 }
 
+.submitError {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--danger-bg, #fef2f2);
+  border: 1px solid var(--danger, #dc2626);
+  border-radius: var(--r-2);
+  color: var(--danger, #dc2626);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--sp-4);
+}
+
 @media (max-width: 40rem) {
   .previewCard {
     grid-template-columns: 1fr;

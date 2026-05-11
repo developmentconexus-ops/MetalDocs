@@ -107,11 +107,24 @@
 ---
 
 ### confirmacao-backend-submit
-**Context:** Step 5 (Confirmação) "Criar e abrir editor →" CTA is mocked — calls `navigate('/templates-v2')` without hitting the API.
-**Blocked by:** `POST /api/v2/templates` requires a `key` field (see `key-generation` backlog item above). Permissions (roles/areas from Step 4) and structure (docx from Step 3) also have no API endpoints yet.
-**File:** `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (`handleSubmit`)
-**TODO tag:** `TODO(novo-template-wizard:confirmacao-backend-submit)` (also in `StepConfirmation.tsx`)
-**Resolution:** After `key-generation` UX is decided, replace `handleSubmit` with a `useMutation` call to `POST /api/v2/templates { key, name, description }`. On success, redirect to editor (see `step3-editor-handoff`). Wire permissions + structure upload in same handoff flow.
+**Status: RESOLVED 2026-05-10.**
+`TemplateWizardPage.handleSubmit` now calls `POST /api/v2/templates { key, name, description }` and redirects to `/templates-v2/<id>/versions/<n>` on success. Error state surfaces inline in `StepConfirmation` via `submitError` prop.
+
+---
+
+### template-create-visibility-api
+**Context:** `POST /api/v2/templates` generated handler (`routes_generated.go`) only accepts `key`, `name`, `description?`, `doc_type_code?`. It hardcodes `Visibility: VisibilityPublic` and `ApproverRole: "approver"`. The wizard collects permissions (Step 4: by area / by role / all-company) and structure origin (Step 3: blank / docx) — none of those are forwarded to the create API.
+**Blocked by:** Backend API contract. The generated OpenAPI spec (`api.gen.go` `CreateTemplateV2JSONBody`) does not expose `visibility`, `areas`, `specific_areas`, or `approver_role` in the create body.
+**Files:**
+- Backend: `internal/modules/templates_v2/api/api.gen.go` (`CreateTemplateV2JSONBody`)
+- Backend: `internal/modules/templates_v2/delivery/http/routes_generated.go` (`CreateTemplateV2`)
+- Frontend: `frontend/apps/web/src/features/templates/api/templatesV2.ts` (`createTemplate`)
+- Frontend: `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (`handleSubmit`)
+**Resolution:**
+1. Backend team expands OpenAPI spec to include `visibility`, `areas`, `specific_areas` (and optionally `approver_role`) in the create body — regenerate `api.gen.go`.
+2. Frontend updates `createTemplate` type to include those fields.
+3. `TemplateWizardPage.handleSubmit` passes `deriveVisibility(state.permissionsMode)` and area IDs. `selectedRoleIds` still needs a backend field (no `roles` parameter exists in domain model).
+4. `permissionsMode === 'roles'` → either map to `specific_areas` or wait for a dedicated `roles` field in the domain.
 
 ---
 
@@ -122,4 +135,4 @@
 | 2 | Identidade | **Done** (2026-05-09) |
 | 3 | Estrutura | **Done** (2026-05-09) — mocked DOCX flow; real upload + placeholder extract deferred (see backlog items above) |
 | 4 | Permissões | **Done** (2026-05-09) — mocked roles/areas/counts; real API deferred (see backlog items above) |
-| 5 | Confirmação | **Done** (2026-05-10) — visual only; submit mocked → navigate('/templates-v2'). Backlog: `confirmacao-backend-submit` |
+| 5 | Confirmação | **Done** (2026-05-10) — submit wired to API; redirects to editor on success. Visibility/permissions deferred: `template-create-visibility-api` |
