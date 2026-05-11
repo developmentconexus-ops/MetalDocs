@@ -15,6 +15,7 @@ type Repository struct {
 	users    map[string]authdomain.Identity
 	byLogin  map[string]string
 	sessions map[string]authdomain.Session
+	tenants  map[string][]string
 }
 
 func NewRepository() *Repository {
@@ -22,6 +23,7 @@ func NewRepository() *Repository {
 		users:    map[string]authdomain.Identity{},
 		byLogin:  map[string]string{},
 		sessions: map[string]authdomain.Session{},
+		tenants:  map[string][]string{},
 	}
 }
 
@@ -398,11 +400,18 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 	return nil
 }
 
-// GetUserTenants returns an empty slice for the in-memory store. Tests that
-// exercise tenant resolution must set AllowDevTenantFallback=true on Config or
-// seed iam_user_roles via a real DB.
-func (r *Repository) GetUserTenants(_ context.Context, _ string) ([]string, error) {
-	return nil, nil
+// SeedUserTenants sets the tenant list for a user. Used in tests only.
+func (r *Repository) SeedUserTenants(userID string, tenantIDs []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.tenants[userID] = append([]string(nil), tenantIDs...)
+}
+
+func (r *Repository) GetUserTenants(_ context.Context, userID string) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tenants := r.tenants[strings.TrimSpace(userID)]
+	return append([]string(nil), tenants...), nil
 }
 
 func cloneIdentity(identity authdomain.Identity) authdomain.Identity {

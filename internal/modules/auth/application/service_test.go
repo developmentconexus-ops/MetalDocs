@@ -248,17 +248,83 @@ func TestAuthenticate_InvalidCredentials(t *testing.T) {
 	}
 }
 
-// TestAuthenticate_TenantClaimRequired verifies that when a user belongs to
-// multiple tenants and no X-Tenant-ID header is provided, authentication fails
-// with ErrTenantClaimRequired. This test requires a postgres setup with
-// iam_user_roles table, so we skip it for memory-only tests.
 func TestAuthenticate_TenantClaimRequired(t *testing.T) {
-	t.Skip("requires postgres iam_user_roles; memory repo GetUserTenants returns nil")
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+
+	ctx := context.Background()
+
+	userID := "tenant-claim-user"
+	password := "TestPassword123!"
+	hash := mustHashPassword(t, password)
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "tenant-claim@example.com",
+		DisplayName:  "Tenant Claim User",
+		PasswordHash: hash,
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	repo.SeedUserTenants(userID, []string{"tenant-a", "tenant-b"})
+
+	svc := NewService(repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		CookieSecure:           false,
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	_, err := svc.Authenticate(ctx, userID, password, req)
+	if !errors.Is(err, authdomain.ErrTenantClaimRequired) {
+		t.Errorf("expected ErrTenantClaimRequired, got %v", err)
+	}
 }
 
-// TestAuthenticate_TenantNotPermitted verifies that when a user tries to
-// authenticate with an X-Tenant-ID header naming a tenant they don't have
-// a role in, authentication fails with ErrTenantNotPermitted.
 func TestAuthenticate_TenantNotPermitted(t *testing.T) {
-	t.Skip("requires postgres iam_user_roles; memory repo GetUserTenants returns nil")
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+
+	ctx := context.Background()
+
+	userID := "tenant-not-permitted-user"
+	password := "TestPassword123!"
+	hash := mustHashPassword(t, password)
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "tenant-not-permitted@example.com",
+		DisplayName:  "Tenant Not Permitted User",
+		PasswordHash: hash,
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	repo.SeedUserTenants(userID, []string{"tenant-a"})
+
+	svc := NewService(repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		CookieSecure:           false,
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	req.Header.Set("X-Tenant-ID", "tenant-z")
+	_, err := svc.Authenticate(ctx, userID, password, req)
+	if !errors.Is(err, authdomain.ErrTenantNotPermitted) {
+		t.Errorf("expected ErrTenantNotPermitted, got %v", err)
+	}
 }
