@@ -14,6 +14,9 @@ import (
 
 	"metaldocs/internal/modules/documents/domain"
 	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // isInvalidUUID returns true when err is a Postgres error with SQLSTATE 22P02
@@ -80,6 +83,10 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 		); err != nil {
 			return "", "", "", fmt.Errorf("acquire revision lock: %w", err)
 		}
+	}
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentCreate), "tenant"); err != nil {
+		return "", "", "", fmt.Errorf("create document: authz check: %w", err)
 	}
 
 	// Deferrable FKs allow inserting doc -> session -> revision in any order in tx.
@@ -214,7 +221,17 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 }
 
 func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error {
-	res, err := r.db.ExecContext(ctx,
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return fmt.Errorf("update document name: authz check: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx,
 		`UPDATE documents SET name=$2, updated_at=now() WHERE id=$1 AND tenant_id=$3`,
 		docID, name, tenantID)
 	if err != nil {
@@ -224,7 +241,7 @@ func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, docID, na
 	if n == 0 {
 		return domain.ErrNotFound
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error) {
@@ -432,7 +449,18 @@ func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id stri
 			col = "archived_at  = now(),"
 		}
 	}
-	res, err := r.db.ExecContext(ctx,
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return fmt.Errorf("update document status: authz check: %w", err)
+	}
+
+	res, err := tx.ExecContext(ctx,
 		fmt.Sprintf(`UPDATE documents SET status=$1, %s updated_at=now() WHERE id=$2 AND tenant_id=$3 AND status=$4`, col),
 		next, id, tenantID, cur)
 	if err != nil {
@@ -442,7 +470,7 @@ func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id stri
 	if n == 0 {
 		return domain.ErrInvalidStateTransition
 	}
-	return nil
+	return tx.Commit()
 }
 
 // AcquireSession attempts to claim the single active-session slot for a doc.
@@ -1070,23 +1098,49 @@ type commentScanner interface {
 // Idempotent: WHERE archived_at IS NULL means double-call is a no-op.
 func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID string) error {
 	_ = actorID // reserved for future audit column; audit via Service layer
-	_, err := r.db.ExecContext(ctx, `
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return fmt.Errorf("mark archived: authz check: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
 		UPDATE public.documents
 		   SET archived_at = now(), updated_at = now()
 		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NULL`,
 		tenantID, docID)
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // Unarchive clears archived_at, restoring the document to active queries.
 func (r *Repository) Unarchive(ctx context.Context, tenantID, docID, actorID string) error {
 	_ = actorID
-	_, err := r.db.ExecContext(ctx, `
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return fmt.Errorf("unarchive: authz check: %w", err)
+	}
+
+	_, err = tx.ExecContext(ctx, `
 		UPDATE public.documents
 		   SET archived_at = NULL, updated_at = now()
 		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NOT NULL`,
 		tenantID, docID)
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func scanComment(row commentScanner) (*domain.Comment, error) {
