@@ -3,9 +3,11 @@
 > **Last verified:** 2026-05-10
 > **Scope:** Per-module deep dives. One file per backend module / frontend feature area.
 
-- [editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal integration layer (Last verified: 2026-05-06)
-- [editor-chrome.md](editor-chrome.md) — shared toolbar overlay + eigenpal CSS overrides for eigenpal-based pages; slot API, `VersionBadge`, `AutosaveStatus`; consumed by templates + documents (Last verified: 2026-05-06)
-- [templates-v2.md](templates-v2.md) — template authoring, versioning, approval; List screen + creation wizard Steps 1–5; reducer SSOT (`selectMaxReachableStep` + auto-clamp); mocked DOCX flow + mocked permissions roles/areas/counts; Step 5 visual-only submit (Last verified: 2026-05-10)
+- [editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal integration layer (Last verified: 2026-05-10)
+- [editor-chrome.md](editor-chrome.md) — shared toolbar overlay + eigenpal CSS overrides for eigenpal-based pages; slot API, `VersionBadge`, `AutosaveStatus`; consumed by templates + documents (Last verified: 2026-05-10)
+- **[templates_v2.md](templates_v2.md)** — **Arc42 + C4 living doc** — templates_v2 backend: authoring lifecycle, 20 HTTP routes, placeholder catalog enforcement, SoD probing, MinIO presigned upload/download, downstream snapshot contract for `documents` (Last verified: 2026-05-10)
+- [templates_v2-tech-debt.md](templates_v2-tech-debt.md) — templates_v2 tech-debt register (14 items: 4 Critical / 6 Major / 4 Minor) (Last verified: 2026-05-10)
+- [templates-v2.md](templates-v2.md) — (predecessor — retire pending R-100) frontend-heavy doc: List screen, creation wizard Steps 1–5, `TemplateEditorPage`, `EditorChrome` wiring (Last verified: 2026-05-10)
 - [frontend-primitives.md](frontend-primitives.md) — generic `components/ui/` primitives: `SelectableCard` (forwardRef) + `useRovingRadioGroup` hook (Last verified: 2026-05-10)
 - [documents.md](documents.md) — **Arc42 + C4** — document instance lifecycle; §5 Container view; §6 finalize trace; §8.1 two-tier authz + tripwire; `CreateDocumentTx` port; `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-10)
 - [documents-tech-debt.md](documents-tech-debt.md) — documents tech-debt register (T-001..T-010) (Last verified: 2026-05-10)
