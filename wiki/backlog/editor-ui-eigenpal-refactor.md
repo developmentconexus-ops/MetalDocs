@@ -2,13 +2,13 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/editor-ui-eigenpal-tech-debt.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Rows
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
-| R-001 | Restore vendored eigenpal tarball or pin to published @eigenpal package | T-001 | M | Critical | — | — | open | — |
+| R-001 | Restore vendored eigenpal tarball or pin to published @eigenpal package | T-001 | M | Critical | — | — | closed 2026-05-11 | Plan 3 |
 | R-002 | Migrate `TemplateEditorPage` to consume `MetalDocsEditor` instead of `DocxEditor` directly | T-002 | M | Major | R-001 | — | open | — |
 | R-003 | Rewrite `templatePlugin.wiring.test.tsx` against the current `template-draft` gate | T-003 | S | Major | — | — | open | — |
 | R-004 | Delete `createOutlinePlugin` export (or re-register if outline panel is brought back) | T-004 | XS | Minor | — | — | open | — |

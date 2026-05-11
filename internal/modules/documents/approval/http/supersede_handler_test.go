@@ -99,7 +99,7 @@ func TestSupersedeHandler(t *testing.T) {
 		},
 		{
 			name:       "authz denied",
-			svcErr:     authz.ErrCapabilityDenied{Capability: "doc.supersede", AreaCode: "tenant-1", ActorID: "actor-1"},
+			svcErr:     authz.ErrCapDenied{Capability: "doc.supersede", AreaCode: "tenant-1", ActorID: "actor-1"},
 			wantStatus: http.StatusForbidden,
 		},
 		{

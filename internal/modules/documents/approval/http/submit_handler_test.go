@@ -90,7 +90,7 @@ func TestSubmitHandler(t *testing.T) {
 			name:       "service capability denied",
 			ifMatch:    "\"v2\"",
 			body:       `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			svcErr:     authz.ErrCapabilityDenied{Capability: "doc.submit", AreaCode: "tenant", ActorID: "actor-1"},
+			svcErr:     authz.ErrCapDenied{Capability: "doc.submit", AreaCode: "tenant", ActorID: "actor-1"},
 			wantStatus: http.StatusForbidden,
 		},
 		{

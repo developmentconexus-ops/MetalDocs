@@ -14,7 +14,7 @@ import (
 
 func TestView_ReaderWithoutAreaGrant_Returns403(t *testing.T) {
 	h := NewViewHandler(fakeViewService{
-		err: authz.ErrCapabilityDenied{Capability: "doc.view_published", AreaCode: "AREA1", ActorID: "reader-1"},
+		err: authz.ErrCapDenied{Capability: "doc.view_published", AreaCode: "AREA1", ActorID: "reader-1"},
 	})
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-1"))
@@ -48,7 +48,7 @@ func TestReconstruct_QMSAdmin_Returns200(t *testing.T) {
 
 func TestReconstruct_MissingCapability_Returns403(t *testing.T) {
 	h := NewReconstructHandler(fakeReconstructService{
-		err: authz.ErrCapabilityDenied{Capability: "doc.reconstruct", AreaCode: "AREA1", ActorID: "author-1"},
+		err: authz.ErrCapDenied{Capability: "doc.reconstruct", AreaCode: "AREA1", ActorID: "author-1"},
 	})
 	rec := httptest.NewRecorder()
 	h.HandleReconstruct(rec, newReconstructReq("doc-1"))

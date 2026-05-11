@@ -2,7 +2,7 @@
 
 > One row = one PR. Pulled from [`wiki/modules/iam-tech-debt.md`](../modules/iam-tech-debt.md). Rows without a `debt_id` are blocked from grooming.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Schema
 

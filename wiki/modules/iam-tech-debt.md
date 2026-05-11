@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Severity scale
 
@@ -52,7 +52,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 ### T-005 · Admin role upsert does not emit audit events
 - **Severity:** critical
 - **Severity rationale:** triggers Critical rubric — "regulated audit-trail gap: a mutation on an ISO 9001 / QMS / regulated path is not written to the audit sink." Role assignment is the privileged op an external auditor inspects first; absence from the trail is a compliance break, not a service degradation.
-- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:316` (`handleUserRoleUpsert`) and `:457` (`recordAudit`)
+- **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:319` (`handleUserRoleUpsert`) and `:454` (`recordAudit`)
 - **Observation:** `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not call `recordAudit` between request validation and response (artifact 02-flow-upsert-user-role §6). The audit sink is wired (`auditdomain.Writer` passed into `NewAdminHandler` at `main.go:182`; sink impl at `internal/modules/audit/infrastructure/postgres/writer.go:20`). Other admin ops do call `recordAudit`; this one does not.
 - **Evidence:** `_artifacts/02-flow-upsert-user-role.md` §6; `_artifacts/03-deps.md` §1 (audit OUT edge).
 - **Linked backlog row:** `backlog/iam-refactor.md#R-005`
@@ -60,9 +60,9 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ### T-006 · IAM error envelope is not RFC 9457
 - **Severity:** major
-- **Surface:** `internal/modules/iam/delivery/http/middleware.go:129` (`writeAPIError` emits `{error:{code,message,details,trace_id}}`); `internal/modules/iam/delivery/http/routes_memberships.go:137` (`writeMembershipAPIError` emits `{code,message}`)
+- **Surface:** `internal/modules/iam/delivery/http/middleware.go:132` (`writeAPIError` emits `{error:{code,message,details,trace_id}}`); `internal/modules/iam/delivery/http/routes_memberships.go:150` (`writeMembershipAPIError` emits `{code,message}`)
 - **Observation:** `wiki/architecture/api-design-system.md` (Last verified 2026-05-10) names RFC 9457 Problem+JSON as the canonical error envelope. IAM uses two non-9457 shapes. No `type` URI, no `title`, no `status` field, no `errors[]` extension for validation. Documents module is migrating to the RFC 9457 envelope; IAM is not on the path yet.
-- **Evidence:** middleware.go:129 (verified by main agent read); routes_memberships.go:137 (artifact 02-flow-list-memberships §5); `_artifacts/05-industry.md` §IP-001.
+- **Evidence:** middleware.go:132 (verified by main agent read); routes_memberships.go:150 (artifact 02-flow-list-memberships §5); `_artifacts/05-industry.md` §IP-001.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-006`
 - **Linked ADR:** missing-ADR (per-module 9457 rollout sequencing not recorded)
 - **Consumer cross-ref:** `wiki/modules/documents-tech-debt.md#t-001` — documents module has the same debt; migrating in parallel is recommended to amortize the `httpresponse.WriteProblem` adoption cost

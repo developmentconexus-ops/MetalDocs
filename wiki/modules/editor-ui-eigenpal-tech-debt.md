@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/editor-ui-eigenpal.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/editor-ui-eigenpal-refactor.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Severity scale
 
@@ -14,13 +14,13 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. Trigg
 
 ## Items
 
-### T-001 · Vendored eigenpal tarball absent from `main`
-- **Severity:** critical
-- **Surface:** `packages/editor-ui/package.json:29`, `apps/docgen-v2/package.json:15`, `frontend/apps/web/package.json:17` — each references `file:../../[…]/vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`. Directory deleted by commit `0ee9160d` (2026-05-04).
-- **Observation:** Three `package.json` files declare `@eigenpal/docx-js-editor` via a `file:` URI that resolves to a path that no longer exists on `main`. Fresh `npm install` (or `pnpm install --frozen-lockfile=false`) from a clean checkout fails to resolve the dep. Existing checkouts keep working off cached `node_modules/`. Lockfiles (`pnpm-lock.yaml`, `package-lock.json`) still carry the prior integrity hashes.
-- **Evidence:** `_artifacts/00-context.md` "Eigenpal version pin / fork status"; `git show --stat 0ee9160d` confirms the tarball and README were deleted in the go-mod-vendor commit; `git ls-files vendor/eigenpal` returns empty.
-- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-001`
-- **Linked ADR:** `wiki/decisions/0001-eigenpal-adoption.md` (claim is now outdated; see also R-009)
+### T-001 · Vendored eigenpal tarball absent from `main` — **RESOLVED Plan 3**
+- **Severity:** critical → **resolved**
+- **Surface:** `packages/editor-ui/package.json:29`, `apps/docgen-v2/package.json:15`, `frontend/apps/web/package.json:17` — each references `file:../../[…]/vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz`.
+- **Resolution (2026-05-11):** Tarball restored at `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (blob `0e35c089`) and `vendor/eigenpal/README.md` (blob `4ec632f0`) from git history. Fresh `pnpm install` resolves the dep. ADR 0001 pin is intact. R-009 (wiki refresh for ADR 0001 + eigenpal-controlled-package) remains open as a separate docs PR.
+- **Evidence:** `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` present; `vendor/eigenpal/README.md` present.
+- **Linked backlog row:** `backlog/editor-ui-eigenpal-refactor.md#R-001` (closed)
+- **Linked ADR:** `wiki/decisions/0001-eigenpal-adoption.md`
 
 ### T-002 · TemplateEditorPage bypasses the `MetalDocsEditor` wrapper
 - **Severity:** major

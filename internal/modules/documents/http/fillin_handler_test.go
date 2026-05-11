@@ -50,7 +50,7 @@ func TestFillInHandler_PutPlaceholderValue(t *testing.T) {
 		wantStatus int
 	}{
 		{name: "ok", body: `{"value":"ABC"}`, wantStatus: http.StatusOK},
-		{name: "capability denied", body: `{"value":"ABC"}`, svcErr: authz.ErrCapabilityDenied{Capability: "doc.edit_draft", AreaCode: "qa", ActorID: "u1"}, wantStatus: http.StatusForbidden},
+		{name: "capability denied", body: `{"value":"ABC"}`, svcErr: authz.ErrCapDenied{Capability: "doc.edit_draft", AreaCode: "qa", ActorID: "u1"}, wantStatus: http.StatusForbidden},
 		{name: "not found", body: `{"value":"ABC"}`, svcErr: v2domain.ErrNotFound, wantStatus: http.StatusNotFound},
 		{name: "not draft", body: `{"value":"ABC"}`, svcErr: v2domain.ErrInvalidStateTransition, wantStatus: http.StatusConflict},
 		{name: "validation", body: `{"value":"abc"}`, svcErr: v2domain.ErrValidationFailed, wantStatus: http.StatusUnprocessableEntity},

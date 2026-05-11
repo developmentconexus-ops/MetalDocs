@@ -146,7 +146,7 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 | IAM | `iam/delivery/http/middleware.go:77` | direct `tenant.FromContext` (with legacy fallback) |
 | IAM | `iam/delivery/http/admin_handler.go:109` | direct `tenant.FromContext` |
 | IAM | `iam/delivery/http/routes_memberships.go:146` | `tenantIDFromRequest` → `tenant.FromContext` |
-| registry | `registry/delivery/http/routes.go:489` | `tenantIDFromRequest` → `tenant.FromContext` |
+| registry | `registry/delivery/http/routes.go:488` | `tenantIDFromRequest` → `tenant.FromContext` |
 | registry | `registry/delivery/http/handler.go:50` | `injectTenant` middleware → `tenant.FromContext` |
 | templates_v2 | `templates_v2/delivery/http/handler.go:83` | `tenantIDFromReq` → `tenant.FromContext` |
 | taxonomy | `taxonomy/delivery/http/routes_profiles.go:230` | `tenantIDFromRequest` → `tenant.FromContext` |

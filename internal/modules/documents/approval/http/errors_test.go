@@ -128,7 +128,7 @@ func TestMapErrorToResponse(t *testing.T) {
 		},
 		{
 			name:       "authz capability denied",
-			err:        fmt.Errorf("wrap: %w", authz.ErrCapabilityDenied{Capability: "x", AreaCode: "tenant", ActorID: "u1"}),
+			err:        fmt.Errorf("wrap: %w", authz.ErrCapDenied{Capability: "x", AreaCode: "tenant", ActorID: "u1"}),
 			wantStatus: http.StatusForbidden,
 			wantCode:   "authz.capability_denied",
 			wantMsg:    "wrap: authz: capability \"x\" denied for actor \"u1\" in area \"tenant\"",

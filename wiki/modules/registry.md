@@ -11,8 +11,8 @@
 > - `internal/modules/registry/delivery/http/handler.go:48` — `injectTenant` middleware (reads tenant via `tenant.FromContext`)
 > - `internal/modules/registry/delivery/http/handler.go:60` — `tenantIDFromContext` (local context accessor)
 > - `internal/modules/registry/delivery/http/routes.go:43` — `AtomicCreateControlledDocument` handler
-> - `internal/modules/registry/delivery/http/routes.go:205` — `GetActiveDocument` handler (FULL OUTER JOIN)
-> - `internal/modules/registry/delivery/http/routes.go:489` — `tenantIDFromRequest` → `tenant.FromContext`
+> - `internal/modules/registry/delivery/http/routes.go:232` — `GetActiveDocument` handler (FULL OUTER JOIN)
+> - `internal/modules/registry/delivery/http/routes.go:488` — `tenantIDFromRequest` → `tenant.FromContext`
 > - `internal/modules/registry/domain/document_initializer.go:30` — `DocumentInitializer` port (consumed by documents)
 > - `internal/modules/registry/infrastructure/repository.go:184` — `UpdateStatus` (lifecycle mutation)
 > - `migrations/0124_registry_controlled_documents.sql` — initial table
@@ -171,7 +171,7 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 | GET | `/api/v2/controlled-documents/preview-code` | `previewControlledDocumentCode` | `routes.go:127` | (read; resolver mapping outside module) |
 | GET | `/api/v2/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
 | GET | `/api/v2/controlled-documents/{id}` | `getControlledDocument` | `routes.go:190` | (read) |
-| GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:205` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
+| GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:232` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
 | PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | (unclear — T-001) |
 | PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | (unclear — T-001) |
 

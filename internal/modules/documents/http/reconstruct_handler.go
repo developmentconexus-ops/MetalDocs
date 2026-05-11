@@ -50,7 +50,7 @@ func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Re
 
 func writeReconstructError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.As(err, &authz.ErrCapabilityDenied{}):
+	case errors.As(err, &authz.ErrCapDenied{}):
 		writeFillInJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
 	case errors.Is(err, v2dom.ErrNotFound):
 		writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})

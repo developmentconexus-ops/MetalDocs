@@ -42,7 +42,7 @@
 ## Plan 3 · Supply-chain unblock + tenant resolution platform fix
 
 - **Goal:** Fresh `npm install` works. Tenant identity sourced from authenticated session, not `X-Tenant-ID` header.
-- **Touches:** `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (restore); `internal/platform/tenant`; `internal/modules/templates_v2/delivery/http/handler.go:84`; `internal/modules/taxonomy/delivery/http/routes_profiles.go:197`; `internal/modules/registry/delivery/http/routes.go:205`.
+- **Touches:** `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (restore); `internal/platform/tenant`; `internal/modules/templates_v2/delivery/http/handler.go:83`; `internal/modules/taxonomy/delivery/http/routes_profiles.go:230`; `internal/modules/registry/delivery/http/routes.go:488`.
 - **Closes:** editor-ui-eigenpal T-001 / R-001; templates_v2 T-003 / R-003; taxonomy T-001 / R-001; registry T-005 / R-005, T-006 / R-006.
 - **Critical rows closed:** 4 (editor-ui-eigenpal T-001, templates_v2 T-003, taxonomy T-001, + registry tenant side).
 - **Blockers:** none.

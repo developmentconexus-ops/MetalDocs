@@ -74,7 +74,7 @@ The category names are useful only when paired with concrete triggers. Use the t
 
 ### T-006 · GetActiveDocument: no authz
 - **Severity:** major
-- **Surface:** `internal/modules/registry/delivery/http/routes.go:205-326`
+- **Surface:** `internal/modules/registry/delivery/http/routes.go:232-326`
 - **Observation:** No `authz.Require` call; no `metaldocs.assert_caps`. Document content hashes, approval state, and published-revision IDs are returned to any authenticated caller. **Plan 3 resolved the header-trust sub-issue** — tenant is now sourced from `tenant.FromContext` via `injectTenant` middleware (`handler.go:48`); the `X-Tenant-ID` header is stripped by auth middleware. The outstanding gap is the missing read-policy authz enforcement. Pending a centralized read-policy ADR, defense-in-depth gap.
 - **Evidence:** `_artifacts/02-flow-get-active.md` §2, §4
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-006`](../backlog/registry-refactor.md)

@@ -248,7 +248,7 @@ func TestCancelInstance_CapDenied(t *testing.T) {
 	_, err := svc.CancelInstance(context.Background(), db, CancelInput{
 		TenantID: "t", InstanceID: "i", ActorUserID: "u", Reason: "reason",
 	})
-	var denied authz.ErrCapabilityDenied
+	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Errorf("expected ErrCapabilityDenied; got %v", err)
 	}

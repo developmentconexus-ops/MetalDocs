@@ -56,7 +56,7 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 
 func writeViewError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.As(err, &authz.ErrCapabilityDenied{}):
+	case errors.As(err, &authz.ErrCapDenied{}):
 		writeFillInJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
 	case errors.Is(err, v2domain.ErrNotFound):
 		writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})
