@@ -35,4 +35,5 @@ const (
 	CapMembershipManage Capability = "membership.manage"
 	CapRouteManage      Capability = "route.manage"
 	CapUserManage       Capability = "user.manage"
+	CapAuditRead        Capability = "audit.read"
 )
