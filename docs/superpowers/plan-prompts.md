@@ -12,10 +12,10 @@
 | Coding — implementing Workstreams | **Codex** — `codex:rescue` skill |
 | Writing + running tests | **Sonnet or Haiku** — after Codex returns |
 | Commits | **Sonnet or Haiku** — review diff, then commit |
-| Final code review before PR | **Opus** only — `nexus:requesting-code-review` |
+| Final review | **Opus** only — once per Plan (all PRs grouped), not per PR |
 | Roadmap status update | **Sonnet** |
 
-**Rule:** Codex implements. Sonnet/Haiku own tests + commits. Opus touches the keyboard only for the final review gate — nothing else.
+**Rule:** Codex implements. Sonnet/Haiku own tests + commits. Opus reviews once per Plan after all workstreams are committed — not after each PR. Token efficiency: one Opus session reviews the whole plan diff together via `nexus:requesting-code-review`.
 
 ---
 
