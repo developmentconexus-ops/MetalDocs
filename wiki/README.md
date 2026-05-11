@@ -23,6 +23,7 @@
 - [backlog/novo-template-wizard.md](backlog/novo-template-wizard.md) — **9 deferred items** for Template Creation Wizard (`/templates-v2/new`): `template-counts` aggregate endpoint, `chk-disabled` hardcode, `next-code-preview` endpoint, `key-generation` UX decision, `font-size-hero` token gap, `step3-docx-upload` / `step3-placeholder-extract` / `step3-editor-handoff` (3 Step-3 deferred items), `permissions-roles-api` / `permissions-area-counts` / `permissions-user-count` (3 Step-4 deferred items), `confirmacao-backend-submit` (Step-5 mocked submit); Steps 2–5 shipped; Step 5 submit mocked pending `key-generation` + API. (Last verified: 2026-05-10)
 - [backlog/iam-refactor.md](backlog/iam-refactor.md) — IAM refactor backlog (14 rows, R-001 through R-014; R-014 merged) (Last verified: 2026-05-10)
 - [backlog/documents-refactor.md](backlog/documents-refactor.md) — documents refactor backlog (9 rows: R-001..R-006 RFC-9457/spec-drift/tripwire/dupe-route/rename-tx/idempotency, R-008 capability namespace, R-009 placeholder FK, R-100 retire documents-v2.md stub) (Last verified: 2026-05-10)
+- [backlog/auth-refactor.md](backlog/auth-refactor.md) — auth refactor backlog (12 rows, R-001 through R-012) (Last verified: 2026-05-10)
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
@@ -53,6 +54,8 @@
 - [modules/render-fanout.md](modules/render-fanout.md) - DOCX -> PDF rendering, substitution engine (stub, Last verified: 2026-05-01)
 - **[modules/iam.md](modules/iam.md)** - IAM module — capabilities, roles, area memberships (Arc42 + C4); covers tier-1 `CapabilityService.CanDo`, tier-2 `authz.Require`, Postgres tripwire, area-scoped authz, group grants, tenant-scoped repositories (Group B), migrations 0002–0170 (Last verified: 2026-05-10)
 - [modules/iam-tech-debt.md](modules/iam-tech-debt.md) - IAM tech-debt register (12 items, T-001 through T-012) (Last verified: 2026-05-10)
+- **[modules/auth.md](modules/auth.md)** - auth module — session cookie authn, bcrypt password storage, per-account lockout, HMAC-signed opaque session tokens, ManagedUser admin ops (Arc42 + C4); 2 Critical / 3 Major / 7 Minor tech-debt items; companion registers linked below (Last verified: 2026-05-10)
+- [modules/auth-tech-debt.md](modules/auth-tech-debt.md) - auth tech-debt register (12 items: T-001 LegacyHeader bypass Critical; T-002 audit-trail gap Critical; T-003 RFC 9457 envelope Major; T-004 non-atomic CreateUser Major; T-005 IP rate-limit absent Major; T-006..T-012 Minor) (Last verified: 2026-05-10)
 - [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-06)
 - [modules/editor-chrome.md](modules/editor-chrome.md) - shared toolbar overlay primitive for eigenpal-based pages; slot API (`left/center/right/alert`), `VersionBadge`, `AutosaveStatus`, eigenpal CSS overrides, design-token coverage; consumed by `TemplateEditorPage` + `DocumentEditorPage` (Last verified: 2026-05-10)
 - [modules/search.md](modules/search.md) - cross-module search; v2 reader JOINs `controlled_documents` to populate `DocumentCode` (stub, Last verified: 2026-05-01)
