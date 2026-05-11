@@ -8,13 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
+	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/platform/httpresponse"
 )
 
 type Handler struct {
 	service *authapp.Service
+	audit   auditdomain.Writer
 }
 
 type loginRequest struct {
@@ -29,6 +33,11 @@ type changePasswordRequest struct {
 
 func NewHandler(service *authapp.Service) *Handler {
 	return &Handler{service: service}
+}
+
+func (h *Handler) WithAudit(w auditdomain.Writer) *Handler {
+	h.audit = w
+	return h
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -62,6 +71,9 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		"user":      session.CurrentUser,
 		"expiresAt": session.ExpiresAt.UTC().Format(time.RFC3339),
 	})
+	h.recordAudit(r, session.CurrentUser.UserID, "auth.login", session.CurrentUser.UserID, map[string]any{
+		"tenant_id": session.CurrentUser.TenantID,
+	})
 }
 
 func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +82,11 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cookie, err := r.Cookie(h.service.SessionCookieName()); err == nil {
-		_ = h.service.Logout(r.Context(), cookie.Value)
+		if err := h.service.Logout(r.Context(), cookie.Value); err == nil {
+			if user, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
+				h.recordAudit(r, user.UserID, "auth.logout", user.UserID, map[string]any{})
+			}
+		}
 	}
 	http.SetCookie(w, h.service.ExpiredSessionCookie())
 	w.WriteHeader(http.StatusNoContent)
@@ -121,6 +137,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		"changed": true,
 		"user":    currentUser,
 	})
+	h.recordAudit(r, user.UserID, "auth.password.changed", user.UserID, map[string]any{})
 }
 
 func (h *Handler) writeAuthError(w http.ResponseWriter, err error, traceID string) {
@@ -160,6 +177,34 @@ func requestTraceID(r *http.Request) string {
 		return traceID
 	}
 	return "trace-local"
+}
+
+func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID string, payload map[string]any) {
+	if h.audit == nil {
+		return
+	}
+	raw, _ := json.Marshal(payload)
+	traceID := "trace-local"
+	if v := strings.TrimSpace(r.Header.Get("X-Trace-Id")); v != "" {
+		traceID = v
+	}
+	tenantID := ""
+	if sess, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
+		tenantID = sess.TenantID
+	}
+	if err := h.audit.Record(r.Context(), auditdomain.Event{
+		ID:           uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      actorID,
+		Action:       action,
+		ResourceType: "user",
+		ResourceID:   resourceID,
+		PayloadJSON:  string(raw),
+		TraceID:      traceID,
+		TenantID:     tenantID,
+	}); err != nil {
+		log.Printf("auth audit write failed action=%s actor=%s: %v", action, actorID, err)
+	}
 }
 
 func writeAPIError(w http.ResponseWriter, status int, code, message, traceID string) {
