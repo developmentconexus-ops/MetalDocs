@@ -26,17 +26,30 @@ vi.mock('@eigenpal/docx-js-editor', () => ({
 }));
 
 describe('template plugin wiring', () => {
-  it('includes template plugin when no sidebar model is provided', () => {
-    render(<MetalDocsEditor mode="document-edit" author="u1" />);
+  it('includes templatePlugin only when mode is template-draft', () => {
+    render(<MetalDocsEditor mode="template-draft" author="u1" />);
     const host = screen.getByTestId('plugin-host');
     expect(host.getAttribute('data-plugins')).toBe('1');
     expect(host.getAttribute('data-plugin-names')).toContain('template');
   });
 
-  it('adds sidebar bridge plugin when sidebar model is provided', () => {
+  it('omits templatePlugin in document-edit mode', () => {
+    render(<MetalDocsEditor mode="document-edit" author="u1" />);
+    const host = screen.getByTestId('plugin-host');
+    expect(host.getAttribute('data-plugins')).toBe('0');
+    expect(host.getAttribute('data-plugin-names') ?? '').not.toContain('template');
+  });
+
+  it('omits templatePlugin in readonly mode', () => {
+    render(<MetalDocsEditor mode="readonly" author="u1" />);
+    const host = screen.getByTestId('plugin-host');
+    expect(host.getAttribute('data-plugins')).toBe('0');
+  });
+
+  it('adds the sidebar bridge plugin alongside templatePlugin in template-draft mode', () => {
     render(
       <MetalDocsEditor
-        mode="document-edit"
+        mode="template-draft"
         author="u1"
         sidebarModel={{
           used: ['a'],
@@ -54,17 +67,16 @@ describe('template plugin wiring', () => {
     expect(names).toContain('metaldocs-sidebar-model');
   });
 
-  it('includes external plugins', () => {
+  it('includes external plugins regardless of mode', () => {
     render(
       <MetalDocsEditor
         mode="document-edit"
         author="u1"
-        externalPlugins={[{ id: 'custom', name: 'custom' }]}
+        externalPlugins={[{ id: 'custom', name: 'custom' } as never]}
       />
     );
     const host = screen.getByTestId('plugin-host');
-    const pluginCount = Number(host.getAttribute('data-plugins') ?? '0');
-    expect(pluginCount).toBeGreaterThanOrEqual(2);
+    expect(host.getAttribute('data-plugins')).toBe('1');
     expect(host.getAttribute('data-plugin-names')).toContain('custom');
   });
 });
