@@ -39,11 +39,39 @@ func (s *ProfileService) Get(ctx context.Context, tenantID, code string) (*domai
 }
 
 func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) error {
-	return s.profiles.Create(ctx, p)
+	if err := s.profiles.Create(ctx, p); err != nil {
+		return err
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"code": p.Code,
+		"name": p.Name,
+	})
+	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
+		EventType:    "profile.created",
+		ResourceType: "document_profile",
+		ResourceID:   p.Code,
+		PayloadJSON:  payload,
+	})
+	return nil
 }
 
 func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) error {
-	return s.profiles.Update(ctx, p)
+	if err := s.profiles.Update(ctx, p); err != nil {
+		return err
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"code": p.Code,
+		"name": p.Name,
+	})
+	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
+		EventType:    "profile.updated",
+		ResourceType: "document_profile",
+		ResourceID:   p.Code,
+		PayloadJSON:  payload,
+	})
+	return nil
 }
 
 func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID, profileCode, templateVersionID, actorID string) error {
