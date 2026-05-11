@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"metaldocs/internal/modules/taxonomy/domain"
@@ -30,11 +31,37 @@ func (s *AreaService) Get(ctx context.Context, tenantID, code string) (*domain.P
 }
 
 func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
-	return s.areas.Create(ctx, a)
+	if err := s.areas.Create(ctx, a); err != nil {
+		return err
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"name": a.Name,
+	})
+	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
+		EventType:    "area.created",
+		ResourceType: "process_area",
+		ResourceID:   a.Code,
+		PayloadJSON:  payload,
+	})
+	return nil
 }
 
 func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
-	return s.areas.Update(ctx, a)
+	if err := s.areas.Update(ctx, a); err != nil {
+		return err
+	}
+
+	payload, _ := json.Marshal(map[string]string{
+		"name": a.Name,
+	})
+	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
+		EventType:    "area.updated",
+		ResourceType: "process_area",
+		ResourceID:   a.Code,
+		PayloadJSON:  payload,
+	})
+	return nil
 }
 
 func (s *AreaService) SetParent(ctx context.Context, tenantID, areaCode string, parentCode *string, actorID string) error {
