@@ -18,7 +18,7 @@ type ctxKeyResourceID struct{}
 
 var writeJSON = httpresponse.WriteJSON
 
-type PermissionResolver func(method, path string) (string, bool)
+type PermissionResolver func(method, path string) (iamdomain.Capability, bool)
 
 type Middleware struct {
 	caps         *iamapp.CapabilityService
@@ -83,7 +83,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 		}
 
 		if m.caps != nil {
-			if err := m.caps.CanDo(r.Context(), userID, tenantID, capability); err != nil {
+			if err := m.caps.CanDo(r.Context(), userID, tenantID, string(capability)); err != nil {
 				writeAPIError(w, http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions", traceID)
 				return
 			}
