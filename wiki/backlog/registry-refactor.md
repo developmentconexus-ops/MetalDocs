@@ -13,7 +13,7 @@
 | R-003 | Migrate registry error responses to RFC 9457 problem+json | T-003 | M | major | — | — | open | — |
 | R-004 | Apply tier-3 tripwire to `controlled_documents` + `cd_sequence_counters`; pair `authz.Require` with each mutator | T-004 | L | major | R-001 | — | open | — |
 | R-005 | Adopt `SET LOCAL metaldocs.tenant_id` GUC + RLS policies for registry-owned tables | T-005 | L | major | — | — | open | — |
-| R-006 | Authz + server-resolved tenant for `GetActiveDocument` (drop `X-Tenant-ID` header source) | T-006 | M | major | — | — | open | — |
+| R-006 | Authz for `GetActiveDocument` (tenant header-source sub-issue resolved by Plan 3; remaining: add read-policy authz check) | T-006 | M | major | — | — | open | — |
 | R-007 | Implement 422 `template_invalid` mapping OR drop spec branch | T-007 | S | major | — | — | open | — |
 | R-008 | Move registry audit emission to platform-owned `internal/audit` writer | T-008 | M | major | audit#R-001 | — | open | — |
 | R-009 | Replace `WithDocumentInitializer` setter with constructor injection (split registry module init into two phases or move port to a shared package) | T-009 | M | minor | — | — | open | — |

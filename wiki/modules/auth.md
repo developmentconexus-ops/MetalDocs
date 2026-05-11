@@ -2,26 +2,36 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-10 · **Owner:** unassigned · **Status:** active (legacy envelope; no audit-trail emission yet)
+**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (legacy envelope; no audit-trail emission yet)
 
 > **Key files:**
-> - `internal/modules/auth/application/service.go:45` — `Service` (single struct holding all use cases)
-> - `internal/modules/auth/application/service.go:100` — `Authenticate` (login)
-> - `internal/modules/auth/application/service.go:166` — `ResolveSession` (middleware backbone)
-> - `internal/modules/auth/application/service.go:439` — `newSessionToken` (HMAC-SHA256 + SHA-256 hash)
-> - `internal/modules/auth/application/service.go:450` — `tokenHashFromCookieValue` (constant-time `hmac.Equal`)
-> - `internal/modules/auth/delivery/http/handler.go:35` — `RegisterRoutes` (4 stdlib mux registrations)
-> - `internal/modules/auth/delivery/http/handler.go:166` — `writeAPIError` (legacy envelope writer)
+> - `internal/modules/auth/application/service.go:48` — `Service` (single struct holding all use cases)
+> - `internal/modules/auth/application/service.go:103` — `Authenticate` (login; calls `resolveLoginTenant` to bind tenant at login)
+> - `internal/modules/auth/application/service.go:172` — `resolveLoginTenant` (binds tenant from session; uses `AllowDevTenantFallback`)
+> - `internal/modules/auth/application/service.go:196` — `ResolveSession` (no longer takes `tenantID`; reads from stored session)
+> - `internal/modules/auth/application/service.go:470` — `newSessionToken` (HMAC-SHA256 + SHA-256 hash)
+> - `internal/modules/auth/application/service.go:481` — `tokenHashFromCookieValue` (constant-time `hmac.Equal`)
+> - `internal/modules/auth/delivery/http/handler.go:34` — `RegisterRoutes` (4 stdlib mux registrations)
+> - `internal/modules/auth/delivery/http/handler.go:165` — `writeAPIError` (legacy envelope writer)
 > - `internal/modules/auth/delivery/http/middleware.go:47` — `Wrap` (session enforcement)
 > - `internal/modules/auth/delivery/http/middleware.go:58` — `LegacyHeaderEnabled` X-User-Id bypass
+> - `internal/modules/auth/delivery/http/middleware.go:83-88` — injects `WithCurrentUser` + `WithAuthContext` + `WithTenantID`; strips `X-Tenant-ID` header
 > - `internal/modules/auth/delivery/http/middleware.go:96` — `defaultPublicPaths` (health + login + logout)
-> - `internal/modules/auth/domain/model.go:9` — `Identity` (holds `[]iamdomain.Role`)
-> - `internal/modules/auth/domain/port.go:8` — `Repository` interface (15 methods)
+> - `internal/modules/auth/domain/model.go:26` — `Session` (now carries `TenantID` field)
+> - `internal/modules/auth/domain/model.go:93` — `CurrentUser` (now carries `TenantID` field)
+> - `internal/modules/auth/domain/errors.go:18` — `ErrTenantNotPermitted` (login rejects unclaimed tenant)
+> - `internal/modules/auth/domain/errors.go:21` — `ErrTenantClaimRequired` (multi-tenant user must supply X-Tenant-ID at login)
+> - `internal/modules/auth/domain/port.go:23` — `GetUserTenants` (new Repository method — list tenant IDs from iam_user_roles)
 > - `internal/modules/auth/infrastructure/postgres/repository.go:151` — `CreateUser` (own tx, INSERT auth_identities)
 > - `internal/modules/auth/infrastructure/postgres/repository.go:80` — `TouchSession` (UPDATE per request)
+> - `internal/modules/auth/infrastructure/memory/repository.go:403` — `SeedUserTenants` (test helper)
 > - `internal/platform/authn/config.go:101-116` — `Config` env-var load sites
+> - `internal/platform/tenant/context.go:1` — `WithTenantID` / `FromContext` / `ErrTenantMissing` (see `wiki/architecture/tenant-context.md`)
+> - `internal/platform/tenant/const.go:4` — `DevTenantID` sentinel
 > - `migrations/0021_init_auth_identities_and_sessions.sql:1-30` — table DDL
 > - `migrations/0036_decouple_auth_identity_from_iam_user_tables.sql:1-88` — FK rewire to `auth_identities(user_id)`
+> - `migrations/0184_auth_sessions_tenant_id.sql` — adds `tenant_id` column to `auth_sessions`
+> - `migrations/0185_revoke_ambiguous_sessions.sql` — revokes existing sessions lacking a tenant binding
 
 ---
 
@@ -51,7 +61,7 @@
 |---|---|
 | End user | Login with username/email + password; session persists across requests; password change required after admin reset or first login |
 | Operator (admin) | Bootstrap a first admin via env; reset another user's password and force change; unlock locked accounts |
-| Developer (other modules) | One way to read current user (`authdomain.CurrentUserFromContext`); one place to read tenant default (`tenant.DevTenantID`) |
+| Developer (other modules) | One way to read current user (`authdomain.CurrentUserFromContext`); one way to read tenant from context (`tenant.FromContext`); fallback sentinel `tenant.DevTenantID` in dev mode |
 | Auditor (ISO) | Login / logout / password-change / admin-reset / role-replace events captured in audit sink — **gap, see §11 T-002** |
 
 ---
@@ -60,7 +70,7 @@
 
 - Language: Go 1.25; stdlib `net/http`, `database/sql`, `golang.org/x/crypto/bcrypt`.
 - Persistence: Postgres; tables under `metaldocs.auth_identities`, `metaldocs.auth_sessions` (auth-owned) + writes to `metaldocs.iam_users` / `iam_user_roles` via injected `iamdomain.RoleAdminRepository` (cross-module).
-- Identity table is **tenant-global** — `auth_identities` has no `tenant_id` column (`migrations/0021_init_auth_identities_and_sessions.sql:1-13`); roles are tenant-scoped in IAM (T-008).
+- Identity table is **tenant-global** — `auth_identities` has no `tenant_id` column (`migrations/0021_init_auth_identities_and_sessions.sql:1-13`); roles are tenant-scoped in IAM (T-008). **Sessions are now tenant-bound** — `auth_sessions.tenant_id` added by migration 0184; `resolveLoginTenant` picks the tenant at login time and stores it in the session row. Subsequent requests read tenant from the session via `tenant.FromContext` (set by middleware) — `X-Tenant-ID` header is stripped after auth and never trusted by downstream handlers.
 - Session token format: `<base64url(rand32)>.<base64url(HMAC-SHA256(secret, token))>`; cookie value carries the signed pair, DB stores the SHA-256 hash of the token half (`application/service.go:439-468`).
 - Cookie attributes: `HttpOnly`, `SameSite=Lax`, `Secure` from `Config.CookieSecure` (defaults to `APP_ENV != local`), `Path=/`, `MaxAge` from `SessionTTL`.
 - Auth is NOT under `oapi-codegen` — routes are registered via `mux.HandleFunc` (`delivery/http/handler.go:35-39`); no entry in `api/openapi/v1/openapi.yaml` for `/api/v1/auth/*`. Consistent with ADR 0012's partial-rollout scope.
@@ -112,7 +122,7 @@ Quality-managed app. Every controlled-document mutation must trace to a known ac
 
 **Outbound Go (own imports, from `_artifacts/03-deps.md` §1):**
 - `internal/modules/iam/domain` — `Role`, `RoleProvider`, `RoleAdminRepository`, `WithAuthContext`, `ErrUserNotFound`, `ErrUserInactive`, `RoleSystemAdmin` (auth ↔ iam bidirectional, T-007)
-- `internal/platform/tenant` — `DevTenantID`
+- `internal/platform/tenant` — `DevTenantID` (bootstrap/dev fallback), `WithTenantID` (middleware injects tenant into ctx), `FromContext` (ResolveSession reads tenant from session row)
 - `internal/platform/httpresponse` — `WriteJSON`
 
 **Outbound DB writes (owned):** `metaldocs.auth_identities`, `metaldocs.auth_sessions`. **Cross-module writes (via injected port):** `metaldocs.iam_users`, `metaldocs.iam_user_roles` (through `iamdomain.RoleAdminRepository`).
@@ -157,15 +167,15 @@ Full table in `_artifacts/01-surface.md` (98 exported symbols). Grouping:
 
 | File | Exports |
 |---|---|
-| `application/service.go` | `Config`, `Service`, `NewService`, `BootstrapLocalAdmin`, `Authenticate`, `ResolveSession`, `Logout`, `ChangePassword`, `ChangePasswordForUser`, `ListUsers`, `ListOnlineUsers`, `CreateUser`, `UpdateUser`, `AdminResetPassword`, `UnlockUser`, `SessionCookie`, `SessionCookieName`, `ExpiredSessionCookie`, `CurrentUser` |
+| `application/service.go` | `Config` (adds `AllowDevTenantFallback`), `Service`, `NewService`, `BootstrapLocalAdmin`, `Authenticate` (calls `resolveLoginTenant`), `ResolveSession` (no longer takes `tenantID` arg), `Logout`, `ChangePassword`, `ChangePasswordForUser`, `ListUsers`, `ListOnlineUsers`, `CreateUser`, `UpdateUser`, `AdminResetPassword`, `UnlockUser`, `SessionCookie`, `SessionCookieName`, `ExpiredSessionCookie`, `CurrentUser` |
 | `delivery/http/handler.go` | `Handler`, `NewHandler`, `RegisterRoutes` |
 | `delivery/http/middleware.go` | `PublicPathChecker`, `Middleware`, `NewMiddleware`, `WithPublicPathChecker`, `Wrap` |
 | `domain/model.go` | `Identity`, `Session`, `OnlineUser`, `ManagedUser`, `CreateUserParams`, `UpdateUserParams`, `BootstrapAdminParams`, `CurrentUser`, `AuthenticatedSession` |
 | `domain/port.go` | `Repository` (15 methods) |
 | `domain/context.go` | `WithCurrentUser`, `CurrentUserFromContext` |
-| `domain/errors.go` | `ErrInvalidCredentials`, `ErrSessionNotFound`, `ErrSessionExpired`, `ErrSessionRevoked`, `ErrPasswordPolicy`, `ErrPasswordChangeRequired`, `ErrIdentityLocked`, `ErrIdentityInactive`, `ErrIdentityNotFound`, `ErrUserAlreadyExists` |
+| `domain/errors.go` | `ErrInvalidCredentials`, `ErrSessionNotFound`, `ErrSessionExpired`, `ErrSessionRevoked`, `ErrPasswordPolicy`, `ErrPasswordChangeRequired`, `ErrIdentityLocked`, `ErrIdentityInactive`, `ErrIdentityNotFound`, `ErrUserAlreadyExists`, `ErrTenantNotPermitted`, `ErrTenantClaimRequired` |
 | `infrastructure/postgres/repository.go` | `Repository`, `NewRepository`, 13 methods (FindIdentityBy*, CreateSession, FindSession, TouchSession, RevokeSession*, RecordSuccessful/FailedLogin, CreateUser, ListUsers, ListOnlineUsers, UpdateUser, BootstrapAdmin) |
-| `infrastructure/memory/repository.go` | `Repository`, `NewRepository`, full `Repository` impl + `iamdomain.RoleAdminRepository` impl (`HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles`, `RolesByUserID`) for memory-mode tests |
+| `infrastructure/memory/repository.go` | `Repository`, `NewRepository`, full `Repository` impl + `iamdomain.RoleAdminRepository` impl (`HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles`, `RolesByUserID`) for memory-mode tests; `SeedUserTenants` (test helper to pre-populate tenant list for a user) |
 
 All exported symbols are `(undocumented)` in the surface scan — captured as T-011.
 
@@ -208,8 +218,9 @@ sequenceDiagram
             H-->>C: 401 legacy envelope + ExpiredSessionCookie
         else match
             S->>R: RecordSuccessfulLogin (UPDATE last_login_at, reset counters)
+            S->>S: resolveLoginTenant(userID, X-Tenant-ID claim) → tenantID
             S->>S: newSessionToken (rand32 + HMAC-SHA256 sign + SHA-256 hash)
-            S->>R: CreateSession (INSERT auth_sessions)
+            S->>R: CreateSession (INSERT auth_sessions WITH tenant_id)
             S->>R: FindIdentityByUserID
             S->>IAM: RolesByUserID(userID, tenantID)
             S-->>H: AuthenticatedSession{rawToken, currentUser, expiresAt}
@@ -246,23 +257,24 @@ sequenceDiagram
     alt LegacyHeaderEnabled && X-User-Id present
         MW-->>C: pass-through (BYPASS — T-001)
     end
-    MW->>S: ResolveSession(rawToken, tenantID)
+    MW->>S: ResolveSession(rawToken)
     S->>S: tokenHashFromCookieValue (split + hmac.Equal)
     S->>R: FindSession(sessionID)
-    R-->>S: Session | ErrSessionNotFound
+    R-->>S: Session{tenantID, ...} | ErrSessionNotFound
     alt revoked or expired
         S-->>MW: typed error
         MW-->>C: 401 AUTH_UNAUTHORIZED
     else live
         S->>R: TouchSession (UPDATE last_seen_at — every request, T-006)
         S->>R: FindIdentityByUserID
-        S->>IAM: RolesByUserID
-        S-->>MW: CurrentUser
+        S->>IAM: RolesByUserID(userID, session.TenantID)
+        S-->>MW: CurrentUser{TenantID=session.TenantID}
         alt MustChangePassword && path NOT in isPasswordChangeAllowedPath
             MW-->>C: 403 AUTH_PASSWORD_CHANGE_REQUIRED
         else
-            MW->>MW: WithCurrentUser + iamdomain.WithAuthContext into ctx
-            MW->>next: ServeHTTP
+            MW->>MW: WithCurrentUser + iamdomain.WithAuthContext + tenant.WithTenantID into ctx
+            MW->>MW: strip X-Tenant-ID header from r2
+            MW->>next: ServeHTTP(w, r2)
         end
     end
 ```
@@ -315,6 +327,8 @@ Two distinct transactions. Failure between TX-A and TX-B leaves an orphan `auth_
 | Account locked | 403 | `AUTH_ACCOUNT_LOCKED` |
 | Account inactive | 403 | `AUTH_ACCOUNT_INACTIVE` |
 | Password policy violation | 400 | `VALIDATION_ERROR` |
+| Claimed tenant not in user's IAM roles (`ErrTenantNotPermitted`) | 403 | `AUTH_TENANT_FORBIDDEN` |
+| User in multiple tenants, no `X-Tenant-ID` claim at login (`ErrTenantClaimRequired`) | 403 | `AUTH_TENANT_REQUIRED` |
 | Missing/invalid session cookie | 401 | `AUTH_UNAUTHORIZED` |
 | Session expired or revoked | 401 | `AUTH_UNAUTHORIZED` |
 | `MustChangePassword` set, path not allowed | 403 | `AUTH_PASSWORD_CHANGE_REQUIRED` |
@@ -379,6 +393,7 @@ From artifact 03 §4. Loaded in `internal/platform/authn/config.go:101-116`.
 | `LoginMaxFailedAttempts` | no | `5` | lockout threshold |
 | `LoginLockDuration` | no | `15m` | lockout window |
 | `LegacyHeaderEnabled` | no | `false` | enables X-User-Id bypass — see T-001 |
+| `AllowDevTenantFallback` | no | `false` | when true, login succeeds for users with no IAM roles by returning `DevTenantID`; dev/test only |
 | `OriginProtection` | no | `authn.Enabled()` | flag declared; **enforcement site not located in repo** (T-012) |
 | `TrustedOrigins` | no | empty | companion to `OriginProtection`; same gap |
 | `BootstrapAdmin*` | yes when `BootstrapAdminEnabled` | `BootstrapAdminEnabled = APP_ENV==local` | first-boot admin seeding |
@@ -461,7 +476,10 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 | BootstrapAdmin | One-shot first-boot admin seed; gated by `BootstrapAdminEnabled` (defaults `APP_ENV==local`). |
 | LegacyHeaderEnabled | Config flag that, when true, lets `X-User-Id` header bypass session enforcement. Off by default. |
 | MustChangePassword | Identity flag forcing the user to call `POST /api/v1/auth/change-password` before any other route returns 200. |
-| `tenant.DevTenantID` | Sentinel UUID `ffffffff-...` used when no `X-Tenant-ID` header arrives. |
+| `tenant.DevTenantID` | Sentinel UUID `ffffffff-...` used when `AllowDevTenantFallback=true` and the user has no IAM roles. Production sessions always carry a real tenant from `resolveLoginTenant`. |
+| Session-bound tenant | `auth_sessions.tenant_id` (migration 0184) stores the tenant selected at login. Middleware reads it via `tenant.FromContext`; downstream handlers never touch `X-Tenant-ID`. |
+| `ErrTenantNotPermitted` | Login rejected because the `X-Tenant-ID` claim names a tenant the user has no IAM role in. |
+| `ErrTenantClaimRequired` | Login rejected because the user belongs to multiple tenants and no `X-Tenant-ID` was provided. |
 
 ---
 
@@ -469,7 +487,7 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 
 - ADRs: [`decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md), [`decisions/0012-contract-first-api.md`](../decisions/0012-contract-first-api.md)
 - Concepts: [`concepts/authz-tiers.md`](../concepts/authz-tiers.md), [`concepts/iso-segregation.md`](../concepts/iso-segregation.md), [`concepts/error-ux.md`](../concepts/error-ux.md)
-- Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md)
+- Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md), [`architecture/tenant-context.md`](../architecture/tenant-context.md)
 - Modules: [`modules/iam.md`](iam.md) (consumer + producer), [`modules/documents.md`](documents.md) (CurrentUser consumer)
 - See also: [`modules/audit.md`](audit.md) — auth is a consumer-side gap (T-002 in auth-tech-debt: login / logout / password-change events not yet emitted to the audit sink)
 - Backlog: [`backlog/auth-refactor.md`](../backlog/auth-refactor.md)
@@ -479,4 +497,5 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 
 ## Changelog
 
+- 2026-05-11 — Plan 3 (session-bound tenant): `Session.TenantID` + `CurrentUser.TenantID` added; `ResolveSession` drops `tenantID` arg; `resolveLoginTenant` + `AllowDevTenantFallback`; new errors `ErrTenantNotPermitted`/`ErrTenantClaimRequired`; middleware now injects `tenant.WithTenantID` + strips `X-Tenant-ID` header; migrations 0184/0185; `SeedUserTenants` helper; Key files, §2, §5.2, §6.1, §6.2, §6.4, §8.7, §12 updated.
 - 2026-05-10 — initial publish; first auth module doc. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.
