@@ -1,162 +1,412 @@
 # Module: taxonomy
 
-> **Last verified:** 2026-05-02
-> **Scope:** Document Families, Profiles (Tipos Documentais / Perfis Documentais), Areas, and their inter-relationships. Covers backend domain, infrastructure, service, HTTP delivery, and frontend admin UI.
-> **Out of scope:** Code generation rules (see `concepts/controlled-documents.md`); approval routing (see `modules/approval.md`).
+> Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
+
+**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
+
 > **Key files:**
-> - `internal/modules/taxonomy/domain/family.go:8` — DocumentFamily struct + sentinel errors + Deactivate()
-> - `internal/modules/taxonomy/domain/port.go:34` — FamilyRepository interface
-> - `internal/modules/taxonomy/infrastructure/family_repository.go:11` — FamilyRepository SQL impl
-> - `internal/modules/taxonomy/application/family_service.go:11` — FamilyService (Create, Get, List, Update, Deactivate)
-> - `internal/modules/taxonomy/delivery/http/routes_families.go:20` — HTTP handlers (list, create, get, update, deactivate)
-> - `internal/modules/taxonomy/delivery/http/handler.go:28` — familyService interface + Handler struct + route registration
-> - `internal/modules/taxonomy/module.go:26` — wire familyRepo → familyService → handler
-> - `migrations/0161_grant_families_write_privileges.sql` — GRANT on document_families to metaldocs_app
-> - `frontend/apps/web/src/features/taxonomy/TaxonomyAdminPage.tsx:10` — admin UI, Famílias tab is default
-> - `frontend/apps/web/src/features/taxonomy/FamilyList.tsx:13` — family table + deactivate action
-> - `frontend/apps/web/src/features/taxonomy/FamilyEditDialog.tsx:12` — create/edit modal
-> - `frontend/apps/web/src/features/taxonomy/ProfileEditDialog.tsx:29` — family dropdown (now dynamic via fetchFamilies)
-> - `frontend/apps/web/src/features/taxonomy/types.ts:63` — DocumentFamily, CreateFamilyRequest, UpdateFamilyRequest
-> - `frontend/apps/web/src/features/taxonomy/api.ts:98` — fetchFamilies, createFamily, updateFamily, deactivateFamily
+> - `internal/modules/taxonomy/domain/family.go:8` — `DocumentFamily` aggregate
+> - `internal/modules/taxonomy/domain/profile.go:8` — `DocumentProfile` aggregate
+> - `internal/modules/taxonomy/domain/area.go:8` — `ProcessArea` aggregate
+> - `internal/modules/taxonomy/domain/port.go:1` — repository ports + `GovernanceEvent`
+> - `internal/modules/taxonomy/application/family_service.go:11` — `FamilyService` (constructor takes no govLogger)
+> - `internal/modules/taxonomy/application/profile_service.go:14` — `ProfileService` (panics if govLogger nil; Create/Update do not call it)
+> - `internal/modules/taxonomy/application/area_service.go:14` — `AreaService` (Archive logs; Create/Update do not)
+> - `internal/modules/taxonomy/delivery/http/handler.go:51-68` — 16 routes mounted on raw `net/http.ServeMux`
+> - `internal/modules/taxonomy/delivery/http/routes_profiles.go:197-203` — `tenantIDFromRequest` (trusts `X-Tenant-ID`; falls back to `tenant.DevTenantID`)
+> - `internal/modules/taxonomy/infrastructure/repository.go:102` — `ProfileRepository.Create` (no tx, no `authz.Require`)
+> - `internal/modules/taxonomy/infrastructure/family_repository.go:91-99` — `HasActiveProfiles` (no tenant predicate; TOCTOU race with `Update`)
+> - `apps/api/cmd/metaldocs-api/permissions.go:158-180` — path-prefix capability dispatcher (PATCH /families/{code} not matched → falls through)
+> - `apps/api/cmd/metaldocs-api/main.go:197-201,225,508-524` — module wiring + standalone `ProfileRepository` + `profileDefaultsAdapter` for documents_v2
+> - `migrations/0023_init_document_family_and_profile_registry.sql` · `0025_init_document_taxonomy.sql` · `0122_taxonomy_extend_document_profiles.sql` · `0123_taxonomy_extend_process_areas.sql` · `0161_grant_families_write_privileges.sql` · `0175_documents_area_name_snapshot.sql`
 
 ---
 
-## Entities
+## 1. Introduction & Goals
 
-### DocumentFamily (globally scoped)
+`internal/modules/taxonomy` owns the **flat, code-keyed classification catalog** that other modules bind controlled documents to: 3 entities — `DocumentFamily`, `DocumentProfile`, `ProcessArea` — each a row in its own Postgres table. Profiles bind to families; areas are flat with optional `parent_code` self-FK and cycle prevention. The module exposes 16 HTTP routes under `/api/v2/taxonomy/*` and serves three downstream consumers: registry (CD code prefix `{profile}-{area}-{seq}`), documents_v2 (template defaults via `profileDefaultsAdapter`), documents (live read of `process_areas.name` for snapshot).
 
-Groups profiles into broad document categories (e.g. "Qualidade", "Recursos Humanos").
+### 1.1 Requirements overview
 
-**Key invariants:**
+- **Catalog CRUD** with code immutability post-create (CHECK + trigger on profile/area; handler-overwrite on family).
+- **Per-tenant scoping for profiles + areas** — `tenant_id UUID NOT NULL DEFAULT DevTenantID` (`0122:4-6`, `0123:3-5`).
+- **Global family catalog** — `document_families` has no `tenant_id` (`0023:1-7`); shared across tenants (no ADR; see T-002).
+- **Soft-archive** for profiles + areas via `archived_at TIMESTAMPTZ NULL` (`0122:13`, `0123:8`).
+- **Area hierarchy** — self-FK `(tenant_id, parent_code) → (tenant_id, code)` with application-layer cycle detection (`area_service.go:SetParent` → `ListAncestors`).
+- **Capability gate** — tier-1 only: `taxonomy.manage` for writes, `doc.view` for reads (`permissions.go:158-180`).
 
-- `document_families` has **no `tenant_id`** — families are global, not per-tenant.
-- Deactivation uses `is_active BOOLEAN` (not `archived_at TIMESTAMPTZ` as profiles/areas use).
-- Family `code` is **immutable** after creation — enforced by `ErrFamilyCodeImmutable` and service logic.
-- Deactivation is **guarded**: blocked if any active profiles reference the family (`HasActiveProfiles` check returns `ErrFamilyHasProfiles`).
-- Sentinel errors live in `domain/family.go:16`: `ErrFamilyNotFound`, `ErrFamilyAlreadyInactive`, `ErrFamilyCodeImmutable`, `ErrFamilyHasProfiles`.
+### 1.2 Quality Goals
 
-**DB table:** `metaldocs.document_families` — columns: `code`, `name`, `description`, `is_active`, `created_at`.
+| Rank | Goal | How verified |
+|---|---|---|
+| 1 | **Multi-tenant isolation** of profiles + areas | per-tenant unique `(tenant_id, code)` indexes; **FAILS** — tenant_id sourced from client header without verification (T-001); families have no tenant scoping at all (T-002) |
+| 2 | **Regulated-mutation traceability** | govLogger emits to `governance_events` on selected ops — **PARTIAL**: `FamilyService` has no govLogger field; `ProfileService.Create/Update` and `AreaService.Create/Update` do not emit (T-004, T-005) |
+| 3 | **Code immutability post-create** | DB trigger `trg_document_profiles_code_immutable` (`0122:33-39`) + `trg_process_areas_code_immutable` (`0123:33-37`) — PASSES for profile + area; family-side enforced only by handler overwriting body `code` (T-013) |
 
-**Domain method:**
+### 1.3 Stakeholders
 
-```go
-// internal/modules/taxonomy/domain/family.go:23
-func (f *DocumentFamily) Deactivate() error {
-    if !f.IsActive {
-        return ErrFamilyAlreadyInactive
+| Role | Expectation |
+|---|---|
+| Admin / QMS | CRUD profiles + areas + families with audit trail; immutable codes once published. |
+| Registry module | `document_profiles.code` and `process_areas.code` as stable FKs for CD code generation. |
+| documents_v2 wizard | `profile.default_template_version_id` resolved via `profileDefaultsAdapter`. |
+| documents module | `process_areas.name` resolvable at document-create time for snapshot column. |
+
+---
+
+## 2. Architecture Constraints
+
+- Language / runtime: Go 1.25
+- Persistence: Postgres; 3 owned tables in schema `metaldocs` (forward-only migrations, `0023`/`0025` base + `0122`/`0123` tenant-extension)
+- HTTP routing: raw `net/http.ServeMux` (`handler.go:51-68`). **No OpenAPI spec**, no oapi-codegen — divergence from ADR 0012 (T-009)
+- Error envelope: legacy `{"code","message"}` via `internal/platform/httpresponse/response.go:14-16`; not RFC 9457 (T-008)
+- Authz: tier-1 path-prefix dispatcher only; no `authz.Require` (`internal/platform/authz` not imported); no DB tripwire / `assert_caps` GUC on any taxonomy table (T-006)
+- Tenant scoping: application-layer only via `X-Tenant-ID` header (no `set_local_tenant_id` GUC anywhere in `internal/`)
+
+---
+
+## 3. System Scope & Context (C4 Level 1)
+
+```mermaid
+C4Context
+    title System Context — taxonomy
+    Person(admin, "Admin / QMS user", "Web UI")
+    System_Boundary(b1, "MetalDocs") {
+        System(taxonomy, "taxonomy", "Catalog of families, profiles, areas")
+        System_Ext(registry, "registry", "Reads profile + area codes for CD prefix")
+        System_Ext(documents_v2, "documents_v2", "Reads profile.default_template_version_id via adapter")
+        System_Ext(documents, "documents", "Reads process_areas.name for snapshot")
+        System_Ext(templates_v2, "templates_v2", "Owns templates_v2_template_version (FK target)")
     }
-    f.IsActive = false
-    return nil
-}
+    System_Ext(pg, "Postgres", "metaldocs.document_families · _profiles · _process_areas")
+    Rel(admin, taxonomy, "HTTP /api/v2/taxonomy/*")
+    Rel(taxonomy, pg, "SQL (sql.DB; no tx)")
+    Rel(registry, pg, "Direct SQL on _profiles + _process_areas (TaxonomyProfileReader / TaxonomyAreaReader)")
+    Rel(documents_v2, taxonomy, "Go: profileDefaultsAdapter.GetDefaultTemplateVersionID")
+    Rel(documents, pg, "Direct SQL: SELECT name FROM _process_areas at document-create")
+    Rel(taxonomy, templates_v2, "READ join: _template_version for IsPublished check")
 ```
 
-### Profile (Tipo Documental / Perfil Documental)
+### 3.1 Business Context
 
-Document category within a family. Tenant-scoped (`tenant_id`). Has a code prefix (e.g. `DC`, `POP`) that drives `{doc_code}`. Archived via `archived_at TIMESTAMPTZ` (not `is_active`).
+A QMS admin needs a stable catalog so every controlled document carries a profile (what kind of doc) and a process area (which part of the operation it governs). The taxonomy module is that catalog. Family-level deactivation is the rare global lever; profile + area archive is the common per-tenant lever. Code immutability is the QMS contract — once a code is in circulation, it does not change.
 
-**Default template binding:** Each profile may have a `default_template_version_id`. The document creation wizard uses this to clone content. Without the binding, the wizard has no template to offer.
+### 3.2 Technical Context
 
-**FK:** `document_profiles.family_code REFERENCES document_families(code)` — a profile cannot be created without a valid, active family.
+Inbound interfaces (Go):
+- `taxonomyapp.NewDBGovernanceLogger(db)` — reused by `registry/module.go:31` to write to `governance_events` from outside the module.
+- `taxonomydomain.{DocumentProfile, ProcessArea, GovernanceEvent, GovernanceLogger, sentinel errors}` — consumed by `registry/application/service.go:13`, `registry/delivery/http/routes.go:17`, `registry/infrastructure/repository.go:15`.
+- `taxonomyinfra.NewProfileRepository(db)` — constructed standalone in `main.go:225` for `profileDefaultsAdapter`.
+- `taxonomyinfra.NewTemplateVersionChecker(db)` — joins to `templates_v2_template{_version}` for `IsPublished` (`template_version_checker.go:14-17`).
 
-### Area (ProcessArea)
+Inbound interfaces (HTTP) — 16 routes (full table in §5.3).
 
-Organizational unit. Tenant-scoped. Code (e.g. `RH`, `QUA`, `PROD`) becomes part of the controlled-document number. Archived via `archived_at TIMESTAMPTZ`.
-
----
-
-## Scoping comparison
-
-| Entity | Scoped by | Inactive pattern |
-|--------|-----------|-----------------|
-| DocumentFamily | global (no tenant_id) | `is_active = FALSE` |
-| DocumentProfile | tenant_id | `archived_at IS NOT NULL` |
-| ProcessArea | tenant_id | `archived_at IS NOT NULL` |
+Outbound interfaces:
+- DB: 3 owned tables; READ join to `templates_v2_template_version` + `templates_v2_template`.
+- Go: `internal/platform/authn` (UserID), `internal/platform/httpresponse` (envelope), `internal/platform/tenant` (DevTenantID fallback). No `internal/platform/authz`, no `internal/audit`, no `internal/modules/iam`.
 
 ---
 
-## API routes
+## 4. Solution Strategy
 
-All routes under `/api/v2/taxonomy/`. Registration: `internal/modules/taxonomy/delivery/http/handler.go:50`.
-
-### Families
-
-| Method | Path | Handler | Notes |
-|--------|------|---------|-------|
-| GET | `/families` | `listFamilies` | `?includeInactive=true` to include deactivated |
-| POST | `/families` | `createFamily` | code + name required; code immutable |
-| GET | `/families/{code}` | `getFamily` | 404 → `FAMILY_NOT_FOUND` |
-| PATCH | `/families/{code}` | `updateFamily` | name + description only; code ignored from body |
-| DELETE | `/families/{code}` | `deactivateFamily` | 204 on success; 409 if has active profiles |
-
-**Error codes** (`routes_families.go:97`): `FAMILY_NOT_FOUND` (404), `FAMILY_ALREADY_INACTIVE` (409), `FAMILY_HAS_PROFILES` (409), `FAMILY_ALREADY_EXISTS` (409 — PG unique violation), `VALIDATION_ERROR` (400).
-
-Note: DELETE is used for deactivation (not POST /archive) because families have no audit-trail requirement.
-
-### Profiles
-
-| Method | Path | Notes |
-|--------|------|-------|
-| GET | `/profiles` | `?includeArchived=true` |
-| POST | `/profiles` | requires `familyCode` |
-| GET | `/profiles/{code}` | |
-| PATCH | `/profiles/{code}` | |
-| DELETE | `/profiles/{code}` | archives |
-| PUT | `/profiles/{code}/default-template` | binds template version |
-
-### Areas
-
-| Method | Path | Notes |
-|--------|------|-------|
-| GET | `/areas` | `?includeArchived=true` |
-| POST | `/areas` | |
-| GET | `/areas/{code}` | |
-| PUT | `/areas/{code}` | full update |
-| DELETE | `/areas/{code}` | archives |
+- **Per-aggregate repository + service split.** Each of the 3 entities has its own service + repository pair. Driver: simplicity; cost: govLogger wired inconsistently (FamilyService omits it — T-004).
+- **DB-level code immutability for profile + area only.** Triggers `trg_document_profiles_code_immutable` (`0122:33-39`) and `trg_process_areas_code_immutable` (`0123:33-37`) raise on `NEW.code <> OLD.code`. Family immutability is *not* enforced in DB — handler overwrites body `code` with path param (T-013).
+- **Tenant scoping on profile + area only; families are global.** `0122:4-6` and `0123:3-5` add `tenant_id`. `document_families` has no `tenant_id` (`0023:1-7`). No ADR justifies the asymmetry (T-002).
+- **Application-layer cycle prevention for area parents.** `AreaService.SetParent` walks `ListAncestors` to reject cycles. Self-FK is structural; acyclicity is application-only.
+- **Single-tier authz via path-prefix dispatcher.** No `authz.Require` in the module; no DB tripwire. Driver: pre-dates two-tier rollout (ADR 0007). Cost: PATCH /families/{code} bypass + cross-tenant blast on global families (T-002, T-003, T-006).
+- **Raw `net/http.ServeMux` routes.** No OpenAPI spec, no codegen. Driver: pre-dates contract-first migration (ADR 0012). Cost: client codegen cannot bind taxonomy methods (T-009).
 
 ---
 
-## Wiring (module.go)
+## 5. Building Block View (C4 Level 2 — Container)
 
-```go
-// internal/modules/taxonomy/module.go:26
-familyRepo := infrastructure.NewFamilyRepository(deps.DB)
-familyService := application.NewFamilyService(familyRepo)
-handler := thttp.NewHandler(profileService, areaService, familyService)
+### 5.1 Whitebox — taxonomy
+
+```mermaid
+C4Container
+    title Container View — taxonomy
+    Container(http, "HTTP Handler", "Go (http.ServeMux)", "16 routes: /api/v2/taxonomy/{profiles,areas,families}")
+    Container(svc, "Service Layer", "Go", "FamilyService · ProfileService · AreaService")
+    Container(domain, "Domain", "Go", "DocumentFamily · DocumentProfile · ProcessArea · GovernanceEvent · sentinel errors")
+    Container(repo, "Repository Layer", "Go + database/sql", "FamilyRepository · ProfileRepository · AreaRepository · TemplateVersionChecker · DBGovernanceLogger")
+    ContainerDb(db, "metaldocs.document_*", "Postgres", "document_families · document_profiles · document_process_areas (+ governance_events)")
+    System_Ext(tplv2, "templates_v2_template_version", "Postgres (templates_v2)", "READ join for IsPublished")
+    Rel(http, svc, "calls")
+    Rel(svc, domain, "uses")
+    Rel(svc, repo, "calls (repository interfaces)")
+    Rel(repo, db, "SQL (no tx; one *sql.DB per repo)")
+    Rel(repo, tplv2, "READ join (TemplateVersionChecker)")
 ```
 
+### 5.2 Public surface
+
+| File | Symbol | Kind | Purpose |
+|---|---|---|---|
+| `domain/family.go:8` | `DocumentFamily` | struct | family aggregate (`Code, Name, Description, IsActive, CreatedAt`) |
+| `domain/family.go:22` | `(*DocumentFamily).Deactivate` | method | in-memory state transition; returns `ErrFamilyAlreadyInactive` |
+| `domain/family.go` | `ErrFamilyNotFound · ErrFamilyAlreadyInactive · ErrFamilyHasProfiles` | sentinels | |
+| `domain/profile.go:8` | `DocumentProfile` | struct | profile aggregate (12 fields incl. `TenantID`, `DefaultTemplateVersionID`, `ArchivedAt`) |
+| `domain/profile.go` | `ErrProfileNotFound · ErrProfileArchived · ErrProfileCodeImmutable · ErrTemplateNotPublished · ErrTemplateProfileMismatch` | sentinels | |
+| `domain/area.go:8` | `ProcessArea` | struct | area aggregate (incl. `TenantID`, `ParentCode`, `ArchivedAt`) |
+| `domain/area.go` | `ErrAreaNotFound · ErrAreaArchived · ErrAreaCodeImmutable · ErrAreaParentCycle` | sentinels | |
+| `domain/port.go` | `FamilyRepository · ProfileRepository · AreaRepository · TemplateVersionChecker · GovernanceLogger` | ifaces | repository ports |
+| `domain/port.go` | `GovernanceEvent` | struct | governance log row (`ActorID, EntityType, EntityCode, Action, BeforeJSON, AfterJSON, OccurredAt`) |
+| `application/family_service.go:11` | `FamilyService` | struct | List · Get · Create · Update · Deactivate (no govLogger) |
+| `application/profile_service.go:14` | `ProfileService` | struct | List · Get · Create · Update · Archive · SetDefaultTemplate (Archive + SetDefaultTemplate emit) |
+| `application/area_service.go:14` | `AreaService` | struct | List · Get · Create · Update · Archive · SetParent (Archive emits; cycle check via `ListAncestors`) |
+| `application/governance.go` | `NewDBGovernanceLogger` | func | re-exported by registry (`registry/module.go:31`) |
+| `infrastructure/family_repository.go:11` | `FamilyRepository` | struct | `*sql.DB`-backed; no tx; `HasActiveProfiles` cross-tenant SELECT |
+| `infrastructure/repository.go:14,180` | `ProfileRepository · AreaRepository` | structs | `*sql.DB`-backed; no tx |
+| `infrastructure/template_version_checker.go:11` | `TemplateVersionChecker` | struct | READ join: `_template + _template_version` |
+| `delivery/http/handler.go:15` | `Handler` | struct | HTTP wrapper |
+| `delivery/http/handler.go:51-68` | `Handler.RegisterRoutes` | method | mounts 16 routes |
+| `module.go:11` | `Module · Dependencies` | struct | composition root |
+
+(Phase 1 surface scan: 80 exported symbols total — all without Go doc comments; tracked as T-014.)
+
+### 5.3 HTTP operations
+
+| Method | Path | OperationID | Handler | Authz cap |
+|---|---|---|---|---|
+| GET | `/api/v2/taxonomy/profiles` | _missing_ | `listProfiles` | `doc.view` |
+| POST | `/api/v2/taxonomy/profiles` | _missing_ | `createProfile` | `taxonomy.manage` |
+| GET | `/api/v2/taxonomy/profiles/{code}` | _missing_ | `getProfile` | `doc.view` |
+| PATCH | `/api/v2/taxonomy/profiles/{code}` | _missing_ | `updateProfile` | `taxonomy.manage` |
+| DELETE | `/api/v2/taxonomy/profiles/{code}` | _missing_ | `archiveProfile` | `taxonomy.manage` |
+| PUT | `/api/v2/taxonomy/profiles/{code}/default-template` | _missing_ | `setDefaultTemplate` | `taxonomy.manage` |
+| GET | `/api/v2/taxonomy/areas` | _missing_ | `listAreas` | `doc.view` |
+| POST | `/api/v2/taxonomy/areas` | _missing_ | `createArea` | `taxonomy.manage` |
+| GET | `/api/v2/taxonomy/areas/{code}` | _missing_ | `getArea` | `doc.view` |
+| PUT | `/api/v2/taxonomy/areas/{code}` | _missing_ | `updateArea` | `taxonomy.manage` |
+| DELETE | `/api/v2/taxonomy/areas/{code}` | _missing_ | `archiveArea` | `taxonomy.manage` |
+| GET | `/api/v2/taxonomy/families` | _missing_ | `listFamilies` | `doc.view` |
+| POST | `/api/v2/taxonomy/families` | _missing_ | `createFamily` | `taxonomy.manage` |
+| GET | `/api/v2/taxonomy/families/{code}` | _missing_ | `getFamily` | `doc.view` |
+| **PATCH** | `/api/v2/taxonomy/families/{code}` | _missing_ | `updateFamily` | **NONE** (T-003 — falls through dispatcher) |
+| DELETE | `/api/v2/taxonomy/families/{code}` | _missing_ | `deactivateFamily` | `taxonomy.manage` |
+
 ---
 
-## Frontend admin UI
+## 6. Runtime View (selected scenarios)
 
-`TaxonomyAdminPage.tsx` — three tabs: **Famílias** (default), **Perfis**, **Áreas**. All three are loaded in a single `Promise.all` on mount and on filter change.
+### 6.1 listFamilies — read path
 
-`FamilyList.tsx` — table with columns: code, name, description, status (Ativa/Inativa), actions (Editar / Desativar). The Desativar button is hidden for already-inactive rows.
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant H as Handler.listFamilies
+    participant S as FamilyService.List
+    participant R as FamilyRepository.List
+    participant DB as document_families
+    C->>H: GET /api/v2/taxonomy/families[?includeInactive]
+    H->>S: List(ctx, includeInactive)
+    S->>R: List(ctx, includeInactive)
+    R->>DB: SELECT ... [WHERE is_active=TRUE] ORDER BY code
+    DB-->>R: rows
+    R-->>S: []DocumentFamily
+    S-->>H: items
+    H-->>C: 200 {"items":[DocumentFamily...]}
+```
 
-`FamilyEditDialog.tsx` — modal for create (code editable) and edit (code read-only). Create enforces code to lowercase.
+No tenant predicate (table is global). Tier-1 cap: `doc.view`. No tier-2; no DB tripwire. See `_artifacts/02-flow-list-families.md`.
 
-`ProfileEditDialog.tsx` — family selector (`<select>`) is populated via `fetchFamilies()` (active families only, no `includeInactive` param). Previously hardcoded; changed to dynamic in this feature.
+### 6.2 createProfile — write path
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant H as Handler.createProfile
+    participant T as tenantIDFromRequest
+    participant S as ProfileService.Create
+    participant R as ProfileRepository.Create
+    participant DB as document_profiles
+    C->>H: POST /api/v2/taxonomy/profiles {code,familyCode,...}
+    H->>T: X-Tenant-ID (fallback DevTenantID)
+    T-->>H: tenantID (TRUSTED — no verification)
+    H->>S: Create(ctx, DocumentProfile{TenantID, ...})
+    S->>R: Create(ctx, profile)
+    R->>DB: INSERT (no tx, no authz.Require, no set_local_tenant_id)
+    DB-->>R: ok | 23503 (FK family) | 23505 (PK) | 23514 (CHECK)
+    R-->>S: err mapped
+    S-->>H: err
+    H-->>C: 201 {DocumentProfile} | 4xx legacy envelope
+```
+
+Trust chain: client header → SQL `tenant_id` value. No verification that the authenticated user belongs to the named tenant (T-001). No govLogger emission on Create (T-005). See `_artifacts/02-flow-create-profile.md`.
+
+### 6.3 deactivateFamily — state transition
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant H as Handler.deactivateFamily
+    participant S as FamilyService.Deactivate
+    participant R as FamilyRepository
+    participant DB as Postgres
+    C->>H: DELETE /api/v2/taxonomy/families/{code}
+    H->>S: Deactivate(ctx, code)
+    S->>R: GetByCode(ctx, code)
+    R->>DB: SELECT FROM document_families
+    DB-->>R: family
+    R-->>S: DocumentFamily
+    S->>R: HasActiveProfiles(ctx, code)
+    R->>DB: SELECT EXISTS FROM document_profiles WHERE family_code=$1 AND archived_at IS NULL
+    Note over R,DB: NO tenant predicate — scans every tenant's profiles
+    DB-->>R: bool
+    R-->>S: bool
+    S->>S: (*DocumentFamily).Deactivate
+    S->>R: Update(ctx, family)
+    R->>DB: UPDATE document_families SET is_active=FALSE WHERE code=$4
+    Note over S,DB: NO tx · NO row lock · TOCTOU race window (T-007)
+    DB-->>R: ok
+    R-->>S: nil
+    S-->>H: nil
+    H-->>C: 204
+```
+
+| From | To | Trigger | Cap |
+|---|---|---|---|
+| `is_active=TRUE` | `is_active=FALSE` | `DELETE /families/{code}` + no active profiles | `taxonomy.manage` |
+
+`FamilyService` has no govLogger field — no governance event emitted on this regulated mutation (T-004). See `_artifacts/02-flow-deactivate-family.md`.
+
+Failure modes — reference `wiki/concepts/error-ux.md`:
+
+| Condition | HTTP | Envelope `code` |
+|---|---|---|
+| family not found | 404 | `FAMILY_NOT_FOUND` |
+| already inactive | 409 | `FAMILY_ALREADY_INACTIVE` |
+| has active profiles | 409 | `FAMILY_HAS_PROFILES` |
+| internal | 500 | `INTERNAL_ERROR` |
+
+(Legacy envelope; not RFC 9457 — T-008.)
 
 ---
 
-## DB migration
+## 7. Deployment View
 
-`migrations/0161_grant_families_write_privileges.sql` — grants `SELECT, INSERT, UPDATE, DELETE` on `metaldocs.document_families` to the `metaldocs_app` runtime user. Without this migration the API returns Postgres permission errors on all family endpoints.
-
----
-
-## Invariants summary
-
-1. Family code is immutable after creation.
-2. A profile requires a valid family (`family_code` FK).
-3. A family with active profiles cannot be deactivated (`HasActiveProfiles` guard in `FamilyService.Deactivate`).
-4. Families are globally shared — all tenants see the same set.
-5. Profile/area archiving uses `archived_at`; family deactivation uses `is_active`.
+- Binary: single Go server (`apps/api/cmd/metaldocs-api`)
+- Process: one container, port `:8081`
+- Migrations: forward-only; 19 migrations touch taxonomy tables (see `_artifacts/04-persistence.md` §6)
+- Environment: **no taxonomy-specific env vars or config keys** (Phase 3 §4); tenant scoping is header-driven, not config-driven; `DevTenantID` is a compile-time constant (`internal/platform/tenant/const.go:1-4`)
 
 ---
 
-## See also
+## 8. Cross-cutting Concepts
 
-- [workflows/user-onboarding.md](../workflows/user-onboarding.md) — Steps 1 + 4
-- [concepts/controlled-documents.md](../concepts/controlled-documents.md) — code generation
-- [modules/templates-v2.md](templates-v2.md)
-- [architecture/data-model.md](../architecture/data-model.md) — document_families table entry
+### 8.1 Authentication & Authorization
+- **Tier 1 (HTTP edge):** path-prefix dispatcher (`apps/api/cmd/metaldocs-api/permissions.go:158-180`). Profiles branch matches GET + POST/PATCH/PUT/DELETE. Areas branch matches GET + POST/PUT/DELETE. Families branch matches GET + POST/PUT/DELETE — **PATCH not matched** (T-003).
+- **Tier 2 (in-tx):** absent — `internal/platform/authz` not imported anywhere under `internal/modules/taxonomy/` (Phase 3 OUT-edge check).
+- **Postgres tripwire:** absent — no `assert_caps` trigger on any of the 3 owned tables; no `set_local_tenant_id` GUC anywhere in `internal/` (Phase 4 §3). Compare to approval (`0142b_role_capabilities_v2_enforce.sql:200-209`).
+- See `wiki/decisions/0007-two-tier-authz.md` — taxonomy is non-conformant (T-006).
+
+### 8.2 Tenant scoping
+- `tenant.DevTenantID` (`internal/platform/tenant/const.go:1-4`) is the fallback when `X-Tenant-ID` header is absent (`routes_profiles.go:197-203`). Handler trusts the header value as authoritative and inserts it into `document_profiles.tenant_id` / `document_process_areas.tenant_id` (T-001).
+- `document_families` has no `tenant_id` — globally shared across tenants. Mutation blast radius extends to every tenant's UI/registry (T-002).
+- No DB-level tenant predicate guard: `HasActiveProfiles` scans across all tenants (T-007 cross-tenant probe surface).
+
+### 8.3 Error envelope
+- Legacy `{"code","message"}` (`internal/platform/httpresponse/response.go:14-16`). Codebase-wide drift; see audit T-002, auth T-003, iam T-006, documents T-001. RFC 9457 migration is a cross-module ADR, not taxonomy-local (T-008).
+
+### 8.4 Idempotency
+- No `Idempotency-Key` handling on any write route. Duplicate POST `/profiles` with same code returns PG `23505` → currently maps to `INTERNAL_ERROR 500` (unmapped). Latent — see refactor backlog R-008.
+
+### 8.5 Pagination
+- No pagination. `listProfiles`, `listAreas`, `listFamilies` return full ordered slices. Catalog cardinality expected to stay small (< 1k rows per tenant). Latent risk; tracked as T-015.
+
+### 8.6 Logging & Observability
+- No structured logging in module. `DBGovernanceLogger` writes to `metaldocs.governance_events` — a module-local parallel sink to `audit.Writer`. Same gap as audit T-007 (two parallel sinks; not unified).
+- No trace-id propagation; no metrics.
+
+### 8.7 Concurrency / Transactions
+- Repositories hold `*sql.DB`, not `*sql.Tx`. No service-layer tx boundary. `FamilyService.Deactivate` runs `GetByCode` + `HasActiveProfiles` + `Update` as three discrete connections — TOCTOU race window (T-007).
+- `ProfileService.Create` similarly: pre-INSERT lookup + INSERT on separate connections. `ProfileRepository.Create` also calls `TemplateVersionChecker` outside any tx.
+
+### 8.8 Code immutability
+- Profile + area: DB-enforced via `reject_code_update()` function + BEFORE-UPDATE trigger (`0122:25-39`, `0123:23-37`).
+- Family: enforced only by handler overwriting body `code` with path-param `code` before passing to service. A bypassing caller (e.g. PATCH-bypass per T-003) could rename via direct UPDATE without DB protection (T-013).
+
+### 8.9 Cross-module data contracts
+- `document_profiles.code` + `process_areas.code` → CD code prefix (`{profile}-{area}-{seq}`) in `registry/domain/controlled_document.go:48`.
+- `document_profiles.default_template_version_id` → documents_v2 wizard via `profileDefaultsAdapter` (`main.go:508-524`).
+- `process_areas.name` → snapshotted live by documents (`internal/modules/documents/repository/repository.go:94-101`) into `documents.area_name_snapshot`.
+- `document_profiles.family_code` → FK to `document_families.code`.
+
+---
+
+## 9. Architecture Decisions
+
+| Decision | Link / Status |
+|---|---|
+| Two-tier authz (referenced; taxonomy non-conformant) | `wiki/decisions/0007-two-tier-authz.md` |
+| Soft-archive via timestamp (`archived_at`) | `wiki/decisions/0010-soft-archive-via-timestamp.md` |
+| Contract-first API (referenced; taxonomy never migrated) | `wiki/decisions/0012-contract-first-api.md` |
+| `document_families` global (no `tenant_id`) by design | `tech-debt: missing-ADR` (T-002) |
+| Application-layer cycle prevention on area parents | `tech-debt: missing-ADR` (T-016) |
+| Same `*sql.DB` (no tx) across three repositories | `tech-debt: missing-ADR` (T-007 sub-bullet) |
+| `DBGovernanceLogger` as a module-local audit sink parallel to `audit.Writer` | `tech-debt: missing-ADR` (T-004 sub-bullet) |
+| Raw `http.ServeMux` instead of oapi-codegen | `tech-debt: missing-ADR` (T-009) |
+
+---
+
+## 10. Quality Requirements
+
+| Goal | Scenario | Pass criteria | Current state |
+|---|---|---|---|
+| Multi-tenant isolation | Authn'd user in tenant A POSTs `/profiles` with `X-Tenant-ID: <tenant B>` | 403; no insert | **FAILS** — header trusted, insert proceeds (T-001) |
+| Authz on regulated mutations | Authn'd user without `taxonomy.manage` PATCHes `/families/{code}` | 403 | **FAILS** — PATCH not in dispatcher (T-003) |
+| Regulated-mutation traceability | `Create`/`Update`/`Deactivate` on family/profile/area emits a governance event | grep shows ≥1 govLogger call per mutating service method | **FAILS** — FamilyService has no govLogger; Profile/Area Create + Update do not emit (T-004, T-005) |
+| Code immutability | Direct UPDATE to `document_profiles.code` raises | trigger fires | PASSES (`0122:33-39`) |
+| Family code immutability | Direct UPDATE to `document_families.code` raises | trigger fires | **FAILS** — no DB trigger; only handler-level overwrite (T-013) |
+| Concurrency on Deactivate | Concurrent INSERT into `_profiles` during Deactivate cannot bypass `HasActiveProfiles` | row lock or single tx | **FAILS** — no tx, no lock (T-007) |
+| Migration discipline | Schema changes appended forward-only | grep migrations | PASSES (19 sequential migrations; IP-006 conformant) |
+| `(tenant_id, code)` uniqueness | Two profiles with same code in same tenant rejected | unique index | PASSES (`ux_document_profiles_tenant_code`) |
+
+---
+
+## 11. Risks & Technical Debt
+
+Pointer-only. Body in `wiki/modules/taxonomy-tech-debt.md`. Severity rubric: see that file.
+
+- Critical: 5
+- Major: 5
+- Minor: 6
+
+Top 3 (by severity, then by blast-radius):
+
+1. **Tenant header trusted as authoritative** — any authenticated caller can read/write any tenant's profiles + areas by setting `X-Tenant-ID`. Multi-tenant data leak + cross-tenant write. See tech-debt T-001.
+2. **`document_families` is globally shared with no ADR** — any caller with `taxonomy.manage` (held by `qms_admin` + `system_admin` in any tenant) mutates a row visible to every tenant. Cross-tenant blast on a regulated catalog. See tech-debt T-002.
+3. **PATCH /families/{code} bypasses the capability dispatcher** — falls through `permissions.go:174-180` (only POST/PUT/DELETE matched); unauthenticated network actor can update a globally-shared family. Authz bypass on regulated mutation. See tech-debt T-003.
+
+---
+
+## 12. Glossary
+
+| Term | Definition |
+|---|---|
+| `document_family` | Top-level catalog grouping ("Procedimento", "Instrução"). Global across tenants; no `tenant_id`. |
+| `document_profile` | Per-tenant document type bound to a family. Has `default_template_version_id` for documents_v2 wizard. |
+| `process_area` | Per-tenant operational area with optional `parent_code` self-FK. Cycle prevention is application-layer. |
+| `taxonomy.manage` | IAM capability gating writes on all 16 taxonomy routes; held by `system_admin` (migration 0165) + `qms_admin` (migration 0169). |
+| `governance_events` | Module-local audit sink written via `DBGovernanceLogger`. Parallel to `audit.Writer`; not unified. |
+| `DevTenantID` | Compile-time UUID constant (`ffffffff-...`) used as fallback when `X-Tenant-ID` header is absent. |
+| `archived_at` | Soft-archive timestamp on profile + area (per ADR 0010). Families use `is_active` boolean (predates ADR 0010). |
+| `code` | Primary key in all three entities; CHECK `^[a-z][a-z0-9_-]{1,63}$` (profile + area only). Immutable via trigger (profile + area only). |
+
+---
+
+## Cross-links
+
+- Related ADRs: `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0010-soft-archive-via-timestamp.md`, `wiki/decisions/0012-contract-first-api.md`
+- Related concepts: `wiki/concepts/authz-tiers.md`, `wiki/concepts/controlled-documents.md`, `wiki/concepts/iso-segregation.md`, `wiki/concepts/error-ux.md`
+- Cross-module: `wiki/modules/registry.md` (CD code prefix consumer), `wiki/modules/documents.md` (live area-name read), `wiki/modules/templates_v2.md` (template-version FK target), `wiki/modules/audit.md` (parallel sink rationale)
+- Backlog: `wiki/backlog/taxonomy-refactor.md`
+- Tech debt: `wiki/modules/taxonomy-tech-debt.md`
+- Artifacts: `wiki/modules/taxonomy/_artifacts/`
+
+## Changelog (this doc)
+
+- 2026-05-11 — initial publish (metaldocs-module-doc skill v1.2). Supersedes the 2026-05-02 stub which incorrectly claimed `ErrFamilyCodeImmutable` exists.
