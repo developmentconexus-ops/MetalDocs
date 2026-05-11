@@ -1,6 +1,6 @@
 # Concept: ISO Segregation of Duties
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-10
 > **Status:** Stub. Add full enforcement points + edge cases when audited.
 > **Scope:** Why and how the platform enforces that submitters cannot approve their own work.
 > **Out of scope:** Error messages shown to users when SoD is violated (see `concepts/error-ux.md`).

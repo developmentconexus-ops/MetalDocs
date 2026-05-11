@@ -1,10 +1,10 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-05-04
+> **Last verified:** 2026-05-10
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
-> - `internal/modules/documents/delivery/http/handler.go:259` — `finalizeDocument` — atomic finalize+submit handler
+> - `internal/modules/documents/delivery/http/handler.go:316` — `finalizeDocument` — atomic finalize+submit handler
 > - `internal/modules/documents/approval/application/submit_service.go:140` — `resolveEligibleActors` call inside stage-instance loop
 > - `internal/modules/documents/approval/application/submit_service.go:299` — `resolveEligibleActors` implementation (queries `metaldocs.user_process_areas`)
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
@@ -24,7 +24,7 @@ See [workflows/user-onboarding.md](user-onboarding.md) for the full step-by-step
 
 Previously `POST /api/v2/documents/{id}/finalize` only updated the document status to `under_review`. No approval instance was created, so the inbox was always empty after finalize.
 
-Now `finalizeDocument` at `handler.go:259`:
+Now `finalizeDocument` at `handler.go:316`:
 
 1. Reads `revision_version` and `controlled_document_id` from the document row (errors with 409 if not in `draft`).
 2. Reads `profile_code` from `controlled_documents`.
@@ -87,7 +87,7 @@ Migration `0160` grants `metaldocs_app` SELECT/INSERT/UPDATE on `metaldocs.idemp
 - Author can immediately open the document, edit, and call finalize again → new approval round (prior signoff history preserved on the old instance).
 - Author notification mechanism TBD (email? in-app?).
 
-**File:** `internal/modules/documents/approval/application/decision_service.go:284` — `QuorumRejectedStage` branch.
+**File:** `internal/modules/documents/approval/application/decision_service.go:319` — `QuorumRejectedStage` branch.
 
 ## Edge cases (TBD)
 
