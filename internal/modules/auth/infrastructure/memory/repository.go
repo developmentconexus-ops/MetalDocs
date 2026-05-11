@@ -398,6 +398,13 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 	return nil
 }
 
+// GetUserTenants returns an empty slice for the in-memory store. Tests that
+// exercise tenant resolution must set AllowDevTenantFallback=true on Config or
+// seed iam_user_roles via a real DB.
+func (r *Repository) GetUserTenants(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+
 func cloneIdentity(identity authdomain.Identity) authdomain.Identity {
 	identity.Roles = append([]iamdomain.Role(nil), identity.Roles...)
 	return identity
