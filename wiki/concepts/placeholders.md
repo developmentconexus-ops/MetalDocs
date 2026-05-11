@@ -7,7 +7,7 @@
 > **Scope:** What a placeholder is, the fixed 7-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
-> - `packages/editor-ui/src/MetalDocsEditor.tsx:54` — eigenpal `templatePlugin` wired here
+> - `packages/editor-ui/src/MetalDocsEditor.tsx:55` — eigenpal `templatePlugin` wired here (plugins array, mode-gated)
 > - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — catalog panel, auto-detect via `getVariables()` (renamed from `TemplateAuthorPage` 2026-05-10)
 > - `frontend/apps/web/src/features/templates/placeholder-types.ts` — `CatalogPlaceholder` type
 > - `internal/modules/templates_v2/application/validate_placeholders.go` — `ValidatePlaceholders` rejects non-catalog names
@@ -97,7 +97,8 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 ## Cross-refs
 
 - [concepts/token-syntax.md](token-syntax.md) — deeper dive on `{name}` vs `{{uuid}}`
-- [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md) — how MetalDocsEditor wires eigenpal plugins
+- [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md) — how MetalDocsEditor wires eigenpal plugins; seam-isolation policy + mode-gate rule
+- [modules/editor-ui-eigenpal-tech-debt.md](../modules/editor-ui-eigenpal-tech-debt.md) — T-001 (tarball absent) + T-002 (`TemplateEditorPage` bypass) directly affect placeholder pipeline reliability
 - [modules/render-fanout.md](../modules/render-fanout.md) — server substitution code
 - [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
