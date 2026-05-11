@@ -49,3 +49,15 @@
 @media (prefers-reduced-motion: reduce) {
   .dotSaving { animation: none; }
 }
+
+.statusWarn {
+  color: var(--warning);
+}
+
+.dotDirty {
+  background: var(--text-muted);
+}
+
+.dotWarn {
+  background: var(--warning);
+}
