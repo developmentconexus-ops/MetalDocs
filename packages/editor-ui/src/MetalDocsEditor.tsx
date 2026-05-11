@@ -44,6 +44,8 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
           inFlightRef.current = false;
         }
       }, AUTOSAVE_DEBOUNCE_MS);
+      // Notify consumers of change before debounce fires (for lightweight sync).
+      props.onChange?.();
     };
 
     const libMode = props.mode === 'readonly' ? 'viewing' : 'editing';
