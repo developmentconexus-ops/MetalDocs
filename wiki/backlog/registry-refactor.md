@@ -2,16 +2,16 @@
 
 > Actionable rows. One row = one PR. Pulled from [wiki/modules/registry-tech-debt.md](../modules/registry-tech-debt.md).
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 5)
 
 ## Rows
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
-| R-001 | Verify + wire capability gates for Obsolete/Supersede (resolver + service-side guard) | T-001 | M | critical | — | — | open | — |
+| R-001 | Verify + wire capability gates for Obsolete/Supersede (resolver + service-side guard) | T-001 | M | critical | — | — | merged | Plan 5 (2026-05-11) |
 | R-002 | Emit governance event from `changeStatus` (active→obsolete, active→superseded) | T-002 | S | critical | — | — | open | — |
 | R-003 | Migrate registry error responses to RFC 9457 problem+json | T-003 | M | major | — | — | open | — |
-| R-004 | Apply tier-3 tripwire to `controlled_documents` + `cd_sequence_counters`; pair `authz.Require` with each mutator | T-004 | L | major | R-001 | — | open | — |
+| R-004 | Apply tier-3 tripwire to `controlled_documents` + `cd_sequence_counters`; pair `authz.Require` with each mutator | T-004 | L | major | R-001 | — | merged | Plan 5 (2026-05-11) |
 | R-005 | Adopt `SET LOCAL metaldocs.tenant_id` GUC + RLS policies for registry-owned tables | T-005 | L | major | — | — | open | — |
 | R-006 | Authz for `GetActiveDocument` (tenant header-source sub-issue resolved by Plan 3; remaining: add read-policy authz check) | T-006 | M | major | — | — | open | — |
 | R-007 | Implement 422 `template_invalid` mapping OR drop spec branch | T-007 | S | major | — | — | open | — |

@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active
+**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active
 
 ---
 
@@ -23,7 +23,7 @@
 
 | Rank | Goal | How verified |
 |---|---|---|
-| 1 | Authz isolation on regulated mutations | Tier-1 role gate + tier-2 `authz.Require` + Postgres tripwire on approval tables; gap on `documents` table itself (T-003) |
+| 1 | Authz isolation on regulated mutations | Tier-1 role gate + tier-2 `authz.Require` + Postgres tripwire; **T-003 closed Plan 5** — all 5 `documents` table mutations now call `authz.Require` + tripwire attached (migration 0188) |
 | 2 | Atomic CD+draft create | `CreateDocumentTx` port; one transaction across `controlled_documents`, `documents`, `cd_sequence_counters` (ADR 0011) |
 | 3 | Forward-only schema evolution | All `documents`-owned migrations are append-only (`migrations/0001..0183`); rename from `documents_v2` shipped as paired migrations 0167/0168 |
 
@@ -178,7 +178,7 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/delivery/http/handler.go:869` | `authorizeDocumentScope` | func | Role + ownership gate (tier-1) |
 | `internal/modules/documents/delivery/http/handler.go:958..1009` | `mapErr` | func | Legacy envelope mapping (T-001) |
 | `internal/modules/documents/repository/repository.go:73` | `CreateDocumentTx` impl | func | Tx-scoped CD+document insert (ADR 0011) |
-| `internal/modules/documents/repository/repository.go:216` | `UpdateDocumentName` | func | Plain UPDATE; no authz.Require (T-003) |
+| `internal/modules/documents/repository/repository.go:216` | `UpdateDocumentName` | func | UPDATE inside tx with `authz.Require(CapDocumentEdit)` (T-003 closed Plan 5) |
 | `internal/modules/documents/repository/repository.go:343` | `ListDocumentsPaginated` | func | LIMIT/OFFSET; pageSize cap 50 |
 | `internal/modules/documents/repository/repository.go:376` | `CountDocuments` | func | Sibling COUNT(*) for list |
 | `internal/modules/documents/approval/repository/postgres_approval_repository.go:34` | `InsertInstance` | func | Tripwire-gated INSERT into `approval_instances` |
@@ -357,7 +357,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - Tier-2 (in-tx): `authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode)` (`submit_service.go:85`). Capability value `"document.submit"` (Plan 4: previously `"doc.submit"`, closed T-008 / iam T-001).
 - Typed capabilities: `internal/modules/documents/application/fillin_authz.go:9` consumes `iamdomain.Capability` consts. Module now uses typed namespace exclusively (T-008 closed).
 - Capability adapter: `internal/modules/documents/application/ports.go` declares `CapabilityChecker`; impl `capabilityServiceAdapter` at `apps/api/internal/wiring/documents.go:14`; `NewCapabilityChecker` factory at `:24` (ADR 0007 J2 amendment).
-- Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Reads `metaldocs.asserted_caps` GUC set by `setAuthzGUC` (`approval/application/authz_guc.go:11`). **Not attached to `documents` table** — T-003.
+- Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Plan 5 migration `0188_tripwire_extend.sql:196-199` additionally attaches `trg_require_cap_asserted` to `public.documents` (INSERT `CapDocumentCreate`; UPDATE `CapDocumentEdit`). Reads `metaldocs.asserted_caps` GUC set by `setAuthzGUC` (`approval/application/authz_guc.go:11`). **T-003 closed.**
 - Sentinel: `iamapp.ErrCapabilityDenied` imported at `handler.go:17`; `authz.ErrCapDenied` (struct) also imported (iam T-009 closed by Plan 4 — renamed from `authz.ErrCapabilityDenied`).
 
 ### 8.2 Error envelope
@@ -417,7 +417,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Goal | Scenario | Pass criteria |
 |---|---|---|
 | Authz isolation (approval) | A user without `document.submit` calls `POST /finalize` | 403; `approval_instances` unchanged; tripwire would fire even if tier-2 bypassed |
-| Authz isolation (documents table) | A user with stale role token calls `PATCH /documents/{id}` | 403 from role gate; **defense-in-depth gap T-003: no in-tx check** |
+| Authz isolation (documents table) | A user with stale role token calls `PATCH /documents/{id}` | 403 from role gate; in-tx `authz.Require` + tripwire trigger on `documents` table (T-003 closed Plan 5) |
 | Atomic CD create | Crash mid-registry insert | Whole tx rolls back; `cd_sequence_counters` unchanged (ADR 0011) |
 | Audit completeness on rename | Crash between UPDATE and audit.Write | **T-005: row mutated, no audit row** — fails today |
 | Replay safety on finalize | Client retries finalize over flaky network | Second call → 409 from `ux_approval_instances_active`. **T-006: not a true idempotent replay** |
@@ -437,7 +437,7 @@ Summary counts (T-008 closed Plan 4; all rows counted by tally including closed)
 
 Top 3 (by severity, then blast radius):
 1. OpenAPI spec drift on `/api/v2/documents/*` — see tech-debt T-002 (Critical; blocks RFC 9457 migration; multiple handlers without spec ops)
-2. `documents` table mutations lack tier-2 + tripwire — see tech-debt T-003 (Major; defense-in-depth gap on regulated path)
+2. `renameDocument` audit write outside SQL tx — see tech-debt T-005 (Major; audit-trail atomicity broken) — replaces T-003 in top-3 (T-003 closed Plan 5)
 3. `renameDocument` audit write outside SQL tx — see tech-debt T-005 (Major; audit-trail atomicity broken)
 
 ---

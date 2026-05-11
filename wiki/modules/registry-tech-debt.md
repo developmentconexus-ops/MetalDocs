@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/registry.md](registry.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/registry-refactor.md](../backlog/registry-refactor.md).
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 5)
 
 ## Severity scale
 
@@ -32,10 +32,10 @@ The category names are useful only when paired with concrete triggers. Use the t
 
 ## Items
 
-### T-001 · Lifecycle PUTs lack in-module authz; capability mapping unverified
-- **Severity:** critical
-- **Surface:** `internal/modules/registry/delivery/http/routes.go:328`, `:337`; `internal/modules/registry/application/service.go:293-317`
-- **Observation:** `Obsolete` and `Supersede` handlers + service contain no `authz.Require`, no `CapabilityService` call, no capability-name constant. Codex Phase-2 trace recorded "(unclear: not found in path)" for `registry.obsolete` / `registry.supersede`. `migrations/0165_role_capabilities_reseed.sql` seeds only `registry.create`. If the resolver in `apps/api/cmd/metaldocs-api/permissions.go` does not gate these PUT routes, any authenticated user can transition the canonical QMS catalog. Escalated to Critical per rubric rule (regulated path + unverified) pending resolver verification.
+### T-001 · Lifecycle PUTs lack in-module authz; capability mapping unverified — CLOSED 2026-05-11 (Plan 5)
+- **Severity:** critical (closed)
+- **Surface:** `internal/modules/registry/application/service.go:297` (`Obsolete` passes `string(iamdomain.CapRegistryObsolete)` to `changeStatus`) · `:301` (`Supersede` passes `CapRegistrySupersede`) · `:327` (`changeStatus` calls `authz.Require(ctx, tx, cap, "tenant")` inside a new tx). `migrations/0187_registry_lifecycle_caps_seed.sql` renames `doc.supersede → registry.supersede`, seeds `registry.obsolete`. `apps/api/cmd/metaldocs-api/permissions.go` PATCH method added to taxonomy families + areas routes; obsolete/supersede cases changed to `CapRegistryObsolete`/`CapRegistrySupersede`.
+- **Observation (original):** `Obsolete` and `Supersede` handlers + service contained no `authz.Require`, no `CapabilityService` call, no capability-name constant. `migrations/0165_role_capabilities_reseed.sql` seeded only `registry.create`. Any authenticated user could transition the canonical QMS catalog.
 - **Evidence:** `_artifacts/02-flow-obsolete.md` §4
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-001`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR
@@ -56,10 +56,10 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-003`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR
 
-### T-004 · Tier-3 Postgres tripwire absent for registry-owned tables
-- **Severity:** major
-- **Surface:** `internal/modules/registry/infrastructure/repository.go:133`, `:137`, `:184`, `:208`, `:239`; `migrations/0142b_role_capabilities_v2_enforce.sql:201-207`
-- **Observation:** 5 mutator methods (`Create`, `CreateTx`, `UpdateStatus`, `EnsureCounter`, `NextAndIncrement`) execute INSERT/UPDATE without preceding `authz.Require(...)`. None set `metaldocs.asserted_caps`. The `enforce_capability_asserted` trigger installed by 0142b covers `approval_instances` and `signoffs`; `controlled_documents` and `cd_sequence_counters` are NOT in the protected set. A tier-1 IAM-middleware bypass (direct DB, alternate module import, future test harness) is not caught at the DB layer.
+### T-004 · Tier-3 Postgres tripwire absent for registry-owned tables — CLOSED 2026-05-11 (Plan 5)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/registry/infrastructure/repository.go:135` (`Create` now opens tx + `authz.Require(CapRegistryCreate)` at `:142`) · `:151` (`CreateTx` calls `authz.Require` at `:155`). `migrations/0188_tripwire_extend.sql:201-208` attaches `trg_require_cap_asserted` to `public.controlled_documents` (INSERT + UPDATE, with OR-logic for `registry.obsolete|registry.supersede` on UPDATE) and `public.cd_sequence_counters` (line 206).
+- **Observation (original):** 5 mutator methods (`Create`, `CreateTx`, `UpdateStatus`, `EnsureCounter`, `NextAndIncrement`) executed INSERT/UPDATE without preceding `authz.Require(...)`. None set `metaldocs.asserted_caps`. The `enforce_capability_asserted` trigger installed by 0142b covered `approval_instances` and `signoffs`; `controlled_documents` and `cd_sequence_counters` were NOT in the protected set.
 - **Evidence:** `_artifacts/04-persistence.md` §5 (5 violations); `_artifacts/05-industry.md` IP-004
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-004`](../backlog/registry-refactor.md)
 - **Linked ADR:** [wiki/decisions/0007-two-tier-authz.md](../decisions/0007-two-tier-authz.md)

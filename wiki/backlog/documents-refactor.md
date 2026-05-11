@@ -2,7 +2,7 @@
 
 > One row = one PR. Pulled from `wiki/modules/documents-tech-debt.md`.
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 5)
 
 ## Rows
 
@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|---|---|---|
 | R-001 | Migrate documents handlers to RFC 9457 Problem+JSON via `httpresponse.WriteProblem` | T-001 | M | major | R-002 | — | open | — |
 | R-002 | Reconcile spec ↔ handlers: add ops for renameDocument, duplicateDocument, archiveDocument, comments CRUD; set `operationId: finalizeDocument`; rename spec `listDocumentsV2` → `listDocuments` | T-002 | L | critical | — | — | open | — |
-| R-003 | Add `enforce_capability_asserted` trigger to `documents` table; wire `authz.Require("doc.write", areaCode)` into CreateDocumentTx / UpdateDocumentName / UpdateDocumentStatus / MarkArchived / Unarchive | T-003 | M | major | — | — | open | — |
+| R-003 | Add `enforce_capability_asserted` trigger to `documents` table; wire `authz.Require` into CreateDocumentTx / UpdateDocumentName / UpdateDocumentStatus / MarkArchived / Unarchive | T-003 | M | major | — | — | merged | Plan 5 (2026-05-11) |
 | R-004 | Remove duplicate `PATCH /api/v2/documents/{id}` registration at `handler.go:86` | T-004 | XS | minor | — | — | open | — |
 | R-005 | Wrap `RenameDocument` UPDATE + `audit.Write` in single `BeginTx` transaction | T-005 | S | major | — | — | open | — |
 | R-006 | Wire `Idempotency-Key` middleware on `POST /api/v2/documents/{id}/finalize` against `metaldocs.idempotency_keys` store | T-006 | M | major | — | — | open | — |
