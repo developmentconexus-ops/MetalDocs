@@ -39,7 +39,11 @@ func (h *FillInHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) {
-	tid := tenantID(r)
+	tid, err := tenantID(r)
+	if err != nil {
+		writeFillInError(w, requestID(r), err)
+		return
+	}
 	docID := r.PathValue("id")
 	phs, err := h.service.GetFillInSchema(r.Context(), tid, docID)
 	if err != nil {
@@ -58,7 +62,13 @@ func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) 
 
 func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
-	vals, err := h.service.GetPlaceholderValues(r.Context(), tenantID(r), docID)
+	tenantID, err := tenantID(r)
+	if err != nil {
+		writeFillInError(w, requestID(r), err)
+		return
+	}
+
+	vals, err := h.service.GetPlaceholderValues(r.Context(), tenantID, docID)
 	if err != nil {
 		writeFillInError(w, requestID(r), err)
 		return
@@ -83,9 +93,14 @@ func (h *FillInHandler) PutPlaceholderValue(w http.ResponseWriter, r *http.Reque
 		writeFillInError(w, requestID(r), err)
 		return
 	}
+	tenantID, err := tenantID(r)
+	if err != nil {
+		writeFillInError(w, requestID(r), err)
+		return
+	}
 
-	err := h.service.SetPlaceholderValue(r.Context(),
-		tenantID(r),
+	err = h.service.SetPlaceholderValue(r.Context(),
+		tenantID,
 		actorID(r),
 		r.PathValue("id"),
 		r.PathValue("pid"),
@@ -198,11 +213,8 @@ func requestID(r *http.Request) string {
 	return fmt.Sprintf("req-%d", time.Now().UnixNano())
 }
 
-func tenantID(r *http.Request) string {
-	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
-		return t
-	}
-	return tenant.DevTenantID
+func tenantID(r *http.Request) (string, error) {
+	return tenant.FromContext(r.Context())
 }
 
 func actorID(r *http.Request) string {

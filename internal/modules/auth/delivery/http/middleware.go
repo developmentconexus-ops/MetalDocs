@@ -8,7 +8,7 @@ import (
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/platform/tenant"
+	platformtenant "metaldocs/internal/platform/tenant"
 )
 
 // PublicPathChecker returns true if the given method+path requires no session
@@ -66,11 +66,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-		if tenantID == "" {
-			tenantID = tenant.DevTenantID
-		}
-		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value, tenantID)
+		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
 		if err != nil {
 			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) {
 				writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))
@@ -86,7 +82,11 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		ctx := authdomain.WithCurrentUser(r.Context(), currentUser)
 		ctx = iamdomain.WithAuthContext(ctx, currentUser.UserID, currentUser.Roles)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		ctx = platformtenant.WithTenantID(ctx, currentUser.TenantID)
+		r2 := r.WithContext(ctx)
+		r2.Header = r2.Header.Clone()
+		r2.Header.Del("X-Tenant-ID")
+		next.ServeHTTP(w, r2)
 	})
 }
 

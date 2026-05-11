@@ -10,7 +10,11 @@ import (
 )
 
 func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
 		writeMappedErr(w, err)
 		return
@@ -63,7 +67,11 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
 		writeMappedErr(w, err)
@@ -91,7 +99,11 @@ func (h *Handler) getTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
 		writeMappedErr(w, err)
@@ -117,7 +129,11 @@ func (h *Handler) getVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
 		writeMappedErr(w, err)
@@ -145,7 +161,11 @@ func (h *Handler) getDocxURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	templateID := r.PathValue("id")
 	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
 		writeMappedErr(w, err)

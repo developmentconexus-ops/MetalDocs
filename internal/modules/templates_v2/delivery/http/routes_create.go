@@ -9,7 +9,11 @@ import (
 )
 
 func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 
 	if err := h.authz(r, tenantID, "*", "template.create"); err != nil {
@@ -60,7 +64,11 @@ func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createNextVersion(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 

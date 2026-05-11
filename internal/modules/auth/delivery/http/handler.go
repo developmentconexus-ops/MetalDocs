@@ -11,7 +11,6 @@ import (
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/platform/httpresponse"
-	"metaldocs/internal/platform/tenant"
 )
 
 type Handler struct {
@@ -113,11 +112,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		h.writeAuthError(w, err, traceID)
 		return
 	}
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		tenantID = tenant.DevTenantID
-	}
-	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, tenantID)
+	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, user.TenantID)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error", traceID)
 		return
@@ -140,6 +135,10 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error, traceID strin
 		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), traceID)
 	case errors.Is(err, authdomain.ErrIdentityInactive):
 		writeAPIError(w, http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive", traceID)
+	case errors.Is(err, authdomain.ErrTenantNotPermitted):
+		writeAPIError(w, http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant", traceID)
+	case errors.Is(err, authdomain.ErrTenantClaimRequired):
+		writeAPIError(w, http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required — user belongs to multiple tenants", traceID)
 	default:
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error", traceID)
 	}

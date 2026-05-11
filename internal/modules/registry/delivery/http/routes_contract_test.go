@@ -18,6 +18,7 @@ import (
 	"metaldocs/internal/modules/registry/application"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeRegistryDocs struct{}
@@ -189,7 +190,7 @@ func newTestHandler(db *sql.DB) *Handler {
 func newAuthedRequest(t *testing.T, method, url, tenantID string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(method, url, nil)
-	req.Header.Set("X-Tenant-ID", tenantID)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantID))
 	// extract {id} path value from URL pattern /api/v2/controlled-documents/{id}/active-document
 	// httptest doesn't set path values automatically; set manually
 	// URL format: /api/v2/controlled-documents/<id>/active-document
@@ -243,6 +244,7 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/99999999-9999-9999-9999-999999999999", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -267,6 +269,7 @@ func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
 		"title":"Policy",
 		"ownerUserId":"user-1"
 	}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.AtomicCreateControlledDocument(rec, req, registryapi.AtomicCreateControlledDocumentParams{})
@@ -289,6 +292,7 @@ func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
 		"ownerUserId":"user-1",
 		"evilField":true
 	}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.AtomicCreateControlledDocument(rec, req, registryapi.AtomicCreateControlledDocumentParams{})
@@ -313,6 +317,7 @@ func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 		"templateVersionId":"11111111-1111-1111-1111-111111111111",
 		"formData":{"summary":"hello","count":2}
 	}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.AtomicCreateControlledDocument(rec, req, registryapi.AtomicCreateControlledDocumentParams{})
@@ -342,7 +347,7 @@ func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
 	profileCode := "DC"
 	processAreaCode := "RH"
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	rec := httptest.NewRecorder()
 
 	handler.ListControlledDocuments(rec, req, registryapi.ListControlledDocumentsParams{
@@ -391,6 +396,7 @@ func TestGetControlledDocument_UsesGeneratedResponse(t *testing.T) {
 	spy := &spyRegistryService{getResult: &doc}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/"+doc.ID, nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.GetControlledDocument(rec, req, uuid.MustParse(doc.ID))
@@ -428,6 +434,7 @@ func TestPreviewControlledDocumentCode_UsesGeneratedParamsAndResponse(t *testing
 	spy := &spyRegistryService{peekResult: 7}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/preview-code", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.PreviewControlledDocumentCode(rec, req, registryapi.PreviewControlledDocumentCodeParams{
@@ -459,6 +466,7 @@ func TestCreateControlledDocumentRevision_UsesGeneratedBody(t *testing.T) {
 		"templateVersionId":"33333333-3333-3333-3333-333333333333",
 		"formData":{"field":"value"}
 	}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.CreateControlledDocumentRevision(rec, req, uuid.MustParse(cdID), registryapi.CreateControlledDocumentRevisionParams{})
@@ -484,6 +492,7 @@ func TestCreateControlledDocumentRevision_UnknownField_Returns400(t *testing.T) 
 		"name":"Revision 2",
 		"evilField":true
 	}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.CreateControlledDocumentRevision(rec, req, uuid.MustParse(cdID), registryapi.CreateControlledDocumentRevisionParams{})
@@ -502,6 +511,7 @@ func TestCreateControlledDocumentRevision_MissingName_Returns400(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents/"+cdID+"/revisions", strings.NewReader(`{
 		"formData":{"field":"value"}
 	}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.CreateControlledDocumentRevision(rec, req, uuid.MustParse(cdID), registryapi.CreateControlledDocumentRevisionParams{})
@@ -519,6 +529,7 @@ func TestObsoleteControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 	handler := &Handler{svc: spy}
 	cdID := "99999999-9999-9999-9999-999999999999"
 	req := httptest.NewRequest(http.MethodPut, "/api/v2/controlled-documents/"+cdID+"/obsolete", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.ObsoleteControlledDocument(rec, req, uuid.MustParse(cdID))
@@ -550,6 +561,7 @@ func TestSupersedeControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 	handler := &Handler{svc: spy}
 	cdID := "aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa"
 	req := httptest.NewRequest(http.MethodPut, "/api/v2/controlled-documents/"+cdID+"/supersede", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 
 	handler.SupersedeControlledDocument(rec, req, uuid.MustParse(cdID))
@@ -708,7 +720,7 @@ func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -732,7 +744,7 @@ func TestGetPreviewCode_200(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/preview-code?profileCode=DC&areaCode=RH", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -758,7 +770,7 @@ func TestGetPreviewCode_MissingParams_400(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/controlled-documents/preview-code?profileCode=DC", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

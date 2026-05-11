@@ -1,6 +1,6 @@
 # ADR 0001: Adopt eigenpal as the document editor
 
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-11
 > **Status:** Accepted
 > **Date:** ~2026-04 (verify from git log)
 > **Scope:** Editor library choice for MetalDocs WYSIWYG.

@@ -17,7 +17,11 @@ var (
 
 func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := actorIDFromRequest(r)
 	instanceID := r.PathValue("instance_id")
 	stageID := r.PathValue("stage_id")

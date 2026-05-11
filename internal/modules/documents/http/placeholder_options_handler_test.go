@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"metaldocs/internal/platform/tenant"
 	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
 )
 
@@ -32,7 +33,7 @@ func newOptionsReq(docID, pid string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents/"+docID+"/placeholder-options/"+pid, nil)
 	req.SetPathValue("id", docID)
 	req.SetPathValue("pid", pid)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	return req
 }
 

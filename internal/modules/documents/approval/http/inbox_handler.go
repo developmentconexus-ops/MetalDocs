@@ -14,7 +14,11 @@ import (
 
 func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
 	areaCode := strings.TrimSpace(r.URL.Query().Get("area_code"))
 

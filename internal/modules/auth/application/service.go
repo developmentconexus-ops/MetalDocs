@@ -30,8 +30,11 @@ type Config struct {
 	PasswordMinLength      int
 	LoginMaxFailedAttempts int
 	LoginLockDuration      time.Duration
-	LegacyHeaderEnabled    bool
-	OriginProtection       bool
+	LegacyHeaderEnabled      bool
+	OriginProtection         bool
+	// AllowDevTenantFallback allows login to succeed for users with no IAM roles
+	// by returning DevTenantID. Set true only in dev/test; defaults false (prod-safe).
+	AllowDevTenantFallback bool
 	TrustedOrigins         []string
 	BootstrapAdminEnabled  bool
 	BootstrapAdminUserID   string
@@ -108,11 +111,11 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	if err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
-	if !identity.IsActive {
-		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
-	}
 	if identity.LockedUntil != nil && identity.LockedUntil.After(time.Now().UTC()) {
 		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityLocked
+	}
+	if !identity.IsActive {
+		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
 	}
 	if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(password)) != nil {
 		attempts := identity.FailedLoginAttempts + 1
@@ -126,6 +129,11 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	}
 
 	now := time.Now().UTC()
+	claimedTenant := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	tenantID, err := s.resolveLoginTenant(ctx, identity.UserID, claimedTenant)
+	if err != nil {
+		return authdomain.AuthenticatedSession{}, err
+	}
 	if err := s.repo.RecordSuccessfulLogin(ctx, identity.UserID, now); err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
@@ -143,14 +151,12 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		UserAgent:  truncate(strings.TrimSpace(r.UserAgent()), 512),
 		LastSeenAt: now,
 	}
+	session.TenantID = tenantID
+
 	if err := s.repo.CreateSession(ctx, session); err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
 
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		tenantID = tenant.DevTenantID
-	}
 	user, err := s.buildCurrentUser(ctx, identity.UserID, tenantID)
 	if err != nil {
 		return authdomain.AuthenticatedSession{}, err
@@ -163,7 +169,31 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	}, nil
 }
 
-func (s *Service) ResolveSession(ctx context.Context, rawToken, tenantID string) (authdomain.CurrentUser, error) {
+func (s *Service) resolveLoginTenant(ctx context.Context, userID, claimedTenantID string) (string, error) {
+	tenants, err := s.repo.GetUserTenants(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	if claimedTenantID != "" {
+		for _, t := range tenants {
+			if t == claimedTenantID {
+				return claimedTenantID, nil
+			}
+		}
+		return "", authdomain.ErrTenantNotPermitted
+	}
+
+	if len(tenants) == 1 {
+		return tenants[0], nil
+	}
+	if len(tenants) == 0 && s.cfg.AllowDevTenantFallback {
+		return tenant.DevTenantID, nil
+	}
+	return "", authdomain.ErrTenantClaimRequired
+}
+
+func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdomain.CurrentUser, error) {
 	token := strings.TrimSpace(rawToken)
 	if token == "" {
 		return authdomain.CurrentUser{}, authdomain.ErrSessionNotFound
@@ -187,7 +217,7 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken, tenantID string)
 	if err := s.repo.TouchSession(ctx, sessionID, time.Now().UTC()); err != nil {
 		return authdomain.CurrentUser{}, err
 	}
-	return s.buildCurrentUser(ctx, session.UserID, tenantID)
+	return s.buildCurrentUser(ctx, session.UserID, session.TenantID)
 }
 
 func (s *Service) Logout(ctx context.Context, rawToken string) error {
@@ -413,6 +443,7 @@ func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string)
 	}
 	return authdomain.CurrentUser{
 		UserID:             identity.UserID,
+		TenantID:           tenantID,
 		Username:           identity.Username,
 		Email:              identity.Email,
 		DisplayName:        identity.DisplayName,

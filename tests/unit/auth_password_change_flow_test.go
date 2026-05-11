@@ -25,6 +25,7 @@ func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T)
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      5 * time.Minute,
+		AllowDevTenantFallback: true,
 	}
 	svc := authapp.NewService(repo, repo, repo, cfg)
 	if err := svc.CreateUser(context.Background(), "flow-user", "flow.user", "flow.user@test.local", "Flow User", "abc12345", tenant.DevTenantID, []iamdomain.Role{iamdomain.RoleViewer}, "test"); err != nil {

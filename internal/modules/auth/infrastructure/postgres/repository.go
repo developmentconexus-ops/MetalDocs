@@ -42,10 +42,10 @@ WHERE i.user_id = $1
 
 func (r *Repository) CreateSession(ctx context.Context, session authdomain.Session) error {
 	const q = `
-INSERT INTO metaldocs.auth_sessions (session_id, user_id, created_at, expires_at, revoked_at, ip_address, user_agent, last_seen_at)
-VALUES ($1, $2, $3, $4, NULL, $5, $6, $7)
+INSERT INTO metaldocs.auth_sessions (session_id, user_id, tenant_id, created_at, expires_at, revoked_at, ip_address, user_agent, last_seen_at)
+VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8)
 `
-	_, err := r.db.ExecContext(ctx, q, session.SessionID, session.UserID, session.CreatedAt, session.ExpiresAt, session.IPAddress, session.UserAgent, session.LastSeenAt)
+	_, err := r.db.ExecContext(ctx, q, session.SessionID, session.UserID, session.TenantID, session.CreatedAt, session.ExpiresAt, session.IPAddress, session.UserAgent, session.LastSeenAt)
 	if err != nil {
 		return fmt.Errorf("insert auth session: %w", err)
 	}
@@ -54,7 +54,7 @@ VALUES ($1, $2, $3, $4, NULL, $5, $6, $7)
 
 func (r *Repository) FindSession(ctx context.Context, sessionID string) (authdomain.Session, error) {
 	const q = `
-SELECT session_id, user_id, created_at, expires_at, revoked_at, COALESCE(ip_address, ''), COALESCE(user_agent, ''), last_seen_at
+SELECT session_id, user_id, COALESCE(tenant_id, ''), created_at, expires_at, revoked_at, COALESCE(ip_address, ''), COALESCE(user_agent, ''), last_seen_at
 FROM metaldocs.auth_sessions
 WHERE session_id = $1
 `
@@ -62,6 +62,7 @@ WHERE session_id = $1
 	if err := r.db.QueryRowContext(ctx, q, sessionID).Scan(
 		&session.SessionID,
 		&session.UserID,
+		&session.TenantID,
 		&session.CreatedAt,
 		&session.ExpiresAt,
 		&session.RevokedAt,
@@ -75,6 +76,28 @@ WHERE session_id = $1
 		return authdomain.Session{}, fmt.Errorf("select auth session: %w", err)
 	}
 	return session, nil
+}
+
+func (r *Repository) GetUserTenants(ctx context.Context, userID string) ([]string, error) {
+	const q = `
+SELECT DISTINCT tenant_id
+FROM metaldocs.iam_user_roles
+WHERE user_id = $1
+`
+	rows, err := r.db.QueryContext(ctx, q, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get user tenants: %w", err)
+	}
+	defer rows.Close()
+	var tenants []string
+	for rows.Next() {
+		var tid string
+		if err := rows.Scan(&tid); err != nil {
+			return nil, fmt.Errorf("scan user tenant: %w", err)
+		}
+		tenants = append(tenants, tid)
+	}
+	return tenants, rows.Err()
 }
 
 func (r *Repository) TouchSession(ctx context.Context, sessionID string, seenAt time.Time) error {

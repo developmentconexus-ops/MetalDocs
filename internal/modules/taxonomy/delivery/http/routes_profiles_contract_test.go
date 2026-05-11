@@ -10,6 +10,7 @@ import (
 
 	apiv2 "metaldocs/internal/api/v2"
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeProfileService struct{}
@@ -44,6 +45,7 @@ func TestProfilesHandler_ErrorEnvelopeContract(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/taxonomy/profiles/missing", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -66,6 +68,7 @@ func TestProfilesHandler_UpdateUsesPatch(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPatch, "/api/v2/taxonomy/profiles/foo", strings.NewReader(`{}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
