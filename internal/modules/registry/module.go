@@ -6,10 +6,12 @@ import (
 	"log/slog"
 	"net/http"
 
+	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/modules/registry/application"
 	dhttp "metaldocs/internal/modules/registry/delivery/http"
 	"metaldocs/internal/modules/registry/infrastructure"
 	taxonomyapp "metaldocs/internal/modules/taxonomy/application"
+	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
 type Module struct {
@@ -18,8 +20,9 @@ type Module struct {
 }
 
 type Dependencies struct {
-	DB     *sql.DB
-	Logger *slog.Logger
+	DB          *sql.DB
+	Logger      *slog.Logger
+	AuditWriter auditdomain.Writer
 }
 
 func New(deps Dependencies) *Module {
@@ -28,7 +31,12 @@ func New(deps Dependencies) *Module {
 	tplCheck := infrastructure.NewPostgresTemplateVersionChecker(deps.DB)
 	profiles := infrastructure.NewTaxonomyProfileReader(deps.DB)
 	areas := infrastructure.NewTaxonomyAreaReader(deps.DB)
-	govLogger := taxonomyapp.NewDBGovernanceLogger(deps.DB)
+	var govLogger taxonomydomain.GovernanceLogger
+	if deps.AuditWriter != nil {
+		govLogger = taxonomyapp.NewAuditGovernanceAdapter(deps.AuditWriter)
+	} else {
+		govLogger = taxonomyapp.NewDBGovernanceLogger(deps.DB)
+	}
 	svc := application.NewRegistryService(deps.DB, repo, seq, tplCheck, profiles, areas, govLogger, nil)
 	h := dhttp.NewHandler(svc, deps.DB)
 	return &Module{Handler: h, svc: svc}
