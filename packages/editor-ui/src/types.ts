@@ -22,6 +22,12 @@ export interface MetalDocsEditorProps {
   sidebarModel?: SidebarModel;
   externalPlugins?: EditorPlugin[];
   onAutoSave?: (buf: ArrayBuffer) => Promise<void>;
+  /**
+   * Called synchronously on every editor change event (before the autosave
+   * debounce fires). Use for lightweight side-effects (placeholder sync,
+   * outline refresh). Do NOT trigger heavy async work here.
+   */
+  onChange?: () => void;
   onLockLost?: () => void;
   showRuler?: boolean;
 }
