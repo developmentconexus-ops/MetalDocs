@@ -2,22 +2,23 @@
 
 > Companion to `wiki/modules/templates_v2.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates_v2-refactor.md`.
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 5)
 
 ## Items
 
-### T-001 · Authz wired `nil` — every mutation bypasses capability assertion
-- **Severity:** critical
-- **Surface:** `internal/modules/templates_v2/delivery/http/handler.go:24-29` (constructor + nil-authz fallback) + `apps/api/cmd/metaldocs-api/main.go:329` (passes `nil` for `AuthzFunc`).
-- **Observation:** `New(svc, authz)` accepts an `AuthzFunc` argument, then if `authz == nil` substitutes `func(*http.Request, string, string, string) error { return nil }`. The composition root passes `nil`. Result: every route — including `POST /publish`, `POST /approve`, `PUT .../schema` — invokes a no-op authz callback. None of the seven repo mutations is wrapped in `internal/platform/authz.Require`. No `metaldocs.asserted_caps` GUC tripwire is installed on `templates_v2_*` tables. Capabilities `template.view/create/edit/submit/approve/publish` are seeded in `migrations/0165_role_capabilities_reseed.sql` but never asserted at any layer.
+### T-001 · Authz wired `nil` — every mutation bypasses capability assertion — CLOSED 2026-05-11 (Plan 5)
+- **Severity:** critical (closed)
+- **Surface (resolved):** `internal/modules/templates_v2/application/service.go:22` — `WithDB(db *sql.DB) *Service` builder added; `apps/api/cmd/metaldocs-api/main.go` wires `tv2Svc.WithDB(deps.SQLDB)` + real `capabilityService` `AuthzFunc`. `application/create.go:84` (`CreateTemplate`), `application/lifecycle.go:54` (`SubmitForReview`), `:125`/`:148` (`Review`), `:226` (`Approve`), `:345` (`PublishTemplateVersion`), `:406` (`ArchiveTemplate`) — all six mutation paths call `authz.Require` with the appropriate capability when `s.db != nil`. Migration `0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_v2_template` and `public.templates_v2_template_version`.
+- **Observation (original):** `New(svc, authz)` accepted an `AuthzFunc` argument, then if `authz == nil` substituted a no-op callback. The composition root passed `nil`. None of the seven repo mutations was wrapped in `internal/platform/authz.Require`. No `metaldocs.asserted_caps` GUC tripwire was installed on `templates_v2_*` tables.
 - **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/02-flow-publish.md`, `_artifacts/04-persistence.md` §5 (7 tripwire violations), `_artifacts/03-deps.md` §3.
 - **Linked backlog row:** `backlog/templates_v2-refactor.md#R-001`
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (decision exists; module deviation is the debt)
 
-### T-002 · Cross-tenant version access — repo getters accept no tenant arg
-- **Severity:** critical
-- **Surface:** `internal/modules/templates_v2/repository/postgres.go` — `GetVersion(template_id, version_number)` and `GetVersionByID(version_id)`; bypass site at `internal/modules/templates_v2/application/create.go:126` (`CreateNextVersion` calls `GetVersionByID(*template.PublishedVersionID)` without re-asserting tenant).
-- **Observation:** Both repository getters select by version primary keys with no `tenant_id` predicate. `templates_v2_template_version` carries no `tenant_id` column (per `_artifacts/04-persistence.md` §1) — tenant scope inherits via FK to `templates_v2_template`. Most service call sites front the getter with `GetTemplate(tenant, template_id)` as a "tenant gate"; `CreateNextVersion` skips the gate when cloning from `PublishedVersionID`. A request that knows or guesses a `version_id` from another tenant can resolve to that row.
+### T-002 · Cross-tenant version access — repo getters accept no tenant arg — PARTIALLY CLOSED 2026-05-11 (Plan 5)
+- **Severity:** critical → **partially resolved**
+- **Surface (resolved):** `internal/modules/templates_v2/application/create.go:148` — `CreateNextVersion` now verifies `source.TemplateID != template.ID` and returns `domain.ErrNotFound` if the loaded version belongs to a different template. This closes the `CreateNextVersion` bypass path.
+- **Surface (residual):** `internal/modules/templates_v2/repository/postgres.go` — `GetVersion(template_id, version_number)` and `GetVersionByID(version_id)` still have no `tenant_id` predicate. Callers that front these with `GetTemplate(tenant, template_id)` are safe; any future call site that forgets the gate is still vulnerable.
+- **Observation (original):** Both repository getters select by version primary keys with no `tenant_id` predicate. `CreateNextVersion` skipped the tenant gate when cloning from `PublishedVersionID`.
 - **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/04-persistence.md` §1 (`templates_v2_template_version` schema), `_artifacts/05-industry.md` IP-008.
 - **Linked backlog row:** `backlog/templates_v2-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
@@ -30,10 +31,11 @@
 - **Linked backlog row:** `backlog/templates_v2-refactor.md#R-003` (can be closed)
 - **Linked ADR:** `wiki/architecture/tenant-context.md`
 
-### T-004 · `PublishTemplateVersion` bypasses approval lifecycle (no SoD, no role check, no content_hash gate)
-- **Severity:** critical
-- **Surface:** `internal/modules/templates_v2/application/lifecycle.go:265` (`Service.PublishTemplateVersion`).
-- **Observation:** Parallel publish path to `Service.Approve` (`lifecycle.go:159`). Transitions a version directly `draft → published` on `POST /api/v2/templates/{id}/versions/{n}/publish`. Does NOT invoke `domain.CheckSegregation`, does NOT verify `pending_approver_role` against actor role, does NOT enforce `content_hash != ""` (presigned upload may not have committed). The `Approve` path enforces all three. ISO 9001 §7.5 traceability requires the regulated approval chain on every published row; this path produces published versions that lack reviewer/approver identity. Trigger: regulated audit-trail / authn-bypass on a regulated path → Critical (per template rubric §"How to rate").
+### T-004 · `PublishTemplateVersion` bypasses approval lifecycle (no SoD, no role check, no content_hash gate) — PARTIALLY CLOSED 2026-05-11 (Plan 5)
+- **Severity:** critical → **partially resolved**
+- **Surface (resolved):** `internal/modules/templates_v2/application/lifecycle.go:320` — `content_hash != ""` guard added (`ErrContentHashMismatch` on empty hash). `lifecycle.go:325` — `domain.CheckSegregation("approver", ...)` now called (SoD gate). `lifecycle.go:345` — `authz.Require(CapTemplatePublish)` called inside a new tx when `s.db != nil`.
+- **Surface (residual):** `PublishTemplateVersion` still does not verify `pending_approver_role` against `cmd.ActorUserID`'s roles (role-binding check). The `Approve` path enforces this; the direct publish path does not. ISO 9001 §7.5 identity traceability gap remains for `POST /publish`.
+- **Observation (original):** Parallel publish path to `Service.Approve`. Transitions a version directly `draft → published` without SoD, role check, or `content_hash` gate.
 - **Evidence:** `_artifacts/02-flow-publish.md`, `_artifacts/05-industry.md` IP-004.
 - **Linked backlog row:** `backlog/templates_v2-refactor.md#R-004`
 - **Linked ADR:** missing-ADR

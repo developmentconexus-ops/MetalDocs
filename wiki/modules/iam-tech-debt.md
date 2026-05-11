@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 5)
 
 ## Severity scale
 
@@ -41,10 +41,11 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked backlog row:** `backlog/iam-refactor.md#R-003`
 - **Linked ADR:** missing-ADR
 
-### T-004 · IAM mutations have neither tier-2 nor tripwire enforcement
-- **Severity:** major
-- **Surface:** `infrastructure/postgres/role_admin_repository.go:33,72` (`UpsertUserAndAssignRole`, `ReplaceUserRoles` on `iam_user_roles`); `infrastructure/postgres/user_area_repository.go:51,75,90` (`Insert`, `CloseActive`, `GrantAtomic` on `user_process_areas`); `area_membership/area_membership.go:53,65` (`Grant`, `Revoke` via SECURITY DEFINER funcs)
-- **Observation:** All IAM-owned mutating tables (`iam_user_roles`, `user_process_areas`, `iam_users`) are guarded by tier-1 middleware only. `authz.Require(...)` is called by none of these repository methods (artifact 04 §5 — all rows "Authz.Require called? = NO"). The Postgres tripwire `enforce_capability_asserted` is attached to `public.approval_instances` and `public.approval_signoffs` only (`migrations/0142b_role_capabilities_v2_enforce.sql:200-209`), not to any IAM-owned table. The defense-in-depth pattern (IP-004 in `references/industry-patterns-index.md`) is therefore single-layer for IAM admin writes.
+### T-004 · IAM mutations have neither tier-2 nor tripwire enforcement — PARTIALLY CLOSED 2026-05-11 (Plan 5)
+- **Severity:** major → **partially resolved** (residual: `iam_users` INSERT still tier-1 only)
+- **Surface (resolved):** `infrastructure/postgres/role_admin_repository.go:34,76` (`UpsertUserAndAssignRole` at `:40`, `ReplaceUserRoles` at `:82` now call `authz.Require(CapUserManage)`); `infrastructure/postgres/user_area_repository.go:52,84,109` (`Insert` at `:59`, `CloseActive` at `:91`, `GrantAtomic` at `:118` now call `authz.Require(CapMembershipManage)`). `migrations/0188_tripwire_extend.sql` attaches `trg_require_cap_asserted` to `metaldocs.iam_user_roles` (line 187) and `metaldocs.user_process_areas` (line 192).
+- **Surface (residual):** `iam_users` INSERT inside `UpsertUserAndAssignRole` (`role_admin_repository.go:50`) and `ReplaceUserRoles` (`:92`) is still not explicitly guarded at tier-2 on the `iam_users` table itself (no separate tripwire trigger on `metaldocs.iam_users`). The capability check on the enclosing tx covers it functionally, but DB-layer enforcement is absent.
+- **Observation (original):** All IAM-owned mutating tables (`iam_user_roles`, `user_process_areas`, `iam_users`) were guarded by tier-1 middleware only. `authz.Require(...)` was called by none of these repository methods. The Postgres tripwire `enforce_capability_asserted` was attached to `public.approval_instances` and `public.approval_signoffs` only (`migrations/0142b_role_capabilities_v2_enforce.sql:200-209`), not to any IAM-owned table. The defense-in-depth pattern (IP-004 in `references/industry-patterns-index.md`) was therefore single-layer for IAM admin writes.
 - **Evidence:** `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` §IP-004.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-004`
 - **Linked ADR:** [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) (documents tiers but does not address IAM-table coverage)

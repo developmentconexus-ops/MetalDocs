@@ -1,6 +1,6 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected); cross-linked documents consumer 2026-05-10
+> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected); amended 2026-05-11 Plan 5 (tier-2 + tier-3 tripwire extended to all regulated modules: IAM, documents, registry, taxonomy, templates_v2)
 > **Last verified:** 2026-05-11
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.
@@ -87,7 +87,7 @@ Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.m
 ## See also
 
 - [`wiki/modules/iam.md`](../modules/iam.md) — full Arc42 + C4 living architecture doc for `internal/modules/iam`; two live tiers (AuthorizationService deleted Plan 4 — T-003 closed)
-- [`wiki/modules/documents.md §8.1`](../modules/documents.md#81-authentication--authorization) — documents consumer: tier-1 role gate, tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), …)`, `CapabilityChecker` adapter (`wiring/documents.go:24`), tripwire on approval tables; gap T-003 (no trigger on `documents` table itself)
+- [`wiki/modules/documents.md §8.1`](../modules/documents.md#81-authentication--authorization) — documents consumer: tier-1 role gate, tier-2 `authz.Require` in all 5 `documents` mutations, tripwire on `documents` + approval tables (T-003 closed Plan 5)
 - [`wiki/modules/auth.md`](../modules/auth.md) — canonical auth module doc; §8.1 covers how auth's middleware injects `iamdomain.WithAuthContext` so tier-1 and tier-2 checks have an actor; tier-0 session enforcement sits here, upstream of both authz tiers
-- [`wiki/modules/registry.md §8.1`](../modules/registry.md#81-authentication--authorization) — registry is a known partial-adoption module: tier-1 wired for POST create; tier-2 and tier-3 absent on all routes (T-001, T-004 in registry-tech-debt.md)
-- [`wiki/modules/taxonomy.md §8.1`](../modules/taxonomy.md#81-authentication--authorization) — taxonomy is a residual non-conformant module: tier-1 path-prefix dispatcher only; `internal/platform/authz` not imported; no DB tripwire on any of the 3 owned tables; PATCH /families/{code} falls through the dispatcher entirely (taxonomy T-003, T-006)
+- [`wiki/modules/registry.md §8.1`](../modules/registry.md#81-authentication--authorization) — registry now conforms: tier-2 `authz.Require` wired for Create/CreateTx + changeStatus (Obsolete/Supersede); tier-3 tripwire on `controlled_documents` + `cd_sequence_counters` (T-001/T-004 closed Plan 5)
+- [`wiki/modules/taxonomy.md §8.1`](../modules/taxonomy.md#81-authentication--authorization) — taxonomy partially conformant Plan 5: PATCH dispatcher fixed (T-003 closed); `authz.Require` wired in Create/Update methods + tripwire on all 3 tables; archive/deactivate paths still tier-1 only (T-006 partial)

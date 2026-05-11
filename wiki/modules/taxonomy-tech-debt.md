@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 5)
 
 ## Severity scale
 
@@ -32,10 +32,10 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · PATCH /api/v2/taxonomy/families/{code} bypasses capability dispatcher
-- **Severity:** critical
-- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:67` (`mux.HandleFunc("PATCH /api/v2/taxonomy/families/{code}", h.updateFamily)`); `apps/api/cmd/metaldocs-api/permissions.go:174-180` (switch covers `MethodPost, MethodPut, MethodDelete` only — `MethodPatch` absent for the families branch); contrast: profiles branch (`:162`) does include `MethodPatch`
-- **Observation:** The families capability switch enumerates POST/PUT/DELETE but omits PATCH. The handler is mounted at PATCH. Capability resolver therefore returns `("", false)` for PATCH `/families/{code}`; per the project's default behaviour for unregistered paths (audit module shows the same default — see `wiki/modules/audit-tech-debt.md#T-001`), the path is treated as public. An unauthenticated network actor can mutate any family row, which propagates to every tenant per T-002. Trigger fired: authn/authz bypass on regulated mutation (Critical).
+### T-003 · PATCH /api/v2/taxonomy/families/{code} bypasses capability dispatcher — CLOSED 2026-05-11 (Plan 5)
+- **Severity:** critical (closed)
+- **Surface:** `apps/api/cmd/metaldocs-api/permissions.go` — PATCH method added to the families branch (and areas branch). Plan 5 commit aligns the families dispatcher with the profiles branch which already included `MethodPatch`.
+- **Observation (original):** The families capability switch enumerated POST/PUT/DELETE but omitted PATCH. The handler was mounted at PATCH. Capability resolver therefore returned `("", false)` for PATCH `/families/{code}` — path treated as public.
 - **Evidence:** `_artifacts/01-surface.md` (handler.go route list); `_artifacts/03-deps.md` §1 (no authz import); direct grep of `permissions.go:174-180`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-003`
 - **Linked ADR:** missing-ADR
@@ -56,13 +56,14 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-005`
 - **Linked ADR:** missing-ADR
 
-### T-006 · Single-tier defense-in-depth (no `authz.Require`, no DB tripwire)
-- **Severity:** major
-- **Surface:** `internal/modules/taxonomy/` (grep: `authz.Require` returns 0 hits; `internal/platform/authz` is not imported — see `_artifacts/03-deps.md` §1); `_artifacts/04-persistence.md` §3 + §5 (no `assert_caps` trigger on any of the 3 owned tables; no `set_local_tenant_id` symbol anywhere in `internal/`)
-- **Observation:** Defense relies entirely on `apps/api/cmd/metaldocs-api/permissions.go:158-180` (tier-1 path-prefix dispatcher). No in-tx `authz.Require(ctx, tx, cap, area)` call; no Postgres tripwire that would refuse a mutation lacking `metaldocs.asserted_caps`. Compare to approval (`migrations/0142b_role_capabilities_v2_enforce.sql:200-209`), iam, and documents which all run the full three-layer pattern. A bug at any single layer (e.g. T-003 dispatcher gap) is unguarded by the next layer. Trigger fired: defense-in-depth gap on routes that ADR 0007 calls for multi-layer enforcement (Major).
-- **Evidence:** `_artifacts/03-deps.md` §1 (`internal/platform/authz` ABSENT); `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` IP-004.
+### T-006 · Single-tier defense-in-depth (no `authz.Require`, no DB tripwire) — PARTIALLY CLOSED 2026-05-11 (Plan 5)
+- **Severity:** major → **partially resolved** (FamilyRepository + ProfileRepository + AreaRepository write methods now have tier-2; DB tripwire attached to the three owned tables)
+- **Surface (resolved):** `internal/modules/taxonomy/infrastructure/family_repository.go:77` (`Create` calls `authz.Require(CapTaxonomyManage)`) · `:96` (`Update` same). `internal/modules/taxonomy/infrastructure/repository.go` — `ProfileRepository.Create` + `Update` and `AreaRepository.Create` + `Update` all call `authz.Require(CapTaxonomyManage)` inside a tx. `migrations/0188_tripwire_extend.sql:211-224` attaches `trg_require_cap_asserted` to `metaldocs.document_profiles`, `metaldocs.document_process_areas`, `metaldocs.document_families`.
+- **Surface (residual):** Archive/deactivate paths and read paths still have no tier-2 call. `iam/authz` import is now present in taxonomy infrastructure.
+- **Observation (original):** Defense relied entirely on tier-1 path-prefix dispatcher. No in-tx `authz.Require(ctx, tx, cap, area)` call; no Postgres tripwire on any of the 3 owned tables. A bug at the tier-1 layer (e.g. T-003 dispatcher gap) was unguarded.
+- **Evidence:** `_artifacts/03-deps.md` §1 (`internal/platform/authz` was ABSENT); `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` IP-004.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-006`
-- **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (taxonomy non-conformant)
+- **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (taxonomy partially conformant as of Plan 5)
 
 ### T-007 · TOCTOU race + missing tx + cross-tenant SELECT in `FamilyService.Deactivate`
 - **Severity:** major
@@ -112,10 +113,10 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-012`
 - **Linked ADR:** missing-ADR
 
-### T-013 · Family code immutability is handler-side only
-- **Severity:** minor
-- **Surface:** `internal/modules/taxonomy/delivery/http/routes_families.go` (updateFamily handler overwrites body `code` with path-param `code` before calling service); `migrations/0023_init_document_family_and_profile_registry.sql:1-7` (no immutability trigger on `document_families`); contrast `migrations/0122:25-39` and `0123:23-37` (profile + area triggers)
-- **Observation:** Code immutability on profiles + areas is DB-enforced (`reject_code_update()` BEFORE-UPDATE trigger). Family code immutability is enforced only by the handler ignoring `body.code` and using path-param `code` for the UPDATE — a single layer that a bypass path (e.g. T-003 PATCH gap) defeats. Trigger fired: defense-in-depth gap (latent because the bypass path is itself T-003; severity stays Minor because the practical exploit requires T-003 to fire first).
+### T-013 · Family code immutability is handler-side only — CLOSED 2026-05-11 (Plan 5)
+- **Severity:** minor (closed)
+- **Surface:** `migrations/0188_tripwire_extend.sql:239-257` — `reject_families_code_update()` BEFORE-UPDATE trigger added to `metaldocs.document_families`, mirroring the `0122`/`0123` pattern for profiles + areas. Handler-side override of `body.code` with path-param `code` remains as an additional safe guard.
+- **Observation (original):** Code immutability on profiles + areas was DB-enforced (`reject_code_update()` BEFORE-UPDATE trigger). Family code immutability was enforced only by the handler — a single layer that a bypass path (T-003 PATCH gap) could defeat.
 - **Evidence:** `_artifacts/04-persistence.md` §1 (no trigger row for `document_families`); `_artifacts/04-persistence.md` §3 (trigger inventory).
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-013`
 - **Linked ADR:** missing-ADR

@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 5)
 
 ## Severity scale
 
@@ -26,10 +26,10 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-002
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`
 
-### T-003 · `documents` table mutations lack tier-2 + tripwire defense-in-depth
-- **Severity:** major
-- **Surface:** `internal/modules/documents/repository/repository.go:73` (CreateDocumentTx) · `:216` (UpdateDocumentName) · `:428` (UpdateDocumentStatus) · `:1071` (MarkArchived) · `:1082` (Unarchive)
-- **Observation:** Approval-instance writes are layered (tier-1 role gate + tier-2 `authz.Require` + Postgres tripwire trigger `trg_require_cap_asserted_instances` at `migrations/0142b_role_capabilities_v2_enforce.sql:201`). The `documents` table itself is single-layer: tier-1 role/owner check only; no `authz.Require` and no `enforce_capability_asserted` trigger attached. Defense-in-depth gap on a regulated mutation surface.
+### T-003 · `documents` table mutations lack tier-2 + tripwire defense-in-depth — CLOSED 2026-05-11 (Plan 5)
+- **Severity:** major (closed)
+- **Surface:** `internal/modules/documents/repository/repository.go` — `CreateDocumentTx`, `UpdateDocumentName`, `UpdateDocumentStatus`, `MarkArchived`, `Unarchive` — all 5 mutations now call `authz.Require` with `CapDocumentCreate` or `CapDocumentEdit` as appropriate. Migration `0188_tripwire_extend.sql:196-199` attaches `trg_require_cap_asserted` (`BEFORE INSERT OR UPDATE`) on `public.documents`.
+- **Observation (original):** Approval-instance writes were layered (tier-1 role gate + tier-2 `authz.Require` + Postgres tripwire trigger). The `documents` table itself was single-layer: tier-1 role/owner check only; no `authz.Require` and no `enforce_capability_asserted` trigger attached. Defense-in-depth gap on a regulated mutation surface.
 - **Evidence:** `_artifacts/04-persistence.md` (tripwire-pairing audit); `_artifacts/05-industry.md` IP-004.
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-003
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`

@@ -75,7 +75,7 @@
 - Cookie attributes: `HttpOnly`, `SameSite=Lax`, `Secure` from `Config.CookieSecure` (defaults to `APP_ENV != local`), `Path=/`, `MaxAge` from `SessionTTL`.
 - Auth is NOT under `oapi-codegen` — routes are registered via `mux.HandleFunc` (`delivery/http/handler.go:35-39`); no entry in `api/openapi/v1/openapi.yaml` for `/api/v1/auth/*`. Consistent with ADR 0012's partial-rollout scope.
 - Error envelope is legacy `{error:{code,message,details,trace_id}}` — does NOT yet match RFC 9457 Problem Details from `wiki/architecture/api-design-system.md` (T-003).
-- Auth tables are explicitly **outside** the `enforce_capability_asserted` tripwire scope (`migrations/0142b_role_capabilities_v2_enforce.sql:200-209` attaches only to approval tables) — per ADR 0007 amendment.
+- Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, registry, taxonomy, templates_v2) but auth tables remain unguarded — per ADR 0007 amendment.
 - `LegacyHeaderEnabled` — when true, requests with `X-User-Id` header bypass session enforcement entirely (`middleware.go:58-61`); single-flag compromise vector (T-001).
 
 ---

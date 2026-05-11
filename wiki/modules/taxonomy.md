@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
+**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` — `DocumentFamily` aggregate
@@ -14,7 +14,7 @@
 > - `internal/modules/taxonomy/application/area_service.go:14` — `AreaService` (Archive logs; Create/Update do not)
 > - `internal/modules/taxonomy/delivery/http/handler.go:51-68` — 16 routes mounted on raw `net/http.ServeMux`
 > - `internal/modules/taxonomy/delivery/http/routes_profiles.go:230-231` — `tenantIDFromRequest` (delegates to `tenant.FromContext`; Plan 3 removed header trust)
-> - `internal/modules/taxonomy/infrastructure/repository.go:102` — `ProfileRepository.Create` (no tx, no `authz.Require`)
+> - `internal/modules/taxonomy/infrastructure/repository.go:102` — `ProfileRepository.Create` (now in tx + `authz.Require(CapTaxonomyManage)` — Plan 5 wired)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:91-99` — `HasActiveProfiles` (no tenant predicate; TOCTOU race with `Update`)
 > - `apps/api/cmd/metaldocs-api/permissions.go:158-180` — path-prefix capability dispatcher (PATCH /families/{code} not matched → falls through)
 > - `apps/api/cmd/metaldocs-api/main.go:197-201,225,508-524` — module wiring + standalone `ProfileRepository` + `profileDefaultsAdapter` for documents_v2
@@ -41,7 +41,7 @@
 |---|---|---|
 | 1 | **Multi-tenant isolation** of profiles + areas | per-tenant unique `(tenant_id, code)` indexes; **FAILS** — tenant_id sourced from client header without verification (T-001); families have no tenant scoping at all (T-002) |
 | 2 | **Regulated-mutation traceability** | govLogger emits to `governance_events` on selected ops — **PARTIAL**: `FamilyService` has no govLogger field; `ProfileService.Create/Update` and `AreaService.Create/Update` do not emit (T-004, T-005) |
-| 3 | **Code immutability post-create** | DB trigger `trg_document_profiles_code_immutable` (`0122:33-39`) + `trg_process_areas_code_immutable` (`0123:33-37`) — PASSES for profile + area; family-side enforced only by handler overwriting body `code` (T-013) |
+| 3 | **Code immutability post-create** | DB trigger `trg_document_profiles_code_immutable` (`0122:33-39`) + `trg_process_areas_code_immutable` (`0123:33-37`) + `trg_reject_families_code_update` (migration 0188, Plan 5 — T-013 closed) — PASSES for all 3 entities |
 
 ### 1.3 Stakeholders
 
@@ -60,7 +60,7 @@
 - Persistence: Postgres; 3 owned tables in schema `metaldocs` (forward-only migrations, `0023`/`0025` base + `0122`/`0123` tenant-extension)
 - HTTP routing: raw `net/http.ServeMux` (`handler.go:51-68`). **No OpenAPI spec**, no oapi-codegen — divergence from ADR 0012 (T-009)
 - Error envelope: legacy `{"code","message"}` via `internal/platform/httpresponse/response.go:14-16`; not RFC 9457 (T-008)
-- Authz: tier-1 path-prefix dispatcher only; no `authz.Require` (`internal/platform/authz` not imported); no DB tripwire / `assert_caps` GUC on any taxonomy table (T-006)
+- Authz: tier-1 path-prefix dispatcher (T-003 PATCH bypass closed Plan 5); **Plan 5 wired `authz.Require(CapTaxonomyManage)` in `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update`; tripwire on all 3 tables via migration 0188 (T-006 partially closed)**; archive/deactivate paths still tier-1 only
 - Tenant scoping: application-layer only via `tenant.FromContext` (Plan 3 replaced `X-Tenant-ID` header reads; no `set_local_tenant_id` GUC anywhere in `internal/`)
 
 ---
@@ -110,10 +110,10 @@ Outbound interfaces:
 ## 4. Solution Strategy
 
 - **Per-aggregate repository + service split.** Each of the 3 entities has its own service + repository pair. Driver: simplicity; cost: govLogger wired inconsistently (FamilyService omits it — T-004).
-- **DB-level code immutability for profile + area only.** Triggers `trg_document_profiles_code_immutable` (`0122:33-39`) and `trg_process_areas_code_immutable` (`0123:33-37`) raise on `NEW.code <> OLD.code`. Family immutability is *not* enforced in DB — handler overwrites body `code` with path param (T-013).
+- **DB-level code immutability for profile + area + family.** Triggers `trg_document_profiles_code_immutable` (`0122:33-39`) and `trg_process_areas_code_immutable` (`0123:33-37`) raise on `NEW.code <> OLD.code`. Family immutability added by migration 0188 via `trg_reject_families_code_update` (Plan 5, T-013 closed). Handler still overwrites body `code` with path param as an additional guard.
 - **Tenant scoping on profile + area only; families are global.** `0122:4-6` and `0123:3-5` add `tenant_id`. `document_families` has no `tenant_id` (`0023:1-7`). No ADR justifies the asymmetry (T-002).
 - **Application-layer cycle prevention for area parents.** `AreaService.SetParent` walks `ListAncestors` to reject cycles. Self-FK is structural; acyclicity is application-only.
-- **Single-tier authz via path-prefix dispatcher.** No `authz.Require` in the module; no DB tripwire. Driver: pre-dates two-tier rollout (ADR 0007). Cost: PATCH /families/{code} bypass + cross-tenant blast on global families (T-002, T-003, T-006).
+- **Two-tier authz now wired for Create/Update paths (Plan 5).** `authz.Require(CapTaxonomyManage)` in FamilyRepository + ProfileRepository + AreaRepository write methods; tripwire on all 3 taxonomy tables (migration 0188). PATCH dispatcher bypass fixed (T-003). Archive/deactivate + FamilyService govLogger gap remain (T-004, T-005, T-006 partial).
 - **Raw `net/http.ServeMux` routes.** No OpenAPI spec, no codegen. Driver: pre-dates contract-first migration (ADR 0012). Cost: client codegen cannot bind taxonomy methods (T-009).
 
 ---
@@ -182,7 +182,7 @@ C4Container
 | GET | `/api/v2/taxonomy/families` | _missing_ | `listFamilies` | `doc.view` |
 | POST | `/api/v2/taxonomy/families` | _missing_ | `createFamily` | `taxonomy.manage` |
 | GET | `/api/v2/taxonomy/families/{code}` | _missing_ | `getFamily` | `doc.view` |
-| **PATCH** | `/api/v2/taxonomy/families/{code}` | _missing_ | `updateFamily` | **NONE** (T-003 — falls through dispatcher) |
+| **PATCH** | `/api/v2/taxonomy/families/{code}` | _missing_ | `updateFamily` | `taxonomy.manage` (T-003 closed Plan 5 — PATCH added to dispatcher) |
 | DELETE | `/api/v2/taxonomy/families/{code}` | _missing_ | `deactivateFamily` | `taxonomy.manage` |
 
 ---
@@ -227,7 +227,7 @@ sequenceDiagram
     T-->>H: tenantID (TRUSTED — no verification)
     H->>S: Create(ctx, DocumentProfile{TenantID, ...})
     S->>R: Create(ctx, profile)
-    R->>DB: INSERT (no tx, no authz.Require, no set_local_tenant_id)
+    R->>DB: INSERT in tx with `authz.Require(CapTaxonomyManage)` (Plan 5: no set_local_tenant_id GUC yet)
     DB-->>R: ok | 23503 (FK family) | 23505 (PK) | 23514 (CHECK)
     R-->>S: err mapped
     S-->>H: err
@@ -298,10 +298,10 @@ Failure modes — reference `wiki/concepts/error-ux.md`:
 ## 8. Cross-cutting Concepts
 
 ### 8.1 Authentication & Authorization
-- **Tier 1 (HTTP edge):** path-prefix dispatcher (`apps/api/cmd/metaldocs-api/permissions.go:158-180`). Profiles branch matches GET + POST/PATCH/PUT/DELETE. Areas branch matches GET + POST/PUT/DELETE. Families branch matches GET + POST/PUT/DELETE — **PATCH not matched** (T-003).
-- **Tier 2 (in-tx):** absent — `internal/platform/authz` not imported anywhere under `internal/modules/taxonomy/` (Phase 3 OUT-edge check).
-- **Postgres tripwire:** absent — no `assert_caps` trigger on any of the 3 owned tables; no `set_local_tenant_id` GUC anywhere in `internal/` (Phase 4 §3). Compare to approval (`0142b_role_capabilities_v2_enforce.sql:200-209`).
-- See `wiki/decisions/0007-two-tier-authz.md` — taxonomy is non-conformant (T-006).
+- **Tier 1 (HTTP edge):** path-prefix dispatcher (`apps/api/cmd/metaldocs-api/permissions.go:158-180`). Profiles branch matches GET + POST/PATCH/PUT/DELETE. Areas branch matches GET + POST/PUT/DELETE. Families branch now matches GET + POST/PATCH/PUT/DELETE (T-003 closed Plan 5 — PATCH added).
+- **Tier 2 (in-tx):** `authz.Require(CapTaxonomyManage)` wired in `FamilyRepository.Create` (`:77`) / `Update` (`:96`); `ProfileRepository.Create` / `Update`; `AreaRepository.Create` / `Update`. Archive/deactivate paths still tier-1 only (T-006 partial). `internal/modules/iam/authz` import now present in taxonomy infrastructure.
+- **Postgres tripwire:** `migrations/0188_tripwire_extend.sql:211-224` attaches `trg_require_cap_asserted` to `document_profiles`, `document_process_areas`, `document_families`.
+- See `wiki/decisions/0007-two-tier-authz.md` — taxonomy partially conformant as of Plan 5 (T-006 partially closed).
 
 ### 8.2 Tenant scoping
 - Tenant now sourced from `tenant.FromContext` (`routes_profiles.go:230-231`). Plan 3 replaced the `X-Tenant-ID` header reads; `tenant.DevTenantID` is no longer a fallback at this layer — if context lacks a tenant, `ErrTenantMissing` returns 500. T-001 (header trust) is resolved; see `taxonomy-tech-debt.md` T-001.
@@ -327,7 +327,7 @@ Failure modes — reference `wiki/concepts/error-ux.md`:
 
 ### 8.8 Code immutability
 - Profile + area: DB-enforced via `reject_code_update()` function + BEFORE-UPDATE trigger (`0122:25-39`, `0123:23-37`).
-- Family: enforced only by handler overwriting body `code` with path-param `code` before passing to service. A bypassing caller (e.g. PATCH-bypass per T-003) could rename via direct UPDATE without DB protection (T-013).
+- Family: DB-enforced by `trg_reject_families_code_update` trigger (migration 0188, Plan 5 — T-013 closed). Handler also overwrites body `code` with path-param `code` as a defense-in-depth layer.
 
 ### 8.9 Cross-module data contracts
 - `document_profiles.code` + `process_areas.code` → CD code prefix (`{profile}-{area}-{seq}`) in `registry/domain/controlled_document.go:48`.
@@ -357,10 +357,10 @@ Failure modes — reference `wiki/concepts/error-ux.md`:
 | Goal | Scenario | Pass criteria | Current state |
 |---|---|---|---|
 | Multi-tenant isolation | Authn'd user in tenant A POSTs `/profiles` with forged `X-Tenant-ID` header | 403; no insert | **PASSES** after Plan 3 — header stripped by auth middleware; tenant from session (`tenant.FromContext`) |
-| Authz on regulated mutations | Authn'd user without `taxonomy.manage` PATCHes `/families/{code}` | 403 | **FAILS** — PATCH not in dispatcher (T-003) |
+| Authz on regulated mutations | Authn'd user without `taxonomy.manage` PATCHes `/families/{code}` | 403 | **PASSES** — PATCH added to dispatcher Plan 5 (T-003 closed) |
 | Regulated-mutation traceability | `Create`/`Update`/`Deactivate` on family/profile/area emits a governance event | grep shows ≥1 govLogger call per mutating service method | **FAILS** — FamilyService has no govLogger; Profile/Area Create + Update do not emit (T-004, T-005) |
 | Code immutability | Direct UPDATE to `document_profiles.code` raises | trigger fires | PASSES (`0122:33-39`) |
-| Family code immutability | Direct UPDATE to `document_families.code` raises | trigger fires | **FAILS** — no DB trigger; only handler-level overwrite (T-013) |
+| Family code immutability | Direct UPDATE to `document_families.code` raises | trigger fires | **PASSES** — `trg_reject_families_code_update` added migration 0188 Plan 5 (T-013 closed) |
 | Concurrency on Deactivate | Concurrent INSERT into `_profiles` during Deactivate cannot bypass `HasActiveProfiles` | row lock or single tx | **FAILS** — no tx, no lock (T-007) |
 | Migration discipline | Schema changes appended forward-only | grep migrations | PASSES (19 sequential migrations; IP-006 conformant) |
 | `(tenant_id, code)` uniqueness | Two profiles with same code in same tenant rejected | unique index | PASSES (`ux_document_profiles_tenant_code`) |
@@ -377,9 +377,9 @@ Pointer-only. Body in `wiki/modules/taxonomy-tech-debt.md`. Severity rubric: see
 
 Top 3 (by severity, then by blast-radius):
 
-1. **Tenant header trust removed (Plan 3)** — `tenantIDFromRequest` now calls `tenant.FromContext`; `X-Tenant-ID` header is stripped by auth middleware before reaching taxonomy handlers. T-001 resolved. Residual: no GUC-based row-level isolation (tech-debt T-006).
-2. **`document_families` is globally shared with no ADR** — any caller with `taxonomy.manage` (held by `qms_admin` + `system_admin` in any tenant) mutates a row visible to every tenant. Cross-tenant blast on a regulated catalog. See tech-debt T-002.
-3. **PATCH /families/{code} bypasses the capability dispatcher** — falls through `permissions.go:174-180` (only POST/PUT/DELETE matched); unauthenticated network actor can update a globally-shared family. Authz bypass on regulated mutation. See tech-debt T-003.
+1. **Tenant header trust removed (Plan 3)** — `tenantIDFromRequest` now calls `tenant.FromContext`; `X-Tenant-ID` header is stripped by auth middleware before reaching taxonomy handlers. T-001 resolved. Residual: no GUC-based row-level isolation (T-006 partial).
+2. **`document_families` is globally shared with no ADR** — any caller with `taxonomy.manage` (held by `qms_admin` + `system_admin` in any tenant) mutates a row visible to every tenant. Cross-tenant blast on a regulated catalog. See tech-debt T-002. Still open.
+3. **Plan 5 closures** — T-003 (PATCH dispatcher bypass fixed in `permissions.go`); T-006 partially closed (Create/Update paths now have `authz.Require` + DB tripwire on all 3 taxonomy tables); T-013 (families code immutability trigger added, migration 0188).
 
 ---
 

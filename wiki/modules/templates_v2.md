@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates_v2/` and routes still mount under `/api/v2/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates_v2 is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates_v2-refactor.md#R-101`).
 
-**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied)
+**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied; **Plan 5 wired `authz.Require` + tripwire on all 6 mutation paths**)
 
 ---
 
@@ -44,7 +44,7 @@
 
 - Language / runtime: Go (per repo defaults).
 - Persistence: Postgres; tables created in `migrations/0120_templates_v2_init.sql`.
-- Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md` — **NOT applied** (see T-001).
+- Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md` — **applied Plan 5** (`WithDB` builder + `authz.Require` in all 6 mutation paths + DB tripwire on `templates_v2_template` + `templates_v2_template_version`; T-001 closed).
 - API contract: OpenAPI 3.0.3 generated via oapi-codegen — **partial** (8 of 20 routes generated; see T-006).
 - Error envelope: RFC 9457 Problem+JSON per `wiki/architecture/api-design-system.md` — **NOT applied** (see T-005).
 - Placeholder syntax + catalog: per `wiki/concepts/placeholders.md` (fixed 7-token) and `wiki/concepts/token-syntax.md` (`{name}` single-brace, eigenpal-native).
@@ -165,9 +165,10 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` §3.
 | `internal/modules/templates_v2/application/approval_config.go:9` | `UpsertApprovalConfigCmd` | struct | Approval-config command |
 | `internal/modules/templates_v2/application/queries.go:41` | `GetDocxURLCmd` | struct | Presigned GET for stored DOCX |
 | `internal/modules/templates_v2/application/visibility_graph.go:16` | `DetectVisibilityCycle` | func | Cycle check across `VisibilityCondition` graph |
-| `internal/modules/templates_v2/delivery/http/handler.go:17` | `AuthzFunc` | type | Authz callback (wired nil — T-001) |
+| `internal/modules/templates_v2/delivery/http/handler.go:17` | `AuthzFunc` | type | Authz callback; now wired to real `capabilityService` (T-001 closed Plan 5) |
 | `internal/modules/templates_v2/delivery/http/handler.go:19` | `Handler` | struct | HTTP handler |
-| `internal/modules/templates_v2/delivery/http/handler.go:24` | `New` | func | Handler constructor; nil-authz fallback at lines 25-27 |
+| `internal/modules/templates_v2/delivery/http/handler.go:24` | `New` | func | Handler constructor |
+| `internal/modules/templates_v2/application/service.go:22` | `WithDB` | method | Builder that injects `*sql.DB` enabling tx-backed `authz.Require` calls (added Plan 5) |
 | `internal/modules/templates_v2/delivery/http/handler.go:31` | `Handler.Register` | method | Mounts 20 routes on `*http.ServeMux` |
 | `internal/modules/templates_v2/delivery/http/errors.go:10` | `MapErr` | func | Domain error → HTTP status + code mapping |
 | `internal/modules/templates_v2/repository/postgres.go:21` | `Repository` | struct | Postgres adapter implementing `application.Repository` |
@@ -224,7 +225,7 @@ sequenceDiagram
     participant DB as Postgres
     C->>H: GET /api/v2/templates
     H->>H: tenantIDFromReq(r) → tenant.FromContext (Plan 3: no longer reads X-Tenant-ID header)
-    H->>H: authz(r, tenant, area, action) → no-op (nil-authz fallback)
+    H->>H: authz(r, tenant, area, action) → real capability check (T-001 closed Plan 5)
     H->>S: List(ctx, ListFilter{TenantID, DocTypeCode, Areas, Visibility, IncludeArchived})
     S->>R: ListTemplates(ctx, filter)
     R->>DB: SELECT FROM templates_v2_template WHERE tenant_id = $1 AND ... (no LIMIT)
@@ -350,9 +351,9 @@ Failure modes:
 
 ### 8.1 Authentication & Authorization
 
-- Tier 1 (HTTP edge): `CapabilityService` per `wiki/architecture/api-design-system.md` — **NOT applied**; `AuthzFunc` arg is `nil` at wiring (`apps/api/cmd/metaldocs-api/main.go:329`).
-- Tier 2 (in-tx): `internal/platform/authz.Require` — **never imported** by templates_v2.
-- Postgres tripwire: `metaldocs.asserted_caps` GUC — **no trigger installed** on `templates_v2_*` tables (per `_artifacts/04-persistence.md` §3).
+- Tier 1 (HTTP edge): `CapabilityService` now wired — `AuthzFunc` receives real `capabilityService` check (T-001 closed Plan 5).
+- Tier 2 (in-tx): `internal/modules/iam/authz.Require` called in `CreateTemplate` (`create.go:84`), `SubmitForReview` (`lifecycle.go:54`), `Review` (`:125`/`:148`), `Approve` (`:226`), `PublishTemplateVersion` (`:345`), `ArchiveTemplate` (`:406`) when `s.db != nil` (injected via `WithDB`).
+- Postgres tripwire: `migrations/0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_v2_template` and `public.templates_v2_template_version`.
 - Capabilities in seed (`migrations/0165_role_capabilities_reseed.sql`): `template.view/create/edit/submit/approve/publish` mapped to `viewer/editor/author/approver/system_admin` — currently advisory only. See T-001.
 
 ### 8.2 Error envelope
@@ -398,7 +399,7 @@ Failure modes:
 | Eigenpal as DOCX editor | `wiki/decisions/0001-eigenpal-adoption.md` |
 | `{name}` single-brace token syntax | `wiki/decisions/0003-token-syntax-migration.md` |
 | Fixed 7-token placeholder catalog | `wiki/decisions/0008-placeholder-fixed-catalog.md` |
-| Two-tier authz (intended) | `wiki/decisions/0007-two-tier-authz.md` (NOT applied here — T-001) |
+| Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` — applied Plan 5 (T-001 closed); `PublishTemplateVersion` role-binding check still absent (T-004 partial) |
 | Contract-first via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (PARTIAL — T-006) |
 | Hexagonal layer split (`domain/application/delivery/repository`) | tech-debt: missing-ADR (T-014) |
 | Two parallel publish paths (`Approve` vs `PublishTemplateVersion`) | tech-debt: missing-ADR (T-004) |
@@ -428,9 +429,9 @@ Pointer-only. Body lives in `wiki/modules/templates_v2-tech-debt.md`.
 
 Top 3 (by severity, then blast-radius):
 
-1. **Authz wired `nil` everywhere** (`handler.go:25-27` + `main.go:329`) — every route is open. All seven repo mutations land without capability assertion. — see tech-debt §T-001
-2. **Tenant now sourced from `tenant.FromContext`** (`handler.go:83`) — Plan 3 closed the header-trust gap (T-003 resolved). Residual: T-001 (nil authz) still allows unauthenticated mutations for users who bypass the session gate.
-3. **`PublishTemplateVersion` bypasses the entire approval lifecycle** (`lifecycle.go:265`) — draft → published in one call, no role check, no SoD, no content_hash gate. Published rows can lack the regulated approval chain ISO 9001 §7.5 requires. — see tech-debt §T-004
+1. **T-001 closed Plan 5** — `authz.Require` wired in all 6 mutation paths via `WithDB` builder; tripwire on both templates_v2 tables (migration 0188).
+2. **Tenant sourced from `tenant.FromContext`** (`handler.go:83`) — Plan 3 closed the header-trust gap (T-003 resolved).
+3. **`PublishTemplateVersion` partially hardened Plan 5** (`lifecycle.go:320-347`) — `content_hash` gate + SoD check + `authz.Require(CapTemplatePublish)` added. Residual: `pending_approver_role` vs actor-role binding check still absent (T-004 partially open). — see tech-debt §T-004
 
 ---
 

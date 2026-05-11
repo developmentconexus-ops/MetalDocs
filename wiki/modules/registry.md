@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active
+**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active
 
 > **Key files:**
 > - `internal/modules/registry/module.go:25` — module wiring (`New`, dependencies)
@@ -56,7 +56,7 @@ The **registry** module owns the catalog of code-numbered Controlled Documents (
 - Language / runtime: Go 1.25
 - Persistence: Postgres (per [wiki/architecture/data-model.md](architecture/data-model.md))
 - API contract: OpenAPI 3.0.3 via oapi-codegen v2 — partial at `api/openapi/v1/partials/registry.yaml` (path prefix `/api/v2/` despite the v1 spec tree)
-- Authz: two-tier per [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) (tier-3 tripwire not yet applied — T-004)
+- Authz: two-tier per [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md); Plan 5 wired `authz.Require` + tripwire on `controlled_documents` and `cd_sequence_counters` (T-001/T-004 closed); `Obsolete`/`Supersede` now pass typed `CapRegistryObsolete`/`CapRegistrySupersede` from `iamdomain` (migration 0187 seeded both caps)
 - Idempotency: shared platform `internal/platform/idempotency` per ADR 0011
 - Numbering: 3-segment `{PROFILE}-{AREA}-{NNN}` per ADR 0011
 - Error envelope: legacy `{code, message}` today (RFC 9457 not yet adopted — T-003)
@@ -172,8 +172,8 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 | GET | `/api/v2/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
 | GET | `/api/v2/controlled-documents/{id}` | `getControlledDocument` | `routes.go:190` | (read) |
 | GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:232` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
-| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | (unclear — T-001) |
-| PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | (unclear — T-001) |
+| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | `registry.obsolete` (`CapRegistryObsolete`) — T-001 closed Plan 5 |
+| PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | `registry.supersede` (`CapRegistrySupersede`) — T-001 closed Plan 5 |
 
 ---
 
@@ -300,7 +300,7 @@ State transitions:
 | `controlled_documents` | `active` | `obsolete` | `Obsolete` op | `ErrCDNotActive` if not active | **NO — T-002** |
 | `controlled_documents` | `active` | `superseded` | `Supersede` op | `ErrCDNotActive` if not active | **NO — T-002** |
 
-Tripwire pairing: VIOLATION — no `authz.Require`; capability resolver mapping not located in registry module (T-001).
+Tripwire pairing: active — `authz.Require(CapRegistryObsolete|CapRegistrySupersede)` called inside `changeStatus` tx (`service.go:327`); `trg_require_cap_asserted` on `controlled_documents` (UPDATE, OR-logic accepts either cap, migration 0188 line 201). T-001/T-004 closed Plan 5.
 
 Detail: `_artifacts/02-flow-obsolete.md`.
 
@@ -321,8 +321,8 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 ### 8.1 Authentication & Authorization
 
 - Tier 1 (HTTP edge): IAM `CapabilityService` resolves `CapRegistryCreate` (=`registry.create`) for POST routes (`apps/api/cmd/metaldocs-api/permissions.go:186-187`; reseeded in `migrations/0165_role_capabilities_reseed.sql` for `editor`, `author`, `system_admin`).
-- Tier 2 (in-tx `authz.Require`): NOT applied in registry.
-- Tier 3 (Postgres `enforce_capability_asserted` tripwire): triggers exist (`migrations/0142b_role_capabilities_v2_enforce.sql:201-207`) but cover `approval_instances` / `signoffs` — NOT registry-owned tables. See T-004.
+- Tier 2 (in-tx `authz.Require`): applied in `Create`/`CreateTx` (`CapRegistryCreate`) and `changeStatus` (`CapRegistryObsolete|CapRegistrySupersede`). Plan 5 (T-001/T-004 closed).
+- Tier 3 (Postgres `enforce_capability_asserted` tripwire): `migrations/0188_tripwire_extend.sql:201-208` attaches `trg_require_cap_asserted` to `controlled_documents` (INSERT + UPDATE with OR-logic) and `cd_sequence_counters`.
 - See [wiki/concepts/authz-tiers.md](concepts/authz-tiers.md) and [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md).
 
 ### 8.2 Error envelope
@@ -364,10 +364,10 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 | Decision | Link / Status |
 |---|---|
 | Atomic CD + first-revision create + per-area numbering + `Idempotency-Key` | [wiki/decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md) |
-| Two-tier authz | [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) (tier-2/3 not yet wired for registry — T-004) |
+| Two-tier authz | [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) (tier-2/3 wired Plan 5 — T-001/T-004 closed) |
 | Contract-first API (OpenAPI + oapi-codegen) | [wiki/decisions/0012-contract-first-api.md](decisions/0012-contract-first-api.md) (spec/handler drift on 422 — T-007) |
 | Which CD lifecycle events emit audit | tech-debt: missing-ADR (T-002) |
-| Capability granularity (single `registry.create` vs separate caps for obsolete/supersede) | tech-debt: missing-ADR (T-001) |
+| Capability granularity (separate `registry.create` / `registry.obsolete` / `registry.supersede`) | implemented Plan 5 (migration 0187 + `CapRegistryObsolete`/`CapRegistrySupersede` in `domain/model.go`); missing standalone ADR — ADR-TODO per Plan 13 |
 | RFC 9457 envelope adoption schedule | tech-debt: missing-ADR (T-003) |
 | GUC-based tenant scoping vs query-arg only | tech-debt: missing-ADR (T-005) |
 | Read-path authz contract (e.g. `GetActiveDocument` tenant source) | tech-debt: missing-ADR (T-006) |
@@ -403,9 +403,10 @@ Detail in [wiki/modules/registry-tech-debt.md](modules/registry-tech-debt.md). S
 
 Top 3 (by severity, then blast-radius):
 
-1. T-002 — `Obsolete` / `Supersede` mutate a regulated QMS lifecycle without emitting `governance_events` (audit-trail gap on the canonical catalog).
-2. T-001 — Lifecycle PUTs (`obsolete`, `supersede`) have no in-module authz check and no capability mapping located in the registry path; resolver coverage unverified.
-3. T-004 — Tier-3 Postgres tripwire absent on `controlled_documents` + `cd_sequence_counters` mutations; defense-in-depth gap on the QMS catalog.
+1. T-002 — `Obsolete` / `Supersede` mutate a regulated QMS lifecycle without emitting `governance_events` (audit-trail gap on the canonical catalog). Still open.
+2. T-006 — `GetActiveDocument` has no authz check for the read path; residual gap after Plan 3 header-trust fix.
+3. T-005 — Tenant scoping relies on query-arg only; no GUC + RLS backstop on registry-owned tables.
+(T-001 closed Plan 5: lifecycle authz wired. T-004 closed Plan 5: tripwire attached to `controlled_documents` + `cd_sequence_counters`.)
 
 ### Coverage stats
 
