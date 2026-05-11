@@ -20,4 +20,8 @@ type Repository interface {
 	UpdateUser(ctx context.Context, params UpdateUserParams) error
 	ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]OnlineUser, error)
 	BootstrapAdmin(ctx context.Context, params BootstrapAdminParams) (bool, error)
+	// GetUserTenants returns the distinct tenant IDs from iam_user_roles for the
+	// given user. Used by Login to verify the X-Tenant-ID claim and bind it to
+	// the session row.
+	GetUserTenants(ctx context.Context, userID string) ([]string, error)
 }

@@ -13,6 +13,7 @@ import (
 	httphandler "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeSvc struct {
@@ -185,7 +186,7 @@ func newMux(t *testing.T, svc *fakeSvc) *http.ServeMux {
 
 func withAuthHeaders(req *http.Request, roles string) {
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("X-Tenant-ID", "tenant_1")
+	*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant_1"))
 	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user_1", []iamdomain.Role{}))
 	req.Header.Set("X-User-Roles", roles)
 }

@@ -15,6 +15,7 @@ type Repository struct {
 	users    map[string]authdomain.Identity
 	byLogin  map[string]string
 	sessions map[string]authdomain.Session
+	tenants  map[string][]string
 }
 
 func NewRepository() *Repository {
@@ -22,6 +23,7 @@ func NewRepository() *Repository {
 		users:    map[string]authdomain.Identity{},
 		byLogin:  map[string]string{},
 		sessions: map[string]authdomain.Session{},
+		tenants:  map[string][]string{},
 	}
 }
 
@@ -396,6 +398,20 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 	identity.UpdatedAt = time.Now().UTC()
 	r.users[userID] = identity
 	return nil
+}
+
+// SeedUserTenants sets the tenant list for a user. Used in tests only.
+func (r *Repository) SeedUserTenants(userID string, tenantIDs []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.tenants[userID] = append([]string(nil), tenantIDs...)
+}
+
+func (r *Repository) GetUserTenants(_ context.Context, userID string) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tenants := r.tenants[strings.TrimSpace(userID)]
+	return append([]string(nil), tenants...), nil
 }
 
 func cloneIdentity(identity authdomain.Identity) authdomain.Identity {

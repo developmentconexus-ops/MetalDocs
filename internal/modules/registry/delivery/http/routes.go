@@ -27,7 +27,13 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	items, err := h.svc.List(r.Context(), tenantIDFromRequest(r), filter)
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+
+	items, err := h.svc.List(r.Context(), tenantID, filter)
 	if err != nil {
 		h.writeDomainError(w, err)
 		return
@@ -41,6 +47,12 @@ func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params registryapi.AtomicCreateControlledDocumentParams) {
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+
 	var req registryapi.CreateAtomicRequest
 	if err := decodeStrictJSON(r, &req); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -59,7 +71,7 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 	}
 
 	res, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
-		TenantID:                  tenantIDFromRequest(r),
+		TenantID:                  tenantID,
 		ProfileCode:               strings.TrimSpace(req.ProfileCode),
 		ProcessAreaCode:           strings.TrimSpace(req.ProcessAreaCode),
 		DepartmentCode:            req.DepartmentCode,
@@ -131,7 +143,11 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "profileCode and areaCode query parameters are required")
 		return
 	}
-	tenantID := tenantIDFromRequest(r)
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
 	next, err := h.svc.PeekSeq(r.Context(), tenantID, profileCode, areaCode)
 	if err != nil {
 		h.writeDomainError(w, err)
@@ -147,6 +163,11 @@ func (h *Handler) PreviewControlledDocumentCode(w http.ResponseWriter, r *http.R
 
 func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params registryapi.CreateControlledDocumentRevisionParams) {
 	r.SetPathValue("id", id.String())
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
 	cdID := r.PathValue("id")
 	var body registryapi.CreateRevisionRequest
 	if err := decodeStrictJSON(r, &body); err != nil {
@@ -162,7 +183,7 @@ func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *htt
 		formData = *body.FormData
 	}
 	ref, err := h.svc.CreateRevision(r.Context(), application.CreateRevisionCmd{
-		TenantID:          tenantIDFromRequest(r),
+		TenantID:          tenantID,
 		CDID:              cdID,
 		Name:              strings.TrimSpace(body.Name),
 		FormData:          formData,
@@ -189,7 +210,13 @@ func missingCreateRevisionField(req registryapi.CreateRevisionRequest) string {
 
 func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
-	doc, err := h.svc.Get(r.Context(), tenantIDFromRequest(r), r.PathValue("id"))
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+
+	doc, err := h.svc.Get(r.Context(), tenantID, r.PathValue("id"))
 	if err != nil {
 		h.writeDomainError(w, err)
 		return
@@ -204,7 +231,11 @@ func (h *Handler) GetControlledDocument(w http.ResponseWriter, r *http.Request, 
 
 func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
-	tenantID := tenantIDFromRequest(r)
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
 	cdID := r.PathValue("id")
 
 	// FULL OUTER JOIN so we get a row whenever either an active doc or a published
@@ -217,7 +248,7 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 		approvalState  sql.NullString
 		publishedDocID sql.NullString
 	)
-	err := h.db.QueryRowContext(r.Context(), `
+	err = h.db.QueryRowContext(r.Context(), `
 SELECT active.id,
        COALESCE(active.content_hash_at_submit,
                 (SELECT r.content_hash FROM document_revisions r
@@ -327,7 +358,12 @@ SELECT id::text
 
 func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
-	if err := h.svc.Obsolete(r.Context(), tenantIDFromRequest(r), r.PathValue("id")); err != nil {
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	if err := h.svc.Obsolete(r.Context(), tenantID, r.PathValue("id")); err != nil {
 		h.writeDomainError(w, err)
 		return
 	}
@@ -336,7 +372,12 @@ func (h *Handler) ObsoleteControlledDocument(w http.ResponseWriter, r *http.Requ
 
 func (h *Handler) SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	r.SetPathValue("id", id.String())
-	if err := h.svc.Supersede(r.Context(), tenantIDFromRequest(r), r.PathValue("id")); err != nil {
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	if err := h.svc.Supersede(r.Context(), tenantID, r.PathValue("id")); err != nil {
 		h.writeDomainError(w, err)
 		return
 	}
@@ -444,12 +485,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	}
 }
 
-func tenantIDFromRequest(r *http.Request) string {
-	tid := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tid == "" {
-		return tenant.DevTenantID
-	}
-	return tid
+func tenantIDFromRequest(r *http.Request) (string, error) {
+	return tenant.FromContext(r.Context())
 }
 
 func filterFromListParams(params registryapi.ListControlledDocumentsParams) (application.CDFilter, error) {

@@ -47,7 +47,13 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	items, err := h.svc.ListActive(r.Context(), userID, tenantIDFromRequest(r))
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+
+	items, err := h.svc.ListActive(r.Context(), userID, tenantID)
 	if err != nil {
 		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships")
 		return
@@ -70,12 +76,17 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 		writeMembershipAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userId, areaCode and role are required")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 
 	grantedBy := authn.UserIDFromContext(r.Context())
-	err := h.svc.Grant(
+	err = h.svc.Grant(
 		r.Context(),
 		strings.TrimSpace(req.UserID),
-		tenantIDFromRequest(r),
+		tenantID,
 		strings.TrimSpace(req.AreaCode),
 		iamdomain.Role(strings.ToLower(strings.TrimSpace(req.Role))),
 		grantedBy,
@@ -87,7 +98,7 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"userId":   strings.TrimSpace(req.UserID),
-		"tenantId": tenantIDFromRequest(r),
+		"tenantId": tenantID,
 		"areaCode": strings.TrimSpace(req.AreaCode),
 		"role":     strings.ToLower(strings.TrimSpace(req.Role)),
 	})
@@ -107,7 +118,13 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 	}
 	revokedBy := authn.UserIDFromContext(r.Context())
 
-	err := h.svc.Revoke(r.Context(), userID, tenantIDFromRequest(r), areaCode, revokedBy)
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+
+	err = h.svc.Revoke(r.Context(), userID, tenantID, areaCode, revokedBy)
 	if err != nil {
 		h.writeMembershipError(w, err, "Failed to revoke membership")
 		return
@@ -126,12 +143,8 @@ func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err erro
 	}
 }
 
-func tenantIDFromRequest(r *http.Request) string {
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		return tenant.DevTenantID
-	}
-	return tenantID
+func tenantIDFromRequest(r *http.Request) (string, error) {
+	return tenant.FromContext(r.Context())
 }
 
 func writeMembershipAPIError(w http.ResponseWriter, status int, code, message string) {

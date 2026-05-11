@@ -51,7 +51,11 @@ func (h *ExportHandler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *rate
 
 func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 	userID := userIDFromReq(r)
 
 	req := exportPDFReq{PaperSize: "A4"}
@@ -93,7 +97,11 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 
 func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 	userID := userIDFromReq(r)
 
 	signedURL, err := h.svc.SignedDocxURL(r.Context(), tenantID, userID, docID)

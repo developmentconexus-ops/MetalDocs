@@ -15,6 +15,7 @@ import (
 	approvalsignature "metaldocs/internal/modules/documents/approval/infra/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeDecisionService struct {
@@ -45,7 +46,7 @@ func TestSignoffHandler_HappyApprove(t *testing.T) {
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req.Header.Set("If-Match", "v3")
@@ -88,6 +89,7 @@ func TestSignoffHandler_HappyReject(t *testing.T) {
 
 	body := `{"decision":"reject","reason":"wrong value","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req.Header.Set("If-Match", "v2")
@@ -113,6 +115,7 @@ func TestSignoffHandler_SoDViolation(t *testing.T) {
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req.Header.Set("If-Match", "v1")
@@ -131,6 +134,7 @@ func TestSignoffHandler_SignatureInvalid(t *testing.T) {
 
 	body := `{"decision":"approve","reason":"","password_token":"bad","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req.Header.Set("If-Match", "v1")
@@ -149,6 +153,7 @@ func TestSignoffHandler_ContentHashMismatch(t *testing.T) {
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req.Header.Set("If-Match", "v1")
@@ -167,6 +172,7 @@ func TestSignoffHandler_MissingIdempotencyKey(t *testing.T) {
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("If-Match", "v1")
 
@@ -191,6 +197,7 @@ func TestSignoffHandler_MissingIfMatch(t *testing.T) {
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 
@@ -208,6 +215,7 @@ func TestSignoffHandler_MalformedIfMatch(t *testing.T) {
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req.Header.Set("If-Match", "invalid")
@@ -289,7 +297,7 @@ func TestSignoffByDocumentHandler_ReplayAfterClose(t *testing.T) {
 	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/signoff", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	req.Header.Set("Idempotency-Key", "idem-replay")
 
