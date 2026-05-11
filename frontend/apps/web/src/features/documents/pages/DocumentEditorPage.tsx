@@ -181,11 +181,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     () => localStorage.getItem('editor-sidebar-open') !== 'false'
   );
 
-  const autosaveState: AutosaveState =
-    autosave.status === 'saving' ? 'saving' :
-    autosave.status === 'error' ? 'error' :
-    autosave.status === 'saved' ? 'saved' :
-    'idle';
+  // AutosaveState (7-state) is structurally identical to useDocumentAutosave.AutosaveStatus.
+  const autosaveState: AutosaveState = autosave.status;
 
   const statusForPill: DocumentStatus | null = (() => {
     if (!docStatus) return null;
