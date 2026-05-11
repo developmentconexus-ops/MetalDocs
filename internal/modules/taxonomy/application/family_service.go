@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -9,11 +10,12 @@ import (
 )
 
 type FamilyService struct {
-	families domain.FamilyRepository
+	families  domain.FamilyRepository
+	govLogger domain.GovernanceLogger
 }
 
-func NewFamilyService(families domain.FamilyRepository) *FamilyService {
-	return &FamilyService{families: families}
+func NewFamilyService(families domain.FamilyRepository, govLogger domain.GovernanceLogger) *FamilyService {
+	return &FamilyService{families: families, govLogger: govLogger}
 }
 
 func (s *FamilyService) List(ctx context.Context, includeInactive bool) ([]domain.DocumentFamily, error) {
@@ -26,7 +28,19 @@ func (s *FamilyService) Get(ctx context.Context, code string) (*domain.DocumentF
 
 func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) error {
 	f.IsActive = true
-	return s.families.Create(ctx, f)
+	if err := s.families.Create(ctx, f); err != nil {
+		return err
+	}
+	if s.govLogger != nil {
+		payload, _ := json.Marshal(map[string]string{"code": f.Code, "name": f.Name})
+		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
+			EventType:    "family.created",
+			ResourceType: "document_family",
+			ResourceID:   f.Code,
+			PayloadJSON:  payload,
+		})
+	}
+	return nil
 }
 
 func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*domain.DocumentFamily, error) {
@@ -41,6 +55,15 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	existing.Description = f.Description
 	if err := s.families.Update(ctx, existing); err != nil {
 		return nil, err
+	}
+	if s.govLogger != nil {
+		payload, _ := json.Marshal(map[string]string{"code": existing.Code, "name": existing.Name})
+		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
+			EventType:    "family.updated",
+			ResourceType: "document_family",
+			ResourceID:   existing.Code,
+			PayloadJSON:  payload,
+		})
 	}
 	return existing, nil
 }
@@ -60,5 +83,17 @@ func (s *FamilyService) Deactivate(ctx context.Context, code string) error {
 	if err := f.Deactivate(); err != nil {
 		return err
 	}
-	return s.families.Update(ctx, f)
+	if err := s.families.Update(ctx, f); err != nil {
+		return err
+	}
+	if s.govLogger != nil {
+		payload, _ := json.Marshal(map[string]string{"code": code})
+		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
+			EventType:    "family.deactivated",
+			ResourceType: "document_family",
+			ResourceID:   code,
+			PayloadJSON:  payload,
+		})
+	}
+	return nil
 }
