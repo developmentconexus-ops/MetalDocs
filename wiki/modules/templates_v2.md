@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates_v2/` and routes still mount under `/api/v2/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates_v2 is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates_v2-refactor.md#R-101`).
 
-**Last verified:** 2026-05-10 · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment)
+**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment)
 
 ---
 
@@ -453,9 +453,11 @@ Top 3 (by severity, then blast-radius):
 - Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0003-token-syntax-migration.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0008-placeholder-fixed-catalog.md`, `wiki/decisions/0012-contract-first-api.md`
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`, `wiki/concepts/iso-segregation.md`, `wiki/concepts/error-ux.md`, `wiki/concepts/authz-tiers.md`
 - Downstream module: `wiki/modules/documents.md` (consumes published versions; snapshots placeholder schema at finalize)
+- Taxonomy coupling: `wiki/modules/taxonomy.md` — taxonomy's `TemplateVersionChecker` (`infrastructure/template_version_checker.go:11`) READ-joins `templates_v2_template_version` + `templates_v2_template` to verify `IsPublished` when binding a profile's default template; taxonomy §3.2 documents this IN-edge
 - Approval coupling: `wiki/modules/approval.md` (SoD probing of template author identity — iam T-003)
 - Editor coupling: `wiki/modules/editor-ui-eigenpal.md`, `wiki/modules/editor-chrome.md`
 - Predecessor wiki stub: `wiki/modules/templates-v2.md` (kebab dash) — frontend-heavy; will be retired (see `backlog/templates_v2-refactor.md#R-100`).
+- See also: [`modules/registry.md`](registry.md) — registry holds a FK (`controlled_documents.template_version_id`) to published template versions; registry T-008 tracks the shared taxonomy audit-sink coupling that also affects this module
 - Backlog: `wiki/backlog/templates_v2-refactor.md`
 - Tech debt: `wiki/modules/templates_v2-tech-debt.md`
 

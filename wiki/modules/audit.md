@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-10 · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
+**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` — `Event`, `ListEventsQuery`, `Writer`, `Reader`
@@ -339,6 +339,8 @@ Top 3 (by severity, then by blast-radius):
 - Related ADRs: `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0012-contract-first-api.md`
 - Related concepts: `wiki/concepts/iso-segregation.md`, `wiki/concepts/error-ux.md`, `wiki/concepts/authz-tiers.md`
 - Consumer-side audit debt: `wiki/modules/auth-tech-debt.md#T-002`, `wiki/modules/iam-tech-debt.md` (T-005), `wiki/modules/documents-tech-debt.md#T-005`, `wiki/modules/documents-tech-debt.md#T-007`
+- Parallel-sink peer: `wiki/modules/taxonomy.md` — taxonomy's `DBGovernanceLogger` writes regulated events to `governance_events` instead of consuming `auditdomain.Writer`; taxonomy T-010 + §8.6 document this two-sink gap; registry reuses the same logger (`registry/module.go:31`) — see also registry T-008
+- See also: [`modules/registry.md §8.5`](registry.md#85-audit--governance) — registry's create path emits via the taxonomy governance-events sink (T-008: cross-module coupling); Obsolete/Supersede emit no audit event (registry T-002 Critical)
 - Backlog: `wiki/backlog/audit-refactor.md`
 - Tech debt: `wiki/modules/audit-tech-debt.md`
 - Artifacts: `wiki/modules/audit/_artifacts/`

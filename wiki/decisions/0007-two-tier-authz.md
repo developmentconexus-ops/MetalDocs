@@ -1,7 +1,7 @@
 # ADR 0007 — Two-Tier Authorization
 
 > **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected); cross-linked documents consumer 2026-05-10
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-11
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.
 > **Key files:**
@@ -89,3 +89,4 @@ Full spike notes: `docs/superpowers/notes/2026-05-10-authz-codegen-feasibility.m
 - [`wiki/modules/iam.md`](../modules/iam.md) — full Arc42 + C4 living architecture doc for `internal/modules/iam`; §5.4 covers the third authz surface (`AuthorizationService`)
 - [`wiki/modules/documents.md §8.1`](../modules/documents.md#81-authentication--authorization) — documents consumer: tier-1 role gate, tier-2 `authz.Require("doc.submit", …)`, `CapabilityChecker` adapter (`wiring/documents.go:24`), tripwire on approval tables; gap T-003 (no trigger on `documents` table itself)
 - [`wiki/modules/auth.md`](../modules/auth.md) — canonical auth module doc; §8.1 covers how auth's middleware injects `iamdomain.WithAuthContext` so tier-1 and tier-2 checks have an actor; tier-0 session enforcement sits here, upstream of both authz tiers
+- [`wiki/modules/registry.md §8.1`](../modules/registry.md#81-authentication--authorization) — registry is a known partial-adoption module: tier-1 wired for POST create; tier-2 and tier-3 absent on all routes (T-001, T-004 in registry-tech-debt.md)

@@ -2,7 +2,7 @@
 
 > **Status:** Accepted
 > **Date:** 2026-05-07
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-11
 > **Scope:** How controlled documents are created, numbered, and made idempotent.
 > **Out of scope:** System-wide idempotency rollout (future ADR), visibility enforcement (see `backlog/novo-documento.md#visibility`).
 > **Key files:**
@@ -53,3 +53,4 @@ Deliver numbering fix, atomic create, and idempotency in a single PR so the thre
 - `wiki/concepts/controlled-documents.md` — updated endpoint docs
 - [`wiki/modules/documents.md §5`](../modules/documents.md#5-building-block-view-c4-level-2--container) — `CreateDocumentTx` port in the Container diagram; registry calls the port inside the shared `*sql.Tx`
 - `wiki/modules/approval.md` — signoff idempotency store (now uses shared platform)
+- [`wiki/modules/registry.md §6.1`](../modules/registry.md#61-atomiccreatecontrolleddocument) — full sequence diagram + state transitions for the atomic create flow implemented by this decision
