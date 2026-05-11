@@ -16,13 +16,13 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ## Items
 
-### T-001 · Tenant header trusted as authoritative on writes
-- **Severity:** critical
-- **Surface:** `internal/modules/taxonomy/delivery/http/routes_profiles.go:197-203` (`tenantIDFromRequest`); `internal/modules/taxonomy/delivery/http/routes_areas.go` (mirror); `internal/modules/taxonomy/infrastructure/repository.go:102-104` (INSERT uses `p.TenantID`); `apps/api/cmd/metaldocs-api/permissions.go:158-180` (tier-1 cap check does not enforce tenant binding)
-- **Observation:** `tenantIDFromRequest` reads `X-Tenant-ID` from the request and falls back to `tenant.DevTenantID` (`internal/platform/tenant/const.go:1-4`). The handler inserts this UUID into `document_profiles.tenant_id` / `document_process_areas.tenant_id` with no verification that the authenticated user belongs to that tenant. A caller with `taxonomy.manage` in tenant A can therefore create or update profiles/areas in tenant B by setting the header. Reads on profile + area list/get respect the header similarly — same cross-tenant probe surface. Trigger fired: multi-tenant data leak path (Critical).
-- **Evidence:** `_artifacts/02-flow-create-profile.md` §4 (trust chain); `_artifacts/03-deps.md` §1 (`internal/platform/tenant` import); `_artifacts/05-industry.md` IP-008.
-- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-001`
-- **Linked ADR:** missing-ADR
+### T-001 · Tenant header trusted as authoritative on writes — **RESOLVED Plan 3**
+- **Severity:** critical → **resolved**
+- **Surface:** `internal/modules/taxonomy/delivery/http/routes_profiles.go:230-231` (`tenantIDFromRequest`).
+- **Resolution (2026-05-11):** `tenantIDFromRequest` now calls `tenant.FromContext(r.Context())` (Plan 3 module sweep). The `X-Tenant-ID` header is stripped by auth middleware (`auth/delivery/http/middleware.go:87-88`) before reaching taxonomy handlers. Tenant is sourced from the session-bound `auth_sessions.tenant_id` (migration 0184). Cross-tenant write via header forgery is closed. Residual gap: no GUC/RLS row-level enforcement at DB layer (T-006 tracks this).
+- **Evidence:** `_artifacts/02-flow-create-profile.md` §4 (trust chain — now stale); `_artifacts/03-deps.md` §1 (`internal/platform/tenant` import); `_artifacts/05-industry.md` IP-008.
+- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-001` (can be closed)
+- **Linked ADR:** `wiki/architecture/tenant-context.md`
 
 ### T-002 · `document_families` globally shared with no ADR
 - **Severity:** critical

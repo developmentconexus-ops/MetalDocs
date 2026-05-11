@@ -8,8 +8,11 @@
 > - `internal/modules/registry/module.go:25` — module wiring (`New`, dependencies)
 > - `internal/modules/registry/application/service.go:104` — `RegistryService.Create` (atomic create)
 > - `internal/modules/registry/application/service.go:293` — `Obsolete` / `Supersede` via `changeStatus`
+> - `internal/modules/registry/delivery/http/handler.go:48` — `injectTenant` middleware (reads tenant via `tenant.FromContext`)
+> - `internal/modules/registry/delivery/http/handler.go:60` — `tenantIDFromContext` (local context accessor)
 > - `internal/modules/registry/delivery/http/routes.go:43` — `AtomicCreateControlledDocument` handler
 > - `internal/modules/registry/delivery/http/routes.go:205` — `GetActiveDocument` handler (FULL OUTER JOIN)
+> - `internal/modules/registry/delivery/http/routes.go:489` — `tenantIDFromRequest` → `tenant.FromContext`
 > - `internal/modules/registry/domain/document_initializer.go:30` — `DocumentInitializer` port (consumed by documents)
 > - `internal/modules/registry/infrastructure/repository.go:184` — `UpdateStatus` (lifecycle mutation)
 > - `migrations/0124_registry_controlled_documents.sql` — initial table
@@ -168,7 +171,7 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 | GET | `/api/v2/controlled-documents/preview-code` | `previewControlledDocumentCode` | `routes.go:127` | (read; resolver mapping outside module) |
 | GET | `/api/v2/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
 | GET | `/api/v2/controlled-documents/{id}` | `getControlledDocument` | `routes.go:190` | (read) |
-| GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:205` | (read; tenant from `X-Tenant-ID` header — T-006) |
+| GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:205` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
 | PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | (unclear — T-001) |
 | PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | (unclear — T-001) |
 
@@ -241,7 +244,7 @@ sequenceDiagram
     participant C as Client
     participant H as Handler
     participant DB as Postgres
-    C->>H: GET /controlled-documents/{id}/active-document  (X-Tenant-ID)
+    C->>H: GET /controlled-documents/{id}/active-document  (tenant from context via injectTenant)
     H->>DB: FULL OUTER JOIN (documents active LEFT JOIN documents published)
     DB-->>H: row (active OR pub OR both)
     alt approval row exists
@@ -257,7 +260,7 @@ sequenceDiagram
 
 State transitions: none (read).
 
-Tripwire pairing: VIOLATION — no `authz.Require`, no `metaldocs.assert_caps`, no GUC; tenant scoped only via `$1::uuid` arg from `X-Tenant-ID` header. See T-006.
+Tripwire pairing: VIOLATION — no `authz.Require`, no `metaldocs.assert_caps`, no GUC; tenant is now sourced from `tenant.FromContext` (via `injectTenant` middleware) rather than `X-Tenant-ID` header (Plan 3 fix). Authz gap on this read path persists — see T-006.
 
 Detail: `_artifacts/02-flow-get-active.md`.
 
@@ -345,6 +348,8 @@ Create path emits governance events post-commit via `s.govLogger.Log(...)` (`ser
 ### 8.7 Tenant scoping
 
 `controlled_documents.tenant_id NOT NULL`; `cd_sequence_counters` PK includes `tenant_id`. Indexes lead with `tenant_id` (`ix_controlled_documents_tenant_area`, `ix_controlled_documents_tenant_profile`). Tenant is enforced via query-argument predicate in every WHERE clause; no `SET LOCAL metaldocs.tenant_id` GUC + RLS (T-005). `migrations/0127_documents_v2_tenant_consistency_trigger.sql` cross-checks tenant on `documents_v2` writes (legacy bridge).
+
+Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middleware (`delivery/http/handler.go:48`), which reads the value injected by auth middleware (from `auth_sessions.tenant_id`). This replaces the prior `X-Tenant-ID` header reads (Plan 3 sweep). See `wiki/architecture/tenant-context.md`.
 
 ### 8.8 Numbering invariants
 
@@ -436,4 +441,5 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-05-11 — Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; §5.3 T-006 note updated; §6.2 sequence + tripwire note updated; §8.7 tenant-scoping paragraph added; Key files updated.
 - 2026-05-11 — initial Arc42 + C4 publish; supersedes 2026-05-07 stub.

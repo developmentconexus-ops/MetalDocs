@@ -13,7 +13,7 @@
 > - `internal/modules/taxonomy/application/profile_service.go:14` — `ProfileService` (panics if govLogger nil; Create/Update do not call it)
 > - `internal/modules/taxonomy/application/area_service.go:14` — `AreaService` (Archive logs; Create/Update do not)
 > - `internal/modules/taxonomy/delivery/http/handler.go:51-68` — 16 routes mounted on raw `net/http.ServeMux`
-> - `internal/modules/taxonomy/delivery/http/routes_profiles.go:197-203` — `tenantIDFromRequest` (trusts `X-Tenant-ID`; falls back to `tenant.DevTenantID`)
+> - `internal/modules/taxonomy/delivery/http/routes_profiles.go:230-231` — `tenantIDFromRequest` (delegates to `tenant.FromContext`; Plan 3 removed header trust)
 > - `internal/modules/taxonomy/infrastructure/repository.go:102` — `ProfileRepository.Create` (no tx, no `authz.Require`)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:91-99` — `HasActiveProfiles` (no tenant predicate; TOCTOU race with `Update`)
 > - `apps/api/cmd/metaldocs-api/permissions.go:158-180` — path-prefix capability dispatcher (PATCH /families/{code} not matched → falls through)
@@ -61,7 +61,7 @@
 - HTTP routing: raw `net/http.ServeMux` (`handler.go:51-68`). **No OpenAPI spec**, no oapi-codegen — divergence from ADR 0012 (T-009)
 - Error envelope: legacy `{"code","message"}` via `internal/platform/httpresponse/response.go:14-16`; not RFC 9457 (T-008)
 - Authz: tier-1 path-prefix dispatcher only; no `authz.Require` (`internal/platform/authz` not imported); no DB tripwire / `assert_caps` GUC on any taxonomy table (T-006)
-- Tenant scoping: application-layer only via `X-Tenant-ID` header (no `set_local_tenant_id` GUC anywhere in `internal/`)
+- Tenant scoping: application-layer only via `tenant.FromContext` (Plan 3 replaced `X-Tenant-ID` header reads; no `set_local_tenant_id` GUC anywhere in `internal/`)
 
 ---
 
@@ -223,7 +223,7 @@ sequenceDiagram
     participant R as ProfileRepository.Create
     participant DB as document_profiles
     C->>H: POST /api/v2/taxonomy/profiles {code,familyCode,...}
-    H->>T: X-Tenant-ID (fallback DevTenantID)
+    H->>T: tenant.FromContext (session-bound tenant_id, Plan 3)
     T-->>H: tenantID (TRUSTED — no verification)
     H->>S: Create(ctx, DocumentProfile{TenantID, ...})
     S->>R: Create(ctx, profile)
@@ -304,7 +304,7 @@ Failure modes — reference `wiki/concepts/error-ux.md`:
 - See `wiki/decisions/0007-two-tier-authz.md` — taxonomy is non-conformant (T-006).
 
 ### 8.2 Tenant scoping
-- `tenant.DevTenantID` (`internal/platform/tenant/const.go:1-4`) is the fallback when `X-Tenant-ID` header is absent (`routes_profiles.go:197-203`). Handler trusts the header value as authoritative and inserts it into `document_profiles.tenant_id` / `document_process_areas.tenant_id` (T-001).
+- Tenant now sourced from `tenant.FromContext` (`routes_profiles.go:230-231`). Plan 3 replaced the `X-Tenant-ID` header reads; `tenant.DevTenantID` is no longer a fallback at this layer — if context lacks a tenant, `ErrTenantMissing` returns 500. T-001 (header trust) is resolved; see `taxonomy-tech-debt.md` T-001.
 - `document_families` has no `tenant_id` — globally shared across tenants. Mutation blast radius extends to every tenant's UI/registry (T-002).
 - No DB-level tenant predicate guard: `HasActiveProfiles` scans across all tenants (T-007 cross-tenant probe surface).
 
@@ -356,7 +356,7 @@ Failure modes — reference `wiki/concepts/error-ux.md`:
 
 | Goal | Scenario | Pass criteria | Current state |
 |---|---|---|---|
-| Multi-tenant isolation | Authn'd user in tenant A POSTs `/profiles` with `X-Tenant-ID: <tenant B>` | 403; no insert | **FAILS** — header trusted, insert proceeds (T-001) |
+| Multi-tenant isolation | Authn'd user in tenant A POSTs `/profiles` with forged `X-Tenant-ID` header | 403; no insert | **PASSES** after Plan 3 — header stripped by auth middleware; tenant from session (`tenant.FromContext`) |
 | Authz on regulated mutations | Authn'd user without `taxonomy.manage` PATCHes `/families/{code}` | 403 | **FAILS** — PATCH not in dispatcher (T-003) |
 | Regulated-mutation traceability | `Create`/`Update`/`Deactivate` on family/profile/area emits a governance event | grep shows ≥1 govLogger call per mutating service method | **FAILS** — FamilyService has no govLogger; Profile/Area Create + Update do not emit (T-004, T-005) |
 | Code immutability | Direct UPDATE to `document_profiles.code` raises | trigger fires | PASSES (`0122:33-39`) |
@@ -377,7 +377,7 @@ Pointer-only. Body in `wiki/modules/taxonomy-tech-debt.md`. Severity rubric: see
 
 Top 3 (by severity, then by blast-radius):
 
-1. **Tenant header trusted as authoritative** — any authenticated caller can read/write any tenant's profiles + areas by setting `X-Tenant-ID`. Multi-tenant data leak + cross-tenant write. See tech-debt T-001.
+1. **Tenant header trust removed (Plan 3)** — `tenantIDFromRequest` now calls `tenant.FromContext`; `X-Tenant-ID` header is stripped by auth middleware before reaching taxonomy handlers. T-001 resolved. Residual: no GUC-based row-level isolation (tech-debt T-006).
 2. **`document_families` is globally shared with no ADR** — any caller with `taxonomy.manage` (held by `qms_admin` + `system_admin` in any tenant) mutates a row visible to every tenant. Cross-tenant blast on a regulated catalog. See tech-debt T-002.
 3. **PATCH /families/{code} bypasses the capability dispatcher** — falls through `permissions.go:174-180` (only POST/PUT/DELETE matched); unauthenticated network actor can update a globally-shared family. Authz bypass on regulated mutation. See tech-debt T-003.
 
@@ -392,7 +392,7 @@ Top 3 (by severity, then by blast-radius):
 | `process_area` | Per-tenant operational area with optional `parent_code` self-FK. Cycle prevention is application-layer. |
 | `taxonomy.manage` | IAM capability gating writes on all 16 taxonomy routes; held by `system_admin` (migration 0165) + `qms_admin` (migration 0169). |
 | `governance_events` | Module-local audit sink written via `DBGovernanceLogger`. Parallel to `audit.Writer`; not unified. |
-| `DevTenantID` | Compile-time UUID constant (`ffffffff-...`) used as fallback when `X-Tenant-ID` header is absent. |
+| `DevTenantID` | Compile-time UUID constant (`ffffffff-...`). After Plan 3, this is no longer the fallback in taxonomy handlers — `tenant.FromContext` errors out if no session tenant is present. Still used in auth's `AllowDevTenantFallback` mode for dev-only login. |
 | `archived_at` | Soft-archive timestamp on profile + area (per ADR 0010). Families use `is_active` boolean (predates ADR 0010). |
 | `code` | Primary key in all three entities; CHECK `^[a-z][a-z0-9_-]{1,63}$` (profile + area only). Immutable via trigger (profile + area only). |
 

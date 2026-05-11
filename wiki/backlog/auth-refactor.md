@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/auth-tech-debt.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Rows
 

@@ -67,15 +67,15 @@ The category names are useful only when paired with concrete triggers. Use the t
 ### T-005 · Tenant scoping via query arg only — no GUC + RLS backstop
 - **Severity:** major
 - **Surface:** `internal/modules/registry/infrastructure/repository.go:26`, `:36`, `:46`, `:57`, `:137`, `:184`, `:208`, `:239`
-- **Observation:** Every WHERE clause includes `tenant_id = $...` from the request context (sourced via `internal/platform/tenant` or `X-Tenant-ID` header). No `SET LOCAL metaldocs.tenant_id` GUC is issued before the query; no RLS policy on `controlled_documents` / `cd_sequence_counters`. A repository method that forgets the `tenant_id` predicate has no DB-level backstop. Defense-in-depth gap on a multi-tenant table.
+- **Observation:** Every WHERE clause includes `tenant_id = $...` from the request context (sourced via `tenant.FromContext` — Plan 3 removed the `X-Tenant-ID` header source). No `SET LOCAL metaldocs.tenant_id` GUC is issued before the query; no RLS policy on `controlled_documents` / `cd_sequence_counters`. A repository method that forgets the `tenant_id` predicate has no DB-level backstop. Defense-in-depth gap on a multi-tenant table.
 - **Evidence:** `_artifacts/04-persistence.md` §5; `_artifacts/05-industry.md` IP-008
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-005`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR
 
-### T-006 · GetActiveDocument: no authz, tenant from request header
+### T-006 · GetActiveDocument: no authz
 - **Severity:** major
 - **Surface:** `internal/modules/registry/delivery/http/routes.go:205-326`
-- **Observation:** Handler reads tenant from `X-Tenant-ID` request header (fallback dev constant via `platform/tenant.DevTenantID`); no `authz.Require` call; no `metaldocs.assert_caps`. Document content hashes, approval state, and published-revision IDs are returned to any caller that supplies a tenant id in the header. Cross-references `approval_instances` via `document_v2_id` predicate; surface is exposed wherever the gateway authn cookie maps to a tenant. Pending a centralized read-policy ADR, defense-in-depth gap.
+- **Observation:** No `authz.Require` call; no `metaldocs.assert_caps`. Document content hashes, approval state, and published-revision IDs are returned to any authenticated caller. **Plan 3 resolved the header-trust sub-issue** — tenant is now sourced from `tenant.FromContext` via `injectTenant` middleware (`handler.go:48`); the `X-Tenant-ID` header is stripped by auth middleware. The outstanding gap is the missing read-policy authz enforcement. Pending a centralized read-policy ADR, defense-in-depth gap.
 - **Evidence:** `_artifacts/02-flow-get-active.md` §2, §4
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-006`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR

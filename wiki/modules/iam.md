@@ -8,9 +8,10 @@
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require` (in-tx area check); system_admin bypass `:58`
 > - `internal/modules/iam/authz/context.go:13` — `ErrActorContextMissing` / `ErrTenantContextMissing`; `MustActorID` `:21`, `MustTenantID` `:34`
-> - `internal/modules/iam/delivery/http/middleware.go:31` — `NewMiddleware`; `Wrap` `:49`; `writeAPIError` `:129`
-> - `internal/modules/iam/delivery/http/admin_handler.go:82` — admin routes registration
-> - `internal/modules/iam/delivery/http/routes_memberships.go:30` — area-membership routes
+> - `internal/modules/iam/delivery/http/middleware.go:31` — `NewMiddleware`; `Wrap` `:49`; tenant resolution: prefers `tenant.FromContext`, falls back to `X-Tenant-ID` header then `DevTenantID` (legacy-header mode only)
+> - `internal/modules/iam/delivery/http/middleware.go:77` — `tenant.FromContext` call (primary tenant source post-Plan 3)
+> - `internal/modules/iam/delivery/http/admin_handler.go:82` — admin routes registration; `handleAdminOverview` reads `tenant.FromContext` at `:109`
+> - `internal/modules/iam/delivery/http/routes_memberships.go:30` — area-membership routes; `tenantIDFromRequest` delegates to `tenant.FromContext` at `:146`
 > - `internal/modules/iam/application/admin_service.go:23` — `UpsertUserAndAssignRole`
 > - `internal/modules/iam/application/area_membership_service.go:49` — `Grant` use case
 > - `internal/modules/iam/application/cached_role_provider.go:18` — TTL-cached role provider
@@ -67,7 +68,7 @@ IAM owns identity-derived authorization for MetalDocs: it answers "can user X pe
 - DB enforcement floor: `metaldocs.asserted_caps` GUC + `enforce_capability_asserted` trigger attached to `approval_instances` + `approval_signoffs` only.
 - IAM is NOT under oapi-codegen yet (ADR 0012 documents the partial rollout). Membership routes have no `operationId`; admin POST `/api/v1/iam/users/{userId}/roles` has request/response schemas (`api/openapi/v1/openapi.yaml:5043,5054`) but no codegen stub.
 - Error envelope: IAM emits `{error:{code,message,details,trace_id}}` (`delivery/http/middleware.go:129`) — does NOT yet match the RFC 9457 Problem envelope named in `wiki/architecture/api-design-system.md`.
-- Tenant sentinel: `DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` (`internal/platform/tenant/const.go:4`).
+- Tenant sentinel: `DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` (`internal/platform/tenant/const.go:4`). Primary tenant source is `tenant.FromContext` (injected by auth middleware from `auth_sessions.tenant_id`). IAM middleware falls back to `X-Tenant-ID` header only in legacy-header mode; see `wiki/architecture/tenant-context.md` for the full pattern.
 
 ---
 
@@ -439,7 +440,7 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
 - ADRs: [`decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md), [`decisions/0012-contract-first-api.md`](../decisions/0012-contract-first-api.md)
 - Concepts: [`concepts/authz-tiers.md`](../concepts/authz-tiers.md), [`concepts/iso-segregation.md`](../concepts/iso-segregation.md)
-- Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md)
+- Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md), [`architecture/tenant-context.md`](../architecture/tenant-context.md)
 - Modules: [`modules/approval.md`](approval.md) (tier-2 consumer), [`modules/documents.md`](documents.md) (tier-2 consumer), [`modules/templates-v2.md`](templates-v2.md) (predecessor frontend doc), [`modules/templates_v2.md`](templates_v2.md) (Arc42 backend doc — unenforced consumer of `template.*` capability namespace; T-001 tracks the enforcement gap), [`modules/auth.md`](auth.md) (bidirectional dep: auth imports `iamdomain`; `iam.AdminHandler` imports `authdomain.ManagedUser/OnlineUser/UpdateUserParams`)
 - See also: [`modules/audit.md`](audit.md) — iam `AdminHandler.recordAudit` calls `audit.Writer.Record` for role/user admin ops; T-005 tracks the gap where `handleUserRoleUpsert` does not yet emit
 - See also: [`modules/registry.md §8.1`](registry.md#81-authentication--authorization) — registry is a tier-1-only consumer of IAM (`registry.create` capability via `CapabilityService`); tier-2 `authz.Require` and tier-3 DB tripwire are absent on registry-owned tables (registry T-001, T-004)
@@ -449,4 +450,5 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
 ## Changelog
 
+- 2026-05-11 — Plan 3 (module sweep): IAM middleware now calls `tenant.FromContext` as primary tenant source; legacy fallback to `X-Tenant-ID` header preserved under `legacyHeader` mode; `handleAdminOverview` + `tenantIDFromRequest` updated; Key files, §2, cross-links updated.
 - 2026-05-10 — initial publish; supersedes retired `iam-rbac.md` stub. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.

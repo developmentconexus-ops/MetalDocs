@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/templates_v2.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates_v2-refactor.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11
 
 ## Items
 
@@ -22,13 +22,13 @@
 - **Linked backlog row:** `backlog/templates_v2-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · `X-Tenant-ID` header trusted with `DevTenantID` fallback
-- **Severity:** critical
-- **Surface:** `internal/modules/templates_v2/delivery/http/handler.go:84-89` (`tenantIDFromReq`).
-- **Observation:** Helper reads `X-Tenant-ID` request header; if empty, returns `tenant.DevTenantID`. No verification against an authenticated subject's tenant claim. Any client can set the header to read or write into any tenant. Combined with T-001 (no authz), a publicly reachable instance accepts unauthenticated mutations against an arbitrary `tenant_id`. The fallback to `DevTenantID` in production silently funnels header-less clients into the dev tenant.
+### T-003 · `X-Tenant-ID` header trusted with `DevTenantID` fallback — **RESOLVED Plan 3**
+- **Severity:** critical → **resolved**
+- **Surface:** `internal/modules/templates_v2/delivery/http/handler.go:83-84` (`tenantIDFromReq`).
+- **Resolution (2026-05-11):** `tenantIDFromReq` now delegates to `tenant.FromContext(r.Context())` (Plan 3 module sweep). Tenant is injected into the request context by the auth middleware from the session-bound `tenant_id` (`auth_sessions.tenant_id`, migration 0184). The `X-Tenant-ID` header is stripped by auth middleware before reaching this handler. The residual risk is that T-001 (nil authz) still allows unauthenticated mutations, but tenant forging via header is closed.
 - **Evidence:** `_artifacts/02-flow-list.md`, `_artifacts/05-industry.md` IP-008.
-- **Linked backlog row:** `backlog/templates_v2-refactor.md#R-003`
-- **Linked ADR:** missing-ADR
+- **Linked backlog row:** `backlog/templates_v2-refactor.md#R-003` (can be closed)
+- **Linked ADR:** `wiki/architecture/tenant-context.md`
 
 ### T-004 · `PublishTemplateVersion` bypasses approval lifecycle (no SoD, no role check, no content_hash gate)
 - **Severity:** critical

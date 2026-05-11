@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates_v2/` and routes still mount under `/api/v2/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates_v2 is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates_v2-refactor.md#R-101`).
 
-**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment)
+**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied)
 
 ---
 
@@ -222,8 +222,8 @@ sequenceDiagram
     participant S as Service
     participant R as Repository
     participant DB as Postgres
-    C->>H: GET /api/v2/templates (header X-Tenant-ID)
-    H->>H: tenantIDFromReq(r) → header or DevTenantID fallback
+    C->>H: GET /api/v2/templates
+    H->>H: tenantIDFromReq(r) → tenant.FromContext (Plan 3: no longer reads X-Tenant-ID header)
     H->>H: authz(r, tenant, area, action) → no-op (nil-authz fallback)
     H->>S: List(ctx, ListFilter{TenantID, DocTypeCode, Areas, Visibility, IncludeArchived})
     S->>R: ListTemplates(ctx, filter)
@@ -240,7 +240,7 @@ Failure modes:
 |---|---|---|
 | empty result | 200 | `{"templates":[]}` |
 | db error | 500 | `{"error":{"code":"internal","message":"..."}}` (legacy envelope — T-005) |
-| forged `X-Tenant-ID` header | 200 | rows from any tenant the header names (T-003) |
+| tenant not in context (no active session) | 500 | `INTERNAL_ERROR` — `tenant.FromContext` returns `ErrTenantMissing`; resolved by T-003 fix (Plan 3) |
 
 ### 6.2 UpdateSchema (write — placeholder catalog enforcement) — `PUT /api/v2/templates/{id}/versions/{n}/schema`
 
@@ -380,7 +380,7 @@ Failure modes:
 
 ### 8.7 Tenant scoping
 
-- `tenantIDFromReq(r)` (handler.go:84) trusts `X-Tenant-ID` header with `tenant.DevTenantID` fallback. See T-003.
+- `tenantIDFromReq(r)` (handler.go:83) now calls `tenant.FromContext` — Plan 3 resolved T-003 (header trust removed).
 - `Repository.GetVersion(template_id, version_number)` and `GetVersionByID(version_id)` accept no tenant argument. The service layer fronts these with `GetTemplate(tenant, template_id)` as a "tenant gate" at most call sites — `CreateNextVersion` (`create.go:126`) bypasses the gate when `template.PublishedVersionID` is non-nil, calling `GetVersionByID` directly. See T-002.
 
 ### 8.8 Placeholder catalog enforcement
@@ -429,7 +429,7 @@ Pointer-only. Body lives in `wiki/modules/templates_v2-tech-debt.md`.
 Top 3 (by severity, then blast-radius):
 
 1. **Authz wired `nil` everywhere** (`handler.go:25-27` + `main.go:329`) — every route is open. All seven repo mutations land without capability assertion. — see tech-debt §T-001
-2. **`X-Tenant-ID` header trusted with `DevTenantID` fallback** (`handler.go:84-89`) — any client picks the tenant for read or write. Multi-tenant cutover ships an open door. — see tech-debt §T-003
+2. **Tenant now sourced from `tenant.FromContext`** (`handler.go:83`) — Plan 3 closed the header-trust gap (T-003 resolved). Residual: T-001 (nil authz) still allows unauthenticated mutations for users who bypass the session gate.
 3. **`PublishTemplateVersion` bypasses the entire approval lifecycle** (`lifecycle.go:265`) — draft → published in one call, no role check, no SoD, no content_hash gate. Published rows can lack the regulated approval chain ISO 9001 §7.5 requires. — see tech-debt §T-004
 
 ---

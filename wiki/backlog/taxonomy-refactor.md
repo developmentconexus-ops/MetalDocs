@@ -8,7 +8,7 @@
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
-| R-001 | Verify authenticated user belongs to claimed tenant before honouring X-Tenant-ID; reject on mismatch | T-001 | M | Critical | — | — | open | — |
+| R-001 | Verify authenticated user belongs to claimed tenant before honouring X-Tenant-ID; reject on mismatch | T-001 | M | Critical | — | — | **done** | Plan 3 (2026-05-11) |
 | R-002 | Add ADR + migration: backfill tenant_id on document_families OR document the global-by-design choice with a threat model and lock-down policy | T-002 | L | Critical | — | — | open | — |
 | R-003 | Add MethodPatch to the families branch of permissions.go path-prefix dispatcher (line 174-180) | T-003 | XS | Critical | — | — | open | — |
 | R-004 | Wire DBGovernanceLogger into FamilyService; emit on Create/Update/Deactivate | T-004 | S | Critical | — | — | open | — |
