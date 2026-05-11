@@ -135,6 +135,10 @@ func (h *Handler) writeAuthError(w http.ResponseWriter, err error, traceID strin
 		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), traceID)
 	case errors.Is(err, authdomain.ErrIdentityInactive):
 		writeAPIError(w, http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive", traceID)
+	case errors.Is(err, authdomain.ErrTenantNotPermitted):
+		writeAPIError(w, http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant", traceID)
+	case errors.Is(err, authdomain.ErrTenantClaimRequired):
+		writeAPIError(w, http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required — user belongs to multiple tenants", traceID)
 	default:
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error", traceID)
 	}
