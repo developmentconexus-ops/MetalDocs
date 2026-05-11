@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/templates_v2.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates_v2-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 5)
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Items
 
@@ -104,8 +104,8 @@
 - **Linked backlog row:** `backlog/templates_v2-refactor.md#R-012`
 - **Linked ADR:** `wiki/decisions/0002-zone-purge.md` (decision exists; column persistence is the residual debt) — missing-ADR for the deferral itself.
 
-### T-013 · Module-local `templates_v2_audit_log` parallel to canonical `metaldocs.audit_events`
-- **Severity:** minor
+### T-013 · Module-local `templates_v2_audit_log` parallel to canonical `metaldocs.audit_events` — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** minor (closed)
 - **Surface:** `migrations/0120_templates_v2_init.sql` (CREATE `templates_v2_audit_log`); `internal/modules/templates_v2/repository/postgres.go:318` (`AppendAudit` writes only to the local sink).
 - **Observation:** MetalDocs has a canonical audit sink at `metaldocs.audit_events` (per `wiki/modules/audit.md`). templates_v2 writes to a module-local `templates_v2_audit_log` table instead. Two sinks of record means downstream queries (compliance export, forensic timeline) must union both — and a future canonical-sink consumer that does not know about the local sink will silently miss every templates_v2 event. Decision to fork was undocumented.
 - **Evidence:** `_artifacts/04-persistence.md` §1, §6.

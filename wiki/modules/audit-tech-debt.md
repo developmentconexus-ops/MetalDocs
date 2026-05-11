@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/audit.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/audit-refactor.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Severity scale
 
@@ -18,8 +18,8 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ## Items
 
-### T-001 · Unauthenticated `GET /api/v1/audit/events`
-- **Severity:** critical
+### T-001 · Unauthenticated `GET /api/v1/audit/events` — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** critical (closed)
 - **Surface:** `internal/modules/audit/delivery/http/handler.go:34-35` (route registration); `apps/api/cmd/metaldocs-api/permissions.go:211-221` (resolver default + public-path checker treat unregistered paths as public)
 - **Observation:** The route is mounted via `mux.HandleFunc("/api/v1/audit/events", h.handleEvents)` with zero auth middleware. The capability resolver has no rule for the path; the public-path checker therefore admits the request as public. Verified by grep — no `audit/events` rule in `permissions.go`. Any network-reachable client can read up to 200 audit rows per call, filtered by `resource_type`/`resource_id`. Confidentiality breach + tampering reconnaissance vector. Trigger fired: authn/authz bypass.
 - **Evidence:** `_artifacts/02-flow-list.md` §1, §6; `_artifacts/05-industry.md` IP-004.
@@ -34,8 +34,8 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · No retention or purge policy
-- **Severity:** major
+### T-003 · No retention or purge policy — CLOSED 2026-05-11 (Plan 6a, app-level goroutine)
+- **Severity:** major (closed)
 - **Surface:** `migrations/0004_init_audit_events.sql`; `migrations/0005_grant_workflow_audit_privileges.sql` (no follow-up retention migration); module code (no purge job, no partition, no TTL)
 - **Observation:** `metaldocs.audit_events` grows monotonically. No partitioning, no `pg_cron` job, no soft-delete, no archive offload. Regulated data has both retention-floor (ISO 9001 §7.5.3 record retention) and retention-ceiling (LGPD/GDPR right-to-erasure for personal data inside `payload`) obligations. Without a retention strategy, both ends fail: old records cannot be selectively purged when erasure is requested; storage growth is unbounded. Trigger fired: governance/compliance gap on a regulated path with measurable consumer impact (legal).
 - **Evidence:** `_artifacts/04-persistence.md` §6 ("none — table grows monotonically"); `_artifacts/05-industry.md` "Patterns deliberately NOT cited" — retention.
@@ -50,8 +50,8 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-004`
 - **Linked ADR:** missing-ADR
 
-### T-005 · Fire-and-forget Record discards emission errors
-- **Severity:** major
+### T-005 · Fire-and-forget Record discards emission errors — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** major (closed)
 - **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:457` (`_ = h.audit.Record(...)`); `apps/api/cmd/metaldocs-api/main.go:467` (adapter — logs error but emits no metric and does not propagate)
 - **Observation:** All consumer call sites discard or only log the Record error. There is no failure metric, no dead-letter queue, no alarm, no retry. On Postgres unavailability or PK collision (see T-006), the regulated action persists but the audit row is silently lost. Operator cannot detect dropped trail entries. Per user-supplied rubric, this is rated **Major** here because the drop happens *consumer-side* (audit module's port contract correctly returns the error — callers ignore it); the Critical-rated mirror lives in the consumer registers. Trigger fired: defense-in-depth + observability sink gap on regulated path.
 - **Evidence:** `_artifacts/02-flow-record.md` §6(c); `_artifacts/03-deps.md` §2b, §2c.
@@ -66,8 +66,8 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-006`
 - **Linked ADR:** missing-ADR
 
-### T-007 · No `tenant_id` column or tenant-scoped query path
-- **Severity:** major
+### T-007 · No `tenant_id` column or tenant-scoped query path — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** major (closed)
 - **Surface:** `migrations/0004_init_audit_events.sql:1-14` (schema); `internal/modules/audit/infrastructure/postgres/writer.go:50-57` (SELECT has no tenant filter)
 - **Observation:** `metaldocs.audit_events` has no `tenant_id` column. `ListEvents` filters by `resource_type` and `resource_id` only. When multi-tenant lands (auth T-008 plans `tenant_id` on identity tables), a tenant-A admin reading `/api/v1/audit/events` would see Tenant-B events. Latent today (single-tenant deploy); load-bearing on multi-tenant cutover. Trigger fired: multi-tenant data leak path (latent — single-tenant today, but the leak path is in code today).
 - **Evidence:** `_artifacts/04-persistence.md` §1; `_artifacts/05-industry.md` IP-008.

@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-05-11 (Plan 5)
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Severity scale
 
@@ -50,8 +50,8 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked backlog row:** `backlog/iam-refactor.md#R-004`
 - **Linked ADR:** [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) (documents tiers but does not address IAM-table coverage)
 
-### T-005 · Admin role upsert does not emit audit events
-- **Severity:** critical
+### T-005 · Admin role upsert does not emit audit events — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** critical (closed)
 - **Severity rationale:** triggers Critical rubric — "regulated audit-trail gap: a mutation on an ISO 9001 / QMS / regulated path is not written to the audit sink." Role assignment is the privileged op an external auditor inspects first; absence from the trail is a compliance break, not a service degradation.
 - **Surface:** `internal/modules/iam/delivery/http/admin_handler.go:319` (`handleUserRoleUpsert`) and `:454` (`recordAudit`)
 - **Observation:** `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not call `recordAudit` between request validation and response (artifact 02-flow-upsert-user-role §6). The audit sink is wired (`auditdomain.Writer` passed into `NewAdminHandler` at `main.go:182`; sink impl at `internal/modules/audit/infrastructure/postgres/writer.go:20`). Other admin ops do call `recordAudit`; this one does not.

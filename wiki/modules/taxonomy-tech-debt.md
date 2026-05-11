@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 5)
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Severity scale
 
@@ -40,16 +40,16 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-003`
 - **Linked ADR:** missing-ADR
 
-### T-004 · `FamilyService` has no govLogger — Create/Update/Deactivate emit no governance events
-- **Severity:** critical
+### T-004 · `FamilyService` has no govLogger — Create/Update/Deactivate emit no governance events — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** critical (closed)
 - **Surface:** `internal/modules/taxonomy/application/family_service.go:11-13` (struct has only `repo FamilyRepository`; no logger field); `internal/modules/taxonomy/module.go:30` (constructor wires `FamilyService` without the logger that `ProfileService`/`AreaService` receive); `_artifacts/02-flow-deactivate-family.md` §6 (audit emission: no)
 - **Observation:** Mutations on the globally-shared `document_families` (Create, Update, Deactivate) leave no governance-event row. Compared to ProfileService and AreaService, which both hold a `govLogger GovernanceLogger` field. ISO 9001 / QMS controls require traceability of catalog changes; the regulated path on the table with the widest blast radius (T-002) is the one that emits nothing. Trigger fired: regulated audit-trail gap (Critical, per rubric).
 - **Evidence:** `_artifacts/02-flow-deactivate-family.md` §6; module-wiring code at `module.go:22-31`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-004`
 - **Linked ADR:** missing-ADR
 
-### T-005 · ProfileService.Create/Update + AreaService.Create/Update do not emit governance events
-- **Severity:** critical
+### T-005 · ProfileService.Create/Update + AreaService.Create/Update do not emit governance events — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** critical (closed)
 - **Surface:** `internal/modules/taxonomy/application/profile_service.go:41` (`Create` — no `s.govLogger.Log` call); `:55` (`Update` — same); `internal/modules/taxonomy/application/area_service.go` (`Create`, `Update` — same); contrast `profile_service.go:77` (`SetDefaultTemplate` — emits) and `:98` (`Archive` — emits)
 - **Observation:** ProfileService panics if govLogger is nil at construction (`profile_service.go:14`) but does not call it on Create or Update — only on SetDefaultTemplate and Archive. AreaService follows the same pattern (Archive emits; Create + Update do not). Regulated tenant-scoped catalog mutations therefore leave a partial audit trail: archives + template re-points are observed, but the act of bringing the row into existence and renaming/redefining it is not. Trigger fired: regulated audit-trail gap (Critical, per rubric).
 - **Evidence:** `_artifacts/02-flow-create-profile.md` §6 ("Audit emission: no for createProfile … sibling ops SetDefaultTemplate and Archive DO emit").
@@ -89,8 +89,8 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009`
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md` (taxonomy is the residual unmigrated module)
 
-### T-010 · `DBGovernanceLogger` is a module-local parallel audit sink
-- **Severity:** major
+### T-010 · `DBGovernanceLogger` is a module-local parallel audit sink — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** major (closed)
 - **Surface:** `internal/modules/taxonomy/application/governance.go` (DBGovernanceLogger writes to `governance_events`); `internal/modules/audit/` (parallel `audit.Writer` writing to `metaldocs.audit_events`); `internal/modules/registry/module.go:31` (registry imports + reuses `taxonomyapp.NewDBGovernanceLogger`)
 - **Observation:** Taxonomy ships its own audit sink (`governance_events` table) instead of consuming `auditdomain.Writer`. Registry re-exports the taxonomy logger rather than wiring its own audit writer. Result: regulated mutation events live in two sinks with no shared schema, no shared `actor_id` resolution, no shared retention story. Auditor query for "all regulated actions in time T" must JOIN/UNION across both. Same gap surfaced in audit T-007 (cross-module). Trigger fired: duplicated write surfaces with divergent semantics for the same use case (Major).
 - **Evidence:** `_artifacts/03-deps.md` §2 (registry imports `taxonomyapp.NewDBGovernanceLogger`); `_artifacts/03-deps.md` §1 (`internal/audit` ABSENT from taxonomy OUT-edges).

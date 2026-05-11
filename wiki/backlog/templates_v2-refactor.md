@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/templates_v2-tech-debt.md`. Rows that lack a debt-id are blocked from grooming.
 
-**Last verified:** 2026-05-11 (Plan 5)
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Rows
 
@@ -20,7 +20,7 @@
 | R-010 | Enforce `ExpectedLockVersion` in `SaveTemplateDraft` — UPDATE … WHERE lock_version = $X; return 412 on mismatch | T-010 | S | Major | — | — | open | — |
 | R-011 | Add cursor pagination (Plan 2 cursor primitive) to `ListTemplates`; default page size 50 | T-011 | S | Minor | — | — | open | — |
 | R-012 | Drop `templates_v2_template_version.editable_zones` column (verify 0157 effect; emit corrective migration if needed) | T-012 | XS | Minor | — | — | open | — |
-| R-013 | Replace `templates_v2_audit_log` writes with canonical `metaldocs.audit_events` sink; backfill historical rows; drop the local table | T-013 | M | Minor | — | — | open | — |
+| R-013 | Replace `templates_v2_audit_log` writes with canonical `metaldocs.audit_events` sink; backfill historical rows; drop the local table | T-013 | M | Minor | — | — | merged | Plan 6a (2026-05-11, commit 71a2dc53) |
 | R-014 | Add Go doc comments to every exported symbol under `internal/modules/templates_v2/{domain,application,delivery,repository}/` | T-014 | S | Minor | — | — | open | — |
 | R-100 | Retire predecessor frontend-heavy stub `wiki/modules/templates-v2.md` (kebab) and repoint inbound links to `wiki/modules/templates_v2.md` | maint:doc-cleanup | XS | Minor | — | — | open | — |
 | R-101 | Rename module dir `internal/modules/templates_v2/` → `internal/modules/templates/`, flip routes `/api/v2/templates` → `/api/v1/templates`, rename wiki doc to `templates.md` (single follow-up commit) | maint:migration-cleanup | M | Minor | R-006 | — | open | — |

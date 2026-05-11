@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 5)
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Severity scale
 
@@ -42,8 +42,8 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-004
 - **Linked ADR:** missing-ADR
 
-### T-005 · `renameDocument` audit write happens outside the SQL UPDATE transaction
-- **Severity:** major
+### T-005 · `renameDocument` audit write happens outside the SQL UPDATE transaction — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** major (closed)
 - **Surface:** `internal/modules/documents/application/service.go:575` (UpdateDocumentName) · `internal/modules/documents/application/service.go:579` (s.audit.Write)
 - **Observation:** `Service.RenameDocument` issues a plain `ExecContext` UPDATE and then calls `s.audit.Write` as an independent operation — there is no transaction boundary wrapping both. A crash between the two leaves the table mutated with no governance event. Defense-in-depth gap; audit is the only sink for QMS rename trail.
 - **Evidence:** `_artifacts/02-flow-renameDocument.md` §2 ("Transaction boundary: NONE").
