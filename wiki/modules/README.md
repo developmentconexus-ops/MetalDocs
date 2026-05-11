@@ -1,6 +1,6 @@
 # Modules
 
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-11
 > **Scope:** Per-module deep dives. One file per backend module / frontend feature area.
 
 - [editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal integration layer (Last verified: 2026-05-10)
@@ -12,7 +12,8 @@
 - [documents.md](documents.md) — **Arc42 + C4** — document instance lifecycle; §5 Container view; §6 finalize trace; §8.1 two-tier authz + tripwire; `CreateDocumentTx` port; `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-10)
 - [documents-tech-debt.md](documents-tech-debt.md) — documents tech-debt register (T-001..T-010) (Last verified: 2026-05-10)
 - [registry.md](registry.md) — controlled-document catalog, code generation, active-document FULL OUTER JOIN (E10), registry detail page, PublishedDownloadCell (Last verified: 2026-05-04)
-- [taxonomy.md](taxonomy.md) — families (global), profiles, areas; CRUD routes, scoping distinction, deactivation guards (Last verified: 2026-05-02)
+- **[taxonomy.md](taxonomy.md)** — **Arc42 + C4 living doc** — taxonomy: document families (global), profiles, areas; 16 HTTP routes `/api/v2/taxonomy/*`; per-tenant scoping; deactivation guards; 5C/5M/6m debt; companion tech-debt register + refactor backlog (Last verified: 2026-05-11)
+- [taxonomy-tech-debt.md](taxonomy-tech-debt.md) — taxonomy tech-debt register (16 items: T-001..T-005 Critical; T-006..T-010 Major; T-011..T-016 Minor) (Last verified: 2026-05-11)
 - **[approval.md](approval.md)** — Arc42 + C4 living doc — 16-route sign-off chain; SoD, J1 eligibility, quorum, transactional outbox, 4-layer defense-in-depth authz; §6 Submit/Signoff/Inbox sequence diagrams (Last verified: 2026-05-10)
 - [approval-tech-debt.md](approval-tech-debt.md) — approval tech-debt register (12 items: T-001 RFC 9457 Critical; T-002 OpenAPI gap Critical; T-003..T-006 Major; T-007..T-012 Minor) (Last verified: 2026-05-10)
 - render-fanout.md — TBD (Last verified: 2026-05-04)

@@ -3,12 +3,12 @@
 > _Changelog: 2026-04-26 — rewritten for fixed-catalog model (ADR 0008); dropped legacy fill-in workflow content._
 > _Changelog: 2026-04-27 — composition system deprecated, UI removed (Phase 1)._
 >
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-11
 > **Scope:** What a placeholder is, the fixed 7-entry catalog, how tokens stay literal in the editor, and when substitution occurs.
 > **Out of scope:** Substitution engine internals (see `modules/render-fanout.md`), editor plugin wiring (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
 > - `packages/editor-ui/src/MetalDocsEditor.tsx:55` — eigenpal `templatePlugin` wired here (plugins array, mode-gated)
-> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — catalog panel, auto-detect via `getVariables()` (renamed from `TemplateAuthorPage` 2026-05-10)
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — catalog panel, auto-detect via `getVariables()` (renamed from `TemplateAuthorPage` 2026-05-11)
 > - `frontend/apps/web/src/features/templates/placeholder-types.ts` — `CatalogPlaceholder` type
 > - `internal/modules/templates_v2/application/validate_placeholders.go` — `ValidatePlaceholders` rejects non-catalog names
 > - `internal/modules/render/fanout/` — server-side substitution at freeze/finalize (Go)
@@ -103,6 +103,7 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
 - [modules/templates_v2.md §8.8](../modules/templates_v2.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
+- [modules/registry.md](../modules/registry.md) — owns the `controlled_documents` catalog; `{doc_code}` resolver source is the CD's `AutoCode` (`{PROFILE}-{AREA}-{NNN}`)
 
 ## Composition system (deprecated 2026-04-27)
 
@@ -126,4 +127,4 @@ Backend untouched:
 
 Future: when standardized blocks (revision history table, approval signatures) genuinely need to return, implement as **rich-content resolvers** — `{revision_history_table}` resolver returns OOXML table. User drops the placeholder where they want it in the eigenpal editor. One mental model: everything is a placeholder.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-11

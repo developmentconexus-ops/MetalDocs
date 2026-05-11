@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-10 · **Owner:** unassigned · **Status:** active (partial contract-first; partial defense-in-depth)
+**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (partial contract-first; partial defense-in-depth)
 
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
@@ -442,6 +442,7 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 - Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md)
 - Modules: [`modules/approval.md`](approval.md) (tier-2 consumer), [`modules/documents.md`](documents.md) (tier-2 consumer), [`modules/templates-v2.md`](templates-v2.md) (predecessor frontend doc), [`modules/templates_v2.md`](templates_v2.md) (Arc42 backend doc — unenforced consumer of `template.*` capability namespace; T-001 tracks the enforcement gap), [`modules/auth.md`](auth.md) (bidirectional dep: auth imports `iamdomain`; `iam.AdminHandler` imports `authdomain.ManagedUser/OnlineUser/UpdateUserParams`)
 - See also: [`modules/audit.md`](audit.md) — iam `AdminHandler.recordAudit` calls `audit.Writer.Record` for role/user admin ops; T-005 tracks the gap where `handleUserRoleUpsert` does not yet emit
+- See also: [`modules/registry.md §8.1`](registry.md#81-authentication--authorization) — registry is a tier-1-only consumer of IAM (`registry.create` capability via `CapabilityService`); tier-2 `authz.Require` and tier-3 DB tripwire are absent on registry-owned tables (registry T-001, T-004)
 - Backlog: [`backlog/iam-refactor.md`](../backlog/iam-refactor.md)
 - Tech debt: [`iam-tech-debt.md`](iam-tech-debt.md)
 - Source artifacts: [`iam/_artifacts/00-context.md`](iam/_artifacts/00-context.md) through [`05-industry.md`](iam/_artifacts/05-industry.md)
