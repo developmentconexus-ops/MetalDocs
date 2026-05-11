@@ -42,9 +42,9 @@ func NewHandler(svc *application.RegistryService, db *sql.DB) *Handler {
 	}
 }
 
-// injectTenant is a thin middleware that reads X-Tenant-ID from the request
-// header and stores it in the context so the idempotency actor closure can
-// access it without a reference to the *http.Request.
+// injectTenant is a thin middleware that reads the tenant from context (set by
+// auth middleware) and re-stores it under a local key so the idempotency actor
+// closure can access it without a reference to the *http.Request.
 func injectTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tid, err := tenant.FromContext(r.Context())
