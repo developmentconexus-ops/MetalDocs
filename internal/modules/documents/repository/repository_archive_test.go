@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -15,9 +16,27 @@ func TestMarkArchived_StampsTimestampWithoutStatusChange(t *testing.T) {
 	defer db.Close()
 	r := New(db)
 
+	mock.ExpectBegin()
+	// authz.Require: MustActorID
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("user-1"))
+	// authz.Require: MustTenantID
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("tenant-1"))
+	// authz.Require: system_admin check
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	// authz.Require: appendAssertedCap — read existing caps
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
+	// authz.Require: appendAssertedCap — write caps
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps'")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	// actual UPDATE
 	mock.ExpectExec(`UPDATE public\.documents`).
 		WithArgs("tenant-1", "doc-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	if err := r.MarkArchived(context.Background(), "tenant-1", "doc-1", "user-1"); err != nil {
 		t.Fatalf("MarkArchived: %v", err)
@@ -32,9 +51,27 @@ func TestUnarchive_ClearsTimestamp(t *testing.T) {
 	defer db.Close()
 	r := New(db)
 
+	mock.ExpectBegin()
+	// authz.Require: MustActorID
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("user-1"))
+	// authz.Require: MustTenantID
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("tenant-1"))
+	// authz.Require: system_admin check
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	// authz.Require: appendAssertedCap — read existing caps
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
+	// authz.Require: appendAssertedCap — write caps
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps'")).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	// actual UPDATE
 	mock.ExpectExec(`UPDATE public\.documents`).
 		WithArgs("tenant-1", "doc-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	if err := r.Unarchive(context.Background(), "tenant-1", "doc-1", "user-1"); err != nil {
 		t.Fatalf("Unarchive: %v", err)
