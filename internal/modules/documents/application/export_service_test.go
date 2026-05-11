@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"testing"
@@ -99,6 +100,17 @@ func (f *fakeAudit) Write(_ context.Context, tenantID, actorID, action, docID st
 		"doc_id":    docID,
 		"meta":      meta,
 	})
+}
+
+func (f *fakeAudit) WriteTx(_ context.Context, _ *sql.Tx, tenantID, actorID, action, docID string, meta any) error {
+	f.events = append(f.events, map[string]any{
+		"tenant_id": tenantID,
+		"actor_id":  actorID,
+		"action":    action,
+		"doc_id":    docID,
+		"meta":      meta,
+	})
+	return nil
 }
 
 func newDoc(tenantID, documentID, revisionID string) *domain.Document {

@@ -57,6 +57,7 @@ func New(deps Dependencies) *Module {
 	} else {
 		svc = application.NewService(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.RegistryReader, deps.Caps, deps.ProfileDefaults)
 	}
+	svc.WithDB(deps.DB)
 	svc.WithRegistryDuplicator(deps.RegistryDuplicator)
 	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc)
 
