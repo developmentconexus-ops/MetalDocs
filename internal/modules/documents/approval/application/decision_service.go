@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 type FreezeInvoker interface {
@@ -138,7 +139,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: load document area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, "doc.signoff", areaCode); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSignoff), areaCode); err != nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, err
 	}
