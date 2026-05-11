@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
@@ -291,11 +294,11 @@ func (s *RegistryService) PeekSeq(ctx context.Context, tenantID, profileCode, ar
 }
 
 func (s *RegistryService) Obsolete(ctx context.Context, tenantID, controlledDocumentID string) error {
-	return s.changeStatus(ctx, tenantID, controlledDocumentID, registrydomain.CDStatusObsolete)
+	return s.changeStatus(ctx, tenantID, controlledDocumentID, registrydomain.CDStatusObsolete, string(iamdomain.CapRegistryObsolete))
 }
 
 func (s *RegistryService) Supersede(ctx context.Context, tenantID, controlledDocumentID string) error {
-	return s.changeStatus(ctx, tenantID, controlledDocumentID, registrydomain.CDStatusSuperseded)
+	return s.changeStatus(ctx, tenantID, controlledDocumentID, registrydomain.CDStatusSuperseded, string(iamdomain.CapRegistrySupersede))
 }
 
 func (s *RegistryService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error) {
@@ -306,7 +309,7 @@ func (s *RegistryService) Get(ctx context.Context, tenantID, id string) (*Contro
 	return s.docs.GetByID(ctx, tenantID, id)
 }
 
-func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlledDocumentID string, next registrydomain.CDStatus) error {
+func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlledDocumentID string, next registrydomain.CDStatus, cap string) error {
 	doc, err := s.docs.GetByID(ctx, tenantID, controlledDocumentID)
 	if err != nil {
 		return err
@@ -314,7 +317,20 @@ func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlled
 	if !doc.IsActive() {
 		return registrydomain.ErrCDNotActive
 	}
-	return s.docs.UpdateStatus(ctx, tenantID, controlledDocumentID, next, s.now().UTC())
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin changeStatus tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
+		return fmt.Errorf("registry: authz check changeStatus: %w", err)
+	}
+	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 type CreateRevisionCmd struct {
