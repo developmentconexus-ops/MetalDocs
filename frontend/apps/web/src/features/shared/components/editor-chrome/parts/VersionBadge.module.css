@@ -2,10 +2,10 @@
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 10.5px; /* TODO:token — between --font-size-2xs (9.5px) and --font-size-xs (11px) */
   font-weight: 600;
   letter-spacing: 0.06em;
-  padding: 2px 6px;
+  padding: 2px 6px; /* TODO:token — 2px and 6px have no --sp tokens (--sp-1=4px, --sp-2=8px) */
   border-radius: var(--r-1);
   background: var(--brand);
   color: #fff;

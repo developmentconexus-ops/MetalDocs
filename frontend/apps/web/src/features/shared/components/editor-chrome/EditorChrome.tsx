@@ -20,11 +20,37 @@ export type EditorChromeProps = {
  * EditorChrome — shared wrapper for eigenpal-based document editors.
  *
  * Provides:
- *  - position: relative wrapper with eigenpal styling overrides
+ *  - `position: relative` wrapper with eigenpal styling overrides
  *    (compact title bar, wine formatting bar, gradient scrollbar)
+ *    targeting selectors from eigenpal-docx-js-editor-0.2.0.tgz.
+ *    See the coupling-pin comment in EditorChrome.module.css for the
+ *    upgrade checklist.
  *  - 3 absolute-positioned overlay slots (left/center/right) atop
  *    eigenpal's 40px title bar
- *  - optional alert banner
+ *  - optional alert banner rendered below the title bar
+ *
+ * Slot semantics:
+ *  - `left`   — rendered top-left; pointer-events enabled (back button, etc.).
+ *  - `center` — rendered centered; `pointer-events: none` on the container.
+ *               Children that need interactivity must set `pointer-events: auto`
+ *               themselves (see overlayCenter comment in the CSS).
+ *  - `right`  — rendered top-right; pointer-events enabled (actions, autosave).
+ *  - `alert`  — optional banner below title bar; pass `null`/`undefined` to hide.
+ *  - `children` — the eigenpal editor instance (always rendered).
+ *
+ * @example
+ * ```tsx
+ * <EditorChrome
+ *   center={<><CodeChip>{code}</CodeChip><span>{title}</span></>}
+ *   right={<><AutosaveStatus status={autosaveState} /><button>Submit</button></>}
+ * >
+ *   <MetalDocsEditor ... />
+ * </EditorChrome>
+ * ```
+ *
+ * `editorChromeStyles` re-export gives consumers access to the shared button
+ * primitives (.primaryBtn, .ghostBtn, .iconBtn) and text helpers (.docTitle,
+ * .docMeta, .docSep) without duplicating class definitions per page.
  *
  * Used by templates/TemplateEditorPage and documents/DocumentEditorPage.
  */
