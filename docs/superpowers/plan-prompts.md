@@ -4,6 +4,19 @@
 > Always read `wiki/backlog/roadmap.md` first in every session — it is the source of truth for status + scope.
 > Execution order: 3 → 4 (‖ 11) → 5 (‖ 6) → 7 (‖ 8) → 9 → 10 → 12 (‖ 13)
 
+## Execution model (applies to every plan)
+
+| Step | Who |
+|------|-----|
+| Writing implementation spec | Sonnet — `nexus:writing-plans` |
+| Coding — implementing Workstreams | **Codex** — `codex:rescue` skill |
+| Writing + running tests | **Sonnet or Haiku** — after Codex returns |
+| Commits | **Sonnet or Haiku** — review diff, then commit |
+| Final code review before PR | **Opus** only — `nexus:requesting-code-review` |
+| Roadmap status update | **Sonnet** |
+
+**Rule:** Codex implements. Sonnet/Haiku own tests + commits. Opus touches the keyboard only for the final review gate — nothing else.
+
 ---
 
 ## Plan 4 · Capability namespace collapse + IAM dual-surface consolidation
