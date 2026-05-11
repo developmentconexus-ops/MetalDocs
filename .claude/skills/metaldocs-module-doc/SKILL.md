@@ -59,7 +59,7 @@ Rule: if a subagent ever writes a sentence containing "should", "recommend", "co
 | 0 — Load context | Main | module name | `_artifacts/00-context.md` | Read `wiki/README.md`, existing module stub, related ADRs, related concept docs |
 | 1 — Surface scan | Codex subagent | module root path | `_artifacts/01-surface.md` | public exports, HTTP ops, file tree, migration list |
 | 2 — Data-flow trace | 2–3 Codex subagents (parallel) | top operations from §1 | `_artifacts/02-flow-<op>.md` × N | HTTP → handler → service → repo → DB end-to-end |
-| 3 — Cross-deps | Codex subagent | module root | `_artifacts/03-deps.md` | imports IN / imports OUT, callers map |
+| 3 — Cross-deps | Sonnet 4.6 subagent (`general-purpose`, `model: "sonnet"`) | module root | `_artifacts/03-deps.md` | imports IN / imports OUT, callers map. Sonnet, not Codex — Codex run on auth took ~3× longer than other phases because the IN-edge scan + 14 config-field trace is grep-bound, not AST-bound; Sonnet via Grep tool is faster. |
 | 4 — Persistence map | Codex subagent | module root + migrations dir | `_artifacts/04-persistence.md` | tables, FKs, triggers, tripwire pairing, GUC reads |
 | 5 — Industry comparison | Main + context7 + WebSearch | §1–§4 artifacts + `references/industry-patterns-index.md` | `_artifacts/05-industry.md` | gated: only patterns from the index, or explicit user opt-in |
 | 6 — Compose | Main | all artifacts | `wiki/modules/M.md` + `M-tech-debt.md` + `backlog/M-refactor.md` | Arc42 + C4 Mermaid; coverage gate enforced |
@@ -75,7 +75,7 @@ Rule: if a subagent ever writes a sentence containing "should", "recommend", "co
 3. **Phase 0** — Main reads existing wiki + ADRs. Drop summary into `00-context.md`. List open questions to the user (one batch, then proceed).
 4. **Phase 1** — Dispatch `codex:codex-rescue` with `templates/subagent-surface-scan.md`. Provide module path. Receive `01-surface.md`.
 5. **Phase 2** — From §1, pick the 2–3 most representative operations (one read, one write, one state-transition if it exists). Dispatch them in parallel (one Codex subagent per operation, all in a single message). Each uses `templates/subagent-data-flow-trace.md`.
-6. **Phase 3** — Dispatch Codex with `templates/subagent-cross-deps.md`. Receive `03-deps.md`.
+6. **Phase 3** — Dispatch `general-purpose` subagent with `model: "sonnet"` and `templates/subagent-cross-deps.md`. Receive `03-deps.md`. (Sonnet 4.6, not Codex — see Phase-3 row in workflow table for rationale.)
 7. **Phase 4** — Dispatch Codex with `templates/subagent-persistence-map.md`. Receive `04-persistence.md`.
 8. **Phase 5** — Main does industry comparison. ONLY patterns named in `references/industry-patterns-index.md` are admissible by default. If a fresh comparison is genuinely warranted, ask the user once; on yes, use `context7` for current docs and WebSearch for source-of-truth, then add the pattern to the index in the same commit.
 9. **Phase 6** — Main composes `wiki/modules/M.md` from `templates/module-doc.md`. Coverage gate (see below) must pass before continuing.
@@ -109,7 +109,9 @@ Write `_artifacts/06-selfreview.md` answering each item. One short sentence per 
 7. **Industry citations.** Every §5 industry-comparison citation traces back to a row in `references/industry-patterns-index.md` or to a new row added in the same commit.
 8. **Subagent purity.** Re-skim `_artifacts/02-flow-*.md`, `03-deps.md`, `04-persistence.md`. If any contains "should / recommend / professional / industry-standard", that prose came from a subagent that broke the research-only rule; flag and strip.
 
-## Codex dispatch pattern
+## Subagent dispatch patterns
+
+**Phases 1, 2, 4 — Codex (`codex:codex-rescue`):**
 
 ```
 Agent({
@@ -118,6 +120,19 @@ Agent({
   prompt: "[paste subagent template from .claude/skills/metaldocs-module-doc/templates/subagent-<X>.md]\n\nModule path: internal/modules/<m>\nArtifact path: wiki/modules/<m>/_artifacts/<NN>-<X>.md\nModel: --model gpt-5.3-codex"
 })
 ```
+
+**Phase 3 — Sonnet 4.6 (`general-purpose`):**
+
+```
+Agent({
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  description: "phase 3 cross-deps: <module>",
+  prompt: "[paste subagent template from .claude/skills/metaldocs-module-doc/templates/subagent-cross-deps.md]\n\nModule path: internal/modules/<m>\nArtifact path: wiki/modules/<m>/_artifacts/03-deps.md"
+})
+```
+
+Rationale: cross-deps work is grep-bound (IN-edge scan across whole repo, config-var trace to env-var sites, DI wiring across composition roots). Sonnet via the Grep tool finishes in a fraction of the Codex wall-clock time. Other phases stay on Codex because they benefit from its AST/code-execution sandbox.
 
 Subagent never edits the wiki doc directly. Only writes its artifact file.
 
@@ -160,5 +175,6 @@ End-of-run report covers: module name · 5 artifact paths · final 3 wiki paths 
 
 ## Changelog
 
+- 1.2 (2026-05-10) — After auth first-run review: moved Phase 3 (cross-deps) off Codex onto Sonnet 4.6 (`general-purpose`, `model: "sonnet"`). Codex took ~3× longer than other phases on auth because cross-deps work is grep-bound (whole-repo IN-edge scan + 14 config-field env-var trace + DI wiring across composition roots), not AST-bound. Sonnet via the Grep tool is the fast path. Updated workflow table, run sequence, dispatch-pattern section, and `templates/subagent-cross-deps.md`. Other phases stay on Codex.
 - 1.1 (2026-05-10) — Hardening pass after iam first-run review. Added Phase 6.5 mechanical tally (`scripts/tally_check.sh`) to catch severity-count drift and ADR-count mismatches. Added Phase 6.75 self-review checklist to catch severity-judgment slack and stray mermaid boxes. Tightened severity rubric in tech-debt template with concrete triggers (regulated audit-trail gap → Critical, etc.). Loosened refactor-backlog `debt_id` schema with `maint:<kind>` enum for maintenance rows that have no debt origin. Softened opening "Iron Law" framing with rationale (why gates exist, when skipping is OK if recorded).
 - 1.0 (2026-05-10) — initial release. Arc42 + C4 + ADR scaffold; subagent/main split; coverage gate; industry-patterns-index guard.

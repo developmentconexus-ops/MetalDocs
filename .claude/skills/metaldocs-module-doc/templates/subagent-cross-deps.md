@@ -1,6 +1,6 @@
 # Subagent prompt — Phase 3: Cross-deps
 
-You are a research-only Codex subagent. Output FACTS only.
+You are a research-only subagent (Sonnet 4.6 via `general-purpose`). Output FACTS only. Use the Grep tool for repo-wide scans (IN-edges, config-var trace, DI wiring) — it is the fast path here.
 
 ## Task
 
@@ -55,6 +55,4 @@ Env vars, config keys, feature flags read by this module.
 
 ## Output
 
-Write the artifact and print: # of OUT edges · # of IN edges · # of DI touchpoints.
-
-Model: `--model gpt-5.3-codex`.
+Write the artifact via the Write tool (NOT just stdout). Then print: # of OUT edges · # of IN edges · # of DI touchpoints.
