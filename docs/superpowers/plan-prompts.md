@@ -29,6 +29,10 @@ Execution model:
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 4. Note anchor decision: typed iamdomain.Capability wins.
 2. wiki/README.md
@@ -115,6 +119,10 @@ Execution model:
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 11.
 2. wiki/README.md
@@ -192,6 +200,10 @@ Execution model:
 - Codex (codex:rescue skill): implements all Workstream code changes.
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 5. Confirm Plans 3 + 4 are done.
@@ -286,6 +298,10 @@ Execution model:
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 6. Confirm Plans 3 + 4 done.
 2. wiki/README.md
@@ -373,6 +389,10 @@ Execution model:
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 7. Confirm Plans 3–6 done (or 6a at minimum).
 2. wiki/README.md
@@ -437,6 +457,10 @@ Execution model:
 - Codex (codex:rescue skill): implements all Workstream code changes.
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 8. Confirm Plan 7 done.
@@ -525,6 +549,10 @@ Execution model:
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 9. Confirm Plans 7 + 8 done.
 2. wiki/README.md
@@ -597,6 +625,10 @@ Execution model:
 - Codex (codex:rescue skill): implements all Workstream code changes.
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 10. Confirm Plans 4, 5, 6, 7, 8 done.
@@ -699,6 +731,10 @@ Execution model:
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 12. Confirm Plans 7, 8, 9, 11 done.
 2. wiki/README.md
@@ -774,6 +810,10 @@ Execution model:
 - Codex (codex:rescue skill): implements all Workstream code changes.
 - Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
 - Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
+Rules:
+- NO FALLBACK. If information needed to implement a fix is missing or unclear, STOP and report. Never guess, never use a default value, never assume a safe fallback. A wrong fallback is worse than no implementation.
+- Evidence-based artifact reading: when a tech-debt row's Evidence field cites `_artifacts/XX.md §section`, read that exact file+section before implementing that fix. Do not read artifacts that no debt row in this plan cites.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 13. Confirm Plans 3–12 all done.
