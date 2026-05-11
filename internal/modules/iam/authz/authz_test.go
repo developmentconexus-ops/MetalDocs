@@ -168,12 +168,12 @@ func TestRequire_CapDenied(t *testing.T) {
 
 	err := Require(WithCapCache(context.Background()), tx, "doc.publish", "AREA2")
 	if err == nil {
-		t.Fatal("Require returned nil, want ErrCapabilityDenied")
+		t.Fatal("Require returned nil, want ErrCapDenied")
 	}
 
-	var denied ErrCapabilityDenied
+	var denied ErrCapDenied
 	if !errors.As(err, &denied) {
-		t.Fatalf("Require error = %T %v, want ErrCapabilityDenied", err, err)
+		t.Fatalf("Require error = %T %v, want ErrCapDenied", err, err)
 	}
 	if denied.Capability != "doc.publish" || denied.AreaCode != "AREA2" || denied.ActorID != "actor-2" {
 		t.Fatalf("denied error = %#v", denied)
