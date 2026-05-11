@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
@@ -330,7 +331,30 @@ func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlled
 	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	eventType := "registry.cd.obsoleted"
+	if next == registrydomain.CDStatusSuperseded {
+		eventType = "registry.cd.superseded"
+	}
+	payload, _ := json.Marshal(map[string]string{"status": string(next)})
+	actorID := ""
+	if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
+		actorID = u.UserID
+	}
+	if err := s.govLogger.Log(ctx, taxonomydomain.GovernanceEvent{
+		TenantID:     tenantID,
+		EventType:    eventType,
+		ActorUserID:  actorID,
+		ResourceType: "controlled_document",
+		ResourceID:   controlledDocumentID,
+		PayloadJSON:  payload,
+	}); err != nil {
+		slog.Warn("registry governance event logging failed", "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
+	}
+	return nil
 }
 
 type CreateRevisionCmd struct {

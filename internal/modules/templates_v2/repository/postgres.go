@@ -3,12 +3,17 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/modules/templates_v2/application"
 	"metaldocs/internal/modules/templates_v2/domain"
+	tenant "metaldocs/internal/platform/tenant"
 )
 
 // isInvalidUUID returns true when err is a Postgres error with SQLSTATE 22P02
@@ -19,10 +24,16 @@ func isInvalidUUID(err error) bool {
 }
 
 type Repository struct {
-	db *sql.DB
+	db    *sql.DB
+	audit auditdomain.Writer
 }
 
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
+
+func (r *Repository) WithAudit(w auditdomain.Writer) *Repository {
+	r.audit = w
+	return r
+}
 
 var _ application.Repository = (*Repository)(nil)
 
@@ -400,22 +411,27 @@ SET reviewer_role = EXCLUDED.reviewer_role,
 	return err
 }
 
-func (r *Repository) AppendAudit(ctx context.Context, e *domain.AuditEvent) error {
-	detailsJSON, err := marshalAuditDetails(e.Details)
-	if err != nil {
-		return err
+func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) error {
+	if r.audit == nil {
+		return nil
 	}
-
-	const q = `
-INSERT INTO templates_v2_audit_log (
-	tenant_id, template_id, version_id, actor_id, action, details, occurred_at
-) VALUES (
-	$1, $2, $3, $4, $5, $6, $7
-)`
-	_, err = r.db.ExecContext(ctx, q,
-		e.TenantID, e.TemplateID, e.VersionID, e.ActorID, string(e.Action), detailsJSON, e.OccurredAt,
-	)
-	return err
+	payload, _ := json.Marshal(entry.Details)
+	tenantID := entry.TenantID
+	if tenantID == "" {
+		if tid, err := tenant.FromContext(ctx); err == nil {
+			tenantID = tid
+		}
+	}
+	return r.audit.Record(ctx, auditdomain.Event{
+		ID:           uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      entry.ActorID,
+		Action:       string(entry.Action),
+		ResourceType: "template",
+		ResourceID:   entry.TemplateID,
+		PayloadJSON:  string(payload),
+		TenantID:     tenantID,
+	})
 }
 
 func (r *Repository) ListAudit(ctx context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
