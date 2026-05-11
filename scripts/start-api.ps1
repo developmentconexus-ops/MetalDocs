@@ -1,3 +1,8 @@
+param(
+    [switch]$Build,
+    [switch]$NoWorker
+)
+
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -20,18 +25,26 @@ if ($held) {
     Start-Sleep -Seconds 1
 }
 
-# Always rebuild binaries to avoid stale binary issues
 $binary = Join-Path $root "metaldocs-api.exe"
 $workerBinary = Join-Path $root "metaldocs-worker.exe"
-Write-Host "Building metaldocs-api.exe..."
-go build -o metaldocs-api.exe ./apps/api/cmd/metaldocs-api/...
-if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
-Write-Host "Building metaldocs-worker.exe..."
-go build -o metaldocs-worker.exe ./apps/worker/cmd/metaldocs-worker/...
-if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
+
+if ($Build) {
+    Write-Host "Building metaldocs-api.exe..."
+    go build -o metaldocs-api.exe ./apps/api/cmd/metaldocs-api/...
+    if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
+    Write-Host "Building metaldocs-worker.exe..."
+    go build -o metaldocs-worker.exe ./apps/worker/cmd/metaldocs-worker/...
+    if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
+} elseif (-not (Test-Path $binary)) {
+    Write-Host "Binary not found — building (run with -Build to force rebuild)..."
+    go build -o metaldocs-api.exe ./apps/api/cmd/metaldocs-api/...
+    if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
+    go build -o metaldocs-worker.exe ./apps/worker/cmd/metaldocs-worker/...
+    if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
+}
 
 # Start worker in background so PDF jobs are consumed alongside the API
-if ($args -notcontains "-NoWorker") {
+if (-not $NoWorker) {
     Write-Host "Starting MetalDocs Worker in background..."
     $workerProc = Start-Process -FilePath $workerBinary -PassThru -WindowStyle Hidden
     Write-Host "Worker PID: $($workerProc.Id)"
