@@ -154,7 +154,7 @@ func TestProbeC_SubmitWithoutCapDenied(t *testing.T) {
 	setConfig(t, ctx, tx, "metaldocs.actor_id", "probe-c-user")
 	setConfig(t, ctx, tx, "metaldocs.tenant_id", probeTenantID)
 
-	err := authz.Require(ctx, tx, "doc.submit", "QA")
+	err := authz.Require(ctx, tx, "document.submit", "QA")
 	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied, got %v", err)
@@ -169,7 +169,7 @@ func TestProbeD_SubmitWithCapAssertedCapsSet(t *testing.T) {
 	tx := beginTx(t, ctx, db)
 	defer tx.Rollback()
 
-	actorID, tenantID, ok, err := findActorWithCapability(ctx, tx, "doc.submit")
+	actorID, tenantID, ok, err := findActorWithCapability(ctx, tx, "document.submit")
 	if err != nil {
 		t.Fatalf("find actor with doc.submit capability: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestProbeD_SubmitWithCapAssertedCapsSet(t *testing.T) {
 	setConfig(t, ctx, tx, "metaldocs.tenant_id", tenantID)
 	setConfig(t, ctx, tx, "metaldocs.asserted_caps", "[]")
 
-	if err := authz.Require(ctx, tx, "doc.submit", "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, "document.submit", "tenant"); err != nil {
 		t.Fatalf("authz.Require(doc.submit): %v", err)
 	}
 
@@ -200,7 +200,7 @@ func TestProbeD_SubmitWithCapAssertedCapsSet(t *testing.T) {
 
 	found := false
 	for _, cap := range asserted {
-		if cap["cap"] == "doc.submit" {
+		if cap["cap"] == "document.submit" {
 			found = true
 			break
 		}
@@ -383,7 +383,7 @@ func TestProbeJ_AreaMismatchTriggersError(t *testing.T) {
 	tx := beginTx(t, ctx, db)
 	defer tx.Rollback()
 
-	setConfig(t, ctx, tx, "metaldocs.asserted_caps", `[{"cap":"doc.submit","area":"AREA_X"}]`)
+	setConfig(t, ctx, tx, "metaldocs.asserted_caps", `[{"cap":"document.submit","area":"AREA_X"}]`)
 	setConfig(t, ctx, tx, "metaldocs.bypass_authz", "")
 
 	_, err := tx.ExecContext(ctx, `
