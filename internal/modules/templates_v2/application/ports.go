@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"metaldocs/internal/modules/templates_v2/domain"
@@ -9,15 +10,18 @@ import (
 
 type Repository interface {
 	CreateTemplate(ctx context.Context, t *domain.Template) error
+	CreateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error
 	GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error)
 	GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error)
 	ListTemplates(ctx context.Context, f ListFilter) ([]*domain.Template, error)
 	UpdateTemplate(ctx context.Context, t *domain.Template) error
+	UpdateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error
 
 	CreateVersion(ctx context.Context, v *domain.TemplateVersion) error
 	GetVersion(ctx context.Context, templateID string, n int) (*domain.TemplateVersion, error)
 	GetVersionByID(ctx context.Context, id string) (*domain.TemplateVersion, error)
 	UpdateVersion(ctx context.Context, v *domain.TemplateVersion) error
+	UpdateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error
 	ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error
 
 	GetApprovalConfig(ctx context.Context, templateID string) (*domain.ApprovalConfig, error)

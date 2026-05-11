@@ -28,7 +28,7 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 		Status:         domain.VersionStatusDraft,
 		DocxStorageKey: "templates/tpl-1/versions/1.docx",
 		ContentHash:    "hash_abc",
-		AuthorID:       "user-a",
+		AuthorID:       "original-author",
 		CreatedAt:      fakeClock{}.Now(),
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)

@@ -266,6 +266,98 @@ WHERE id = $1`
 	return nil
 }
 
+func (r *Repository) CreateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
+	const q = `
+INSERT INTO templates_v2_template (
+	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
+	specific_areas, latest_version, published_version_id, created_by, created_at, archived_at
+) VALUES (
+	$1, $2, $3, $4, $5, $6, $7, $8,
+	$9, $10, $11, $12, $13, $14
+)`
+	_, err := tx.ExecContext(ctx, q,
+		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description, t.Areas, string(t.Visibility),
+		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.CreatedAt, t.ArchivedAt,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return domain.ErrKeyConflict
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *Repository) UpdateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
+	const q = `
+UPDATE templates_v2_template
+SET
+	doc_type_code = $3,
+	key = $4,
+	name = $5,
+	description = $6,
+	areas = $7,
+	visibility = $8,
+	specific_areas = $9,
+	latest_version = $10,
+	published_version_id = $11,
+	archived_at = $12
+WHERE id = $1 AND tenant_id = $2`
+	res, err := tx.ExecContext(ctx, q,
+		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
+		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.ArchivedAt,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
+func (r *Repository) UpdateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error {
+	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
+	if err != nil {
+		return err
+	}
+
+	const q = `
+UPDATE templates_v2_template_version
+SET
+	status = $2,
+	docx_storage_key = $3,
+	content_hash = $4,
+	metadata_schema = $5,
+	placeholder_schema = $6,
+	pending_reviewer_role = $7,
+	pending_approver_role = $8,
+	reviewer_id = $9,
+	approver_id = $10,
+	submitted_at = $11,
+	reviewed_at = $12,
+	approved_at = $13,
+	published_at = $14,
+	obsoleted_at = $15
+WHERE id = $1`
+	res, err := tx.ExecContext(ctx, q,
+		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
+		metadataJSON, placeholderJSON,
+		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
+		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error {
 	const q = `
 UPDATE templates_v2_template_version

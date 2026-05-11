@@ -3,6 +3,7 @@ package http_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -93,6 +94,18 @@ func (r *fakeRepo) GetVersionByID(_ context.Context, id string) (*domain.Templat
 		return nil, domain.ErrNotFound
 	}
 	return v, nil
+}
+
+func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Template) error {
+	return r.CreateTemplate(context.Background(), t)
+}
+
+func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Template) error {
+	return r.UpdateTemplate(context.Background(), t)
+}
+
+func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, v *domain.TemplateVersion) error {
+	return r.UpdateVersion(context.Background(), v)
 }
 
 func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) error {
