@@ -24,6 +24,11 @@
 ```
 Mode: implementation. Plan 4 of the MetalDocs refactor roadmap.
 
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 4. Note anchor decision: typed iamdomain.Capability wins.
 2. wiki/README.md
@@ -105,6 +110,11 @@ Push back if I try to:
 ```
 Mode: implementation. Plan 11 of the MetalDocs refactor roadmap (runs parallel to Plan 4).
 
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 11.
 2. wiki/README.md
@@ -177,6 +187,11 @@ Push back if I try to:
 
 ```
 Mode: implementation. Plan 5 of the MetalDocs refactor roadmap.
+
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 5. Confirm Plans 3 + 4 are done.
@@ -266,6 +281,11 @@ Push back if I try to:
 ```
 Mode: implementation. Plan 6 of the MetalDocs refactor roadmap.
 
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 6. Confirm Plans 3 + 4 done.
 2. wiki/README.md
@@ -348,6 +368,11 @@ Push back if I try to:
 ```
 Mode: implementation. Plan 7 of the MetalDocs refactor roadmap (can run parallel to Plan 8).
 
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 7. Confirm Plans 3–6 done (or 6a at minimum).
 2. wiki/README.md
@@ -407,6 +432,11 @@ Push back if I try to:
 
 ```
 Mode: implementation. Plan 8 of the MetalDocs refactor roadmap (can start after Plan 7 is green).
+
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 8. Confirm Plan 7 done.
@@ -490,6 +520,11 @@ Push back if I try to:
 ```
 Mode: implementation. Plan 9 of the MetalDocs refactor roadmap.
 
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 9. Confirm Plans 7 + 8 done.
 2. wiki/README.md
@@ -557,6 +592,11 @@ Push back if I try to:
 
 ```
 Mode: implementation. Plan 10 of the MetalDocs refactor roadmap.
+
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 10. Confirm Plans 4, 5, 6, 7, 8 done.
@@ -654,6 +694,11 @@ Push back if I try to:
 ```
 Mode: implementation. Plan 12 of the MetalDocs refactor roadmap.
 
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
+
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 12. Confirm Plans 7, 8, 9, 11 done.
 2. wiki/README.md
@@ -724,6 +769,11 @@ Push back if I try to:
 
 ```
 Mode: implementation. Plan 13 of the MetalDocs refactor roadmap. Final plan.
+
+Execution model:
+- Codex (codex:rescue skill): implements all Workstream code changes.
+- Sonnet/Haiku: writes + runs tests, reviews diffs, makes commits.
+- Opus: one grouped final review after ALL workstream commits land (nexus:requesting-code-review). NOT per-PR.
 
 Read first (in order):
 1. wiki/backlog/roadmap.md — locate Plan 13. Confirm Plans 3–12 all done.
