@@ -111,11 +111,11 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	if err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
-	if !identity.IsActive {
-		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
-	}
 	if identity.LockedUntil != nil && identity.LockedUntil.After(time.Now().UTC()) {
 		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityLocked
+	}
+	if !identity.IsActive {
+		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
 	}
 	if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(password)) != nil {
 		attempts := identity.FailedLoginAttempts + 1
@@ -129,6 +129,11 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	}
 
 	now := time.Now().UTC()
+	claimedTenant := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	tenantID, err := s.resolveLoginTenant(ctx, identity.UserID, claimedTenant)
+	if err != nil {
+		return authdomain.AuthenticatedSession{}, err
+	}
 	if err := s.repo.RecordSuccessfulLogin(ctx, identity.UserID, now); err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
@@ -145,11 +150,6 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		IPAddress:  remoteIP(r),
 		UserAgent:  truncate(strings.TrimSpace(r.UserAgent()), 512),
 		LastSeenAt: now,
-	}
-	claimedTenant := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	tenantID, err := s.resolveLoginTenant(ctx, identity.UserID, claimedTenant)
-	if err != nil {
-		return authdomain.AuthenticatedSession{}, err
 	}
 	session.TenantID = tenantID
 
