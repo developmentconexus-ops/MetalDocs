@@ -41,6 +41,7 @@ import (
 	authdelivery "metaldocs/internal/modules/auth/delivery/http"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/modules/registry"
 	registryapp "metaldocs/internal/modules/registry/application"
@@ -325,8 +326,12 @@ func main() {
 	registryModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
 	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
-	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})
-	tv2http.New(tv2Svc, nil).Register(mux)
+	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
+	tv2AuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
+		userID := iamdomain.UserIDFromContext(r.Context())
+		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
+	}
+	tv2http.New(tv2Svc, tv2AuthzFn).Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)

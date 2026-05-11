@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates_v2/domain"
 )
 
@@ -73,7 +75,22 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		CreatedAt:           s.clock.Now(),
 	}
 
-	if err := s.repo.CreateTemplate(ctx, template); err != nil {
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("templates create: begin tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
+			return nil, fmt.Errorf("templates create: authz: %w", err)
+		}
+		if err := s.repo.CreateTemplateTx(ctx, tx, template); err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+	} else if err := s.repo.CreateTemplate(ctx, template); err != nil {
 		return nil, err
 	}
 	if err := s.repo.CreateVersion(ctx, version); err != nil {
@@ -124,11 +141,18 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 	var source *domain.TemplateVersion
 	if template.PublishedVersionID != nil {
 		source, err = s.repo.GetVersionByID(ctx, *template.PublishedVersionID)
+		if err != nil {
+			return nil, err
+		}
+		// T-002: GetVersionByID has no tenant predicate — reject if version belongs to a different template.
+		if source.TemplateID != template.ID {
+			return nil, domain.ErrNotFound
+		}
 	} else {
 		source, err = s.repo.GetVersion(ctx, template.ID, template.LatestVersion)
-	}
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	newNum := template.LatestVersion + 1

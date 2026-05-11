@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -104,6 +105,18 @@ func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) e
 	}
 	r.versions[v.ID] = v
 	return nil
+}
+
+func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Template) error {
+	return r.CreateTemplate(context.Background(), t)
+}
+
+func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Template) error {
+	return r.UpdateTemplate(context.Background(), t)
+}
+
+func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, v *domain.TemplateVersion) error {
+	return r.UpdateVersion(context.Background(), v)
 }
 
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
