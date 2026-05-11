@@ -1,6 +1,6 @@
 # ADR 0012 — Contract-First API via oapi-codegen
 
-> **Last verified:** 2026-05-08
+> **Last verified:** 2026-05-11
 > **Scope:** Decision to migrate MetalDocs backend HTTP handlers to spec-generated types; root cause analysis of the `documents.name` bug; migration scope and constraints.
 > **Out of scope:** Frontend codegen (covered in `architecture/api-contract.md §6`); specific handler implementation patterns (covered in `architecture/api-contract.md §3`).
 > **Key files:**
@@ -80,3 +80,4 @@ Principles:
 - `wiki/backlog/contract-first-followups.md` — deferred items and migration template
 - [`wiki/modules/documents.md`](../modules/documents.md) — documents module: codegen bootstrap-only status; handler migration blocked by spec drift
 - [`wiki/modules/documents-tech-debt.md T-002`](../modules/documents-tech-debt.md#t-002--openapi-spec-drift-on-apiv2documents-routes) — spec/handler drift detail: ops without spec, spec ops without handler, missing `operationId` on `finalizeDocument`
+- [`wiki/modules/taxonomy.md §8.1`](../modules/taxonomy.md#81-authentication--authorization) — taxonomy is the residual unmigrated module: raw `net/http.ServeMux`, no spec coverage for any of its 16 routes, no oapi-codegen — explicitly called out in Consequences §"Pre-codegen modules still drift-prone" (taxonomy T-009)
