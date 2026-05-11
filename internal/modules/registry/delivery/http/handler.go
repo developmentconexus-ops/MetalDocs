@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
-	"strings"
 
 	registryapi "metaldocs/internal/modules/registry/api"
 	"metaldocs/internal/modules/registry/application"
@@ -48,9 +47,10 @@ func NewHandler(svc *application.RegistryService, db *sql.DB) *Handler {
 // access it without a reference to the *http.Request.
 func injectTenant(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tid := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-		if tid == "" {
-			tid = tenant.DevTenantID
+		tid, err := tenant.FromContext(r.Context())
+		if err != nil {
+			httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+			return
 		}
 		ctx := context.WithValue(r.Context(), tenantContextKey{}, tid)
 		next.ServeHTTP(w, r.WithContext(ctx))

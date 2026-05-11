@@ -3,9 +3,9 @@ package documentshttp
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type placeholderOptionsSchemaReader interface {
@@ -36,7 +36,11 @@ func (h *PlaceholderOptionsHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *http.Request) {
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeFillInError(w, requestID(r), err)
+		return
+	}
 	revisionID := r.PathValue("id")
 	placeholderID := r.PathValue("pid")
 

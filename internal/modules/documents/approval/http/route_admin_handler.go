@@ -15,7 +15,11 @@ import (
 
 func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := actorIDFromRequest(r)
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {
@@ -58,7 +62,11 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := actorIDFromRequest(r)
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
@@ -107,7 +115,11 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := actorIDFromRequest(r)
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
@@ -143,7 +155,11 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 
 func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 
 	if h.db == nil {
 		WriteError(w, reqID, fmt.Errorf("database not configured"))

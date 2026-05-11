@@ -14,7 +14,11 @@ import (
 func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
 	documentID := r.PathValue("id")
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {

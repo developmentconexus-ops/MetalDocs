@@ -15,7 +15,11 @@ import (
 // It looks up the active approval instance for the document and returns it.
 func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	docID := r.PathValue("id")
 
 	if h.readSvc == nil {
@@ -50,7 +54,11 @@ type docSignoffRequest struct {
 // It finds the active instance+stage for the document and records the signoff.
 func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := actorIDFromRequest(r)
 	docID := r.PathValue("id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
@@ -145,7 +153,11 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 // It finds the active instance for the document and cancels it.
 func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := actorIDFromRequest(r)
 	docID := r.PathValue("id")
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))

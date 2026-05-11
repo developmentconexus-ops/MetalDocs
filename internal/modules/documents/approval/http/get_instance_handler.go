@@ -13,7 +13,11 @@ import (
 
 func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 	reqID := requestID(r)
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		WriteError(w, reqID, err)
+		return
+	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
 	instanceID := r.PathValue("instance_id")
 

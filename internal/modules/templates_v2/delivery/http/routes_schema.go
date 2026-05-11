@@ -9,7 +9,11 @@ import (
 )
 
 func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))

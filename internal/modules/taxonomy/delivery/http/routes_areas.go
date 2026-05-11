@@ -26,8 +26,13 @@ func (h *Handler) listAreas(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "includeArchived must be true or false")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 
-	items, err := h.areas.List(r.Context(), tenantIDFromRequest(r), includeArchived)
+	items, err := h.areas.List(r.Context(), tenantID, includeArchived)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list areas")
 		return
@@ -41,10 +46,15 @@ func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 
 	area := &domain.ProcessArea{
 		Code:                strings.TrimSpace(req.Code),
-		TenantID:            tenantIDFromRequest(r),
+		TenantID:            tenantID,
 		Name:                strings.TrimSpace(req.Name),
 		Description:         strings.TrimSpace(req.Description),
 		ParentCode:          req.ParentCode,
@@ -64,7 +74,13 @@ func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getArea(w http.ResponseWriter, r *http.Request) {
-	area, err := h.areas.Get(r.Context(), tenantIDFromRequest(r), r.PathValue("code"))
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+
+	area, err := h.areas.Get(r.Context(), tenantID, r.PathValue("code"))
 	if err != nil {
 		h.writeAreaError(w, err)
 		return
@@ -78,10 +94,15 @@ func (h *Handler) updateArea(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 
 	area := &domain.ProcessArea{
 		Code:                r.PathValue("code"),
-		TenantID:            tenantIDFromRequest(r),
+		TenantID:            tenantID,
 		Name:                strings.TrimSpace(req.Name),
 		Description:         strings.TrimSpace(req.Description),
 		ParentCode:          req.ParentCode,
@@ -96,9 +117,15 @@ func (h *Handler) updateArea(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) archiveArea(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+
 	if err := h.areas.Archive(
 		r.Context(),
-		tenantIDFromRequest(r),
+		tenantID,
 		r.PathValue("code"),
 		authn.UserIDFromContext(r.Context()),
 	); err != nil {
