@@ -51,6 +51,10 @@ func (f fakeRegistryDocs) UpdateStatus(ctx context.Context, tenantID, id string,
 	return nil
 }
 
+func (f fakeRegistryDocs) UpdateStatusTx(_ context.Context, _ *sql.Tx, _, _ string, _ registrydomain.CDStatus, _ time.Time) error {
+	return nil
+}
+
 type fakeSequenceAllocator struct{}
 
 func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx registrydomain.DBExecutor, tenantID, profileCode, areaCode string) (int, error) {

@@ -11,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
@@ -131,12 +133,27 @@ WHERE tenant_id = $1`
 }
 
 func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *registrydomain.ControlledDocument) error {
-	return r.createWithQueryer(ctx, r.db, doc)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin create CD tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapRegistryCreate), "tenant"); err != nil {
+		return fmt.Errorf("registry: authz check Create: %w", err)
+	}
+	if err := r.createWithQueryer(ctx, tx, doc); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx *sql.Tx, doc *registrydomain.ControlledDocument) error {
 	if tx == nil {
 		return errors.New("nil transaction")
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapRegistryCreate), "tenant"); err != nil {
+		return fmt.Errorf("registry: authz check CreateTx: %w", err)
 	}
 	return r.createWithQueryer(ctx, tx, doc)
 }
@@ -183,6 +200,21 @@ RETURNING id::text`
 
 func (r *PostgresControlledDocumentRepository) UpdateStatus(ctx context.Context, tenantID, id string, status registrydomain.CDStatus, updatedAt time.Time) error {
 	res, err := r.db.ExecContext(ctx,
+		`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`,
+		status, updatedAt, tenantID, id,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return registrydomain.ErrCDNotFound
+	}
+	return nil
+}
+
+func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Context, tx *sql.Tx, tenantID, id string, status registrydomain.CDStatus, updatedAt time.Time) error {
+	res, err := tx.ExecContext(ctx,
 		`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`,
 		status, updatedAt, tenantID, id,
 	)

@@ -253,6 +253,10 @@ func (f *fakeControlledDocumentRepository) UpdateStatus(_ context.Context, _, _ 
 	return nil
 }
 
+func (f *fakeControlledDocumentRepository) UpdateStatusTx(_ context.Context, _ *sql.Tx, _, _ string, _ registrydomain.CDStatus, _ time.Time) error {
+	return nil
+}
+
 type fakeSequenceAllocator struct {
 	next int
 }

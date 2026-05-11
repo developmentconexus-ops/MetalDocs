@@ -14,6 +14,7 @@ type ControlledDocumentRepository interface {
 	Create(ctx context.Context, doc *ControlledDocument) error
 	CreateTx(ctx context.Context, tx *sql.Tx, doc *ControlledDocument) error
 	UpdateStatus(ctx context.Context, tenantID, id string, status CDStatus, updatedAt time.Time) error
+	UpdateStatusTx(ctx context.Context, tx *sql.Tx, tenantID, id string, status CDStatus, updatedAt time.Time) error
 }
 
 type CDFilter struct {
