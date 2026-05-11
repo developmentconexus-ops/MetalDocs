@@ -1,6 +1,6 @@
 # EigenPal Controlled Package
 
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-11
 > **Scope:** What MetalDocs needs to know about the controlled EigenPal package.
 > **Out of scope:** Internal EigenPal implementation details; keep those in the fork docs.
 > **Key files:**
