@@ -2,14 +2,14 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/auth-tech-debt.md`.
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Rows
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
 | R-001 | Remove LegacyHeaderEnabled X-User-Id authn bypass | T-001 | S | critical | — | — | open | — |
-| R-002 | Wire identity-mutation audit emission (login/logout/pw-change/admin-reset/create-user) | T-002 | M | critical | — | — | open | — |
+| R-002 | Wire identity-mutation audit emission (login/logout/pw-change/admin-reset/create-user) | T-002 | M | critical | — | — | merged | Plan 6a (2026-05-11, commits 27c19011 + f27529e8) |
 | R-003 | Migrate auth error envelope to RFC 9457 problem+json | T-003 | M | major | — | — | open | — |
 | R-004 | Wrap CreateUser identity+role writes in single outer transaction | T-004 | M | major | — | — | open | — |
 | R-005 | Add IP-based rate limit on POST /api/v1/auth/login | T-005 | S | major | — | — | open | — |

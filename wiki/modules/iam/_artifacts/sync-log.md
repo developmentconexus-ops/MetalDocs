@@ -2,6 +2,18 @@
 
 One line per `metaldocs-module-doc-sync` run. Append-only.
 
+## 2026-05-11 · Plan 6a — close T-005
+
+- **Context:** Plan 6a (commit f27529e8) · emit recordAudit in handleUserRoleUpsert + handleCreateUser
+- **Anchors moved:** 0
+- **Symbols renamed:** 0
+- **T-NNN closed:** T-005 · evidence: handleUserRoleUpsert now calls h.recordAudit after writeJSON; handleCreateUser emits auth.user.created event
+- **R-NNN updated:** R-005 → merged · commit f27529e8
+- **§11 counts after:** Critical=2 Major=5 Minor=5 (unchanged)
+- **Tally gate:** PASS
+- **Patched files:** wiki/modules/iam-tech-debt.md · wiki/backlog/iam-refactor.md
+- **Structural changes noted:** none for iam (behavioral change in existing handlers only)
+
 ## 2026-05-11 · Plan 4 — capability namespace collapse + IAM dual-surface consolidation
 
 - **Context:** Plan 4 tasks 1-9 completed: deleted capabilities.go, role_capabilities.go, authorization.go, startup.go, area_membership/; renamed authz.ErrCapabilityDenied→ErrCapDenied; extended model.go to 18 typed Capability consts; migration 0186 reseeded doc.*→document.*

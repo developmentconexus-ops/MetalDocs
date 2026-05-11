@@ -27,7 +27,8 @@
 | P1 | 4 | Capability namespace collapse + IAM dual-surface consolidation | 8 commits | done 2026-05-11 |
 | P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | ~3 | pending |
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
-| P2 | 6 | Audit-trail completeness sweep + audit-module hardening | ~7 | pending |
+| P2 | 6a | Audit-trail completeness sweep (emission + sink consolidation) | 11 commits | done 2026-05-11 |
+| P2 | 6b | Audit tamper-evidence hash chain (T-004) | — | pending |
 | P3 | 7 | RFC 9457 envelope rollout | ~9 | pending |
 | P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | pending |
 | P4 | 9 | Transactional + idempotency hardening | ~4 | pending |
@@ -75,14 +76,22 @@
 - **Blockers:** Plan 4 (stable cap names).
 - **Status:** done 2026-05-11. Commits: `0dba5589` (CapRegistryObsolete/Supersede), `37cbcc7b` (PATCH taxonomy routes), `aa6d96a7` (obsolete/supersede cap routing), `1ab62d49` (migration 0187), `b9192b95` (IAM role_admin tier-2), `70aeccd2` (IAM user_area tier-2), `8b565d67` (documents tier-2), `2e156721` (registry tier-2), `d26ac392` (taxonomy tier-2), `4cd03873` (templates_v2 tier-2 + T-002 + T-004 + real authz wire), `fdcf90e7` (migration 0188). Spec: `docs/superpowers/specs/2026-05-11-plan-05-tripwire.md`.
 
-## Plan 6 · Audit-trail completeness sweep + audit-module hardening
+## Plan 6a · Audit-trail completeness sweep (emission + sink consolidation)
 
-- **Goal:** One canonical sink (`metaldocs.audit_events`). Every regulated mutation emits. Tamper-evidence (hash chain), retention policy, tenant_id, gated read endpoint.
-- **Touches:** `internal/modules/audit/` (add `tenant_id` column via migration; add `prev_hash` / `row_hash` hash-chain columns; add retention strategy — partitioning or scheduled purge per ADR; remove fire-and-forget at adapter sites); `apps/api/cmd/metaldocs-api/permissions.go` (gate `GET /api/v1/audit/events`); `internal/modules/iam/delivery/http/admin_handler.go:316` (emit on role upsert); `internal/modules/auth/application/service.go:117,279,358` (emit on login/logout/password/CreateUser); `internal/modules/registry/application/service.go:293` (emit on Obsolete/Supersede); `internal/modules/taxonomy/application/family_service.go:11` (add govLogger field) + `profile_service.go:41,55` + `area_service.go`; `internal/modules/documents/application/service.go:575` (move audit into tx); `internal/modules/templates_v2/repository/postgres.go:318` (point at canonical sink, drop `templates_v2_audit_log`); `internal/modules/taxonomy/application/governance.go` (collapse `governance_events` onto canonical); `internal/modules/registry/module.go:31` (drop reuse of taxonomy logger).
-- **Closes:** audit T-001/R-001, T-003/R-003, T-004/R-004, T-005/R-005, T-007/R-007, T-010/R-010; auth T-002/R-002; iam T-005/R-005; registry T-002/R-002, T-008/R-008; taxonomy T-004/R-004, T-005/R-005, T-010/R-010; documents T-005/R-005; templates_v2 T-013/R-013.
-- **Critical rows closed:** 8 (auth T-002, iam T-005, audit T-001 + T-004, registry T-002, taxonomy T-004 + T-005, + documents audit tx).
+- **Goal:** One canonical sink (`metaldocs.audit_events`). Every regulated mutation emits to it. Gated read endpoint, tenant_id, retention goroutine.
+- **Touches:** `internal/modules/audit/` (add `tenant_id` column via migration 0190; add `RecordTx` to Writer interface; retention goroutine); `apps/api/cmd/metaldocs-api/permissions.go` (gate `GET /api/v1/audit/events`); `internal/modules/iam/delivery/http/admin_handler.go` (emit on role upsert + createUser); `internal/modules/auth/delivery/http/handler.go` (emit on login/logout/password-change); `internal/modules/registry/application/service.go` (emit on Obsolete/Supersede); `internal/modules/taxonomy/application/family_service.go` (add govLogger field) + `profile_service.go` + `area_service.go`; `internal/modules/documents/application/service.go` (move audit into tx); `internal/modules/templates_v2/repository/postgres.go` (point at canonical sink); `internal/modules/taxonomy/application/audit_governance_adapter.go` (new — collapses governance_events onto canonical); `internal/modules/registry/module.go` + `taxonomy/module.go` (wire AuditWriter).
+- **Closes:** audit T-001/R-001, T-003/R-003, T-005/R-005, T-007/R-007; auth T-002/R-002; iam T-005/R-005; registry T-002/R-002, T-008/R-008; taxonomy T-004/R-004, T-005/R-005, T-010/R-010; documents T-005/R-005; templates_v2 T-013/R-013.
+- **Critical rows closed:** 7 (auth T-002, iam T-005, audit T-001, registry T-002, taxonomy T-004 + T-005 + T-010).
 - **Blockers:** Plan 3 (tenant_id resolution), Plan 4 (cap name in audit row).
-- **Split rule:** if hash-chain implementation balloons (own ADR, schema migration, validation job, ops runbook), split as Plan 6b and ship Plan 6a (emission completeness + sink consolidation + retention + gate + tenant_id) first.
+- **Status:** done 2026-05-11. Commits: `0279546f` (CapAuditRead + migration 0189), `6b34c277` (gate audit endpoint T-001), `1994bb84` (fix fire-and-forget T-005), `b5b077b7` (tenant_id column + RecordTx T-007), `27c19011` (auth audit handler T-002), `f27529e8` (IAM role upsert + createUser audit T-005/auth-T-002), `5bb06964` (registry governance event T-002), `20bf2067` (taxonomy profile/area emit T-005), `115cb635` (taxonomy family govLogger T-004), `0e106ed9` (documents RenameDocument tx T-005), `71a2dc53` (AuditGovernanceAdapter T-008/T-010). Spec: `docs/superpowers/specs/2026-05-11-plan-06-audit.md`.
+
+## Plan 6b · Audit tamper-evidence hash chain (T-004)
+
+- **Goal:** Hash chain (`prev_hash`, `row_hash`) on `metaldocs.audit_events`. A privileged actor cannot rewrite history undetected.
+- **Touches:** migration (add hash columns); `internal/modules/audit/infrastructure/postgres/writer.go` (hash-chain on INSERT, advisory lock or `SELECT ... FOR UPDATE` on last row); integrity-validation job or endpoint.
+- **Closes:** audit T-004/R-004.
+- **Critical rows closed:** 1 (audit T-004).
+- **Blockers:** Plan 6a.
 - **Status:** pending.
 
 ## Plan 7 · RFC 9457 envelope rollout (parallel to Plan 8)

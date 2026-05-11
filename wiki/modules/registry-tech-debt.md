@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/registry.md](registry.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/registry-refactor.md](../backlog/registry-refactor.md).
 
-**Last verified:** 2026-05-11 (Plan 5)
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Severity scale
 
@@ -40,8 +40,8 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-001`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR
 
-### T-002 · Audit-trail gap on Obsolete / Supersede
-- **Severity:** critical
+### T-002 · Audit-trail gap on Obsolete / Supersede — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** critical (closed)
 - **Surface:** `internal/modules/registry/application/service.go:309-317`
 - **Observation:** `changeStatus` performs get + active-guard + UPDATE only. No `s.govLogger.Log(...)` call. The create path emits governance events (`service.go:267-271`); the lifecycle path does not. Transitioning a controlled document from `active` to `obsolete` or `superseded` is a regulated QMS event under ISO 9001 — Critical trigger "Regulated audit-trail gap" fires.
 - **Evidence:** `_artifacts/02-flow-obsolete.md` §6
@@ -88,8 +88,8 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-007`](../backlog/registry-refactor.md)
 - **Linked ADR:** [wiki/decisions/0012-contract-first-api.md](../decisions/0012-contract-first-api.md)
 
-### T-008 · Cross-module audit sink — taxonomy logger reused
-- **Severity:** major
+### T-008 · Cross-module audit sink — taxonomy logger reused — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** major (closed)
 - **Surface:** `internal/modules/registry/module.go:31`; `internal/modules/taxonomy/application/governance_logger.go:18`
 - **Observation:** Registry wires its governance logger from `taxonomyapp.NewDBGovernanceLogger(deps.DB)`. Registry's audit emissions land in `governance_events` via taxonomy's adapter. Two coupled concerns: (a) the audit sink semantics belong to a platform-owned `internal/audit` per the audit module's port/adapter contract (see `wiki/modules/audit.md`), not to a sibling business module; (b) registry's debt items + retention policies become coupled to taxonomy refactors. Cross-module dependency that blocks audit's clean port adoption.
 - **Evidence:** `_artifacts/03-deps.md` §1 (OUT-edges)

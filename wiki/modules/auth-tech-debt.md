@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/auth.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/auth-refactor.md`.
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-11 (Plan 6a)
 
 ## Severity scale
 
@@ -18,8 +18,8 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked backlog row:** `backlog/auth-refactor.md#R-001`
 - **Linked ADR:** missing-ADR
 
-### T-002 · Audit-trail gap on identity mutations
-- **Severity:** critical
+### T-002 · Audit-trail gap on identity mutations — CLOSED 2026-05-11 (Plan 6a)
+- **Severity:** critical (closed)
 - **Surface:** `internal/modules/auth/application/service.go:117-126,279-326,358-397`; `internal/modules/iam/delivery/http/admin_handler.go:259-285`
 - **Observation:** Login, logout, password-change, admin password-reset, and `CreateUser` emit no audit-sink record. Only `log.Printf` (`handler.go:56,112`) is wired. `handleCreateUser` does NOT call `recordAudit` even though its sibling `handleReplaceUserRoles` does (`admin_handler.go:398`). Identity is a regulated/QMS surface under ISO 9001 controls. Trigger fired: regulated audit-trail gap.
 - **Evidence:** `_artifacts/02-flow-login.md` §audit; `_artifacts/02-flow-create-user.md` §6; `_artifacts/03-deps.md` §5.
