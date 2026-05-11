@@ -1,10 +1,10 @@
 # Token Syntax — `{name}` (docxtemplater native)
 
-> **Last verified:** 2026-04-25 (post-migration)
+> **Last verified:** 2026-05-10
 > **Scope:** Why `{name}` was chosen, what the format implies, comparison with the legacy `{{uuid}}` approach.
 > **Out of scope:** Migration mechanics (see `decisions/0003-token-syntax-migration.md`), placeholder concept overall (see `placeholders.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` — current `` `{${placeholder.name}}` `` insertion
+> - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — current `` `{${placeholder.name}}` `` insertion (renamed from `TemplateAuthorPage` 2026-05-10)
 > - `packages/editor-ui/src/MetalDocsEditor.tsx:54` — `templatePlugin` (detects `{name}`)
 
 ---
@@ -93,3 +93,4 @@ Backend substitution map: `{ customer_name: "Acme", revision: "1.2", ... }` — 
 - [placeholders.md](placeholders.md) — full concept
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — migration ADR
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md) — T4 used `{name}` fixture, validated approach
+- [modules/templates_v2.md §2](../modules/templates_v2.md) — architecture constraint: `{name}` single-brace eigenpal-native syntax required by the templates_v2 backend (oapi-codegen + `ValidatePlaceholders`)

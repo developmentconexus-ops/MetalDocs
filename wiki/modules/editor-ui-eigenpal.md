@@ -2,7 +2,7 @@
 
 > _Changelog: 2026-04-26 — added note that `applyVariables` is NOT used in writer mode (ADR 0008). 2026-05-04 — DocumentEditorPage consumer updated: isEditable gate, PDF polling wired. 2026-05-06 — eigenpal CSS overrides moved to `EditorChrome.module.css` (shared primitive); consumer paths updated (no longer under `v2/` sub-folder). 2026-05-06 — `templatePlugin` gated to `template-draft` mode only; `EditorMode` type expanded to three values; document editor layout switched to left rail._
 >
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-05-10
 > **Scope:** How MetalDocs wraps `@eigenpal/docx-js-editor`, what plugins are registered, autosave wiring, ProseMirror access patterns.
 > **Out of scope:** EigenPal fork internals (see `vendor/eigenpal/README.md` and the fork docs), placeholder semantics (see `concepts/placeholders.md`), template authoring page UX (see `modules/templates-v2.md`), toolbar overlay + eigenpal CSS overrides (see `modules/editor-chrome.md`), deferred editor backlog items (see `backlog/editor.md`).
 > **Key files:**
@@ -26,7 +26,7 @@
   - Plugin registration order (see `templatePlugin` gating below)
   - Imperative `ref` exposing `getDocumentBuffer()` for parent to grab DOCX bytes
 - **Consumers:**
-  - `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` (template authoring, mode=`template-draft`)
+  - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` (template authoring, mode=`template-draft`; renamed from `TemplateAuthorPage` 2026-05-10)
   - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx` (document fill-in/view, mode=`document-edit` when `isEditable`, otherwise `readonly`; non-draft docs also show `PDFCell` via `useDocumentPdfStatus`)
 
   Both consumers wrap `MetalDocsEditor` inside `EditorChrome` (see `modules/editor-chrome.md`), which owns the toolbar overlay and all eigenpal CSS overrides.
@@ -74,7 +74,7 @@ Imported from `@eigenpal/docx-js-editor`. Detects docxtemplater tokens (`{name}`
 - Provides sidebar chips
 - Exposes `TemplateTag[]` via plugin state
 
-**Status:** Active. MetalDocs now uses `{name}` syntax (post-migration 2026-04-25), so tokens are highlighted orange and listed in the sidebar natively. In template authoring, `TemplateAuthorPage` also reads `editorRef.current.getAgent().getVariables()` after editor changes and auto-syncs schema metadata from detected token names. See `concepts/placeholders.md`.
+**Status:** Active. MetalDocs now uses `{name}` syntax (post-migration 2026-04-25), so tokens are highlighted orange and listed in the sidebar natively. In template authoring, `TemplateEditorPage` also reads `editorRef.current.getAgent().getVariables()` after editor changes and auto-syncs schema metadata from detected token names. See `concepts/placeholders.md`.
 
 **`applyVariables` is NOT called in writer mode.** Tokens remain as literal `{name}` strings in the editor DOCX. Substitution occurs server-side at freeze/finalize via the fanout pipeline. Reason: eigenpal autosaves on every change — calling `applyVariables` in-editor would persist substituted values in the DOCX, destroying original tokens. A future "preview mode" (two-buffer design) would allow ephemeral browser-side substitution without affecting the autosaved edit buffer. See `decisions/0008-placeholder-fixed-catalog.md`.
 
@@ -94,7 +94,7 @@ Source: `packages/editor-ui/src/plugins/sidebarModelBridge.ts`. Optional. When t
 Source: `packages/editor-ui/src/plugins/mergefieldPlugin.ts`. Loaded by Vite (per network log) but not in the plugins array of `MetalDocsEditor.tsx`. May be legacy or invoked elsewhere. **Action item:** confirm whether to remove or document its real entry point.
 
 ### `filterTransactionGuard` (page-specific)
-`frontend/apps/web/src/editor-adapters/filter-transaction-guard.ts`. Passed as `externalPlugins` from `TemplateAuthorPage`. Filters specific transactions to prevent unwanted edits in template mode.
+`frontend/apps/web/src/editor-adapters/filter-transaction-guard.ts`. Passed as `externalPlugins` from `TemplateEditorPage`. Filters specific transactions to prevent unwanted edits in template mode.
 
 ## Modes
 
@@ -107,7 +107,7 @@ MetalDocs uses three modes instead of eigenpal's two (`editing` / `viewing`):
 
 | MetalDocs mode | eigenpal `mode` | `templatePlugin` | Autosave | Consumer |
 |---|---|---|---|---|
-| `template-draft` | `editing` | included | yes | `TemplateAuthorPage` |
+| `template-draft` | `editing` | included | yes | `TemplateEditorPage` |
 | `document-edit` | `editing` | **skipped** | yes | `DocumentEditorPage` (writer session) |
 | `readonly` | `viewing` | **skipped** | no | `DocumentEditorPage` (no writer session) |
 
@@ -201,7 +201,8 @@ This checklist validates MetalDocs integration only. EigenPal rendering fidelity
 - [concepts/placeholders.md](../concepts/placeholders.md) — placeholder schema and `{name}` token format
 - [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md) — approve → freeze → fanout → PDF artifact
 - [modules/editor-chrome.md](editor-chrome.md) — toolbar overlay primitive + eigenpal CSS overrides (used by both consumers)
-- [modules/templates-v2.md](templates-v2.md) — TemplateAuthorPage consumer (`template-draft` mode)
+- [modules/templates-v2.md](templates-v2.md) — TemplateEditorPage consumer (`template-draft` mode; frontend doc)
+- [modules/templates_v2.md](templates_v2.md) — backend module the editor authors against (Arc42 doc); eigenpal is the authoring surface for regulated DOCX templates
 - [modules/documents.md](documents.md) — DocumentEditorPage consumer (`document-edit` / `readonly` modes); left-rail layout
 - [backlog/editor.md](../backlog/editor.md) — deferred Metadados, Revisões, Aprovadores sidebar items; cross-cutting note on templatePlugin gating
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md) — T7 outline plugin origin + caveats

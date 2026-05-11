@@ -15,6 +15,8 @@ export type StepConfirmationProps = {
   selectedAreaIds: string[];
   onBack: () => void;
   onSubmit: () => void;
+  isSubmitting?: boolean;
+  submitError?: string | null;
 };
 
 // k % 3 === 1 pattern: indices 1, 4, 7, 10 — matches design reference
@@ -31,6 +33,8 @@ export function StepConfirmation({
   selectedAreaIds,
   onBack,
   onSubmit,
+  isSubmitting = false,
+  submitError = null,
 }: StepConfirmationProps): JSX.Element {
   const [confirmed, setConfirmed] = useState(false);
   const user = useAuthStore((s) => s.user);
@@ -52,7 +56,6 @@ export function StepConfirmation({
   const autorValue = user?.displayName ?? '—';
 
   function handleSubmit() {
-    // TODO(novo-template-wizard:confirmacao-backend-submit): replace with real POST /api/v2/templates when API wiring ships. Backlog: wiki/backlog/novo-template-wizard.md.
     onSubmit();
   }
 
@@ -131,16 +134,24 @@ export function StepConfirmation({
         </span>
       </label>
 
+      {submitError && (
+        <div role="alert" className={styles.submitError}>
+          {submitError}
+        </div>
+      )}
+
       <WizardFooter
         stepLabel={
-          confirmed
-            ? 'Etapa 5 de 5 · Tudo pronto para criar'
-            : 'Etapa 5 de 5 · Confirme para continuar'
+          isSubmitting
+            ? 'Etapa 5 de 5 · Criando template…'
+            : confirmed
+              ? 'Etapa 5 de 5 · Tudo pronto para criar'
+              : 'Etapa 5 de 5 · Confirme para continuar'
         }
         showBack
         onBack={onBack}
-        primaryLabel="Criar e abrir editor →"
-        primaryDisabled={!confirmed}
+        primaryLabel={isSubmitting ? 'Criando…' : 'Criar e abrir editor →'}
+        primaryDisabled={!confirmed || isSubmitting}
         onAdvance={handleSubmit}
       />
     </div>

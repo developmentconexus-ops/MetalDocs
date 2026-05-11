@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import {
@@ -9,6 +9,7 @@ import {
   type ScopeType,
   type PermissionsMode,
 } from '../state/templateWizard.reducer';
+import { createTemplate } from '../api/templatesV2';
 import { WizardShell } from '../../shared/components/wizard/WizardShell';
 import type { StepperStep } from '../../../components/ui/Stepper';
 import { StepScope } from '../components/wizard/steps/StepScope';
@@ -16,6 +17,21 @@ import { StepIdentity } from '../components/wizard/steps/StepIdentity';
 import { StepStructure } from '../components/wizard/steps/StepStructure';
 import { StepPermissions } from '../components/wizard/steps/StepPermissions';
 import { StepConfirmation } from '../components/wizard/steps/StepConfirmation';
+
+/** Converts a display name into a stable URL-safe key (max 64 chars). */
+function slugifyName(name: string): string {
+  // Combining diacritical marks U+0300–U+036F (written via RegExp to avoid
+  // encoding-sensitive literal unicode in source).
+  const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(COMBINING, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
+
 
 const TPL_STEPS: StepperStep[] = [
   { id: '1', label: 'Perfil' },
@@ -34,6 +50,8 @@ function parseStepParam(raw: string | null): TemplateWizardStep {
 export function TemplateWizardPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [state, dispatch] = useReducer(
     templateWizardReducer,
     undefined,
@@ -87,8 +105,20 @@ export function TemplateWizardPage(): JSX.Element {
     dispatch({ type: 'SET_PROFILE', code });
   }
 
-  function handleSubmit() {
-    navigate('/templates-v2');
+  async function handleSubmit() {
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const { template, version } = await createTemplate({
+        key: slugifyName(state.name),
+        name: state.name,
+        description: state.description.trim() || undefined,
+      });
+      navigate(`/templates-v2/${template.id}/versions/${version.version_number}`);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Erro ao criar template.');
+      setIsSubmitting(false);
+    }
   }
 
   function handleCancel() {
@@ -196,7 +226,9 @@ export function TemplateWizardPage(): JSX.Element {
           selectedRoleIds={state.selectedRoleIds}
           selectedAreaIds={state.selectedAreaIds}
           onBack={() => goToStep(4)}
-          onSubmit={handleSubmit}
+          onSubmit={() => void handleSubmit()}
+          isSubmitting={isSubmitting}
+          submitError={submitError}
         />
       )}
     </WizardShell>

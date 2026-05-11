@@ -1,6 +1,6 @@
 # ADR 0001: Adopt eigenpal as the document editor
 
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-10
 > **Status:** Accepted
 > **Date:** ~2026-04 (verify from git log)
 > **Scope:** Editor library choice for MetalDocs WYSIWYG.
@@ -46,12 +46,19 @@ As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from
 ## Verification
 
 - Spike T1–T8 all run + reviewed (`references/eigenpal-spike.md`)
-- Production usage: `TemplateAuthorPage`, `DocumentEditorPage`
+- Production usage: `TemplateEditorPage` (renamed from `TemplateAuthorPage` 2026-05-10), `DocumentEditorPage`
+
+## Affected modules
+
+- `TemplateEditorPage` — eigenpal in `template-draft` mode; `templatePlugin` detects `{name}` tokens. See `wiki/modules/editor-ui-eigenpal.md`.
+- `DocumentEditorPage` — eigenpal in `document-edit` / `readonly` mode (no `templatePlugin`). See `wiki/modules/documents.md`.
+- `templates_v2` — backend module whose authoring constraints (placeholder syntax, editor wiring) are grounded in this decision. See [`wiki/modules/templates_v2.md`](../modules/templates_v2.md).
 
 ## Cross-refs
 
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md)
 - [references/eigenpal-controlled-package.md](../references/eigenpal-controlled-package.md)
 - [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md)
+- [modules/templates_v2.md](../modules/templates_v2.md) — backend module that authors against eigenpal (§2 Architecture Constraints)
 - [decisions/0002-zone-purge.md](0002-zone-purge.md)
 - [decisions/0003-token-syntax-migration.md](0003-token-syntax-migration.md)
