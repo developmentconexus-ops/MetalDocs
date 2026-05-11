@@ -18,6 +18,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 // supersedeIntRows returns a single int64 row.
@@ -129,7 +130,7 @@ func TestSupersedeHandler(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-2/supersede", strings.NewReader(`{"superseded_document_id":"11111111-1111-1111-1111-111111111111"}`))
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("X-Tenant-ID", "tenant-1")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Idempotency-Key", "idem-1")
 			req.Header.Set("If-Match", "\"v5\"")

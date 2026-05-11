@@ -11,6 +11,7 @@ import (
 	apiv2 "metaldocs/internal/api/v2"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeUserAreaWriteRepository struct{}
@@ -43,6 +44,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v2/iam/area-memberships?userId=user-1&areaCode=ops&revokedBy=attacker", nil)
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "session-user", nil))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

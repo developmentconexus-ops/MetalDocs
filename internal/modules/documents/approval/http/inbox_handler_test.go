@@ -13,6 +13,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeReadServiceInbox struct {
@@ -72,7 +73,7 @@ func TestInboxHandler_HappyEmptyList(t *testing.T) {
 	mux := inboxTestMux(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
 
@@ -95,7 +96,7 @@ func TestInboxHandler_ValidLimitParam(t *testing.T) {
 	mux := inboxTestMux(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox?area_code=finance&limit=40&offset=10", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
 
@@ -118,7 +119,7 @@ func TestInboxHandler_InvalidLimitTooLarge(t *testing.T) {
 	mux := inboxTestMux(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox?limit=101", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
 
@@ -150,7 +151,7 @@ func TestInboxHandler_PopulatesTitleQuorumAndTotal(t *testing.T) {
 	mux := inboxTestMux(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox?limit=1", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
 

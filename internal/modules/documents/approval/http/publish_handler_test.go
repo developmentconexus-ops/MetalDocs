@@ -16,6 +16,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeReadServicePublish struct {
@@ -96,7 +97,7 @@ func TestPublishHandler(t *testing.T) {
 				inst: &domain.Instance{ID: "inst-1", DocumentID: "doc-1"},
 			}
 			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/publish", nil)
-			req.Header.Set("X-Tenant-ID", "tenant-1")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Idempotency-Key", "idem-1")
 			req.Header.Set("If-Match", "\"v3\"")
@@ -173,7 +174,7 @@ func TestSchedulePublishHandler(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/schedule-publish", strings.NewReader(`{"effective_from":"2026-05-01T12:00:00Z"}`))
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("X-Tenant-ID", "tenant-1")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Idempotency-Key", "idem-1")
 			req.Header.Set("If-Match", "\"v4\"")

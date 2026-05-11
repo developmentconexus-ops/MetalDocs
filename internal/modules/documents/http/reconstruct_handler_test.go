@@ -12,6 +12,7 @@ import (
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 	"metaldocs/internal/modules/render/fanout"
 )
 
@@ -30,7 +31,7 @@ func (f fakeReconstructService) GetReconstruction(_ context.Context, _, _, _ str
 func newReconstructReq(docID string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/"+docID+"/reconstruct", nil)
 	req.SetPathValue("id", docID)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{}))
 	return req
 }
