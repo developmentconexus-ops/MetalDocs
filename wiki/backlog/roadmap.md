@@ -23,7 +23,7 @@
 
 | Prio | Plan | Title | PRs | Status |
 |------|------|-------|-----|--------|
-| P0 | 3 | Supply-chain unblock + tenant resolution platform fix | ~3 | pending |
+| P0 | 3 | Supply-chain unblock + tenant resolution platform fix | PR2 (tenant platform), PR3 (module sweep) | done 2026-05-11 |
 | P1 | 4 | Capability namespace collapse + IAM dual-surface consolidation | ~4 | pending |
 | P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | ~3 | pending |
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | ~5 | pending |
@@ -46,7 +46,7 @@
 - **Closes:** editor-ui-eigenpal T-001 / R-001; templates_v2 T-003 / R-003; taxonomy T-001 / R-001; registry T-005 / R-005, T-006 / R-006.
 - **Critical rows closed:** 4 (editor-ui-eigenpal T-001, templates_v2 T-003, taxonomy T-001, + registry tenant side).
 - **Blockers:** none.
-- **Status:** pending.
+- **Status:** done 2026-05-11. PRs: PR2 (session-bound tenant platform), PR3 (module-sweep — all X-Tenant-ID header reads migrated to `tenant.FromContext`).
 
 ## Plan 4 · Capability namespace collapse + IAM dual-surface consolidation
 
