@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 type UserAreaRepository struct {
@@ -18,7 +19,7 @@ func NewUserAreaRepository(db *sql.DB) *UserAreaRepository {
 	return &UserAreaRepository{db: db}
 }
 
-func (r *UserAreaRepository) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error) {
+func (r *UserAreaRepository) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]iamdomain.UserProcessArea, error) {
 	const q = `
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
 FROM user_process_areas
@@ -34,7 +35,7 @@ ORDER BY area_code ASC, effective_from DESC
 	}
 	defer rows.Close()
 
-	result := make([]domain.UserProcessArea, 0, 8)
+	result := make([]iamdomain.UserProcessArea, 0, 8)
 	for rows.Next() {
 		item, err := scanUserProcessArea(rows)
 		if err != nil {
@@ -48,16 +49,25 @@ ORDER BY area_code ASC, effective_from DESC
 	return result, nil
 }
 
-func (r *UserAreaRepository) Insert(ctx context.Context, membership domain.UserProcessArea) error {
+func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin insert area tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
+		return fmt.Errorf("iam: authz check Insert area: %w", err)
+	}
+
 	const q = `
 INSERT INTO user_process_areas
   (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
 VALUES
   ($1, $2::uuid, $3, $4, $5, $6, $7)
 `
-	_, err := r.db.ExecContext(
-		ctx,
-		q,
+	if _, err := tx.ExecContext(
+		ctx, q,
 		membership.UserID,
 		membership.TenantID,
 		membership.AreaCode,
@@ -65,14 +75,23 @@ VALUES
 		membership.EffectiveFrom,
 		membership.EffectiveTo,
 		membership.GrantedBy,
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("insert user process area: %w", err)
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin close area tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
+		return fmt.Errorf("iam: authz check CloseActive area: %w", err)
+	}
+
 	const q = `
 UPDATE user_process_areas
 SET effective_to = $4
@@ -81,13 +100,13 @@ WHERE user_id = $1
   AND area_code = $3
   AND effective_to IS NULL
 `
-	if _, err := r.db.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo); err != nil {
+	if _, err := tx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo); err != nil {
 		return fmt.Errorf("close active user process area: %w", err)
 	}
-	return nil
+	return tx.Commit()
 }
 
-func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error {
+func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, newMembership iamdomain.UserProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin grant transaction: %w", err)
@@ -95,6 +114,10 @@ func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, new
 	defer func() {
 		_ = tx.Rollback()
 	}()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
+		return fmt.Errorf("iam: authz check GrantAtomic: %w", err)
+	}
 
 	const closeQ = `
 UPDATE user_process_areas
@@ -151,7 +174,7 @@ VALUES
 	return nil
 }
 
-func (r *UserAreaRepository) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error) {
+func (r *UserAreaRepository) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*iamdomain.UserProcessArea, error) {
 	const q = `
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
 FROM user_process_areas
@@ -178,8 +201,8 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
-func scanUserProcessArea(s scanner) (domain.UserProcessArea, error) {
-	var item domain.UserProcessArea
+func scanUserProcessArea(s scanner) (iamdomain.UserProcessArea, error) {
+	var item iamdomain.UserProcessArea
 	var effectiveTo sql.NullTime
 	var grantedBy sql.NullString
 	if err := s.Scan(
@@ -191,7 +214,7 @@ func scanUserProcessArea(s scanner) (domain.UserProcessArea, error) {
 		&effectiveTo,
 		&grantedBy,
 	); err != nil {
-		return domain.UserProcessArea{}, fmt.Errorf("scan user process area: %w", err)
+		return iamdomain.UserProcessArea{}, fmt.Errorf("scan user process area: %w", err)
 	}
 	if effectiveTo.Valid {
 		value := effectiveTo.Time
