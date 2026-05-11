@@ -1,6 +1,6 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-11
+> **Last verified:** 2026-05-11 (roadmap index added)
 > **Purpose:** Single source of truth for codebase knowledge. Read this first — drill into folders only after.
 
 ## How to use this wiki
@@ -14,6 +14,7 @@
 ## Index
 
 ### Backlog (deferred / intentional stubs)
+- **[backlog/roadmap.md](backlog/roadmap.md) — ordered refactor roadmap (11 sub-plans P0–P5, ~57 PRs). Read before starting a refactor session to know which Plan is next; update status when a Plan closes. (Last verified: 2026-05-11)**
 - [backlog/templates_v2-refactor.md](backlog/templates_v2-refactor.md) — templates_v2 refactor backlog (16 rows: R-001..R-014 code-quality / authz / spec / envelope / schema items; R-100 retire `templates-v2.md` predecessor; R-101 rename module dir + route prefix) (Last verified: 2026-05-10)
 - [backlog/library-screen.md](backlog/library-screen.md) — **7 deferred items** for `/documents` Library screen: ActivityPanel inbox + audit wiring, 3 mocked stat cards, Filtros panel, Exportar action. Each item has backend prereq + frontend steps. (Last verified: 2026-05-06)
 - [backlog/novo-documento.md](backlog/novo-documento.md) — **6 deferred items** for the novo-documento wizard (`/documents-v2/new`): visibility enforcement, sequence preview, template versions, blank template, slot rollback, profile counts. (Last verified: 2026-05-07)
