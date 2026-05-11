@@ -284,7 +284,13 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		h.writeAuthError(w, err, traceID)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"userId": strings.TrimSpace(defaultString(req.UserID, req.Username))})
+	createdUserID := strings.TrimSpace(defaultString(req.UserID, req.Username))
+	writeJSON(w, http.StatusCreated, map[string]any{"userId": createdUserID})
+	h.recordAudit(r, createdUserID, "auth.user.created", map[string]any{
+		"username": req.Username,
+		"roles":    req.Roles,
+		"email":    req.Email,
+	})
 }
 
 func (h *AdminHandler) handlePatchUser(w http.ResponseWriter, r *http.Request, userID, traceID string) {
@@ -360,6 +366,10 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 		"userId":      userID,
 		"role":        string(role),
 		"displayName": strings.TrimSpace(req.DisplayName),
+	})
+	h.recordAudit(r, userID, "iam.user.role.upserted", map[string]any{
+		"role":       string(role),
+		"assignedBy": assignedBy,
 	})
 }
 
