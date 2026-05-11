@@ -98,12 +98,13 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
 
-### T-012 · iam `AuthorizationService` / `ResourceCtx` / `ErrSoDViolation` unwired (cross-module)
+### T-012 · iam `AuthorizationService` / `ResourceCtx` / `ErrSoDViolation` unwired (cross-module) — CLOSED Plan 4
 - **Severity:** minor
-- **Surface:** `internal/modules/iam/application/authorization.go` (not imported by approval)
-- **Observation:** Per `wiki/modules/iam-tech-debt.md` T-003, an alternate authz surface exists in iam but is unwired. Approval module enforces SoD via its own pure-domain `domain/sod.go:15` `CheckSoD` and does not consume the iam service. Recorded here only as cross-module pointer; ownership stays in iam-tech-debt.
+- **Surface:** `internal/modules/iam/application/authorization.go` (DELETED Plan 4 — iam T-003 closed; approval never imported it)
+- **Observation:** iam `AuthorizationService` was deleted in Plan 4 (2026-05-11). Approval module enforces SoD via its own pure-domain `domain/sod.go:15` `CheckSoD` and never consumed the iam service. No adoption path needed; cross-module pointer moot. T-012 closed.
+- **Resolution:** Deletion confirmed via Plan 4 commit b17a09e8. No approval-side change required.
 - **Evidence:** `_artifacts/00-context.md` Decision A.
-- **Linked backlog row:** `backlog/approval-refactor.md#R-012`
+- **Linked backlog row:** `backlog/approval-refactor.md#R-012` (merged)
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 
 ---

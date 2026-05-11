@@ -169,7 +169,7 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/application/fillin_service.go` | `FillinService` | type | Placeholder-value writes |
 | `internal/modules/documents/application/fillin_authz.go:9` | typed `iamdomain.Capability` consts | imports | Cross-ref iam T-001 |
 | `internal/modules/documents/application/cd_initializer.go` | `CDDocumentInitializer` | type | Registry-side hook for atomic CD create |
-| `internal/modules/documents/approval/application/submit_service.go:43` | `SubmitService.SubmitRevisionForReview` | func | Tier-2 `authz.Require("doc.submit", areaCode)` at `:85` |
+| `internal/modules/documents/approval/application/submit_service.go:43` | `SubmitService.SubmitRevisionForReview` | func | Tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` at `:85` |
 | `internal/modules/documents/approval/application/decision_service.go` | `DecisionService` | type | Signoff approve/reject/publish/supersede/obsolete |
 | `internal/modules/documents/delivery/http/handler.go:76` | `NewHandlerWithSubmit` | func | Wires db + submitSvc for atomic finalize |
 | `internal/modules/documents/delivery/http/handler.go:145` | `listDocuments` | func | `GET /api/v2/documents` |
@@ -197,7 +197,7 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | GET | `/api/v2/documents/stats` | — | `Handler.documentStats` (`handler.go:174`) | role |
 | GET | `/api/v2/documents/{id}` | `getDocumentV2` | `Handler.getDocument` (`handler.go:114`) | role + ownership |
 | PATCH | `/api/v2/documents/{id}` | — | `Handler.renameDocument` (`handler.go:285`) | role + ownership; **dup registration at `:86`+`:115`** (T-004) |
-| POST | `/api/v2/documents/{id}/finalize` | — (path at `openapi.yaml:3251`) | `Handler.finalizeDocument` (`handler.go:316`) | role + ownership + tier-2 `authz.Require("doc.submit", areaCode)` |
+| POST | `/api/v2/documents/{id}/finalize` | — (path at `openapi.yaml:3251`) | `Handler.finalizeDocument` (`handler.go:316`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
 | POST | `/api/v2/documents/{id}/archive` | — | `Handler.archiveDocument` | role |
 | POST | `/api/v2/documents/{id}/duplicate` | — | `Handler.duplicateDocument` | role |
 | GET/POST/PATCH/DELETE | `/api/v2/documents/{id}/comments[/{commentId}]` | — | comments CRUD | role + ownership |
@@ -206,10 +206,10 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | GET | `/api/v2/documents/{id}/revisions` | — | revisions URL handler | role |
 | POST | `/api/v2/documents/{id}/export/pdf` | — | `ExportHandler` | role |
 | GET | `/api/v2/documents/{id}/export/docx-url` | — | `ExportHandler` | role |
-| POST | `/api/v2/documents/{id}/submit` | — | `ApprovalHandler` (`approval/http/router.go`) | tier-2 `doc.submit` |
-| POST | `/api/v2/documents/{id}/signoff` | — | `ApprovalHandler` | tier-2 `doc.signoff` |
+| POST | `/api/v2/documents/{id}/submit` | — | `ApprovalHandler` (`approval/http/router.go`) | tier-2 `document.submit` |
+| POST | `/api/v2/documents/{id}/signoff` | — | `ApprovalHandler` | tier-2 `document.signoff` |
 | POST | `/api/v2/documents/{id}/cancel` | — | `ApprovalHandler` | tier-2 |
-| POST | `/api/v2/documents/{id}/publish` | — | `ApprovalHandler` | tier-2 `doc.publish` |
+| POST | `/api/v2/documents/{id}/publish` | — | `ApprovalHandler` | tier-2 `document.publish` |
 | POST | `/api/v2/documents/{id}/schedule-publish` | — | `ApprovalHandler` | tier-2 |
 | POST | `/api/v2/documents/{id}/supersede` | — | `ApprovalHandler` | tier-2 |
 | POST | `/api/v2/documents/{id}/obsolete` | — | `ApprovalHandler` | tier-2 |
@@ -296,7 +296,7 @@ sequenceDiagram
     SS->>DB: BeginTx
     SS->>DB: setAuthzGUC (actor, tenant)
     SS->>SS: loadDocumentAreaCode
-    SS->>DB: authz.Require(ctx, tx, "doc.submit", areaCode)
+    SS->>DB: authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode)
     SS->>AR: InsertInstance → INSERT approval_instances (tripwire-gated)
     SS->>AR: InsertStageInstances → INSERT approval_stage_instances (eligible_actor_ids)
     SS->>DB: UPDATE documents SET status='under_review' WHERE status='draft'  (fires enforce_snapshot_on_submit_trg)
@@ -313,12 +313,12 @@ Source: `_artifacts/02-flow-finalizeDocument.md`. Full tripwire defense-in-depth
 
 | From | To | Trigger | Authz cap (tier-2) | Surface |
 |---|---|---|---|---|
-| draft | under_review | `POST .../finalize` (handler) → `SubmitService.SubmitRevisionForReview` | `doc.submit` (`submit_service.go:85`) | `approval_instances` INSERT + `documents.status` UPDATE in one tx |
-| under_review | approved | `POST .../signoff` final-stage | `doc.signoff` | `approval_signoffs` INSERT |
-| approved | published | `POST .../publish` | `doc.publish` | `documents.status='published'` + governance event |
-| published | superseded | `POST .../supersede` | `doc.supersede` | new revision created; old marked superseded |
-| published | obsolete | `POST .../obsolete` | `doc.obsolete` | `documents.status='obsolete'` |
-| under_review | draft (rejected) | `POST .../signoff` reject | `doc.signoff` | `approval_instances.status='rejected'`; `documents.status` rollback |
+| draft | under_review | `POST .../finalize` (handler) → `SubmitService.SubmitRevisionForReview` | `document.submit` (`submit_service.go:85`) | `approval_instances` INSERT + `documents.status` UPDATE in one tx |
+| under_review | approved | `POST .../signoff` final-stage | `document.signoff` | `approval_signoffs` INSERT |
+| approved | published | `POST .../publish` | `document.publish` | `documents.status='published'` + governance event |
+| published | superseded | `POST .../supersede` | `document.supersede` | new revision created; old marked superseded |
+| published | obsolete | `POST .../obsolete` | `document.obsolete` | `documents.status='obsolete'` |
+| under_review | draft (rejected) | `POST .../signoff` reject | `document.signoff` | `approval_instances.status='rejected'`; `documents.status` rollback |
 
 ### Failure modes (current legacy envelope, T-001)
 
@@ -455,7 +455,7 @@ Top 3 (by severity, then blast radius):
 | Signoff | Row in `approval_signoffs`; per-stage approve/reject |
 | Tripwire | Postgres trigger `enforce_capability_asserted` reading `metaldocs.asserted_caps` GUC |
 | `setAuthzGUC` | Helper at `approval/application/authz_guc.go:11` that primes the GUC for tripwire |
-| `doc.submit` | Tier-2 capability string asserted at `submit_service.go:85`; namespace `doc.*` |
+| `document.submit` | Tier-2 capability string asserted at `submit_service.go:85`; renamed from `doc.submit` in Plan 4 (migration 0186) |
 
 ---
 

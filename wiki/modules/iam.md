@@ -404,7 +404,7 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
 | Term | Definition |
 |---|---|
-| Capability | Fine-grained permission string (e.g. `doc.view`) consumed by tier-1 CanDo. |
+| Capability | Fine-grained permission string (e.g. `document.view`) consumed by tier-1 CanDo. Typed as `iamdomain.Capability`; 18 consts in `model.go` (namespace `document.*` / `template.*`). |
 | Role | Named bundle of capabilities; 5 canonical (`viewer`, `editor`, `author`, `approver`, `system_admin`) + 3 area-only (`signer`, `area_admin`, `qms_admin`). |
 | Tier-1 | Edge / HTTP middleware authz check using `CapabilityService.CanDo`. |
 | Tier-2 | In-tx area-scoped authz check using `authz.Require(ctx, tx, cap, areaCode)`. |
