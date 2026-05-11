@@ -22,7 +22,6 @@ type Finding struct {
 var allowedTxPackages = []string{
 	"approval/application",
 	"jobs/",
-	"iam/area_membership",
 }
 
 // RunAll runs every analyzer over the given patterns and aggregates findings.
