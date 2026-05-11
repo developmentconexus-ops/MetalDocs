@@ -354,11 +354,11 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 
 ### 8.1 Authentication & Authorization
 - Tier-1 (HTTP edge): role gate via `hasAnyRole(roleAdmin, roleDocumentFiller)` (`handler.go:870`) + ownership (`IsDocumentOwner` `:880`). Role strings `system_admin` / `document_filler` at `handler.go:26, :28`.
-- Tier-2 (in-tx): `authz.Require(ctx, tx, "doc.submit", areaCode)` (`submit_service.go:85`). Capability strings live in the `doc.*` namespace.
-- Typed capabilities: `internal/modules/documents/application/fillin_authz.go:9` consumes `iamdomain.Capability` consts. Module straddles both namespaces (T-008; iam T-001).
+- Tier-2 (in-tx): `authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode)` (`submit_service.go:85`). Capability value `"document.submit"` (Plan 4: previously `"doc.submit"`, closed T-008 / iam T-001).
+- Typed capabilities: `internal/modules/documents/application/fillin_authz.go:9` consumes `iamdomain.Capability` consts. Module now uses typed namespace exclusively (T-008 closed).
 - Capability adapter: `internal/modules/documents/application/ports.go` declares `CapabilityChecker`; impl `capabilityServiceAdapter` at `apps/api/internal/wiring/documents.go:14`; `NewCapabilityChecker` factory at `:24` (ADR 0007 J2 amendment).
 - Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Reads `metaldocs.asserted_caps` GUC set by `setAuthzGUC` (`approval/application/authz_guc.go:11`). **Not attached to `documents` table** — T-003.
-- Sentinel: `iamapp.ErrCapabilityDenied` imported at `handler.go:17` (cross-refs iam T-009).
+- Sentinel: `iamapp.ErrCapabilityDenied` imported at `handler.go:17`; `authz.ErrCapDenied` (struct) also imported (iam T-009 closed by Plan 4 — renamed from `authz.ErrCapabilityDenied`).
 
 ### 8.2 Error envelope
 - Current: legacy `{error:{code,message,details,trace_id}}` via `httpErr` + `mapErr` (`handler.go:958..1013`).
@@ -407,7 +407,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Duplicate route registration (`handler.go:86/:115`) | `tech-debt: missing-ADR` (T-004) |
 | `audit.Write` outside SQL UPDATE tx in rename | `tech-debt: missing-ADR` (T-005) |
 | Audit emission via consumer-port interface (no audit/domain import) | `tech-debt: missing-ADR` (T-007) |
-| `doc.*` string capability namespace alongside typed `iamdomain.Capability` | `tech-debt: missing-ADR` (T-008) |
+| Capability namespace unified to typed `iamdomain.Capability` (`document.*`); `doc.submit` literal replaced with `string(iamdomain.CapDocumentSubmit)` | Plan 4 (2026-05-11) — closed T-008 |
 | `document_placeholder_values.revision_id` FK target | `tech-debt: missing-ADR` (T-009) |
 
 ---
@@ -416,7 +416,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 
 | Goal | Scenario | Pass criteria |
 |---|---|---|
-| Authz isolation (approval) | A user without `doc.submit` calls `POST /finalize` | 403; `approval_instances` unchanged; tripwire would fire even if tier-2 bypassed |
+| Authz isolation (approval) | A user without `document.submit` calls `POST /finalize` | 403; `approval_instances` unchanged; tripwire would fire even if tier-2 bypassed |
 | Authz isolation (documents table) | A user with stale role token calls `PATCH /documents/{id}` | 403 from role gate; **defense-in-depth gap T-003: no in-tx check** |
 | Atomic CD create | Crash mid-registry insert | Whole tx rolls back; `cd_sequence_counters` unchanged (ADR 0011) |
 | Audit completeness on rename | Crash between UPDATE and audit.Write | **T-005: row mutated, no audit row** — fails today |
@@ -430,6 +430,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 
 Pointer-only. Body in `wiki/modules/documents-tech-debt.md`. Severity rubric in template `tech-debt-register.md`.
 
+Summary counts (T-008 closed Plan 4; all rows counted by tally including closed):
 - Critical: 1
 - Major: 5
 - Minor: 4
