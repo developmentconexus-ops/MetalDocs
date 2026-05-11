@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"sync"
 
@@ -24,6 +25,10 @@ func (w *Writer) Record(_ context.Context, event domain.Event) error {
 	return nil
 }
 
+func (w *Writer) RecordTx(ctx context.Context, tx *sql.Tx, event domain.Event) error {
+	return w.Record(ctx, event)
+}
+
 func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]domain.Event, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -42,6 +47,9 @@ func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]
 			continue
 		}
 		if resourceID != "" && !strings.EqualFold(event.ResourceID, resourceID) {
+			continue
+		}
+		if query.TenantID != "" && event.TenantID != query.TenantID {
 			continue
 		}
 		items = append(items, event)

@@ -388,6 +388,27 @@ func main() {
 	defer stopOrphans()
 	mux.Handle("/api/v1/metrics", httpObs.MetricsHandler())
 
+	// Audit retention - AUDIT_RETENTION_DAYS=0 disables (default disabled).
+	if retentionDays, _ := strconv.Atoi(strings.TrimSpace(os.Getenv("AUDIT_RETENTION_DAYS"))); retentionDays > 0 && deps.SQLDB != nil {
+		go func() {
+			ticker := time.NewTicker(24 * time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
+					if _, err := deps.SQLDB.ExecContext(ctx,
+						`DELETE FROM metaldocs.audit_events WHERE occurred_at < $1`, cutoff,
+					); err != nil {
+						slog.Warn("audit retention purge failed", "error", err)
+					}
+				}
+			}
+		}()
+	}
+
 	handler := cors.Wrap(originProtection.Wrap(authMiddleware.Wrap(iamMiddleware.Wrap(httpObs.Wrap(rateLimiter.Wrap(mux))))))
 
 	addr := ":8080"
@@ -478,6 +499,7 @@ func (a *documentsV2AuditAdapter) Write(ctx context.Context, tenantID, actorID, 
 		ResourceID:   docID,
 		PayloadJSON:  string(raw),
 		TraceID:      "trace-local",
+		TenantID:     tenantID,
 	}); err != nil {
 		log.Printf("documents_v2 audit write failed: %v", err)
 	}
