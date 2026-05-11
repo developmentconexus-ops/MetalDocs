@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
@@ -65,19 +68,39 @@ FROM metaldocs.document_families`
 }
 
 func (r *FamilyRepository) Create(ctx context.Context, f *domain.DocumentFamily) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin create family tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check Create family: %w", err)
+	}
 	const q = `
 INSERT INTO metaldocs.document_families (code, name, description, is_active)
 VALUES ($1, $2, $3, $4)`
-	_, err := r.db.ExecContext(ctx, q, f.Code, f.Name, f.Description, f.IsActive)
-	return err
+	if _, err := tx.ExecContext(ctx, q, f.Code, f.Name, f.Description, f.IsActive); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *FamilyRepository) Update(ctx context.Context, f *domain.DocumentFamily) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin update family tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return fmt.Errorf("taxonomy: authz check Update family: %w", err)
+	}
 	const q = `
 UPDATE metaldocs.document_families
 SET name = $1, description = $2, is_active = $3
 WHERE code = $4`
-	result, err := r.db.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.Code)
+	result, err := tx.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.Code)
 	if err != nil {
 		return err
 	}
@@ -85,7 +108,7 @@ WHERE code = $4`
 	if rowsAffected == 0 {
 		return domain.ErrFamilyNotFound
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *FamilyRepository) HasActiveProfiles(ctx context.Context, familyCode string) (bool, error) {
