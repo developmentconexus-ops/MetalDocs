@@ -188,9 +188,9 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 			case method == http.MethodPost && strings.HasSuffix(path, "/revisions"):
 				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/obsolete"):
-				return iamdomain.CapDocumentEdit, true
+				return iamdomain.CapRegistryObsolete, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/supersede"):
-				return iamdomain.CapDocumentEdit, true
+				return iamdomain.CapRegistrySupersede, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v2/iam/area-memberships") {
