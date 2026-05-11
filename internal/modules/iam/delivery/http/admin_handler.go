@@ -106,9 +106,10 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
 		return
 	}
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		tenantID = tenant.DevTenantID
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		return
 	}
 	activeSince := time.Now().UTC().Add(-10 * time.Minute)
 	users, err := h.authService.ListUsers(r.Context(), tenantID)
@@ -222,9 +223,10 @@ func (h *AdminHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
 		return
 	}
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		tenantID = tenant.DevTenantID
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		return
 	}
 	items, err := h.authService.ListUsers(r.Context(), tenantID)
 	if err != nil {
@@ -272,9 +274,10 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles", traceID)
 		return
 	}
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		tenantID = tenant.DevTenantID
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		return
 	}
 	assignedBy := authenticatedActor(r)
 	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, tenantID, roles, assignedBy); err != nil {
@@ -342,9 +345,10 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	if assignedBy == "" {
 		assignedBy = authenticatedActor(r)
 	}
-	upsertTenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if upsertTenantID == "" {
-		upsertTenantID = tenant.DevTenantID
+	upsertTenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		return
 	}
 
 	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy); err != nil {
@@ -376,9 +380,10 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	if assignedBy == "" {
 		assignedBy = authenticatedActor(r)
 	}
-	replaceTenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if replaceTenantID == "" {
-		replaceTenantID = tenant.DevTenantID
+	replaceTenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		return
 	}
 
 	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, roles, assignedBy); err != nil {

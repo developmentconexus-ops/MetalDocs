@@ -10,7 +10,11 @@ import (
 )
 
 func (h *Handler) submitForReview(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
@@ -43,7 +47,11 @@ func (h *Handler) submitForReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) review(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
@@ -88,7 +96,11 @@ func (h *Handler) review(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 	versionNum, err := strconv.Atoi(r.PathValue("n"))
@@ -133,7 +145,11 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 
@@ -160,7 +176,11 @@ func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) upsertApprovalConfig(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	templateID := r.PathValue("id")
 

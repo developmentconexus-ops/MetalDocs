@@ -148,7 +148,11 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 	callerUserID := userIDFromReq(r)
 	isAdmin := hasRole(r, roleAdmin)
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
@@ -178,7 +182,11 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 	callerUserID := userIDFromReq(r)
 	isAdmin := hasRole(r, roleAdmin)
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
@@ -547,7 +555,11 @@ func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusForbidden, "forbidden")
 		return
 	}
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 	adminID := userIDFromReq(r)
 
 	var req struct {
@@ -871,7 +883,11 @@ func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request,
 		httpErr(w, http.StatusForbidden, "forbidden")
 		return "", "", false
 	}
-	tenantID = tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return "", "", false
+	}
 	userID = userIDFromReq(r)
 	if hasRole(r, roleAdmin) {
 		return tenantID, userID, true
@@ -946,11 +962,8 @@ func rolesFromHeader(header string) []string {
 	return roles
 }
 
-func tenantIDFromReq(r *http.Request) string {
-	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
-		return t
-	}
-	return tenant.DevTenantID
+func tenantIDFromReq(r *http.Request) (string, error) {
+	return tenant.FromContext(r.Context())
 }
 
 func userIDFromReq(r *http.Request) string {

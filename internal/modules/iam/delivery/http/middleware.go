@@ -74,9 +74,12 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-		if tenantID == "" {
-			tenantID = tenant.DevTenantID
+		tenantID, err := tenant.FromContext(r.Context())
+		if err != nil {
+			tenantID = strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
+			if tenantID == "" {
+				tenantID = tenant.DevTenantID
+			}
 		}
 
 		if m.caps != nil {

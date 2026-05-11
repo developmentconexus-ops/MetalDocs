@@ -31,8 +31,14 @@ func (h *ViewHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := tenantID(r)
+	if err != nil {
+		writeFillInError(w, requestID(r), err)
+		return
+	}
+
 	result, err := h.svc.GetViewURL(r.Context(),
-		tenantID(r),
+		tenantID,
 		actorID(r),
 		r.PathValue("id"),
 	)

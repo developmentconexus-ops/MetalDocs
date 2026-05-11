@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesapi "metaldocs/internal/modules/templates_v2/api"
@@ -81,11 +80,8 @@ func readStrictJSON(r *http.Request, dst any) error {
 	return nil
 }
 
-func tenantIDFromReq(r *http.Request) string {
-	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
-		return t
-	}
-	return tenant.DevTenantID
+func tenantIDFromReq(r *http.Request) (string, error) {
+	return tenant.FromContext(r.Context())
 }
 
 func userIDFromReq(r *http.Request) string {

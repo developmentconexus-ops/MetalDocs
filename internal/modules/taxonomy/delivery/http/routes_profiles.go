@@ -42,7 +42,13 @@ func (h *Handler) listProfiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := h.profiles.List(r.Context(), tenantIDFromRequest(r), includeArchived)
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+
+	items, err := h.profiles.List(r.Context(), tenantID, includeArchived)
 	if err != nil {
 		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to list profiles")
 		return
@@ -56,6 +62,11 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 
 	code := strings.TrimSpace(req.Code)
 	alias := strings.TrimSpace(req.Alias)
@@ -67,7 +78,7 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	profile := &domain.DocumentProfile{
 		Code:                     code,
-		TenantID:                 tenantIDFromRequest(r),
+		TenantID:                 tenantID,
 		FamilyCode:               strings.TrimSpace(req.FamilyCode),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
@@ -90,7 +101,13 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
-	profile, err := h.profiles.Get(r.Context(), tenantIDFromRequest(r), r.PathValue("code"))
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+
+	profile, err := h.profiles.Get(r.Context(), tenantID, r.PathValue("code"))
 	if err != nil {
 		h.writeProfileError(w, err)
 		return
@@ -104,6 +121,11 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "invalid JSON payload")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 
 	updateCode := r.PathValue("code")
 	updateAlias := strings.TrimSpace(req.Alias)
@@ -115,7 +137,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	profile := &domain.DocumentProfile{
 		Code:                     updateCode,
-		TenantID:                 tenantIDFromRequest(r),
+		TenantID:                 tenantID,
 		FamilyCode:               strings.TrimSpace(req.FamilyCode),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
@@ -142,10 +164,15 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "templateVersionId is required")
 		return
 	}
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 
 	if err := h.profiles.SetDefaultTemplate(
 		r.Context(),
-		tenantIDFromRequest(r),
+		tenantID,
 		r.PathValue("code"),
 		req.TemplateVersionID,
 		authn.UserIDFromContext(r.Context()),
@@ -159,9 +186,15 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := tenantIDFromRequest(r)
+	if err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+
 	if err := h.profiles.Archive(
 		r.Context(),
-		tenantIDFromRequest(r),
+		tenantID,
 		r.PathValue("code"),
 		authn.UserIDFromContext(r.Context()),
 	); err != nil {
@@ -194,12 +227,8 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 	}
 }
 
-func tenantIDFromRequest(r *http.Request) string {
-	tenantID := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-	if tenantID == "" {
-		return tenant.DevTenantID
-	}
-	return tenantID
+func tenantIDFromRequest(r *http.Request) (string, error) {
+	return tenant.FromContext(r.Context())
 }
 
 func parseIncludeArchived(r *http.Request) (bool, error) {

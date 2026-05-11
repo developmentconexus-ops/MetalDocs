@@ -89,11 +89,8 @@ func actorIDFromRequest(r *http.Request) string {
 	return iamdomain.UserIDFromContext(r.Context())
 }
 
-func tenantIDFromReq(r *http.Request) string {
-	if t := strings.TrimSpace(r.Header.Get("X-Tenant-ID")); t != "" {
-		return t
-	}
-	return tenant.DevTenantID
+func tenantIDFromReq(r *http.Request) (string, error) {
+	return tenant.FromContext(r.Context())
 }
 
 func parseIfMatch(header string) (int, error) {

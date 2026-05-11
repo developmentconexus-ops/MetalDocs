@@ -17,7 +17,11 @@ func (h *Handler) ListTemplatesV2(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", "template.create"); err != nil {
 		writeMappedErr(w, err)
@@ -93,7 +97,11 @@ func (h *Handler) PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter, r *htt
 }
 
 func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, id string, n int, storageKey string) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
 		writeMappedErr(w, err)
@@ -132,7 +140,11 @@ func (h *Handler) RedirectSignedUrlV2(w http.ResponseWriter, r *http.Request, pa
 }
 
 func (h *Handler) SaveTemplateDraftV2(w http.ResponseWriter, r *http.Request, id string, n int) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
 		writeMappedErr(w, err)
@@ -149,7 +161,7 @@ func (h *Handler) SaveTemplateDraftV2(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	err := h.svc.SaveTemplateDraft(r.Context(), application.SaveTemplateDraftCmd{
+	err = h.svc.SaveTemplateDraft(r.Context(), application.SaveTemplateDraftCmd{
 		TenantID:            tenantID,
 		ActorUserID:         actorID,
 		TemplateID:          id,
@@ -183,7 +195,11 @@ func missingSaveTemplateDraftV2Field(req templatesapi.SaveTemplateDraftV2JSONReq
 }
 
 func (h *Handler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int) {
-	tenantID := tenantIDFromReq(r)
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
 	actorID := userIDFromReq(r)
 	if err := h.authz(r, tenantID, "*", "template.approve"); err != nil {
 		writeMappedErr(w, err)

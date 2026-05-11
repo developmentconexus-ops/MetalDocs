@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/render/fanout"
+	"metaldocs/internal/platform/tenant"
 )
 
 type ReconstructService interface {
@@ -28,9 +28,15 @@ func (h *ReconstructHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeReconstructError(w, err)
+		return
+	}
+
 	entry, err := h.svc.GetReconstruction(
 		r.Context(),
-		strings.TrimSpace(r.Header.Get("X-Tenant-ID")),
+		tenantID,
 		actorID(r),
 		r.PathValue("id"),
 	)
