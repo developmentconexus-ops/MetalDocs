@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 type RoleAdminRepository struct {
@@ -17,7 +18,7 @@ func NewRoleAdminRepository(db *sql.DB) *RoleAdminRepository {
 	return &RoleAdminRepository{db: db}
 }
 
-func (r *RoleAdminRepository) HasAnyRole(ctx context.Context, role domain.Role, tenantID string) (bool, error) {
+func (r *RoleAdminRepository) HasAnyRole(ctx context.Context, role iamdomain.Role, tenantID string) (bool, error) {
 	var count int
 	if err := r.db.QueryRowContext(ctx, `
 SELECT COUNT(*)
@@ -30,12 +31,15 @@ WHERE role_code = $1
 	return count > 0, nil
 }
 
-func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role domain.Role, assignedBy string) error {
+func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin iam tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := authz.Require(ctx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
+		return fmt.Errorf("require iam user.manage authorization: %w", err)
+	}
 
 	const upsertUser = `
 INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, updated_at)
@@ -69,12 +73,15 @@ VALUES ($1, $2::uuid, $3, NOW(), $4)
 // ReplaceUserRoles writes the user+role assignment. The schema constraint
 // UNIQUE(tenant_id, user_id) means at most ONE role row per user per tenant.
 // If the input slice has multiple roles, only the last one is written.
-func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []domain.Role, assignedBy string) error {
+func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin iam replace tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := authz.Require(ctx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
+		return fmt.Errorf("require iam user.manage authorization: %w", err)
+	}
 
 	const upsertUser = `
 INSERT INTO metaldocs.iam_users (user_id, display_name, is_active, updated_at)
