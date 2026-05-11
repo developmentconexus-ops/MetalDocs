@@ -28,10 +28,9 @@
 | P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | ~3 | pending |
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
 | P2 | 6a | Audit-trail completeness sweep (emission + sink consolidation) | 11 commits | done 2026-05-11 |
-| P2 | 6b | Audit tamper-evidence hash chain (T-004) | — | pending |
 | P3 | 7 | RFC 9457 envelope rollout | ~9 | pending |
 | P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | pending |
-| P4 | 9 | Transactional + idempotency hardening | ~4 | pending |
+| P4 | 9 | Transactional + idempotency hardening + audit hash chain (6b absorbed) | ~6 | pending |
 | P4 | 10 | Legacy purge + rename sweep (`templates_v2 → templates`, `v2 → v1`) | ~6 | pending |
 | P5 | 12 | Screen finalization × 7 (per `metaldocs-screen-implementation`) | ~7 | pending |
 | P5 | 13 | Doc-comment + ADR sweep | ~3 | pending |
@@ -85,14 +84,9 @@
 - **Blockers:** Plan 3 (tenant_id resolution), Plan 4 (cap name in audit row).
 - **Status:** done 2026-05-11. Commits: `0279546f` (CapAuditRead + migration 0189), `6b34c277` (gate audit endpoint T-001), `1994bb84` (fix fire-and-forget T-005), `b5b077b7` (tenant_id column + RecordTx T-007), `27c19011` (auth audit handler T-002), `f27529e8` (IAM role upsert + createUser audit T-005/auth-T-002), `5bb06964` (registry governance event T-002), `20bf2067` (taxonomy profile/area emit T-005), `115cb635` (taxonomy family govLogger T-004), `0e106ed9` (documents RenameDocument tx T-005), `71a2dc53` (AuditGovernanceAdapter T-008/T-010). Spec: `docs/superpowers/specs/2026-05-11-plan-06-audit.md`.
 
-## Plan 6b · Audit tamper-evidence hash chain (T-004)
+## Plan 6b · Audit tamper-evidence hash chain — ABSORBED INTO PLAN 9
 
-- **Goal:** Hash chain (`prev_hash`, `row_hash`) on `metaldocs.audit_events`. A privileged actor cannot rewrite history undetected.
-- **Touches:** migration (add hash columns); `internal/modules/audit/infrastructure/postgres/writer.go` (hash-chain on INSERT, advisory lock or `SELECT ... FOR UPDATE` on last row); integrity-validation job or endpoint.
-- **Closes:** audit T-004/R-004.
-- **Critical rows closed:** 1 (audit T-004).
-- **Blockers:** Plan 6a.
-- **Status:** pending.
+Rationale: hash-chain INSERT requires advisory lock / `SELECT … FOR UPDATE` on the last audit row — same concurrency ADR territory as Plan 9's tx hardening work. Absorbed to avoid two separate concurrency ADRs. See Plan 9 `Closes` list for audit T-004/R-004.
 
 ## Plan 7 · RFC 9457 envelope rollout (parallel to Plan 8)
 
@@ -117,7 +111,7 @@
 - **Goal:** Atomic multi-step writes. HTTP `Idempotency-Key` adopted on POST create/mutate. Optimistic-lock enforced. Template version lifecycle aligned to document 4-stage workflow (`draft → under_review → approved → published`).
 - **Touches:** `internal/modules/auth/application/service.go:305` (wrap CreateUser); `internal/modules/documents/delivery/http/handler.go:316` (read header + integrate `internal/platform/idempotency`); `internal/modules/templates_v2/application/lifecycle.go:265` (wrap publish chain in tx + check `ExpectedLockVersion`) + autosave `UpdateVersion` `WHERE lock_version = $X`; `internal/modules/taxonomy/application/family_service.go:48` (wrap Deactivate + add tenant predicate on `HasActiveProfiles`); `migrations/<next>_placeholder_revision_fk_fix.sql` (documents T-009).
   - **Template workflow alignment:** split `Service.Approve` (`lifecycle.go:159`) into `Review(ctx, ReviewCmd)` + `Approve(ctx, ApproveCmd)` — `Approve` currently handles both paths via `hasReviewer` flag, which conflates reviewer and approver roles. Add `VersionStatusUnderReview` state to `domain.VersionStatus` enum. New service method `Review` checks `CapTemplateReview` + SoD against author. Add `CapTemplateReview Capability = "template.review"` to `internal/modules/iam/domain/model.go`. Seed `template.review` in a migration for approver + system_admin roles. HTTP route: `POST /api/v2/templates/{id}/versions/{n}/review` (add to handler + openapi spec). Update state machine: `draft → [submit] → under_review → [review] → approved → [publish/approve] → published`. Remove `hasReviewer` conditional from `Approve`; reviewer step is now always a distinct service call.
-- **Closes:** auth T-004/R-004; documents T-006/R-006, T-009/R-009; templates_v2 T-007/R-007, T-009/R-009, T-010/R-010; taxonomy T-007/R-007, T-011/R-011; templates_v2 workflow-alignment (new backlog row).
+- **Closes:** auth T-004/R-004; documents T-006/R-006, T-009/R-009; templates_v2 T-007/R-007, T-009/R-009, T-010/R-010; taxonomy T-007/R-007, T-011/R-011; audit T-004/R-004 (hash chain — absorbed from Plan 6b); templates_v2 workflow-alignment (new backlog row).
 - **Critical rows closed:** 0 (all Major).
 - **Blockers:** Plan 5 (authz wiring on templates must land first so Review method gets cap-checked on arrival).
 - **Status:** pending.
