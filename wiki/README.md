@@ -25,6 +25,7 @@
 - [backlog/documents-refactor.md](backlog/documents-refactor.md) — documents refactor backlog (9 rows: R-001..R-006 RFC-9457/spec-drift/tripwire/dupe-route/rename-tx/idempotency, R-008 capability namespace, R-009 placeholder FK, R-100 retire documents-v2.md stub) (Last verified: 2026-05-10)
 - [backlog/auth-refactor.md](backlog/auth-refactor.md) — auth refactor backlog (12 rows, R-001 through R-012) (Last verified: 2026-05-10)
 - [backlog/approval-refactor.md](backlog/approval-refactor.md) — approval refactor backlog (12 rows, R-001..R-012: RFC-9457 envelope, OpenAPI spec gap, substring classifier 500→409, deprecated PDF dispatcher, inbox snapshot drift, cancel/cutover tripwire audit, infra naming, document_v2_id suffix, NOT VALID FKs, undocumented symbols, dual GUC helpers, unwired iam AuthorizationService) (Last verified: 2026-05-10)
+- [backlog/audit-refactor.md](backlog/audit-refactor.md) — audit refactor backlog (12 rows, R-001..R-012) (Last verified: 2026-05-10)
 
 ### Bug Tracker
 - [bugs/audit-2026-05-03.md](bugs/audit-2026-05-03.md) - **40 bugs in 5 groups (A–H)** pre-smoke deep audit 2026-05-03/04. Groups A–H mostly resolved.
@@ -58,6 +59,8 @@
 - [modules/iam-tech-debt.md](modules/iam-tech-debt.md) - IAM tech-debt register (12 items, T-001 through T-012) (Last verified: 2026-05-10)
 - **[modules/auth.md](modules/auth.md)** - auth module — session cookie authn, bcrypt password storage, per-account lockout, HMAC-signed opaque session tokens, ManagedUser admin ops (Arc42 + C4); 2 Critical / 3 Major / 7 Minor tech-debt items; companion registers linked below (Last verified: 2026-05-10)
 - [modules/auth-tech-debt.md](modules/auth-tech-debt.md) - auth tech-debt register (12 items: T-001 LegacyHeader bypass Critical; T-002 audit-trail gap Critical; T-003 RFC 9457 envelope Major; T-004 non-atomic CreateUser Major; T-005 IP rate-limit absent Major; T-006..T-012 Minor) (Last verified: 2026-05-10)
+- **[modules/audit.md](modules/audit.md)** - Arc42 + C4 living doc — append-only event sink (`metaldocs.audit_events`), `Writer`/`Reader` port+adapter, `GET /api/v1/audit/events`; consumers: iam, documents, auth (gap); 2 Critical / 4 Major / 6 Minor tech-debt items; companion register + refactor backlog linked below (Last verified: 2026-05-10)
+- [modules/audit-tech-debt.md](modules/audit-tech-debt.md) - audit tech-debt register (12 items: T-001 unauthenticated list endpoint Critical; T-002 legacy error envelope Critical; T-003..T-006 Major; T-007..T-012 Minor) (Last verified: 2026-05-10)
 - [modules/editor-ui-eigenpal.md](modules/editor-ui-eigenpal.md) - eigenpal integration layer, controlled package, plugin wiring (Last verified: 2026-05-06)
 - [modules/editor-chrome.md](modules/editor-chrome.md) - shared toolbar overlay primitive for eigenpal-based pages; slot API (`left/center/right/alert`), `VersionBadge`, `AutosaveStatus`, eigenpal CSS overrides, design-token coverage; consumed by `TemplateEditorPage` + `DocumentEditorPage` (Last verified: 2026-05-10)
 - [modules/search.md](modules/search.md) - cross-module search; v2 reader JOINs `controlled_documents` to populate `DocumentCode` (stub, Last verified: 2026-05-01)
