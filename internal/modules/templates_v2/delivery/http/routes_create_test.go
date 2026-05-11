@@ -14,6 +14,7 @@ import (
 	"metaldocs/internal/modules/templates_v2/application"
 	tmplhttp "metaldocs/internal/modules/templates_v2/delivery/http"
 	"metaldocs/internal/modules/templates_v2/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeRepo struct {
@@ -195,7 +196,7 @@ func createBody(key string) []byte {
 
 func withHeaders(req *http.Request) {
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("X-Tenant-ID", "tenant-a")
+	*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant-a"))
 	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))
 }
 

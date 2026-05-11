@@ -75,7 +75,7 @@ func TestGetInstanceHandler_HappyPath(t *testing.T) {
 	mux := getInstanceTestMux(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/instances/inst-1", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
 
@@ -112,7 +112,7 @@ func TestGetInstanceHandler_NotFound(t *testing.T) {
 	mux := getInstanceTestMux(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/instances/inst-missing", nil)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
 
@@ -138,6 +138,7 @@ func TestGetInstanceHandler_NoTenantHeader(t *testing.T) {
 	mux := getInstanceTestMux(h)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/instances/inst-2", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), tenant.DevTenantID))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
 

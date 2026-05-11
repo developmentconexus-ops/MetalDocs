@@ -10,6 +10,7 @@ import (
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeViewService struct {
@@ -27,7 +28,7 @@ func (f fakeViewService) GetViewURL(_ context.Context, _, _, _ string) (ViewResu
 func newViewReq(docID string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents/"+docID+"/view", nil)
 	req.SetPathValue("id", docID)
-	req.Header.Set("X-Tenant-ID", "tenant-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{}))
 	return req
 }

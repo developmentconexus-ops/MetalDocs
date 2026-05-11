@@ -15,6 +15,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeRouteAdminService struct {
@@ -82,7 +83,7 @@ func TestCreateRoute_HappyPath(t *testing.T) {
 			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/routes", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("X-Tenant-ID", "tenant-1")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Idempotency-Key", "idem-1")
 
@@ -148,6 +149,7 @@ func TestCreateRoute_CapDenied(t *testing.T) {
 
 			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/routes", strings.NewReader(body))
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", "idem-1")
 
@@ -176,6 +178,7 @@ func TestCreateRoute_DuplicateProfile(t *testing.T) {
 
 			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/routes", strings.NewReader(body))
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", "idem-1")
 
@@ -208,7 +211,7 @@ func TestUpdateRoute_HappyPath(t *testing.T) {
 			body := `{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"m_of_n","quorum_m":2,"drift_policy":"keep_snapshot"}]}`
 			req := httptest.NewRequest(http.MethodPut, "/api/v2/approval/routes/route-1", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("X-Tenant-ID", "tenant-1")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Idempotency-Key", "idem-1")
 			req.Header.Set("If-Match", "\"v4\"")
@@ -265,6 +268,7 @@ func TestUpdateRoute_RouteInUse(t *testing.T) {
 
 			body := `{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"fail_stage"}]}`
 			req := httptest.NewRequest(http.MethodPut, "/api/v2/approval/routes/route-1", strings.NewReader(body))
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", "idem-1")
 			req.Header.Set("If-Match", "\"v4\"")
@@ -295,7 +299,7 @@ func TestDeactivateRoute_HappyPath(t *testing.T) {
 			mux := routeAdminTestMux(h)
 
 			req := httptest.NewRequest(http.MethodDelete, "/api/v2/approval/routes/route-1", nil)
-			req.Header.Set("X-Tenant-ID", "tenant-1")
+			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Idempotency-Key", "idem-1")
 			req.Header.Set("If-Match", "\"v3\"")
