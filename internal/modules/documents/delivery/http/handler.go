@@ -990,7 +990,7 @@ func mapErr(err error) (int, string) {
 		return http.StatusBadRequest, "controlled_document_required"
 	case errors.Is(err, domain.ErrCommentInvalid):
 		return http.StatusBadRequest, "comment_invalid"
-	case errors.Is(err, iamapp.ErrAccessDenied), errors.Is(err, iamapp.ErrCapabilityDenied):
+	case errors.Is(err, iamapp.ErrCapabilityDenied):
 		return http.StatusForbidden, "forbidden"
 	case errors.Is(err, domain.ErrExpiredUpload):
 		return http.StatusGone, "expired_upload"

@@ -186,7 +186,7 @@ func TestCreate_AuthzFail(t *testing.T) {
 			ProcessAreaCode: "AREA-01",
 			Status:          registrydomain.CDStatusActive,
 		}},
-		&fakeAuthzChecker{err: iamapp.ErrAccessDenied},
+		&fakeAuthzChecker{err: iamapp.ErrCapabilityDenied},
 		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_default"), status: strptr("published")},
 	)
 
@@ -197,8 +197,8 @@ func TestCreate_AuthzFail(t *testing.T) {
 		Name:                 "Contract",
 		FormData:             json.RawMessage(`{"a":1}`),
 	})
-	if !errors.Is(err, iamapp.ErrAccessDenied) {
-		t.Fatalf("expected ErrAccessDenied, got %v", err)
+	if !errors.Is(err, iamapp.ErrCapabilityDenied) {
+		t.Fatalf("expected ErrCapabilityDenied, got %v", err)
 	}
 }
 
