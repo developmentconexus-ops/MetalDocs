@@ -15,7 +15,7 @@
 | R-005 | Add IP-based rate limit on POST /api/v1/auth/login | T-005 | S | major | — | — | open | — |
 | R-006 | Throttle TouchSession write (debounce per-session in-memory) | T-006 | S | minor | — | — | open | — |
 | R-007 | Extract auth↔iam shared identity contract into platform package | T-007 | L | minor | — | — | open | — |
-| R-008 | Add tenant_id to auth_identities + auth_sessions with backfill | T-008 | L | minor | — | — | open | — |
+| R-008 | Add tenant_id to auth_identities with backfill (auth_sessions.tenant_id already added by Plan 3 / migration 0184) | T-008 | M | minor | — | — | partial (sessions done 2026-05-11) | — |
 | R-009 | Distinguish malformed-cookie from no-session in Logout error path | T-009 | XS | minor | — | — | open | — |
 | R-010 | Author ADR for session-cookie + bcrypt + lockout policy | T-010 | S | minor | — | — | open | — |
 | R-011 | Add Go doc comments to all exported auth symbols | T-011 | M | minor | — | — | open | — |

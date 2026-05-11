@@ -66,7 +66,7 @@ func TestReconstructHandler_SuccessReturnsEntry(t *testing.T) {
 }
 
 func TestReconstructHandler_CapabilityDeniedReturns403(t *testing.T) {
-	h := NewReconstructHandler(fakeReconstructService{err: authz.ErrCapabilityDenied{Capability: "doc.reconstruct", AreaCode: "AREA9", ActorID: "user-1"}})
+	h := NewReconstructHandler(fakeReconstructService{err: authz.ErrCapDenied{Capability: "doc.reconstruct", AreaCode: "AREA9", ActorID: "user-1"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleReconstruct(rec, newReconstructReq("doc-1"))

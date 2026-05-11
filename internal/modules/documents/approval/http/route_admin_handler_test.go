@@ -142,7 +142,7 @@ func TestCreateRoute_CapDenied(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &fakeRouteAdminService{
-				createErr: authz.ErrCapabilityDenied{Capability: "route.admin", AreaCode: "tenant", ActorID: "actor-1"},
+				createErr: authz.ErrCapDenied{Capability: "route.admin", AreaCode: "tenant", ActorID: "actor-1"},
 			}
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)

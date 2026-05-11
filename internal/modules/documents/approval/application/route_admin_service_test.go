@@ -237,7 +237,7 @@ func TestRouteAdminCreate_CapDenied(t *testing.T) {
 		ActorUserID: "user-1",
 		Stages:      validRouteStages(),
 	})
-	var denied authz.ErrCapabilityDenied
+	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Errorf("expected ErrCapabilityDenied; got %v", err)
 	}

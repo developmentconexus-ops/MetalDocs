@@ -22,8 +22,8 @@
 > - `internal/modules/auth/domain/errors.go:18` — `ErrTenantNotPermitted` (login rejects unclaimed tenant)
 > - `internal/modules/auth/domain/errors.go:21` — `ErrTenantClaimRequired` (multi-tenant user must supply X-Tenant-ID at login)
 > - `internal/modules/auth/domain/port.go:23` — `GetUserTenants` (new Repository method — list tenant IDs from iam_user_roles)
-> - `internal/modules/auth/infrastructure/postgres/repository.go:151` — `CreateUser` (own tx, INSERT auth_identities)
-> - `internal/modules/auth/infrastructure/postgres/repository.go:80` — `TouchSession` (UPDATE per request)
+> - `internal/modules/auth/infrastructure/postgres/repository.go:174` — `CreateUser` (own tx, INSERT auth_identities)
+> - `internal/modules/auth/infrastructure/postgres/repository.go:103` — `TouchSession` (UPDATE per request)
 > - `internal/modules/auth/infrastructure/memory/repository.go:403` — `SeedUserTenants` (test helper)
 > - `internal/platform/authn/config.go:101-116` — `Config` env-var load sites
 > - `internal/platform/tenant/context.go:1` — `WithTenantID` / `FromContext` / `ErrTenantMissing` (see `wiki/architecture/tenant-context.md`)

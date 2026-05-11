@@ -8,13 +8,13 @@ import (
 	"sync"
 )
 
-type ErrCapabilityDenied struct {
+type ErrCapDenied struct {
 	Capability string
 	AreaCode   string
 	ActorID    string
 }
 
-func (e ErrCapabilityDenied) Error() string {
+func (e ErrCapDenied) Error() string {
 	return fmt.Sprintf("authz: capability %q denied for actor %q in area %q", e.Capability, e.ActorID, e.AreaCode)
 }
 
@@ -89,7 +89,7 @@ SELECT EXISTS (
 	}
 
 	if !granted {
-		return ErrCapabilityDenied{Capability: capability, AreaCode: areaCode, ActorID: actorID}
+		return ErrCapDenied{Capability: capability, AreaCode: areaCode, ActorID: actorID}
 	}
 
 	storeGranted(ctx, capability, areaCode)

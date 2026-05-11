@@ -132,7 +132,7 @@ func mapFillInError(err error) (int, fillInErrorResponse) {
 	code := "internal.unknown"
 
 	switch {
-	case errors.As(err, &authz.ErrCapabilityDenied{}):
+	case errors.As(err, &authz.ErrCapDenied{}):
 		status = http.StatusForbidden
 		code = "authz.capability_denied"
 	case errors.As(err, &notChoicePlaceholderError{}):

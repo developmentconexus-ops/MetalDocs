@@ -137,7 +137,7 @@ func TestProbeB_GrantMembershipWithoutCap(t *testing.T) {
 	setConfig(t, ctx, tx, "metaldocs.tenant_id", probeTenantID)
 
 	err := authz.Require(ctx, tx, "membership.grant", "tenant")
-	var denied authz.ErrCapabilityDenied
+	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied, got %v", err)
 	}
@@ -155,7 +155,7 @@ func TestProbeC_SubmitWithoutCapDenied(t *testing.T) {
 	setConfig(t, ctx, tx, "metaldocs.tenant_id", probeTenantID)
 
 	err := authz.Require(ctx, tx, "doc.submit", "QA")
-	var denied authz.ErrCapabilityDenied
+	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied, got %v", err)
 	}

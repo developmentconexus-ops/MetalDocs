@@ -36,7 +36,7 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 
 ### T-004 · CreateUser two-transaction non-atomicity
 - **Severity:** major
-- **Surface:** `internal/modules/auth/application/service.go:305,325`; `internal/modules/auth/infrastructure/postgres/repository.go:151-170`; `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:73-112`
+- **Surface:** `internal/modules/auth/application/service.go:305,325`; `internal/modules/auth/infrastructure/postgres/repository.go:174-211`; `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:73-112`
 - **Observation:** `Service.CreateUser` calls `repo.CreateUser` (own `BeginTx` → INSERT `auth_identities` → COMMIT) then `roleAdmin.ReplaceUserRoles` (own `BeginTx` → UPSERT `iam_users`, DELETE+INSERT `iam_user_roles` → COMMIT). No outer transaction. If TX-B fails after TX-A commits, `auth_identities` row is orphaned with no role binding. Recovery is manual. Trigger fired: data-loss-adjacent path (orphan rows on partial failure).
 - **Evidence:** `_artifacts/02-flow-create-user.md` §2 transaction-boundary fact.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-004`
@@ -52,7 +52,7 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 
 ### T-006 · TouchSession write amplification per request
 - **Severity:** minor
-- **Surface:** `internal/modules/auth/infrastructure/postgres/repository.go:80`
+- **Surface:** `internal/modules/auth/infrastructure/postgres/repository.go:103`
 - **Observation:** Every authenticated request issues an `UPDATE auth_sessions SET last_seen_at = now()` via `TouchSession`. At sustained QPS this is one row-write per request on the hot session row. Latent perf concern; no caller currently observes pressure. Trigger fired: latent (surface exists, not yet a bug).
 - **Evidence:** `_artifacts/02-flow-resolve-session.md` §middleware chain; `_artifacts/04-persistence.md` §auth_sessions.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-006`
@@ -66,13 +66,13 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 - **Linked backlog row:** `backlog/auth-refactor.md#R-007`
 
-### T-008 · Auth tables lack tenant_id (latent multi-tenant identity sharing)
+### T-008 · auth_identities lacks tenant_id (latent multi-tenant identity sharing) — auth_sessions partially resolved
 - **Severity:** minor
 - **Surface:** `migrations/0021_init_auth_identities_and_sessions.sql`; `migrations/0036_decouple_auth_identity_from_iam_user_tables.sql`
-- **Observation:** `auth_identities` and `auth_sessions` carry no `tenant_id` column. Identity is tenant-global. IAM tables added `tenant_id` in 0130/0162 to enforce row-level isolation; auth did not. Latent because today every tenant is on the same identity pool by design (single-tenant install). Becomes a multi-tenant data-leak vector if multi-tenancy is enabled without backfill. Trigger fired: latent (surface exists, no caller hits it under current single-tenant deployment).
+- **Observation:** `auth_identities` carries no `tenant_id` column — identity is tenant-global. **Partially resolved (2026-05-11, Plan 3):** `auth_sessions.tenant_id` was added by migration `0184_auth_sessions_tenant_id.sql`; session-bound tenant is now the authoritative source for all downstream handlers. The remaining gap is `auth_identities` itself — if true per-identity tenant isolation is required in a multi-tenant deployment, `auth_identities` would need backfilling too. Today this is latent (single-tenant install; roles enforce per-tenant boundary via IAM). Trigger fired: latent (surface exists, no caller hits it under current single-tenant deployment).
 - **Evidence:** `_artifacts/04-persistence.md` §3 columns; `_artifacts/05-industry.md` IP-008.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-008`
-- **Linked ADR:** missing-ADR
+- **Linked ADR:** `wiki/architecture/tenant-context.md` (sessions portion), missing-ADR (identities portion)
 
 ### T-009 · Logout swallows malformed-cookie error silently
 - **Severity:** minor

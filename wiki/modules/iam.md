@@ -67,7 +67,7 @@ IAM owns identity-derived authorization for MetalDocs: it answers "can user X pe
 - Authz model: two-tier per ADR 0007; system_admin bypass on both tiers.
 - DB enforcement floor: `metaldocs.asserted_caps` GUC + `enforce_capability_asserted` trigger attached to `approval_instances` + `approval_signoffs` only.
 - IAM is NOT under oapi-codegen yet (ADR 0012 documents the partial rollout). Membership routes have no `operationId`; admin POST `/api/v1/iam/users/{userId}/roles` has request/response schemas (`api/openapi/v1/openapi.yaml:5043,5054`) but no codegen stub.
-- Error envelope: IAM emits `{error:{code,message,details,trace_id}}` (`delivery/http/middleware.go:129`) — does NOT yet match the RFC 9457 Problem envelope named in `wiki/architecture/api-design-system.md`.
+- Error envelope: IAM emits `{error:{code,message,details,trace_id}}` (`delivery/http/middleware.go:132`) — does NOT yet match the RFC 9457 Problem envelope named in `wiki/architecture/api-design-system.md`.
 - Tenant sentinel: `DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` (`internal/platform/tenant/const.go:4`). Primary tenant source is `tenant.FromContext` (injected by auth middleware from `auth_sessions.tenant_id`). IAM middleware falls back to `X-Tenant-ID` header only in legacy-header mode; see `wiki/architecture/tenant-context.md` for the full pattern.
 
 ---
@@ -313,9 +313,9 @@ Tripwire pairing: **N/A** — `enforce_capability_asserted` not attached to `iam
 
 | Condition | HTTP | Body |
 |---|---|---|
-| Tier-1 capability denied | 403 | `{error:{code:"forbidden",message:...,trace_id}}` (`middleware.go:129`) |
+| Tier-1 capability denied | 403 | `{error:{code:"forbidden",message:...,trace_id}}` (`middleware.go:132`) |
 | Tier-1 no capability mapped (`guarded=false`) | passes through | (no enforcement) |
-| Validation error (admin) | 400 | `{code,message}` (`routes_memberships.go:137` analog in admin) |
+| Validation error (admin) | 400 | `{code,message}` (`routes_memberships.go:150` analog in admin) |
 | Tier-2 `authz.Require` denied | error returned to caller | typed `authz.ErrCapabilityDenied` (`authz/authz.go:11`) |
 | GUC missing in tier-2 | error returned | `authz.ErrActorContextMissing` / `ErrTenantContextMissing` |
 

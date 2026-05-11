@@ -88,7 +88,7 @@ func MapErrorToResponse(err error) (statusCode int, body contracts.ErrorResponse
 		statusCode = http.StatusInternalServerError
 		code = "internal.db_unknown"
 	default:
-		var capabilityDenied authz.ErrCapabilityDenied
+		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError
 		var typeErr *json.UnmarshalTypeError
 

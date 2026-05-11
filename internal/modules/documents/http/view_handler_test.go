@@ -78,7 +78,7 @@ func TestViewHandler_NotApprovedReturns404(t *testing.T) {
 }
 
 func TestViewHandler_MissingAreaGrantReturns403(t *testing.T) {
-	h := NewViewHandler(fakeViewService{err: authz.ErrCapabilityDenied{Capability: "doc.view_published", AreaCode: "AREA9", ActorID: "user-1"}})
+	h := NewViewHandler(fakeViewService{err: authz.ErrCapDenied{Capability: "doc.view_published", AreaCode: "AREA9", ActorID: "user-1"}})
 
 	rec := httptest.NewRecorder()
 	h.HandleView(rec, newViewReq("doc-1"))

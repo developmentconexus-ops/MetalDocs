@@ -278,7 +278,7 @@ func TestPublishSuperseding_CapabilityDenied(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected ErrCapabilityDenied; got nil")
 	}
-	var denied authz.ErrCapabilityDenied
+	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied; got %v", err)
 	}
