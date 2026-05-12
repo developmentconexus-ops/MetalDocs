@@ -10,6 +10,7 @@ import (
 	templatesapi "metaldocs/internal/modules/templates_v2/api"
 	"metaldocs/internal/modules/templates_v2/application"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -89,12 +90,7 @@ func userIDFromReq(r *http.Request) string {
 }
 
 func writeErr(w http.ResponseWriter, status int, code, message string) {
-	httpresponse.WriteJSON(w, status, map[string]any{
-		"error": map[string]string{
-			"code":    code,
-			"message": message,
-		},
-	})
+	_ = problem.Write(w, problem.New(status, code, message))
 }
 
 var friendlyMsg = map[string]string{

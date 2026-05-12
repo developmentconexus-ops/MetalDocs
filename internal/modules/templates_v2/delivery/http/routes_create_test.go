@@ -274,15 +274,13 @@ func TestCreateTemplate_RejectUnknownField(t *testing.T) {
 	}
 
 	var out struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
+		Code string `json:"code"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Error.Code != "invalid_body" {
-		t.Fatalf("expected error.code=invalid_body, got %q", out.Error.Code)
+	if out.Code != "invalid_body" {
+		t.Fatalf("expected error.code=invalid_body, got %q", out.Code)
 	}
 }
 
@@ -307,14 +305,12 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	}
 
 	var out struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
+		Code string `json:"code"`
 	}
 	if err := json.Unmarshal(secondRR.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Error.Code != "key_conflict" {
-		t.Fatalf("expected error.code=key_conflict, got %q", out.Error.Code)
+	if out.Code != "key_conflict" {
+		t.Fatalf("expected error.code=key_conflict, got %q", out.Code)
 	}
 }

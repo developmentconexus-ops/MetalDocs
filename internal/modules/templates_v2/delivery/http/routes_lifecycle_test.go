@@ -82,15 +82,13 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 	}
 
 	var out struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
+		Code string `json:"code"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Error.Code != "invalid_state_transition" {
-		t.Fatalf("expected error.code=invalid_state_transition, got %q", out.Error.Code)
+	if out.Code != "invalid_state_transition" {
+		t.Fatalf("expected error.code=invalid_state_transition, got %q", out.Code)
 	}
 }
 
@@ -117,15 +115,13 @@ func TestSubmitForReview_NoUpload(t *testing.T) {
 	}
 
 	var out struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
+		Code string `json:"code"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Error.Code != "upload_missing" {
-		t.Fatalf("expected error.code=upload_missing, got %q", out.Error.Code)
+	if out.Code != "upload_missing" {
+		t.Fatalf("expected error.code=upload_missing, got %q", out.Code)
 	}
 }
 

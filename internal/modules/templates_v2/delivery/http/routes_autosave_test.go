@@ -174,14 +174,12 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 	}
 
 	var out struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
+		Code string `json:"code"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Error.Code != "content_hash_mismatch" {
-		t.Fatalf("expected error.code=content_hash_mismatch, got %q", out.Error.Code)
+	if out.Code != "content_hash_mismatch" {
+		t.Fatalf("expected error.code=content_hash_mismatch, got %q", out.Code)
 	}
 }
