@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/audit/application"
 	"metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 )
 
 type Handler struct {
@@ -45,7 +46,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 {
-			writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid limit value", requestTraceID(r))
+			_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid limit value"))
 			return
 		}
 		limit = parsed
@@ -57,7 +58,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 		Limit:        limit,
 	})
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events", requestTraceID(r))
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events"))
 		return
 	}
 
@@ -81,26 +82,5 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
 		"items": responseItems,
-	})
-}
-
-func requestTraceID(r *http.Request) string {
-	if r == nil {
-		return "trace-local"
-	}
-	if traceID := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceID != "" {
-		return traceID
-	}
-	return "trace-local"
-}
-
-func writeAPIError(w http.ResponseWriter, status int, code, message, traceID string) {
-	httpresponse.WriteJSON(w, status, map[string]any{
-		"error": map[string]any{
-			"code":     code,
-			"message":  message,
-			"details":  map[string]any{},
-			"trace_id": traceID,
-		},
 	})
 }
