@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Severity scale
 
@@ -59,14 +59,13 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 - **Linked backlog row:** `backlog/iam-refactor.md#R-005`
 - **Linked ADR:** missing-ADR (audit-emission policy not formalised)
 
-### T-006 · IAM error envelope is not RFC 9457
-- **Severity:** major
-- **Surface:** `internal/modules/iam/delivery/http/middleware.go:132` (`writeAPIError` emits `{error:{code,message,details,trace_id}}`); `internal/modules/iam/delivery/http/routes_memberships.go:150` (`writeMembershipAPIError` emits `{code,message}`)
-- **Observation:** `wiki/architecture/api-design-system.md` (Last verified 2026-05-10) names RFC 9457 Problem+JSON as the canonical error envelope. IAM uses two non-9457 shapes. No `type` URI, no `title`, no `status` field, no `errors[]` extension for validation. Documents module is migrating to the RFC 9457 envelope; IAM is not on the path yet.
-- **Evidence:** middleware.go:132 (verified by main agent read); routes_memberships.go:150 (artifact 02-flow-list-memberships §5); `_artifacts/05-industry.md` §IP-001.
-- **Linked backlog row:** `backlog/iam-refactor.md#R-006`
-- **Linked ADR:** missing-ADR (per-module 9457 rollout sequencing not recorded)
-- **Consumer cross-ref:** `wiki/modules/documents-tech-debt.md#t-001` — documents module has the same debt; migrating in parallel is recommended to amortize the `httpresponse.WriteProblem` adoption cost
+### T-006 · IAM error envelope is not RFC 9457 — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/iam/delivery/http/middleware.go:73,78,87,98,101,103` — local `writeAPIError`/`apiErrorEnvelope` deleted; all error paths call `problem.Write(w, problem.New(...))` directly. `internal/modules/iam/delivery/http/routes_memberships.go:38,47,53,59,67,73,77,82,96,110,116,119,124,139,141,143` — `writeMembershipAPIError` and inline error sites use `problem.Write`. Two non-RFC-9457 shapes are gone.
+- **Observation (original):** IAM used two non-9457 shapes: `{error:{code,message,details,trace_id}}` in middleware and `{code,message}` in membership routes. No `type` URI, no `title`, no `status`, no `errors[]`.
+- **Evidence:** `_artifacts/05-industry.md` §IP-001.
+- **Linked backlog row:** `backlog/iam-refactor.md#R-006` (merged Plan 7 2026-05-11, commit `1ecfe674`)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
 
 ### T-007 · `MembershipGovernanceLogger` wired with `nil` in production
 - **Severity:** major

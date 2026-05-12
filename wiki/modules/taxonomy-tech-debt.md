@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Severity scale
 
@@ -73,13 +73,13 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-007`
 - **Linked ADR:** missing-ADR
 
-### T-008 · Legacy error envelope (RFC 9457 drift)
-- **Severity:** major
-- **Surface:** `internal/modules/taxonomy/delivery/http/routes_families.go:98-115` (writeFamilyError); `routes_profiles.go:177-193` (writeProfileError); `routes_areas.go` error helpers; `internal/platform/httpresponse/response.go:14-16` (envelope definition)
-- **Observation:** Every error path returns `{"code":"...","message":"..."}` instead of `application/problem+json` per RFC 9457. Identical drift documented in audit T-002, auth T-003, iam T-006, documents T-001 — codebase-wide pattern. Consumer tooling that expects `type`/`title`/`status`/`detail`/`instance` cannot parse taxonomy errors uniformly. Trigger fired: documented contract not followed with measurable consumer impact (Major).
+### T-008 · Legacy error envelope (RFC 9457 drift) — CLOSED 2026-05-12 (Plan 7, alias cascade)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/taxonomy/delivery/http/routes_profiles.go:19` — `writeError = httpresponse.WriteError` (package-level alias). `internal/platform/httpresponse/response.go:16-18` — `WriteError` now calls `problem.Write(w, problem.New(status, code, message))`. All taxonomy error paths (`writeFamilyError`, `writeProfileError`, `writeAreaError`, and inline `writeError` call sites) inherit RFC 9457 `application/problem+json` via this cascade. No taxonomy handler file required direct edits; verified by taxonomy contract tests (`commit f0bb64c0`).
+- **Observation (original):** Every error path returned `{"code":"...","message":"..."}` instead of `application/problem+json`. The gap was codebase-wide across audit T-002, auth T-003, iam T-006, documents T-001.
 - **Evidence:** `_artifacts/02-flow-list-families.md` §5; `_artifacts/02-flow-create-profile.md` §5; `_artifacts/02-flow-deactivate-family.md` §5; `_artifacts/05-industry.md` IP-001.
-- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-008`
-- **Linked ADR:** missing-ADR
+- **Linked backlog row:** `backlog/taxonomy-refactor.md#R-008` (merged Plan 7 2026-05-11, commit `11589032` cascade + `f0bb64c0` test fix)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
 
 ### T-009 · No OpenAPI spec; raw `http.ServeMux` instead of oapi-codegen
 - **Severity:** major

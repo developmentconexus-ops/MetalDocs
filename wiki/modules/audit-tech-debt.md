@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/audit.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/audit-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Severity scale
 
@@ -26,13 +26,13 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-001`
 - **Linked ADR:** missing-ADR
 
-### T-002 · Legacy error envelope (RFC 9457 drift)
-- **Severity:** major
-- **Surface:** `internal/modules/audit/delivery/http/handler.go:48,60,97-105`
-- **Observation:** Handler emits `{"error":{"code","message","details","trace_id"}}` instead of `application/problem+json` per RFC 9457. Mirrors documented drift in auth T-003, iam T-006, documents T-001. Consumer tooling that relies on `type`/`title`/`status`/`detail`/`instance` cannot parse audit errors uniformly. Trigger fired: contract violation with measurable consumer impact.
+### T-002 · Legacy error envelope (RFC 9457 drift) — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/audit/delivery/http/handler.go:49` (limit validation) and `:61` (list error) — local `requestTraceID`/`writeAPIError` helpers deleted; all error paths now call `problem.Write(w, problem.New(...))` directly. `application/problem+json` is emitted on all 4xx/5xx paths.
+- **Observation (original):** Handler emitted `{"error":{"code","message","details","trace_id"}}` instead of `application/problem+json`. Mirrored drift in auth T-003, iam T-006, documents T-001.
 - **Evidence:** `_artifacts/02-flow-list.md` §5; `_artifacts/05-industry.md` IP-001.
-- **Linked backlog row:** `backlog/audit-refactor.md#R-002`
-- **Linked ADR:** missing-ADR
+- **Linked backlog row:** `backlog/audit-refactor.md#R-002` (merged Plan 7 2026-05-11, commit `2ca727d6`)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
 
 ### T-003 · No retention or purge policy — CLOSED 2026-05-11 (Plan 6a, app-level goroutine)
 - **Severity:** major (closed)

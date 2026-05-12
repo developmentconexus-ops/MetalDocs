@@ -2,7 +2,7 @@
 
 > One row = one PR. Pulled from [`wiki/modules/iam-tech-debt.md`](../modules/iam-tech-debt.md). Rows without a `debt_id` are blocked from grooming.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Schema
 
@@ -27,7 +27,7 @@
 | R-003 | Delete unwired `AuthorizationService` (third authz surface); Plan 5 wires tier-2 `authz.Require` per module instead | T-003 | M | Major | — | — | merged | Plan 4 (2026-05-11, commit 8da32dbf) |
 | R-004 | Attach `enforce_capability_asserted` trigger to IAM-owned mutating tables (`iam_user_roles`, `user_process_areas`, `iam_users`) — new migration; first wire `authz.Require` in the corresponding repo methods | T-004 | L | Major | R-001 | — | merged (partial) | Plan 5 (2026-05-11): `iam_user_roles` + `user_process_areas` done; `iam_users` INSERT residual |
 | R-005 | Emit `auditdomain.Writer.Record` from `handleUserRoleUpsert` (and any other admin op missing audit) — match the call pattern in handlers that already do | T-005 | S | Critical | — | — | merged | Plan 6a (2026-05-11, commit f27529e8) |
-| R-006 | Migrate IAM error envelopes (middleware + membership handler) to RFC 9457 Problem+JSON; add `metaldocs.authz.forbidden` and `metaldocs.iam.*` Problem `type` URIs | T-006 | M | Major | — | — | open | — |
+| R-006 | Migrate IAM error envelopes (middleware + membership handler) to RFC 9457 Problem+JSON; add `metaldocs.authz.forbidden` and `metaldocs.iam.*` Problem `type` URIs | T-006 | M | Major | — | — | merged | Plan 7 (2026-05-11, commit 1ecfe674) |
 | R-007 | Implement and wire a real `MembershipGovernanceLogger` (Postgres `governance_events` writer) at `main.go:217` | T-007 | S | Major | — | — | open | — |
 | R-008 | Add `CachedRoleProvider.InvalidateGroup(groupID)` + wire it into the (future) group-write site; cover with unit test | T-008 | S | Minor | (deferred until group writes exist) | — | open | — |
 | R-009 | Rename `authz.ErrCapabilityDenied` → `authz.ErrCapDenied` (struct kept); `iamapp.ErrCapabilityDenied` sentinel preserved | T-009 | XS | Minor | — | — | merged | Plan 4 (2026-05-11, commit ec7d151a) |

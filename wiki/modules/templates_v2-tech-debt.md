@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/templates_v2.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates_v2-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Items
 
@@ -40,13 +40,13 @@
 - **Linked backlog row:** `backlog/templates_v2-refactor.md#R-004`
 - **Linked ADR:** missing-ADR
 
-### T-005 · Legacy error envelope — RFC 9457 Problem+JSON not adopted
-- **Severity:** major
-- **Surface:** `internal/modules/templates_v2/delivery/http/handler.go:95-102` (`writeErr`) + `delivery/http/errors.go:10` (`MapErr`).
-- **Observation:** Module emits `{"error":{"code":"...","message":"..."}}` for all non-2xx responses. Plan 2 (`wiki/architecture/api-design-system.md`, commits ae1229e8..c84215f7) introduced `internal/platform/problem` for RFC 9457 envelope; templates_v2 has not been migrated. Same shape as `documents` T-001 / `auth` T-003 — module-by-module rollout debt. Frontend error-UX layer (`wiki/concepts/error-ux.md`) still consumes the legacy shape, so the contract drift is observable but not yet user-blocking.
+### T-005 · Legacy error envelope — RFC 9457 Problem+JSON not adopted — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/templates_v2/delivery/http/handler.go:92-93` (`writeErr`) — body is now `problem.Write(w, problem.New(status, code, message))`. All call sites that use `writeErr` (including `MapErr` consumers at `:109`) emit `application/problem+json`. The legacy `{"error":{"code":"...","message":"..."}}` shape is gone.
+- **Observation (original):** Module emitted `{"error":{"code":"...","message":"..."}}` for all non-2xx responses. `internal/platform/problem` existed from Plan 2 but templates_v2 had not been migrated.
 - **Evidence:** `_artifacts/05-industry.md` IP-001, `_artifacts/01-surface.md` §1c.
-- **Linked backlog row:** `backlog/templates_v2-refactor.md#R-005`
-- **Linked ADR:** `wiki/architecture/api-design-system.md` (decision exists; module migration is the debt)
+- **Linked backlog row:** `backlog/templates_v2-refactor.md#R-005` (merged Plan 7 2026-05-11, commit `bbe3933b`)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
 
 ### T-006 · OpenAPI / handler drift — 12 of 20 routes hand-rolled, not in spec
 - **Severity:** major

@@ -2,15 +2,15 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/approval-tech-debt.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Rows
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
-| R-001 | Migrate approval HTTP error envelope to RFC 9457 Problem+JSON | T-001 | M | critical | — | — | open | — |
+| R-001 | Migrate approval HTTP error envelope to RFC 9457 Problem+JSON | T-001 | M | critical | — | — | merged | Plan 7 (2026-05-11, commit b8747d6a + c4f5535f) |
 | R-002 | Add OpenAPI operationIds + schemas for v2 doc-action approval routes | T-002 | M | critical | — | — | open | — |
-| R-003 | Replace `looksLikeValidationError` substring classifier with typed sentinel matching | T-003 | S | major | — | — | open | — |
+| R-003 | Replace `looksLikeValidationError` substring classifier with typed sentinel matching | T-003 | S | major | — | — | merged | Plan 7 (2026-05-11, commit b8747d6a) |
 | R-004 | Remove deprecated post-commit `PDFDispatchInvoker` path; require outbox | T-004 | S | major | — | — | open | — |
 | R-005 | Convert inbox list+count to single tx (or single window-function query) | T-005 | S | major | — | — | open | — |
 | R-006 | Audit cancel & cutover service paths for `authz.Require` pairing | T-006 | S | major | — | — | open | — |

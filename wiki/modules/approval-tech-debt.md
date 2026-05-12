@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/approval.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/approval-refactor.md`.
 
-**Last verified:** 2026-05-10
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Severity scale
 
@@ -10,13 +10,13 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 
 ## Items
 
-### T-001 · RFC 9457 envelope absent across approval HTTP surface
-- **Severity:** critical
-- **Surface:** `internal/modules/documents/approval/http/contracts/errors.go:3-12`, `internal/modules/documents/approval/http/errors.go:147` (`WriteError`)
-- **Observation:** All non-2xx responses return legacy `{error:{code,message,details,trace_id}}` envelope. `wiki/decisions/0007-two-tier-authz.md` and the documents-module doc both target RFC 9457 Problem+JSON. Frontend `ApprovalError extends ApiError` (`frontend/apps/web/src/features/approval/api/mutationClient.ts:9`) parses the legacy shape; switching server-side breaks the parser.
+### T-001 · RFC 9457 envelope absent across approval HTTP surface — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** critical (closed)
+- **Surface (resolved):** `internal/modules/documents/approval/http/errors.go:23` (`MapErrorToResponse`) returns `*problem.Problem`; `:136-141` (`WriteError`) calls `problem.Write(w, prob)`. `internal/modules/documents/approval/http/contracts/errors.go` — emptied to `package contracts` (error sentinels remain in `errors.go`). Frontend `frontend/apps/web/src/features/approval/api/mutationClient.ts:55-66` — `parseProblem(res.clone())` is now tried first in all non-2xx branches; legacy `{error:{code,message}}` fallback retained for incremental rollout.
+- **Observation (original):** All non-2xx responses returned legacy `{error:{code,message,details,trace_id}}` envelope. Frontend `ApprovalError` parsed the legacy shape; switching server-side required a coordinated frontend update.
 - **Evidence:** `_artifacts/02-flow-inbox.md` §5; `_artifacts/02-flow-signoff.md` §5; `_artifacts/05-industry.md` IP-001 row.
-- **Linked backlog row:** `backlog/approval-refactor.md#R-001`
-- **Linked ADR:** missing-ADR
+- **Linked backlog row:** `backlog/approval-refactor.md#R-001` (merged Plan 7 2026-05-11, commit `b8747d6a` + `c4f5535f`)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
 
 ### T-002 · Signoff & cancel document-scoped routes absent from OpenAPI
 - **Severity:** critical
@@ -26,12 +26,12 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · `looksLikeValidationError` substring classifier — completed-instance signoff returns 500
-- **Severity:** major
-- **Surface:** `internal/modules/documents/approval/http/errors.go:181`
-- **Observation:** Validation errors are detected by substring match on `" must be "`, `" is required"`, `" must not be "`. Domain error `"no active stage in this approval instance"` (re-signoff after instance approved) does not match → 500 `internal.unknown` instead of 409 `state.instance_completed`. Pre-existing E4 finding from prior stub still stands.
-- **Evidence:** prior stub `wiki/modules/approval.md` §E4; `_artifacts/02-flow-inbox.md` §5 confirms current code path unchanged.
-- **Linked backlog row:** `backlog/approval-refactor.md#R-003`
+### T-003 · `looksLikeValidationError` substring classifier — completed-instance signoff returns 500 — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/documents/approval/http/errors.go:82-84` — `domain.ErrNoActiveStage` now has an explicit `errors.Is` branch: 409 `state.instance_completed`. The substring fallback (`looksLikeValidationError` at `:127`) is retained for genuine validation strings but is no longer the path for `ErrNoActiveStage`.
+- **Observation (original):** `domain.ErrNoActiveStage` ("no active stage in this approval instance") did not match the substring classifier → 500 `internal.unknown` instead of the correct 409. E4 finding from prior stub.
+- **Evidence:** prior stub `wiki/modules/approval.md` §E4; `_artifacts/02-flow-inbox.md` §5.
+- **Linked backlog row:** `backlog/approval-refactor.md#R-003` (merged Plan 7 2026-05-11, commit `b8747d6a`)
 - **Linked ADR:** missing-ADR
 
 ### T-004 · Deprecated post-commit PDF dispatcher path still compiled

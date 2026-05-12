@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Severity scale
 
@@ -10,13 +10,13 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 
 ## Items
 
-### T-001 · RFC 9457 Problem Details envelope not adopted on documents routes
-- **Severity:** major
-- **Surface:** `internal/modules/documents/delivery/http/handler.go:958` (mapErr) · `internal/modules/documents/delivery/http/handler.go:1013` (httpErr)
-- **Observation:** Handlers emit legacy `{error:{code,message,details,trace_id}}` shape via `httpErr` + `mapErr`. Codegen bootstrap is in place (`internal/modules/documents/api/api.gen.go`) but handler migration is deferred per ADR 0012. Documented contract not followed yet — measurable impact for tooling that depends on Problem+JSON.
-- **Evidence:** `_artifacts/02-flow-finalizeDocument.md` §5 (error response anchors); `_artifacts/05-industry.md` IP-001.
-- **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-001
-- **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`
+### T-001 · RFC 9457 Problem Details envelope not adopted on documents routes — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/documents/delivery/http/handler.go:974` (`mapErr`) · `:1027-1029` (`httpErr`) — `httpErr` now delegates to `problem.Write(w, problem.New(code, msg, msg))`. All call sites that used `httpErr` inherit `application/problem+json` responses. `mapErr` continues to map domain errors to `(int, string)` tuples consumed by `httpErr`.
+- **Observation (original):** Handlers emitted legacy `{error:{code,message,details,trace_id}}` shape. Codegen bootstrap was in place but handler migration was deferred per ADR 0012.
+- **Evidence:** `_artifacts/02-flow-finalizeDocument.md` §5; `_artifacts/05-industry.md` IP-001.
+- **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-001 (merged Plan 7 2026-05-11, commit `5b792150`)
+- **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`; `wiki/architecture/api-design-system.md`
 
 ### T-002 · OpenAPI spec drift on `/api/v2/documents/*` routes
 - **Severity:** critical
