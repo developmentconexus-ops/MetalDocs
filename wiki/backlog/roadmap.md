@@ -1,6 +1,6 @@
 # Refactor Roadmap
 
-> **Last verified:** 2026-05-11
+> **Last verified:** 2026-05-12 (Plan 7)
 > **Scope:** Ordered sequence of cross-module refactor sub-plans from current state → professional structured architecture. Each sub-plan = one fresh implementation session = one PR series.
 > **Out of scope:** Implementation detail. Sub-plans are written one-at-a-time in their own session under `docs/superpowers/specs/` and linked back here.
 > **Source evidence:** Every `Closes` row cites a T-NNN (tech-debt) or R-NNN (refactor backlog) in `wiki/modules/<m>-tech-debt.md` / `wiki/backlog/<m>-refactor.md`.
@@ -28,7 +28,7 @@
 | P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | ~3 | pending |
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
 | P2 | 6a | Audit-trail completeness sweep (emission + sink consolidation) | 11 commits | done 2026-05-11 |
-| P3 | 7 | RFC 9457 envelope rollout | ~9 | pending |
+| P3 | 7 | RFC 9457 envelope rollout | 11 commits | done 2026-05-11 |
 | P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | pending |
 | P4 | 9 | Transactional + idempotency hardening + audit hash chain (6b absorbed) | ~6 | pending |
 | P4 | 10 | Legacy purge + rename sweep (`templates_v2 → templates`, `v2 → v1`) | ~6 | pending |
@@ -92,10 +92,10 @@ Rationale: hash-chain INSERT requires advisory lock / `SELECT … FOR UPDATE` on
 
 - **Goal:** `application/problem+json` on every error response. Frontend `ApiError` parser updated to new shape.
 - **Touches:** `internal/platform/problem` (exists from Plan 2 — confirm); per-module handler error helpers: `internal/modules/iam/delivery/http/middleware.go:129` + `routes_memberships.go:137`; `internal/modules/documents/delivery/http/handler.go:958,1013`; `internal/modules/auth/delivery/http/handler.go:166` + `middleware.go:65`; `internal/modules/documents/approval/http/errors.go:147`; `internal/modules/audit/delivery/http/handler.go:48`; `internal/modules/templates_v2/delivery/http/handler.go:95`; `internal/platform/httpresponse/response.go:14` (registry + taxonomy consumers); frontend `frontend/apps/web/src/lib/api/` parser.
-- **Closes:** iam T-006/R-006; documents T-001/R-001; auth T-003/R-003; approval T-001/R-001, T-003/R-003; audit T-002/R-002; templates_v2 T-005/R-005; registry T-003/R-003; taxonomy T-008/R-008.
+- **Closes:** iam T-006/R-006; documents T-001/R-001; auth T-003/R-003; approval T-001/R-001, T-003/R-003; audit T-002/R-002; templates_v2 T-005/R-005; registry T-003/R-003, T-007/R-007; taxonomy T-008/R-008.
 - **Critical rows closed:** 1 (approval T-001).
 - **Blockers:** prefer after Plan 6 so audit emits same shape.
-- **Status:** pending.
+- **Status:** done 2026-05-11. Commits: `11589032` (httpresponse cascade fix), `1ecfe674` (IAM), `97822581` (IAM test fix), `95ebedfc` (auth), `5b792150` (documents), `b8747d6a` (approval + T-003 fix), `2ca727d6` (audit), `bbe3933b` (templates_v2), `395b0b24` (registry + T-007), `f0bb64c0` (taxonomy test), `c4f5535f` (frontend mutationClient). Spec: `docs/superpowers/specs/2026-05-11-plan-07-rfc9457.md`.
 
 ## Plan 8 · OpenAPI / contract-first completion (parallel to Plan 7)
 

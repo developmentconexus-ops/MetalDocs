@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from [wiki/modules/registry-tech-debt.md](../modules/registry-tech-debt.md).
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Rows
 
@@ -10,11 +10,11 @@
 |---|---|---|---|---|---|---|---|---|
 | R-001 | Verify + wire capability gates for Obsolete/Supersede (resolver + service-side guard) | T-001 | M | critical | — | — | merged | Plan 5 (2026-05-11) |
 | R-002 | Emit governance event from `changeStatus` (active→obsolete, active→superseded) | T-002 | S | critical | — | — | merged | Plan 6a (2026-05-11, commit 5bb06964) |
-| R-003 | Migrate registry error responses to RFC 9457 problem+json | T-003 | M | major | — | — | open | — |
+| R-003 | Migrate registry error responses to RFC 9457 problem+json | T-003 | M | major | — | — | merged | Plan 7 (2026-05-11) |
 | R-004 | Apply tier-3 tripwire to `controlled_documents` + `cd_sequence_counters`; pair `authz.Require` with each mutator | T-004 | L | major | R-001 | — | merged | Plan 5 (2026-05-11) |
 | R-005 | Adopt `SET LOCAL metaldocs.tenant_id` GUC + RLS policies for registry-owned tables | T-005 | L | major | — | — | open | — |
 | R-006 | Authz for `GetActiveDocument` (tenant header-source sub-issue resolved by Plan 3; remaining: add read-policy authz check) | T-006 | M | major | — | — | open | — |
-| R-007 | Implement 422 `template_invalid` mapping OR drop spec branch | T-007 | S | major | — | — | open | — |
+| R-007 | Implement 422 `template_invalid` mapping OR drop spec branch | T-007 | S | major | — | — | merged | Plan 7 (2026-05-11, commit 395b0b24) |
 | R-008 | Move registry audit emission to platform-owned `internal/audit` writer | T-008 | M | major | audit#R-001 | — | merged | Plan 6a (2026-05-11, commit 71a2dc53) |
 | R-009 | Replace `WithDocumentInitializer` setter with constructor injection (split registry module init into two phases or move port to a shared package) | T-009 | M | minor | — | — | open | — |
 | R-010 | Expose registry repository (or a read-only port) via `Module` so external wiring stops reaching into `infrastructure` | T-010 | S | minor | — | — | open | — |
