@@ -9,6 +9,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -34,7 +35,7 @@ func (h *MembershipHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Request) {
 	if h.svc == nil {
-		writeMembershipAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured")
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured"))
 		return
 	}
 
@@ -43,19 +44,19 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		userID = strings.TrimSpace(authenticatedActor(r))
 	}
 	if userID == "" {
-		writeMembershipAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userId is required")
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId is required"))
 		return
 	}
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 
 	items, err := h.svc.ListActive(r.Context(), userID, tenantID)
 	if err != nil {
-		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships")
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships"))
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
@@ -63,22 +64,22 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 
 func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Request) {
 	if h.svc == nil {
-		writeMembershipAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured")
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured"))
 		return
 	}
 
 	var req grantMembershipRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeMembershipAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload")
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 	if strings.TrimSpace(req.UserID) == "" || strings.TrimSpace(req.AreaCode) == "" || strings.TrimSpace(req.Role) == "" {
-		writeMembershipAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userId, areaCode and role are required")
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId, areaCode and role are required"))
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 
@@ -106,21 +107,21 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 
 func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Request) {
 	if h.svc == nil {
-		writeMembershipAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured")
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "Membership service is not configured"))
 		return
 	}
 
 	userID := strings.TrimSpace(r.URL.Query().Get("userId"))
 	areaCode := strings.TrimSpace(r.URL.Query().Get("areaCode"))
 	if userID == "" || areaCode == "" {
-		writeMembershipAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "userId and areaCode are required")
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId and areaCode are required"))
 		return
 	}
 	revokedBy := authn.UserIDFromContext(r.Context())
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
-		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 
@@ -135,21 +136,14 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err error, defaultMessage string) {
 	switch {
 	case errors.Is(err, iamapp.ErrMembershipNotFound):
-		writeMembershipAPIError(w, http.StatusNotFound, "MEMBERSHIP_NOT_FOUND", "Membership not found")
+		_ = problem.Write(w, problem.New(http.StatusNotFound, "MEMBERSHIP_NOT_FOUND", "Membership not found"))
 	case errors.Is(err, iamapp.ErrUnknownRole):
-		writeMembershipAPIError(w, http.StatusBadRequest, "UNKNOWN_ROLE", "Unknown role")
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "UNKNOWN_ROLE", "Unknown role"))
 	default:
-		writeMembershipAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", defaultMessage)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", defaultMessage))
 	}
 }
 
 func tenantIDFromRequest(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
-}
-
-func writeMembershipAPIError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, map[string]any{
-		"code":    code,
-		"message": message,
-	})
 }

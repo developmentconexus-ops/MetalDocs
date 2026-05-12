@@ -14,6 +14,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/authn"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -101,27 +102,26 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	traceID := requestTraceID(r)
 	if h.authService == nil {
-		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 	activeSince := time.Now().UTC().Add(-10 * time.Minute)
 	users, err := h.authService.ListUsers(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("iam admin: list users failed: %v", err)
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
 		return
 	}
 	onlineUsers, err := h.authService.ListOnlineUsers(r.Context(), activeSince)
 	if err != nil {
 		log.Printf("iam admin: list online users failed: %v", err)
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list online users", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list online users"))
 		return
 	}
 	recentEvents := []auditdomain.Event{}
@@ -129,7 +129,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		events, err := h.auditReader.ListEvents(r.Context(), auditdomain.ListEventsQuery{Limit: 25, TenantID: tenantID})
 		if err != nil {
 			log.Printf("iam admin: list audit events failed: %v", err)
-			writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events", traceID)
+			_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events"))
 			return
 		}
 		recentEvents = events
@@ -188,50 +188,48 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	})
 }
 func (h *AdminHandler) handleUserRoute(w http.ResponseWriter, r *http.Request) {
-	traceID := requestTraceID(r)
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/iam/users/")
 	parts := strings.Split(path, "/")
 	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "roles" {
 		switch r.Method {
 		case http.MethodPost:
-			h.handleUserRoleUpsert(w, r, strings.TrimSpace(parts[0]), traceID)
+			h.handleUserRoleUpsert(w, r, strings.TrimSpace(parts[0]))
 		case http.MethodPut:
-			h.handleReplaceUserRoles(w, r, strings.TrimSpace(parts[0]), traceID)
+			h.handleReplaceUserRoles(w, r, strings.TrimSpace(parts[0]))
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
 		return
 	}
 	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "reset-password" && r.Method == http.MethodPost {
-		h.handleResetPassword(w, r, strings.TrimSpace(parts[0]), traceID)
+		h.handleResetPassword(w, r, strings.TrimSpace(parts[0]))
 		return
 	}
 	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "unlock" && r.Method == http.MethodPost {
-		h.handleUnlockUser(w, r, strings.TrimSpace(parts[0]), traceID)
+		h.handleUnlockUser(w, r, strings.TrimSpace(parts[0]))
 		return
 	}
 	if len(parts) == 1 && strings.TrimSpace(parts[0]) != "" && r.Method == http.MethodPatch {
-		h.handlePatchUser(w, r, strings.TrimSpace(parts[0]), traceID)
+		h.handlePatchUser(w, r, strings.TrimSpace(parts[0]))
 		return
 	}
-	writeAPIError(w, http.StatusNotFound, "INTERNAL_ERROR", "Route not found", traceID)
+	_ = problem.Write(w, problem.New(http.StatusNotFound, "INTERNAL_ERROR", "Route not found"))
 }
 
 func (h *AdminHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	traceID := requestTraceID(r)
 	if h.authService == nil {
-		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 	items, err := h.authService.ListUsers(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("iam admin: list users failed: %v", err)
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
 		return
 	}
 	out := make([]map[string]any, 0, len(items))
@@ -259,29 +257,28 @@ func (h *AdminHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
-	traceID := requestTraceID(r)
 	if h.authService == nil {
-		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
 		return
 	}
 	var req CreateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 	roles, ok := parseRoles(req.Roles)
 	if !ok {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles"))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 	assignedBy := authenticatedActor(r)
 	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, tenantID, roles, assignedBy); err != nil {
-		h.writeAuthError(w, err, traceID)
+		h.writeAuthError(w, err)
 		return
 	}
 	createdUserID := strings.TrimSpace(defaultString(req.UserID, req.Username))
@@ -293,14 +290,14 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-func (h *AdminHandler) handlePatchUser(w http.ResponseWriter, r *http.Request, userID, traceID string) {
+func (h *AdminHandler) handlePatchUser(w http.ResponseWriter, r *http.Request, userID string) {
 	if h.authService == nil {
-		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
 		return
 	}
 	var req UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 	if err := h.authService.UpdateUser(r.Context(), authdomain.UpdateUserParams{
@@ -310,7 +307,7 @@ func (h *AdminHandler) handlePatchUser(w http.ResponseWriter, r *http.Request, u
 		IsActive:           req.IsActive,
 		MustChangePassword: req.MustChangePassword,
 	}, req.NewPassword); err != nil {
-		h.writeAuthError(w, err, traceID)
+		h.writeAuthError(w, err)
 		return
 	}
 	h.recordAudit(r, userID, "iam.user.updated", map[string]any{
@@ -322,7 +319,7 @@ func (h *AdminHandler) handlePatchUser(w http.ResponseWriter, r *http.Request, u
 	writeJSON(w, http.StatusOK, map[string]any{"userId": userID, "updated": true})
 }
 
-func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Request, userID, traceID string) {
+func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Request, userID string) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -330,20 +327,20 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 
 	var req UpsertUserRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 
 	role := iamdomain.Role(strings.ToLower(strings.TrimSpace(req.Role)))
 	if role == "" {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Role is required", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Role is required"))
 		return
 	}
 
 	switch role {
 	case iamdomain.RoleSystemAdmin, iamdomain.RoleApprover, iamdomain.RoleAuthor, iamdomain.RoleEditor, iamdomain.RoleViewer:
 	default:
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role"))
 		return
 	}
 
@@ -353,12 +350,12 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	}
 	upsertTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 
 	if err := h.service.UpsertUserAndAssignRole(r.Context(), userID, req.DisplayName, upsertTenantID, role, assignedBy); err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to upsert user role", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to upsert user role"))
 		return
 	}
 
@@ -373,16 +370,16 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Request, userID, traceID string) {
+func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Request, userID string) {
 	var req ReplaceUserRolesRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 
 	roles, ok := parseRoles(req.Roles)
 	if !ok {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles"))
 		return
 	}
 
@@ -392,12 +389,12 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	}
 	replaceTenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 
 	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, roles, assignedBy); err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to replace user roles", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to replace user roles"))
 		return
 	}
 
@@ -415,18 +412,18 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	})
 }
 
-func (h *AdminHandler) handleResetPassword(w http.ResponseWriter, r *http.Request, userID, traceID string) {
+func (h *AdminHandler) handleResetPassword(w http.ResponseWriter, r *http.Request, userID string) {
 	if h.authService == nil {
-		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
 		return
 	}
 	var req ResetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 	if err := h.authService.AdminResetPassword(r.Context(), userID, req.NewPassword); err != nil {
-		h.writeAuthError(w, err, traceID)
+		h.writeAuthError(w, err)
 		return
 	}
 	h.recordAudit(r, userID, "auth.user.password_reset", map[string]any{
@@ -435,29 +432,29 @@ func (h *AdminHandler) handleResetPassword(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"userId": userID, "reset": true, "mustChangePassword": true})
 }
 
-func (h *AdminHandler) handleUnlockUser(w http.ResponseWriter, r *http.Request, userID, traceID string) {
+func (h *AdminHandler) handleUnlockUser(w http.ResponseWriter, r *http.Request, userID string) {
 	if h.authService == nil {
-		writeAPIError(w, http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured", traceID)
+		_ = problem.Write(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
 		return
 	}
 	if err := h.authService.UnlockUser(r.Context(), userID); err != nil {
-		h.writeAuthError(w, err, traceID)
+		h.writeAuthError(w, err)
 		return
 	}
 	h.recordAudit(r, userID, "auth.user.unlocked", map[string]any{})
 	writeJSON(w, http.StatusOK, map[string]any{"userId": userID, "unlocked": true})
 }
 
-func (h *AdminHandler) writeAuthError(w http.ResponseWriter, err error, traceID string) {
+func (h *AdminHandler) writeAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 	case errors.Is(err, authdomain.ErrUserAlreadyExists):
-		writeAPIError(w, http.StatusConflict, "CONFLICT_ERROR", "User already exists", traceID)
+		_ = problem.Write(w, problem.New(http.StatusConflict, "CONFLICT_ERROR", "User already exists"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		writeAPIError(w, http.StatusNotFound, "NOT_FOUND", "User not found", traceID)
+		_ = problem.Write(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
 	default:
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to process user request", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to process user request"))
 	}
 }
 
@@ -481,7 +478,7 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 		ResourceType: "user",
 		ResourceID:   userID,
 		PayloadJSON:  string(payloadJSON),
-		TraceID:      requestTraceID(r),
+		TraceID:      strings.TrimSpace(r.Header.Get("X-Trace-Id")),
 		TenantID:     tenantID,
 	}); err != nil {
 		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
