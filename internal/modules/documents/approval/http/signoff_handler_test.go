@@ -15,6 +15,7 @@ import (
 	approvalsignature "metaldocs/internal/modules/documents/approval/infra/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -182,12 +183,12 @@ func TestSignoffHandler_MissingIdempotencyKey(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 	}
-	var out contracts.ErrorResponse
+	var out problem.Problem
 	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if out.Error.Code != "idempotency.key_required" {
-		t.Fatalf("error.code = %q, want %q", out.Error.Code, "idempotency.key_required")
+	if out.Code != "idempotency.key_required" {
+		t.Fatalf("error.code = %q, want %q", out.Code, "idempotency.key_required")
 	}
 }
 

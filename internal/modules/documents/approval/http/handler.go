@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
@@ -76,13 +74,6 @@ func NewHandler(services *application.Services, db *sql.DB, idempStore signoffId
 		h.routeAdmin = services.RouteAdmin
 	}
 	return h
-}
-
-func requestID(r *http.Request) string {
-	if id := strings.TrimSpace(r.Header.Get("X-Request-ID")); id != "" {
-		return id
-	}
-	return fmt.Sprintf("req-%d", time.Now().UnixNano())
 }
 
 func actorIDFromRequest(r *http.Request) string {

@@ -18,6 +18,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/problem"
 )
 
 func TestMapErrorToResponse(t *testing.T) {
@@ -26,140 +27,126 @@ func TestMapErrorToResponse(t *testing.T) {
 		err        error
 		wantStatus int
 		wantCode   string
-		wantMsg    string
+		wantTitle  string
 	}{
 		{
 			name:       "repository stale revision",
 			err:        repository.ErrStaleRevision,
 			wantStatus: http.StatusConflict,
 			wantCode:   "conflict.stale_revision",
-			wantMsg:    repository.ErrStaleRevision.Error(),
+			wantTitle:  repository.ErrStaleRevision.Error(),
 		},
 		{
 			name:       "repository no active instance",
 			err:        repository.ErrNoActiveInstance,
 			wantStatus: http.StatusNotFound,
 			wantCode:   "not_found.instance",
-			wantMsg:    repository.ErrNoActiveInstance.Error(),
+			wantTitle:  repository.ErrNoActiveInstance.Error(),
 		},
 		{
 			name:       "repository duplicate submission",
 			err:        repository.ErrDuplicateSubmission,
 			wantStatus: http.StatusConflict,
 			wantCode:   "conflict.duplicate_submission",
-			wantMsg:    repository.ErrDuplicateSubmission.Error(),
+			wantTitle:  repository.ErrDuplicateSubmission.Error(),
 		},
 		{
 			name:       "repository actor already signed",
 			err:        repository.ErrActorAlreadySigned,
 			wantStatus: http.StatusConflict,
 			wantCode:   "signoff.duplicate",
-			wantMsg:    repository.ErrActorAlreadySigned.Error(),
+			wantTitle:  repository.ErrActorAlreadySigned.Error(),
 		},
 		{
 			name:       "repository instance completed",
 			err:        repository.ErrInstanceCompleted,
 			wantStatus: http.StatusConflict,
 			wantCode:   "state.instance_completed",
-			wantMsg:    repository.ErrInstanceCompleted.Error(),
+			wantTitle:  repository.ErrInstanceCompleted.Error(),
+		},
+		{
+			name:       "domain no active stage",
+			err:        domain.ErrNoActiveStage,
+			wantStatus: http.StatusConflict,
+			wantCode:   "state.instance_completed",
+			wantTitle:  domain.ErrNoActiveStage.Error(),
 		},
 		{
 			name:       "repository route in use",
 			err:        repository.ErrRouteInUse,
 			wantStatus: http.StatusConflict,
 			wantCode:   "route.in_use",
-			wantMsg:    repository.ErrRouteInUse.Error(),
+			wantTitle:  repository.ErrRouteInUse.Error(),
 		},
 		{
 			name:       "repository duplicate route profile",
 			err:        repository.ErrDuplicateRouteProfile,
 			wantStatus: http.StatusConflict,
 			wantCode:   "route.duplicate_profile",
-			wantMsg:    repository.ErrDuplicateRouteProfile.Error(),
+			wantTitle:  repository.ErrDuplicateRouteProfile.Error(),
 		},
 		{
 			name:       "domain sod submitter cannot sign",
 			err:        domain.ErrAuthorCannotSign,
 			wantStatus: http.StatusForbidden,
 			wantCode:   "sod.submitter_cannot_sign",
-			wantMsg:    domain.ErrAuthorCannotSign.Error(),
+			wantTitle:  domain.ErrAuthorCannotSign.Error(),
 		},
 		{
 			name:       "domain sod cross-stage duplicate",
 			err:        domain.ErrActorAlreadySigned,
 			wantStatus: http.StatusForbidden,
 			wantCode:   "sod.cross_stage_duplicate",
-			wantMsg:    domain.ErrActorAlreadySigned.Error(),
+			wantTitle:  domain.ErrActorAlreadySigned.Error(),
 		},
 		{
 			name:       "freeze effective date missing",
 			err:        v2dom.ErrEffectiveDateMissing,
 			wantStatus: http.StatusUnprocessableEntity,
 			wantCode:   "freeze.effective_date_missing",
-			wantMsg:    v2dom.ErrEffectiveDateMissing.Error(),
-		},
-		{
-			name:       "repository fk violation",
-			err:        repository.ErrFKViolation,
-			wantStatus: http.StatusUnprocessableEntity,
-			wantCode:   "db.fk_violation",
-			wantMsg:    repository.ErrFKViolation.Error(),
-		},
-		{
-			name:       "repository check violation",
-			err:        repository.ErrCheckViolation,
-			wantStatus: http.StatusUnprocessableEntity,
-			wantCode:   "db.check_violation",
-			wantMsg:    repository.ErrCheckViolation.Error(),
+			wantTitle:  v2dom.ErrEffectiveDateMissing.Error(),
 		},
 		{
 			name:       "repository insufficient privilege",
 			err:        repository.ErrInsufficientPrivilege,
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   "internal.db_privilege_missing",
-			wantMsg:    "internal error",
+			wantTitle:  "internal error",
 		},
 		{
 			name:       "repository unknown db",
 			err:        repository.ErrUnknownDB,
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   "internal.db_unknown",
-			wantMsg:    "internal error",
+			wantTitle:  "internal error",
 		},
 		{
 			name:       "authz capability denied",
 			err:        fmt.Errorf("wrap: %w", authz.ErrCapDenied{Capability: "x", AreaCode: "tenant", ActorID: "u1"}),
 			wantStatus: http.StatusForbidden,
 			wantCode:   "authz.capability_denied",
-			wantMsg:    "wrap: authz: capability \"x\" denied for actor \"u1\" in area \"tenant\"",
+			wantTitle:  "wrap: authz: capability \"x\" denied for actor \"u1\" in area \"tenant\"",
 		},
 		{
 			name:       "application reason required",
 			err:        application.ErrReasonRequired,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.reason_required",
-			wantMsg:    application.ErrReasonRequired.Error(),
+			wantTitle:  application.ErrReasonRequired.Error(),
 		},
 		{
 			name:       "application route not found",
 			err:        application.ErrRouteNotFound,
 			wantStatus: http.StatusNotFound,
 			wantCode:   "not_found.route",
-			wantMsg:    application.ErrRouteNotFound.Error(),
+			wantTitle:  application.ErrRouteNotFound.Error(),
 		},
 		{
 			name:       "context deadline exceeded",
 			err:        context.DeadlineExceeded,
 			wantStatus: http.StatusGatewayTimeout,
 			wantCode:   "timeout",
-			wantMsg:    "internal error",
-		},
-		{
-			name:       "context canceled",
-			err:        context.Canceled,
-			wantStatus: http.StatusGatewayTimeout,
-			wantCode:   "timeout",
-			wantMsg:    "internal error",
+			wantTitle:  "internal error",
 		},
 		{
 			name: "json syntax error",
@@ -169,7 +156,7 @@ func TestMapErrorToResponse(t *testing.T) {
 			}(),
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.json_decode",
-			wantMsg:    "unexpected end of JSON input",
+			wantTitle:  "unexpected end of JSON input",
 		},
 		{
 			name: "json type error",
@@ -181,119 +168,112 @@ func TestMapErrorToResponse(t *testing.T) {
 			}(),
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.json_type_error",
-			wantMsg:    "json: cannot unmarshal string into Go struct field .n of type int",
+			wantTitle:  "json: cannot unmarshal string into Go struct field .n of type int",
 		},
 		{
 			name:       "io EOF",
 			err:        io.EOF,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.empty_body",
-			wantMsg:    io.EOF.Error(),
+			wantTitle:  io.EOF.Error(),
 		},
 		{
 			name:       "contracts content type",
 			err:        contracts.ErrContentType,
 			wantStatus: http.StatusUnsupportedMediaType,
 			wantCode:   "validation.content_type",
-			wantMsg:    contracts.ErrContentType.Error(),
+			wantTitle:  contracts.ErrContentType.Error(),
 		},
 		{
 			name:       "contracts body too large",
 			err:        contracts.ErrBodyTooLarge,
 			wantStatus: http.StatusRequestEntityTooLarge,
 			wantCode:   "validation.body_too_large",
-			wantMsg:    contracts.ErrBodyTooLarge.Error(),
+			wantTitle:  contracts.ErrBodyTooLarge.Error(),
 		},
 		{
 			name:       "contracts empty body",
 			err:        contracts.ErrEmptyBody,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.empty_body",
-			wantMsg:    contracts.ErrEmptyBody.Error(),
+			wantTitle:  contracts.ErrEmptyBody.Error(),
 		},
 		{
 			name:       "contracts duplicate key",
 			err:        contracts.ErrDuplicateKey,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.duplicate_key",
-			wantMsg:    contracts.ErrDuplicateKey.Error(),
+			wantTitle:  contracts.ErrDuplicateKey.Error(),
 		},
 		{
 			name:       "if-match required",
 			err:        ErrIfMatchRequired,
 			wantStatus: http.StatusPreconditionRequired,
 			wantCode:   "precondition.if_match_required",
-			wantMsg:    ErrIfMatchRequired.Error(),
+			wantTitle:  ErrIfMatchRequired.Error(),
 		},
 		{
 			name:       "if-match malformed",
 			err:        ErrIfMatchMalformed,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.if_match_malformed",
-			wantMsg:    ErrIfMatchMalformed.Error(),
+			wantTitle:  ErrIfMatchMalformed.Error(),
 		},
 		{
 			name:       "idempotency key required",
 			err:        ErrIdempotencyRequired,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "idempotency.key_required",
-			wantMsg:    ErrIdempotencyRequired.Error(),
+			wantTitle:  ErrIdempotencyRequired.Error(),
 		},
 		{
 			name:       "content hash mismatch",
 			err:        ErrContentHashMismatch,
 			wantStatus: http.StatusPreconditionFailed,
 			wantCode:   "precondition.content_hash_mismatch",
-			wantMsg:    ErrContentHashMismatch.Error(),
+			wantTitle:  ErrContentHashMismatch.Error(),
 		},
 		{
 			name:       "signature invalid",
 			err:        approvalsignature.ErrInvalidCredentials,
 			wantStatus: http.StatusUnauthorized,
 			wantCode:   "authn.signature_invalid",
-			wantMsg:    approvalsignature.ErrInvalidCredentials.Error(),
-		},
-		{
-			name:       "signature rate-limited",
-			err:        approvalsignature.ErrRateLimited,
-			wantStatus: http.StatusTooManyRequests,
-			wantCode:   "authn.signature_rate_limited",
-			wantMsg:    approvalsignature.ErrRateLimited.Error(),
+			wantTitle:  approvalsignature.ErrInvalidCredentials.Error(),
 		},
 		{
 			name:       "generic validation error",
 			err:        errors.New("route_id is required"),
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.request_invalid",
-			wantMsg:    "route_id is required",
+			wantTitle:  "route_id is required",
 		},
 		{
 			name:       "unknown error",
 			err:        errors.New("boom"),
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   "internal.unknown",
-			wantMsg:    "internal error",
+			wantTitle:  "internal error",
 		},
 		{
 			name:       "nil error",
 			err:        nil,
 			wantStatus: http.StatusInternalServerError,
 			wantCode:   "internal.unknown",
-			wantMsg:    "internal error",
+			wantTitle:  "internal error",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, body := MapErrorToResponse(tt.err)
-			if status != tt.wantStatus {
-				t.Fatalf("status = %d, want %d", status, tt.wantStatus)
+			prob := MapErrorToResponse(tt.err)
+			if prob.Status != tt.wantStatus {
+				t.Fatalf("status = %d, want %d", prob.Status, tt.wantStatus)
 			}
-			if body.Error.Code != tt.wantCode {
-				t.Fatalf("code = %q, want %q", body.Error.Code, tt.wantCode)
+			if prob.Code != tt.wantCode {
+				t.Fatalf("code = %q, want %q", prob.Code, tt.wantCode)
 			}
-			if body.Error.Message != tt.wantMsg {
-				t.Fatalf("message = %q, want %q", body.Error.Message, tt.wantMsg)
+			if prob.Title != tt.wantTitle {
+				t.Fatalf("title = %q, want %q", prob.Title, tt.wantTitle)
 			}
 		})
 	}
@@ -301,40 +281,48 @@ func TestMapErrorToResponse(t *testing.T) {
 
 func TestMapErrorToResponse_WrappedSentinel(t *testing.T) {
 	err := fmt.Errorf("service: %w", repository.ErrStaleRevision)
-	status, body := MapErrorToResponse(err)
+	prob := MapErrorToResponse(err)
 
-	if status != http.StatusConflict {
-		t.Fatalf("status = %d, want %d", status, http.StatusConflict)
+	if prob.Status != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", prob.Status, http.StatusConflict)
 	}
-	if body.Error.Code != "conflict.stale_revision" {
-		t.Fatalf("code = %q, want %q", body.Error.Code, "conflict.stale_revision")
+	if prob.Code != "conflict.stale_revision" {
+		t.Fatalf("code = %q, want %q", prob.Code, "conflict.stale_revision")
 	}
-	if body.Error.Message != err.Error() {
-		t.Fatalf("message = %q, want %q", body.Error.Message, err.Error())
+	if prob.Title != err.Error() {
+		t.Fatalf("title = %q, want %q", prob.Title, err.Error())
+	}
+}
+
+func TestMapErrorToResponse_ErrNoActiveStage(t *testing.T) {
+	prob := MapErrorToResponse(domain.ErrNoActiveStage)
+
+	if prob.Status != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", prob.Status, http.StatusConflict)
+	}
+	if prob.Code != "state.instance_completed" {
+		t.Fatalf("code = %q, want %q", prob.Code, "state.instance_completed")
 	}
 }
 
 func TestWriteError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
-	WriteError(rr, "req-123", repository.ErrStaleRevision)
+	WriteError(rr, repository.ErrStaleRevision)
 
 	if rr.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusConflict)
 	}
-	if got := rr.Header().Get("Content-Type"); got != "application/json" {
-		t.Fatalf("content-type = %q, want %q", got, "application/json")
+	if got := rr.Header().Get("Content-Type"); got != "application/problem+json" {
+		t.Fatalf("content-type = %q, want %q", got, "application/problem+json")
 	}
 
-	var body contracts.ErrorResponse
+	var body problem.Problem
 	if err := json.NewDecoder(rr.Body).Decode(&body); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if body.RequestID != "req-123" {
-		t.Fatalf("request_id = %q, want %q", body.RequestID, "req-123")
-	}
-	if body.Error.Code != "conflict.stale_revision" {
-		t.Fatalf("code = %q, want %q", body.Error.Code, "conflict.stale_revision")
+	if body.Code != "conflict.stale_revision" {
+		t.Fatalf("code = %q, want %q", body.Code, "conflict.stale_revision")
 	}
 }
 

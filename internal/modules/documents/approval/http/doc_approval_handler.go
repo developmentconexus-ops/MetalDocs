@@ -14,26 +14,25 @@ import (
 // GetInstanceByDocumentHandler handles GET /api/v2/documents/{id}/approval-instance.
 // It looks up the active approval instance for the document and returns it.
 func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	docID := r.PathValue("id")
 
 	if h.readSvc == nil {
-		WriteError(w, reqID, errors.New("read service not configured"))
+		WriteError(w, errors.New("read service not configured"))
 		return
 	}
 
 	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, reqID, repository.ErrNoActiveInstance)
+			WriteError(w, repository.ErrNoActiveInstance)
 			return
 		}
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -53,10 +52,9 @@ type docSignoffRequest struct {
 // SignoffByDocumentHandler handles POST /api/v2/documents/{id}/signoff.
 // It finds the active instance+stage for the document and records the signoff.
 func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -64,29 +62,29 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
 	if idempKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 	if h.decisionSvc == nil || h.readSvc == nil {
-		WriteError(w, reqID, errors.New("services not configured"))
+		WriteError(w, errors.New("services not configured"))
 		return
 	}
 
 	var body docSignoffRequest
 	if err := contracts.Decode(r, &body); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if body.Decision != "approve" && body.Decision != "reject" {
-		WriteError(w, reqID, errors.New("decision must be one of: approve, reject"))
+		WriteError(w, errors.New("decision must be one of: approve, reject"))
 		return
 	}
 	if body.Decision == "reject" && strings.TrimSpace(body.Reason) == "" {
-		WriteError(w, reqID, errors.New("reason is required for reject"))
+		WriteError(w, errors.New("reason is required for reject"))
 		return
 	}
 	if strings.TrimSpace(body.Password) == "" {
-		WriteError(w, reqID, errors.New("password is required"))
+		WriteError(w, errors.New("password is required"))
 		return
 	}
 
@@ -95,7 +93,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	if h.idempStore != nil {
 		found, outcome, err := h.idempStore.CheckReplay(r.Context(), tenantID, actorID, idempKey)
 		if err != nil {
-			WriteError(w, reqID, err)
+			WriteError(w, err)
 			return
 		}
 		if found {
@@ -107,16 +105,16 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, reqID, repository.ErrNoActiveInstance)
+			WriteError(w, repository.ErrNoActiveInstance)
 			return
 		}
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	activeStage := inst.Active()
 	if activeStage == nil {
-		WriteError(w, reqID, repository.ErrInstanceCompleted)
+		WriteError(w, repository.ErrInstanceCompleted)
 		return
 	}
 
@@ -132,7 +130,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		ContentFormData:  map[string]any{"_content_hash": body.ContentHash},
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -152,10 +150,9 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 // CancelByDocumentHandler handles POST /api/v2/documents/{id}/cancel.
 // It finds the active instance for the document and cancels it.
 func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -163,31 +160,31 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
 	if idempKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 	if h.readSvc == nil {
-		WriteError(w, reqID, errors.New("read service not configured"))
+		WriteError(w, errors.New("read service not configured"))
 		return
 	}
 
 	var body contracts.CancelRequest
 	if err := contracts.Decode(r, &body); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, reqID, repository.ErrNoActiveInstance)
+			WriteError(w, repository.ErrNoActiveInstance)
 			return
 		}
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -199,7 +196,7 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		Reason:                  body.Reason,
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 

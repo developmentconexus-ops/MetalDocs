@@ -13,10 +13,9 @@ import (
 )
 
 func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
@@ -24,30 +23,30 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 
 	limit, err := parseInboxLimit(r.URL.Query().Get("limit"))
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	offset, err := parseInboxOffset(r.URL.Query().Get("offset"))
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	if h.readSvc == nil {
-		WriteError(w, reqID, errors.New("read service not configured"))
+		WriteError(w, errors.New("read service not configured"))
 		return
 	}
 
 	views, err := h.readSvc.ListInboxItems(r.Context(), h.db, tenantID, actorID, areaCode, limit, offset)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	total, err := h.readSvc.CountPendingForActor(r.Context(), h.db, tenantID, actorID, areaCode)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 

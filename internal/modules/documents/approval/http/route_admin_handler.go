@@ -14,32 +14,31 @@ import (
 )
 
 func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 
 	var req contracts.CreateRouteRequest
 	if err := contracts.Decode(r, &req); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
-		WriteError(w, reqID, errors.New("route admin service not configured"))
+		WriteError(w, errors.New("route admin service not configured"))
 		return
 	}
 
@@ -51,7 +50,7 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		Stages:      mapStageRequests(req.Stages),
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -61,37 +60,36 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	var req contracts.UpdateRouteRequest
 	if err := contracts.Decode(r, &req); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
-		WriteError(w, reqID, errors.New("route admin service not configured"))
+		WriteError(w, errors.New("route admin service not configured"))
 		return
 	}
 
@@ -103,7 +101,7 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		Stages:      mapStageRequests(req.Stages),
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -114,27 +112,26 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
 	routeID := r.PathValue("id")
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
-		WriteError(w, reqID, errors.New("route admin service not configured"))
+		WriteError(w, errors.New("route admin service not configured"))
 		return
 	}
 
@@ -144,7 +141,7 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		ActorUserID: actorID,
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -154,15 +151,14 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	if h.db == nil {
-		WriteError(w, reqID, fmt.Errorf("database not configured"))
+		WriteError(w, fmt.Errorf("database not configured"))
 		return
 	}
 
@@ -174,7 +170,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		tenantID,
 	)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	defer rows.Close()
@@ -190,7 +186,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 			createdAt                  time.Time
 		)
 		if err := rows.Scan(&id, &name, &tid, &profileCode, &active, &createdAt); err != nil {
-			WriteError(w, reqID, err)
+			WriteError(w, err)
 			return
 		}
 
@@ -210,7 +206,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := rows.Err(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -230,7 +226,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 			args...,
 		)
 		if err != nil {
-			WriteError(w, reqID, err)
+			WriteError(w, err)
 			return
 		}
 		defer stageRows.Close()
@@ -241,7 +237,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 				stageName, stageRole, requiredCapability, areaCode, quorum, driftPolicy *string
 			)
 			if err := stageRows.Scan(&id, &stageName, &stageRole, &requiredCapability, &areaCode, &quorum, &driftPolicy); err != nil {
-				WriteError(w, reqID, err)
+				WriteError(w, err)
 				return
 			}
 
@@ -280,7 +276,7 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := stageRows.Err(); err != nil {
-			WriteError(w, reqID, err)
+			WriteError(w, err)
 			return
 		}
 	}

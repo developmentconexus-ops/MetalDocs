@@ -19,10 +19,9 @@ var cancelInstance = func(h *Handler, ctx context.Context, db *sql.DB, req appli
 }
 
 func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -30,23 +29,23 @@ func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
 
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	var body contracts.CancelRequest
 	if err := contracts.Decode(r, &body); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -58,7 +57,7 @@ func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
 		Reason:                  body.Reason,
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 

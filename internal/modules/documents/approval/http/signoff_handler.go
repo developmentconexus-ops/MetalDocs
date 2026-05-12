@@ -16,10 +16,9 @@ var (
 )
 
 func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -28,25 +27,25 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 
 	if idempKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if h.decisionSvc == nil {
-		WriteError(w, reqID, errors.New("decision service not configured"))
+		WriteError(w, errors.New("decision service not configured"))
 		return
 	}
 
 	var body contracts.SignoffRequest
 	if err := contracts.Decode(r, &body); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -62,7 +61,7 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		ContentFormData:  map[string]any{"_content_hash": body.ContentHash},
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 

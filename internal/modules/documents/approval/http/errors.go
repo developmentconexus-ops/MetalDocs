@@ -15,12 +15,13 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/problem"
 )
 
 const internalErrorMessage = "internal error"
 
-func MapErrorToResponse(err error) (statusCode int, body contracts.ErrorResponse) {
-	statusCode = http.StatusInternalServerError
+func MapErrorToResponse(err error) *problem.Problem {
+	statusCode := http.StatusInternalServerError
 	code := "internal.unknown"
 
 	switch {
@@ -57,12 +58,6 @@ func MapErrorToResponse(err error) (statusCode int, body contracts.ErrorResponse
 	case errors.Is(err, v2dom.ErrEffectiveDateMissing):
 		statusCode = http.StatusUnprocessableEntity
 		code = "freeze.effective_date_missing"
-	case errors.Is(err, repository.ErrFKViolation):
-		statusCode = http.StatusUnprocessableEntity
-		code = "db.fk_violation"
-	case errors.Is(err, repository.ErrCheckViolation):
-		statusCode = http.StatusUnprocessableEntity
-		code = "db.check_violation"
 	case errors.Is(err, ErrIfMatchRequired):
 		statusCode = http.StatusPreconditionRequired
 		code = "precondition.if_match_required"
@@ -78,15 +73,15 @@ func MapErrorToResponse(err error) (statusCode int, body contracts.ErrorResponse
 	case errors.Is(err, approvalsignature.ErrInvalidCredentials):
 		statusCode = http.StatusUnauthorized
 		code = "authn.signature_invalid"
-	case errors.Is(err, approvalsignature.ErrRateLimited):
-		statusCode = http.StatusTooManyRequests
-		code = "authn.signature_rate_limited"
 	case errors.Is(err, repository.ErrInsufficientPrivilege):
 		statusCode = http.StatusInternalServerError
 		code = "internal.db_privilege_missing"
 	case errors.Is(err, repository.ErrUnknownDB):
 		statusCode = http.StatusInternalServerError
 		code = "internal.db_unknown"
+	case errors.Is(err, domain.ErrNoActiveStage):
+		statusCode = http.StatusConflict
+		code = "state.instance_completed"
 	default:
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError
@@ -135,30 +130,20 @@ func MapErrorToResponse(err error) (statusCode int, body contracts.ErrorResponse
 		}
 	}
 
-	body = contracts.ErrorResponse{
-		Error: contracts.ErrorBody{
-			Code:    code,
-			Message: responseMessage(err, statusCode),
-		},
-	}
-	return statusCode, body
+	return problem.New(statusCode, code, responseTitle(err, statusCode))
 }
 
-func WriteError(w http.ResponseWriter, requestID string, err error) {
-	statusCode, body := MapErrorToResponse(err)
-	body.RequestID = requestID
-	WriteJSON(w, statusCode, body)
+func WriteError(w http.ResponseWriter, err error) {
+	prob := MapErrorToResponse(err)
+	if writeErr := problem.Write(w, prob); writeErr != nil {
+		WriteJSON(w, http.StatusInternalServerError, problem.New(http.StatusInternalServerError, "internal.unknown", internalErrorMessage))
+	}
 }
 
 func WriteJSON(w http.ResponseWriter, status int, body any) {
 	payload, err := json.Marshal(body)
 	if err != nil {
-		fallback := contracts.ErrorResponse{
-			Error: contracts.ErrorBody{
-				Code:    "internal.unknown",
-				Message: internalErrorMessage,
-			},
-		}
+		fallback := problem.New(http.StatusInternalServerError, "internal.unknown", internalErrorMessage)
 		payload, _ = json.Marshal(fallback)
 		status = http.StatusInternalServerError
 	}
@@ -168,7 +153,7 @@ func WriteJSON(w http.ResponseWriter, status int, body any) {
 	_, _ = w.Write(payload)
 }
 
-func responseMessage(err error, statusCode int) string {
+func responseTitle(err error, statusCode int) string {
 	if statusCode >= http.StatusInternalServerError {
 		return internalErrorMessage
 	}
