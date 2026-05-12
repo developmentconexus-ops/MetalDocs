@@ -187,6 +187,30 @@ Source: `_artifacts/01-surface.md` §3. Wired via `internal/modules/documents/ap
 | DELETE | `/api/v2/approval/routes/{id}` | `DeactivateRouteHandler` (`route_admin_handler.go:108`) | `route.admin` |
 | GET | `/api/v2/approval/routes` | `ListRoutesHandler` (`route_admin_handler.go:144`) | `route.admin` |
 
+## API Route Truth Table (Plan 8 Baseline)
+
+| Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
+|---|---|---|---|---|---|---|---|---|
+| POST | `/api/v2/documents/{id}/submit` | `internal/modules/documents/approval/http/router.go:8` | `h.SubmitHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `internal/modules/documents/approval/http/router.go:9` | `h.SignoffHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/documents/{id}/publish` | `internal/modules/documents/approval/http/router.go:10` | `h.PublishHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/documents/{id}/schedule-publish` | `internal/modules/documents/approval/http/router.go:11` | `h.SchedulePublishHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/documents/{id}/supersede` | `internal/modules/documents/approval/http/router.go:12` | `h.SupersedeHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/documents/{id}/obsolete` | `internal/modules/documents/approval/http/router.go:13` | `h.ObsoleteHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/approval/instances/{instance_id}/cancel` | `internal/modules/documents/approval/http/router.go:14` | `h.CancelHandler` | — | — | — | Spec missing |  |
+| GET | `/api/v2/approval/instances/{instance_id}` | `internal/modules/documents/approval/http/router.go:17` | `h.GetInstanceHandler` | — | — | — | Spec missing |  |
+| GET | `/api/v2/documents/{id}/approval-instance` | `internal/modules/documents/approval/http/router.go:18` | `h.GetInstanceByDocumentHandler` | — | — | — | Spec missing |  |
+| GET | `/api/v2/approval/inbox` | `internal/modules/documents/approval/http/router.go:19` | `h.InboxHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/documents/{id}/signoff` | `internal/modules/documents/approval/http/router.go:22` | `h.SignoffByDocumentHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/documents/{id}/cancel` | `internal/modules/documents/approval/http/router.go:23` | `h.CancelByDocumentHandler` | — | — | — | Spec missing |  |
+| POST | `/api/v2/approval/routes` | `internal/modules/documents/approval/http/router.go:26` | `h.CreateRouteHandler` | — | — | — | Spec missing |  |
+| PUT | `/api/v2/approval/routes/{id}` | `internal/modules/documents/approval/http/router.go:27` | `h.UpdateRouteHandler` | — | — | — | Spec missing |  |
+| DELETE | `/api/v2/approval/routes/{id}` | `internal/modules/documents/approval/http/router.go:28` | `h.DeactivateRouteHandler` | — | — | — | Spec missing |  |
+| GET | `/api/v2/approval/routes` | `internal/modules/documents/approval/http/router.go:29` | `h.ListRoutesHandler` | — | — | — | Spec missing |  |
+
+Module contract status: Raw  
+Owner: leandro
+
 ---
 
 ## 6. Runtime View

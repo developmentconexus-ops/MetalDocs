@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (legacy envelope; no audit-trail emission yet)
+**Last verified:** 2026-05-12 · **Owner:** unassigned · **Status:** active (legacy envelope; no audit-trail emission yet)
 
 > **Key files:**
 > - `internal/modules/auth/application/service.go:48` — `Service` (single struct holding all use cases)
@@ -187,6 +187,18 @@ All exported symbols are `(undocumented)` in the surface scan — captured as T-
 | POST | `/api/v1/auth/logout` | `Handler.handleLogout` (`handler.go:68`) | public (in `defaultPublicPaths`) |
 | GET | `/api/v1/auth/me` | `Handler.handleMe` (`handler.go:80`) | session cookie required |
 | POST | `/api/v1/auth/change-password` | `Handler.handleChangePassword` (`handler.go:94`) | session cookie required; allowed during `MustChangePassword` lock |
+
+## API Route Truth Table (Plan 8 Baseline)
+
+| Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
+|---|---|---|---|---|---|---|---|---|
+| POST | `/api/v1/auth/login` | `internal/modules/auth/delivery/http/handler.go:45` | `handleLogin` | `/auth/login` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| POST | `/api/v1/auth/logout` | `internal/modules/auth/delivery/http/handler.go:46` | `handleLogout` | `/auth/logout` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| GET | `/api/v1/auth/me` | `internal/modules/auth/delivery/http/handler.go:47` | `handleMe` | `/auth/me` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| POST | `/api/v1/auth/change-password` | `internal/modules/auth/delivery/http/handler.go:48` | `handleChangePassword` | `/auth/change-password` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+
+- Module contract status: Partial
+- Owner: leandro
 
 Composition root may inject a `PublicPathChecker` overriding `defaultPublicPaths` (`middleware.go:35`); the API binary does so at `apps/api/cmd/metaldocs-api/main.go:171` (cross-ref `permissions.go:7`).
 

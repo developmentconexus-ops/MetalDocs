@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes)
+**Last verified:** 2026-05-12 (Plan 8 baseline) · **Owner:** unassigned · **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes)
 
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
@@ -182,6 +182,25 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 | POST | `/api/v1/iam/users/{userId}/reset-password` | `AdminHandler.handleResetPassword` (`:206`) | `user.manage` |
 | POST | `/api/v1/iam/users/{userId}/unlock` | `AdminHandler.handleUnlockUser` (`:210`) | `user.manage` |
 | PATCH | `/api/v1/iam/users/{userId}` | `AdminHandler.handlePatchUser` (`:214`) | `user.manage` |
+
+## API Route Truth Table (Plan 8 Baseline)
+
+| Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
+|---|---|---|---|---|---|---|---|---|
+| GET | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:31` | `listMemberships` | — | — | — | Spec missing | Runtime mounted route has no OpenAPI path yet. |
+| POST | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:32` | `grantMembership` | — | — | — | Spec missing | Runtime mounted route has no OpenAPI path yet. |
+| DELETE | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:33` | `revokeMembership` | — | — | — | Spec missing | Runtime mounted route has no OpenAPI path yet. |
+| GET | `/api/v1/iam/users` | `internal/modules/iam/delivery/http/admin_handler.go:84` | `handleUsers` (`GET` branch) | `/iam/users` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| POST | `/api/v1/iam/users` | `internal/modules/iam/delivery/http/admin_handler.go:84` | `handleUsers` (`POST` branch) | `/iam/users` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| PATCH | `/api/v1/iam/users/{userId}` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handlePatchUser` | `/iam/users/{userId}` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| POST | `/api/v1/iam/users/{userId}/reset-password` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleResetPassword` | `/iam/users/{userId}/reset-password` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| POST | `/api/v1/iam/users/{userId}/unlock` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleUnlockUser` | `/iam/users/{userId}/unlock` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| POST | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleUserRoleUpsert` | `/iam/users/{userId}/roles` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| PUT | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleReplaceUserRoles` | `/iam/users/{userId}/roles` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| GET | `/api/v1/iam/admin/overview` | `internal/modules/iam/delivery/http/admin_handler.go:86` | `handleAdminOverview` | `/iam/admin/overview` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+
+- Module contract status: Partial
+- Owner: leandro
 
 Permission resolver: `apps/api/cmd/metaldocs-api/permissions.go:54,196`. None of these ops is wired through oapi-codegen; only `POST .../roles` has request+response schema components in `openapi.yaml`.
 

@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-12 (Plan 7) · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
+**Last verified:** 2026-05-12 (Plan 8 baseline) · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` — `DocumentFamily` aggregate
@@ -184,6 +184,30 @@ C4Container
 | GET | `/api/v2/taxonomy/families/{code}` | _missing_ | `getFamily` | `doc.view` |
 | **PATCH** | `/api/v2/taxonomy/families/{code}` | _missing_ | `updateFamily` | `taxonomy.manage` (T-003 closed Plan 5 — PATCH added to dispatcher) |
 | DELETE | `/api/v2/taxonomy/families/{code}` | _missing_ | `deactivateFamily` | `taxonomy.manage` |
+
+## API Route Truth Table (Plan 8 Baseline)
+
+| Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
+|---|---|---|---|---|---|---|---|---|
+| GET | `/api/v2/taxonomy/profiles` | `internal/modules/taxonomy/delivery/http/handler.go:51` | `listProfiles` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| POST | `/api/v2/taxonomy/profiles` | `internal/modules/taxonomy/delivery/http/handler.go:52` | `createProfile` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v2/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:53` | `getProfile` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PATCH | `/api/v2/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:54` | `updateProfile` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| DELETE | `/api/v2/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:55` | `archiveProfile` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PUT | `/api/v2/taxonomy/profiles/{code}/default-template` | `internal/modules/taxonomy/delivery/http/handler.go:56` | `setDefaultTemplate` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v2/taxonomy/areas` | `internal/modules/taxonomy/delivery/http/handler.go:58` | `listAreas` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| POST | `/api/v2/taxonomy/areas` | `internal/modules/taxonomy/delivery/http/handler.go:59` | `createArea` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v2/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:60` | `getArea` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PUT | `/api/v2/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:61` | `updateArea` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| DELETE | `/api/v2/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:62` | `archiveArea` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v2/taxonomy/families` | `internal/modules/taxonomy/delivery/http/handler.go:64` | `listFamilies` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| POST | `/api/v2/taxonomy/families` | `internal/modules/taxonomy/delivery/http/handler.go:65` | `createFamily` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:66` | `getFamily` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PATCH | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:67` | `updateFamily` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| DELETE | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:68` | `deactivateFamily` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+
+- Module contract status: Raw
+- Owner: leandro
 
 ---
 
