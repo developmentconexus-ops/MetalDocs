@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active
+**Last verified:** 2026-05-12 (Plan 7) · **Owner:** unassigned · **Status:** active
 
 > **Key files:**
 > - `internal/modules/registry/module.go:25` — module wiring (`New`, dependencies)
@@ -59,7 +59,7 @@ The **registry** module owns the catalog of code-numbered Controlled Documents (
 - Authz: two-tier per [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md); Plan 5 wired `authz.Require` + tripwire on `controlled_documents` and `cd_sequence_counters` (T-001/T-004 closed); `Obsolete`/`Supersede` now pass typed `CapRegistryObsolete`/`CapRegistrySupersede` from `iamdomain` (migration 0187 seeded both caps)
 - Idempotency: shared platform `internal/platform/idempotency` per ADR 0011
 - Numbering: 3-segment `{PROFILE}-{AREA}-{NNN}` per ADR 0011
-- Error envelope: legacy `{code, message}` today (RFC 9457 not yet adopted — T-003)
+- Error envelope: **RFC 9457** `application/problem+json` via `httpresponse.WriteError` → `problem.Write` (T-003 closed Plan 7); `ErrTemplateProfileMismatch` → 422 `template_invalid` via direct `problem.Write` (T-007 closed Plan 7)
 
 ---
 
@@ -232,7 +232,7 @@ Failure modes:
 | Profile/area archived | 409 | `PROFILE_ARCHIVED` / `AREA_ARCHIVED` |
 | Override template mismatch | 409 | `TEMPLATE_PROFILE_MISMATCH` |
 | Code uniqueness violation | 409 | `CONTROLLED_DOCUMENT_CODE_TAKEN` |
-| Spec declares 422 `template_invalid` | (no handler branch — T-007) | — |
+| Template/profile mismatch | 422 | `template_invalid` (`routes.go:470-471` — T-007 closed Plan 7) |
 
 Detail: `_artifacts/02-flow-atomic-create.md`.
 
@@ -327,7 +327,7 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 
 ### 8.2 Error envelope
 
-All responses use legacy `{"code":"...","message":"..."}` (`internal/platform/httpresponse/response.go:14-15`). RFC 9457 Problem Details not yet adopted (T-003). `application/problem+json` content-type is never set.
+RFC 9457 `application/problem+json`. `httpresponse.WriteError` at `internal/platform/httpresponse/response.go:16-18` calls `problem.Write(w, problem.New(status, code, message))`. `ErrTemplateProfileMismatch` uses a direct `problem.Write` call at `routes.go:470-471` (422 `template_invalid`). T-003 and T-007 both closed Plan 7.
 
 ### 8.3 Idempotency
 
@@ -365,10 +365,10 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 |---|---|
 | Atomic CD + first-revision create + per-area numbering + `Idempotency-Key` | [wiki/decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md) |
 | Two-tier authz | [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) (tier-2/3 wired Plan 5 — T-001/T-004 closed) |
-| Contract-first API (OpenAPI + oapi-codegen) | [wiki/decisions/0012-contract-first-api.md](decisions/0012-contract-first-api.md) (spec/handler drift on 422 — T-007) |
+| Contract-first API (OpenAPI + oapi-codegen) | [wiki/decisions/0012-contract-first-api.md](decisions/0012-contract-first-api.md) (422 `template_invalid` spec/handler drift — **CLOSED Plan 7 T-007**) |
 | Which CD lifecycle events emit audit | tech-debt: missing-ADR (T-002) |
 | Capability granularity (separate `registry.create` / `registry.obsolete` / `registry.supersede`) | implemented Plan 5 (migration 0187 + `CapRegistryObsolete`/`CapRegistrySupersede` in `domain/model.go`); missing standalone ADR — ADR-TODO per Plan 13 |
-| RFC 9457 envelope adoption schedule | tech-debt: missing-ADR (T-003) |
+| RFC 9457 envelope adoption | **CLOSED Plan 7** (T-003 + T-007) |
 | GUC-based tenant scoping vs query-arg only | tech-debt: missing-ADR (T-005) |
 | Read-path authz contract (e.g. `GetActiveDocument` tenant source) | tech-debt: missing-ADR (T-006) |
 | Where registry audit sink should live (own logger vs shared taxonomy sink) | tech-debt: missing-ADR (T-008) |

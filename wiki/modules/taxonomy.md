@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
+**Last verified:** 2026-05-12 (Plan 7) · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` — `DocumentFamily` aggregate
@@ -59,7 +59,7 @@
 - Language / runtime: Go 1.25
 - Persistence: Postgres; 3 owned tables in schema `metaldocs` (forward-only migrations, `0023`/`0025` base + `0122`/`0123` tenant-extension)
 - HTTP routing: raw `net/http.ServeMux` (`handler.go:51-68`). **No OpenAPI spec**, no oapi-codegen — divergence from ADR 0012 (T-009)
-- Error envelope: legacy `{"code","message"}` via `internal/platform/httpresponse/response.go:14-16`; not RFC 9457 (T-008)
+- Error envelope: **RFC 9457** `application/problem+json` via `writeError = httpresponse.WriteError` alias (`routes_profiles.go:19`) which cascades to `problem.Write` — T-008 closed Plan 7
 - Authz: tier-1 path-prefix dispatcher (T-003 PATCH bypass closed Plan 5); **Plan 5 wired `authz.Require(CapTaxonomyManage)` in `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update`; tripwire on all 3 tables via migration 0188 (T-006 partially closed)**; archive/deactivate paths still tier-1 only
 - Tenant scoping: application-layer only via `tenant.FromContext` (Plan 3 replaced `X-Tenant-ID` header reads; no `set_local_tenant_id` GUC anywhere in `internal/`)
 
@@ -282,7 +282,7 @@ Failure modes — reference `wiki/concepts/error-ux.md`:
 | has active profiles | 409 | `FAMILY_HAS_PROFILES` |
 | internal | 500 | `INTERNAL_ERROR` |
 
-(Legacy envelope; not RFC 9457 — T-008.)
+(RFC 9457 `application/problem+json` — T-008 closed Plan 7.)
 
 ---
 
@@ -309,7 +309,7 @@ Failure modes — reference `wiki/concepts/error-ux.md`:
 - No DB-level tenant predicate guard: `HasActiveProfiles` scans across all tenants (T-007 cross-tenant probe surface).
 
 ### 8.3 Error envelope
-- Legacy `{"code","message"}` (`internal/platform/httpresponse/response.go:14-16`). Codebase-wide drift; see audit T-002, auth T-003, iam T-006, documents T-001. RFC 9457 migration is a cross-module ADR, not taxonomy-local (T-008).
+- RFC 9457 `application/problem+json` via `writeError` package alias at `routes_profiles.go:19` (`var writeError = httpresponse.WriteError`). `httpresponse.WriteError` at `internal/platform/httpresponse/response.go:16-18` delegates to `problem.Write`. No direct taxonomy handler changes were required — T-008 closed via cascade (Plan 7, commit `11589032` + test fix `f0bb64c0`).
 
 ### 8.4 Idempotency
 - No `Idempotency-Key` handling on any write route. Duplicate POST `/profiles` with same code returns PG `23505` → currently maps to `INTERNAL_ERROR 500` (unmapped). Latent — see refactor backlog R-008.

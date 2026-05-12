@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/auth.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/auth-refactor.md`.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Severity scale
 
@@ -26,13 +26,13 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked backlog row:** `backlog/auth-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · Legacy error envelope (RFC 9457 drift)
-- **Severity:** major
-- **Surface:** `internal/modules/auth/delivery/http/handler.go:166`; `internal/modules/auth/delivery/http/middleware.go:65,76,79,83`
-- **Observation:** Auth emits `{error:{code,message,details,trace_id}}` instead of `application/problem+json` (RFC 9457). Mirrors documented drift in iam T-006 and documents T-001. Consumer tooling that relies on `type`/`title`/`status`/`detail`/`instance` fields cannot parse auth errors uniformly. Trigger fired: contract violation with measurable consumer impact.
+### T-003 · Legacy error envelope (RFC 9457 drift) — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/auth/delivery/http/handler.go:141-158` (`writeAuthError`) — every branch calls `problem.Write(w, problem.New(...))`. `handler.go:58,102,115,121,126,131` — inline error paths use `problem.Write` directly. `internal/modules/auth/delivery/http/middleware.go:66,73,76,80` — all error branches use `problem.Write`. `writeAuthError` signature also drops the `traceID` parameter (was a noop; removed in Plan 7).
+- **Observation (original):** Auth emitted `{error:{code,message,details,trace_id}}` instead of `application/problem+json`.
 - **Evidence:** `_artifacts/05-industry.md` IP-001.
-- **Linked backlog row:** `backlog/auth-refactor.md#R-003`
-- **Linked ADR:** missing-ADR
+- **Linked backlog row:** `backlog/auth-refactor.md#R-003` (merged Plan 7 2026-05-11, commit `95ebedfc`)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
 
 ### T-004 · CreateUser two-transaction non-atomicity
 - **Severity:** major

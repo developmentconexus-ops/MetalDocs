@@ -1,7 +1,7 @@
 # API Design System
 
 > **Status:** accepted 2026-05-10
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-12 (Plan 7 rollout complete)
 > **Scope:** API design conventions for v1 — error envelope, pagination, idempotency, two-tier authz, list filtering, naming.
 > **Out of scope:** Adoption — Plan 2 migrates handlers, paths, and module names. Frontend wiring is in Plan 1 only for the shared parser; per-page adoption is Plan 2.
 > **Key files:**
@@ -229,16 +229,20 @@ The three existing jobs (`backend-codegen-drift`, `frontend-codegen-drift`, `ope
 
 ## 9. What's next
 
-**Plan 2 — Adoption (~1 week):**
-1. Migrate `registry`, `templates_v2`, `documents` to RFC 9457 envelope + cursor + idempotency.
-2. Path rewrite `/api/v2/...` → `/api/v1/...` (atomic across server + frontend).
-3. Module rename `templates_v2/` → `templates/`.
-4. Frontend list pages → `useInfiniteQuery` + cursor.
-5. Frontend wizard forms → `errors[]` field consumption.
-6. Delete `PostgresSignoffIdempStore`.
-7. Flip `continue-on-error: false` in CI.
+**RFC 9457 envelope rollout — DONE (Plan 7, 2026-05-11):**
+All modules now emit `application/problem+json` on 4xx/5xx. Closes: registry T-003, approval T-001/T-003, documents T-001, auth T-003, iam T-006, audit T-002, templates_v2 T-005, taxonomy T-008.
 
-Sub-projects #5 (spec coverage for `approval`/`taxonomy`/`iam`/`platform`) run as separate plans, each adopting these conventions per module.
+**Plan 8 — OpenAPI / contract-first completion (pending):**
+1. Add OpenAPI ops for documents (rename/duplicate/archive/comments/finalize), approval signoff/cancel, templates_v2 12 hand-rolled routes, taxonomy 16 routes, audit operationId.
+2. Regen via `make oapi`; rewire each module's `Register` to mount generated `ServerInterface`.
+3. Flip `continue-on-error: false` in CI.
+
+**Plan 9 — Transactional + idempotency hardening (pending):**
+- Cursor pagination on list endpoints.
+- `Idempotency-Key` middleware on `POST` create/mutate routes.
+- Optimistic-lock enforcement on autosave.
+
+Sub-projects (spec coverage for `approval`/`taxonomy`/`iam`) run as separate plans.
 
 ---
 

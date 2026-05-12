@@ -2,13 +2,13 @@
 
 > One row = one PR. Pulled from `wiki/modules/documents-tech-debt.md`.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Rows
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
-| R-001 | Migrate documents handlers to RFC 9457 Problem+JSON via `httpresponse.WriteProblem` | T-001 | M | major | R-002 | — | open | — |
+| R-001 | Migrate documents handlers to RFC 9457 Problem+JSON via `httpresponse.WriteProblem` | T-001 | M | major | R-002 | — | merged | Plan 7 (2026-05-11, commit 5b792150) |
 | R-002 | Reconcile spec ↔ handlers: add ops for renameDocument, duplicateDocument, archiveDocument, comments CRUD; set `operationId: finalizeDocument`; rename spec `listDocumentsV2` → `listDocuments` | T-002 | L | critical | — | — | open | — |
 | R-003 | Add `enforce_capability_asserted` trigger to `documents` table; wire `authz.Require` into CreateDocumentTx / UpdateDocumentName / UpdateDocumentStatus / MarkArchived / Unarchive | T-003 | M | major | — | — | merged | Plan 5 (2026-05-11) |
 | R-004 | Remove duplicate `PATCH /api/v2/documents/{id}` registration at `handler.go:86` | T-004 | XS | minor | — | — | open | — |

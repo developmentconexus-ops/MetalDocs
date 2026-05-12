@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/registry.md](registry.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/registry-refactor.md](../backlog/registry-refactor.md).
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Severity scale
 
@@ -48,13 +48,13 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-002`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR
 
-### T-003 · Legacy `{code, message}` error envelope across module
-- **Severity:** major
-- **Surface:** `internal/platform/httpresponse/response.go:14-15` consumed by all registry routes (`routes.go:43..343`)
-- **Observation:** Errors emit JSON object `{"code": "...", "message": "..."}` with default content-type. RFC 9457 Problem Details (`application/problem+json`) is not used. `Content-Type` is never set to `application/problem+json` on any registry error path. Peer modules (documents T-001, audit T-002, templates_v2 T-005, approval T-001) carry the same gap — uniform spec drift.
+### T-003 · Legacy `{code, message}` error envelope across module — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/platform/httpresponse/response.go:16-18` — `WriteError` now delegates to `problem.Write(w, problem.New(status, code, message))`. All registry routes that called `httpresponse.WriteError` inherit RFC 9457 `application/problem+json` output. `internal/modules/registry/delivery/http/routes.go:470-471` — `ErrTemplateProfileMismatch` branch directly calls `problem.Write` with 422 `template_invalid`.
+- **Observation (original):** Errors emitted JSON object `{"code": "...", "message": "..."}` with default content-type. RFC 9457 Problem Details (`application/problem+json`) was not used. Peer modules (documents T-001, audit T-002, templates_v2 T-005, approval T-001) carried the same gap.
 - **Evidence:** `_artifacts/02-flow-atomic-create.md` §5; `_artifacts/05-industry.md` IP-001
-- **Linked backlog row:** [`backlog/registry-refactor.md#R-003`](../backlog/registry-refactor.md)
-- **Linked ADR:** missing-ADR
+- **Linked backlog row:** [`backlog/registry-refactor.md#R-003`](../backlog/registry-refactor.md) (merged Plan 7 2026-05-11, commit `11589032` + `395b0b24`)
+- **Linked ADR:** `wiki/architecture/api-design-system.md`
 
 ### T-004 · Tier-3 Postgres tripwire absent for registry-owned tables — CLOSED 2026-05-11 (Plan 5)
 - **Severity:** major (closed)
@@ -80,12 +80,12 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-006`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR
 
-### T-007 · OpenAPI spec/handler drift on 422 `template_invalid`
-- **Severity:** major
-- **Surface:** `api/openapi/v1/partials/registry.yaml:73`; `internal/modules/registry/delivery/http/routes.go:410-444`
-- **Observation:** Spec declares 422 `template_invalid` on `POST /controlled-documents`; handler's `writeDomainError` switch has no branch mapping any error to that code. Downstream OpenAPI clients (generated from the spec) include a 422 case that the server never emits. Contract drift — Major per "Documented contract not followed by this module yet".
+### T-007 · OpenAPI spec/handler drift on 422 `template_invalid` — CLOSED 2026-05-12 (Plan 7)
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/registry/delivery/http/routes.go:470-471` — `writeDomainError` now has a branch: `errors.Is(err, registrydomain.ErrTemplateProfileMismatch)` → `problem.Write(w, problem.New(http.StatusUnprocessableEntity, "template_invalid", "template version does not match the document profile"))`. Spec 422 case and runtime are now aligned.
+- **Observation (original):** Spec declared 422 `template_invalid` on `POST /controlled-documents`; handler's `writeDomainError` switch had no branch mapping any error to that code. Contract drift — downstream OpenAPI clients included a 422 case the server never emitted.
 - **Evidence:** `_artifacts/02-flow-atomic-create.md` §5
-- **Linked backlog row:** [`backlog/registry-refactor.md#R-007`](../backlog/registry-refactor.md)
+- **Linked backlog row:** [`backlog/registry-refactor.md#R-007`](../backlog/registry-refactor.md) (merged Plan 7 2026-05-11, commit `395b0b24`)
 - **Linked ADR:** [wiki/decisions/0012-contract-first-api.md](../decisions/0012-contract-first-api.md)
 
 ### T-008 · Cross-module audit sink — taxonomy logger reused — CLOSED 2026-05-11 (Plan 6a)

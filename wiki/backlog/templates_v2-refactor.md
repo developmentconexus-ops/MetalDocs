@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/templates_v2-tech-debt.md`. Rows that lack a debt-id are blocked from grooming.
 
-**Last verified:** 2026-05-11 (Plan 6a)
+**Last verified:** 2026-05-12 (Plan 7)
 
 ## Rows
 
@@ -12,7 +12,7 @@
 | R-002 | Add `tenant_id` argument to `Repository.GetVersion` / `GetVersionByID`; make `CreateNextVersion` pass tenant when cloning from `PublishedVersionID` | T-002 | S | Critical | — | — | merged (partial) | Plan 5 (2026-05-11): CreateNextVersion guard added; repo getter signatures unchanged (residual) |
 | R-003 | Replace `tenantIDFromReq` header trust with subject-claim derived tenant; remove `DevTenantID` fallback in non-dev environments | T-003 | S | Critical | R-001 | — | **done** | Plan 3 (2026-05-11) |
 | R-004 | Make `PublishTemplateVersion` route to `Service.Approve` (or fold the path) so SoD + role + content_hash gates always run on publish | T-004 | M | Critical | — | — | merged (partial) | Plan 5 (2026-05-11): content_hash + SoD + authz.Require added; role-binding check against pending_approver_role still absent |
-| R-005 | Migrate templates_v2 error responses to `internal/platform/problem` (RFC 9457) and update `MapErr` to emit Problem documents | T-005 | S | Major | — | — | open | — |
+| R-005 | Migrate templates_v2 error responses to `internal/platform/problem` (RFC 9457) and update `MapErr` to emit Problem documents | T-005 | S | Major | — | — | merged | Plan 7 (2026-05-11, commit bbe3933b) |
 | R-006 | Add the 12 hand-rolled routes to the OpenAPI spec; regenerate `api.gen.go`; replace hand-rolled handlers with strict-server impls | T-006 | L | Major | — | — | open | — |
 | R-007 | Introduce `Repository.WithTx` and wrap `PublishTemplateVersion` / `Approve` / `CreateTemplate` in a single `pgx.Tx`; emit `AuditObsoleted` for the obsolete side-effect | T-007 | M | Major | — | — | open | — |
 | R-008 | Inject `ResolverRegistryReader` at `tv2app.New` in composition root; have `ValidatePlaceholders` reject unknown `resolver_key` for `PHComputed` | T-008 | S | Major | — | — | open | — |
