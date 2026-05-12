@@ -36,6 +36,9 @@ func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rec.Code)
 	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("Content-Type = %q, want application/problem+json", ct)
+	}
 	var body map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	if body["code"] == nil {
