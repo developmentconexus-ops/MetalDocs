@@ -58,6 +58,8 @@ paths:
   /auth/login:
     post:
       summary: Autentica usuario local e cria sessao por cookie
+      tags: [auth]
+      operationId: login
       requestBody:
         required: true
         content:
@@ -80,12 +82,16 @@ paths:
   /auth/logout:
     post:
       summary: Revoga a sessao atual
+      tags: [auth]
+      operationId: logout
       responses:
         '204':
           description: Sessao encerrada
   /auth/me:
     get:
       summary: Retorna o usuario autenticado atual
+      tags: [auth]
+      operationId: getCurrentUser
       responses:
         '200':
           description: Usuario atual
@@ -102,6 +108,8 @@ paths:
   /auth/change-password:
     post:
       summary: Troca a senha do usuario autenticado
+      tags: [auth]
+      operationId: changePassword
       requestBody:
         required: true
         content:
@@ -130,6 +138,8 @@ paths:
   /iam/users:
     get:
       summary: Lista usuarios internos com estado de autenticacao
+      tags: [iam]
+      operationId: listManagedUsers
       responses:
         '200':
           description: Lista de usuarios
@@ -139,6 +149,8 @@ paths:
                 $ref: '#/components/schemas/ListManagedUsersResponse'
     post:
       summary: Cria usuario interno com credencial local inicial
+      tags: [iam]
+      operationId: createManagedUser
       requestBody:
         required: true
         content:
@@ -155,6 +167,8 @@ paths:
   /iam/users/{userId}:
     patch:
       summary: Atualiza estado e credencial de um usuario interno
+      tags: [iam]
+      operationId: updateManagedUser
       parameters:
         - name: userId
           in: path
@@ -177,6 +191,8 @@ paths:
   /iam/users/{userId}/reset-password:
     post:
       summary: Reseta administrativamente a senha de um usuario e exige troca no proximo login
+      tags: [iam]
+      operationId: resetManagedUserPassword
       parameters:
         - name: userId
           in: path
@@ -199,6 +215,8 @@ paths:
   /iam/users/{userId}/unlock:
     post:
       summary: Limpa lock operacional e contador de falhas de login de um usuario
+      tags: [iam]
+      operationId: unlockManagedUser
       parameters:
         - name: userId
           in: path
@@ -215,6 +233,8 @@ paths:
   /iam/admin/overview:
     get:
       summary: Resumo administrativo de usuarios, presenca e atividades recentes
+      tags: [iam]
+      operationId: getIamAdminOverview
       responses:
         '200':
           description: Resumo administrativo
@@ -1058,6 +1078,8 @@ paths:
   /audit/events:
     get:
       summary: Lista eventos de auditoria append-only
+      tags: [audit]
+      operationId: listAuditEvents
       parameters:
         - name: resourceType
           in: query
@@ -2642,6 +2664,8 @@ paths:
   /iam/users/{userId}/roles:
     post:
       summary: Cria/atualiza usuario IAM e atribui role
+      tags: [iam]
+      operationId: upsertUserRole
       parameters:
         - name: userId
           in: path
@@ -2681,6 +2705,8 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
     put:
       summary: Reconcilia o conjunto de roles de um usuario interno
+      tags: [iam]
+      operationId: replaceUserRoles
       parameters:
         - name: userId
           in: path
@@ -2718,6 +2744,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v2/iam/area-memberships:
+    get:
+      summary: List active area memberships for the current tenant
+      tags: [iam]
+      operationId: listAreaMembershipsV2
+      responses:
+        '200':
+          description: ok
+    post:
+      summary: Grant or replace an active area membership
+      tags: [iam]
+      operationId: grantAreaMembershipV2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, areaCode, role]
+              properties:
+                userId: { type: string }
+                areaCode: { type: string }
+                role: { type: string }
+                grantedBy: { type: string }
+      responses:
+        '201':
+          description: created
+    delete:
+      summary: Revoke an active area membership
+      tags: [iam]
+      operationId: revokeAreaMembershipV2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, areaCode]
+              properties:
+                userId: { type: string }
+                areaCode: { type: string }
+      responses:
+        '204':
+          description: revoked
   /telemetry/mddm-shadow-diff:
     post:
       summary: Submit a Phase 1 shadow-diff telemetry event
