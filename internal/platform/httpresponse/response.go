@@ -3,6 +3,8 @@ package httpresponse
 import (
 	"encoding/json"
 	"net/http"
+
+	"metaldocs/internal/platform/problem"
 )
 
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
@@ -12,7 +14,7 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func WriteError(w http.ResponseWriter, status int, code, message string) {
-	WriteJSON(w, status, map[string]string{"code": code, "message": message})
+	_ = problem.Write(w, problem.New(status, code, message))
 }
 
 func ReadJSON(r *http.Request, v any) error {
