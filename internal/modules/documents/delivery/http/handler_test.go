@@ -215,6 +215,9 @@ func TestListDocuments_Forbidden(t *testing.T) {
 	if rr.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d", rr.Code)
 	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Errorf("want application/problem+json, got %s", ct)
+	}
 }
 
 func TestAcquireSession_Happy(t *testing.T) {
