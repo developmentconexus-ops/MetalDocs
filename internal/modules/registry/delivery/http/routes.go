@@ -17,6 +17,7 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -467,7 +468,7 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, registrydomain.ErrOverrideNotPublished):
 		httpresponse.WriteError(w, http.StatusConflict, "OVERRIDE_TEMPLATE_NOT_PUBLISHED", "override template is not published")
 	case errors.Is(err, registrydomain.ErrTemplateProfileMismatch):
-		httpresponse.WriteError(w, http.StatusConflict, "TEMPLATE_PROFILE_MISMATCH", "template profile mismatch")
+		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, "template_invalid", "template version does not match the document profile"))
 	case errors.Is(err, registrydomain.ErrProfileHasNoDefaultTemplate):
 		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_NO_DEFAULT_TEMPLATE", "profile has no default template")
 	case errors.Is(err, registrydomain.ErrDefaultObsolete):

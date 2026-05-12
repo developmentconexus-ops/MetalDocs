@@ -265,6 +265,26 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 	}
 }
 
+func TestWriteDomainError_TemplateMismatchIs422(t *testing.T) {
+	handler := &Handler{}
+	rec := httptest.NewRecorder()
+
+	handler.writeDomainError(rec, registrydomain.ErrTemplateProfileMismatch)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusUnprocessableEntity, rec.Body.String())
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if body.Code != "template_invalid" {
+		t.Fatalf("code = %q, want %q", body.Code, "template_invalid")
+	}
+}
+
 func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyRegistryService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v2/controlled-documents", strings.NewReader(`{
