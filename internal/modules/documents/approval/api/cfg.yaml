@@ -1,0 +1,10 @@
+package: approvalapi
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  embedded-spec: true
+output: api.gen.go
+output-options:
+  include-tags:
+    - approval
