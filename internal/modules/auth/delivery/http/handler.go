@@ -10,10 +10,11 @@ import (
 
 	"github.com/google/uuid"
 
+	auditdomain "metaldocs/internal/modules/audit/domain"
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
-	auditdomain "metaldocs/internal/modules/audit/domain"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 )
 
 type Handler struct {
@@ -52,10 +53,9 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	traceID := requestTraceID(r)
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("auth login failed for %q: %v", strings.TrimSpace(req.Identifier), err)
 		http.SetCookie(w, h.service.ExpiredSessionCookie())
-		h.writeAuthError(w, err, traceID)
+		h.writeAuthError(w, err)
 		return
 	}
 	http.SetCookie(w, h.service.SessionCookie(session.RawToken, session.ExpiresAt))
@@ -97,10 +97,9 @@ func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	traceID := requestTraceID(r)
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", traceID)
+		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, user)
@@ -111,26 +110,25 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	traceID := requestTraceID(r)
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", traceID)
+		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 		return
 	}
 
 	var req changePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload", traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 	if err := h.service.ChangePasswordForUser(r.Context(), user, req.CurrentPassword, req.NewPassword); err != nil {
 		log.Printf("auth change password failed for %q: %v", strings.TrimSpace(user.UserID), err)
-		h.writeAuthError(w, err, traceID)
+		h.writeAuthError(w, err)
 		return
 	}
 	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, user.TenantID)
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
@@ -140,43 +138,25 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	h.recordAudit(r, user.UserID, "auth.password.changed", user.UserID, map[string]any{})
 }
 
-func (h *Handler) writeAuthError(w http.ResponseWriter, err error, traceID string) {
+func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrInvalidCredentials):
-		writeAPIError(w, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password", traceID)
+		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		writeAPIError(w, http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password", traceID)
+		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityLocked):
-		writeAPIError(w, http.StatusForbidden, "AUTH_ACCOUNT_LOCKED", "Account is temporarily locked", traceID)
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_LOCKED", "Account is temporarily locked"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error(), traceID)
+		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 	case errors.Is(err, authdomain.ErrIdentityInactive):
-		writeAPIError(w, http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive", traceID)
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive"))
 	case errors.Is(err, authdomain.ErrTenantNotPermitted):
-		writeAPIError(w, http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant", traceID)
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant"))
 	case errors.Is(err, authdomain.ErrTenantClaimRequired):
-		writeAPIError(w, http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required — user belongs to multiple tenants", traceID)
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required"))
 	default:
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error", traceID)
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
 	}
-}
-
-type apiErrorEnvelope struct {
-	Error apiError `json:"error"`
-}
-
-type apiError struct {
-	Code    string         `json:"code"`
-	Message string         `json:"message"`
-	Details map[string]any `json:"details"`
-	TraceID string         `json:"trace_id"`
-}
-
-func requestTraceID(r *http.Request) string {
-	if traceID := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceID != "" {
-		return traceID
-	}
-	return "trace-local"
 }
 
 func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID string, payload map[string]any) {
@@ -205,8 +185,4 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	}); err != nil {
 		log.Printf("auth audit write failed action=%s actor=%s: %v", action, actorID, err)
 	}
-}
-
-func writeAPIError(w http.ResponseWriter, status int, code, message, traceID string) {
-	httpresponse.WriteJSON(w, status, apiErrorEnvelope{Error: apiError{Code: code, Message: message, Details: map[string]any{}, TraceID: traceID}})
 }
