@@ -8,6 +8,7 @@ import (
 	authapp "metaldocs/internal/modules/auth/application"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/problem"
 	platformtenant "metaldocs/internal/platform/tenant"
 )
 
@@ -19,9 +20,9 @@ import (
 type PublicPathChecker func(method, path string) bool
 
 type Middleware struct {
-	service      *authapp.Service
-	cfg          authapp.Config
-	enabled      bool
+	service       *authapp.Service
+	cfg           authapp.Config
+	enabled       bool
 	publicChecker PublicPathChecker // optional; falls back to defaultPublicPaths
 }
 
@@ -62,21 +63,21 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		cookie, err := r.Cookie(m.cfg.SessionCookieName)
 		if err != nil || strings.TrimSpace(cookie.Value) == "" {
-			writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))
+			_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 			return
 		}
 
 		currentUser, err := m.service.ResolveSession(r.Context(), cookie.Value)
 		if err != nil {
 			if errors.Is(err, authdomain.ErrSessionNotFound) || errors.Is(err, authdomain.ErrSessionExpired) || errors.Is(err, authdomain.ErrSessionRevoked) {
-				writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))
+				_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 				return
 			}
-			writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Authentication failed", requestTraceID(r))
+			_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authentication failed"))
 			return
 		}
 		if currentUser.MustChangePassword && !isPasswordChangeAllowedPath(r.URL.Path, r.Method) {
-			writeAPIError(w, http.StatusForbidden, "AUTH_PASSWORD_CHANGE_REQUIRED", "Password change is required before accessing the application", requestTraceID(r))
+			_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_PASSWORD_CHANGE_REQUIRED", "Password change is required before accessing the application"))
 			return
 		}
 
