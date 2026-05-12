@@ -1772,93 +1772,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/render/pdf:
-    post:
-      summary: Convert client-produced HTML (MDDM engine) to PDF via Gotenberg Chromium
-      description: |
-        Stateless HTML→PDF proxy used by the MDDM client-side rendering engine.
-        The request body is multipart/form-data containing `index.html` (required)
-        and `style.css` (optional). The server forwards the parts to Gotenberg's
-        Chromium route and streams the resulting PDF back. Differs from
-        `/content/render-pdf`, which re-renders a stored document from backend state.
-      operationId: renderDocumentPDF
-      tags:
-        - documents
-      parameters:
-        - name: documentId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required:
-                - index.html
-              properties:
-                index.html:
-                  type: string
-                  format: binary
-                  description: HTML document produced by blocksToFullHTML + print wrapper
-                style.css:
-                  type: string
-                  format: binary
-                  description: Optional additional stylesheet
-      responses:
-        '200':
-          description: PDF bytes
-          content:
-            application/pdf:
-              schema:
-                type: string
-                format: binary
-        '400':
-          description: Malformed request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Not authenticated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Not authorized for this document
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '413':
-          description: Payload exceeds the 10 MB limit
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '422':
-          description: Unprocessable Entity
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '502':
-          description: Gotenberg upstream unavailable or misconfigured
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-      security:
-        - sessionCookie: []
   /documents/{documentId}/content/render-pdf:
     post:
       summary: Forca re-render do PDF do documento
@@ -3289,6 +3202,20 @@ paths:
       operationId: getDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '404': { description: not_found } }
+    patch:
+      tags: [documents]
+      operationId: renameDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses: { '200': { description: ok } }
 
   /api/v2/documents/{id}/finalize:
     post:
@@ -3302,6 +3229,12 @@ paths:
       operationId: archiveDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/duplicate:
+    post:
+      tags: [documents]
+      operationId: duplicateDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '201': { description: created } }
 
   /api/v2/documents/stats:
     get:
@@ -3480,6 +3413,46 @@ paths:
       responses:
         '302': { description: redirect to signed URL }
 
+  /api/v2/documents/{id}/comments:
+    get:
+      tags: [documents]
+      operationId: listDocumentCommentsV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+    post:
+      tags: [documents]
+      operationId: createDocumentCommentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses: { '201': { description: created } }
+
+  /api/v2/documents/{id}/comments/{libraryID}:
+    patch:
+      tags: [documents]
+      operationId: updateDocumentCommentV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: libraryID, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses: { '200': { description: ok } }
+    delete:
+      tags: [documents]
+      operationId: deleteDocumentCommentV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: libraryID, in: path, required: true, schema: { type: integer } }
+      responses: { '204': { description: deleted } }
+
   /api/v2/documents/{id}/export/pdf:
     post:
       operationId: exportDocumentPDF
@@ -3532,6 +3505,64 @@ paths:
                   signed_url:  { type: string, format: uri }
                   revision_id: { type: string, format: uuid }
         '409': { description: docx_missing }
+
+  /api/v2/documents/{id}/fill-in-schema:
+    get:
+      tags: [documents]
+      operationId: getDocumentFillInSchemaV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+
+  /api/v2/documents/{id}/placeholders:
+    get:
+      tags: [documents]
+      operationId: listDocumentPlaceholderValuesV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+
+  /api/v2/documents/{id}/placeholders/{pid}:
+    put:
+      tags: [documents]
+      operationId: putDocumentPlaceholderValueV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: pid, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses: { '200': { description: ok } }
+
+  /api/v2/documents/{id}/view:
+    get:
+      tags: [documents]
+      operationId: viewDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+
+  /api/v2/documents/{id}/reconstruct:
+    post:
+      tags: [documents]
+      operationId: reconstructDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses: { '200': { description: ok } }
+
+  /api/v2/documents/{id}/placeholder-options/{pid}:
+    get:
+      tags: [documents]
+      operationId: getDocumentPlaceholderOptionsV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: pid, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
 
 components:
   parameters:

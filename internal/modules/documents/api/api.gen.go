@@ -14,7 +14,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
@@ -24,10 +23,6 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
-)
-
-const (
-	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
 )
 
 // Defines values for DocumentSummaryStatus.
@@ -413,6 +408,11 @@ type DocumentStatsV2Params struct {
 	ProfileCode *string `form:"profileCode,omitempty" json:"profileCode,omitempty"`
 }
 
+// RenameDocumentV2JSONBody defines parameters for RenameDocumentV2.
+type RenameDocumentV2JSONBody struct {
+	Name string `json:"name"`
+}
+
 // CommitDocumentAutosaveV2JSONBody defines parameters for CommitDocumentAutosaveV2.
 type CommitDocumentAutosaveV2JSONBody struct {
 	FormDataSnapshot *map[string]interface{} `json:"form_data_snapshot,omitempty"`
@@ -432,6 +432,12 @@ type CreateDocumentCheckpointV2JSONBody struct {
 	Label *string `json:"label,omitempty"`
 }
 
+// CreateDocumentCommentV2JSONBody defines parameters for CreateDocumentCommentV2.
+type CreateDocumentCommentV2JSONBody = map[string]interface{}
+
+// UpdateDocumentCommentV2JSONBody defines parameters for UpdateDocumentCommentV2.
+type UpdateDocumentCommentV2JSONBody = map[string]interface{}
+
 // ExportDocumentPDFJSONBody defines parameters for ExportDocumentPDF.
 type ExportDocumentPDFJSONBody struct {
 	Landscape *bool                               `json:"landscape,omitempty"`
@@ -441,14 +447,14 @@ type ExportDocumentPDFJSONBody struct {
 // ExportDocumentPDFJSONBodyPaperSize defines parameters for ExportDocumentPDF.
 type ExportDocumentPDFJSONBodyPaperSize string
 
-// RenderDocumentPDFMultipartBody defines parameters for RenderDocumentPDF.
-type RenderDocumentPDFMultipartBody struct {
-	// IndexHtml HTML document produced by blocksToFullHTML + print wrapper
-	IndexHtml openapi_types.File `json:"index.html"`
+// PutDocumentPlaceholderValueV2JSONBody defines parameters for PutDocumentPlaceholderValueV2.
+type PutDocumentPlaceholderValueV2JSONBody = map[string]interface{}
 
-	// StyleCss Optional additional stylesheet
-	StyleCss *openapi_types.File `json:"style.css,omitempty"`
-}
+// ReconstructDocumentV2JSONBody defines parameters for ReconstructDocumentV2.
+type ReconstructDocumentV2JSONBody = map[string]interface{}
+
+// RenameDocumentV2JSONRequestBody defines body for RenameDocumentV2 for application/json ContentType.
+type RenameDocumentV2JSONRequestBody RenameDocumentV2JSONBody
 
 // CommitDocumentAutosaveV2JSONRequestBody defines body for CommitDocumentAutosaveV2 for application/json ContentType.
 type CommitDocumentAutosaveV2JSONRequestBody CommitDocumentAutosaveV2JSONBody
@@ -459,11 +465,20 @@ type PresignDocumentAutosaveV2JSONRequestBody PresignDocumentAutosaveV2JSONBody
 // CreateDocumentCheckpointV2JSONRequestBody defines body for CreateDocumentCheckpointV2 for application/json ContentType.
 type CreateDocumentCheckpointV2JSONRequestBody CreateDocumentCheckpointV2JSONBody
 
+// CreateDocumentCommentV2JSONRequestBody defines body for CreateDocumentCommentV2 for application/json ContentType.
+type CreateDocumentCommentV2JSONRequestBody = CreateDocumentCommentV2JSONBody
+
+// UpdateDocumentCommentV2JSONRequestBody defines body for UpdateDocumentCommentV2 for application/json ContentType.
+type UpdateDocumentCommentV2JSONRequestBody = UpdateDocumentCommentV2JSONBody
+
 // ExportDocumentPDFJSONRequestBody defines body for ExportDocumentPDF for application/json ContentType.
 type ExportDocumentPDFJSONRequestBody ExportDocumentPDFJSONBody
 
-// RenderDocumentPDFMultipartRequestBody defines body for RenderDocumentPDF for multipart/form-data ContentType.
-type RenderDocumentPDFMultipartRequestBody RenderDocumentPDFMultipartBody
+// PutDocumentPlaceholderValueV2JSONRequestBody defines body for PutDocumentPlaceholderValueV2 for application/json ContentType.
+type PutDocumentPlaceholderValueV2JSONRequestBody = PutDocumentPlaceholderValueV2JSONBody
+
+// ReconstructDocumentV2JSONRequestBody defines body for ReconstructDocumentV2 for application/json ContentType.
+type ReconstructDocumentV2JSONRequestBody = ReconstructDocumentV2JSONBody
 
 // AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
 func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
@@ -716,6 +731,9 @@ type ServerInterface interface {
 	// (GET /api/v2/documents/{id})
 	GetDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (PATCH /api/v2/documents/{id})
+	RenameDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (POST /api/v2/documents/{id}/archive)
 	ArchiveDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -734,14 +752,44 @@ type ServerInterface interface {
 	// (POST /api/v2/documents/{id}/checkpoints/{version}/restore)
 	RestoreDocumentCheckpointV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, version int)
 
+	// (GET /api/v2/documents/{id}/comments)
+	ListDocumentCommentsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v2/documents/{id}/comments)
+	CreateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (DELETE /api/v2/documents/{id}/comments/{libraryID})
+	DeleteDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
+
+	// (PATCH /api/v2/documents/{id}/comments/{libraryID})
+	UpdateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
+
+	// (POST /api/v2/documents/{id}/duplicate)
+	DuplicateDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (GET /api/v2/documents/{id}/export/docx-url)
 	GetDocumentDocxURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v2/documents/{id}/export/pdf)
 	ExportDocumentPDF(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (GET /api/v2/documents/{id}/fill-in-schema)
+	GetDocumentFillInSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (POST /api/v2/documents/{id}/finalize)
 	FinalizeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v2/documents/{id}/placeholder-options/{pid})
+	GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
+
+	// (GET /api/v2/documents/{id}/placeholders)
+	ListDocumentPlaceholderValuesV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v2/documents/{id}/placeholders/{pid})
+	PutDocumentPlaceholderValueV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
+
+	// (POST /api/v2/documents/{id}/reconstruct)
+	ReconstructDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v2/documents/{id}/revisions/{rid}/url)
 	GetDocumentRevisionUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, rid openapi_types.UUID)
@@ -757,9 +805,9 @@ type ServerInterface interface {
 
 	// (POST /api/v2/documents/{id}/session/release)
 	ReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-	// Convert client-produced HTML (MDDM engine) to PDF via Gotenberg Chromium
-	// (POST /documents/{documentId}/render/pdf)
-	RenderDocumentPDF(w http.ResponseWriter, r *http.Request, documentId string)
+
+	// (GET /api/v2/documents/{id}/view)
+	ViewDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -967,6 +1015,32 @@ func (siw *ServerInterfaceWrapper) GetDocumentV2(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// RenameDocumentV2 operation middleware
+func (siw *ServerInterfaceWrapper) RenameDocumentV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RenameDocumentV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ArchiveDocumentV2 operation middleware
 func (siw *ServerInterfaceWrapper) ArchiveDocumentV2(w http.ResponseWriter, r *http.Request) {
 
@@ -1132,6 +1206,154 @@ func (siw *ServerInterfaceWrapper) RestoreDocumentCheckpointV2(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
+// ListDocumentCommentsV2 operation middleware
+func (siw *ServerInterfaceWrapper) ListDocumentCommentsV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDocumentCommentsV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateDocumentCommentV2 operation middleware
+func (siw *ServerInterfaceWrapper) CreateDocumentCommentV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateDocumentCommentV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteDocumentCommentV2 operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDocumentCommentV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "libraryID" -------------
+	var libraryID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "libraryID", r.PathValue("libraryID"), &libraryID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDocumentCommentV2(w, r, id, libraryID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateDocumentCommentV2 operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDocumentCommentV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "libraryID" -------------
+	var libraryID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "libraryID", r.PathValue("libraryID"), &libraryID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDocumentCommentV2(w, r, id, libraryID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DuplicateDocumentV2 operation middleware
+func (siw *ServerInterfaceWrapper) DuplicateDocumentV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DuplicateDocumentV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetDocumentDocxURL operation middleware
 func (siw *ServerInterfaceWrapper) GetDocumentDocxURL(w http.ResponseWriter, r *http.Request) {
 
@@ -1184,6 +1406,32 @@ func (siw *ServerInterfaceWrapper) ExportDocumentPDF(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// GetDocumentFillInSchemaV2 operation middleware
+func (siw *ServerInterfaceWrapper) GetDocumentFillInSchemaV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDocumentFillInSchemaV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // FinalizeDocumentV2 operation middleware
 func (siw *ServerInterfaceWrapper) FinalizeDocumentV2(w http.ResponseWriter, r *http.Request) {
 
@@ -1201,6 +1449,128 @@ func (siw *ServerInterfaceWrapper) FinalizeDocumentV2(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.FinalizeDocumentV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDocumentPlaceholderOptionsV2 operation middleware
+func (siw *ServerInterfaceWrapper) GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "pid" -------------
+	var pid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pid", r.PathValue("pid"), &pid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDocumentPlaceholderOptionsV2(w, r, id, pid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListDocumentPlaceholderValuesV2 operation middleware
+func (siw *ServerInterfaceWrapper) ListDocumentPlaceholderValuesV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDocumentPlaceholderValuesV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutDocumentPlaceholderValueV2 operation middleware
+func (siw *ServerInterfaceWrapper) PutDocumentPlaceholderValueV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "pid" -------------
+	var pid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "pid", r.PathValue("pid"), &pid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "pid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutDocumentPlaceholderValueV2(w, r, id, pid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReconstructDocumentV2 operation middleware
+func (siw *ServerInterfaceWrapper) ReconstructDocumentV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReconstructDocumentV2(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1349,29 +1719,23 @@ func (siw *ServerInterfaceWrapper) ReleaseDocumentSessionV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// RenderDocumentPDF operation middleware
-func (siw *ServerInterfaceWrapper) RenderDocumentPDF(w http.ResponseWriter, r *http.Request) {
+// ViewDocumentV2 operation middleware
+func (siw *ServerInterfaceWrapper) ViewDocumentV2(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
-	// ------------- Path parameter "documentId" -------------
-	var documentId string
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
 
-	err = runtime.BindStyledParameterWithOptions("simple", "documentId", r.PathValue("documentId"), &documentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: ""})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "documentId", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
 
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
-
-	r = r.WithContext(ctx)
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RenderDocumentPDF(w, r, documentId)
+		siw.Handler.ViewDocumentV2(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1504,21 +1868,32 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents", wrapper.ListDocumentsV2)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/stats", wrapper.DocumentStatsV2)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}", wrapper.GetDocumentV2)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v2/documents/{id}", wrapper.RenameDocumentV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/archive", wrapper.ArchiveDocumentV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/autosave/commit", wrapper.CommitDocumentAutosaveV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/autosave/presign", wrapper.PresignDocumentAutosaveV2)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/checkpoints", wrapper.ListDocumentCheckpointsV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/checkpoints", wrapper.CreateDocumentCheckpointV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/checkpoints/{version}/restore", wrapper.RestoreDocumentCheckpointV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/comments", wrapper.ListDocumentCommentsV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/comments", wrapper.CreateDocumentCommentV2)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v2/documents/{id}/comments/{libraryID}", wrapper.DeleteDocumentCommentV2)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v2/documents/{id}/comments/{libraryID}", wrapper.UpdateDocumentCommentV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/duplicate", wrapper.DuplicateDocumentV2)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/export/docx-url", wrapper.GetDocumentDocxURL)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/export/pdf", wrapper.ExportDocumentPDF)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/fill-in-schema", wrapper.GetDocumentFillInSchemaV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/finalize", wrapper.FinalizeDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/placeholder-options/{pid}", wrapper.GetDocumentPlaceholderOptionsV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/placeholders", wrapper.ListDocumentPlaceholderValuesV2)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/documents/{id}/placeholders/{pid}", wrapper.PutDocumentPlaceholderValueV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/reconstruct", wrapper.ReconstructDocumentV2)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/revisions/{rid}/url", wrapper.GetDocumentRevisionUrlV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/acquire", wrapper.AcquireDocumentSessionV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/force-release", wrapper.ForceReleaseDocumentSessionV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/heartbeat", wrapper.HeartbeatDocumentSessionV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/release", wrapper.ReleaseDocumentSessionV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{documentId}/render/pdf", wrapper.RenderDocumentPDF)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/view", wrapper.ViewDocumentV2)
 
 	return m
 }
@@ -1672,6 +2047,23 @@ type GetDocumentV2404Response struct {
 
 func (response GetDocumentV2404Response) VisitGetDocumentV2Response(w http.ResponseWriter) error {
 	w.WriteHeader(404)
+	return nil
+}
+
+type RenameDocumentV2RequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *RenameDocumentV2JSONRequestBody
+}
+
+type RenameDocumentV2ResponseObject interface {
+	VisitRenameDocumentV2Response(w http.ResponseWriter) error
+}
+
+type RenameDocumentV2200Response struct {
+}
+
+func (response RenameDocumentV2200Response) VisitRenameDocumentV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
 	return nil
 }
 
@@ -1861,6 +2253,90 @@ func (response RestoreDocumentCheckpointV2404Response) VisitRestoreDocumentCheck
 	return nil
 }
 
+type ListDocumentCommentsV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListDocumentCommentsV2ResponseObject interface {
+	VisitListDocumentCommentsV2Response(w http.ResponseWriter) error
+}
+
+type ListDocumentCommentsV2200Response struct {
+}
+
+func (response ListDocumentCommentsV2200Response) VisitListDocumentCommentsV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type CreateDocumentCommentV2RequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *CreateDocumentCommentV2JSONRequestBody
+}
+
+type CreateDocumentCommentV2ResponseObject interface {
+	VisitCreateDocumentCommentV2Response(w http.ResponseWriter) error
+}
+
+type CreateDocumentCommentV2201Response struct {
+}
+
+func (response CreateDocumentCommentV2201Response) VisitCreateDocumentCommentV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(201)
+	return nil
+}
+
+type DeleteDocumentCommentV2RequestObject struct {
+	Id        openapi_types.UUID `json:"id"`
+	LibraryID int                `json:"libraryID"`
+}
+
+type DeleteDocumentCommentV2ResponseObject interface {
+	VisitDeleteDocumentCommentV2Response(w http.ResponseWriter) error
+}
+
+type DeleteDocumentCommentV2204Response struct {
+}
+
+func (response DeleteDocumentCommentV2204Response) VisitDeleteDocumentCommentV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type UpdateDocumentCommentV2RequestObject struct {
+	Id        openapi_types.UUID `json:"id"`
+	LibraryID int                `json:"libraryID"`
+	Body      *UpdateDocumentCommentV2JSONRequestBody
+}
+
+type UpdateDocumentCommentV2ResponseObject interface {
+	VisitUpdateDocumentCommentV2Response(w http.ResponseWriter) error
+}
+
+type UpdateDocumentCommentV2200Response struct {
+}
+
+func (response UpdateDocumentCommentV2200Response) VisitUpdateDocumentCommentV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type DuplicateDocumentV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DuplicateDocumentV2ResponseObject interface {
+	VisitDuplicateDocumentV2Response(w http.ResponseWriter) error
+}
+
+type DuplicateDocumentV2201Response struct {
+}
+
+func (response DuplicateDocumentV2201Response) VisitDuplicateDocumentV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(201)
+	return nil
+}
+
 type GetDocumentDocxURLRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1948,6 +2424,22 @@ func (response ExportDocumentPDF502Response) VisitExportDocumentPDFResponse(w ht
 	return nil
 }
 
+type GetDocumentFillInSchemaV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetDocumentFillInSchemaV2ResponseObject interface {
+	VisitGetDocumentFillInSchemaV2Response(w http.ResponseWriter) error
+}
+
+type GetDocumentFillInSchemaV2200Response struct {
+}
+
+func (response GetDocumentFillInSchemaV2200Response) VisitGetDocumentFillInSchemaV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
 type FinalizeDocumentV2RequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1969,6 +2461,74 @@ type FinalizeDocumentV2409Response struct {
 
 func (response FinalizeDocumentV2409Response) VisitFinalizeDocumentV2Response(w http.ResponseWriter) error {
 	w.WriteHeader(409)
+	return nil
+}
+
+type GetDocumentPlaceholderOptionsV2RequestObject struct {
+	Id  openapi_types.UUID `json:"id"`
+	Pid string             `json:"pid"`
+}
+
+type GetDocumentPlaceholderOptionsV2ResponseObject interface {
+	VisitGetDocumentPlaceholderOptionsV2Response(w http.ResponseWriter) error
+}
+
+type GetDocumentPlaceholderOptionsV2200Response struct {
+}
+
+func (response GetDocumentPlaceholderOptionsV2200Response) VisitGetDocumentPlaceholderOptionsV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type ListDocumentPlaceholderValuesV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListDocumentPlaceholderValuesV2ResponseObject interface {
+	VisitListDocumentPlaceholderValuesV2Response(w http.ResponseWriter) error
+}
+
+type ListDocumentPlaceholderValuesV2200Response struct {
+}
+
+func (response ListDocumentPlaceholderValuesV2200Response) VisitListDocumentPlaceholderValuesV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type PutDocumentPlaceholderValueV2RequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Pid  string             `json:"pid"`
+	Body *PutDocumentPlaceholderValueV2JSONRequestBody
+}
+
+type PutDocumentPlaceholderValueV2ResponseObject interface {
+	VisitPutDocumentPlaceholderValueV2Response(w http.ResponseWriter) error
+}
+
+type PutDocumentPlaceholderValueV2200Response struct {
+}
+
+func (response PutDocumentPlaceholderValueV2200Response) VisitPutDocumentPlaceholderValueV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type ReconstructDocumentV2RequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *ReconstructDocumentV2JSONRequestBody
+}
+
+type ReconstructDocumentV2ResponseObject interface {
+	VisitReconstructDocumentV2Response(w http.ResponseWriter) error
+}
+
+type ReconstructDocumentV2200Response struct {
+}
+
+func (response ReconstructDocumentV2200Response) VisitReconstructDocumentV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
 	return nil
 }
 
@@ -2077,131 +2637,20 @@ func (response ReleaseDocumentSessionV2200Response) VisitReleaseDocumentSessionV
 	return nil
 }
 
-type RenderDocumentPDFRequestObject struct {
-	DocumentId string `json:"documentId"`
-	Body       *multipart.Reader
+type ViewDocumentV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
 }
 
-type RenderDocumentPDFResponseObject interface {
-	VisitRenderDocumentPDFResponse(w http.ResponseWriter) error
+type ViewDocumentV2ResponseObject interface {
+	VisitViewDocumentV2Response(w http.ResponseWriter) error
 }
 
-type RenderDocumentPDF200ApplicationpdfResponse struct {
-	Body          io.Reader
-	ContentLength int64
+type ViewDocumentV2200Response struct {
 }
 
-func (response RenderDocumentPDF200ApplicationpdfResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	w.Header().Set("Content-Type", "application/pdf")
-	if response.ContentLength != 0 {
-		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
-	}
+func (response ViewDocumentV2200Response) VisitViewDocumentV2Response(w http.ResponseWriter) error {
 	w.WriteHeader(200)
-
-	if closer, ok := response.Body.(io.ReadCloser); ok {
-		defer closer.Close()
-	}
-	_, err := io.Copy(w, response.Body)
-	return err
-}
-
-type RenderDocumentPDF400JSONResponse ApiErrorEnvelope
-
-func (response RenderDocumentPDF400JSONResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type RenderDocumentPDF401JSONResponse ApiErrorEnvelope
-
-func (response RenderDocumentPDF401JSONResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type RenderDocumentPDF403JSONResponse ApiErrorEnvelope
-
-func (response RenderDocumentPDF403JSONResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type RenderDocumentPDF413JSONResponse ApiErrorEnvelope
-
-func (response RenderDocumentPDF413JSONResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(413)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type RenderDocumentPDF422JSONResponse ApiErrorEnvelope
-
-func (response RenderDocumentPDF422JSONResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(422)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type RenderDocumentPDF500JSONResponse ApiErrorEnvelope
-
-func (response RenderDocumentPDF500JSONResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-	_, err := buf.WriteTo(w)
-	return err
-}
-
-type RenderDocumentPDF502JSONResponse ApiErrorEnvelope
-
-func (response RenderDocumentPDF502JSONResponse) VisitRenderDocumentPDFResponse(w http.ResponseWriter) error {
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
-		return err
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(502)
-	_, err := buf.WriteTo(w)
-	return err
+	return nil
 }
 
 // StrictServerInterface represents all server handlers.
@@ -2215,6 +2664,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v2/documents/{id})
 	GetDocumentV2(ctx context.Context, request GetDocumentV2RequestObject) (GetDocumentV2ResponseObject, error)
+
+	// (PATCH /api/v2/documents/{id})
+	RenameDocumentV2(ctx context.Context, request RenameDocumentV2RequestObject) (RenameDocumentV2ResponseObject, error)
 
 	// (POST /api/v2/documents/{id}/archive)
 	ArchiveDocumentV2(ctx context.Context, request ArchiveDocumentV2RequestObject) (ArchiveDocumentV2ResponseObject, error)
@@ -2234,14 +2686,44 @@ type StrictServerInterface interface {
 	// (POST /api/v2/documents/{id}/checkpoints/{version}/restore)
 	RestoreDocumentCheckpointV2(ctx context.Context, request RestoreDocumentCheckpointV2RequestObject) (RestoreDocumentCheckpointV2ResponseObject, error)
 
+	// (GET /api/v2/documents/{id}/comments)
+	ListDocumentCommentsV2(ctx context.Context, request ListDocumentCommentsV2RequestObject) (ListDocumentCommentsV2ResponseObject, error)
+
+	// (POST /api/v2/documents/{id}/comments)
+	CreateDocumentCommentV2(ctx context.Context, request CreateDocumentCommentV2RequestObject) (CreateDocumentCommentV2ResponseObject, error)
+
+	// (DELETE /api/v2/documents/{id}/comments/{libraryID})
+	DeleteDocumentCommentV2(ctx context.Context, request DeleteDocumentCommentV2RequestObject) (DeleteDocumentCommentV2ResponseObject, error)
+
+	// (PATCH /api/v2/documents/{id}/comments/{libraryID})
+	UpdateDocumentCommentV2(ctx context.Context, request UpdateDocumentCommentV2RequestObject) (UpdateDocumentCommentV2ResponseObject, error)
+
+	// (POST /api/v2/documents/{id}/duplicate)
+	DuplicateDocumentV2(ctx context.Context, request DuplicateDocumentV2RequestObject) (DuplicateDocumentV2ResponseObject, error)
+
 	// (GET /api/v2/documents/{id}/export/docx-url)
 	GetDocumentDocxURL(ctx context.Context, request GetDocumentDocxURLRequestObject) (GetDocumentDocxURLResponseObject, error)
 
 	// (POST /api/v2/documents/{id}/export/pdf)
 	ExportDocumentPDF(ctx context.Context, request ExportDocumentPDFRequestObject) (ExportDocumentPDFResponseObject, error)
 
+	// (GET /api/v2/documents/{id}/fill-in-schema)
+	GetDocumentFillInSchemaV2(ctx context.Context, request GetDocumentFillInSchemaV2RequestObject) (GetDocumentFillInSchemaV2ResponseObject, error)
+
 	// (POST /api/v2/documents/{id}/finalize)
 	FinalizeDocumentV2(ctx context.Context, request FinalizeDocumentV2RequestObject) (FinalizeDocumentV2ResponseObject, error)
+
+	// (GET /api/v2/documents/{id}/placeholder-options/{pid})
+	GetDocumentPlaceholderOptionsV2(ctx context.Context, request GetDocumentPlaceholderOptionsV2RequestObject) (GetDocumentPlaceholderOptionsV2ResponseObject, error)
+
+	// (GET /api/v2/documents/{id}/placeholders)
+	ListDocumentPlaceholderValuesV2(ctx context.Context, request ListDocumentPlaceholderValuesV2RequestObject) (ListDocumentPlaceholderValuesV2ResponseObject, error)
+
+	// (PUT /api/v2/documents/{id}/placeholders/{pid})
+	PutDocumentPlaceholderValueV2(ctx context.Context, request PutDocumentPlaceholderValueV2RequestObject) (PutDocumentPlaceholderValueV2ResponseObject, error)
+
+	// (POST /api/v2/documents/{id}/reconstruct)
+	ReconstructDocumentV2(ctx context.Context, request ReconstructDocumentV2RequestObject) (ReconstructDocumentV2ResponseObject, error)
 
 	// (GET /api/v2/documents/{id}/revisions/{rid}/url)
 	GetDocumentRevisionUrlV2(ctx context.Context, request GetDocumentRevisionUrlV2RequestObject) (GetDocumentRevisionUrlV2ResponseObject, error)
@@ -2257,9 +2739,9 @@ type StrictServerInterface interface {
 
 	// (POST /api/v2/documents/{id}/session/release)
 	ReleaseDocumentSessionV2(ctx context.Context, request ReleaseDocumentSessionV2RequestObject) (ReleaseDocumentSessionV2ResponseObject, error)
-	// Convert client-produced HTML (MDDM engine) to PDF via Gotenberg Chromium
-	// (POST /documents/{documentId}/render/pdf)
-	RenderDocumentPDF(ctx context.Context, request RenderDocumentPDFRequestObject) (RenderDocumentPDFResponseObject, error)
+
+	// (GET /api/v2/documents/{id}/view)
+	ViewDocumentV2(ctx context.Context, request ViewDocumentV2RequestObject) (ViewDocumentV2ResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2362,6 +2844,39 @@ func (sh *strictHandler) GetDocumentV2(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetDocumentV2ResponseObject); ok {
 		if err := validResponse.VisitGetDocumentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RenameDocumentV2 operation middleware
+func (sh *strictHandler) RenameDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request RenameDocumentV2RequestObject
+
+	request.Id = id
+
+	var body RenameDocumentV2JSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RenameDocumentV2(ctx, request.(RenameDocumentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RenameDocumentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RenameDocumentV2ResponseObject); ok {
+		if err := validResponse.VisitRenameDocumentV2Response(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2550,6 +3065,152 @@ func (sh *strictHandler) RestoreDocumentCheckpointV2(w http.ResponseWriter, r *h
 	}
 }
 
+// ListDocumentCommentsV2 operation middleware
+func (sh *strictHandler) ListDocumentCommentsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListDocumentCommentsV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDocumentCommentsV2(ctx, request.(ListDocumentCommentsV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDocumentCommentsV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDocumentCommentsV2ResponseObject); ok {
+		if err := validResponse.VisitListDocumentCommentsV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateDocumentCommentV2 operation middleware
+func (sh *strictHandler) CreateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreateDocumentCommentV2RequestObject
+
+	request.Id = id
+
+	var body CreateDocumentCommentV2JSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateDocumentCommentV2(ctx, request.(CreateDocumentCommentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateDocumentCommentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateDocumentCommentV2ResponseObject); ok {
+		if err := validResponse.VisitCreateDocumentCommentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteDocumentCommentV2 operation middleware
+func (sh *strictHandler) DeleteDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int) {
+	var request DeleteDocumentCommentV2RequestObject
+
+	request.Id = id
+	request.LibraryID = libraryID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteDocumentCommentV2(ctx, request.(DeleteDocumentCommentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteDocumentCommentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteDocumentCommentV2ResponseObject); ok {
+		if err := validResponse.VisitDeleteDocumentCommentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateDocumentCommentV2 operation middleware
+func (sh *strictHandler) UpdateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int) {
+	var request UpdateDocumentCommentV2RequestObject
+
+	request.Id = id
+	request.LibraryID = libraryID
+
+	var body UpdateDocumentCommentV2JSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateDocumentCommentV2(ctx, request.(UpdateDocumentCommentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateDocumentCommentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateDocumentCommentV2ResponseObject); ok {
+		if err := validResponse.VisitUpdateDocumentCommentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DuplicateDocumentV2 operation middleware
+func (sh *strictHandler) DuplicateDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DuplicateDocumentV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DuplicateDocumentV2(ctx, request.(DuplicateDocumentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DuplicateDocumentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DuplicateDocumentV2ResponseObject); ok {
+		if err := validResponse.VisitDuplicateDocumentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetDocumentDocxURL operation middleware
 func (sh *strictHandler) GetDocumentDocxURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request GetDocumentDocxURLRequestObject
@@ -2612,6 +3273,32 @@ func (sh *strictHandler) ExportDocumentPDF(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// GetDocumentFillInSchemaV2 operation middleware
+func (sh *strictHandler) GetDocumentFillInSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetDocumentFillInSchemaV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDocumentFillInSchemaV2(ctx, request.(GetDocumentFillInSchemaV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDocumentFillInSchemaV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDocumentFillInSchemaV2ResponseObject); ok {
+		if err := validResponse.VisitGetDocumentFillInSchemaV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // FinalizeDocumentV2 operation middleware
 func (sh *strictHandler) FinalizeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request FinalizeDocumentV2RequestObject
@@ -2631,6 +3318,126 @@ func (sh *strictHandler) FinalizeDocumentV2(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(FinalizeDocumentV2ResponseObject); ok {
 		if err := validResponse.VisitFinalizeDocumentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDocumentPlaceholderOptionsV2 operation middleware
+func (sh *strictHandler) GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string) {
+	var request GetDocumentPlaceholderOptionsV2RequestObject
+
+	request.Id = id
+	request.Pid = pid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDocumentPlaceholderOptionsV2(ctx, request.(GetDocumentPlaceholderOptionsV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDocumentPlaceholderOptionsV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDocumentPlaceholderOptionsV2ResponseObject); ok {
+		if err := validResponse.VisitGetDocumentPlaceholderOptionsV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListDocumentPlaceholderValuesV2 operation middleware
+func (sh *strictHandler) ListDocumentPlaceholderValuesV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListDocumentPlaceholderValuesV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDocumentPlaceholderValuesV2(ctx, request.(ListDocumentPlaceholderValuesV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDocumentPlaceholderValuesV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDocumentPlaceholderValuesV2ResponseObject); ok {
+		if err := validResponse.VisitListDocumentPlaceholderValuesV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutDocumentPlaceholderValueV2 operation middleware
+func (sh *strictHandler) PutDocumentPlaceholderValueV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string) {
+	var request PutDocumentPlaceholderValueV2RequestObject
+
+	request.Id = id
+	request.Pid = pid
+
+	var body PutDocumentPlaceholderValueV2JSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutDocumentPlaceholderValueV2(ctx, request.(PutDocumentPlaceholderValueV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutDocumentPlaceholderValueV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutDocumentPlaceholderValueV2ResponseObject); ok {
+		if err := validResponse.VisitPutDocumentPlaceholderValueV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReconstructDocumentV2 operation middleware
+func (sh *strictHandler) ReconstructDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ReconstructDocumentV2RequestObject
+
+	request.Id = id
+
+	var body ReconstructDocumentV2JSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReconstructDocumentV2(ctx, request.(ReconstructDocumentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReconstructDocumentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReconstructDocumentV2ResponseObject); ok {
+		if err := validResponse.VisitReconstructDocumentV2Response(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2769,32 +3576,25 @@ func (sh *strictHandler) ReleaseDocumentSessionV2(w http.ResponseWriter, r *http
 	}
 }
 
-// RenderDocumentPDF operation middleware
-func (sh *strictHandler) RenderDocumentPDF(w http.ResponseWriter, r *http.Request, documentId string) {
-	var request RenderDocumentPDFRequestObject
+// ViewDocumentV2 operation middleware
+func (sh *strictHandler) ViewDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ViewDocumentV2RequestObject
 
-	request.DocumentId = documentId
-
-	if reader, err := r.MultipartReader(); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
-		return
-	} else {
-		request.Body = reader
-	}
+	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RenderDocumentPDF(ctx, request.(RenderDocumentPDFRequestObject))
+		return sh.ssi.ViewDocumentV2(ctx, request.(ViewDocumentV2RequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RenderDocumentPDF")
+		handler = middleware(handler, "ViewDocumentV2")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RenderDocumentPDFResponseObject); ok {
-		if err := validResponse.VisitRenderDocumentPDFResponse(w); err != nil {
+	} else if validResponse, ok := response.(ViewDocumentV2ResponseObject); ok {
+		if err := validResponse.VisitViewDocumentV2Response(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2807,67 +3607,62 @@ func (sh *strictHandler) RenderDocumentPDF(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7Dzvbtu4k69C6A64FCdHSdtd4PItmzS7uU3bIEn7ZVu4tDiyuKVIlaScuFl/vQe4R7wnOZDUP0uUIydN",
-	"2gK/T7bEmeFwOP9J+zaIRZYLDlyr4OA2UHEKGbZfD3P6SkohzfdcihykpmBHYkHAfOplDsFBoLSkfB6s",
-	"woCAxpRZGEwI1VRwzM5buFoWEFZ4YvY3xNrgZaAUnvtpaoljmFLiGVyFgYQvBZVAgoO/HFsNsYadFpGP",
-	"ntmrhb7iC2Aih/6CoZLDv0tIgoPg36JGalEpsqiWV5cvh+2b+VjERQZcn1GlL0DlgivP7FRDtv5lExsV",
-	"zcsiy7BcWhG6ebGU2D7n67KmXMMcZDVySb8OjGqhMTNDiZAZ1m7w15dB2IPtSMAxXk7cmqUiuUk2lxpr",
-	"NSyc2fJQAh7WuBHMeiafLc20hfq2dDtSqScJq1VslEO5nz0JHMaaLuASlKKCnx57jehQxildADnUa5wT",
-	"rGGiaWZ2gheM4RmDjpE2NI6GrP5IcC0FY0AqXh0Xd1OUgPVGpoZQflv6OSmkBK4vYEE3CONEyOwYa/zf",
-	"l2/frM08W2rvpAN03uDML5BzKWJQymypEdolx7lKhR4lk3MpEspga7xqze9Bmo+RCtpoOfAiM0pJJE50",
-	"EAYFJyCnEhYUroMwwHkuxQJIYFTYqKb9anwOKZj9nhczRlXq3hc5SAXEPoiZEgw0tLS7YfsKspxhDSXb",
-	"A5K+Ao4rreoNvsvJtlr0HrMC1IkUX4Hf3yQ65nx6HLQ49S2tVJla7B1V9Olvf2PDnsG3Daktjra1lOa7",
-	"ycFU/J5QYOSSCf1GEBh2vIkB+5Ny0tYeFWOGpXenvRHcxAKd+uP+0kXiirSdb6KY0B7yna2wo3bKcoKw",
-	"xe4YGZzhGbDN6x9Yj4YbPWo9zEyx3VIs7THsdzknoGJJc20dQ3BOmdBIFTMFOlLFLBb874JrgXIzgIlA",
-	"BKPXoDE7FrFCuiSKji/PQmScB49tODQzAmI0oxYJIxPXQ6QgNhNNEokzCJFdZ4ia7QuRpHFafYUcsLYP",
-	"CJA21mYfdk36Rg3XGeVYu+wrw3luZFRpn9OGO/KgzWodlvswkkhfL6psahz+OZ5DB70lgbFULiyKZy21",
-	"YEdTonHqobO2hWNpXTqkE4PTodfs61hiVwajx5nxF84Ily74OlNYhYHg8DYJDv4alxsPbscq3I7A4Jq3",
-	"JdRXrG0p+PV7WypehdiaiF8/tyUzoAMfPQ6vt5H9mjWljEjgW9dRXp/qKaqG4kHH7VtvsZXXrzkf4/kH",
-	"RD8uejtX9CjRu+3lHj98e7V4pAxonD6OBGrf/PjrH3RLP45ZUM1glNzWY9HjWY7f24xTGhvfHkVrWpHz",
-	"W6uNQac8Ef0E8fD8FFFOY4oZIqKVCu4s9p/tolcqFrlAWBeYIQWZzQnnEsdYoFhk6PRw94OpU8o9Dhr8",
-	"w/PTIAwWVYka7O/u7e7Z8J0DxzkNDoIXu3u7L8oFWIFHODbF9CQXjMZuE1ZhEOGcRovnUVz3Hiak3NAR",
-	"EFHuCttJ2cm8C/yWktVIsAjb6qx+OxatrpJHwsuyLFRjEeqafB2hLbVgDrZ2MfqOjS6ckuAgOKNKV8ai",
-	"3j+3e2NsUYNUNuOiZiu/FCBNmcldXlZ2+pzXsLk75TQzOr3v6xYOEyn7hC1C+MYR+mUvvJPqul4fXb5H",
-	"ypbeKKFMgwwRZkogo2G5VmUxAgRZPpBdpqnSfbypqoRvOOtZp39VuGwL3Qc3b7pD90H/ch8kymNWEKha",
-	"iD4SMyEYYB6sVh+NS3K+02rU8709d2JgykarXDjPGY2tekV/K9epagiOCT1r3XLrxta3WXw2LuXlN5y5",
-	"d0LgmfXCeGJFjROkfIEZJdixsf+kbLzBAuHCzEVjTIRj4cWTsnAJGcpBZlQpLGyUUlXv2joTVPsclAiJ",
-	"tG2Z2SpxrmwLsnZJH1c+TxUZ2xv2V2sHB2P91Y9tzk9hVevnLP8yq5/KrOr4bOObQrNlFegwJ8io6Db2",
-	"VaY7fvP6HepsYNC4yuyzCiDu1KBKVF0vvZFL3XovCtflHKf8fuV82R/iQk8TUXBiZbaVECLsgp4tA4Ty",
-	"SKOMij+oRLZfb6GFwgswOppRPbzuIzteLfuwRHvC5X8pQOnfBFluZYN57wR3SrDGU9U6autVijlwQvl8",
-	"WuRMYFJeRbiDyTBQ7nxmHHinkmvh+qb313LrAl09MGR0Dzsgy4XBnErIGV76kj8zoytKxsqohrfV7l1F",
-	"wpqI2lN1CPnFs24dFQJyim6SfiFRs0xULrPx8+v41Q4Z55IKRkCif+q8xr4V19ydsXqdUrWpLedkIP+r",
-	"D5lRNTMA6B9UqwV3RaZ5pTGD6Qy75svLfY8jgJvcCK3UH/QPKhXJBJJyH14+f97HK1VlmmKVGuAM6zh9",
-	"iE/JJSg658NO5dwB/ORexWzGdFtLaAu7rHLPgM91Ghz8+tLWue3Hx3M2PeY7rD3A9XQMwO01EFRINqj8",
-	"Po33WV7bDLZW0DiF+HMu6NgmyFED/3PE+3AoiNvrAf1l/WQGV57g+q4H9nS1r5v7Hs/nrk08TJWi27LP",
-	"uYokKC3khizywgF8r50IvUQX9YWTYcobA/bHR0pB+htm2ELXKXD09g06evvm5Oz06Art1PGYkhC13dgz",
-	"lJj1oAmK3Y0blAImCDMJmCyRjXSgGkm1UhwO11s79zWcEalOGChRyBimjTpNy924R6bU5djDT9iW7rj0",
-	"ySosQTscrp3w6owK5ya5AfIMvb1oZ1RcTESOdmjiFzp8KTBTSKeAmmUju1sPzcI8qdNgYtYS+Xrh2BTb",
-	"J0JeY0kmgrMlKiVhVIkJDr0FSFggyrVAGPVEtW1NHsFNLqQ2b28mJmyOqNGPRXzz7uLsO4ape9r7tkbm",
-	"solpKZYGXNK7M6AGdb2GGWMKly6L+f3VFXp3cWY7mpV+1yaxa3ZsMMkxg002vrqnUuQkGQ4wryxMpRPn",
-	"xyc/WYDnRMU4L++yJbhgOjhIMFPgc9E5zkFOVXmNvYYPDl8GYX2wah/OQGuQ/pPVEanDQ9Q7xnEKxF9G",
-	"2wahohrqcmC4cn4E6zDQX2E6W+rRF92ND8RzmH6G5d2/02gDh+vG11n5GidhJbPtbfT8+ATZKDPSBk1F",
-	"7AGSWMPU3ncEW6//sucpm+cm2s1AzqcJpmw4iwyDm4khOLEEncezxqKmRn0zygsNwcHzvdUG208ox6xU",
-	"dL/ln5QQP3DP1iPpstU/VdqIXEvMlf0Nxj3cY31QHt1K8zwyblbXrt9J9j2TcPmNN+KFT2UlECoh1kgL",
-	"VBblJmXYXtZllhXh2PK7oW3uAOqzJ4f3A+mm8RY2v9vBXOgUJCoUSGSSTFUlkzYv9RaQ15JqkKgUA3mA",
-	"JBMhY5hIYIDVJis3YBcO6scVamXwnkw+EXJGCQH+AFmlgKWeAd5wbPFHBfLjC2lEN+wBsrpTo34KZbp7",
-	"+c6drV95qn7QoAZeO0mVBbeKbvlqNGBZmtkGe1mhjUW0v7saDV7+2mo8gpO+hzWtcZyWGtI8nJJV1GS2",
-	"FrAgVEewaN+wK3QaxSnmc5jkWKlrIUl7iIm5UY61F6LQ7TdZdR2t2r8JloBVdBsLAqvuGIEcS92+5Ocb",
-	"GkBOcEZZc4Gwfl9ewhh8H922rmmsxkFFs4ITBiOB52IBkmMej0WoTWk8cKsdaZ0H1mMnq7TK6nYXRxU2",
-	"6VZD7wf2omuCzcAyH3gZ3ZqPP2E5INwulopuq6+nZLVxsG0EowG71kLENe/Y1gCRmRTXCuQECNVCTvyr",
-	"WUeJBWN4Jpx/jpiIP28Dn0tQ0NeuHk7b3DcDVWsYB+xRnAFIjrW7bjEC1jU8RgBK4ATkZDS885GbYbfY",
-	"u1bTbjPg3bO6lXRbPZ1+lCmZGCiF/rh6ffZ///O/pvjNpbhZmhSWoNnStihfHx+/RjGj1lgpAeRoUz5H",
-	"wOeUw+4HfpWa17YoRTNBlogqlBVMU+NqTWqaTQjW2LbWMeUG9xPlBG52U52xT2inSgGefeCYE/RJ6SWD",
-	"3VipT2hH5O5H9c92kZlHgVyARInrrbo2qplGmaLk96qm/g/1gR+lUmS0yJAUhQZ7wUlpCThzSBKUYZHP",
-	"kVn4DMefd9ExTRKQCiVSZB/4J49mfArRdUrjFEmTbZu3CmFUNrmrLbD4liTYSbEGd9O9mzoZ/G2bbc0+",
-	"b8ydtmqyeTZr4xFLvXd9tTLK1Agil4IUsdOmmXFH6kqcFIxZqP9EuaRco2uJ8xxkELZ+YU85thcg+y2n",
-	"SjX6U78tNQU1/8SALLhKAfQY8t2/o2jW+e2v0pTG6cl2B7nz9qtc0+s73Lh8jZlhGUhl+9/lvqXQyCSI",
-	"7sJl2W976huXFRNC0q9A3GXllKraDNyVm6fl6Rwv7TUeuIkBSj+5v4de/+Z+iN26zfNkLL3jufvDCzxj",
-	"gF5xTfXStUefVnFPuTZpNEOXLpaU/8ZT92mfjJE6XKEid6EJFRwvMLX/JoGERBlVseAJnRdVe0hBXEgj",
-	"OBMeyir9SIjPFIKDvz4aN98cQB4JvgCpq/BdO2PrfXdsZHcx/JkJnsaZLChugiiqIuiG88eBBEQVs4zq",
-	"SSLkxP0jCL4j160S/QlWphTP7kwwN1UbHdCqvh0HFRGaVAlgAlgXEiYJs8u371LAzJSoTf5ZvnEHB+4V",
-	"xVmESUZ5ZEo2+98ozUChbHhff45uzUdTgfQHIpOd624B7YMTTZXqGS54qy7IQEsaV9BcaJqU+u59F922",
-	"Hx1TdTJaZzcqctpcvi+t3lXsvnfrxZ8CLOO0V6+ZZNVwu4wyQrKJSjER15PWZl0L+Tlh4nqwJisVUY2E",
-	"b04TLIa1PeMvXGZmq7eyo7IfrD6u/j8AAP//",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
