@@ -3212,50 +3212,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
-    post:
-      summary: Create document from published template
-      tags: [documents]
-      operationId: createDocumentV2
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [template_version_id, name, form_data]
-              properties:
-                template_version_id: { type: string, format: uuid }
-                name: { type: string }
-                form_data: { type: object, additionalProperties: true }
-      responses:
-        '201':
-          description: created
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [DocumentID, InitialRevisionID, SessionID]
-                properties:
-                  DocumentID: { type: string, format: uuid }
-                  InitialRevisionID: { type: string, format: uuid }
-                  SessionID: { type: string, format: uuid }
-        '403': { description: forbidden }
-        '422': { description: form_data_invalid or template parse error }
 
   /api/v2/documents/{id}:
     get:
       tags: [documents]
+      operationId: getDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '404': { description: not_found } }
 
   /api/v2/documents/{id}/finalize:
     post:
       tags: [documents]
+      operationId: finalizeDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '409': { description: invalid_state_transition } }
   /api/v2/documents/{id}/archive:
     post:
       tags: [documents]
+      operationId: archiveDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
@@ -3306,6 +3280,7 @@ paths:
   /api/v2/documents/{id}/session/acquire:
     post:
       tags: [documents]
+      operationId: acquireDocumentSessionV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '201': { description: writer acquired }
@@ -3313,22 +3288,26 @@ paths:
   /api/v2/documents/{id}/session/heartbeat:
     post:
       tags: [documents]
+      operationId: heartbeatDocumentSessionV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '409': { description: session_inactive } }
   /api/v2/documents/{id}/session/release:
     post:
       tags: [documents]
+      operationId: releaseDocumentSessionV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v2/documents/{id}/session/force-release:
     post:
       tags: [documents]
+      operationId: forceReleaseDocumentSessionV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '403': { description: forbidden } }
 
   /api/v2/documents/{id}/autosave/presign:
     post:
       tags: [documents]
+      operationId: presignDocumentAutosaveV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3347,6 +3326,7 @@ paths:
   /api/v2/documents/{id}/autosave/commit:
     post:
       tags: [documents]
+      operationId: commitDocumentAutosaveV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -3383,10 +3363,12 @@ paths:
   /api/v2/documents/{id}/checkpoints:
     get:
       tags: [documents]
+      operationId: listDocumentCheckpointsV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
     post:
       tags: [documents]
+      operationId: createDocumentCheckpointV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         content:
@@ -3394,13 +3376,14 @@ paths:
             schema: { type: object, properties: { label: { type: string } } }
       responses: { '201': { description: created } }
 
-  /api/v2/documents/{id}/checkpoints/{versionNum}/restore:
+  /api/v2/documents/{id}/checkpoints/{version}/restore:
     post:
       tags: [documents]
+      operationId: restoreDocumentCheckpointV2
       summary: Forward-only restore - clones the checkpoint rev into a new head revision
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
-        - { name: versionNum, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses:
         '200':
           description: restored (new head revision appended) OR idempotent no-op (if current head already equals the checkpoint hash)
@@ -3420,6 +3403,7 @@ paths:
   /api/v2/documents/{id}/revisions/{rid}/url:
     get:
       tags: [documents]
+      operationId: getDocumentRevisionUrlV2
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: rid, in: path, required: true, schema: { type: string, format: uuid } }
