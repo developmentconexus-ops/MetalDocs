@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-11 · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
+**Last verified:** 2026-05-12 · **Owner:** unassigned · **Status:** active (intrinsic gaps; see §11)
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` — `Event`, `ListEventsQuery`, `Writer`, `Reader`
@@ -152,6 +152,15 @@ C4Container
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
 | GET | `/api/v1/audit/events` | _missing_ (T-008) | `Handler.handleEvents` (`handler.go:38`) | **none** (T-001) |
+
+## API Route Truth Table (Plan 8 Baseline)
+
+| Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
+|---|---|---|---|---|---|---|---|---|
+| GET | `/api/v1/audit/events` | `internal/modules/audit/delivery/http/handler.go:36` | `handleEvents` | `/audit/events` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+
+- Module contract status: Partial
+- Owner: leandro
 
 ---
 

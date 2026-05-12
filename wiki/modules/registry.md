@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-12 (Plan 7) · **Owner:** unassigned · **Status:** active
+**Last verified:** 2026-05-12 (Plan 8) · **Owner:** unassigned · **Status:** active
 
 > **Key files:**
 > - `internal/modules/registry/module.go:25` — module wiring (`New`, dependencies)
@@ -174,6 +174,22 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 | GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:232` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
 | PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | `registry.obsolete` (`CapRegistryObsolete`) — T-001 closed Plan 5 |
 | PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | `registry.supersede` (`CapRegistrySupersede`) — T-001 closed Plan 5 |
+
+## API Route Truth Table (Plan 8 Baseline)
+
+| Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
+|---|---|---|---|---|---|---|---|---|
+| GET | `/api/v2/controlled-documents` | `internal/modules/registry/delivery/http/handler.go:84` | `generated.ListControlledDocuments` | `/api/v2/controlled-documents` | `listControlledDocuments` | `ListControlledDocuments` | Aligned | Wrapper-mounted |
+| POST | `/api/v2/controlled-documents` | `internal/modules/registry/delivery/http/handler.go:79` | `generated.AtomicCreateControlledDocument` | `/api/v2/controlled-documents` | `atomicCreateControlledDocument` | `AtomicCreateControlledDocument` | Aligned | Idempotency middleware wraps generated handler |
+| GET | `/api/v2/controlled-documents/preview-code` | `internal/modules/registry/delivery/http/handler.go:83` | `generated.PreviewControlledDocumentCode` | `/api/v2/controlled-documents/preview-code` | `previewControlledDocumentCode` | `PreviewControlledDocumentCode` | Aligned |  |
+| GET | `/api/v2/controlled-documents/{id}` | `internal/modules/registry/delivery/http/handler.go:85` | `generated.GetControlledDocument` | `/api/v2/controlled-documents/{id}` | `getControlledDocument` | `GetControlledDocument` | Aligned |  |
+| POST | `/api/v2/controlled-documents/{id}/revisions` | `internal/modules/registry/delivery/http/handler.go:81` | `generated.CreateControlledDocumentRevision` | `/api/v2/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `CreateControlledDocumentRevision` | Aligned | Idempotency middleware wraps generated handler |
+| GET | `/api/v2/controlled-documents/{id}/active-document` | `internal/modules/registry/delivery/http/handler.go:86` | `generated.GetActiveDocument` | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `GetActiveDocument` | Aligned |  |
+| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `internal/modules/registry/delivery/http/handler.go:87` | `generated.ObsoleteControlledDocument` | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `ObsoleteControlledDocument` | Aligned |  |
+| PUT | `/api/v2/controlled-documents/{id}/supersede` | `internal/modules/registry/delivery/http/handler.go:88` | `generated.SupersedeControlledDocument` | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `SupersedeControlledDocument` | Aligned |  |
+
+Module contract status: Wrapper-only  
+Owner: leandro
 
 ---
 

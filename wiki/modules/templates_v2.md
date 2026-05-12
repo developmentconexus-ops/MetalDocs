@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates_v2/` and routes still mount under `/api/v2/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates_v2 is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates_v2-refactor.md#R-101`).
 
-**Last verified:** 2026-05-11 (Plan 5) · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied; **Plan 5 wired `authz.Require` + tripwire on all 6 mutation paths**)
+**Last verified:** 2026-05-12 (Plan 8) · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied; **Plan 5 wired `authz.Require` + tripwire on all 6 mutation paths**)
 
 ---
 
@@ -206,6 +206,35 @@ Source: `_artifacts/01-surface.md` §1a + §1b. **All routes still mount under `
 | GET | `/api/v2/templates/v2/placeholder-catalog` | — (hand-rolled) | `Handler.listPlaceholderCatalog` | (none) |
 
 Hand-rolled rows (12 of 20) are absent from the OpenAPI spec → spec/handler drift (T-006). All "intended" caps in the rightmost column are advisory; **no route enforces them at runtime** (T-001).
+
+## API Route Truth Table (Plan 8 Baseline)
+
+| Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
+|---|---|---|---|---|---|---|---|---|
+| GET | `/api/v2/signed` | `internal/modules/templates_v2/delivery/http/handler.go:39` | `generated.RedirectSignedUrlV2` | `/api/v2/signed` | `redirectSignedUrlV2` | `RedirectSignedUrlV2` | Aligned | Wrapper-mounted |
+| GET | `/api/v2/templates` | `internal/modules/templates_v2/delivery/http/handler.go:40` | `generated.ListTemplatesV2` | `/api/v2/templates` | `listTemplatesV2` | `ListTemplatesV2` | Aligned | Wrapper-mounted |
+| POST | `/api/v2/templates` | `internal/modules/templates_v2/delivery/http/handler.go:41` | `generated.CreateTemplateV2` | `/api/v2/templates` | `createTemplateV2` | `CreateTemplateV2` | Aligned | Wrapper-mounted |
+| GET | `/api/v2/templates/{id}/versions/{n}` | `internal/modules/templates_v2/delivery/http/handler.go:42` | `generated.GetTemplateVersionV2` | `/api/v2/templates/{id}/versions/{n}` | `getTemplateVersionV2` | `GetTemplateVersionV2` | Aligned | Wrapper-mounted |
+| POST | `/api/v2/templates/{id}/versions/{n}/docx-upload-url` | `internal/modules/templates_v2/delivery/http/handler.go:43` | `generated.PresignTemplateDocxUploadUrlV2` | `/api/v2/templates/{id}/versions/{n}/docx-upload-url` | `presignTemplateDocxUploadUrlV2` | `PresignTemplateDocxUploadUrlV2` | Aligned | Wrapper-mounted |
+| POST | `/api/v2/templates/{id}/versions/{n}/schema-upload-url` | `internal/modules/templates_v2/delivery/http/handler.go:44` | `generated.PresignTemplateSchemaUploadUrlV2` | `/api/v2/templates/{id}/versions/{n}/schema-upload-url` | `presignTemplateSchemaUploadUrlV2` | `PresignTemplateSchemaUploadUrlV2` | Aligned | Wrapper-mounted |
+| PUT | `/api/v2/templates/{id}/versions/{n}/draft` | `internal/modules/templates_v2/delivery/http/handler.go:45` | `generated.SaveTemplateDraftV2` | `/api/v2/templates/{id}/versions/{n}/draft` | `saveTemplateDraftV2` | `SaveTemplateDraftV2` | Aligned | Wrapper-mounted |
+| POST | `/api/v2/templates/{id}/versions/{n}/publish` | `internal/modules/templates_v2/delivery/http/handler.go:46` | `generated.PublishTemplateVersionV2` | `/api/v2/templates/{id}/versions/{n}/publish` | `publishTemplateVersionV2` | `PublishTemplateVersionV2` | Aligned | Wrapper-mounted |
+| POST | `/api/v2/templates/{id}/versions` | `internal/modules/templates_v2/delivery/http/handler.go:48` | `h.createNextVersion` | — | — | — | Spec missing |  |
+| PUT | `/api/v2/templates/{id}/versions/{n}/schema` | `internal/modules/templates_v2/delivery/http/handler.go:49` | `h.updateSchemas` | — | — | — | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/autosave/presign` | `internal/modules/templates_v2/delivery/http/handler.go:50` | `h.presignAutosave` | — | — | — | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/autosave/commit` | `internal/modules/templates_v2/delivery/http/handler.go:51` | `h.commitAutosave` | — | — | — | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/submit` | `internal/modules/templates_v2/delivery/http/handler.go:52` | `h.submitForReview` | — | — | — | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/review` | `internal/modules/templates_v2/delivery/http/handler.go:53` | `h.review` | — | — | — | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/approve` | `internal/modules/templates_v2/delivery/http/handler.go:54` | `h.approve` | — | — | — | Spec missing |  |
+| POST | `/api/v2/templates/{id}/archive` | `internal/modules/templates_v2/delivery/http/handler.go:55` | `h.archiveTemplate` | — | — | — | Spec missing |  |
+| PUT | `/api/v2/templates/{id}/approval-config` | `internal/modules/templates_v2/delivery/http/handler.go:56` | `h.upsertApprovalConfig` | — | — | — | Spec missing |  |
+| GET | `/api/v2/templates/{id}` | `internal/modules/templates_v2/delivery/http/handler.go:58` | `h.getTemplate` | — | — | — | Spec missing |  |
+| GET | `/api/v2/templates/{id}/versions/{n}/docx-url` | `internal/modules/templates_v2/delivery/http/handler.go:59` | `h.getDocxURL` | — | — | — | Spec missing |  |
+| GET | `/api/v2/templates/{id}/audit` | `internal/modules/templates_v2/delivery/http/handler.go:60` | `h.listAudit` | — | — | — | Spec missing |  |
+| GET | `/api/v2/templates/v2/placeholder-catalog` | `internal/modules/templates_v2/delivery/http/handler.go:61` | `h.listPlaceholderCatalog` | — | — | — | Spec missing |  |
+
+Module contract status: Partial  
+Owner: leandro
 
 ---
 

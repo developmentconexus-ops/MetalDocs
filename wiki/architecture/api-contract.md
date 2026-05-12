@@ -2,7 +2,7 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-05-08
+> **Last verified:** 2026-05-12
 > **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, per-module migration status.
 > **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md §7`).
 > **Key files:**
@@ -134,7 +134,7 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 
 ---
 
-## 8. Module migration status
+## 8. Legacy migration notes (superseded by Plan 8 baseline)
 
 | Module | Path prefix | Codegen status | Handler migration |
 |--------|------------|----------------|------------------|
@@ -150,7 +150,33 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 
 ---
 
-## 9. Adding a new module
+## 9. Module migration status (Plan 8 baseline)
+
+| Module | Path prefix | Contract status | Notes |
+|--------|------------|-----------------|-------|
+| `documents` | `/api/v2/documents` | `Partial` | Mixed aligned+raw surface; includes one path signature mismatch (`{version}` vs `{versionNum}`) |
+| `approval` | `/api/v2/approval`, `/api/v2/documents/* approval routes` | `Raw` | Runtime routes are mounted but not yet represented in OpenAPI/codegen |
+| `templates_v2` | `/api/v2/templates`, `/api/v2/signed` | `Partial` | Core generated routes aligned; several runtime routes still spec-missing |
+| `registry` | `/api/v2/controlled-documents` | `Wrapper-only` | Fully mounted through `ServerInterfaceWrapper` and aligned with spec/codegen |
+| `taxonomy` | `/api/v2/taxonomy` | `Raw` | Runtime routes present; no OpenAPI coverage yet |
+| `audit` | `/api/v1/audit` | `Partial` | Runtime path aligns with spec (`/audit/events` + `/api/v1` server prefix); operationId missing |
+| `iam` | `/api/v1/iam`, `/api/v2/iam` | `Partial` | v1 admin routes aligned; v2 area-membership routes are spec-missing |
+| `auth/platform` | `/api/v1/auth` | `Partial` | Auth runtime routes align with spec paths, but operationIds are missing |
+
+### Route truth tables
+
+- [Documents route table](../modules/documents.md#api-route-truth-table-plan-8-baseline)
+- [Approval route table](../modules/approval.md#api-route-truth-table-plan-8-baseline)
+- [Templates_v2 route table](../modules/templates_v2.md#api-route-truth-table-plan-8-baseline)
+- [Registry route table](../modules/registry.md#api-route-truth-table-plan-8-baseline)
+- [Taxonomy route table](../modules/taxonomy.md#api-route-truth-table-plan-8-baseline)
+- [Audit route table](../modules/audit.md#api-route-truth-table-plan-8-baseline)
+- [IAM route table](../modules/iam.md#api-route-truth-table-plan-8-baseline)
+- [Auth route table](../modules/auth.md#api-route-truth-table-plan-8-baseline)
+
+---
+
+## 10. Adding a new module
 
 1. Author operations in `api/openapi/v1/openapi.yaml` with a new `tags: [<module>]` value.
 2. Lint: `npx @redocly/cli lint api/openapi/v1/openapi.yaml`.
