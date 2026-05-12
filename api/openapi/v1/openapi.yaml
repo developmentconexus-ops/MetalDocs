@@ -3564,6 +3564,100 @@ paths:
         - { name: pid, in: path, required: true, schema: { type: string } }
       responses: { '200': { description: ok } }
 
+  /api/v2/documents/{id}/submit:
+    post:
+      tags: [approval]
+      operationId: submitDocumentForApprovalV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs:
+    post:
+      tags: [approval]
+      operationId: recordApprovalStageSignoffV2
+      parameters:
+        - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/publish:
+    post:
+      tags: [approval]
+      operationId: publishDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/schedule-publish:
+    post:
+      tags: [approval]
+      operationId: scheduleDocumentPublishV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/supersede:
+    post:
+      tags: [approval]
+      operationId: supersedeDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/obsolete:
+    post:
+      tags: [approval]
+      operationId: obsoleteDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/approval/instances/{instance_id}/cancel:
+    post:
+      tags: [approval]
+      operationId: cancelApprovalInstanceV2
+      parameters: [{ name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/approval/instances/{instance_id}:
+    get:
+      tags: [approval]
+      operationId: getApprovalInstanceV2
+      parameters: [{ name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/approval-instance:
+    get:
+      tags: [approval]
+      operationId: getApprovalInstanceByDocumentV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/approval/inbox:
+    get:
+      tags: [approval]
+      operationId: listApprovalInboxV2
+      responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/signoff:
+    post:
+      tags: [approval]
+      operationId: recordDocumentSignoffV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/documents/{id}/cancel:
+    post:
+      tags: [approval]
+      operationId: cancelDocumentApprovalV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+  /api/v2/approval/routes:
+    post:
+      tags: [approval]
+      operationId: createApprovalRouteV2
+      responses: { '200': { description: ok } }
+    get:
+      tags: [approval]
+      operationId: listApprovalRoutesV2
+      responses: { '200': { description: ok } }
+  /api/v2/approval/routes/{id}:
+    put:
+      tags: [approval]
+      operationId: updateApprovalRouteV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+    delete:
+      tags: [approval]
+      operationId: deactivateApprovalRouteV2
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses: { '200': { description: ok } }
+
 components:
   parameters:
     DocumentId:
