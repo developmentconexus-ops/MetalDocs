@@ -18,6 +18,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/tenant"
 )
@@ -1024,5 +1025,5 @@ func mapErr(err error) (int, string) {
 }
 
 func httpErr(w http.ResponseWriter, code int, msg string) {
-	httpresponse.WriteJSON(w, code, map[string]string{"error": msg})
+	_ = problem.Write(w, problem.New(code, msg, msg))
 }
