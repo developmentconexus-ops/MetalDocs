@@ -27,6 +27,12 @@ For ANY work under `frontend/apps/web/src/` (new screens, components, refactors,
 
 Designed screens land in `frontend/apps/web/design-source/<slug>/` (HTML + screenshot + NOTES.md). For any task that says "implement screen X" or references a `design-source/<slug>/` directory, ALSO use the **`metaldocs-screen-implementation`** skill (`.claude/skills/metaldocs-screen-implementation/SKILL.md`) on top of `metaldocs-frontend`. It drives a 6-phase workflow (Audit → Map → Pre-flight → Page assembly → Verify → Document) with hard gates that captures lessons from the Library screen rollout.
 
+## Backend/API
+
+For ANY work on MetalDocs backend HTTP routes, OpenAPI, oapi-codegen, handler wiring, API contracts, route migrations, or generated frontend API types, use the **`metaldocs-backend-api`** skill (`.claude/skills/metaldocs-backend-api/SKILL.md`). It enforces the canonical backend/API structure defined in `wiki/architecture/backend-api-structure.md` and the behavior contracts in `wiki/architecture/api-contract.md` and `wiki/architecture/api-design-system.md`.
+
+Do not change public backend routes, generated `api.gen.go` wiring, or OpenAPI contract shape from memory. Build the route truth table first, compare runtime/spec/codegen/wiki, then implement from the canonical module pattern.
+
 ---
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
