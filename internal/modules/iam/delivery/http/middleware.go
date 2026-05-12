@@ -9,6 +9,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	httpresponse "metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -64,13 +65,12 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		traceID := requestTraceID(r)
 		userID := iamdomain.UserIDFromContext(r.Context())
 		if userID == "" && m.legacyHeader {
 			userID = strings.TrimSpace(r.Header.Get("X-User-Id"))
 		}
 		if userID == "" {
-			writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", traceID)
+			_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 			return
 		}
 
@@ -84,7 +84,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 		if m.caps != nil {
 			if err := m.caps.CanDo(r.Context(), userID, tenantID, string(capability)); err != nil {
-				writeAPIError(w, http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions", traceID)
+				_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
 				return
 			}
 		}
@@ -95,11 +95,11 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			if m.roleProvider != nil {
 				resolvedRoles, err := m.roleProvider.RolesByUserID(r.Context(), userID, tenantID)
 				if errors.Is(err, iamdomain.ErrUserNotFound) || errors.Is(err, iamdomain.ErrUserInactive) {
-					writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "User is not authorized", traceID)
+					_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "User is not authorized"))
 					return
 				}
 				if err != nil {
-					writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Authorization lookup failed", traceID)
+					_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authorization lookup failed"))
 					return
 				}
 				roles = resolvedRoles
@@ -111,31 +111,3 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 	})
 }
 
-type apiErrorEnvelope struct {
-	Error apiError `json:"error"`
-}
-
-type apiError struct {
-	Code    string         `json:"code"`
-	Message string         `json:"message"`
-	Details map[string]any `json:"details"`
-	TraceID string         `json:"trace_id"`
-}
-
-func requestTraceID(r *http.Request) string {
-	if traceID := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceID != "" {
-		return traceID
-	}
-	return "trace-local"
-}
-
-func writeAPIError(w http.ResponseWriter, status int, code, message, traceID string) {
-	httpresponse.WriteJSON(w, status, apiErrorEnvelope{
-		Error: apiError{
-			Code:    code,
-			Message: message,
-			Details: map[string]any{},
-			TraceID: traceID,
-		},
-	})
-}

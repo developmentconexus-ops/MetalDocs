@@ -52,6 +52,10 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 
+	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("Content-Type = %q, want application/problem+json", ct)
+	}
+
 	var apiErr apiv2.APIError
 	if err := json.Unmarshal(rec.Body.Bytes(), &apiErr); err != nil {
 		t.Fatalf("unmarshal api error: %v body=%s", err, rec.Body.String())
