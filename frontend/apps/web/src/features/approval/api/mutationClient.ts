@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
 import { ApiError, dispatchAuthExpired } from '../../../lib/api';
+import { parseProblem } from '../../../lib/api/problem';
 import { etagCache } from './etagCache';
 
 // Re-export ApiError subclass for backwards compatibility with existing import sites.
@@ -46,49 +47,45 @@ export async function mutate<TReq, TRes>(
     etagCache.set(opts.resourceId, newETag);
   }
 
+  if (res.ok) {
+    return res.json() as Promise<TRes>;
+  }
+
+  // Try RFC 9457 problem+json first.
+  const prob = await parseProblem(res.clone());
+  if (prob) {
+    if (prob.status === 401) {
+      dispatchAuthExpired(window.location.pathname + window.location.search);
+    }
+    if (prob.status === 412 && opts.on412 && opts.resourceId) {
+      opts.on412(opts.resourceId);
+    } else if (prob.status === 412) {
+      toast.error('Documento foi alterado. Por favor, atualize a página.');
+    }
+    throw new ApprovalError(prob.code, prob.status, prob.title ?? prob.detail ?? '');
+  }
+
+  // Legacy envelope fallback: { error: { code, message } }.
+  const legacyBody = (await res.json().catch(() => ({}))) as {
+    error?: { code?: string; message?: string };
+  };
+  const legacyCode = legacyBody?.error?.code ?? `http_${res.status}`;
+  const legacyMessage = legacyBody?.error?.message ?? 'Erro interno';
+
+  if (res.status === 401) {
+    dispatchAuthExpired(window.location.pathname + window.location.search);
+    throw new ApprovalError('authn.expired', 401, 'Não autorizado');
+  }
   if (res.status === 412) {
     if (opts.on412 && opts.resourceId) {
       opts.on412(opts.resourceId);
     } else {
       toast.error('Documento foi alterado. Por favor, atualize a página.');
     }
-    const responseBody = (await res.json().catch(() => ({}))) as { error?: { code?: string } };
-    throw new ApprovalError(responseBody.error?.code ?? 'conflict.stale', 412, 'Stale resource');
+    throw new ApprovalError(legacyCode, 412, legacyMessage);
   }
-
-  if (res.status === 401) {
-    // Dispatch auth bus so useAuthSession listener can store returnTo + reset state.
-    // No toast here — auth layer handles the UX (E4).
-    dispatchAuthExpired(window.location.pathname + window.location.search);
-    throw new ApprovalError('authn.expired', 401, 'Não autorizado');
-  }
-
-  if (res.status === 403) {
-    const responseBody = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    // No generic toast — callers use resolveErrorMessage on the thrown code (E2).
-    throw new ApprovalError(
-      responseBody.error?.code ?? 'authz.denied',
-      403,
-      responseBody.error?.message ?? 'Proibido',
-    );
-  }
-
   if (res.status === 429) {
     throw new ApprovalError('authn.rate_limited', 429, 'Muitas tentativas. Aguarde 30 segundos.');
   }
-
-  if (!res.ok) {
-    const responseBody = (await res.json().catch(() => ({}))) as {
-      error?: { code?: string; message?: string };
-    };
-    throw new ApprovalError(
-      responseBody.error?.code ?? `http_${res.status}`,
-      res.status,
-      responseBody.error?.message ?? 'Erro interno',
-    );
-  }
-
-  return res.json() as Promise<TRes>;
+  throw new ApprovalError(legacyCode, res.status, legacyMessage);
 }
