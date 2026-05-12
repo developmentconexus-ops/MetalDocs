@@ -12,27 +12,26 @@ import (
 )
 
 func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
 	instanceID := r.PathValue("instance_id")
 
 	if h.readSvc == nil {
-		WriteError(w, reqID, errors.New("read service not configured"))
+		WriteError(w, errors.New("read service not configured"))
 		return
 	}
 
 	inst, err := h.readSvc.LoadInstance(r.Context(), h.db, tenantID, actorID, instanceID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, reqID, repository.ErrNoActiveInstance)
+			WriteError(w, repository.ErrNoActiveInstance)
 			return
 		}
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 

@@ -12,33 +12,32 @@ import (
 )
 
 func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	documentID := r.PathValue("id")
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := iamdomain.UserIDFromContext(r.Context())
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	var req contracts.SubmitRequest
 	if err := contracts.Decode(r, &req); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -47,7 +46,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		submitSvc = h.services.Submit
 	}
 	if submitSvc == nil {
-		WriteError(w, reqID, errors.New("submit service not configured"))
+		WriteError(w, errors.New("submit service not configured"))
 		return
 	}
 
@@ -60,7 +59,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		RevisionVersion: expectedRevisionVersion,
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 

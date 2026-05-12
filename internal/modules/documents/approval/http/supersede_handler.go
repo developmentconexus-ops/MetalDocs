@@ -19,10 +19,9 @@ var publishSuperseding = func(h *Handler, ctx context.Context, db *sql.DB, req a
 }
 
 func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -30,23 +29,23 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 
 	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	var body contracts.SupersedeRequest
 	if err := contracts.Decode(r, &body); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -55,7 +54,7 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 		`SELECT revision_version FROM documents WHERE id = $1 AND tenant_id = $2`,
 		body.SupersededDocumentID, tenantID,
 	).Scan(&priorRevisionVersion); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -68,7 +67,7 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 		PriorRevisionVersion: priorRevisionVersion,
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 

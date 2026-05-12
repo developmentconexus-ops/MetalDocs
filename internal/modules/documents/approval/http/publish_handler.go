@@ -28,10 +28,9 @@ var (
 )
 
 func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -39,18 +38,18 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 
 	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, documentID)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -60,7 +59,7 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 		PublishedBy: actorID,
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -71,10 +70,9 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request) {
-	reqID := requestID(r)
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	actorID := actorIDFromRequest(r)
@@ -82,30 +80,30 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 
 	idempKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempKey == "" {
-		WriteError(w, reqID, ErrIdempotencyRequired)
+		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
 
 	ifMatchVersion, err := parseIfMatch(r.Header.Get("If-Match"))
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	_ = ifMatchVersion
 
 	var body contracts.SchedulePublishRequest
 	if err := contracts.Decode(r, &body); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
 	effectiveFrom, err := time.Parse(time.RFC3339, body.EffectiveFrom)
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
@@ -116,7 +114,7 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 		ScheduledBy:   actorID,
 	})
 	if err != nil {
-		WriteError(w, reqID, err)
+		WriteError(w, err)
 		return
 	}
 
