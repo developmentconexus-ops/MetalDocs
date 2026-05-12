@@ -180,7 +180,8 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 
 ## See also
 
-- `wiki/decisions/0012-contract-first-api.md` — ADR: why spec-as-source-of-truth was adopted and root cause of the `documents.name` bug
-- `wiki/backlog/contract-first-followups.md` — deferred handler migrations + documents spec/handler gap inventory
-- `wiki/references/oapi-codegen.md` — operational how-to (regenerate, vendor mode, add module)
-- `wiki/architecture/frontend-structure.md §7` — frontend API call patterns using generated types
+- `wiki/architecture/backend-api-structure.md` - canonical backend/API structure rules and migration discipline
+- `wiki/decisions/0012-contract-first-api.md` - ADR: why spec-as-source-of-truth was adopted and root cause of the `documents.name` bug
+- `wiki/backlog/contract-first-followups.md` - deferred handler migrations + documents spec/handler gap inventory
+- `wiki/references/oapi-codegen.md` - operational how-to (regenerate, vendor mode, add module)
+- `wiki/architecture/frontend-structure.md §7` - frontend API call patterns using generated types

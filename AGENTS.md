@@ -1,3 +1,13 @@
+## Backend/API
+
+For ANY work on MetalDocs backend HTTP routes, OpenAPI, oapi-codegen, handler wiring, API contracts, or route migrations, use the `metaldocs-backend-api` skill at `.agents/skills/metaldocs-backend-api/SKILL.md` and read:
+
+- `wiki/architecture/backend-api-structure.md`
+- `wiki/architecture/api-contract.md`
+- `wiki/architecture/api-design-system.md`
+
+Do not duplicate the backend/API rules here. The wiki is the source of truth and the skill is the required workflow.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.
