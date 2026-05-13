@@ -470,7 +470,7 @@ Coverage stats (computed at compose):
 - Operations missing C4 placement: 0 / 4
 - Cross-deps missing in §5/§8: 0
 - State transitions missing in §6: 0
-- Decisions without ADR link: 9
+- Decisions without ADR link: 8
 
 Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md).
 

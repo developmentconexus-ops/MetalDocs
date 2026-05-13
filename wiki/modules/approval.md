@@ -464,7 +464,7 @@ Per index IP-007: observability stack not wired in MetalDocs. Module does not as
 
 Pointer-only. Body lives in `wiki/modules/approval-tech-debt.md`. Severity rubric (concrete triggers) lives in the same file.
 
-- Critical: 1 (T-001 closed Plan 7; T-002 remaining)
+- Critical: 2 (T-001 closed Plan 7; T-002 remaining)
 - Major: 4 (T-003 closed Plan 7; T-004/T-005/T-006 remaining)
 - Minor: 6
 

@@ -272,7 +272,7 @@ Coupling is exclusively CSS via `:global(.ep-root ...)` descendant selectors. Th
 Pointer-only. Full register: [editor-chrome-tech-debt.md](editor-chrome-tech-debt.md). Severity rubric concrete triggers live there.
 
 - Critical: 0
-- Major: 3
+- Major: 4
 - Minor: 5
 
 Top 3 (by severity, then by blast-radius):

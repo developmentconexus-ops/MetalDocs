@@ -430,7 +430,7 @@ Top 3 (by severity, then blast-radius):
 - Operations missing C4 placement: 0 / 8
 - Cross-deps missing in §5/§8: 0 / 13 (IN-edges) + 0 / 6 (OUT-edges)
 - State transitions missing in §6: 0 / 2 (Obsolete, Supersede both in §6.3; Create in §6.1)
-- Decisions without ADR link: 10 / 12
+- Decisions without ADR link: 9 / 12
 
 ---
 
