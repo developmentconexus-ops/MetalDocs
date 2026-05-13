@@ -159,7 +159,7 @@ C4Container
 |---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/audit/events` | `internal/modules/audit/delivery/http/handler.go:36` | `handleEvents` | `/audit/events` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
 
-- Module contract status: Partial
+- Module contract status: Contracted
 - Owner: leandro
 
 ---
@@ -357,3 +357,4 @@ Top 3 (by severity, then by blast-radius):
 ## Changelog (this doc)
 
 - 2026-05-10 — initial publish (metaldocs-module-doc skill v1.2)
+

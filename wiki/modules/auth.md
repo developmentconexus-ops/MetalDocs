@@ -197,7 +197,7 @@ All exported symbols are `(undocumented)` in the surface scan — captured as T-
 | GET | `/api/v1/auth/me` | `internal/modules/auth/delivery/http/handler.go:47` | `handleMe` | `/auth/me` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
 | POST | `/api/v1/auth/change-password` | `internal/modules/auth/delivery/http/handler.go:48` | `handleChangePassword` | `/auth/change-password` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
 
-- Module contract status: Partial
+- Module contract status: Contracted
 - Owner: leandro
 
 Composition root may inject a `PublicPathChecker` overriding `defaultPublicPaths` (`middleware.go:35`); the API binary does so at `apps/api/cmd/metaldocs-api/main.go:171` (cross-ref `permissions.go:7`).
@@ -511,3 +511,4 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 
 - 2026-05-11 — Plan 3 (session-bound tenant): `Session.TenantID` + `CurrentUser.TenantID` added; `ResolveSession` drops `tenantID` arg; `resolveLoginTenant` + `AllowDevTenantFallback`; new errors `ErrTenantNotPermitted`/`ErrTenantClaimRequired`; middleware now injects `tenant.WithTenantID` + strips `X-Tenant-ID` header; migrations 0184/0185; `SeedUserTenants` helper; Key files, §2, §5.2, §6.1, §6.2, §6.4, §8.7, §12 updated.
 - 2026-05-10 — initial publish; first auth module doc. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.
+

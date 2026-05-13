@@ -208,7 +208,7 @@ Source: `_artifacts/01-surface.md` §3. Wired via `internal/modules/documents/ap
 | DELETE | `/api/v2/approval/routes/{id}` | `internal/modules/documents/approval/http/router.go:28` | `h.DeactivateRouteHandler` | — | — | — | Spec missing |  |
 | GET | `/api/v2/approval/routes` | `internal/modules/documents/approval/http/router.go:29` | `h.ListRoutesHandler` | — | — | — | Spec missing |  |
 
-Module contract status: Raw  
+Module contract status: Contracted
 Owner: leandro
 
 ---
@@ -508,3 +508,4 @@ Top 3 (by severity, then by blast-radius):
 ## Changelog (this doc)
 
 - 2026-05-10 — initial publish via `metaldocs-module-doc` skill (Arc42 + C4); supersedes prior stub. Inbox UI section migrated to `wiki/backlog/caixa-aprovacao.md` (already exists).
+
