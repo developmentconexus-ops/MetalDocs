@@ -1,45 +1,37 @@
 # Sync Log Entry Template
 
-Append one block to `wiki/modules/<m>/_artifacts/sync-log.md` per sync run. If the file does not exist, create it with this header at top:
+Append one block to `wiki/modules/<m>/_artifacts/sync-log.md` per sync run. If the file does not exist, create it with this header:
 
 ```markdown
-# Sync log — <m>
+# Sync log - <m>
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 ```
 
-Then prepend each entry directly below the header.
+Prepend each entry directly below the header.
 
-## Entry format
-
-```markdown
-## <YYYY-MM-DD> · <one-line change context>
-
-- **Context:** <plan task description | git range | explicit file list>
-- **Anchors moved:** N (list: <file>:L<old>→L<new>, ...)
-- **Symbols renamed:** N (list: <old>→<new>, ...)
-- **T-NNN closed:** <ids or "none"> · evidence: <one line>
-- **R-NNN updated:** <ids → new status or "none"> · PR: <url or sha>
-- **§11 counts after:** Critical=<n> Major=<n> Minor=<n>
-- **Tally gate:** PASS
-- **Patched files:** wiki/modules/<m>.md · wiki/modules/<m>-tech-debt.md · wiki/backlog/<m>-refactor.md
-```
-
-## Example
+## Entry Format
 
 ```markdown
-## 2026-05-12 · resolved iam T-007 (governance logger wired)
+## <YYYY-MM-DD> - <one-line change context>
 
-- **Context:** plan task "Plan 1 v2 follow-up: wire MembershipGovernanceLogger" · commits abc1234..def5678
-- **Anchors moved:** 1 (apps/api/cmd/metaldocs-api/main.go:L217→L221)
-- **Symbols renamed:** 0
-- **T-NNN closed:** T-007 · evidence: NewAreaMembershipService now receives postgres MembershipGovernanceLogger impl, no nil-arg
-- **R-NNN updated:** R-007 → merged · PR: https://github.com/.../pull/482
-- **§11 counts after:** Critical=2 Major=4 Minor=5
-- **Tally gate:** PASS
-- **Patched files:** wiki/modules/iam.md · wiki/modules/iam-tech-debt.md · wiki/backlog/iam-refactor.md
+- **Context:** <git range | plan task | explicit file list | uncommitted diff>
+- **Mode:** <lite patch | structural refresh>
+- **Anchors moved:** <N; list or "none">
+- **Public surface:** <symbols/ports/handlers/codegen changed or "none">
+- **Routes/API:** <runtime/spec/codegen facts updated or "none">
+- **Runtime flows:** <flow sections/artifacts updated or "none">
+- **Persistence:** <tables/migrations/triggers/GUC facts updated or "none">
+- **Dependencies:** <IN/OUT edges or wiring facts updated or "none">
+- **T-NNN touched:** <ids + status/evidence or "none">
+- **R-NNN touched:** <ids + status/evidence or "none">
+- **Counts after:** Critical=<n> Major=<n> Minor=<n>; missing-ADR=<n or n/a>
+- **Tally gate:** <PASS | FAIL pre-existing | FAIL fixed after rerun>
+- **Patched files:** <wiki file list>
 ```
 
-## Why this log exists
+## Notes
 
-The next Phase 1 diff scan reads this file to know what has already been reconciled. Without it, the scanner risks re-flagging anchors that were fixed last week. Treat it as the equivalent of a CHANGELOG specifically for doc-sync runs — small but load-bearing.
+- Keep this log factual and compact.
+- Do not use it as a commit message replacement.
+- Record pre-existing tally failures separately from failures caused by the sync patch.

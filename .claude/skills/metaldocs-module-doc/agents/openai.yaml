@@ -1,0 +1,4 @@
+interface:
+  display_name: "MetalDocs Module Wiki"
+  short_description: "Build mature module wiki memory."
+  default_prompt: "Promote one MetalDocs module to a mature technical wiki entry. Build the module doc, tech-debt register, refactor backlog, source artifacts, API route truth table, persistence/dependency maps, self-review, and validation gates."
