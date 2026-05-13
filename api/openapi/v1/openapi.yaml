@@ -3031,30 +3031,54 @@ paths:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyProfilesV2
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDocumentProfilesResponse'
     post:
       tags: [taxonomy]
       operationId: createTaxonomyProfileV2
-      responses: { '200': { description: ok } }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentProfileItem'
   /api/v2/taxonomy/profiles/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyProfileV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentProfileItem'
     patch:
       tags: [taxonomy]
       operationId: updateTaxonomyProfileV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentProfileItem'
     delete:
       tags: [taxonomy]
       operationId: archiveTaxonomyProfileV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses: { '204': { description: archived } }
   /api/v2/taxonomy/profiles/{code}/default-template:
     put:
       tags: [taxonomy]
@@ -3066,30 +3090,54 @@ paths:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyAreasV2
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListProcessAreasResponse'
     post:
       tags: [taxonomy]
       operationId: createTaxonomyAreaV2
-      responses: { '200': { description: ok } }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessAreaItem'
   /api/v2/taxonomy/areas/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyAreaV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessAreaItem'
     put:
       tags: [taxonomy]
       operationId: updateTaxonomyAreaV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessAreaItem'
     delete:
       tags: [taxonomy]
       operationId: archiveTaxonomyAreaV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses: { '204': { description: archived } }
   /api/v2/taxonomy/families:
     get:
       tags: [taxonomy]
@@ -3098,30 +3146,54 @@ paths:
         - name: includeInactive
           in: query
           schema: { type: boolean }
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListDocumentFamiliesResponse'
     post:
       tags: [taxonomy]
       operationId: createTaxonomyFamilyV2
-      responses: { '200': { description: ok } }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentFamilyItem'
   /api/v2/taxonomy/families/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyFamilyV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentFamilyItem'
     patch:
       tags: [taxonomy]
       operationId: updateTaxonomyFamilyV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentFamilyItem'
     delete:
       tags: [taxonomy]
       operationId: deactivateTaxonomyFamilyV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
-      responses: { '200': { description: ok } }
+      responses: { '204': { description: deactivated } }
   /api/v2/controlled-documents:
     get:
       summary: List controlled documents

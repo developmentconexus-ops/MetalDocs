@@ -187,6 +187,28 @@ func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
 	}
 }
 
+// DocumentFamilyItem defines model for DocumentFamilyItem.
+type DocumentFamilyItem struct {
+	Code        string `json:"code"`
+	Description string `json:"description"`
+	Name        string `json:"name"`
+}
+
+// DocumentProfileItem defines model for DocumentProfileItem.
+type DocumentProfileItem struct {
+	ActiveSchemaVersion int     `json:"activeSchemaVersion"`
+	Alias               *string `json:"alias,omitempty"`
+	ApprovalRequired    bool    `json:"approvalRequired"`
+	Code                string  `json:"code"`
+	Description         string  `json:"description"`
+	FamilyCode          string  `json:"familyCode"`
+	Name                string  `json:"name"`
+	RetentionDays       int     `json:"retentionDays"`
+	ReviewIntervalDays  int     `json:"reviewIntervalDays"`
+	ValidityDays        int     `json:"validityDays"`
+	WorkflowProfile     string  `json:"workflowProfile"`
+}
+
 // DocumentTemplateFieldSlotNodeResponse defines model for DocumentTemplateFieldSlotNodeResponse.
 type DocumentTemplateFieldSlotNodeResponse struct {
 	FieldKind DocumentTemplateFieldSlotNodeResponseFieldKind `json:"fieldKind"`
@@ -278,6 +300,28 @@ type DocumentTemplateTableSlotNodeResponseFieldKind string
 
 // DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
 type DocumentTemplateTableSlotNodeResponseType string
+
+// ListDocumentFamiliesResponse defines model for ListDocumentFamiliesResponse.
+type ListDocumentFamiliesResponse struct {
+	Items []DocumentFamilyItem `json:"items"`
+}
+
+// ListDocumentProfilesResponse defines model for ListDocumentProfilesResponse.
+type ListDocumentProfilesResponse struct {
+	Items []DocumentProfileItem `json:"items"`
+}
+
+// ListProcessAreasResponse defines model for ListProcessAreasResponse.
+type ListProcessAreasResponse struct {
+	Items []ProcessAreaItem `json:"items"`
+}
+
+// ProcessAreaItem defines model for ProcessAreaItem.
+type ProcessAreaItem struct {
+	Code        string `json:"code"`
+	Description string `json:"description"`
+	Name        string `json:"name"`
+}
 
 // ListTaxonomyFamiliesV2Params defines parameters for ListTaxonomyFamiliesV2.
 type ListTaxonomyFamiliesV2Params struct {
@@ -1094,12 +1138,18 @@ type ListTaxonomyAreasV2ResponseObject interface {
 	VisitListTaxonomyAreasV2Response(w http.ResponseWriter) error
 }
 
-type ListTaxonomyAreasV2200Response struct {
-}
+type ListTaxonomyAreasV2200JSONResponse ListProcessAreasResponse
 
-func (response ListTaxonomyAreasV2200Response) VisitListTaxonomyAreasV2Response(w http.ResponseWriter) error {
+func (response ListTaxonomyAreasV2200JSONResponse) VisitListTaxonomyAreasV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CreateTaxonomyAreaV2RequestObject struct {
@@ -1109,12 +1159,18 @@ type CreateTaxonomyAreaV2ResponseObject interface {
 	VisitCreateTaxonomyAreaV2Response(w http.ResponseWriter) error
 }
 
-type CreateTaxonomyAreaV2200Response struct {
-}
+type CreateTaxonomyAreaV2201JSONResponse ProcessAreaItem
 
-func (response CreateTaxonomyAreaV2200Response) VisitCreateTaxonomyAreaV2Response(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+func (response CreateTaxonomyAreaV2201JSONResponse) VisitCreateTaxonomyAreaV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ArchiveTaxonomyAreaV2RequestObject struct {
@@ -1125,11 +1181,11 @@ type ArchiveTaxonomyAreaV2ResponseObject interface {
 	VisitArchiveTaxonomyAreaV2Response(w http.ResponseWriter) error
 }
 
-type ArchiveTaxonomyAreaV2200Response struct {
+type ArchiveTaxonomyAreaV2204Response struct {
 }
 
-func (response ArchiveTaxonomyAreaV2200Response) VisitArchiveTaxonomyAreaV2Response(w http.ResponseWriter) error {
-	w.WriteHeader(200)
+func (response ArchiveTaxonomyAreaV2204Response) VisitArchiveTaxonomyAreaV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(204)
 	return nil
 }
 
@@ -1141,12 +1197,18 @@ type GetTaxonomyAreaV2ResponseObject interface {
 	VisitGetTaxonomyAreaV2Response(w http.ResponseWriter) error
 }
 
-type GetTaxonomyAreaV2200Response struct {
-}
+type GetTaxonomyAreaV2200JSONResponse ProcessAreaItem
 
-func (response GetTaxonomyAreaV2200Response) VisitGetTaxonomyAreaV2Response(w http.ResponseWriter) error {
+func (response GetTaxonomyAreaV2200JSONResponse) VisitGetTaxonomyAreaV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type UpdateTaxonomyAreaV2RequestObject struct {
@@ -1157,12 +1219,18 @@ type UpdateTaxonomyAreaV2ResponseObject interface {
 	VisitUpdateTaxonomyAreaV2Response(w http.ResponseWriter) error
 }
 
-type UpdateTaxonomyAreaV2200Response struct {
-}
+type UpdateTaxonomyAreaV2200JSONResponse ProcessAreaItem
 
-func (response UpdateTaxonomyAreaV2200Response) VisitUpdateTaxonomyAreaV2Response(w http.ResponseWriter) error {
+func (response UpdateTaxonomyAreaV2200JSONResponse) VisitUpdateTaxonomyAreaV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListTaxonomyFamiliesV2RequestObject struct {
@@ -1173,12 +1241,18 @@ type ListTaxonomyFamiliesV2ResponseObject interface {
 	VisitListTaxonomyFamiliesV2Response(w http.ResponseWriter) error
 }
 
-type ListTaxonomyFamiliesV2200Response struct {
-}
+type ListTaxonomyFamiliesV2200JSONResponse ListDocumentFamiliesResponse
 
-func (response ListTaxonomyFamiliesV2200Response) VisitListTaxonomyFamiliesV2Response(w http.ResponseWriter) error {
+func (response ListTaxonomyFamiliesV2200JSONResponse) VisitListTaxonomyFamiliesV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CreateTaxonomyFamilyV2RequestObject struct {
@@ -1188,12 +1262,18 @@ type CreateTaxonomyFamilyV2ResponseObject interface {
 	VisitCreateTaxonomyFamilyV2Response(w http.ResponseWriter) error
 }
 
-type CreateTaxonomyFamilyV2200Response struct {
-}
+type CreateTaxonomyFamilyV2201JSONResponse DocumentFamilyItem
 
-func (response CreateTaxonomyFamilyV2200Response) VisitCreateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+func (response CreateTaxonomyFamilyV2201JSONResponse) VisitCreateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type DeactivateTaxonomyFamilyV2RequestObject struct {
@@ -1204,11 +1284,11 @@ type DeactivateTaxonomyFamilyV2ResponseObject interface {
 	VisitDeactivateTaxonomyFamilyV2Response(w http.ResponseWriter) error
 }
 
-type DeactivateTaxonomyFamilyV2200Response struct {
+type DeactivateTaxonomyFamilyV2204Response struct {
 }
 
-func (response DeactivateTaxonomyFamilyV2200Response) VisitDeactivateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
-	w.WriteHeader(200)
+func (response DeactivateTaxonomyFamilyV2204Response) VisitDeactivateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(204)
 	return nil
 }
 
@@ -1220,12 +1300,18 @@ type GetTaxonomyFamilyV2ResponseObject interface {
 	VisitGetTaxonomyFamilyV2Response(w http.ResponseWriter) error
 }
 
-type GetTaxonomyFamilyV2200Response struct {
-}
+type GetTaxonomyFamilyV2200JSONResponse DocumentFamilyItem
 
-func (response GetTaxonomyFamilyV2200Response) VisitGetTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+func (response GetTaxonomyFamilyV2200JSONResponse) VisitGetTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type UpdateTaxonomyFamilyV2RequestObject struct {
@@ -1236,12 +1322,18 @@ type UpdateTaxonomyFamilyV2ResponseObject interface {
 	VisitUpdateTaxonomyFamilyV2Response(w http.ResponseWriter) error
 }
 
-type UpdateTaxonomyFamilyV2200Response struct {
-}
+type UpdateTaxonomyFamilyV2200JSONResponse DocumentFamilyItem
 
-func (response UpdateTaxonomyFamilyV2200Response) VisitUpdateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+func (response UpdateTaxonomyFamilyV2200JSONResponse) VisitUpdateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListTaxonomyProfilesV2RequestObject struct {
@@ -1251,12 +1343,18 @@ type ListTaxonomyProfilesV2ResponseObject interface {
 	VisitListTaxonomyProfilesV2Response(w http.ResponseWriter) error
 }
 
-type ListTaxonomyProfilesV2200Response struct {
-}
+type ListTaxonomyProfilesV2200JSONResponse ListDocumentProfilesResponse
 
-func (response ListTaxonomyProfilesV2200Response) VisitListTaxonomyProfilesV2Response(w http.ResponseWriter) error {
+func (response ListTaxonomyProfilesV2200JSONResponse) VisitListTaxonomyProfilesV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CreateTaxonomyProfileV2RequestObject struct {
@@ -1266,12 +1364,18 @@ type CreateTaxonomyProfileV2ResponseObject interface {
 	VisitCreateTaxonomyProfileV2Response(w http.ResponseWriter) error
 }
 
-type CreateTaxonomyProfileV2200Response struct {
-}
+type CreateTaxonomyProfileV2201JSONResponse DocumentProfileItem
 
-func (response CreateTaxonomyProfileV2200Response) VisitCreateTaxonomyProfileV2Response(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+func (response CreateTaxonomyProfileV2201JSONResponse) VisitCreateTaxonomyProfileV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ArchiveTaxonomyProfileV2RequestObject struct {
@@ -1282,11 +1386,11 @@ type ArchiveTaxonomyProfileV2ResponseObject interface {
 	VisitArchiveTaxonomyProfileV2Response(w http.ResponseWriter) error
 }
 
-type ArchiveTaxonomyProfileV2200Response struct {
+type ArchiveTaxonomyProfileV2204Response struct {
 }
 
-func (response ArchiveTaxonomyProfileV2200Response) VisitArchiveTaxonomyProfileV2Response(w http.ResponseWriter) error {
-	w.WriteHeader(200)
+func (response ArchiveTaxonomyProfileV2204Response) VisitArchiveTaxonomyProfileV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(204)
 	return nil
 }
 
@@ -1298,12 +1402,18 @@ type GetTaxonomyProfileV2ResponseObject interface {
 	VisitGetTaxonomyProfileV2Response(w http.ResponseWriter) error
 }
 
-type GetTaxonomyProfileV2200Response struct {
-}
+type GetTaxonomyProfileV2200JSONResponse DocumentProfileItem
 
-func (response GetTaxonomyProfileV2200Response) VisitGetTaxonomyProfileV2Response(w http.ResponseWriter) error {
+func (response GetTaxonomyProfileV2200JSONResponse) VisitGetTaxonomyProfileV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type UpdateTaxonomyProfileV2RequestObject struct {
@@ -1314,12 +1424,18 @@ type UpdateTaxonomyProfileV2ResponseObject interface {
 	VisitUpdateTaxonomyProfileV2Response(w http.ResponseWriter) error
 }
 
-type UpdateTaxonomyProfileV2200Response struct {
-}
+type UpdateTaxonomyProfileV2200JSONResponse DocumentProfileItem
 
-func (response UpdateTaxonomyProfileV2200Response) VisitUpdateTaxonomyProfileV2Response(w http.ResponseWriter) error {
+func (response UpdateTaxonomyProfileV2200JSONResponse) VisitUpdateTaxonomyProfileV2Response(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type SetTaxonomyProfileDefaultTemplateV2RequestObject struct {
@@ -1830,38 +1946,43 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplateV2(w http.ResponseWrit
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"TWrR7NsPjpA8my7mbXr6cvp/AAAA//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
