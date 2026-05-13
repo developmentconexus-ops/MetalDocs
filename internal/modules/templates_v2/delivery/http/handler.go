@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	templatesapi "metaldocs/internal/modules/templates_v2/api"
 	"metaldocs/internal/modules/templates_v2/application"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -38,20 +40,20 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/v2/signed", generated.RedirectSignedUrlV2)
 	mux.HandleFunc("GET /api/v2/templates", generated.ListTemplatesV2)
-	mux.HandleFunc("POST /api/v2/templates", generated.CreateTemplateV2)
+	mux.Handle("POST /api/v2/templates", h.idempotent("POST /api/v2/templates", generated.CreateTemplateV2))
 	mux.HandleFunc("GET /api/v2/templates/{id}/versions/{n}", generated.GetTemplateVersionV2)
 	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/docx-upload-url", generated.PresignTemplateDocxUploadUrlV2)
 	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/schema-upload-url", generated.PresignTemplateSchemaUploadUrlV2)
 	mux.HandleFunc("PUT /api/v2/templates/{id}/versions/{n}/draft", generated.SaveTemplateDraftV2)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/publish", generated.PublishTemplateVersionV2)
+	mux.Handle("POST /api/v2/templates/{id}/versions/{n}/publish", h.idempotent("POST /api/v2/templates/{id}/versions/{n}/publish", generated.PublishTemplateVersionV2))
 
 	mux.HandleFunc("POST /api/v2/templates/{id}/versions", generated.CreateTemplateVersionV2)
 	mux.HandleFunc("PUT /api/v2/templates/{id}/versions/{n}/schema", generated.UpdateTemplateSchemaV2)
 	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/autosave/presign", generated.PresignTemplateAutosaveV2)
 	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/autosave/commit", generated.CommitTemplateAutosaveV2)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/submit", generated.SubmitTemplateVersionV2)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/review", generated.ReviewTemplateVersionV2)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/approve", generated.ApproveTemplateVersionV2)
+	mux.Handle("POST /api/v2/templates/{id}/versions/{n}/submit", h.idempotent("POST /api/v2/templates/{id}/versions/{n}/submit", generated.SubmitTemplateVersionV2))
+	mux.Handle("POST /api/v2/templates/{id}/versions/{n}/review", h.idempotent("POST /api/v2/templates/{id}/versions/{n}/review", generated.ReviewTemplateVersionV2))
+	mux.Handle("POST /api/v2/templates/{id}/versions/{n}/approve", h.idempotent("POST /api/v2/templates/{id}/versions/{n}/approve", generated.ApproveTemplateVersionV2))
 	mux.HandleFunc("POST /api/v2/templates/{id}/archive", generated.ArchiveTemplateV2)
 	mux.HandleFunc("PUT /api/v2/templates/{id}/approval-config", generated.UpsertTemplateApprovalConfigV2)
 
@@ -59,6 +61,18 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v2/templates/{id}/versions/{n}/docx-url", generated.GetTemplateDocxUrlV2)
 	mux.HandleFunc("GET /api/v2/templates/{id}/audit", generated.ListTemplateAuditV2)
 	mux.HandleFunc("GET /api/v2/templates/v2/placeholder-catalog", generated.ListTemplatePlaceholderCatalogV2)
+}
+
+func (h *Handler) idempotent(routeTemplate string, next http.HandlerFunc) http.Handler {
+	db := h.svc.DB()
+	if db == nil {
+		return http.HandlerFunc(next)
+	}
+	store := idempotency.New(db, routeTemplate)
+	return idempotency.Require(store, func(ctx context.Context) (string, string) {
+		tenantID, _ := tenant.FromContext(ctx)
+		return tenantID, iamdomain.UserIDFromContext(ctx)
+	})(http.HandlerFunc(next))
 }
 
 var (

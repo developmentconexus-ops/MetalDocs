@@ -59,3 +59,7 @@ func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]
 	}
 	return items, nil
 }
+
+func (w *Writer) ValidateIntegrity(context.Context) ([]domain.IntegrityIssue, error) {
+	return nil, nil
+}

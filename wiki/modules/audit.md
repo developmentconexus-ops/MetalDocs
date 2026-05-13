@@ -32,7 +32,7 @@
 
 | Rank | Goal | How verified |
 |---|---|---|
-| 1 | **Tamper-resistance of the event log** | grant audit (only INSERT to app role); see Â§10 â€” currently passes at app layer, fails at DBA layer (T-004) |
+| 1 | **Tamper-resistance of the event log** | app role has no UPDATE/DELETE + row-hash chain (`prev_hash`/`row_hash`) + integrity validator job; see section 10 |
 | 2 | **Coverage of regulated actions** | callers must call `Record` on every regulated mutation; see consumer registers (auth T-002, iam T-005, documents T-005) |
 | 3 | **Read confidentiality** | only authorised admin can read `/api/v1/audit/events`; currently fails (T-001) |
 
@@ -102,7 +102,7 @@ Outbound interfaces:
 ## 4. Solution Strategy
 
 - **Domain port + concrete adapters.** `Writer`/`Reader` defined in `domain/port.go`; postgres and in-memory adapters injected via platform bootstrap. Lets consumers depend on `auditdomain` only.
-- **Append-only via grant, not via trigger or RLS.** `metaldocs_app` gets `INSERT` only (`migrations/0005:2`). Simpler than a forbid-update trigger; weaker (DBA bypass â€” T-004). Driver: minimal complexity until tamper-evidence is needed.
+- **Append-only via grant plus hash-chain evidence.** `metaldocs_app` gets `INSERT` only (`migrations/0005:2`), while `migrations/0193` adds `audit_sequence`, `prev_hash`, `row_hash`, and `metaldocs.audit_event_row_hash(...)`. Simpler than a forbid-update trigger; DBA/superuser changes are detected by the integrity validator job rather than prevented.
 - **Fire-and-forget write contract.** Caller's regulated action commits its own tx FIRST; audit Record is a separate, post-hoc call that returns an error the caller ignores. Driver: audit failure must never roll back a regulated state change. Cost: dropped audit emissions are silent (T-005).
 - **One handler-mounted route, not codegen.** `handler.RegisterRoutes` wires `mux.HandleFunc` directly. Driver: pre-dates the contract-first migration (ADR 0012); audit was never re-mounted under oapi-codegen.
 - **Same `*postgres.Writer` serves both `Writer` and `Reader`.** Bootstrap wires `auditpg.NewWriter(db)` into both interface slots (`bootstrap/api.go:100-101`). Driver: simplicity; cost: nothing today.
@@ -284,7 +284,7 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 - The memory adapter uses a `sync.Mutex` (`memory/writer.go:12`).
 
 ### 8.7 Append-only contract
-- Achieved by **grant** (`migrations/0005:2` grants only `INSERT` to `metaldocs_app`). Not enforced by trigger or RLS. The `metaldocs` schema owner and Postgres superuser retain `UPDATE/DELETE` privileges. No hash chain, no signature, no external WORM mirror â€” see T-004.
+- Achieved by **grant** (`migrations/0005:2` grants only `INSERT` to `metaldocs_app`) plus the T-004 row-hash chain (`migrations/0193`). The `metaldocs` schema owner and Postgres superuser retain `UPDATE/DELETE` privileges, but tampering is detectable through `Writer.ValidateIntegrity` and the `audit_integrity_validator` job.
 
 ---
 
@@ -293,7 +293,7 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 | Decision | Link / Status |
 |---|---|
 | Audit module wraps eigenpal-unrelated regulated-action logging in a port + adapter shape | `tech-debt: missing-ADR` (T-011) |
-| Append-only via grant only (no trigger, no RLS, no tamper-evidence) | `tech-debt: missing-ADR` (T-011) |
+| Append-only via grant plus row-hash chain | `tech-debt: missing-ADR` (T-011) |
 | Same `*postgres.Writer` satisfies both `Writer` and `Reader` interfaces | `tech-debt: missing-ADR` (T-011, sub-bullet) |
 | Two-tier authz (referenced for Â§8.1) | `wiki/decisions/0007-two-tier-authz.md` |
 | Contract-first API (referenced for Â§8.2 drift) | `wiki/decisions/0012-contract-first-api.md` |
@@ -306,8 +306,8 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 | Goal | Scenario | Pass criteria | Current state |
 |---|---|---|---|
 | **Read confidentiality** | An unauthenticated client calls `GET /api/v1/audit/events` | 401 / 403 with Problem `metaldocs.authz.forbidden`; no rows returned | **FAILS** â€” endpoint is unguarded (T-001). |
-| **Tamper-resistance (app)** | `metaldocs_app` attempts `UPDATE` or `DELETE` on `audit_events` | DB rejects (`permission denied`) | PASSES â€” grants are INSERT-only (`migration 0005:2`). |
-| **Tamper-resistance (DBA)** | Schema owner or superuser executes `UPDATE audit_events SET action=...` | Detected via integrity proof | **FAILS** â€” no hash chain / signing (T-004). |
+| **Tamper-resistance (app)** | `metaldocs_app` attempts `UPDATE` or `DELETE` on `audit_events` | DB rejects (`permission denied`) | PASSES - grants allow INSERT/SELECT only, not UPDATE/DELETE (`migrations 0005 + 0193`). |
+| **Tamper-resistance (DBA)** | Schema owner or superuser executes `UPDATE audit_events SET action=...` | Detected via integrity proof | PASSES for detection once `ENABLE_JOB_AUDIT_INTEGRITY_VALIDATOR` is enabled; row-hash chain added in T-004 follow-up. |
 | **Coverage of regulated mutations** | Every regulated write in iam/documents/auth has a paired `Record` call | grep over consumer modules shows zero gaps | **PARTIAL** â€” auth T-002, iam T-005, documents T-005 are gaps in the consumer registers. |
 | **Durability of accepted events** | INSERT returns nil â†’ event survives crash | row present after restart | PASSES â€” synchronous INSERT. |
 | **Visibility of dropped events** | `Record` fails â†’ operator can detect | log line or metric | **FAILS** â€” iam path discards error (`admin_handler.go:457`); adapter path logs but emits no metric (T-005). |
@@ -326,7 +326,7 @@ Pointer-only. Body in `wiki/modules/audit-tech-debt.md`. Severity rubric: see th
 Top 3 (by severity, then by blast-radius):
 
 1. **Unauthenticated `GET /api/v1/audit/events`** â€” any reachable network actor can read the full audit trail. Confidentiality breach + tampering reconnaissance. See tech-debt T-001.
-2. **No tamper-evidence on the event log** â€” append-only is grant-enforced only; schema owner / superuser can rewrite history undetected. See tech-debt T-004.
+2. **Audit event ID collisions remain possible** - timestamp-derived event ids can collide under same-nanosecond emissions. See tech-debt T-006.
 3. **Fire-and-forget Record on regulated paths drops events silently** â€” IAM admin handler discards `Record`'s error; consumer-side trail coverage is best-effort. See tech-debt T-005 (audit register; consumer-side critical-rated rows live in auth T-002, iam T-005, documents T-005).
 
 ---
@@ -338,7 +338,7 @@ Top 3 (by severity, then by blast-radius):
 | Append-only sink | A write surface whose semantic contract forbids UPDATE/DELETE. In MetalDocs enforced only by `GRANT INSERT` (app role); not enforced against the schema owner. |
 | Action string | Free-text identifier of the regulated event (`document.created`, `iam.user.updated`, etc.). 15 production strings catalogued in `_artifacts/03-deps.md` Â§6. |
 | Fire-and-forget Record | Pattern where the caller invokes `Writer.Record` and ignores the returned error so audit failure cannot roll back the regulated mutation. |
-| Tamper-evidence | A proof (hash chain, signature, external WORM) that the trail has not been mutated post-write. Absent in audit today (T-004). |
+| Tamper-evidence | A proof that the trail has not been mutated post-write. Audit now uses a database row-hash chain (`prev_hash`/`row_hash`) plus an integrity validator job; external WORM/signing remains outside this follow-up. |
 | `metaldocs_app` | The Postgres role the application connects as. Receives `INSERT` only on `metaldocs.audit_events`. |
 
 ---

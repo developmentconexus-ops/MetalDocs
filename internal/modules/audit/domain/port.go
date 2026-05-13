@@ -18,6 +18,23 @@ type Event struct {
 	TenantID     string
 }
 
+type IntegrityIssueKind string
+
+const (
+	IntegrityIssuePrevHashMismatch IntegrityIssueKind = "prev_hash_mismatch"
+	IntegrityIssueRowHashMismatch  IntegrityIssueKind = "row_hash_mismatch"
+)
+
+type IntegrityIssue struct {
+	Sequence         int64
+	EventID          string
+	Kind             IntegrityIssueKind
+	ExpectedHash     string
+	ActualHash       string
+	ExpectedPrevHash string
+	ActualPrevHash   string
+}
+
 type ListEventsQuery struct {
 	ResourceType string
 	ResourceID   string
@@ -32,4 +49,8 @@ type Writer interface {
 
 type Reader interface {
 	ListEvents(ctx context.Context, query ListEventsQuery) ([]Event, error)
+}
+
+type IntegrityValidator interface {
+	ValidateIntegrity(ctx context.Context) ([]IntegrityIssue, error)
 }

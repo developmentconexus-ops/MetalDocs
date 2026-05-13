@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
-type fakeFamilyService struct{}
+type fakeFamilyService struct {
+	createErr error
+}
 
 func (f fakeFamilyService) List(_ context.Context, includeInactive bool) ([]domain.DocumentFamily, error) {
 	return nil, nil
@@ -18,11 +22,11 @@ func (f fakeFamilyService) List(_ context.Context, includeInactive bool) ([]doma
 func (f fakeFamilyService) Get(_ context.Context, code string) (*domain.DocumentFamily, error) {
 	return nil, domain.ErrFamilyNotFound
 }
-func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily) error { return nil }
+func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily) error { return f.createErr }
 func (f fakeFamilyService) Update(_ context.Context, fam *domain.DocumentFamily) (*domain.DocumentFamily, error) {
 	return fam, nil
 }
-func (f fakeFamilyService) Deactivate(_ context.Context, code string) error            { return nil }
+func (f fakeFamilyService) Deactivate(_ context.Context, code string) error { return nil }
 
 func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 	handler := &Handler{families: fakeFamilyService{}}
@@ -57,5 +61,19 @@ func TestFamiliesHandler_ListReturns200(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
+	handler := &Handler{families: fakeFamilyService{createErr: &pgconn.PgError{Code: "23505"}}}
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
 	}
 }

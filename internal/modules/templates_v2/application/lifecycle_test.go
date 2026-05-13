@@ -572,3 +572,41 @@ func TestArchiveTemplate_Idempotent(t *testing.T) {
 		t.Fatalf("expected no audit events for idempotent archive, got %d", len(repo.audit))
 	}
 }
+
+func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
+	repo := newFakeRepo()
+	repo.failCreateVersion = true
+	template := &domain.Template{
+		ID:            "tpl-1",
+		TenantID:      "tenant-a",
+		LatestVersion: 1,
+	}
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          "tpl-1",
+		VersionNumber:       1,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		DocxKey:       "templates/tpl-1/versions/1.docx",
+		SchemaKey:     "templates/tpl-1/versions/1.schema.json",
+	})
+	if err == nil {
+		t.Fatalf("expected publish to fail when creating next draft fails")
+	}
+	if version.Status != domain.VersionStatusPublished {
+		t.Fatalf("expected non-tx path to leave published state after failure, got %q", version.Status)
+	}
+}

@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/audit.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/audit-refactor.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-13 (audit T-004 follow-up)
 
 ## Severity scale
 
@@ -42,10 +42,10 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-003`
 - **Linked ADR:** missing-ADR
 
-### T-004 · No tamper-evidence on the audit trail
-- **Severity:** critical
-- **Surface:** `migrations/0004_init_audit_events.sql:1-14` (no hash column); `migrations/0005_grant_workflow_audit_privileges.sql:2` (grant is INSERT only — but schema owner / superuser retain UPDATE/DELETE); `internal/modules/audit/infrastructure/postgres/writer.go:20-42` (no signing, no hash chaining)
-- **Observation:** Append-only is enforced at the application role (`metaldocs_app` has only `INSERT`). The schema owner role (used by migrations) and any Postgres superuser retain full `UPDATE/DELETE` on `metaldocs.audit_events`. There is no hash chain (`prev_hash`/`row_hash`), no row signing (no asymmetric signature column), no external WORM mirror, no Merkle root, and no integrity-validation job. A privileged actor can rewrite history undetected. Trigger fired: regulated audit-trail tampering path (user-supplied rubric: "audit-trail tampering path = Critical").
+### T-004 · No tamper-evidence on the audit trail — CLOSED 2026-05-13 (audit T-004 follow-up)
+- **Severity:** critical (closed)
+- **Surface (resolved):** `migrations/0193_audit_events_hash_chain.sql` adds `audit_sequence`, `prev_hash`, `row_hash`, backfills existing rows, and defines `metaldocs.audit_event_row_hash(...)`; `internal/modules/audit/infrastructure/postgres/writer.go` now serializes audit inserts with a transaction-scoped advisory lock and writes the row-hash chain; `internal/modules/jobs/audit_integrity_validator/job.go` exposes the integrity validation job.
+- **Observation (original):** Append-only is enforced at the application role (`metaldocs_app` has only `INSERT`). The schema owner role (used by migrations) and any Postgres superuser retain full `UPDATE/DELETE` on `metaldocs.audit_events`. Before this follow-up there was no hash chain (`prev_hash`/`row_hash`) and no integrity-validation job, so a privileged actor could rewrite history undetected. Trigger fired: regulated audit-trail tampering path (user-supplied rubric: "audit-trail tampering path = Critical").
 - **Evidence:** `_artifacts/04-persistence.md` §1, §3, §6; `_artifacts/05-industry.md` "Patterns deliberately NOT cited" — tamper-evidence.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-004`
 - **Linked ADR:** missing-ADR

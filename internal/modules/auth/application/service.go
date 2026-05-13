@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -50,6 +51,18 @@ type Service struct {
 	roleProvider iamdomain.RoleProvider
 	roleAdmin    iamdomain.RoleAdminRepository
 	cfg          Config
+}
+
+type createUserTxRepository interface {
+	CreateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.CreateUserParams) error
+}
+
+type replaceUserRolesTxRepository interface {
+	ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error
+}
+
+type beginTxRepository interface {
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
 func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) *Service {
@@ -332,7 +345,7 @@ func (s *Service) CreateUser(ctx context.Context, userID, username, email, displ
 		return err
 	}
 
-	if err := s.repo.CreateUser(ctx, authdomain.CreateUserParams{
+	params := authdomain.CreateUserParams{
 		UserID:             userID,
 		Username:           username,
 		Email:              email,
@@ -343,14 +356,36 @@ func (s *Service) CreateUser(ctx context.Context, userID, username, email, displ
 		IsActive:           true,
 		Roles:              nil,
 		CreatedBy:          createdBy,
-	}); err != nil {
-		return err
 	}
 	if s.roleAdmin == nil {
 		return fmt.Errorf("role admin repository is required")
 	}
 	if tenantID == "" {
 		tenantID = tenant.DevTenantID
+	}
+	repoTx, repoTxOK := s.repo.(createUserTxRepository)
+	roleTx, roleTxOK := s.roleAdmin.(replaceUserRolesTxRepository)
+	beginner, beginOK := s.repo.(beginTxRepository)
+	if repoTxOK && roleTxOK && beginOK {
+		tx, err := beginner.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("begin create user tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := repoTx.CreateUserTx(ctx, tx, params); err != nil {
+			return err
+		}
+		if err := roleTx.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, roles, createdBy); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit create user tx: %w", err)
+		}
+		return nil
+	}
+
+	if err := s.repo.CreateUser(ctx, params); err != nil {
+		return err
 	}
 	return s.roleAdmin.ReplaceUserRoles(ctx, userID, displayName, tenantID, roles, createdBy)
 }

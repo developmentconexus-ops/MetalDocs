@@ -23,3 +23,7 @@ func (s *Service) WithDB(db *sql.DB) *Service {
 	s.db = db
 	return s
 }
+
+func (s *Service) DB() *sql.DB {
+	return s.db
+}

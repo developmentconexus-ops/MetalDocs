@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/audit-tech-debt.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-13 (audit T-004 follow-up)
 
 ## Rows
 
@@ -11,7 +11,7 @@
 | R-001 | Gate GET /api/v1/audit/events behind capability check (audit.read) | T-001 | S | critical | — | — | merged | Plan 6a (2026-05-11, commits 0279546f + 6b34c277) |
 | R-002 | Migrate audit error envelope to RFC 9457 problem+json | T-002 | S | major | — | — | merged | Plan 7 (2026-05-11, commit 2ca727d6) |
 | R-003 | Add retention policy: monthly partition + pg_cron purge job + ADR | T-003 | L | major | — | — | merged (goroutine only; pg_cron + partitioning deferred) | Plan 6a (2026-05-11, commit b5b077b7 + main.go) |
-| R-004 | Add tamper-evidence: row-hash chain (prev_hash, row_hash) + integrity-validate job | T-004 | L | critical | R-005 | — | open | — |
+| R-004 | Add tamper-evidence: row-hash chain (prev_hash, row_hash) + integrity-validate job | T-004 | L | critical | R-005 | — | merged | audit T-004 follow-up (2026-05-13; migration 0193 + validator job) |
 | R-005 | Surface Record errors: emit metric + structured log + optional outbox for retry | T-005 | M | major | — | — | merged | Plan 6a (2026-05-11, commit 1994bb84) |
 | R-006 | Switch event id from timestamp string to ULID/UUIDv7 generator | T-006 | S | minor | — | — | open | — |
 | R-007 | Add tenant_id column + ListEvents tenant filter; backfill via auth tenant cutover | T-007 | L | major | auth#R-008 | — | merged | Plan 6a (2026-05-11, commit b5b077b7 + migration 0190) |

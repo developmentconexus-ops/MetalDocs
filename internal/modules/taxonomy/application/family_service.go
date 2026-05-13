@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type FamilyService struct {
@@ -69,11 +70,26 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 }
 
 func (s *FamilyService) Deactivate(ctx context.Context, code string) error {
-	f, err := s.families.GetByCode(ctx, code)
+	tx, err := s.families.BeginTx(ctx)
 	if err != nil {
 		return err
 	}
-	hasProfiles, err := s.families.HasActiveProfiles(ctx, code)
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	f, err := s.families.GetByCodeForUpdate(ctx, tx, code)
+	if err != nil {
+		return err
+	}
+	tenantID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	hasProfiles, err := s.families.HasActiveProfilesTx(ctx, tx, tenantID, code)
 	if err != nil {
 		return err
 	}
@@ -83,9 +99,13 @@ func (s *FamilyService) Deactivate(ctx context.Context, code string) error {
 	if err := f.Deactivate(); err != nil {
 		return err
 	}
-	if err := s.families.Update(ctx, f); err != nil {
+	if err := s.families.UpdateTx(ctx, tx, f); err != nil {
 		return err
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 	if s.govLogger != nil {
 		payload, _ := json.Marshal(map[string]string{"code": code})
 		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{

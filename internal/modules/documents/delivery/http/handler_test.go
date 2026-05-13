@@ -3,6 +3,7 @@ package http_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,9 +11,11 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/application"
+	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	httphandler "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -184,6 +187,27 @@ func newMux(t *testing.T, svc *fakeSvc) *http.ServeMux {
 	return mux
 }
 
+type fakeApprovalSubmitter struct {
+	called bool
+}
+
+func (f *fakeApprovalSubmitter) SubmitRevisionForReview(_ context.Context, _ *sql.DB, _ approvalapp.SubmitRequest) (approvalapp.SubmitResult, error) {
+	f.called = true
+	return approvalapp.SubmitResult{InstanceID: "inst_1"}, nil
+}
+
+type fakeFinalizeIdempotencyStore struct {
+	replay *idempotency.Replay
+}
+
+func (f *fakeFinalizeIdempotencyStore) CheckReplay(_ context.Context, _, _, _, _ string) (*idempotency.Replay, error) {
+	return f.replay, nil
+}
+
+func (f *fakeFinalizeIdempotencyStore) RecordReplay(_ context.Context, _, _, _, _ string, _ int, _ []byte) error {
+	return nil
+}
+
 func withAuthHeaders(req *http.Request, roles string) {
 	req.Header.Set("content-type", "application/json")
 	*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant_1"))
@@ -312,5 +336,58 @@ func TestRenameDocument_EmptyName_Returns400(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
+	mux := newMux(t, &fakeSvc{})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/finalize", nil)
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
+	key := "11111111-1111-4111-8111-111111111111"
+	body := []byte(`{"instanceId":"inst_1"}`)
+
+	submitter := &fakeApprovalSubmitter{}
+	store := &fakeFinalizeIdempotencyStore{replay: &idempotency.Replay{Status: http.StatusCreated, Body: body}}
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(&fakeSvc{}, &sql.DB{}, submitter, store)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/finalize", nil)
+	withAuthHeaders(req, "document_filler")
+	req.Header.Set("Idempotency-Key", key)
+	if tid, err := tenant.FromContext(req.Context()); err != nil || tid == "" {
+		t.Fatalf("tenant missing before ServeHTTP: tid=%q err=%v", tid, err)
+	}
+	if uid := iamdomain.UserIDFromContext(req.Context()); uid == "" {
+		t.Fatalf("user missing before ServeHTTP")
+	}
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if got := rr.Header().Get("Idempotent-Replay"); got != "true" {
+		t.Fatalf("expected Idempotent-Replay=true, got %q", got)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got, _ := out["instanceId"].(string); got != "inst_1" {
+		t.Fatalf("expected instanceId=inst_1, got %q", got)
+	}
+	if submitter.called {
+		t.Fatalf("submit service should not be called on replay")
 	}
 }

@@ -7,7 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates_v2/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
@@ -155,6 +157,48 @@ func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 	}
 }
 
+func TestGeneratedTemplatesRoutes_IdempotencyKeyRequired(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "11111111-1111-1111-1111-111111111111",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
+		ContentHash:    "hash_abc",
+	}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "create", method: http.MethodPost, path: "/api/v2/templates", body: `{"key":"k1","name":"n1"}`},
+		{name: "publish", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"docx_key":"d","schema_key":"s"}`},
+		{name: "submit", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", body: `{}`},
+		{name: "review", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/review", body: `{"accept":true}`},
+		{name: "approve", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", body: `{"accept":true}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, bytes.NewBufferString(tt.body))
+			req.Header.Set("content-type", "application/json")
+			*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant-a"))
+			*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))
+			rr := httptest.NewRecorder()
+
+			mux.ServeHTTP(rr, req)
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
 func jsonBody(t *testing.T, body map[string]any) []byte {
 	t.Helper()
 	raw, err := json.Marshal(body)
@@ -163,4 +207,3 @@ func jsonBody(t *testing.T, body map[string]any) []byte {
 	}
 	return raw
 }
-

@@ -21,13 +21,13 @@ import (
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/config"
 	pgdb "metaldocs/internal/platform/db/postgres"
-	"metaldocs/internal/platform/tenant"
 	"metaldocs/internal/platform/messaging"
-	"metaldocs/internal/platform/servicebus"
 	nooppub "metaldocs/internal/platform/messaging/noop"
 	outboxpg "metaldocs/internal/platform/messaging/outbox/postgres"
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/render/gotenberg"
+	"metaldocs/internal/platform/servicebus"
+	"metaldocs/internal/platform/tenant"
 )
 
 type APIDependencies struct {
@@ -36,6 +36,7 @@ type APIDependencies struct {
 	AuthRepo        authdomain.Repository
 	AuditWriter     auditdomain.Writer
 	AuditReader     auditdomain.Reader
+	AuditValidator  auditdomain.IntegrityValidator
 	Publisher       messaging.Publisher
 	GotenbergClient *gotenberg.Client
 	StatusProvider  observability.RuntimeStatusProvider
@@ -93,12 +94,14 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 				minioBucket = attachmentsCfg.MinIOBucket
 			}
 		}
+		auditStore := auditpg.NewWriter(db)
 		return APIDependencies{
 			RoleProvider:    iampg.NewRoleProvider(db),
 			RoleAdminRepo:   iampg.NewRoleAdminRepository(db),
 			AuthRepo:        authRepo,
-			AuditWriter:     auditpg.NewWriter(db),
-			AuditReader:     auditpg.NewWriter(db),
+			AuditWriter:     auditStore,
+			AuditReader:     auditStore,
+			AuditValidator:  auditStore,
 			Publisher:       outboxpg.NewPublisher(db),
 			GotenbergClient: gotenbergClient,
 			StatusProvider:  observability.NewPostgresRuntimeStatusProvider(db, repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
@@ -128,6 +131,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			AuthRepo:        authRepo,
 			AuditWriter:     auditStore,
 			AuditReader:     auditStore,
+			AuditValidator:  auditStore,
 			Publisher:       nooppub.NewPublisher(),
 			GotenbergClient: gotenbergClient,
 			StatusProvider:  observability.NewStaticRuntimeStatusProvider(repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
@@ -135,7 +139,6 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		}, nil
 	}
 }
-
 
 func closeDB(db *sql.DB) error {
 	if db == nil {

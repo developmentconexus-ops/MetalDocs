@@ -1,10 +1,14 @@
 package http
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -18,6 +22,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/ratelimit"
 	"metaldocs/internal/platform/tenant"
@@ -63,10 +68,16 @@ type approvalSubmitter interface {
 	SubmitRevisionForReview(ctx context.Context, db *sql.DB, req approvalapp.SubmitRequest) (approvalapp.SubmitResult, error)
 }
 
+type finalizeIdempotencyStore interface {
+	CheckReplay(ctx context.Context, tenantID, actorID, key, payloadHash string) (*idempotency.Replay, error)
+	RecordReplay(ctx context.Context, tenantID, actorID, key, payloadHash string, status int, body []byte) error
+}
+
 type Handler struct {
-	svc       Service
-	db        *sql.DB
-	submitSvc approvalSubmitter
+	svc           Service
+	db            *sql.DB
+	submitSvc     approvalSubmitter
+	idempFinalize finalizeIdempotencyStore
 }
 
 var writeJSON = httpresponse.WriteJSON
@@ -76,7 +87,15 @@ func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
 // NewHandlerWithSubmit constructs a Handler with direct DB access and approval
 // submit service — required for the finalize→submit flow.
 func NewHandlerWithSubmit(svc Service, db *sql.DB, submitSvc approvalSubmitter) *Handler {
-	return &Handler{svc: svc, db: db, submitSvc: submitSvc}
+	return NewHandlerWithSubmitAndFinalizeStore(svc, db, submitSvc, nil)
+}
+
+func NewHandlerWithSubmitAndFinalizeStore(svc Service, db *sql.DB, submitSvc approvalSubmitter, store finalizeIdempotencyStore) *Handler {
+	h := &Handler{svc: svc, db: db, submitSvc: submitSvc, idempFinalize: store}
+	if h.idempFinalize == nil && db != nil {
+		h.idempFinalize = idempotency.New(db, "POST /api/v2/documents/{id}/finalize")
+	}
+	return h
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -323,6 +342,12 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey == "" {
+		httpErr(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_REQUIRED")
+		return
+	}
+
 	if h.submitSvc == nil || h.db == nil {
 		// Fallback: legacy status-only transition when submit service not wired.
 		r = withAdminCtx(r)
@@ -338,6 +363,40 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		}
 		return
+	}
+
+	payloadHash, err := hashRequestBody(r)
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	tenantForReplay, err := tenantIDFromReq(r)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	actorForReplay := userIDFromReq(r)
+	idempStore := h.idempFinalize
+	if idempStore == nil && h.db != nil {
+		idempStore = idempotency.New(h.db, "POST /api/v2/documents/{id}/finalize")
+	}
+	if idempStore != nil {
+		replay, err := idempStore.CheckReplay(r.Context(), tenantForReplay, actorForReplay, idempotencyKey, payloadHash)
+		if errors.Is(err, idempotency.ErrConflict) {
+			httpErr(w, http.StatusUnprocessableEntity, "IDEMPOTENCY_KEY_REUSED")
+			return
+		}
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, "internal_error")
+			return
+		}
+		if replay != nil {
+			w.Header().Set("Idempotent-Replay", "true")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(replay.Status)
+			_, _ = w.Write(replay.Body)
+			return
+		}
 	}
 
 	r = withAdminCtx(r)
@@ -425,8 +484,25 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Finalize(r.Context(), tenantID, docID, actorID); err != nil {
 		log.Printf("documents_v2 finalize audit-only error: %v", err)
 	}
+	respBody := map[string]string{"instanceId": result.InstanceID}
+	if idempStore != nil {
+		body, _ := json.Marshal(respBody)
+		if err := idempStore.RecordReplay(r.Context(), tenantID, actorID, idempotencyKey, payloadHash, http.StatusCreated, body); err != nil {
+			log.Printf("documents_v2 finalize idempotency record error: %v", err)
+		}
+	}
+	httpresponse.WriteJSON(w, http.StatusCreated, respBody)
+}
 
-	httpresponse.WriteJSON(w, http.StatusCreated, map[string]string{"instanceId": result.InstanceID})
+func hashRequestBody(r *http.Request) (string, error) {
+	buf, err := io.ReadAll(r.Body)
+	if err != nil {
+		return "", err
+	}
+	_ = r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(buf))
+	sum := sha256.Sum256(buf)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func (h *Handler) archiveDocument(w http.ResponseWriter, r *http.Request) {

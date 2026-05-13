@@ -105,9 +105,13 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 	if version.Status != domain.VersionStatusDraft {
 		return domain.ErrInvalidStateTransition
 	}
-	version.DocxStorageKey = cmd.DocxStorageKey
-	version.ContentHash = cmd.DocxContentHash
-	if err := s.repo.UpdateVersion(ctx, version); err != nil {
+	if err := s.repo.UpdateVersionDraftCAS(
+		ctx,
+		version.ID,
+		cmd.ExpectedLockVersion,
+		cmd.DocxStorageKey,
+		cmd.DocxContentHash,
+	); err != nil {
 		return err
 	}
 	return s.repo.AppendAudit(ctx, &domain.AuditEvent{

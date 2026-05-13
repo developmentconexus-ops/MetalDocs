@@ -8,12 +8,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	apiv2 "metaldocs/internal/api/v2"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/tenant"
 )
 
-type fakeProfileService struct{}
+type fakeProfileService struct {
+	createErr error
+}
 
 func (f fakeProfileService) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.DocumentProfile, error) {
 	return nil, nil
@@ -24,7 +27,7 @@ func (f fakeProfileService) Get(ctx context.Context, tenantID, code string) (*do
 }
 
 func (f fakeProfileService) Create(ctx context.Context, p *domain.DocumentProfile) error {
-	return nil
+	return f.createErr
 }
 
 func (f fakeProfileService) Update(ctx context.Context, p *domain.DocumentProfile) error {
@@ -74,5 +77,20 @@ func TestProfilesHandler_UpdateUsesPatch(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestProfilesHandler_CreateUniqueViolationReturns409(t *testing.T) {
+	handler := &Handler{profiles: fakeProfileService{createErr: &pgconn.PgError{Code: "23505"}}}
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/taxonomy/profiles", strings.NewReader(`{"code":"P1","familyCode":"F1","name":"Profile"}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
 	}
 }

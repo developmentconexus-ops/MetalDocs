@@ -7266,7 +7266,9 @@ export interface operations {
     createTemplateV2: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -7434,12 +7436,21 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description stale expected_lock_version */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     publishTemplateVersionV2: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
                 n: number;
@@ -7570,7 +7581,9 @@ export interface operations {
     submitTemplateVersionV2: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
                 n: number;
@@ -7591,7 +7604,9 @@ export interface operations {
     reviewTemplateVersionV2: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
                 n: number;
@@ -7612,7 +7627,9 @@ export interface operations {
     approveTemplateVersionV2: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
                 n: number;
@@ -8548,7 +8565,9 @@ export interface operations {
     finalizeDocumentV2: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path: {
                 id: string;
             };

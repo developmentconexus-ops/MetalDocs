@@ -21,6 +21,8 @@ func MapErr(err error) (httpStatus int, code string) {
 		return http.StatusConflict, "invalid_state_transition"
 	case errors.Is(err, domain.ErrStaleBase):
 		return http.StatusConflict, "stale_base"
+	case errors.Is(err, domain.ErrStaleLockVersion):
+		return http.StatusPreconditionFailed, "stale_lock_version"
 	case errors.Is(err, domain.ErrContentHashMismatch):
 		return http.StatusConflict, "content_hash_mismatch"
 	case errors.Is(err, domain.ErrUploadMissing):

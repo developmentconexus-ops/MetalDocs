@@ -4,12 +4,17 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/auth/infrastructure/memory"
+	authpostgres "metaldocs/internal/modules/auth/infrastructure/postgres"
+	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/tenant"
 
 	"golang.org/x/crypto/bcrypt"
@@ -326,5 +331,103 @@ func TestAuthenticate_TenantNotPermitted(t *testing.T) {
 	_, err := svc.Authenticate(ctx, userID, password, req)
 	if !errors.Is(err, authdomain.ErrTenantNotPermitted) {
 		t.Errorf("expected ErrTenantNotPermitted, got %v", err)
+	}
+}
+
+func TestCreateUser_RollbackWhenReplaceUserRolesFails(t *testing.T) {
+	const tenantID = "11111111-1111-1111-1111-111111111111"
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT user_id
+FROM metaldocs.auth_identities
+WHERE lower(username) = lower($1)
+`)).
+		WithArgs("alice").
+		WillReturnRows(sqlmock.NewRows([]string{"user_id"}))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT user_id
+FROM metaldocs.auth_identities
+WHERE lower(email) = lower($1)
+`)).
+		WithArgs("alice@example.com").
+		WillReturnRows(sqlmock.NewRows([]string{"user_id"}))
+	mock.ExpectExec(regexp.QuoteMeta(`
+INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
+VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
+`)).
+		WithArgs("alice", "alice", "alice@example.com", "Alice", true, sqlmock.AnyArg(), "bcrypt", true).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("admin"))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1 FROM metaldocs.iam_user_roles
+   WHERE user_id   = $1
+     AND tenant_id = $2::uuid
+     AND role_code = 'system_admin'
+)`)).
+		WithArgs("admin", tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1
+  FROM metaldocs.role_capabilities rc
+  JOIN metaldocs.user_process_areas upa
+    ON upa.role = rc.role
+   AND upa.tenant_id = $4::uuid
+   AND upa.user_id   = $3
+   AND upa.effective_to IS NULL
+  WHERE rc.capability = $1
+    AND ($2 = 'tenant' OR upa.area_code = $2)
+)`)).
+		WithArgs(string(iamdomain.CapUserManage), "tenant", "admin", tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
+		WithArgs(`[{"area":"tenant","cap":"user.manage"}]`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_users`)).
+		WithArgs("alice", "Alice").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`)).
+		WithArgs(tenantID, "alice").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)`)).
+		WithArgs("alice", tenantID, "author", "admin").
+		WillReturnError(sqlmock.ErrCancelled)
+	mock.ExpectRollback()
+
+	repo := authpostgres.NewRepository(db)
+	roleProvider := newMockRoleProvider()
+	roleAdmin := iampostgres.NewRoleAdminRepository(db)
+	svc := NewService(repo, roleProvider, roleAdmin, Config{
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionTTL:             24 * time.Hour,
+		SessionCookieName:      "session",
+		CookieSecure:           false,
+	})
+
+	err = svc.CreateUser(context.Background(), "alice", "alice", "alice@example.com", "Alice", "Password123!", tenantID, []iamdomain.Role{iamdomain.Role("author")}, "admin")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got, want := err.Error(), "insert iam role"; !regexp.MustCompile(want).MatchString(got) {
+		t.Fatalf("expected %q in error, got %q", want, got)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
 	}
 }
