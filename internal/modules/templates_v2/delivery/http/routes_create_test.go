@@ -314,3 +314,4 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		t.Fatalf("expected error.code=key_conflict, got %q", out.Code)
 	}
 }
+

@@ -20,23 +20,23 @@ func withActorRoles(req *http.Request, roles string) {
 func TestSubmitForReview_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
-		TemplateID:    "tpl-1",
+		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
 		ContentHash:   "deadbeef",
 		AuthorID:      "author-1",
 	}
-	repo.approvalConfigs["tpl-1"] = &domain.ApprovalConfig{
-		TemplateID:   "tpl-1",
+	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{
+		TemplateID:   "11111111-1111-1111-1111-111111111111",
 		ReviewerRole: &reviewerRole,
 		ApproverRole: "approver",
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/submit", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -62,17 +62,17 @@ func TestSubmitForReview_Happy(t *testing.T) {
 
 func TestSubmitForReview_NonDraft(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
-		TemplateID:    "tpl-1",
+		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusInReview,
 	}
-	repo.approvalConfigs["tpl-1"] = &domain.ApprovalConfig{TemplateID: "tpl-1", ApproverRole: "approver"}
+	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{TemplateID: "11111111-1111-1111-1111-111111111111", ApproverRole: "approver"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/submit", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -94,18 +94,18 @@ func TestSubmitForReview_NonDraft(t *testing.T) {
 
 func TestSubmitForReview_NoUpload(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
-		TemplateID:    "tpl-1",
+		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
 		ContentHash:   "", // no autosave committed
 	}
-	repo.approvalConfigs["tpl-1"] = &domain.ApprovalConfig{TemplateID: "tpl-1", ApproverRole: "approver"}
+	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{TemplateID: "11111111-1111-1111-1111-111111111111", ApproverRole: "approver"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/submit", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -128,10 +128,10 @@ func TestSubmitForReview_NoUpload(t *testing.T) {
 func TestReview_Accept_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:                  "ver-1",
-		TemplateID:          "tpl-1",
+		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
 		Status:              domain.VersionStatusInReview,
 		AuthorID:            "author-1",
@@ -140,7 +140,7 @@ func TestReview_Accept_Happy(t *testing.T) {
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	raw, _ := json.Marshal(map[string]any{"accept": true})
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/review", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/review", bytes.NewReader(raw))
 	withHeaders(req)
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "reviewer-1", []iamdomain.Role{}))
 	withActorRoles(req, "reviewer")
@@ -169,10 +169,10 @@ func TestReview_Accept_Happy(t *testing.T) {
 func TestApprove_Accept_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:                  "ver-1",
-		TemplateID:          "tpl-1",
+		TemplateID:          "11111111-1111-1111-1111-111111111111",
 		VersionNumber:       1,
 		Status:              domain.VersionStatusApproved,
 		AuthorID:            "author-1",
@@ -183,7 +183,7 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	raw, _ := json.Marshal(map[string]any{"accept": true})
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/approve", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", bytes.NewReader(raw))
 	withHeaders(req)
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "approver-1", []iamdomain.Role{}))
 	withActorRoles(req, "approver")
@@ -211,10 +211,10 @@ func TestApprove_Accept_Happy(t *testing.T) {
 
 func TestArchiveTemplate_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/archive", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/archive", nil)
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -240,14 +240,14 @@ func TestArchiveTemplate_Happy(t *testing.T) {
 
 func TestUpsertApprovalConfig_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a", CreatedBy: "user-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a", CreatedBy: "user-a"}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	raw, _ := json.Marshal(map[string]any{
 		"reviewer_role": "reviewer",
 		"approver_role": "approver",
 	})
-	req := httptest.NewRequest(http.MethodPut, "/api/v2/templates/tpl-1/approval-config", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPut, "/api/v2/templates/11111111-1111-1111-1111-111111111111/approval-config", bytes.NewReader(raw))
 	withHeaders(req)
 	withActorRoles(req, "editor")
 	rr := httptest.NewRecorder()
@@ -271,3 +271,4 @@ func TestUpsertApprovalConfig_Happy(t *testing.T) {
 		t.Fatalf("expected data.approval_config.approver_role=approver, got %q", out.Data.ApprovalConfig.ApproverRole)
 	}
 }
+

@@ -45,20 +45,20 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v2/templates/{id}/versions/{n}/draft", generated.SaveTemplateDraftV2)
 	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/publish", generated.PublishTemplateVersionV2)
 
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions", h.createNextVersion)
-	mux.HandleFunc("PUT /api/v2/templates/{id}/versions/{n}/schema", h.updateSchemas)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/autosave/presign", h.presignAutosave)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/autosave/commit", h.commitAutosave)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/submit", h.submitForReview)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/review", h.review)
-	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/approve", h.approve)
-	mux.HandleFunc("POST /api/v2/templates/{id}/archive", h.archiveTemplate)
-	mux.HandleFunc("PUT /api/v2/templates/{id}/approval-config", h.upsertApprovalConfig)
+	mux.HandleFunc("POST /api/v2/templates/{id}/versions", generated.CreateTemplateVersionV2)
+	mux.HandleFunc("PUT /api/v2/templates/{id}/versions/{n}/schema", generated.UpdateTemplateSchemaV2)
+	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/autosave/presign", generated.PresignTemplateAutosaveV2)
+	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/autosave/commit", generated.CommitTemplateAutosaveV2)
+	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/submit", generated.SubmitTemplateVersionV2)
+	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/review", generated.ReviewTemplateVersionV2)
+	mux.HandleFunc("POST /api/v2/templates/{id}/versions/{n}/approve", generated.ApproveTemplateVersionV2)
+	mux.HandleFunc("POST /api/v2/templates/{id}/archive", generated.ArchiveTemplateV2)
+	mux.HandleFunc("PUT /api/v2/templates/{id}/approval-config", generated.UpsertTemplateApprovalConfigV2)
 
-	mux.HandleFunc("GET /api/v2/templates/{id}", h.getTemplate)
-	mux.HandleFunc("GET /api/v2/templates/{id}/versions/{n}/docx-url", h.getDocxURL)
-	mux.HandleFunc("GET /api/v2/templates/{id}/audit", h.listAudit)
-	mux.HandleFunc("GET /api/v2/templates/v2/placeholder-catalog", h.listPlaceholderCatalog)
+	mux.HandleFunc("GET /api/v2/templates/{id}", generated.GetTemplateV2)
+	mux.HandleFunc("GET /api/v2/templates/{id}/versions/{n}/docx-url", generated.GetTemplateDocxUrlV2)
+	mux.HandleFunc("GET /api/v2/templates/{id}/audit", generated.ListTemplateAuditV2)
+	mux.HandleFunc("GET /api/v2/templates/v2/placeholder-catalog", generated.ListTemplatePlaceholderCatalogV2)
 }
 
 var (

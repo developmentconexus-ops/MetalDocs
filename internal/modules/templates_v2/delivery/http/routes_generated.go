@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	templatesapi "metaldocs/internal/modules/templates_v2/api"
 	"metaldocs/internal/modules/templates_v2/application"
 	"metaldocs/internal/modules/templates_v2/domain"
@@ -249,4 +250,56 @@ func missingPublishTemplateVersionV2Field(req templatesapi.PublishTemplateVersio
 
 func intString(v int) string {
 	return strconv.Itoa(v)
+}
+
+func (h *Handler) CreateTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	h.createNextVersion(w, r)
+}
+
+func (h *Handler) UpdateTemplateSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	h.updateSchemas(w, r)
+}
+
+func (h *Handler) PresignTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	h.presignAutosave(w, r)
+}
+
+func (h *Handler) CommitTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	h.commitAutosave(w, r)
+}
+
+func (h *Handler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	h.submitForReview(w, r)
+}
+
+func (h *Handler) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	h.review(w, r)
+}
+
+func (h *Handler) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	h.approve(w, r)
+}
+
+func (h *Handler) ArchiveTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	h.archiveTemplate(w, r)
+}
+
+func (h *Handler) UpsertTemplateApprovalConfigV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	h.upsertApprovalConfig(w, r)
+}
+
+func (h *Handler) GetTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	h.getTemplate(w, r)
+}
+
+func (h *Handler) GetTemplateDocxUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	h.getDocxURL(w, r)
+}
+
+func (h *Handler) ListTemplateAuditV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	h.listAudit(w, r)
+}
+
+func (h *Handler) ListTemplatePlaceholderCatalogV2(w http.ResponseWriter, r *http.Request) {
+	h.listPlaceholderCatalog(w, r)
 }

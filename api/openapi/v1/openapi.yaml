@@ -2931,6 +2931,102 @@ paths:
                   orphan_tokens: { type: array, items: { type: string } }
 
   # ── Registry: Controlled Documents ────────────────────────────────────────
+  /api/v2/templates/{id}/versions:
+    post:
+      tags: [templates]
+      operationId: createTemplateVersionV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/versions/{n}/schema:
+    put:
+      tags: [templates]
+      operationId: updateTemplateSchemaV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/versions/{n}/autosave/presign:
+    post:
+      tags: [templates]
+      operationId: presignTemplateAutosaveV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/versions/{n}/autosave/commit:
+    post:
+      tags: [templates]
+      operationId: commitTemplateAutosaveV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/versions/{n}/submit:
+    post:
+      tags: [templates]
+      operationId: submitTemplateVersionV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/versions/{n}/review:
+    post:
+      tags: [templates]
+      operationId: reviewTemplateVersionV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/versions/{n}/approve:
+    post:
+      tags: [templates]
+      operationId: approveTemplateVersionV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/archive:
+    post:
+      tags: [templates]
+      operationId: archiveTemplateV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/approval-config:
+    put:
+      tags: [templates]
+      operationId: upsertTemplateApprovalConfigV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}:
+    get:
+      tags: [templates]
+      operationId: getTemplateV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/versions/{n}/docx-url:
+    get:
+      tags: [templates]
+      operationId: getTemplateDocxUrlV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/{id}/audit:
+    get:
+      tags: [templates]
+      operationId: listTemplateAuditV2
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses: { '200': { description: ok } }
+  /api/v2/templates/v2/placeholder-catalog:
+    get:
+      tags: [templates]
+      operationId: listTemplatePlaceholderCatalogV2
+      responses: { '200': { description: ok } }
   /api/v2/controlled-documents:
     get:
       summary: List controlled documents
@@ -5571,3 +5667,4 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
+

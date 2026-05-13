@@ -40,3 +40,4 @@ func TestPlaceholderCatalog_Returns7Entries(t *testing.T) {
 		}
 	}
 }
+
