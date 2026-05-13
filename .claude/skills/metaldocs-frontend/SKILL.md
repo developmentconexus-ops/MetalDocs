@@ -30,6 +30,7 @@ Companion docs to consult when relevant:
 - If the task references a designed screen, read `frontend/apps/web/design-source/<slug>/NOTES.md` and view the `<slug>.html` reference.
 - **Audit the design before implementing.** The `design-source/*.jsx` mockups were AI-generated without domain context. Run the audit from [wiki/concepts/design-workflow-audit.md](../../../wiki/concepts/design-workflow-audit.md) — walk every UI element, verify it maps to real document states / RBAC / personas, record Keep/Cut/Defer in the screen's `NOTES.md`. Cut decorative widgets that imply behavior we don't support. **No TSX before audit.**
 - Locate the right feature folder (`frontend/apps/web/src/features/<domain>/`). The list of domains is in section 1 of the spec.
+- If frontend work discovers startup drift, auth/session drift, or shared runtime/contract drift, do not absorb the repair silently into the feature task. Classify it and stop unless it is strictly local to the current screen or module boundary.
 
 ### 2. Apply the decision rules
 
@@ -48,7 +49,7 @@ When in doubt, stay feature-local. Promote to shared only when a second caller a
 Use the right tool for the right job. The defaults are not negotiable because they were chosen to keep the codebase coherent at scale:
 
 - **Server state** — TanStack Query hooks in `features/<x>/queries/`. Never `useEffect` + `setState` for fetching.
-- **API call** — thin function in `features/<x>/api/<domain>.ts` using `lib/api/client.ts` (the `openapi-fetch` instance) with types from `lib/api-types/`.
+- **API call** — thin function in `features/<x>/api/<domain>.ts` using `lib/api/client.ts` as the canonical client surface, plus its shared helpers, with types from `lib/api-types/`.
 - **Server-state workflow** — when API calls, query hooks, query keys, invalidation, optimistic updates, generated API types, polling, prefetching, or freshness are involved, also load `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
 - **Local UI state** — `useState`/`useReducer`. Cross-cutting UI state — `store/ui.store.ts` or `store/auth.store.ts`. Domain state spanning components should use lifted state or a subtree-scoped context/reducer, not feature-scoped Zustand.
 - **Routing** — feature `routes.tsx` exporting `RouteObject[]`, lazy-loaded pages. Composed in `app/AppRouter.tsx`. Never `HashRouter`. Never string-pattern path dispatchers.
@@ -117,3 +118,4 @@ After any frontend task you should report:
 4. Wiki impact (which docs need updates; whether wiki-curator was dispatched).
 
 That report is the contract — without it the change is not done.
+

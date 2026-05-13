@@ -55,6 +55,11 @@ Classify mismatches as:
 - generated-code drift
 - legacy debt
 
+When runtime, OpenAPI, generated code, frontend generated types, or frontend wrapper behavior built on `frontend/apps/web/src/lib/api/client.ts` disagree, classify the mismatch first.
+
+Continue only if the mismatch is local to the current task boundary.
+If it affects shared module contract behavior, stop and route it to a shared contract prerequisite.
+
 ### 4. Pick the canonical pattern before implementation
 
 Use the canonical target from `wiki/architecture/backend-api-structure.md`.
@@ -110,3 +115,4 @@ When finishing backend/API work, report:
 3. The code/spec/wiki changes made
 4. Verification status
 5. Wiki docs updated
+
