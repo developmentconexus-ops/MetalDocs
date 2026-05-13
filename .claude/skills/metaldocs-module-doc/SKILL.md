@@ -1,180 +1,180 @@
 ---
 name: metaldocs-module-doc
-description: Produces senior-grade living architecture documentation (Arc42 + C4 + ADR links + tech-debt register + refactor backlog) for one MetalDocs module per session. Use this skill whenever the user says any of "document module X", "write architecture doc for X", "map module X", "deep-dive X", "we need a real doc for X", or asks to add depth to any `wiki/modules/<m>.md` stub — even when the user does not say the word "skill". Dispatches Codex subagents for cheap research (AST scan, data-flow trace, import graph, persistence map). Main agent owns interpretation, gap analysis, industry comparison, and final composition. Enforces a mechanical tally gate (`scripts/tally_check.sh`) and a self-review pass before publish so severity counts and ADR links cannot drift between the composed doc and the register.
+description: "Produces mature MetalDocs module wiki memory for one module per session: Arc42/C4 doc, API route truth table, runtime flows, public surface, persistence map, cross-dependencies, ADR links, tech-debt register, refactor backlog, artifacts, and validation gates. Use when the user asks to document, mature, promote, deep-dive, map, rebuild, or make a real technical wiki page for a module, especially when a wiki/modules module page is a stub/partial page or lacks the doc trio/artifacts. Use metaldocs-module-doc-sync instead for bounded post-implementation updates to an already mature module."
 ---
 
 # MetalDocs Module Documentation
 
-Build one canonical, living architecture doc per module — read by humans, parsed by LLM peers, kept fresh by `wiki-curator`.
+Build one canonical, mature technical wiki entry per module: read by humans, used as memory by LLM peers, and kept fresh by `metaldocs-module-doc-sync`.
 
-## Why this skill is gated
+## Maturity Target
 
-Module docs that drift from code are worse than no docs — readers trust them, get burned, then stop trusting any doc. The phase gates exist so each step leaves an auditable artifact a future reviewer (human or LLM) can grep. The composer is fluent in English; English is great at hiding mismatched numbers. The gates put the mismatches on the floor before publish:
+A mature module wiki is not just architecture prose. It is an implementation memory packet that lets a future agent answer:
+- What owns this behavior?
+- Which route/API/spec/codegen surface touches it?
+- Which service/repository/database rows change?
+- Which authz, tenant, audit, idempotency, and error-envelope rules apply?
+- What legacy paths, spec gaps, and debt shape the next implementation?
 
-- Each phase deposits a numbered artifact under `wiki/modules/<module>/_artifacts/`. Missing artifact ⇒ phase not done.
-- Coverage proof runs before publish — five mechanical checks (a–e) plus a self-review pass.
-- Wiki integration runs LAST so cross-links cannot rot before the doc is final.
+Read `references/module-wiki-maturity.md` during Phase 0. Use that standard as the acceptance target.
 
-Skip a gate when the work genuinely doesn't need it (e.g. no state machine in the module ⇒ §6 row is "n/a"), but record the skip in `00-context.md`. Silent skips are how drift starts.
+## Maturity Levels
 
-## Auto-invoke triggers
+Use these labels in `00-context.md`, `06-selfreview.md`, and the final report:
 
-Use this skill when the user says any of:
-- "Document module X" · "Write architecture doc for X" · "Map module X"
-- "We need a real doc for X" · "Deep-dive X"
-- Any prompt referencing `wiki/modules/<m>.md` and asking for more depth than a stub
+| Level | Meaning |
+|---|---|
+| L0 stub | A page exists but cannot guide implementation. |
+| L1 partial | Useful facts exist, but no full trio/artifact set. |
+| L2 living doc | Trio plus artifacts exist; main facts are usable. |
+| L3 mature | Meets the maturity standard and passes gates. |
+| L4 current | L3 plus synced after the latest implementation. |
 
-If the user asks to document MULTIPLE modules in one go: refuse politely, do one at a time. Context pollution kills doc quality.
+## One Module Per Run
 
-## Output contract
+If the user asks to mature multiple modules, do one module at a time. Module docs are dense; mixing modules pollutes context and lowers quality. For a whole-module-wiki maturity program, first audit all modules, then promote or refresh them one by one.
+
+## Output Contract
 
 For module `M`, produce:
-- `wiki/modules/M.md` — Arc42-shaped doc with embedded C4 Mermaid diagrams (THIS is the deliverable)
-- `wiki/modules/M-tech-debt.md` — gap register (debt items only, no fix prescriptions)
-- `wiki/backlog/M-refactor.md` — actionable refactor rows (one row = one PR)
-- Update `wiki/README.md` index (Last verified stamps + new anchors)
-- Cross-links from related concept/decision docs
+- `wiki/modules/M.md` - Arc42/C4 living doc with key files, API route truth table, runtime flows, persistence, authz, dependencies, decisions, risks, glossary, cross-links, and changelog.
+- `wiki/modules/M-tech-debt.md` - evidence-backed gap register, debt only, no fix prescriptions.
+- `wiki/backlog/M-refactor.md` - PR-sized refactor rows tied to debt IDs or approved `maint:<kind>` IDs.
+- `wiki/modules/M/_artifacts/00-context.md` - context, scope, existing maturity level, related docs, and open questions.
+- `wiki/modules/M/_artifacts/01-surface.md` - public exports, route owners, generated API surface, jobs, and file tree.
+- `wiki/modules/M/_artifacts/02-flow-*.md` - representative read/write/state-transition traces.
+- `wiki/modules/M/_artifacts/03-deps.md` - inbound/outbound imports, composition-root wiring, config/env edges, and cross-module calls.
+- `wiki/modules/M/_artifacts/04-persistence.md` - tables, migrations, constraints, indexes, triggers, tenant keys, tripwire/GUC behavior, retention/deletion facts.
+- `wiki/modules/M/_artifacts/05-industry.md` - comparison only against approved patterns in `references/industry-patterns-index.md`.
+- `wiki/modules/M/_artifacts/06-selfreview.md` - final maturity and quality review.
+- `wiki/modules/M/_artifacts/sync-log.md` - append-only sync log header for future incremental updates.
+- Index/cross-link updates in `wiki/README.md`, `wiki/modules/README.md`, and directly related module/concept/architecture/decision docs.
 
-Living doc. `wiki-curator` keeps it from rotting after merges.
+After this skill promotes a module to L3, use `metaldocs-module-doc-sync` for cheap post-implementation refreshes.
 
-## Subagent / main agent split
+## Research Split
 
-**Subagents (Codex via `codex:codex-rescue`) do research, NOT judgment.**
-- AST scans · file enumeration · import graph extraction · raw SQL/migration list · route-by-route data flow
-- Output = facts only (file:line, signatures, table names, call edges). No "should/recommend".
-- Cap each subagent prompt at ~800 tokens. Point to templates by path, do not inline.
+Subagents collect facts only:
+- AST/file/symbol scans.
+- HTTP route and generated API inventory.
+- Route-by-route data flow.
+- Import graph and composition-root wiring.
+- SQL/migration/persistence map.
 
-**Main agent (Opus-quality reasoning) does interpretation.**
-- Picks what each fact MEANS for the module
-- Decides which industry patterns are comparable (gated by `references/industry-patterns-index.md`)
-- Writes Quality Goals, Risks, ADR amendments, gap callouts
-- Composes the final doc and signs off
+Main agent performs judgment:
+- Module boundary and purpose.
+- Which facts matter for implementation memory.
+- Severity ratings from the tech-debt rubric.
+- ADR/missing-ADR classification.
+- Industry pattern applicability.
+- Final composition and self-review.
 
-Rule: if a subagent ever writes a sentence containing "should", "recommend", "consider", or "professional", reject the artifact and re-dispatch with a stricter prompt.
+Reject or rewrite any subagent artifact that contains prescriptive prose such as "should", "recommend", "consider", or unsupported "industry standard" claims.
 
-## 8-phase workflow
+## Workflow
 
-| Phase | Owner | Inputs | Artifact | Notes |
-|---|---|---|---|---|
-| 0 — Load context | Main | module name | `_artifacts/00-context.md` | Read `wiki/README.md`, existing module stub, related ADRs, related concept docs |
-| 1 — Surface scan | Codex subagent | module root path | `_artifacts/01-surface.md` | public exports, HTTP ops, file tree, migration list |
-| 2 — Data-flow trace | 2–3 Codex subagents (parallel) | top operations from §1 | `_artifacts/02-flow-<op>.md` × N | HTTP → handler → service → repo → DB end-to-end |
-| 3 — Cross-deps | Sonnet 4.6 subagent (`general-purpose`, `model: "sonnet"`) | module root | `_artifacts/03-deps.md` | imports IN / imports OUT, callers map. Sonnet, not Codex — Codex run on auth took ~3× longer than other phases because the IN-edge scan + 14 config-field trace is grep-bound, not AST-bound; Sonnet via Grep tool is faster. |
-| 4 — Persistence map | Codex subagent | module root + migrations dir | `_artifacts/04-persistence.md` | tables, FKs, triggers, tripwire pairing, GUC reads |
-| 5 — Industry comparison | Main + context7 + WebSearch | §1–§4 artifacts + `references/industry-patterns-index.md` | `_artifacts/05-industry.md` | gated: only patterns from the index, or explicit user opt-in |
-| 6 — Compose | Main | all artifacts | `wiki/modules/M.md` + `M-tech-debt.md` + `backlog/M-refactor.md` | Arc42 + C4 Mermaid; coverage gate enforced |
-| 6.5 — Mechanical tally | Main (runs `scripts/tally_check.sh`) | composed wiki files | stdout `[tally] PASS` | severity counts, missing-ADR count, debt↔backlog linkage |
-| 6.75 — Self-review | Main | composed wiki files + artifacts | `_artifacts/06-selfreview.md` | catches what tally cannot: severity judgment, mermaid box drift, rubric application |
-| 7 — Wiki integration | `wiki-curator` subagent | new doc paths | updated `wiki/README.md` + cross-links | bumps Last verified, adds anchors |
-| 8 — Commit | Main | all wiki changes | git commit | conventional message, no Co-Authored-By unless user asks |
+| Phase | Owner | Artifact | Purpose |
+|---|---|---|---|
+| 0 - Load context | Main | `00-context.md` | Read existing wiki, ADRs, concepts, maturity standard; classify L0-L4. |
+| 1 - Surface scan | Research subagent | `01-surface.md` | Exports, routes, codegen, jobs, file tree, key tests. |
+| 2 - Data-flow traces | Research subagents | `02-flow-*.md` | End-to-end read/write/state-transition behavior. |
+| 3 - Cross-deps | Research subagent | `03-deps.md` | IN/OUT imports, callers, DI/composition wiring, env/config edges. |
+| 4 - Persistence map | Research subagent | `04-persistence.md` | Tables, migrations, constraints, tripwire, tenant keys. |
+| 5 - Industry comparison | Main | `05-industry.md` | Use only approved pattern index unless user approves adding a new source. |
+| 6 - Compose | Main | module doc, register, backlog, sync-log header | Build the mature wiki entry. |
+| 6.5 - Tally | Main/script | stdout | Run `scripts/tally_check.sh M`; fix mismatches. |
+| 6.75 - Self-review | Main | `06-selfreview.md` | Verify maturity, anchors, links, counts, diagrams, severity, artifacts. |
+| 7 - Wiki integration | Main | indexes/cross-links | Thread the module into the wiki graph. |
+| 8 - Commit/report | Main | final report | Report maturity level and gate results; commit only when asked. |
 
-## Run sequence
+## Run Sequence
 
-1. Confirm one module. If user names two, ask which first.
-2. `mkdir wiki/modules/<m>/_artifacts/`. (Use plain folder, not hidden.)
-3. **Phase 0** — Main reads existing wiki + ADRs. Drop summary into `00-context.md`. List open questions to the user (one batch, then proceed).
-4. **Phase 1** — Dispatch `codex:codex-rescue` with `templates/subagent-surface-scan.md`. Provide module path. Receive `01-surface.md`.
-5. **Phase 2** — From §1, pick the 2–3 most representative operations (one read, one write, one state-transition if it exists). Dispatch them in parallel (one Codex subagent per operation, all in a single message). Each uses `templates/subagent-data-flow-trace.md`.
-6. **Phase 3** — Dispatch `general-purpose` subagent with `model: "sonnet"` and `templates/subagent-cross-deps.md`. Receive `03-deps.md`. (Sonnet 4.6, not Codex — see Phase-3 row in workflow table for rationale.)
-7. **Phase 4** — Dispatch Codex with `templates/subagent-persistence-map.md`. Receive `04-persistence.md`.
-8. **Phase 5** — Main does industry comparison. ONLY patterns named in `references/industry-patterns-index.md` are admissible by default. If a fresh comparison is genuinely warranted, ask the user once; on yes, use `context7` for current docs and WebSearch for source-of-truth, then add the pattern to the index in the same commit.
-9. **Phase 6** — Main composes `wiki/modules/M.md` from `templates/module-doc.md`. Coverage gate (see below) must pass before continuing.
-10. **Phase 6.5 — Mechanical tally.** Run `bash .claude/skills/metaldocs-module-doc/scripts/tally_check.sh <module>`. The script grep-counts severities, missing-ADR references, and validates debt↔backlog linkage. On `FAIL`: fix the composed doc, re-run until `PASS`. Do NOT proceed without `[tally] PASS` printed.
-11. **Phase 6.75 — Self-review pass.** Main agent re-reads the composed `M.md` against the artifacts with fresh eyes and writes `_artifacts/06-selfreview.md` answering the checklist below. The point is to catch what the mechanical tally cannot: severity calls, mermaid boxes that name things the prose never explains, and rubric slack. If self-review surfaces a fix, apply it, re-run 6.5, then re-run 6.75 once more on the final state.
-12. **Phase 7** — Dispatch `wiki-curator` to thread the new doc into the wiki graph.
-13. **Phase 8** — Single commit; conventional message `docs(module-<m>): architecture documentation`.
+1. Confirm exactly one module.
+2. Create or reuse `wiki/modules/M/_artifacts/`.
+3. Read `references/module-wiki-maturity.md`, `references/industry-patterns-index.md`, existing `wiki/modules/M*`, related ADRs/concepts/architecture docs, and related modules.
+4. Write `00-context.md` with current maturity level, target level, source files, related docs, and any justified skips.
+5. Generate or refresh research artifacts using the templates in `templates/`.
+6. Compose the three canonical wiki files and sync-log header.
+7. Apply the coverage gate.
+8. Run the tally gate. On Windows, Git Bash may be required:
+   `& 'C:\Program Files\Git\bin\bash.exe' .claude/skills/metaldocs-module-doc/scripts/tally_check.sh M`
+9. Write `06-selfreview.md`. If it finds issues, fix them, rerun tally, and update self-review.
+10. Update indexes and direct cross-links.
+11. End with a concise report: initial/final maturity level, files changed, gates, and deferred gaps.
 
-## Coverage gate (Phase 6 → Phase 6.5)
+## Coverage Gate
 
-Before mechanical tally can start, the composed `wiki/modules/M.md` must satisfy:
+Before publish, `wiki/modules/M.md` must satisfy:
 
-- **(a) Public surface** — every exported type/function in `01-surface.md` is named at least once in the doc (or explicitly listed in tech-debt as undocumented-on-purpose)
-- **(b) Routes** — every HTTP operation in `01-surface.md` appears in the C4 Container or Component diagram
-- **(c) Cross-deps** — every IN-edge and OUT-edge in `03-deps.md` is in §5 (Building Blocks) or §8 (Cross-cutting)
-- **(d) State transitions** — every state machine surfaced in `02-flow-*.md` has a table in §6 (Runtime View)
-- **(e) Decisions** — every architectural decision either links an existing ADR (`wiki/decisions/0xxx-*.md`) or is logged in `M-tech-debt.md` as missing-ADR
+- **(a) Public surface:** every exported/public symbol in `01-surface.md` is named, grouped, or explicitly excluded as undocumented-on-purpose.
+- **(b) Routes/API:** every HTTP operation has runtime owner, handler, authz, spec path, operationId, codegen method, status, and notes in the HTTP operations table and API Route Truth Table.
+- **(c) Runtime behavior:** representative read/write/state-transition flows are traced; state machines, transactions, idempotency, audit, error envelopes, and authz layers are documented when applicable.
+- **(d) Persistence:** every owned/read table, migration family, trigger, index, tenant key, and tripwire/GUC fact in `04-persistence.md` is represented or explicitly n/a.
+- **(e) Cross-deps:** every IN-edge and OUT-edge in `03-deps.md` appears in C4/prose/cross-links or is explicitly excluded with reason.
+- **(f) Decisions:** every load-bearing decision links an ADR or appears as `missing-ADR` debt.
+- **(g) Debt/backlog:** every actionable T-row has a backlog row, except explicitly latent Minor debt.
+- **(h) LLM usability:** the doc answers where to implement, what can break, what is legacy/partial/deprecated, and which debt/backlog rows govern the next PR.
 
-Grep the composed doc against the artifacts. If a coverage check fails, fix the doc — do not lower the gate. Lowering the gate is the slow-motion version of writing a vibes doc.
+Do not lower the gate to make a page pass. Record justified n/a cases in `00-context.md` and `06-selfreview.md`.
 
-## Phase 6.75 — Self-review checklist
+## Self-Review Checklist
 
-Write `_artifacts/06-selfreview.md` answering each item. One short sentence per row; "n/a — <reason>" is allowed but must say why.
+Write `06-selfreview.md` with one short answer per item:
 
-1. **Severity rubric application.** For every Critical or Major row in `M-tech-debt.md`, does the rubric in `templates/tech-debt-register.md` actually map to that severity? If a row claims Major but the trigger list says Critical (e.g. regulated audit-trail gap, multi-tenant data leak), re-rate it now.
-2. **Mermaid box ↔ prose.** Every box in the §3 and §5 diagrams is named at least once in the surrounding prose. Stray boxes get either an explanation or removal.
-3. **Top-3 in §11.** The "Top 3" list is by severity, then by blast-radius — not by order of authorship.
-4. **Cross-link existence.** Every wiki link in the doc points at a file that exists today (`ls` it, don't guess).
-5. **Key Files freshness.** Every `path:LL` anchor opens to the symbol it claims. Sample at least 3.
-6. **Backlog ↔ debt linkage.** Every `T-NNN` has a matching backlog row OR is explicitly "no backlog row yet — latent" (acceptable for Minor only).
-7. **Industry citations.** Every §5 industry-comparison citation traces back to a row in `references/industry-patterns-index.md` or to a new row added in the same commit.
-8. **Subagent purity.** Re-skim `_artifacts/02-flow-*.md`, `03-deps.md`, `04-persistence.md`. If any contains "should / recommend / professional / industry-standard", that prose came from a subagent that broke the research-only rule; flag and strip.
+1. Initial and final maturity level.
+2. Severity rubric application for every Critical and Major row.
+3. Mermaid diagram/prose alignment.
+4. Top-3 debt ordered by severity, then blast radius.
+5. Cross-link existence.
+6. Key file anchor freshness, with at least three sampled anchors.
+7. Backlog/debt linkage.
+8. Route/API truth table completeness.
+9. Persistence/tripwire/tenant-key completeness.
+10. Industry citations trace to `references/industry-patterns-index.md`.
+11. Subagent purity: facts only, no prescriptive prose.
+12. Remaining gaps preventing L4 current status.
 
-## Subagent dispatch patterns
+## Mature Wiki Guard
 
-**Phases 1, 2, 4 — Codex (`codex:codex-rescue`):**
+Do not call a module mature because it has a long page. Mature means the doc is useful for implementation without fresh archaeology:
+- It maps code, runtime behavior, API contract, data ownership, cross-deps, decisions, debt, and backlog.
+- It records what is legacy, partial, deprecated, or intentionally missing.
+- It can be mechanically checked by tally and manually checked by self-review.
+- It is ready for cheap maintenance by `metaldocs-module-doc-sync`.
 
-```
-Agent({
-  subagent_type: "codex:codex-rescue",
-  description: "<phase>: <module>",
-  prompt: "[paste subagent template from .claude/skills/metaldocs-module-doc/templates/subagent-<X>.md]\n\nModule path: internal/modules/<m>\nArtifact path: wiki/modules/<m>/_artifacts/<NN>-<X>.md\nModel: --model gpt-5.3-codex"
-})
-```
+If a module is frontend-only or non-Go, adapt the same maturity target: component surface replaces exported Go symbols, UI workflows replace HTTP flows, and state/store/contracts replace persistence where applicable. Do not force irrelevant backend sections; record n/a with evidence.
 
-**Phase 3 — Sonnet 4.6 (`general-purpose`):**
+## Industry Guard
 
-```
-Agent({
-  subagent_type: "general-purpose",
-  model: "sonnet",
-  description: "phase 3 cross-deps: <module>",
-  prompt: "[paste subagent template from .claude/skills/metaldocs-module-doc/templates/subagent-cross-deps.md]\n\nModule path: internal/modules/<m>\nArtifact path: wiki/modules/<m>/_artifacts/03-deps.md"
-})
-```
+Use only patterns in `references/industry-patterns-index.md` by default. Add new industry sources only with explicit user approval, and then add the source, access date, quote snippet, and applicability note to the index in the same change.
 
-Rationale: cross-deps work is grep-bound (IN-edge scan across whole repo, config-var trace to env-var sites, DI wiring across composition roots). Sonnet via the Grep tool finishes in a fraction of the Codex wall-clock time. Other phases stay on Codex because they benefit from its AST/code-execution sandbox.
+## Anti-Patterns
 
-Subagent never edits the wiki doc directly. Only writes its artifact file.
+- Documenting multiple modules in one run.
+- Producing prose without source artifacts.
+- Skipping route/API truth for modules with HTTP surfaces.
+- Treating OpenAPI, runtime routes, and generated code as interchangeable without checking all three.
+- Inventing debt without concrete evidence.
+- Writing fixes in the tech-debt register instead of the backlog.
+- Claiming ADR coverage without a real `wiki/decisions/*` link.
+- Bumping `Last verified` without checking anchors.
+- Calling a partial/stub page mature.
 
-## Industry comparison guard
+## Output
 
-The cheapest filler is "Stripe does X" with no link, no version, no quote. To block that:
-
-1. `references/industry-patterns-index.md` lists pre-vetted patterns with source URL, version pinned, and quote snippet. Use those.
-2. Any new pattern requires: source URL · accessed date · quoted snippet · why it applies HERE (one sentence anchored to a MetalDocs file:line).
-3. If the user opts to add a new pattern mid-session, append the row to the index in the same commit.
-
-No vibes-based "industry standard" lines. Either it is in the index, or it is footnoted with source.
-
-## Anti-patterns (instant rewrite)
-
-- Documenting two modules in one session.
-- Subagent writing prose with "should/recommend".
-- Skipping Phase 0 (you will rediscover stale wiki context the slow way).
-- "Industry standard" sentences without source link in §5.
-- ADR claim without `wiki/decisions/0xxx-*.md` link.
-- Mermaid diagrams that name boxes the doc never explains.
-- Tech-debt items written as fixes ("we should refactor X") — they go in `backlog/M-refactor.md` instead.
-- File:line anchors not verified (Last verified stamp not bumped).
-- Commit that merges doc + code changes. Doc commit is doc-only.
-
-## Red flags — STOP
-
-| Thought | Reality |
-|---|---|
-| "I already know this module, skip Phase 1" | Codex AST scan catches what you forgot. Run it. |
-| "I'll add ‘industry standard says…' without a link" | Index or footnote. Or delete the sentence. |
-| "Coverage gate is overkill" | Gate is the only thing separating this skill from a vibes doc. |
-| "Skill prompt is long, drop the artifact list" | Artifact list IS the deliverable shape. Keep. |
-| "Two modules at once is faster" | Token bleed kills the second one. One at a time. |
-| "Subagent prompt can be looser" | Loose subagent = prose artifact = main agent rewrites it = double cost. |
-
-## Output expectations
-
-End-of-run report covers: module name · 5 artifact paths · final 3 wiki paths · coverage gate results (a–e pass/fail) · industry references used (with URLs) · open questions deferred to tech-debt.
+End-of-run report includes:
+- Module name.
+- Initial and final maturity level.
+- Artifacts written.
+- Wiki files written.
+- Coverage gate results.
+- Tally result.
+- Industry references used.
+- Deferred gaps and why they remain.
 
 ## Changelog
 
-- 1.2 (2026-05-10) — After auth first-run review: moved Phase 3 (cross-deps) off Codex onto Sonnet 4.6 (`general-purpose`, `model: "sonnet"`). Codex took ~3× longer than other phases on auth because cross-deps work is grep-bound (whole-repo IN-edge scan + 14 config-field env-var trace + DI wiring across composition roots), not AST-bound. Sonnet via the Grep tool is the fast path. Updated workflow table, run sequence, dispatch-pattern section, and `templates/subagent-cross-deps.md`. Other phases stay on Codex.
-- 1.1 (2026-05-10) — Hardening pass after iam first-run review. Added Phase 6.5 mechanical tally (`scripts/tally_check.sh`) to catch severity-count drift and ADR-count mismatches. Added Phase 6.75 self-review checklist to catch severity-judgment slack and stray mermaid boxes. Tightened severity rubric in tech-debt template with concrete triggers (regulated audit-trail gap → Critical, etc.). Loosened refactor-backlog `debt_id` schema with `maint:<kind>` enum for maintenance rows that have no debt origin. Softened opening "Iron Law" framing with rationale (why gates exist, when skipping is OK if recorded).
-- 1.0 (2026-05-10) — initial release. Arc42 + C4 + ADR scaffold; subagent/main split; coverage gate; industry-patterns-index guard.
+- 1.3 (2026-05-13) - Defined module wiki maturity as implementation memory for humans and LLMs. Added `references/module-wiki-maturity.md`; expanded output contract with API route truth table, sync log, indexes, persistence/cross-dep/runtime gates; changed target from long-form architecture doc to L3 mature module wiki.
+- 1.2 (2026-05-10) - Moved cross-deps phase to the fastest suitable research path; preserved Codex for AST/code-heavy phases.
+- 1.1 (2026-05-10) - Added mechanical tally and self-review gates.
+- 1.0 (2026-05-10) - Initial Arc42/C4 module documentation workflow.

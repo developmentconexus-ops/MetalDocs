@@ -1,0 +1,4 @@
+interface:
+  display_name: "MetalDocs Module Doc Sync"
+  short_description: "Refresh module wiki facts from diffs."
+  default_prompt: "Sync the affected MetalDocs module wiki after this implementation. Use the concrete diff context, update routes/API, flows, persistence, dependencies, debt/backlog, artifacts, changelog, and sync log, then run the tally gate."
