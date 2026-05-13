@@ -33,6 +33,18 @@ Use the smallest mode that keeps the module true.
 
 Structural refresh is allowed. Do not escalate merely because a new route/table/dep exists; update the affected module fully from the diff. Escalate only when the changed scope cannot be verified without redoing the full module sweep.
 
+## Sync Success Gate
+
+A sync may claim success only when it includes:
+1. Exact change context
+2. Explicit affected-module list
+3. Explicit affected-surface scan
+4. Mode classification: lite patch, structural refresh, or full rebuild escalation
+5. Preflight/tally result
+6. Explicit explanation for every touched module that was not updated
+
+No silent omissions are allowed.
+
 ## Required Wiki Shape
 
 A synced backend module should preserve these memory surfaces when applicable:
@@ -49,7 +61,8 @@ Frontend-only or legacy wiki pages may not have the full trio. If the trio is mi
 1. Determine changed modules.
    - Read the diff or touched file list.
    - Map `internal/modules/<name>/...`, `frontend/.../features/<name>/...`, `api/openapi/...`, `migrations/...`, and composition-root changes to affected wiki modules.
-   - If a cross-cutting file changes, update every documented module whose route, dependency, or runtime behavior is directly affected.
+   - If a cross-cutting file changes, update every documented module whose route, contract, persistence, runtime flow, or dependency behavior changed.
+   - Do not treat cross-cutting files as single-module edits by default.
 
 2. Run preflight.
    - Prefer `scripts/wiki_sync_preflight.ps1 -Module M` from this skill.
@@ -123,10 +136,12 @@ Use `metaldocs-module-doc` instead when:
 End with:
 - Module(s) synced.
 - Change context.
+- Explicit affected-surface scan.
 - Mode used: lite patch, structural refresh, or escalated full sweep.
 - Facts updated: routes, OpenAPI/codegen, flows, persistence, deps, public surface, debt/backlog.
 - Files patched.
 - Tally result, including whether failures were pre-existing.
+- Every touched module not updated, with reason.
 - Any modules skipped because their doc trio is incomplete.
 
 ## Bundled Resources
