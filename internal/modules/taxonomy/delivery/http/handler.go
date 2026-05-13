@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	taxonomyapi "metaldocs/internal/modules/taxonomy/api"
 	"metaldocs/internal/modules/taxonomy/application"
 	"metaldocs/internal/modules/taxonomy/domain"
 )
@@ -48,22 +49,26 @@ func NewHandler(profiles *application.ProfileService, areas *application.AreaSer
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v2/taxonomy/profiles", h.listProfiles)
-	mux.HandleFunc("POST /api/v2/taxonomy/profiles", h.createProfile)
-	mux.HandleFunc("GET /api/v2/taxonomy/profiles/{code}", h.getProfile)
-	mux.HandleFunc("PATCH /api/v2/taxonomy/profiles/{code}", h.updateProfile)
-	mux.HandleFunc("DELETE /api/v2/taxonomy/profiles/{code}", h.archiveProfile)
-	mux.HandleFunc("PUT /api/v2/taxonomy/profiles/{code}/default-template", h.setDefaultTemplate)
-
-	mux.HandleFunc("GET /api/v2/taxonomy/areas", h.listAreas)
-	mux.HandleFunc("POST /api/v2/taxonomy/areas", h.createArea)
-	mux.HandleFunc("GET /api/v2/taxonomy/areas/{code}", h.getArea)
-	mux.HandleFunc("PUT /api/v2/taxonomy/areas/{code}", h.updateArea)
-	mux.HandleFunc("DELETE /api/v2/taxonomy/areas/{code}", h.archiveArea)
-
-	mux.HandleFunc("GET /api/v2/taxonomy/families", h.listFamilies)
-	mux.HandleFunc("POST /api/v2/taxonomy/families", h.createFamily)
-	mux.HandleFunc("GET /api/v2/taxonomy/families/{code}", h.getFamily)
-	mux.HandleFunc("PATCH /api/v2/taxonomy/families/{code}", h.updateFamily)
-	mux.HandleFunc("DELETE /api/v2/taxonomy/families/{code}", h.deactivateFamily)
+	generated := taxonomyapi.ServerInterfaceWrapper{
+		Handler: h,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		},
+	}
+	mux.HandleFunc("GET /api/v2/taxonomy/profiles", generated.ListTaxonomyProfilesV2)
+	mux.HandleFunc("POST /api/v2/taxonomy/profiles", generated.CreateTaxonomyProfileV2)
+	mux.HandleFunc("GET /api/v2/taxonomy/profiles/{code}", generated.GetTaxonomyProfileV2)
+	mux.HandleFunc("PATCH /api/v2/taxonomy/profiles/{code}", generated.UpdateTaxonomyProfileV2)
+	mux.HandleFunc("DELETE /api/v2/taxonomy/profiles/{code}", generated.ArchiveTaxonomyProfileV2)
+	mux.HandleFunc("PUT /api/v2/taxonomy/profiles/{code}/default-template", generated.SetTaxonomyProfileDefaultTemplateV2)
+	mux.HandleFunc("GET /api/v2/taxonomy/areas", generated.ListTaxonomyAreasV2)
+	mux.HandleFunc("POST /api/v2/taxonomy/areas", generated.CreateTaxonomyAreaV2)
+	mux.HandleFunc("GET /api/v2/taxonomy/areas/{code}", generated.GetTaxonomyAreaV2)
+	mux.HandleFunc("PUT /api/v2/taxonomy/areas/{code}", generated.UpdateTaxonomyAreaV2)
+	mux.HandleFunc("DELETE /api/v2/taxonomy/areas/{code}", generated.ArchiveTaxonomyAreaV2)
+	mux.HandleFunc("GET /api/v2/taxonomy/families", generated.ListTaxonomyFamiliesV2)
+	mux.HandleFunc("POST /api/v2/taxonomy/families", generated.CreateTaxonomyFamilyV2)
+	mux.HandleFunc("GET /api/v2/taxonomy/families/{code}", generated.GetTaxonomyFamilyV2)
+	mux.HandleFunc("PATCH /api/v2/taxonomy/families/{code}", generated.UpdateTaxonomyFamilyV2)
+	mux.HandleFunc("DELETE /api/v2/taxonomy/families/{code}", generated.DeactivateTaxonomyFamilyV2)
 }
