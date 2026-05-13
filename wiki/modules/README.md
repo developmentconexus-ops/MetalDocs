@@ -27,13 +27,20 @@
 - [templates_v2.md](templates_v2.md) - Arc42 + C4 templates backend module (Maturity: L3, Last verified: 2026-05-12)
 - [templates_v2-tech-debt.md](templates_v2-tech-debt.md) - templates_v2 tech-debt register
 
-## Partial / Legacy Module Pages
+## Governed Module Pages (Focused Scope)
 
-- [frontend-primitives.md](frontend-primitives.md) - frontend primitives notes (L1 partial)
-- [novo-documento-wizard.md](novo-documento-wizard.md) - wizard feature notes (L1 partial)
-- [templates-v2.md](templates-v2.md) - predecessor frontend-heavy templates page (L1 partial, candidate retire/promote)
-- [render-fanout.md](render-fanout.md) - stub (L0)
-- [search.md](search.md) - stub (L0)
+- [frontend-primitives.md](frontend-primitives.md) - frontend primitives module notes (Maturity: L2, focused scope)
+- [frontend-primitives-tech-debt.md](frontend-primitives-tech-debt.md) - frontend-primitives tech-debt register
+- [novo-documento-wizard.md](novo-documento-wizard.md) - new-document wizard module notes (Maturity: L2, focused scope)
+- [novo-documento-wizard-tech-debt.md](novo-documento-wizard-tech-debt.md) - novo-documento-wizard tech-debt register
+- [render-fanout.md](render-fanout.md) - render fanout pipeline module notes (Maturity: L2, focused scope)
+- [render-fanout-tech-debt.md](render-fanout-tech-debt.md) - render-fanout tech-debt register
+- [search.md](search.md) - search module notes (Maturity: L2, focused scope)
+- [search-tech-debt.md](search-tech-debt.md) - search tech-debt register
+
+## Legacy / Predecessor
+
+- [templates-v2.md](templates-v2.md) - predecessor frontend-heavy templates page (Maturity: L1, retained for historical context)
 
 ## Audit
 

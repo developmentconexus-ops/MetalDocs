@@ -1,0 +1,3 @@
+# Sync log - render-fanout
+
+> Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
