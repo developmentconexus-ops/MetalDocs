@@ -65,7 +65,7 @@ No TanStack queries — all data from wizard state + auth store.
 
 | Item | Status | Strategy |
 |---|---|---|
-| `POST /api/v2/templates` | Exists but wiring deferred | Mock: navigate('/templates-v2') + TODO tag |
+| `POST /api/v1/templates` | Exists but wiring deferred | Mock: navigate('/templates') + TODO tag |
 | Permissions API | Missing | N/A (visual only) |
 | Structure/docx upload | Missing | N/A (visual only) |
 

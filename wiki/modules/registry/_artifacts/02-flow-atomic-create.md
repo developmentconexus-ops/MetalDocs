@@ -1,14 +1,14 @@
 # Phase 2 — Flow trace: AtomicCreateControlledDocument
 
-`POST /api/v2/controlled-documents`
+`POST /api/v1/controlled-documents`
 
 ### 1. Entry point
 
 | OpenAPI op | Generated server stub | Handler |
 |---|---|---|
-| `POST /api/v2/controlled-documents` `operationId: atomicCreateControlledDocument` — `api/openapi/v1/partials/registry.yaml:2`, `api/openapi/v1/partials/registry.yaml:51` | Route registration to wrapper: `internal/modules/registry/api/api.gen.go:1244`; wrapper method: `internal/modules/registry/api/api.gen.go:875`; interface method: `internal/modules/registry/api/api.gen.go:720` | `internal/modules/registry/delivery/http/routes.go:43` (`AtomicCreateControlledDocument`) |
+| `POST /api/v1/controlled-documents` `operationId: atomicCreateControlledDocument` — `api/openapi/v1/partials/registry.yaml:2`, `api/openapi/v1/partials/registry.yaml:51` | Route registration to wrapper: `internal/modules/registry/api/api.gen.go:1244`; wrapper method: `internal/modules/registry/api/api.gen.go:875`; interface method: `internal/modules/registry/api/api.gen.go:720` | `internal/modules/registry/delivery/http/routes.go:43` (`AtomicCreateControlledDocument`) |
 
-Note: live OpenAPI spec is under `api/openapi/v1/partials/registry.yaml` even though the HTTP path is `/api/v2/...` — there is no `v2` openapi tree.
+Note: live OpenAPI spec is under `api/openapi/v1/partials/registry.yaml` even though the HTTP path is `/api/v1/...` — there is no `v2` openapi tree.
 
 ### 2. Call chain (16 layers)
 

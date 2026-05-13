@@ -1,4 +1,4 @@
-# Phase 2 — Data-flow trace: GET /api/v2/taxonomy/families (listFamilies)
+# Phase 2 — Data-flow trace: GET /api/v1/taxonomy/families (listFamilies)
 
 ## 1. Entry point
 
@@ -6,7 +6,7 @@
 |---|---|---|
 | API bootstrap | `taxonomyModule.RegisterRoutes(mux)` | `apps/api/cmd/metaldocs-api/main.go:201` |
 | Module wiring | `(*Module).RegisterRoutes` | `internal/modules/taxonomy/module.go:36` |
-| Route registration (ServeMux) | `mux.HandleFunc("GET /api/v2/taxonomy/families", h.listFamilies)` | `internal/modules/taxonomy/delivery/http/handler.go:64` |
+| Route registration (ServeMux) | `mux.HandleFunc("GET /api/v1/taxonomy/families", h.listFamilies)` | `internal/modules/taxonomy/delivery/http/handler.go:64` |
 | Handler | `(*Handler).listFamilies` | `internal/modules/taxonomy/delivery/http/routes_families.go:20` |
 | OpenAPI op / generated stub | n/a — no OpenAPI spec / no generated stub | — |
 
@@ -36,7 +36,7 @@ Tx boundary: none.
 |---|---|---|---|---|
 | `internal/modules/taxonomy/infrastructure/family_repository.go:39-45` | SELECT | `metaldocs.document_families` | **none** — `document_families` has no `tenant_id` column (global catalog) | **VIOLATION/N/A — no in-tx authz call**; module has no `authz.Require` usage |
 
-Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:174-180` — `GET /api/v2/taxonomy/families*` → `iamdomain.CapDocView`. Any authenticated user with `doc.view` lists the global family catalog regardless of tenant.
+Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:174-180` — `GET /api/v1/taxonomy/families*` → `iamdomain.CapDocView`. Any authenticated user with `doc.view` lists the global family catalog regardless of tenant.
 
 ## 5. Response shape
 

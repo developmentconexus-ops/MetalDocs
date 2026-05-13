@@ -1,6 +1,6 @@
 # NOTES — novo-template-estrutura
 
-**Target route:** `/templates-v2/new?step=3`
+**Target route:** `/templates/new?step=3`
 **Owning feature:** `frontend/apps/web/src/features/templates/`
 **Tier:** Light (per `metaldocs-screen-implementation` skill v1.3)
 

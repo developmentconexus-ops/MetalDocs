@@ -1,6 +1,6 @@
 # template-editor — Design notes
 
-Functional base: `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` (legacy template editor, route `/templates-v2/:templateId/versions/:versionNum`).
+Functional base: `frontend/apps/web/src/features/templates/TemplateAuthorPage.tsx` (legacy template editor, route `/templates/:templateId/versions/:versionNum`).
 
 Visual reference: `template-editor.html` (1194 HTML + 1169 CSS) — Swiss/minimal chrome with topbar + left/right collapsible rails + centered doc canvas. Topbar pattern also informed by `design-source/editor/`.
 

@@ -26,7 +26,7 @@
 
 - **auth → iam (OUT)**: `iamdomain.Role`, `iamdomain.RoleProvider`, `iamdomain.RoleAdminRepository`, `iamdomain.WithAuthContext` (4+ sites).
 - **iam → auth (IN)**: `iam/delivery/http/admin_handler.go:13` imports `authdomain` for `ManagedUser` listing.
-- **documents/templates_v2 → auth (IN)**: consume `authdomain.CurrentUserFromContext` after middleware injection.
+- **documents/templates → auth (IN)**: consume `authdomain.CurrentUserFromContext` after middleware injection.
 - **platform → auth (IN)**: composition root in `apps/api/cmd/metaldocs-api/main.go` wires Service + Middleware + Handler; `internal/platform/authn` likely supplies enabled flag.
 
 Bidirectional auth↔iam circularity is real: auth Identity holds `[]iamdomain.Role`; IAM repository holds `iam_users` rows seeded by auth. Captured for §11.

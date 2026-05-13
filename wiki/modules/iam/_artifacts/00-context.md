@@ -58,7 +58,7 @@ These are flagged so we can recall later — none block Phase 1.
 
 ## Coverage scope frozen
 
-`internal/modules/iam/` (in-repo Go module). Cross-module IAM consumers (`approval`, `documents`, `templates_v2`, wiring) appear in §3 (cross-deps) but are NOT documented here — their own module docs own them.
+`internal/modules/iam/` (in-repo Go module). Cross-module IAM consumers (`approval`, `documents`, `templates`, wiring) appear in §3 (cross-deps) but are NOT documented here — their own module docs own them.
 
 Out of scope:
 - Authentication (login, sessions, JWT issuance) — handled by `internal/modules/auth/` (separate module).

@@ -15,7 +15,7 @@
 - Action buttons: "Visualizar documento" (→ `/documents-v2/:id`), "Iniciar revisão" (RBAC-gated), "Copiar link" (clipboard)
 - KPI: Versão atual (`revision_version`)
 - AboutCard: owner banner (`created_by` + `created_at`), Fact: Tipo, Fact: Área
-- SignoffPipeline (`GET /api/v2/documents/:id/approval-instance` → stages + signoffs with display names)
+- SignoffPipeline (`GET /api/v1/documents/:id/approval-instance` → stages + signoffs with display names)
 - ObsoleteBanner (status === 'obsolete')
 
 ### CUT (no backend / no domain concept)
@@ -40,4 +40,4 @@
 - DocCardSmall tilt: pure CSS `perspective` + `rotateX/Y` — keep as-is, no domain behavior
 - SignoffPipeline: `ActorUserID` field in API response actually contains display name snapshot (confirmed in handler code)
 - ObsoleteBanner: show when `document.status === 'obsolete'` OR when controlled document status is obsolete/superseded
-- "Iniciar revisão": disabled for non-authors via RBAC; endpoint is `POST /api/v2/controlled-documents/:id/revisions`
+- "Iniciar revisão": disabled for non-authors via RBAC; endpoint is `POST /api/v1/controlled-documents/:id/revisions`

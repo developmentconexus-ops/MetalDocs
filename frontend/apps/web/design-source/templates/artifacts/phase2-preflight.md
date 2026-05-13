@@ -1,6 +1,6 @@
 # Phase 2 — Pre-flight
 
-**Screen:** Templates List (`/templates-v2`)
+**Screen:** Templates List (`/templates`)
 **Date:** 2026-05-07
 
 ## Summary
@@ -8,13 +8,13 @@
 | Step | Status | Notes |
 |---|---|---|
 | 0. Read primitives + styles + tokens | Done | StatusPill, Avatar, WorkspaceHeroHeader, Icon, CodeChip, styles.css scanned |
-| 1. Codegen | Skipped | `/api/v2/templates` already wired in `features/templates/api/templatesV2.ts`. No new endpoints introduced this phase |
+| 1. Codegen | Skipped | `/api/v1/templates` already wired in `features/templates/api/templatesV2.ts`. No new endpoints introduced this phase |
 | 2. Primitive extension (WorkspaceHeroHeader) | Done | Added optional `kicker` + `action`; made `searchQuery`/`onSearchQueryChange` optional |
 | 2a. Primitive CSS audit | Done | Avatar drift recorded but not fixed (out of scope — would touch all callers) |
 | 2b. Global leakage map | Done | Bare-element selectors limited to `table/th/td/tr` + 2 eigenpal portal overrides; no risk for templates page |
 | 3. Status-meta SSOT | Skipped | Reused `StatusPill` (`DocumentStatus` union already covers `published` / `draft` / `archived`); no per-domain meta required |
 | 4. New shared atom — TabBar | Done | Generic ARIA tablist primitive in `components/ui/` |
-| 5. Route stub | N/A | `/templates-v2` route already registered → `pages/TemplatesListRoutePage.tsx` → `TemplatesListPage`. Phase 3 will rewrite the page body in place. No stub committed (would break the working page) |
+| 5. Route stub | N/A | `/templates` route already registered → `pages/TemplatesListRoutePage.tsx` → `TemplatesListPage`. Phase 3 will rewrite the page body in place. No stub committed (would break the working page) |
 | 6. Migrate listTemplates to apiFetch | Done | Single function migrated; other endpoints in `templatesV2.ts` deferred (out of phase 2 scope) |
 
 ## Primitive CSS audit
@@ -61,7 +61,7 @@ None. All needs covered by existing tokens (`--brand`, `--text*`, `--border`, `-
 
 - **Codegen (Step 1)** — Endpoint already wired in pre-existing `templatesV2.ts`; no OpenAPI regen needed.
 - **Status-meta SSOT (Step 3)** — Templates use `StatusPill` directly with derived status (`archived_at` → archived, `published_version_id` → published, else draft). No per-domain meta map needed.
-- **Route stub (Step 5)** — `/templates-v2` already routes to `TemplatesListRoutePage` → `TemplatesListPage`. Phase 3 will rewrite `TemplatesListPage` body in place per scope; replacing with a `<div>Loading…</div>` stub now would regress the working page.
+- **Route stub (Step 5)** — `/templates` already routes to `TemplatesListRoutePage` → `TemplatesListPage`. Phase 3 will rewrite `TemplatesListPage` body in place per scope; replacing with a `<div>Loading…</div>` stub now would regress the working page.
 - **Computed-style probe (Step 2a §"Pixel Parity Playbook §1")** — No dev server in subagent context. Phase 3b page-assembly will probe.
 - **StatusPill / Avatar drift fixes** — Out of phase 2 scope. Logged in artifact for future cleanup. Not blocking templates list assembly because:
   - StatusPill: raw px values are dimensions (consistent across uses), not unauthorised colours.

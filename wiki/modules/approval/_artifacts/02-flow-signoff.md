@@ -1,13 +1,13 @@
 ## Task
 
-For operation `SignoffByDocument` (HTTP `POST /api/v2/documents/{id}/signoffs`) in module `internal/modules/documents/approval`, produce an artifact at `wiki/modules/approval/_artifacts/02-flow-signoff.md` tracing the call end-to-end.
+For operation `SignoffByDocument` (HTTP `POST /api/v1/documents/{id}/signoffs`) in module `internal/modules/documents/approval`, produce an artifact at `wiki/modules/approval/_artifacts/02-flow-signoff.md` tracing the call end-to-end.
 
 ### 1. Entry point
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | NOT FOUND (`/api/v2/documents/{id}/signoffs`) | `api/openapi/spec2.yaml` searched via `rg -n "documents/\\{id\\}/signoff|documents/\\{id\\}/signoffs"` |
-| Generated server stub | NOT FOUND (`ServerInterface` method for `/api/v2/documents/{id}/signoffs`) | `internal/**/api/*.gen.go` searched via `rg -n "SignoffByDocument|signoff"` |
+| OpenAPI op | NOT FOUND (`/api/v1/documents/{id}/signoffs`) | `api/openapi/spec2.yaml` searched via `rg -n "documents/\\{id\\}/signoff|documents/\\{id\\}/signoffs"` |
+| Generated server stub | NOT FOUND (`ServerInterface` method for `/api/v1/documents/{id}/signoffs`) | `internal/**/api/*.gen.go` searched via `rg -n "SignoffByDocument|signoff"` |
 | Handler | `Handler.SignoffByDocumentHandler` | `internal/modules/documents/approval/http/doc_approval_handler.go:51` |
 
 ### 2. Call chain
@@ -99,8 +99,8 @@ Tripwire pairing (`approval_signoffs` INSERT):
 
 ### 5. Response shape
 
-- 2xx schema ref for `POST /api/v2/documents/{id}/signoffs`: NOT FOUND in searched OpenAPI path set (`api/openapi/spec2.yaml` contains `POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs` at `api/openapi/spec2.yaml:73`).
-- Error responses declared on `POST /api/v2/documents/{id}/signoffs`: NOT FOUND in OpenAPI for this path.
+- 2xx schema ref for `POST /api/v1/documents/{id}/signoffs`: NOT FOUND in searched OpenAPI path set (`api/openapi/spec2.yaml` contains `POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs` at `api/openapi/spec2.yaml:73`).
+- Error responses declared on `POST /api/v1/documents/{id}/signoffs`: NOT FOUND in OpenAPI for this path.
 - Handler runtime success response for document route: `contracts.SignoffResponse` via `WriteJSON(..., http.StatusOK, ...)` at `internal/modules/documents/approval/http/doc_approval_handler.go:92` and `:136`.
 
 ### 6. Cross-references

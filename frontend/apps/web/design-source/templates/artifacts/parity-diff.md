@@ -1,6 +1,6 @@
 # Phase 3b — Parity Diff (numerical, region-by-region)
 
-**Method:** `getComputedStyle` + `getBoundingClientRect` snapshot at 1440 viewport, run on both reference (design-source preview port 4181) and impl (port 4174). Reference = `templates.html` rendering `<Templates/>`. Impl = `/templates-v2`.
+**Method:** `getComputedStyle` + `getBoundingClientRect` snapshot at 1440 viewport, run on both reference (design-source preview port 4181) and impl (port 4174). Reference = `templates.html` rendering `<Templates/>`. Impl = `/templates`.
 
 ## Hero header
 

@@ -27,7 +27,7 @@ Test Files  3 passed | 1 skipped (4)
 
 ## Smoke trace (manual against existing page render)
 
-1. Navigate `/templates-v2` → click any draft → lands on `/templates-v2/<id>/versions/<n>`.
+1. Navigate `/templates` → click any draft → lands on `/templates/<id>/versions/<n>`.
 2. Inner rail shows ← Voltar, Variáveis (active, brand-pale background), Estrutura.
 3. PlaceholderCatalogPanel renders 280px panel with detected/available pills.
 4. Click Estrutura → panel swaps to TemplateOutlinePanel; empty-state copy when doc has no headings.
@@ -52,7 +52,7 @@ No new console errors attributable to changed files.
 - `api/templatesV2.ts` (`submitForReview` → `apiFetch` so it throws `ApiError`)
 - `routes.tsx` (lazy import path updated)
 - `__tests__/template-author-page-convergence.test.tsx` (mock paths refreshed; describe.skip until rewrite)
-- `wiki/modules/templates-v2.md` (new section, refreshed Key files)
+- `wiki/modules/templates.md` (new section, refreshed Key files)
 - `wiki/backlog/template-editor.md` (new — version-history, comments, outline-future-enhancements, design-toolbar-parity Decision A, placeholder-catalog-restyle, convergence-test-rewrite, submitForReview-error-codes)
 
 ## Status

@@ -22,7 +22,7 @@
 | `metaldocs/internal/modules/documents/approval/http` | `internal/modules/documents/approval/http/errors.go:17` | `authz.ErrCapabilityDenied`, `iamdomain.UserIDFromContext` | `? from iam/authz`, `iam/domain` |
 | `metaldocs/internal/modules/documents/delivery/http` | `internal/modules/documents/delivery/http/handler.go:17` | `iamapp.ErrAccessDenied`, `iamapp.ErrCapabilityDenied`, `iamdomain.WithAuthContext`, `iamdomain.UserIDFromContext`, `iamdomain.RolesFromContext` | `? from iam/application`, `iam/domain` |
 | `metaldocs/internal/modules/documents/http` | `internal/modules/documents/http/view_handler.go:9` | `authz.ErrCapabilityDenied`, `iamdomain.UserIDFromContext` | `? from iam/authz`, `iam/domain` |
-| `metaldocs/internal/modules/templates_v2/delivery/http` | `internal/modules/templates_v2/delivery/http/routes_lifecycle.go:8` | `iamdomain.RolesFromContext`, `iamdomain.UserIDFromContext` | `? from iam/domain` |
+| `metaldocs/internal/modules/templates/delivery/http` | `internal/modules/templates/delivery/http/routes_lifecycle.go:8` | `iamdomain.RolesFromContext`, `iamdomain.UserIDFromContext` | `? from iam/domain` |
 | `metaldocs/internal/modules/auth/application` | `internal/modules/auth/application/service.go:18` | `iamdomain.Role` | `? from iam/domain` |
 | `metaldocs/internal/modules/auth/delivery/http` | `internal/modules/auth/delivery/http/middleware.go:10` | `iamdomain.WithAuthContext`, `iamdomain.Role` | `? from iam/domain` |
 | `metaldocs/internal/modules/auth/domain` | `internal/modules/auth/domain/model.go:6` | `iamdomain.Role` | `? from iam/domain` |

@@ -230,10 +230,10 @@ The three existing jobs (`backend-codegen-drift`, `frontend-codegen-drift`, `ope
 ## 9. What's next
 
 **RFC 9457 envelope rollout — DONE (Plan 7, 2026-05-11):**
-All modules now emit `application/problem+json` on 4xx/5xx. Closes: registry T-003, approval T-001/T-003, documents T-001, auth T-003, iam T-006, audit T-002, templates_v2 T-005, taxonomy T-008.
+All modules now emit `application/problem+json` on 4xx/5xx. Closes: registry T-003, approval T-001/T-003, documents T-001, auth T-003, iam T-006, audit T-002, templates T-005, taxonomy T-008.
 
 **Plan 8 — OpenAPI / contract-first completion (pending):**
-1. Add OpenAPI ops for documents (rename/duplicate/archive/comments/finalize), approval signoff/cancel, templates_v2 12 hand-rolled routes, taxonomy 16 routes, audit operationId.
+1. Add OpenAPI ops for documents (rename/duplicate/archive/comments/finalize), approval signoff/cancel, templates 12 hand-rolled routes, taxonomy 16 routes, audit operationId.
 2. Regen via `make oapi`; rewire each module's `Register` to mount generated `ServerInterface`.
 3. Flip `continue-on-error: false` in CI.
 

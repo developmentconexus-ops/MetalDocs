@@ -8,7 +8,7 @@
 
 Implement full visual fidelity to design. Missing API fields use hardcoded mock data flagged inline:
 ```ts
-// TODO [BACKLOG: caixa-aprovacao.md]: needs <fieldName> from GET /api/v2/approval/inbox
+// TODO [BACKLOG: caixa-aprovacao.md]: needs <fieldName> from GET /api/v1/approval/inbox
 ```
 All mock fields catalogued in `wiki/backlog/caixa-aprovacao.md`.
 
@@ -61,5 +61,5 @@ See `wiki/backlog/caixa-aprovacao.md` for full list. Summary:
 5. `InboxItem.summary` — revision summary
 6. `InboxItem.changes` — edit count
 7. `InboxItem.version` — version transition string
-8. `GET /api/v2/approval/my-decisions?days=14` — heatmap history
+8. `GET /api/v1/approval/my-decisions?days=14` — heatmap history
 9. Signoff flow — approve/reject action path (design + implement)

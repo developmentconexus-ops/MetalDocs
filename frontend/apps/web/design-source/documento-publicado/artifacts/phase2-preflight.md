@@ -89,7 +89,7 @@ Added to `src/features/documents/api/documentsV2.ts`:
 - `SignoffRecord` type
 - `StageInstance` type
 - `ApprovalInstanceResponse` type
-- `getApprovalInstance(documentId: string)` function → `GET /api/v2/documents/:id/approval-instance`
+- `getApprovalInstance(documentId: string)` function → `GET /api/v1/documents/:id/approval-instance`
 
 ---
 

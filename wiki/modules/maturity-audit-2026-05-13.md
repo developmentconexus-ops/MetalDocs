@@ -32,7 +32,7 @@ Hard blockers before calling the module wiki mature:
 | `audit` | L3 candidate | Full trio, artifacts, sync log, route truth table, key files, tally PASS. | Add explicit maturity stamp; sync after latest implementation to reach L4. |
 | `documents` | L3 candidate | Full trio, artifacts, sync log, route truth table, key files, tally PASS. | Tally warns T-007/T-010 have no backlog rows; add maturity stamp. |
 | `taxonomy` | L3 candidate | Full trio, artifacts, sync log, route truth table, key files, tally PASS. | Add maturity stamp; sync after latest implementation to reach L4. |
-| `templates_v2` | L3 candidate | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing key-file block; many spec-missing routes remain documented debt. |
+| `templates` | L3 candidate | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing key-file block; many spec-missing routes remain documented debt. |
 | `approval` | L2 | Full trio and artifacts, route truth table present, tally PASS. | No sync log; no key-file block; missing maturity stamp. |
 | `auth` | L2 | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing maturity stamp; L4 not yet evidenced. |
 | `editor-chrome` | L2 | Full trio and artifacts, tally PASS. | No sync log; frontend maturity profile not explicitly stamped. |
@@ -41,7 +41,7 @@ Hard blockers before calling the module wiki mature:
 | `registry` | L2 | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing maturity stamp; contract status still wrapper-only. |
 | `frontend-primitives` | L2 (focused scope) | Module page now has maturity stamp, tech-debt, backlog, and artifact/sync-log scaffolding. | Expand coverage from two primitives to full `components/ui` surface. |
 | `novo-documento-wizard` | L2 (focused scope) | Module page now has maturity stamp, tech-debt, backlog, and artifact/sync-log scaffolding. | Consolidate route/API truth links and deferred control contracts. |
-| `templates-v2` | L1 (predecessor) | Explicitly marked predecessor/frontend-heavy historical page. | Keep as legacy reference or retire after complete migration path is documented. |
+| `templates` | L1 (predecessor) | Explicitly marked predecessor/frontend-heavy historical page. | Keep as legacy reference or retire after complete migration path is documented. |
 | `render-fanout` | L2 (focused scope) | Stub promoted with governance companions and artifact/sync-log scaffolding. | Build full Arc42/C4 deep doc from fanout + resolver code surface. |
 | `search` | L2 (focused scope) | Stub promoted with governance companions and artifact/sync-log scaffolding. | Build full Arc42/C4 deep doc and complete entity/indexing contract. |
 
@@ -58,7 +58,7 @@ Hard blockers before calling the module wiki mature:
 | `iam` | PASS | Counts aligned. |
 | `registry` | PASS | Counts aligned. |
 | `taxonomy` | PASS | Actual 5/5/6 matches stated. |
-| `templates_v2` | PASS | Actual 4/6/4 matches stated. |
+| `templates` | PASS | Actual 4/6/4 matches stated. |
 
 ## API Contract Signals
 
@@ -68,7 +68,7 @@ Spec-missing route rows are well documented, which is good. They are product/arc
 |---|---:|
 | `approval` | 16 |
 | `taxonomy` | 16 |
-| `templates_v2` | 13 |
+| `templates` | 13 |
 | `documents` | 11 |
 | `iam` | 3 |
 | `audit`, `auth`, `registry` | 0 |
@@ -86,7 +86,7 @@ Frontend-only modules correctly do not require API route truth tables unless the
    - `frontend-primitives`
    - `novo-documento-wizard`
 5. Decide final disposition for predecessor page:
-   - `templates-v2` (retain as legacy reference or retire)
+   - `templates` (retain as legacy reference or retire)
 5. After each future implementation, use `metaldocs-module-doc-sync` to move touched L3 modules to L4 current.
 
 ## Recommendation

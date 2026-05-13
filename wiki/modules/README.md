@@ -24,8 +24,8 @@
 - [registry-tech-debt.md](registry-tech-debt.md) - registry tech-debt register
 - [taxonomy.md](taxonomy.md) - Arc42 + C4 taxonomy module (Maturity: L3, Last verified: 2026-05-12)
 - [taxonomy-tech-debt.md](taxonomy-tech-debt.md) - taxonomy tech-debt register
-- [templates_v2.md](templates_v2.md) - Arc42 + C4 templates backend module (Maturity: L3, Last verified: 2026-05-12)
-- [templates_v2-tech-debt.md](templates_v2-tech-debt.md) - templates_v2 tech-debt register
+- [templates.md](templates.md) - Arc42 + C4 templates backend module (Maturity: L3, Last verified: 2026-05-12)
+- [templates-tech-debt.md](templates-tech-debt.md) - templates tech-debt register
 
 ## Governed Module Pages (Focused Scope)
 
@@ -40,7 +40,7 @@
 
 ## Legacy / Predecessor
 
-- [templates-v2.md](templates-v2.md) - predecessor frontend-heavy templates page (Maturity: L1, retained for historical context)
+- [templates.md](templates.md) - predecessor frontend-heavy templates page (Maturity: L1, retained for historical context)
 
 ## Audit
 

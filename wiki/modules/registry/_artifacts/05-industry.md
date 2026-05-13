@@ -7,7 +7,7 @@ Patterns drawn from `.claude/skills/metaldocs-module-doc/references/industry-pat
 - Source: https://www.rfc-editor.org/rfc/rfc9457.html (RFC 9457, 2023-07)
 - Quote: "A problem details object can be extended with additional members."
 - **Registry state:** NOT applied. Errors are emitted by `internal/platform/httpresponse/response.go:14-15` as the legacy envelope `{"code":"...","message":"..."}`. Both create (`routes.go:417..441`) and lifecycle (`routes.go:412-416`) paths use this envelope. `Content-Type: application/problem+json` is never set.
-- **Gap:** T-row Major — uniform spec compliance gap aligned with peer modules (templates_v2 T-005, documents T-001, audit T-002).
+- **Gap:** T-row Major — uniform spec compliance gap aligned with peer modules (templates T-005, documents T-001, audit T-002).
 
 ## IP-002 — Stripe-style idempotency (idempotency)
 
@@ -27,7 +27,7 @@ Patterns drawn from `.claude/skills/metaldocs-module-doc/references/industry-pat
 
 - Source: https://learn.openapis.org/best-practices.html (OAI 3.0.3, 2020)
 - Quote: "The OpenAPI Specification … is the standard for HTTP APIs."
-- **Registry state:** APPLIED. Module generates server stubs via `oapi-codegen` (`internal/modules/registry/api/api.gen.go`; cfg at `api/cfg.yaml`; spec partial at `api/openapi/v1/partials/registry.yaml`). All 8 routes registered through the generated `ServerInterfaceWrapper`. Drift caveat: spec lives under `v1/` even though URL is `/api/v2/` — Minor naming drift. Spec/handler drift on 422 `template_invalid` (declared in spec at `registry.yaml:73`; no handler branch) — captured in T-row.
+- **Registry state:** APPLIED. Module generates server stubs via `oapi-codegen` (`internal/modules/registry/api/api.gen.go`; cfg at `api/cfg.yaml`; spec partial at `api/openapi/v1/partials/registry.yaml`). All 8 routes registered through the generated `ServerInterfaceWrapper`. Drift caveat: spec lives under `v1/` even though URL is `/api/v1/` — Minor naming drift. Spec/handler drift on 422 `template_invalid` (declared in spec at `registry.yaml:73`; no handler branch) — captured in T-row.
 
 ## IP-006 — Forward-only migrations
 

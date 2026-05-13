@@ -1,4 +1,4 @@
-# Data-flow: renameDocument (PATCH /api/v2/documents/{id})
+# Data-flow: renameDocument (PATCH /api/v1/documents/{id})
 
 Last verified: 2026-05-10
 
@@ -8,18 +8,18 @@ Last verified: 2026-05-10
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | No `operationId` in `api/openapi/v1/openapi.yaml`; route is registered directly in the Go HTTP mux, not via OpenAPI codegen. | (unclear: operationId absent — PATCH /api/v2/documents/{id} is not in the spec) |
+| OpenAPI op | No `operationId` in `api/openapi/v1/openapi.yaml`; route is registered directly in the Go HTTP mux, not via OpenAPI codegen. | (unclear: operationId absent — PATCH /api/v1/documents/{id} is not in the spec) |
 | Generated server stub | None — no `api.gen.go` involvement; route bypasses codegen entirely. | (unclear: N/A — no generated stub) |
 | Handler | `Handler.renameDocument` | `internal/modules/documents/delivery/http/handler.go:285` |
 
-Route registration: `internal/modules/documents/delivery/http/handler.go:86` and `:115` (duplicate registration — both lines: `mux.HandleFunc("PATCH /api/v2/documents/{id}", h.renameDocument)`).
+Route registration: `internal/modules/documents/delivery/http/handler.go:86` and `:115` (duplicate registration — both lines: `mux.HandleFunc("PATCH /api/v1/documents/{id}", h.renameDocument)`).
 
 ---
 
 ## 2. Call chain
 
 ```
-HTTP PATCH /api/v2/documents/{id}
+HTTP PATCH /api/v1/documents/{id}
   → Handler.renameDocument                      handler.go:285
       → h.authorizeDocumentScope                handler.go:869
           Tier-1 gate: role check (not cap string)
@@ -102,4 +102,4 @@ The struct is returned by `h.svc.GetDocument` (re-fetch after rename) at `handle
 - **Idempotency:** No — PATCH, name field is overwritten on each call; repeated calls with the same name are safe but not idempotent in the HTTP sense (each call re-emits an audit event).
 - **Pagination:** N/A.
 - **Audit log emission:** Yes — `s.audit.Write` at `application/service.go:579`, action `"document.renamed"`, outside transaction, sink: `Audit` interface defined at `application/service.go:81`.
-- **Related handler duplicate:** Route `PATCH /api/v2/documents/{id}` registered at both `handler.go:86` and `handler.go:115` — the second registration overwrites the first in the stdlib mux (net/http last-wins semantics). Both point to the same `h.renameDocument` func so there is no behavioral difference, but the duplicate is a latent maintenance hazard.
+- **Related handler duplicate:** Route `PATCH /api/v1/documents/{id}` registered at both `handler.go:86` and `handler.go:115` — the second registration overwrites the first in the stdlib mux (net/http last-wins semantics). Both point to the same `h.renameDocument` func so there is no behavioral difference, but the duplicate is a latent maintenance hazard.

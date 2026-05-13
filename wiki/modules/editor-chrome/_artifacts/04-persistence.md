@@ -8,7 +8,7 @@ editor-chrome is a React primitive (`features/shared/components/editor-chrome/`)
 None.
 
 ### 2. Tables read or written but NOT owned
-None directly. Consumer pages (`TemplateEditorPage`, `DocumentEditorPage`) write to `templates` / `template_versions` and `documents` via REST → the templates_v2 / documents backend modules. Those writes are recorded in the respective module persistence maps (`wiki/modules/templates_v2.md`, `wiki/modules/documents.md`). editor-chrome itself is a UI shell with no data-layer side effects.
+None directly. Consumer pages (`TemplateEditorPage`, `DocumentEditorPage`) write to `templates` / `template_versions` and `documents` via REST → the templates / documents backend modules. Those writes are recorded in the respective module persistence maps (`wiki/modules/templates.md`, `wiki/modules/documents.md`). editor-chrome itself is a UI shell with no data-layer side effects.
 
 ### 3. Triggers, GUCs, functions
 None.

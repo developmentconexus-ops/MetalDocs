@@ -20,7 +20,7 @@ Performed during inline Phase 3 implementation:
 
 | # | Action | Expected | Observed |
 |---|---|---|---|
-| 1 | Nav to `/templates-v2/new?step=1`, pick Generic, advance | step=2, kicker "Etapa 2 de 5 · Template genérico" | ✓ |
+| 1 | Nav to `/templates/new?step=1`, pick Generic, advance | step=2, kicker "Etapa 2 de 5 · Template genérico" | ✓ |
 | 2 | Step 2 generic recap | "GEN" chip, "Genérico", "Aplicável a qualquer perfil" | ✓ |
 | 3 | Code preview generic | `TPL-GEN-XXX`, brand color, dashed brand-soft border | ✓ |
 | 4 | Type "ab" in name | Avançar disabled, footer label "Informe o nome para continuar" | ✓ |

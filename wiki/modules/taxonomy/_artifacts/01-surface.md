@@ -129,22 +129,22 @@ internal/modules/taxonomy/
 
 | Method | Path | Handler | Source |
 |---|---|---|---|
-| GET    | /api/v2/taxonomy/profiles | listProfiles | handler.go:51 |
-| POST   | /api/v2/taxonomy/profiles | createProfile | handler.go:52 |
-| GET    | /api/v2/taxonomy/profiles/{code} | getProfile | handler.go:53 |
-| PATCH  | /api/v2/taxonomy/profiles/{code} | updateProfile | handler.go:54 |
-| DELETE | /api/v2/taxonomy/profiles/{code} | archiveProfile | handler.go:55 |
-| PUT    | /api/v2/taxonomy/profiles/{code}/default-template | setDefaultTemplate | handler.go:56 |
-| GET    | /api/v2/taxonomy/areas | listAreas | handler.go:58 |
-| POST   | /api/v2/taxonomy/areas | createArea | handler.go:59 |
-| GET    | /api/v2/taxonomy/areas/{code} | getArea | handler.go:60 |
-| PUT    | /api/v2/taxonomy/areas/{code} | updateArea | handler.go:61 |
-| DELETE | /api/v2/taxonomy/areas/{code} | archiveArea | handler.go:62 |
-| GET    | /api/v2/taxonomy/families | listFamilies | handler.go:64 |
-| POST   | /api/v2/taxonomy/families | createFamily | handler.go:65 |
-| GET    | /api/v2/taxonomy/families/{code} | getFamily | handler.go:66 |
-| PATCH  | /api/v2/taxonomy/families/{code} | updateFamily | handler.go:67 |
-| DELETE | /api/v2/taxonomy/families/{code} | deactivateFamily | handler.go:68 |
+| GET    | /api/v1/taxonomy/profiles | listProfiles | handler.go:51 |
+| POST   | /api/v1/taxonomy/profiles | createProfile | handler.go:52 |
+| GET    | /api/v1/taxonomy/profiles/{code} | getProfile | handler.go:53 |
+| PATCH  | /api/v1/taxonomy/profiles/{code} | updateProfile | handler.go:54 |
+| DELETE | /api/v1/taxonomy/profiles/{code} | archiveProfile | handler.go:55 |
+| PUT    | /api/v1/taxonomy/profiles/{code}/default-template | setDefaultTemplate | handler.go:56 |
+| GET    | /api/v1/taxonomy/areas | listAreas | handler.go:58 |
+| POST   | /api/v1/taxonomy/areas | createArea | handler.go:59 |
+| GET    | /api/v1/taxonomy/areas/{code} | getArea | handler.go:60 |
+| PUT    | /api/v1/taxonomy/areas/{code} | updateArea | handler.go:61 |
+| DELETE | /api/v1/taxonomy/areas/{code} | archiveArea | handler.go:62 |
+| GET    | /api/v1/taxonomy/families | listFamilies | handler.go:64 |
+| POST   | /api/v1/taxonomy/families | createFamily | handler.go:65 |
+| GET    | /api/v1/taxonomy/families/{code} | getFamily | handler.go:66 |
+| PATCH  | /api/v1/taxonomy/families/{code} | updateFamily | handler.go:67 |
+| DELETE | /api/v1/taxonomy/families/{code} | deactivateFamily | handler.go:68 |
 
 ## 4. Migration list
 

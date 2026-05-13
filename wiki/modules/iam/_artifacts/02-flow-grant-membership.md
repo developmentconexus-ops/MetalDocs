@@ -30,8 +30,8 @@ Idempotency interactions:
 
 | Entity | From | To | Trigger | Capability required |
 |---|---|---|---|---|
-| `user_process_areas` membership (same user+tenant+area, active row exists) | prior row active (`effective_to IS NULL`) | prior row closed (`effective_to = newMembership.effective_from`) and new active row inserted | `POST /api/v2/iam/area-memberships` via `GrantAtomic` | tier-1 route capability `membership.manage` (`apps/api/cmd/metaldocs-api/permissions.go:196-197`) |
-| `user_process_areas` membership (no active row) | no active row | new active row inserted | `POST /api/v2/iam/area-memberships` via `Insert` | tier-1 route capability `membership.manage` (`apps/api/cmd/metaldocs-api/permissions.go:196-197`) |
+| `user_process_areas` membership (same user+tenant+area, active row exists) | prior row active (`effective_to IS NULL`) | prior row closed (`effective_to = newMembership.effective_from`) and new active row inserted | `POST /api/v1/iam/area-memberships` via `GrantAtomic` | tier-1 route capability `membership.manage` (`apps/api/cmd/metaldocs-api/permissions.go:196-197`) |
+| `user_process_areas` membership (no active row) | no active row | new active row inserted | `POST /api/v1/iam/area-memberships` via `Insert` | tier-1 route capability `membership.manage` (`apps/api/cmd/metaldocs-api/permissions.go:196-197`) |
 
 ## 4. SQL touched
 
@@ -50,7 +50,7 @@ Tripwire pairing anchors:
 
 ## 5. Response shape
 
-- 2xx schema ref: `(unclear: no OpenAPI declaration for POST /api/v2/iam/area-memberships in api/openapi/v1/openapi.yaml)`
+- 2xx schema ref: `(unclear: no OpenAPI declaration for POST /api/v1/iam/area-memberships in api/openapi/v1/openapi.yaml)`
 - Error responses declared on op + Problem type URI: `(unclear: no OpenAPI declaration for this operation in api/openapi/v1/openapi.yaml)`
 - Handler-emitted success body (code path): `internal/modules/iam/delivery/http/routes_memberships.go:88-93` returns HTTP `201` JSON object keys `userId`, `tenantId`, `areaCode`, `role`.
 
@@ -61,6 +61,6 @@ Tripwire pairing anchors:
 - Audit log emission: yes, conditional via `MembershipGovernanceLogger.Log` at `internal/modules/iam/application/area_membership_service.go:79` and `:101`; runtime wiring for API route passes `nil` logger at `apps/api/cmd/metaldocs-api/main.go:217`.
 
 Tier-1 authz middleware path for this route:
-- Permission mapping: `apps/api/cmd/metaldocs-api/permissions.go:196-197` maps `/api/v2/iam/area-memberships` to `iamdomain.CapMembershipManage`.
+- Permission mapping: `apps/api/cmd/metaldocs-api/permissions.go:196-197` maps `/api/v1/iam/area-memberships` to `iamdomain.CapMembershipManage`.
 - Middleware integration: `apps/api/cmd/metaldocs-api/main.go:170-174` wires resolver into IAM middleware.
 - Enforcement call: `internal/modules/iam/delivery/http/middleware.go:61-63` resolves route capability and `:83-85` enforces with `CapabilityService.CanDo`.

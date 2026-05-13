@@ -1320,7 +1320,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { icon: 'home',     label: 'Início',       path: '/' },
   { icon: 'library',  label: 'Documentos',   path: '/documents' },
-  { icon: 'template', label: 'Templates',    path: '/templates-v2' },
+  { icon: 'template', label: 'Templates',    path: '/templates' },
   { icon: 'registry', label: 'Registro',     path: '/registry-v2' },
   { icon: 'inbox',    label: 'Aprovações',   path: '/approvals' },
   { icon: 'audit',    label: 'Auditoria',    path: '/audit' },

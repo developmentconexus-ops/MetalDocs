@@ -140,16 +140,16 @@ Wizard introduces no new status enum. Reuses:
 
 | Endpoint | Path | Status | Shape | Backlog |
 |---|---|---|---|---|
-| List profiles | `GET /api/v2/profiles` | Existing | `ProfileDTO[]` | — |
-| List areas | `GET /api/v2/process-areas` | Existing | `ProcessAreaDTO[]` | — |
-| List templates by profile | `GET /api/v2/templates?doc_type=X` | Existing | `TemplateDTO[]` | — |
-| Create slot | `POST /api/v2/controlled-documents` | Existing | `{profileCode, processAreaCode, title, ownerUserId, overrideTemplateVersionId?}` → `ControlledDocumentDTO` | — |
-| Create document | `POST /api/v2/documents` | Existing | `{controlled_document_id, template_version_id?, name, form_data}` → `DocumentResponse` | — |
+| List profiles | `GET /api/v1/profiles` | Existing | `ProfileDTO[]` | — |
+| List areas | `GET /api/v1/process-areas` | Existing | `ProcessAreaDTO[]` | — |
+| List templates by profile | `GET /api/v1/templates?doc_type=X` | Existing | `TemplateDTO[]` | — |
+| Create slot | `POST /api/v1/controlled-documents` | Existing | `{profileCode, processAreaCode, title, ownerUserId, overrideTemplateVersionId?}` → `ControlledDocumentDTO` | — |
+| Create document | `POST /api/v1/documents` | Existing | `{controlled_document_id, template_version_id?, name, form_data}` → `DocumentResponse` | — |
 | Visibility model | — | Needed | enum + storage on `controlled_documents` | `wiki/backlog/novo-documento.md#visibility` |
 | Share / invitee model | — | Needed | new tables + endpoints | `wiki/backlog/novo-documento.md#sharing` |
-| Sequence preview | `GET /api/v2/controlled-documents/next-code?profile=X&area=Y` | Needed (optional polish) | `{nextCode: string}` | `wiki/backlog/novo-documento.md#sequence-preview` |
-| Template versions list | `GET /api/v2/templates/:id/versions` | Needed | `[{ID, VersionNum, IsPublished, CreatedAt, Label}]` | `wiki/backlog/novo-documento.md#template-versions` |
-| No-template doc create | `POST /api/v2/documents` with `template_version_id:null` | Needed | (existing endpoint relaxed) | `wiki/backlog/novo-documento.md#blank-template` |
+| Sequence preview | `GET /api/v1/controlled-documents/next-code?profile=X&area=Y` | Needed (optional polish) | `{nextCode: string}` | `wiki/backlog/novo-documento.md#sequence-preview` |
+| Template versions list | `GET /api/v1/templates/:id/versions` | Needed | `[{ID, VersionNum, IsPublished, CreatedAt, Label}]` | `wiki/backlog/novo-documento.md#template-versions` |
+| No-template doc create | `POST /api/v1/documents` with `template_version_id:null` | Needed | (existing endpoint relaxed) | `wiki/backlog/novo-documento.md#blank-template` |
 | Profile doc count | — | Needed (low priority) | aggregate | `wiki/backlog/novo-documento.md#profile-counts` |
 | Slot rollback | — | Needed (UX) | compensating delete on `controlled-documents` if doc create fails | `wiki/backlog/novo-documento.md#slot-rollback` |
 

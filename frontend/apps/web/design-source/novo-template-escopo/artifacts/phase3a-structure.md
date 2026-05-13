@@ -10,7 +10,7 @@
 | Created  | `src/features/templates/components/wizard/steps/StepScope.module.css` |
 | Created  | `src/features/shared/components/wizard/WizardFooter.tsx` |
 | Created  | `src/features/shared/components/wizard/WizardFooter.module.css` |
-| Modified | `src/features/templates/routes.tsx` — added `templates-v2/novo` route stub |
+| Modified | `src/features/templates/routes.tsx` — added `templates/novo` route stub |
 
 ## Class-Name Mapping
 
@@ -60,7 +60,7 @@ Design had a two-tab bar: "Para um perfil" (active) + "A partir de um documento"
 Profile cards show `— templates publicados` with a TODO comment referencing `wiki/backlog/novo-template-wizard.md`. No summary endpoint exists today. Mirrors the same pattern used in `StepProfile.tsx` for document counts.
 
 ### 6. Route stub added
-`routes.tsx` did not have the wizard route (Phase 2 gap). Added `templates-v2/novo` pointing to `TemplateWizardPage` with lazy import.
+`routes.tsx` did not have the wizard route (Phase 2 gap). Added `templates/novo` pointing to `TemplateWizardPage` with lazy import.
 
 ## TSC Result
 

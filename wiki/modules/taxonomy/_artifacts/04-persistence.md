@@ -33,7 +33,7 @@
 | created_at | TIMESTAMPTZ | NOT NULL DEFAULT NOW() |
 | alias | TEXT | NOT NULL, length CHECK (`0035`) |
 | tenant_id | UUID | NOT NULL DEFAULT `'ffffffff-...'` (DevTenantID) (`0122:4-6`) |
-| default_template_version_id | UUID | FK → templates_v2_template_version(id) (`0122:8-10`) |
+| default_template_version_id | UUID | FK → templates_template_version(id) (`0122:8-10`) |
 | owner_user_id | TEXT | (`0122:11`) |
 | editable_by_role | TEXT | NOT NULL DEFAULT 'admin' (`0122:12`) |
 | archived_at | TIMESTAMPTZ | nullable (`0122:13`) |
@@ -57,8 +57,8 @@
 
 | Table | Owner | R/W | Use |
 |---|---|---|---|
-| `templates_v2_template_version` | templates_v2 (`0120_templates_v2_init.sql:19`) | READ | `template_version_checker.go:14-17` joins to verify `IsPublished` + return owning profile_code |
-| `templates_v2_template` | templates_v2 | READ | same join (`template_version_checker.go:14-17`) |
+| `templates_template_version` | templates (`0120_templates_init.sql:19`) | READ | `template_version_checker.go:14-17` joins to verify `IsPublished` + return owning profile_code |
+| `templates_template` | templates | READ | same join (`template_version_checker.go:14-17`) |
 
 `HasActiveProfiles` (`family_repository.go:91-99`) queries only `document_profiles` (no joins).
 

@@ -1,7 +1,7 @@
 # Backlog: Novo Template Wizard
 
 > Created: 2026-05-09
-> Feature: `/templates-v2/new` (5-step wizard)
+> Feature: `/templates/new` (5-step wizard)
 > Worksheet: `frontend/apps/web/design-source/novo-template-escopo/IMPLEMENTATION.md`
 
 ---
@@ -72,10 +72,10 @@
 
 ### step3-editor-handoff
 **Context:** After Step 5 create, user expects to land in editor (esp. for `'blank'` start, where there's no real docx to import).
-**Blocked by:** No editor flow defined for templates wizard handoff. Today, `/templates-v2/new` Step 5 just calls create and (presumably) redirects to list.
+**Blocked by:** No editor flow defined for templates wizard handoff. Today, `/templates/new` Step 5 just calls create and (presumably) redirects to list.
 **File:** `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (Step 5 submit handler — not yet implemented).
 **TODO tag:** `TODO(novo-template-wizard:step3-editor-handoff)`
-**Resolution:** After successful create, redirect to `/templates-v2/<id>/edit?import=<blob-ref|blank>` based on `startingPoint`. Editor handles real upload (docx case) or stub-blank schema.json (blank case).
+**Resolution:** After successful create, redirect to `/templates/<id>/edit?import=<blob-ref|blank>` based on `startingPoint`. Editor handles real upload (docx case) or stub-blank schema.json (blank case).
 
 ---
 
@@ -108,7 +108,7 @@
 
 ### confirmacao-backend-submit
 **Status: RESOLVED 2026-05-10.**
-`TemplateWizardPage.handleSubmit` now calls `POST /api/v2/templates { key, name, description }` and redirects to `/templates-v2/<id>/versions/<n>` on success. Error state surfaces inline in `StepConfirmation` via `submitError` prop.
+`TemplateWizardPage.handleSubmit` now calls `POST /api/v2/templates { key, name, description }` and redirects to `/templates/<id>/versions/<n>` on success. Error state surfaces inline in `StepConfirmation` via `submitError` prop.
 
 ---
 
@@ -116,8 +116,8 @@
 **Context:** `POST /api/v2/templates` generated handler (`routes_generated.go`) only accepts `key`, `name`, `description?`, `doc_type_code?`. It hardcodes `Visibility: VisibilityPublic` and `ApproverRole: "approver"`. The wizard collects permissions (Step 4: by area / by role / all-company) and structure origin (Step 3: blank / docx) — none of those are forwarded to the create API.
 **Blocked by:** Backend API contract. The generated OpenAPI spec (`api.gen.go` `CreateTemplateV2JSONBody`) does not expose `visibility`, `areas`, `specific_areas`, or `approver_role` in the create body.
 **Files:**
-- Backend: `internal/modules/templates_v2/api/api.gen.go` (`CreateTemplateV2JSONBody`)
-- Backend: `internal/modules/templates_v2/delivery/http/routes_generated.go` (`CreateTemplateV2`)
+- Backend: `internal/modules/templates/api/api.gen.go` (`CreateTemplateV2JSONBody`)
+- Backend: `internal/modules/templates/delivery/http/routes_generated.go` (`CreateTemplateV2`)
 - Frontend: `frontend/apps/web/src/features/templates/api/templatesV2.ts` (`createTemplate`)
 - Frontend: `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (`handleSubmit`)
 **Resolution:**

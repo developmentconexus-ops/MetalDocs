@@ -1,4 +1,4 @@
-# Phase 2 — Flow trace: GET /api/v2/approval/inbox
+# Phase 2 — Flow trace: GET /api/v1/approval/inbox
 
 ## 1. Entry point
 

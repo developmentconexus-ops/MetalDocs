@@ -24,6 +24,6 @@ See [workflows/user-onboarding.md](user-onboarding.md) for the full step-by-step
 
 ## See also
 
-- [modules/templates-v2.md](../modules/templates-v2.md)
+- [modules/templates.md](../modules/templates.md)
 - [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md)
 - [concepts/placeholders.md](../concepts/placeholders.md)

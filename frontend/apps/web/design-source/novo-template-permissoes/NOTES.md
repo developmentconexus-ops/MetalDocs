@@ -1,6 +1,6 @@
 # NOTES — novo-template-permissoes
 
-**Target route:** `/templates-v2/new?step=4`
+**Target route:** `/templates/new?step=4`
 **Owning feature:** `frontend/apps/web/src/features/templates/`
 **Tier:** Heavy (2-col roles grid + 3-col areas grid → `@media` collapse rules needed)
 

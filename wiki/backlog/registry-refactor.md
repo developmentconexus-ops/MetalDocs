@@ -20,7 +20,7 @@
 | R-010 | Expose registry repository (or a read-only port) via `Module` so external wiring stops reaching into `infrastructure` | T-010 | S | minor | — | — | open | — |
 | R-011 | Restructure OpenAPI tree under `api/openapi/v2/partials/registry.yaml` (or move routes back to `/api/v1/`) | T-011 | S | minor | — | — | open | — |
 | R-012 | Add Go doc comments to remaining 79 exported registry symbols | T-012 | M | minor | — | — | open | — |
-| R-100 | Audit + remove residual references to legacy `profile_sequence_counters` (tests, fixtures, seed scripts) | maint:migration-cleanup | S | minor | — | — | open | — |
+| R-100 | Audit + remove residual references to legacy `profile_sequence_counters` (tests, fixtures, seed scripts) | maint:migration-cleanup | S | minor | — | — | verified closed | Plan 10 verification: runtime grep clean; table dropped by migration 0182 |
 
 ## Notes
 

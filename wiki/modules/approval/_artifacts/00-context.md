@@ -41,8 +41,8 @@ Rationale: migration `0142b_role_capabilities_v2_enforce.sql:200-209` attaches `
 
 ## Phase 2 op picks (planned — confirm against §1 before dispatching)
 1. **Read:** `GET /api/v1/approvals/inbox` → `InboxHandler` → `ListInboxItems` + `CountPendingForActor` (already mapped in stub at `read_service.go:152,222`).
-2. **Write (state-transitioning):** `POST /api/v2/documents/{id}/signoffs` → `SignoffByDocumentHandler` → `RecordSignoff` → eligibility/sod/quorum/freeze (J1 + 0180 trigger story).
-3. **State-transition:** `POST /api/v2/documents/{id}/finalize` → `SubmitRevisionForReview` (instance lifecycle: nothing → pending → in-review). Captures route resolution + `eligible_actor_ids` snapshot + `under_review` document transition.
+2. **Write (state-transitioning):** `POST /api/v1/documents/{id}/signoffs` → `SignoffByDocumentHandler` → `RecordSignoff` → eligibility/sod/quorum/freeze (J1 + 0180 trigger story).
+3. **State-transition:** `POST /api/v1/documents/{id}/finalize` → `SubmitRevisionForReview` (instance lifecycle: nothing → pending → in-review). Captures route resolution + `eligible_actor_ids` snapshot + `under_review` document transition.
 
 ## Open questions (deferred to tech-debt unless answered in artifacts)
 

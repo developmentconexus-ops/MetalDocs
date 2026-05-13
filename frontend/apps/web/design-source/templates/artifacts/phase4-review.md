@@ -32,7 +32,7 @@
 
 ## Verification (numerical, post-fix)
 
-Live preview probes on `http://localhost:4174/templates-v2`:
+Live preview probes on `http://localhost:4174/templates`:
 
 - Page padding: `24px 28px` ✓
 - Hero→tabs gap: `24px` ✓
@@ -41,7 +41,7 @@ Live preview probes on `http://localhost:4174/templates-v2`:
 - TabBar roving: 0/-1/-1/-1 across [Todos, Publicados, Rascunhos, Arquivados] ✓
 - TabBar focus-visible: `outline: 2px solid var(--brand)` rule live ✓
 - HeaderFlat @375: `padding: 0px` ✓
-- Card click: navigates `/templates-v2/:id/versions/:n` ✓
+- Card click: navigates `/templates/:id/versions/:n` ✓
 - aria-label: `Abrir template <name>` ✓
 
 ## Screenshot artifact note

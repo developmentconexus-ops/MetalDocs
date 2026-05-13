@@ -68,5 +68,5 @@ Add entries to this doc when new leakage is confirmed during Pixel Parity probes
 
 ## See also
 
-- `wiki/modules/templates-v2.md` — Step 2 where this was first documented
+- `wiki/modules/templates.md` — Step 2 where this was first documented
 - `wiki/backlog/novo-template-wizard.md#font-size-hero` — related design-token gap (26px between tokens)

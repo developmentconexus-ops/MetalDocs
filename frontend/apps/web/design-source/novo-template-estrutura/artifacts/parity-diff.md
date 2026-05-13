@@ -1,6 +1,6 @@
 # Parity diff — novo-template-estrutura
 
-**Tier:** Light. Reference HTML at `frontend/apps/web/design-source/novo-template-estrutura/novo-template-estrutura.html`. Snapshot via `mcp__Claude_Preview__preview_eval` on both reference and live `/templates-v2/new?step=3`.
+**Tier:** Light. Reference HTML at `frontend/apps/web/design-source/novo-template-estrutura/novo-template-estrutura.html`. Snapshot via `mcp__Claude_Preview__preview_eval` on both reference and live `/templates/new?step=3`.
 
 ## Method
 

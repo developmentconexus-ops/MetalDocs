@@ -20,7 +20,7 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 
 ### T-002 · Signoff & cancel document-scoped routes absent from OpenAPI
 - **Severity:** critical
-- **Surface:** `api/openapi/spec2.yaml` (no entry for `POST /api/v2/documents/{id}/signoff`, `/signoffs`, `/cancel`); routes wired manually in `internal/modules/documents/approval/http/router.go:6-30`
+- **Surface:** `api/openapi/spec2.yaml` (no entry for `POST /api/v1/documents/{id}/signoff`, `/signoffs`, `/cancel`); routes wired manually in `internal/modules/documents/approval/http/router.go:6-30`
 - **Observation:** Per Phase 2 trace, `SignoffByDocumentHandler`, `CancelByDocumentHandler`, and several v2 doc-action POSTs have no OpenAPI operationId or response schema. Frontend cannot codegen types; `ApprovalError` and `signoffOutcome` shapes are hand-maintained. Contract drift downstream consumers rely on.
 - **Evidence:** `_artifacts/02-flow-signoff.md` §1+§5; `_artifacts/02-flow-submit.md` §5; surface scan §3.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-002`

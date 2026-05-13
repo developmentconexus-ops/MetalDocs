@@ -4,11 +4,11 @@ Eight checklist items per skill `metaldocs-module-doc` v1.2.
 
 1. **Severity rubric application.** T-001 (lifecycle authz on obsolete/supersede) + T-002 (no governance event on state-transition) correctly Critical — both sit on the QMS-regulated lifecycle (capability bypass + audit-trail gap triggers in rubric). T-003..T-008 Major: spec/compliance + tenant-leak-adjacent without a confirmed exploit today. T-009..T-012 Minor: ergonomics / docs. Rubric holds.
 
-2. **Mermaid box ↔ prose.** All §3 C4Context actors (Caller, Registry, Documents, Templates_v2, Taxonomy, IAM, Approval, Audit, Postgres) appear in prose. All §5 C4Container components (Handler, Service, Repository, IdempotencyMiddleware, DocumentInitializer port, governance logger, capability resolver) are named at least once in §5/§6 narrative. No stray boxes.
+2. **Mermaid box ↔ prose.** All §3 C4Context actors (Caller, Registry, Documents, templates, Taxonomy, IAM, Approval, Audit, Postgres) appear in prose. All §5 C4Container components (Handler, Service, Repository, IdempotencyMiddleware, DocumentInitializer port, governance logger, capability resolver) are named at least once in §5/§6 narrative. No stray boxes.
 
 3. **Top-3 in §11.** Ordered T-001 → T-002 → T-004 (lifecycle authz, missing audit event, tier-3 tripwire). All Critical / Critical-adjacent and blast-radius-ranked (regulated-lifecycle bypass first, audit gap second, defense-in-depth third). Not authorship order.
 
-4. **Cross-link existence.** All 12 wiki links resolved against the working tree (concept/placeholders, decisions/0007-two-tier-authz, decisions/0011-cd-atomic-create, modules/iam, modules/documents, modules/templates_v2, modules/taxonomy, modules/audit, concepts/authz-tiers, concepts/idempotency, references/local-dev-startup, README). All exist.
+4. **Cross-link existence.** All 12 wiki links resolved against the working tree (concept/placeholders, decisions/0007-two-tier-authz, decisions/0011-cd-atomic-create, modules/iam, modules/documents, modules/templates, modules/taxonomy, modules/audit, concepts/authz-tiers, concepts/idempotency, references/local-dev-startup, README). All exist.
 
 5. **Key Files freshness.** Sampled `service.go:60-75` (CreateResult struct at :63 — verified), `repository.go:184-197` (UpdateStatus SQL — verified), `routes.go:412-441` (error envelope mapping — verified). Anchors hold.
 

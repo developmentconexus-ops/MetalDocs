@@ -1,4 +1,4 @@
-﻿# Documents Module Surface
+# Documents Module Surface
 
 ## 1) File tree
 - internal/modules/documents/
@@ -35,7 +35,7 @@
   - internal/modules/documents/approval/application/publish_service.go - PublishService handles transitioning an approved document to published state.
   - internal/modules/documents/approval/application/read_service.go - InboxView is the read-model projection for the inbox UI.
   - internal/modules/documents/approval/application/route_admin_service.go - RouteAdminService manages approval route configuration changes.
-  - internal/modules/documents/approval/application/scheduler_service.go - SchedulerService processes scheduled publish jobs (F6 â€” ListScheduledDue).
+  - internal/modules/documents/approval/application/scheduler_service.go - SchedulerService processes scheduled publish jobs (F6 — ListScheduledDue).
   - internal/modules/documents/approval/application/services.go - Clock abstracts time so services can be tested deterministically.
   - internal/modules/documents/approval/application/submit_service.go - SubmitService handles document submission for approval.
   - internal/modules/documents/approval/application/supersede_service.go - SupersedeService marks a published document as superseded by a newer revision.
@@ -50,7 +50,7 @@
   - internal/modules/documents/approval/domain/state.go - ErrLegacyStateRejected returned when legacy state string (finalized, archived) parsed.
 - internal/modules/documents/approval/http/
   - internal/modules/documents/approval/http/cancel_handler.go - (undocumented)
-  - internal/modules/documents/approval/http/doc_approval_handler.go - GetInstanceByDocumentHandler handles GET /api/v2/documents/{id}/approval-instance.
+  - internal/modules/documents/approval/http/doc_approval_handler.go - GetInstanceByDocumentHandler handles GET /api/v1/documents/{id}/approval-instance.
   - internal/modules/documents/approval/http/errors.go - (undocumented)
   - internal/modules/documents/approval/http/get_instance_handler.go - (undocumented)
   - internal/modules/documents/approval/http/handler.go - (undocumented)
@@ -329,64 +329,64 @@ OperationIDs from internal/modules/documents/api/api.gen.go:
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/route_admin_handler.go:20 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/route_admin_handler.go:64 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/route_admin_handler.go:69 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/publish | h.PublishHandler | internal/modules/documents/approval/http/router.go:10 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/schedule-publish | h.SchedulePublishHandler | internal/modules/documents/approval/http/router.go:11 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/supersede | h.SupersedeHandler | internal/modules/documents/approval/http/router.go:12 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/obsolete | h.ObsoleteHandler | internal/modules/documents/approval/http/router.go:13 |
-| HANDLEFUNC | POST /api/v2/approval/instances/{instance_id}/cancel | h.CancelHandler | internal/modules/documents/approval/http/router.go:14 |
-| HANDLEFUNC | GET /api/v2/approval/instances/{instance_id} | h.GetInstanceHandler | internal/modules/documents/approval/http/router.go:17 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/approval-instance | h.GetInstanceByDocumentHandler | internal/modules/documents/approval/http/router.go:18 |
-| HANDLEFUNC | GET /api/v2/approval/inbox | h.InboxHandler | internal/modules/documents/approval/http/router.go:19 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/signoff | h.SignoffByDocumentHandler | internal/modules/documents/approval/http/router.go:22 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/cancel | h.CancelByDocumentHandler | internal/modules/documents/approval/http/router.go:23 |
-| HANDLEFUNC | POST /api/v2/approval/routes | h.CreateRouteHandler | internal/modules/documents/approval/http/router.go:26 |
-| HANDLEFUNC | PUT /api/v2/approval/routes/{id} | h.UpdateRouteHandler | internal/modules/documents/approval/http/router.go:27 |
-| HANDLEFUNC | DELETE /api/v2/approval/routes/{id} | h.DeactivateRouteHandler | internal/modules/documents/approval/http/router.go:28 |
-| HANDLEFUNC | GET /api/v2/approval/routes | h.ListRoutesHandler | internal/modules/documents/approval/http/router.go:29 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/submit | h.SubmitHandler | internal/modules/documents/approval/http/router.go:8 |
-| HANDLEFUNC | POST /api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs | h.SignoffHandler | internal/modules/documents/approval/http/router.go:9 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/publish | h.PublishHandler | internal/modules/documents/approval/http/router.go:10 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/schedule-publish | h.SchedulePublishHandler | internal/modules/documents/approval/http/router.go:11 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/supersede | h.SupersedeHandler | internal/modules/documents/approval/http/router.go:12 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/obsolete | h.ObsoleteHandler | internal/modules/documents/approval/http/router.go:13 |
+| HANDLEFUNC | POST /api/v1/approval/instances/{instance_id}/cancel | h.CancelHandler | internal/modules/documents/approval/http/router.go:14 |
+| HANDLEFUNC | GET /api/v1/approval/instances/{instance_id} | h.GetInstanceHandler | internal/modules/documents/approval/http/router.go:17 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/approval-instance | h.GetInstanceByDocumentHandler | internal/modules/documents/approval/http/router.go:18 |
+| HANDLEFUNC | GET /api/v1/approval/inbox | h.InboxHandler | internal/modules/documents/approval/http/router.go:19 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/signoff | h.SignoffByDocumentHandler | internal/modules/documents/approval/http/router.go:22 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/cancel | h.CancelByDocumentHandler | internal/modules/documents/approval/http/router.go:23 |
+| HANDLEFUNC | POST /api/v1/approval/routes | h.CreateRouteHandler | internal/modules/documents/approval/http/router.go:26 |
+| HANDLEFUNC | PUT /api/v1/approval/routes/{id} | h.UpdateRouteHandler | internal/modules/documents/approval/http/router.go:27 |
+| HANDLEFUNC | DELETE /api/v1/approval/routes/{id} | h.DeactivateRouteHandler | internal/modules/documents/approval/http/router.go:28 |
+| HANDLEFUNC | GET /api/v1/approval/routes | h.ListRoutesHandler | internal/modules/documents/approval/http/router.go:29 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/submit | h.SubmitHandler | internal/modules/documents/approval/http/router.go:8 |
+| HANDLEFUNC | POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs | h.SignoffHandler | internal/modules/documents/approval/http/router.go:9 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/signoff_handler.go:24 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/signoff_handler.go:30 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/submit_handler.go:19 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/submit_handler.go:25 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/supersede_handler.go:27 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/approval/http/supersede_handler.go:33 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/export/pdf | h.exportPDF | internal/modules/documents/delivery/http/export_handler.go:40 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/export/docx-url | h.exportDocxURL | internal/modules/documents/delivery/http/export_handler.go:41 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/export/docx-url | h.exportDocxURL | internal/modules/documents/delivery/http/export_handler.go:49 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/checkpoints | h.createCheckpoint | internal/modules/documents/delivery/http/handler.go:100 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/checkpoints/{version}/restore | h.restoreCheckpoint | internal/modules/documents/delivery/http/handler.go:101 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/revisions/{rid}/url | h.signedRevisionURL | internal/modules/documents/delivery/http/handler.go:103 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/comments | h.listComments | internal/modules/documents/delivery/http/handler.go:104 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/comments | h.createComment | internal/modules/documents/delivery/http/handler.go:105 |
-| HANDLEFUNC | PATCH /api/v2/documents/{id}/comments/{libraryID} | h.updateComment | internal/modules/documents/delivery/http/handler.go:106 |
-| HANDLEFUNC | DELETE /api/v2/documents/{id}/comments/{libraryID} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:107 |
-| HANDLEFUNC | GET /api/v2/documents | h.listDocuments | internal/modules/documents/delivery/http/handler.go:111 |
-| HANDLEFUNC | GET /api/v2/documents/stats | h.documentStats | internal/modules/documents/delivery/http/handler.go:112 |
-| HANDLEFUNC | GET /api/v2/documents/{id} | h.getDocument | internal/modules/documents/delivery/http/handler.go:114 |
-| HANDLEFUNC | PATCH /api/v2/documents/{id} | h.renameDocument | internal/modules/documents/delivery/http/handler.go:115 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/finalize | h.finalizeDocument | internal/modules/documents/delivery/http/handler.go:116 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/archive | h.archiveDocument | internal/modules/documents/delivery/http/handler.go:117 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/duplicate | h.duplicateDocument | internal/modules/documents/delivery/http/handler.go:118 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/session/acquire | h.acquireSession | internal/modules/documents/delivery/http/handler.go:120 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/session/heartbeat | h.heartbeatSession | internal/modules/documents/delivery/http/handler.go:121 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/session/release | h.releaseSession | internal/modules/documents/delivery/http/handler.go:122 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/session/force-release | h.forceReleaseSession | internal/modules/documents/delivery/http/handler.go:123 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/checkpoints | h.listCheckpoints | internal/modules/documents/delivery/http/handler.go:134 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/checkpoints | h.createCheckpoint | internal/modules/documents/delivery/http/handler.go:135 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/checkpoints/{version}/restore | h.restoreCheckpoint | internal/modules/documents/delivery/http/handler.go:136 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/revisions/{rid}/url | h.signedRevisionURL | internal/modules/documents/delivery/http/handler.go:138 |
-| HANDLEFUNC | GET /api/v2/documents/{id}/comments | h.listComments | internal/modules/documents/delivery/http/handler.go:139 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/comments | h.createComment | internal/modules/documents/delivery/http/handler.go:140 |
-| HANDLEFUNC | PATCH /api/v2/documents/{id}/comments/{libraryID} | h.updateComment | internal/modules/documents/delivery/http/handler.go:141 |
-| HANDLEFUNC | DELETE /api/v2/documents/{id}/comments/{libraryID} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:142 |
-| HANDLEFUNC | GET /api/v2/documents | h.listDocuments | internal/modules/documents/delivery/http/handler.go:82 |
-| HANDLEFUNC | GET /api/v2/documents/stats | h.documentStats | internal/modules/documents/delivery/http/handler.go:83 |
-| HANDLEFUNC | GET /api/v2/documents/{id} | h.getDocument | internal/modules/documents/delivery/http/handler.go:85 |
-| HANDLEFUNC | PATCH /api/v2/documents/{id} | h.renameDocument | internal/modules/documents/delivery/http/handler.go:86 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/finalize | h.finalizeDocument | internal/modules/documents/delivery/http/handler.go:87 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/archive | h.archiveDocument | internal/modules/documents/delivery/http/handler.go:88 |
-| HANDLEFUNC | POST /api/v2/documents/{id}/duplicate | h.duplicateDocument | internal/modules/documents/delivery/http/handler.go:89 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/export/pdf | h.exportPDF | internal/modules/documents/delivery/http/export_handler.go:40 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/export/docx-url | h.exportDocxURL | internal/modules/documents/delivery/http/export_handler.go:41 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/export/docx-url | h.exportDocxURL | internal/modules/documents/delivery/http/export_handler.go:49 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/checkpoints | h.createCheckpoint | internal/modules/documents/delivery/http/handler.go:100 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/checkpoints/{version}/restore | h.restoreCheckpoint | internal/modules/documents/delivery/http/handler.go:101 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/revisions/{rid}/url | h.signedRevisionURL | internal/modules/documents/delivery/http/handler.go:103 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/comments | h.listComments | internal/modules/documents/delivery/http/handler.go:104 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/comments | h.createComment | internal/modules/documents/delivery/http/handler.go:105 |
+| HANDLEFUNC | PATCH /api/v1/documents/{id}/comments/{libraryID} | h.updateComment | internal/modules/documents/delivery/http/handler.go:106 |
+| HANDLEFUNC | DELETE /api/v1/documents/{id}/comments/{libraryID} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:107 |
+| HANDLEFUNC | GET /api/v1/documents | h.listDocuments | internal/modules/documents/delivery/http/handler.go:111 |
+| HANDLEFUNC | GET /api/v1/documents/stats | h.documentStats | internal/modules/documents/delivery/http/handler.go:112 |
+| HANDLEFUNC | GET /api/v1/documents/{id} | h.getDocument | internal/modules/documents/delivery/http/handler.go:114 |
+| HANDLEFUNC | PATCH /api/v1/documents/{id} | h.renameDocument | internal/modules/documents/delivery/http/handler.go:115 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/finalize | h.finalizeDocument | internal/modules/documents/delivery/http/handler.go:116 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/archive | h.archiveDocument | internal/modules/documents/delivery/http/handler.go:117 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/duplicate | h.duplicateDocument | internal/modules/documents/delivery/http/handler.go:118 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/session/acquire | h.acquireSession | internal/modules/documents/delivery/http/handler.go:120 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/session/heartbeat | h.heartbeatSession | internal/modules/documents/delivery/http/handler.go:121 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/session/release | h.releaseSession | internal/modules/documents/delivery/http/handler.go:122 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/session/force-release | h.forceReleaseSession | internal/modules/documents/delivery/http/handler.go:123 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/checkpoints | h.listCheckpoints | internal/modules/documents/delivery/http/handler.go:134 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/checkpoints | h.createCheckpoint | internal/modules/documents/delivery/http/handler.go:135 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/checkpoints/{version}/restore | h.restoreCheckpoint | internal/modules/documents/delivery/http/handler.go:136 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/revisions/{rid}/url | h.signedRevisionURL | internal/modules/documents/delivery/http/handler.go:138 |
+| HANDLEFUNC | GET /api/v1/documents/{id}/comments | h.listComments | internal/modules/documents/delivery/http/handler.go:139 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/comments | h.createComment | internal/modules/documents/delivery/http/handler.go:140 |
+| HANDLEFUNC | PATCH /api/v1/documents/{id}/comments/{libraryID} | h.updateComment | internal/modules/documents/delivery/http/handler.go:141 |
+| HANDLEFUNC | DELETE /api/v1/documents/{id}/comments/{libraryID} | h.deleteComment | internal/modules/documents/delivery/http/handler.go:142 |
+| HANDLEFUNC | GET /api/v1/documents | h.listDocuments | internal/modules/documents/delivery/http/handler.go:82 |
+| HANDLEFUNC | GET /api/v1/documents/stats | h.documentStats | internal/modules/documents/delivery/http/handler.go:83 |
+| HANDLEFUNC | GET /api/v1/documents/{id} | h.getDocument | internal/modules/documents/delivery/http/handler.go:85 |
+| HANDLEFUNC | PATCH /api/v1/documents/{id} | h.renameDocument | internal/modules/documents/delivery/http/handler.go:86 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/finalize | h.finalizeDocument | internal/modules/documents/delivery/http/handler.go:87 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/archive | h.archiveDocument | internal/modules/documents/delivery/http/handler.go:88 |
+| HANDLEFUNC | POST /api/v1/documents/{id}/duplicate | h.duplicateDocument | internal/modules/documents/delivery/http/handler.go:89 |
 | GET | (unclear: parse failed) | (unclear: parse failed) | internal/modules/documents/delivery/http/handler.go:899 |
 
 ## 4) Migration list

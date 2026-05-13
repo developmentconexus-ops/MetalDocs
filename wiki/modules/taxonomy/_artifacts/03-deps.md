@@ -36,7 +36,7 @@ Other internal MetalDocs packages that import `metaldocs/internal/modules/taxono
 | `apps/api/cmd/metaldocs-api` | `main.go:54` | `taxonomy` (package) | Module wiring — calls `taxonomy.New(...)` |
 | `apps/api/cmd/metaldocs-api` | `main.go:55` | `taxonomydomain "...taxonomy/domain"` | `taxonomydomain.DocumentProfile` in `profileDefaultsAdapter` |
 | `apps/api/cmd/metaldocs-api` | `main.go:56` | `taxonomyinfra "...taxonomy/infrastructure"` | `NewTemplateVersionChecker`, `NewProfileRepository` |
-| `apps/api/cmd/metaldocs-api/permissions.go` | `:158,:166,:174` | path strings only | Capability gate for `/api/v2/taxonomy/*` routes |
+| `apps/api/cmd/metaldocs-api/permissions.go` | `:158,:166,:174` | path strings only | Capability gate for `/api/v1/taxonomy/*` routes |
 | `internal/modules/registry` (module) | `module.go:12` | `taxonomyapp "...taxonomy/application"` | `taxonomyapp.NewDBGovernanceLogger` reused directly |
 | `internal/modules/registry/application` | `service.go:13` | `taxonomydomain "...taxonomy/domain"` | `DocumentProfile`, `ProcessArea`, `GovernanceEvent`, `GovernanceLogger`, sentinel errors |
 | `internal/modules/registry/application` | `service_test.go:13` | `taxonomydomain "...taxonomy/domain"` | Test fixtures using taxonomy domain types |
@@ -52,7 +52,7 @@ Other internal MetalDocs packages that import `metaldocs/internal/modules/taxono
 | `apps/api/cmd/metaldocs-api/permissions.go` — capability gate | **PRESENT** — `:158,:166,:174` (path-string match; no Go import needed) |
 | `internal/modules/registry/...` — profile + area FKs | **PRESENT** — `registry/infrastructure/repository.go:15`, `registry/application/service.go:13` |
 | `internal/modules/documents/...` or `documents_v2` | **ABSENT** — `internal/modules/documents` imports taxonomy **zero times**. The profile adapter (`profileDefaultsAdapter`) lives in `apps/api/cmd/metaldocs-api/main.go:508` and calls `taxonomyinfra.NewProfileRepository` directly, then passes itself into `documents.Dependencies.ProfileDefaults`. |
-| `internal/modules/templates_v2/...` | **ABSENT** — templates_v2 uses `doc_type_code` (its own field mapping to profile code); it imports no taxonomy packages |
+| `internal/modules/templates/...` | **ABSENT** — templates uses `doc_type_code` (its own field mapping to profile code); it imports no taxonomy packages |
 | `internal/modules/approval/...` | **ABSENT** — `documents/approval` reads `process_area_code_snapshot` from the `documents` table (a denormalised snapshot), not from taxonomy directly |
 
 ---
@@ -63,7 +63,7 @@ Other internal MetalDocs packages that import `metaldocs/internal/modules/taxono
 |---|---|
 | `apps/api/cmd/metaldocs-api/main.go:197` | `taxonomy.New(taxonomy.Dependencies{DB: deps.SQLDB, TplChecker: ...})` — constructs the full module |
 | `apps/api/cmd/metaldocs-api/main.go:199` | `taxonomyinfra.NewTemplateVersionChecker(deps.SQLDB)` — passed as `TplChecker` into `taxonomy.New` |
-| `apps/api/cmd/metaldocs-api/main.go:201` | `taxonomyModule.RegisterRoutes(mux)` — mounts `/api/v2/taxonomy/*` routes |
+| `apps/api/cmd/metaldocs-api/main.go:201` | `taxonomyModule.RegisterRoutes(mux)` — mounts `/api/v1/taxonomy/*` routes |
 | `apps/api/cmd/metaldocs-api/main.go:225` | `profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)` — second, standalone instance for `profileDefaultsAdapter` |
 | `apps/api/cmd/metaldocs-api/main.go:280` | `ProfileDefaults: &profileDefaultsAdapter{profileRepo: profileRepo}` — adapter injected into `documents.Dependencies` |
 | `apps/api/cmd/metaldocs-api/main.go:508-524` | `profileDefaultsAdapter` struct definition — bridges `taxonomydomain.DocumentProfile.DefaultTemplateVersionID` → `documents_v2` `ProfileDefaultTemplateReader` interface |

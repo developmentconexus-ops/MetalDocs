@@ -75,7 +75,7 @@
 - Cookie attributes: `HttpOnly`, `SameSite=Lax`, `Secure` from `Config.CookieSecure` (defaults to `APP_ENV != local`), `Path=/`, `MaxAge` from `SessionTTL`.
 - Auth is NOT under `oapi-codegen` â€” routes are registered via `mux.HandleFunc` (`delivery/http/handler.go:35-39`); no entry in `api/openapi/v1/openapi.yaml` for `/api/v1/auth/*`. Consistent with ADR 0012's partial-rollout scope.
 - Error envelope is legacy `{error:{code,message,details,trace_id}}` â€” does NOT yet match RFC 9457 Problem Details from `wiki/architecture/api-design-system.md` (T-003).
-- Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, registry, taxonomy, templates_v2) but auth tables remain unguarded â€” per ADR 0007 amendment.
+- Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, registry, taxonomy, templates) but auth tables remain unguarded â€” per ADR 0007 amendment.
 - `LegacyHeaderEnabled` â€” when true, requests with `X-User-Id` header bypass session enforcement entirely (`middleware.go:58-61`); single-flag compromise vector (T-001).
 
 ---
@@ -89,7 +89,7 @@ C4Context
     System_Boundary(b1, "MetalDocs API") {
         System(auth, "auth", "Authn, sessions, ManagedUser admin ops")
         System(iam, "iam", "Tier-1 capability checks; consumes ManagedUser/CurrentUser")
-        System(docs, "documents/templates_v2/approval", "Read CurrentUser from context")
+        System(docs, "documents/templates/approval", "Read CurrentUser from context")
         System(platform, "platform/{authn,bootstrap,observability,security,tenant,httpresponse}", "Cross-cutting")
     }
     SystemDb(db, "Postgres", "auth_identities, auth_sessions; writes to iam_users + iam_user_roles via iam.RoleAdminRepository")
@@ -416,7 +416,7 @@ From artifact 03 Â§4. Loaded in `internal/platform/authn/config.go:101-116`.
 - **Auth â†’ IAM (OUT):** `iamdomain.{Role, RoleProvider, RoleAdminRepository, WithAuthContext, ErrUserNotFound, ErrUserInactive, RoleSystemAdmin}` at `application/service.go:18`, `delivery/http/middleware.go:10`, `domain/model.go:6`, `infrastructure/memory/repository.go:10`.
 - **IAM â†’ Auth (IN):** `iam.AdminHandler` at `internal/modules/iam/delivery/http/admin_handler.go:13` consumes `authdomain.{ManagedUser, OnlineUser, UpdateUserParams, ErrPasswordPolicy, ErrUserAlreadyExists, ErrIdentityNotFound}`; `iam.middleware` at `:8` reads `CurrentUserFromContext`.
 - Bidirectional, non-circular today (different sub-packages on each side), but coupled enough that splitting either package requires touching both. T-007.
-- **Documents/templates_v2/approval (IN):** read `authdomain.CurrentUserFromContext` after middleware injection. Cross-ref `wiki/modules/documents.md` Â§8.1, `wiki/modules/iam.md` Â§3.2.
+- **Documents/templates/approval (IN):** read `authdomain.CurrentUserFromContext` after middleware injection. Cross-ref `wiki/modules/documents.md` Â§8.1, `wiki/modules/iam.md` Â§3.2.
 - **Platform (IN):** `bootstrap` wires repo; `authn` loads `Config`; `observability` + `security` read `CurrentUser`.
 
 ---

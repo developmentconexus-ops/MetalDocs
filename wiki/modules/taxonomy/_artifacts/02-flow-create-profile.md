@@ -1,4 +1,4 @@
-# Phase 2 — Data-flow trace: POST /api/v2/taxonomy/profiles (createProfile)
+# Phase 2 — Data-flow trace: POST /api/v1/taxonomy/profiles (createProfile)
 
 ## 1. Entry point
 
@@ -7,7 +7,7 @@
 | OpenAPI op | n/a — no OpenAPI spec / no generated stub | — |
 | Generated server stub | n/a — module uses raw `net/http` `ServeMux` | — |
 | Handler | `(*Handler).createProfile` | `internal/modules/taxonomy/delivery/http/routes_profiles.go:53` |
-| Route registration | `mux.HandleFunc("POST /api/v2/taxonomy/profiles", h.createProfile)` | `internal/modules/taxonomy/delivery/http/handler.go:52` |
+| Route registration | `mux.HandleFunc("POST /api/v1/taxonomy/profiles", h.createProfile)` | `internal/modules/taxonomy/delivery/http/handler.go:52` |
 
 ## 2. Call chain
 
@@ -42,7 +42,7 @@ Tx boundary: **none**. `sql.DB.ExecContext` opens an implicit single-statement c
 
 FK side-effect: `document_profiles.family_code REFERENCES document_families(code)` (`migrations/0023_init_document_family_and_profile_registry.sql:9-12`). Missing/inactive family → PG `23503` → handler maps to `409 FAMILY_NOT_FOUND`.
 
-Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:158-164` maps `POST /api/v2/taxonomy/profiles` → `iamdomain.CapTaxonomyManage` (`taxonomy.manage`). No tier-2 in-tx check exists.
+Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:158-164` maps `POST /api/v1/taxonomy/profiles` → `iamdomain.CapTaxonomyManage` (`taxonomy.manage`). No tier-2 in-tx check exists.
 
 Trust chain for `tenant_id`: client header `X-Tenant-ID` → `tenantIDFromRequest` → domain struct → SQL `INSERT`. No verification that the authenticated user belongs to the named tenant. Fallback to `tenant.DevTenantID` when header absent.
 

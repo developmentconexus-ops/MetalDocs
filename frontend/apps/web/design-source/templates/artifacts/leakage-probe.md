@@ -1,6 +1,6 @@
 # Phase 3b — Global CSS Leakage Probe
 
-**Method:** Iterate `document.styleSheets` for each interactive/styled element on `/templates-v2`, collect all rules whose selector matches the element. Filter to global rules (non-CSS-Module-hashed selectors).
+**Method:** Iterate `document.styleSheets` for each interactive/styled element on `/templates`, collect all rules whose selector matches the element. Filter to global rules (non-CSS-Module-hashed selectors).
 
 ## Probe results @ 1440
 

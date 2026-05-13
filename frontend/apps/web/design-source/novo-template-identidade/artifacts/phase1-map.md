@@ -48,8 +48,8 @@ No persisted state. No debounced inputs (form fields, not search).
 
 | Field | Endpoint/source | Status |
 |---|---|---|
-| name | `POST /api/v2/templates` body `name` | exists |
-| description | `POST /api/v2/templates` body `description` | exists |
+| name | `POST /api/v1/templates` body `name` | exists |
+| description | `POST /api/v1/templates` body `description` | exists |
 | version v1.0 | static literal | N/A |
 | code preview | mocked `TPL-{PROFILE}-XXX` (`GEN` for generic) | **deferred** → backlog row `next-code-preview` |
 | key | auto-slug at submit (Step 5) | **deferred** → backlog row `key-generation` |

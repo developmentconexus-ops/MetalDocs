@@ -24,7 +24,7 @@ Last verified: 2026-05-10
 | `sequence_num` | `INT` | nullable |
 | `title` | `TEXT` | NOT NULL |
 | `owner_user_id` | `TEXT` | NOT NULL |
-| `override_template_version_id` | `UUID` | nullable FK -> templates_v2_template_version(id) |
+| `override_template_version_id` | `UUID` | nullable FK -> templates_template_version(id) |
 | `status` | `TEXT` | NOT NULL, default 'active', check in ('active','obsolete','superseded') |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT now() |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT now() |
@@ -59,8 +59,8 @@ Last verified: 2026-05-10
 | `documents` | documents | Read + Write | Backfill read/update (migration.go:30-34, :77-84); active-doc read (routes.go:243-253) |
 | `approval_instances` | approval | Read | active-doc query (routes.go:235-238, :307-312) |
 | `document_revisions` | documents | Read | content hash fallback (routes.go:223-225) |
-| `templates_v2_template_version` | templates_v2 | Read | template state lookup (repository.go:278-280) |
-| `templates_v2_template` | templates_v2 | Read | profile-code join (repository.go:279) |
+| `templates_template_version` | templates | Read | template state lookup (repository.go:278-280) |
+| `templates_template` | templates | Read | profile-code join (repository.go:279) |
 | `document_profiles` | taxonomy | Read | profile lookup (repository.go:307-308) |
 | `document_process_areas` | taxonomy | Read | area lookup (repository.go:346-347) |
 | `schema_migrations` | migration framework | Read + Write | idempotency guards in migrations 0167, 0182, 0183 |

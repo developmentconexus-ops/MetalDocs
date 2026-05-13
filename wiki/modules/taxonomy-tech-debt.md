@@ -32,7 +32,7 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · PATCH /api/v2/taxonomy/families/{code} bypasses capability dispatcher — CLOSED 2026-05-11 (Plan 5)
+### T-003 · PATCH /api/v1/taxonomy/families/{code} bypasses capability dispatcher — CLOSED 2026-05-11 (Plan 5)
 - **Severity:** critical (closed)
 - **Surface:** `apps/api/cmd/metaldocs-api/permissions.go` — PATCH method added to the families branch (and areas branch). Plan 5 commit aligns the families dispatcher with the profiles branch which already included `MethodPatch`.
 - **Observation (original):** The families capability switch enumerated POST/PUT/DELETE but omitted PATCH. The handler was mounted at PATCH. Capability resolver therefore returned `("", false)` for PATCH `/families/{code}` — path treated as public.
@@ -83,7 +83,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-009 · No OpenAPI spec; raw `http.ServeMux` instead of oapi-codegen
 - **Severity:** major
-- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:51-68` (raw `mux.HandleFunc` for 16 routes); `api/openapi/v1/openapi.yaml` (no `/api/v2/taxonomy/*` paths — verified by grep); contrast `internal/modules/registry/delivery/http/routes.go` (also raw mux but routes documented in stub) and documents_v2/templates_v2 modules which ship `*.gen.go` from oapi-codegen
+- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:51-68` (raw `mux.HandleFunc` for 16 routes); `api/openapi/v1/openapi.yaml` (no `/api/v1/taxonomy/*` paths — verified by grep); contrast `internal/modules/registry/delivery/http/routes.go` (also raw mux but routes documented in stub) and documents_v2/templates modules which ship `*.gen.go` from oapi-codegen
 - **Observation:** All 16 routes are mounted on raw `net/http.ServeMux` with no operationId, no request/response schemas in the OpenAPI spec, no generated stubs. ADR 0012 (`wiki/decisions/0012-contract-first-api.md`) commits the project to contract-first; taxonomy was never migrated. Frontend client codegen (`lib/api/openapi.gen.ts` consumers) cannot bind taxonomy methods — feature code in `frontend/apps/web/src/features/taxonomy/*` hand-rolls each call. Trigger fired: documented contract not followed with measurable consumer impact (Major).
 - **Evidence:** `_artifacts/01-surface.md` (handler.go route list, no spec anchors); `_artifacts/03-deps.md` §1 (no codegen-related imports); `_artifacts/05-industry.md` IP-005 "not applicable".
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009`

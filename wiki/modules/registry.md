@@ -44,7 +44,7 @@ The **registry** module owns the catalog of code-numbered Controlled Documents (
 
 | Role | Expectation |
 |---|---|
-| Document author | Can issue a new CD via `POST /api/v2/controlled-documents` and immediately edit the first revision |
+| Document author | Can issue a new CD via `POST /api/v1/controlled-documents` and immediately edit the first revision |
 | Quality manager | `controlled_documents.code` is stable, audit-traceable, area-isolated |
 | Operator | Per-(tenant, profile, area) sequence is monotonic; lifecycle transitions are recoverable |
 | Frontend developer | `GET .../active-document` returns 200 with at least one document handle whenever the CD has any revision |
@@ -55,7 +55,7 @@ The **registry** module owns the catalog of code-numbered Controlled Documents (
 
 - Language / runtime: Go 1.25
 - Persistence: Postgres (per [wiki/architecture/data-model.md](architecture/data-model.md))
-- API contract: OpenAPI 3.0.3 via oapi-codegen v2 â€” partial at `api/openapi/v1/partials/registry.yaml` (path prefix `/api/v2/` despite the v1 spec tree)
+- API contract: OpenAPI 3.0.3 via oapi-codegen v2 â€” partial at `api/openapi/v1/partials/registry.yaml` (path prefix `/api/v1/` despite the v1 spec tree)
 - Authz: two-tier per [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md); Plan 5 wired `authz.Require` + tripwire on `controlled_documents` and `cd_sequence_counters` (T-001/T-004 closed); `Obsolete`/`Supersede` now pass typed `CapRegistryObsolete`/`CapRegistrySupersede` from `iamdomain` (migration 0187 seeded both caps)
 - Idempotency: shared platform `internal/platform/idempotency` per ADR 0011
 - Numbering: 3-segment `{PROFILE}-{AREA}-{NNN}` per ADR 0011
@@ -77,7 +77,7 @@ C4Context
         System_Ext(idempotency, "platform/idempotency", "Replay store")
     }
     SystemDb_Ext(db, "Postgres", "controlled_documents, cd_sequence_counters")
-    Rel(author, registry, "HTTP /api/v2/controlled-documents/*")
+    Rel(author, registry, "HTTP /api/v1/controlled-documents/*")
     Rel(registry, taxonomy, "ProfileReader / AreaReader (Go calls)")
     Rel(registry, documents, "DocumentInitializer.CloneTemplate (in-tx)")
     Rel(registry, idempotency, "Require middleware")
@@ -91,9 +91,9 @@ Registry owns the **identity** of every controlled document under QMS. A row exi
 
 ### 3.2 Technical Context
 
-**Inbound:** 8 HTTP routes under `/api/v2/controlled-documents/*` (see Â§5.3). Go consumers: `internal/modules/documents` (imports `registrydomain` for `ControlledDocument`, `DocumentInitializer`, `DocumentRef`, `CloneTemplateRequest`).
+**Inbound:** 8 HTTP routes under `/api/v1/controlled-documents/*` (see Â§5.3). Go consumers: `internal/modules/documents` (imports `registrydomain` for `ControlledDocument`, `DocumentInitializer`, `DocumentRef`, `CloneTemplateRequest`).
 
-**Outbound:** Postgres (`controlled_documents`, `cd_sequence_counters`, reads of `documents`, `approval_instances`, `document_revisions`, `document_profiles`, `document_process_areas`, `templates_v2_template_version`). Cross-module Go: `taxonomy/domain`, `taxonomy/application` (governance logger), `platform/idempotency`, `platform/authn`, `platform/httpresponse`, `platform/tenant`.
+**Outbound:** Postgres (`controlled_documents`, `cd_sequence_counters`, reads of `documents`, `approval_instances`, `document_revisions`, `document_profiles`, `document_process_areas`, `templates_template_version`). Cross-module Go: `taxonomy/domain`, `taxonomy/application` (governance logger), `platform/idempotency`, `platform/authn`, `platform/httpresponse`, `platform/tenant`.
 
 ---
 
@@ -114,7 +114,7 @@ Registry owns the **identity** of every controlled document under QMS. A row exi
 ```mermaid
 C4Container
     title Container View â€” Registry
-    Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "8 routes under /api/v2/controlled-documents")
+    Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "8 routes under /api/v1/controlled-documents")
     Container(svc, "RegistryService", "Go", "Create / CreateRevision / Obsolete / Supersede / List / Get / PreviewCode")
     Container(repo, "PostgresControlledDocumentRepository", "Go + database/sql", "CRUD on controlled_documents")
     Container(seq, "PostgresSequenceAllocator", "Go + database/sql", "EnsureCounter / NextAndIncrement / Peek")
@@ -166,27 +166,27 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
-| POST | `/api/v2/controlled-documents` | `atomicCreateControlledDocument` | `routes.go:43` | `registry.create` (tier-1 only) |
-| POST | `/api/v2/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `routes.go:148` | `registry.create` (tier-1) |
-| GET | `/api/v2/controlled-documents/preview-code` | `previewControlledDocumentCode` | `routes.go:127` | (read; resolver mapping outside module) |
-| GET | `/api/v2/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
-| GET | `/api/v2/controlled-documents/{id}` | `getControlledDocument` | `routes.go:190` | (read) |
-| GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:232` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
-| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | `registry.obsolete` (`CapRegistryObsolete`) â€” T-001 closed Plan 5 |
-| PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | `registry.supersede` (`CapRegistrySupersede`) â€” T-001 closed Plan 5 |
+| POST | `/api/v1/controlled-documents` | `atomicCreateControlledDocument` | `routes.go:43` | `registry.create` (tier-1 only) |
+| POST | `/api/v1/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `routes.go:148` | `registry.create` (tier-1) |
+| GET | `/api/v1/controlled-documents/preview-code` | `previewControlledDocumentCode` | `routes.go:127` | (read; resolver mapping outside module) |
+| GET | `/api/v1/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
+| GET | `/api/v1/controlled-documents/{id}` | `getControlledDocument` | `routes.go:190` | (read) |
+| GET | `/api/v1/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:232` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
+| PUT | `/api/v1/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | `registry.obsolete` (`CapRegistryObsolete`) â€” T-001 closed Plan 5 |
+| PUT | `/api/v1/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | `registry.supersede` (`CapRegistrySupersede`) â€” T-001 closed Plan 5 |
 
 ## API Route Truth Table (Plan 8 Baseline)
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v2/controlled-documents` | `internal/modules/registry/delivery/http/handler.go:84` | `generated.ListControlledDocuments` | `/api/v2/controlled-documents` | `listControlledDocuments` | `ListControlledDocuments` | Aligned | Wrapper-mounted |
-| POST | `/api/v2/controlled-documents` | `internal/modules/registry/delivery/http/handler.go:79` | `generated.AtomicCreateControlledDocument` | `/api/v2/controlled-documents` | `atomicCreateControlledDocument` | `AtomicCreateControlledDocument` | Aligned | Idempotency middleware wraps generated handler |
-| GET | `/api/v2/controlled-documents/preview-code` | `internal/modules/registry/delivery/http/handler.go:83` | `generated.PreviewControlledDocumentCode` | `/api/v2/controlled-documents/preview-code` | `previewControlledDocumentCode` | `PreviewControlledDocumentCode` | Aligned |  |
-| GET | `/api/v2/controlled-documents/{id}` | `internal/modules/registry/delivery/http/handler.go:85` | `generated.GetControlledDocument` | `/api/v2/controlled-documents/{id}` | `getControlledDocument` | `GetControlledDocument` | Aligned |  |
-| POST | `/api/v2/controlled-documents/{id}/revisions` | `internal/modules/registry/delivery/http/handler.go:81` | `generated.CreateControlledDocumentRevision` | `/api/v2/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `CreateControlledDocumentRevision` | Aligned | Idempotency middleware wraps generated handler |
-| GET | `/api/v2/controlled-documents/{id}/active-document` | `internal/modules/registry/delivery/http/handler.go:86` | `generated.GetActiveDocument` | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `GetActiveDocument` | Aligned |  |
-| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `internal/modules/registry/delivery/http/handler.go:87` | `generated.ObsoleteControlledDocument` | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `ObsoleteControlledDocument` | Aligned |  |
-| PUT | `/api/v2/controlled-documents/{id}/supersede` | `internal/modules/registry/delivery/http/handler.go:88` | `generated.SupersedeControlledDocument` | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `SupersedeControlledDocument` | Aligned |  |
+| GET | `/api/v1/controlled-documents` | `internal/modules/registry/delivery/http/handler.go:84` | `generated.ListControlledDocuments` | `/api/v1/controlled-documents` | `listControlledDocuments` | `ListControlledDocuments` | Aligned | Wrapper-mounted |
+| POST | `/api/v1/controlled-documents` | `internal/modules/registry/delivery/http/handler.go:79` | `generated.AtomicCreateControlledDocument` | `/api/v1/controlled-documents` | `atomicCreateControlledDocument` | `AtomicCreateControlledDocument` | Aligned | Idempotency middleware wraps generated handler |
+| GET | `/api/v1/controlled-documents/preview-code` | `internal/modules/registry/delivery/http/handler.go:83` | `generated.PreviewControlledDocumentCode` | `/api/v1/controlled-documents/preview-code` | `previewControlledDocumentCode` | `PreviewControlledDocumentCode` | Aligned |  |
+| GET | `/api/v1/controlled-documents/{id}` | `internal/modules/registry/delivery/http/handler.go:85` | `generated.GetControlledDocument` | `/api/v1/controlled-documents/{id}` | `getControlledDocument` | `GetControlledDocument` | Aligned |  |
+| POST | `/api/v1/controlled-documents/{id}/revisions` | `internal/modules/registry/delivery/http/handler.go:81` | `generated.CreateControlledDocumentRevision` | `/api/v1/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `CreateControlledDocumentRevision` | Aligned | Idempotency middleware wraps generated handler |
+| GET | `/api/v1/controlled-documents/{id}/active-document` | `internal/modules/registry/delivery/http/handler.go:86` | `generated.GetActiveDocument` | `/api/v1/controlled-documents/{id}/active-document` | `getActiveDocument` | `GetActiveDocument` | Aligned |  |
+| PUT | `/api/v1/controlled-documents/{id}/obsolete` | `internal/modules/registry/delivery/http/handler.go:87` | `generated.ObsoleteControlledDocument` | `/api/v1/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `ObsoleteControlledDocument` | Aligned |  |
+| PUT | `/api/v1/controlled-documents/{id}/supersede` | `internal/modules/registry/delivery/http/handler.go:88` | `generated.SupersedeControlledDocument` | `/api/v1/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `SupersedeControlledDocument` | Aligned |  |
 
 Module contract status: Wrapper-only
 Owner: leandro
@@ -389,7 +389,7 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 | Read-path authz contract (e.g. `GetActiveDocument` tenant source) | tech-debt: missing-ADR (T-006) |
 | Where registry audit sink should live (own logger vs shared taxonomy sink) | tech-debt: missing-ADR (T-008) |
 | Documents DI cycle resolution (`WithDocumentInitializer` setter) | tech-debt: missing-ADR (T-010) |
-| OpenAPI partial directory (`v1/` for `/api/v2/` routes) | tech-debt: missing-ADR (T-011) |
+| OpenAPI partial directory (`v1/` for `/api/v1/` routes) | tech-debt: missing-ADR (T-011) |
 | Exported-symbol doc-comment policy | tech-debt: missing-ADR (T-012) |
 
 ---

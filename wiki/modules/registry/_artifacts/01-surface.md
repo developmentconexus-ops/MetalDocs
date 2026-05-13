@@ -130,14 +130,14 @@
 ### 3. HTTP operations
 | Method | Path | Handler symbol | Source file:line |
 |---|---|---|---|
-| POST | /api/v2/controlled-documents | `generated.AtomicCreateControlledDocument` | internal/modules/registry/delivery/http/handler.go:79 |
-| POST | /api/v2/controlled-documents/{id}/revisions | `generated.CreateControlledDocumentRevision` | internal/modules/registry/delivery/http/handler.go:81 |
-| GET | /api/v2/controlled-documents/preview-code | `generated.PreviewControlledDocumentCode` | internal/modules/registry/delivery/http/handler.go:83 |
-| GET | /api/v2/controlled-documents | `generated.ListControlledDocuments` | internal/modules/registry/delivery/http/handler.go:84 |
-| GET | /api/v2/controlled-documents/{id} | `generated.GetControlledDocument` | internal/modules/registry/delivery/http/handler.go:85 |
-| GET | /api/v2/controlled-documents/{id}/active-document | `generated.GetActiveDocument` | internal/modules/registry/delivery/http/handler.go:86 |
-| PUT | /api/v2/controlled-documents/{id}/obsolete | `generated.ObsoleteControlledDocument` | internal/modules/registry/delivery/http/handler.go:87 |
-| PUT | /api/v2/controlled-documents/{id}/supersede | `generated.SupersedeControlledDocument` | internal/modules/registry/delivery/http/handler.go:88 |
+| POST | /api/v1/controlled-documents | `generated.AtomicCreateControlledDocument` | internal/modules/registry/delivery/http/handler.go:79 |
+| POST | /api/v1/controlled-documents/{id}/revisions | `generated.CreateControlledDocumentRevision` | internal/modules/registry/delivery/http/handler.go:81 |
+| GET | /api/v1/controlled-documents/preview-code | `generated.PreviewControlledDocumentCode` | internal/modules/registry/delivery/http/handler.go:83 |
+| GET | /api/v1/controlled-documents | `generated.ListControlledDocuments` | internal/modules/registry/delivery/http/handler.go:84 |
+| GET | /api/v1/controlled-documents/{id} | `generated.GetControlledDocument` | internal/modules/registry/delivery/http/handler.go:85 |
+| GET | /api/v1/controlled-documents/{id}/active-document | `generated.GetActiveDocument` | internal/modules/registry/delivery/http/handler.go:86 |
+| PUT | /api/v1/controlled-documents/{id}/obsolete | `generated.ObsoleteControlledDocument` | internal/modules/registry/delivery/http/handler.go:87 |
+| PUT | /api/v1/controlled-documents/{id}/supersede | `generated.SupersedeControlledDocument` | internal/modules/registry/delivery/http/handler.go:88 |
 
 ### 4. Migration list
 | Filename | Verb | Tables touched |

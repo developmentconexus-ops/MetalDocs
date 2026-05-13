@@ -17,7 +17,7 @@
 - Eigenpal DOCX editor integration for `draft` editing â€” `wiki/decisions/0001-eigenpal-adoption.md`
 - Placeholder snapshot pinned at submit â€” `wiki/concepts/placeholders.md`
 - `{name}` single-brace token substitution at freeze â€” `wiki/concepts/token-syntax.md`
-- Spec-as-source-of-truth for `/api/v2/documents/*` (in progress) â€” `wiki/decisions/0012-contract-first-api.md`
+- Spec-as-source-of-truth for `/api/v1/documents/*` (in progress) â€” `wiki/decisions/0012-contract-first-api.md`
 
 ### 1.2 Quality Goals
 
@@ -57,14 +57,14 @@ C4Context
     System_Boundary(b1, "MetalDocs API") {
         System(docs, "documents", "Document instance lifecycle: list, create, edit, finalize, approve, publish")
         System(registry, "registry", "Controlled-document identity + numbering")
-        System(templates, "templates_v2", "Template versions consumed at draft create")
+        System(templates, "templates", "Template versions consumed at draft create")
         System(iam, "iam", "Capabilities + actor identity")
         System(render, "render", "DOCX â†’ PDF rendering")
         System(idemp, "platform/idempotency", "Stripe-style replay store")
     }
     SystemDb(db, "Postgres", "documents, document_revisions, document_checkpoints, document_comments, document_exports, approval_*, governance_events, metaldocs.pdf_dispatch_outbox")
     System_Ext(objstore, "Object Store", "DOCX + PDF artifacts")
-    Rel(user, docs, "HTTPS /api/v2/documents/*")
+    Rel(user, docs, "HTTPS /api/v1/documents/*")
     Rel(registry, docs, "Go: CreateDocumentTx port")
     Rel(docs, templates, "Go: template version reads")
     Rel(docs, iam, "Go: CapabilityChecker / ErrCapabilityDenied")
@@ -88,14 +88,14 @@ Quality-managed documents. Each instance traces back to a template + a controlle
 - `apps/worker/cmd/metaldocs-worker/main.go:8` â€” worker side
 - `internal/modules/iam/integration_test.go:16`
 - `internal/jobs/effective_date_publisher/job.go:8` Â· `internal/jobs/stuck_instance_watchdog/job.go:10`
-- `internal/platform/docgenv2/templates_v2_snapshot_reader.go:8`
+- `internal/platform/docgenv2/templates_snapshot_reader.go:8`
 - `internal/platform/objectstore/document_presigner.go:17`
 
 **Outbound Go (from `_artifacts/03-deps.md`):**
 - `internal/modules/iam/domain` (`fillin_handler.go:16`) â€” typed `iamdomain.Capability` consts; cross-refs `iam` T-001
 - `internal/modules/iam/application` (`handler.go:17`) â€” `ErrCapabilityDenied` sentinel; cross-refs `iam` T-009
 - `internal/modules/iam/authz` (`fillin_handler.go:15`)
-- `internal/modules/registry/domain`, `internal/modules/templates_v2/domain`
+- `internal/modules/registry/domain`, `internal/modules/templates/domain`
 - `internal/modules/render` (`resolver_readers.go:9`)
 - `internal/platform/idempotency` (`approval/infrastructure/postgres_signoff_idemp_store.go:9`)
 - `internal/platform/tenant`, `internal/platform/docgenv2`, `internal/platform/httpresponse` (`handler.go:20`), `internal/platform/ratelimit` (`module.go:13`), `internal/platform/servicebus` (`export_service.go:10`)
@@ -125,8 +125,8 @@ Quality-managed documents. Each instance traces back to a template + a controlle
 ```mermaid
 C4Container
     title Container View â€” documents module
-    Container(http, "delivery/http", "Go stdlib mux", "Handler, ExportHandler â€” /api/v2/documents/* + /api/v2/documents/{id}/export/* + comments")
-    Container(approvalHttp, "approval/http", "Go", "ApprovalHandler â€” /api/v2/documents/{id}/{submit,signoff,cancel,publish,schedule-publish,supersede,obsolete} + approval admin")
+    Container(http, "delivery/http", "Go stdlib mux", "Handler, ExportHandler â€” /api/v1/documents/* + /api/v1/documents/{id}/export/* + comments")
+    Container(approvalHttp, "approval/http", "Go", "ApprovalHandler â€” /api/v1/documents/{id}/{submit,signoff,cancel,publish,schedule-publish,supersede,obsolete} + approval admin")
     Container(app, "application", "Go", "Service, SnapshotService, FreezeService, FillinService, ViewService, ExportService, DraftResolverService, ReconstructService, CDDocumentInitializer, SubmitService, DecisionService")
     Container(domain, "domain", "Go", "Document, Revision, Checkpoint, Snapshot, Comment, Export, CompositeHash, ValuesHash, errors, state machine")
     Container(repo, "repository", "Go + pgx", "Repository, FillinRepository, ExportRepository, SnapshotRepository, ResolverReaders, postgres_approval_repository, postgres_signoff_idemp_store")
@@ -135,7 +135,7 @@ C4Container
     ContainerDb(db, "Postgres", "Postgres", "14 owned tables (see Â§3.2)")
     System_Ext(iam, "iam", "Capabilities")
     System_Ext(registry, "registry", "CD identity")
-    System_Ext(templates, "templates_v2", "Template versions")
+    System_Ext(templates, "templates", "Template versions")
     System_Ext(render, "render", "DOCXâ†’PDF")
     System_Ext(idemp, "platform/idempotency", "Signoff replay store")
     Rel(http, app, "calls")
@@ -172,9 +172,9 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/approval/application/submit_service.go:43` | `SubmitService.SubmitRevisionForReview` | func | Tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` at `:85` |
 | `internal/modules/documents/approval/application/decision_service.go` | `DecisionService` | type | Signoff approve/reject/publish/supersede/obsolete |
 | `internal/modules/documents/delivery/http/handler.go:76` | `NewHandlerWithSubmit` | func | Wires db + submitSvc for atomic finalize |
-| `internal/modules/documents/delivery/http/handler.go:145` | `listDocuments` | func | `GET /api/v2/documents` |
-| `internal/modules/documents/delivery/http/handler.go:285` | `renameDocument` | func | `PATCH /api/v2/documents/{id}` (T-002 spec gap, T-004 dup route, T-005 audit-tx gap) |
-| `internal/modules/documents/delivery/http/handler.go:316` | `finalizeDocument` | func | `POST /api/v2/documents/{id}/finalize` (T-006 idempotency gap) |
+| `internal/modules/documents/delivery/http/handler.go:145` | `listDocuments` | func | `GET /api/v1/documents` |
+| `internal/modules/documents/delivery/http/handler.go:285` | `renameDocument` | func | `PATCH /api/v1/documents/{id}` (T-002 spec gap, T-004 dup route, T-005 audit-tx gap) |
+| `internal/modules/documents/delivery/http/handler.go:316` | `finalizeDocument` | func | `POST /api/v1/documents/{id}/finalize` (T-006 idempotency gap) |
 | `internal/modules/documents/delivery/http/handler.go:869` | `authorizeDocumentScope` | func | Role + ownership gate (tier-1) |
 | `internal/modules/documents/delivery/http/handler.go:958..1009` | `mapErr` | func | Legacy envelope mapping (T-001) |
 | `internal/modules/documents/repository/repository.go:73` | `CreateDocumentTx` impl | func | Tx-scoped CD+document insert (ADR 0011) |
@@ -193,28 +193,28 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
-| GET | `/api/v2/documents` | `listDocumentsV2` | `Handler.listDocuments` (`handler.go:145`) | role: admin\|filler; filler scoped to `created_by` |
-| GET | `/api/v2/documents/stats` | â€” | `Handler.documentStats` (`handler.go:174`) | role |
-| GET | `/api/v2/documents/{id}` | `getDocumentV2` | `Handler.getDocument` (`handler.go:114`) | role + ownership |
-| PATCH | `/api/v2/documents/{id}` | â€” | `Handler.renameDocument` (`handler.go:285`) | role + ownership; **dup registration at `:86`+`:115`** (T-004) |
-| POST | `/api/v2/documents/{id}/finalize` | â€” (path at `openapi.yaml:3251`) | `Handler.finalizeDocument` (`handler.go:316`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
-| POST | `/api/v2/documents/{id}/archive` | â€” | `Handler.archiveDocument` | role |
-| POST | `/api/v2/documents/{id}/duplicate` | â€” | `Handler.duplicateDocument` | role |
-| GET/POST/PATCH/DELETE | `/api/v2/documents/{id}/comments[/{commentId}]` | â€” | comments CRUD | role + ownership |
-| GET/POST | `/api/v2/documents/{id}/sessions` | â€” | session controller | role |
-| GET/POST | `/api/v2/documents/{id}/checkpoints` | â€” | checkpoint controller | role |
-| GET | `/api/v2/documents/{id}/revisions` | â€” | revisions URL handler | role |
-| POST | `/api/v2/documents/{id}/export/pdf` | â€” | `ExportHandler` | role |
-| GET | `/api/v2/documents/{id}/export/docx-url` | â€” | `ExportHandler` | role |
-| POST | `/api/v2/documents/{id}/submit` | â€” | `ApprovalHandler` (`approval/http/router.go`) | tier-2 `document.submit` |
-| POST | `/api/v2/documents/{id}/signoff` | â€” | `ApprovalHandler` | tier-2 `document.signoff` |
-| POST | `/api/v2/documents/{id}/cancel` | â€” | `ApprovalHandler` | tier-2 |
-| POST | `/api/v2/documents/{id}/publish` | â€” | `ApprovalHandler` | tier-2 `document.publish` |
-| POST | `/api/v2/documents/{id}/schedule-publish` | â€” | `ApprovalHandler` | tier-2 |
-| POST | `/api/v2/documents/{id}/supersede` | â€” | `ApprovalHandler` | tier-2 |
-| POST | `/api/v2/documents/{id}/obsolete` | â€” | `ApprovalHandler` | tier-2 |
-| GET | `/api/v2/documents/{id}/approval-instance` | â€” | `ApprovalHandler` | role |
-| various | `/api/v2/approval-routes/*` | â€” | `ApprovalHandler` admin | role: admin |
+| GET | `/api/v1/documents` | `listDocumentsV2` | `Handler.listDocuments` (`handler.go:145`) | role: admin\|filler; filler scoped to `created_by` |
+| GET | `/api/v1/documents/stats` | â€” | `Handler.documentStats` (`handler.go:174`) | role |
+| GET | `/api/v1/documents/{id}` | `getDocumentV2` | `Handler.getDocument` (`handler.go:114`) | role + ownership |
+| PATCH | `/api/v1/documents/{id}` | â€” | `Handler.renameDocument` (`handler.go:285`) | role + ownership; **dup registration at `:86`+`:115`** (T-004) |
+| POST | `/api/v1/documents/{id}/finalize` | â€” (path at `openapi.yaml:3251`) | `Handler.finalizeDocument` (`handler.go:316`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
+| POST | `/api/v1/documents/{id}/archive` | â€” | `Handler.archiveDocument` | role |
+| POST | `/api/v1/documents/{id}/duplicate` | â€” | `Handler.duplicateDocument` | role |
+| GET/POST/PATCH/DELETE | `/api/v1/documents/{id}/comments[/{commentId}]` | â€” | comments CRUD | role + ownership |
+| GET/POST | `/api/v1/documents/{id}/sessions` | â€” | session controller | role |
+| GET/POST | `/api/v1/documents/{id}/checkpoints` | â€” | checkpoint controller | role |
+| GET | `/api/v1/documents/{id}/revisions` | â€” | revisions URL handler | role |
+| POST | `/api/v1/documents/{id}/export/pdf` | â€” | `ExportHandler` | role |
+| GET | `/api/v1/documents/{id}/export/docx-url` | â€” | `ExportHandler` | role |
+| POST | `/api/v1/documents/{id}/submit` | â€” | `ApprovalHandler` (`approval/http/router.go`) | tier-2 `document.submit` |
+| POST | `/api/v1/documents/{id}/signoff` | â€” | `ApprovalHandler` | tier-2 `document.signoff` |
+| POST | `/api/v1/documents/{id}/cancel` | â€” | `ApprovalHandler` | tier-2 |
+| POST | `/api/v1/documents/{id}/publish` | â€” | `ApprovalHandler` | tier-2 `document.publish` |
+| POST | `/api/v1/documents/{id}/schedule-publish` | â€” | `ApprovalHandler` | tier-2 |
+| POST | `/api/v1/documents/{id}/supersede` | â€” | `ApprovalHandler` | tier-2 |
+| POST | `/api/v1/documents/{id}/obsolete` | â€” | `ApprovalHandler` | tier-2 |
+| GET | `/api/v1/documents/{id}/approval-instance` | â€” | `ApprovalHandler` | role |
+| various | `/api/v1/approval-routes/*` | â€” | `ApprovalHandler` admin | role: admin |
 
 Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 and `wiki/backlog/contract-first-followups.md`.
 
@@ -222,34 +222,34 @@ Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 an
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v2/documents` | `internal/modules/documents/delivery/http/handler.go:83` | `h.listDocuments` | `/api/v2/documents` | `listDocumentsV2` | `ListDocumentsV2` | Aligned | Also re-registered at `handler.go:112` |
-| GET | `/api/v2/documents/stats` | `internal/modules/documents/delivery/http/handler.go:84` | `h.documentStats` | `/api/v2/documents/stats` | `documentStatsV2` | `DocumentStatsV2` | Aligned | Also re-registered at `handler.go:113` |
-| GET | `/api/v2/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:86` | `h.getDocument` | `/api/v2/documents/{id}` | â€” | `GetApiV2DocumentsId` | Aligned | Also re-registered at `handler.go:115` |
-| PATCH | `/api/v2/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:87` | `h.renameDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:116` |
-| POST | `/api/v2/documents/{id}/finalize` | `internal/modules/documents/delivery/http/handler.go:88` | `h.finalizeDocument` | `/api/v2/documents/{id}/finalize` | â€” | `PostApiV2DocumentsIdFinalize` | Aligned | Also re-registered at `handler.go:117` |
-| POST | `/api/v2/documents/{id}/archive` | `internal/modules/documents/delivery/http/handler.go:89` | `h.archiveDocument` | `/api/v2/documents/{id}/archive` | â€” | `PostApiV2DocumentsIdArchive` | Aligned | Also re-registered at `handler.go:118` |
-| POST | `/api/v2/documents/{id}/duplicate` | `internal/modules/documents/delivery/http/handler.go:90` | `h.duplicateDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:119` |
-| POST | `/api/v2/documents/{id}/session/acquire` | `internal/modules/documents/delivery/http/handler.go:92` | `h.acquireSession` | `/api/v2/documents/{id}/session/acquire` | â€” | `PostApiV2DocumentsIdSessionAcquire` | Aligned | Also re-registered at `handler.go:121` |
-| POST | `/api/v2/documents/{id}/session/heartbeat` | `internal/modules/documents/delivery/http/handler.go:93` | `h.heartbeatSession` | `/api/v2/documents/{id}/session/heartbeat` | â€” | `PostApiV2DocumentsIdSessionHeartbeat` | Aligned | Also re-registered at `handler.go:122` |
-| POST | `/api/v2/documents/{id}/session/release` | `internal/modules/documents/delivery/http/handler.go:94` | `h.releaseSession` | `/api/v2/documents/{id}/session/release` | â€” | `PostApiV2DocumentsIdSessionRelease` | Aligned | Also re-registered at `handler.go:123` |
-| POST | `/api/v2/documents/{id}/session/force-release` | `internal/modules/documents/delivery/http/handler.go:95` | `h.forceReleaseSession` | `/api/v2/documents/{id}/session/force-release` | â€” | `PostApiV2DocumentsIdSessionForceRelease` | Aligned | Also re-registered at `handler.go:124` |
-| POST | `/api/v2/documents/{id}/autosave/presign` | `internal/modules/documents/delivery/http/handler.go:97` | `h.presignAutosave` | `/api/v2/documents/{id}/autosave/presign` | â€” | `PostApiV2DocumentsIdAutosavePresign` | Aligned | Also re-registered (wrapped) at `handler.go:126` |
-| POST | `/api/v2/documents/{id}/autosave/commit` | `internal/modules/documents/delivery/http/handler.go:98` | `h.commitAutosave` | `/api/v2/documents/{id}/autosave/commit` | â€” | `PostApiV2DocumentsIdAutosaveCommit` | Aligned | Also re-registered (wrapped) at `handler.go:130` |
-| GET | `/api/v2/documents/{id}/checkpoints` | `internal/modules/documents/delivery/http/handler.go:100` | `h.listCheckpoints` | `/api/v2/documents/{id}/checkpoints` | â€” | `GetApiV2DocumentsIdCheckpoints` | Aligned | Also re-registered at `handler.go:135` |
-| POST | `/api/v2/documents/{id}/checkpoints` | `internal/modules/documents/delivery/http/handler.go:101` | `h.createCheckpoint` | `/api/v2/documents/{id}/checkpoints` | â€” | `PostApiV2DocumentsIdCheckpoints` | Aligned | Also re-registered at `handler.go:136` |
-| POST | `/api/v2/documents/{id}/checkpoints/{version}/restore` | `internal/modules/documents/delivery/http/handler.go:102` | `h.restoreCheckpoint` | `/api/v2/documents/{id}/checkpoints/{versionNum}/restore` | â€” | `PostApiV2DocumentsIdCheckpointsVersionNumRestore` | Signature mismatch | Runtime param `{version}` differs from spec/codegen `{versionNum}` |
-| GET | `/api/v2/documents/{id}/revisions/{rid}/url` | `internal/modules/documents/delivery/http/handler.go:104` | `h.signedRevisionURL` | `/api/v2/documents/{id}/revisions/{rid}/url` | â€” | `GetApiV2DocumentsIdRevisionsRidUrl` | Aligned | Also re-registered at `handler.go:139` |
-| GET | `/api/v2/documents/{id}/comments` | `internal/modules/documents/delivery/http/handler.go:105` | `h.listComments` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:140` |
-| POST | `/api/v2/documents/{id}/comments` | `internal/modules/documents/delivery/http/handler.go:106` | `h.createComment` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:141` |
-| PATCH | `/api/v2/documents/{id}/comments/{libraryID}` | `internal/modules/documents/delivery/http/handler.go:107` | `h.updateComment` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:142` |
-| DELETE | `/api/v2/documents/{id}/comments/{libraryID}` | `internal/modules/documents/delivery/http/handler.go:108` | `h.deleteComment` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:143` |
-| POST | `/api/v2/documents/{id}/export/pdf` | `internal/modules/documents/delivery/http/export_handler.go:40` | `h.exportPDF` | `/api/v2/documents/{id}/export/pdf` | `exportDocumentPDF` | `ExportDocumentPDF` | Aligned | Also registered via rate-limit wrapper at `export_handler.go:45` |
-| GET | `/api/v2/documents/{id}/export/docx-url` | `internal/modules/documents/delivery/http/export_handler.go:41` | `h.exportDocxURL` | `/api/v2/documents/{id}/export/docx-url` | `getDocumentDocxURL` | `GetDocumentDocxURL` | Aligned | Also re-registered at `export_handler.go:49` |
-| GET | `/api/v2/documents/{id}/fill-in-schema` | `internal/modules/documents/http/fillin_handler.go:36` | `h.GetFillInSchema` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v2/documents/{id}/placeholders` | `internal/modules/documents/http/fillin_handler.go:37` | `h.ListPlaceholderValues` | â€” | â€” | â€” | Spec missing |  |
-| PUT | `/api/v2/documents/{id}/placeholders/{pid}` | `internal/modules/documents/http/fillin_handler.go:38` | `h.PutPlaceholderValue` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v2/documents/{id}/view` | `internal/modules/documents/http/view_handler.go:30` | `h.HandleView` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/documents/{id}/reconstruct` | `internal/modules/documents/http/reconstruct_handler.go:27` | `h.HandleReconstruct` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/documents` | `internal/modules/documents/delivery/http/handler.go:83` | `h.listDocuments` | `/api/v1/documents` | `listDocumentsV2` | `ListDocumentsV2` | Aligned | Also re-registered at `handler.go:112` |
+| GET | `/api/v1/documents/stats` | `internal/modules/documents/delivery/http/handler.go:84` | `h.documentStats` | `/api/v1/documents/stats` | `documentStatsV2` | `DocumentStatsV2` | Aligned | Also re-registered at `handler.go:113` |
+| GET | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:86` | `h.getDocument` | `/api/v1/documents/{id}` | â€” | `GetApiV2DocumentsId` | Aligned | Also re-registered at `handler.go:115` |
+| PATCH | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:87` | `h.renameDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:116` |
+| POST | `/api/v1/documents/{id}/finalize` | `internal/modules/documents/delivery/http/handler.go:88` | `h.finalizeDocument` | `/api/v1/documents/{id}/finalize` | â€” | `PostApiV2DocumentsIdFinalize` | Aligned | Also re-registered at `handler.go:117` |
+| POST | `/api/v1/documents/{id}/archive` | `internal/modules/documents/delivery/http/handler.go:89` | `h.archiveDocument` | `/api/v1/documents/{id}/archive` | â€” | `PostApiV2DocumentsIdArchive` | Aligned | Also re-registered at `handler.go:118` |
+| POST | `/api/v1/documents/{id}/duplicate` | `internal/modules/documents/delivery/http/handler.go:90` | `h.duplicateDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:119` |
+| POST | `/api/v1/documents/{id}/session/acquire` | `internal/modules/documents/delivery/http/handler.go:92` | `h.acquireSession` | `/api/v1/documents/{id}/session/acquire` | â€” | `PostApiV2DocumentsIdSessionAcquire` | Aligned | Also re-registered at `handler.go:121` |
+| POST | `/api/v1/documents/{id}/session/heartbeat` | `internal/modules/documents/delivery/http/handler.go:93` | `h.heartbeatSession` | `/api/v1/documents/{id}/session/heartbeat` | â€” | `PostApiV2DocumentsIdSessionHeartbeat` | Aligned | Also re-registered at `handler.go:122` |
+| POST | `/api/v1/documents/{id}/session/release` | `internal/modules/documents/delivery/http/handler.go:94` | `h.releaseSession` | `/api/v1/documents/{id}/session/release` | â€” | `PostApiV2DocumentsIdSessionRelease` | Aligned | Also re-registered at `handler.go:123` |
+| POST | `/api/v1/documents/{id}/session/force-release` | `internal/modules/documents/delivery/http/handler.go:95` | `h.forceReleaseSession` | `/api/v1/documents/{id}/session/force-release` | â€” | `PostApiV2DocumentsIdSessionForceRelease` | Aligned | Also re-registered at `handler.go:124` |
+| POST | `/api/v1/documents/{id}/autosave/presign` | `internal/modules/documents/delivery/http/handler.go:97` | `h.presignAutosave` | `/api/v1/documents/{id}/autosave/presign` | â€” | `PostApiV2DocumentsIdAutosavePresign` | Aligned | Also re-registered (wrapped) at `handler.go:126` |
+| POST | `/api/v1/documents/{id}/autosave/commit` | `internal/modules/documents/delivery/http/handler.go:98` | `h.commitAutosave` | `/api/v1/documents/{id}/autosave/commit` | â€” | `PostApiV2DocumentsIdAutosaveCommit` | Aligned | Also re-registered (wrapped) at `handler.go:130` |
+| GET | `/api/v1/documents/{id}/checkpoints` | `internal/modules/documents/delivery/http/handler.go:100` | `h.listCheckpoints` | `/api/v1/documents/{id}/checkpoints` | â€” | `GetApiV2DocumentsIdCheckpoints` | Aligned | Also re-registered at `handler.go:135` |
+| POST | `/api/v1/documents/{id}/checkpoints` | `internal/modules/documents/delivery/http/handler.go:101` | `h.createCheckpoint` | `/api/v1/documents/{id}/checkpoints` | â€” | `PostApiV2DocumentsIdCheckpoints` | Aligned | Also re-registered at `handler.go:136` |
+| POST | `/api/v1/documents/{id}/checkpoints/{version}/restore` | `internal/modules/documents/delivery/http/handler.go:102` | `h.restoreCheckpoint` | `/api/v1/documents/{id}/checkpoints/{versionNum}/restore` | â€” | `PostApiV2DocumentsIdCheckpointsVersionNumRestore` | Signature mismatch | Runtime param `{version}` differs from spec/codegen `{versionNum}` |
+| GET | `/api/v1/documents/{id}/revisions/{rid}/url` | `internal/modules/documents/delivery/http/handler.go:104` | `h.signedRevisionURL` | `/api/v1/documents/{id}/revisions/{rid}/url` | â€” | `GetApiV2DocumentsIdRevisionsRidUrl` | Aligned | Also re-registered at `handler.go:139` |
+| GET | `/api/v1/documents/{id}/comments` | `internal/modules/documents/delivery/http/handler.go:105` | `h.listComments` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:140` |
+| POST | `/api/v1/documents/{id}/comments` | `internal/modules/documents/delivery/http/handler.go:106` | `h.createComment` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:141` |
+| PATCH | `/api/v1/documents/{id}/comments/{libraryID}` | `internal/modules/documents/delivery/http/handler.go:107` | `h.updateComment` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:142` |
+| DELETE | `/api/v1/documents/{id}/comments/{libraryID}` | `internal/modules/documents/delivery/http/handler.go:108` | `h.deleteComment` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:143` |
+| POST | `/api/v1/documents/{id}/export/pdf` | `internal/modules/documents/delivery/http/export_handler.go:40` | `h.exportPDF` | `/api/v1/documents/{id}/export/pdf` | `exportDocumentPDF` | `ExportDocumentPDF` | Aligned | Also registered via rate-limit wrapper at `export_handler.go:45` |
+| GET | `/api/v1/documents/{id}/export/docx-url` | `internal/modules/documents/delivery/http/export_handler.go:41` | `h.exportDocxURL` | `/api/v1/documents/{id}/export/docx-url` | `getDocumentDocxURL` | `GetDocumentDocxURL` | Aligned | Also re-registered at `export_handler.go:49` |
+| GET | `/api/v1/documents/{id}/fill-in-schema` | `internal/modules/documents/http/fillin_handler.go:36` | `h.GetFillInSchema` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/documents/{id}/placeholders` | `internal/modules/documents/http/fillin_handler.go:37` | `h.ListPlaceholderValues` | â€” | â€” | â€” | Spec missing |  |
+| PUT | `/api/v1/documents/{id}/placeholders/{pid}` | `internal/modules/documents/http/fillin_handler.go:38` | `h.PutPlaceholderValue` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/documents/{id}/view` | `internal/modules/documents/http/view_handler.go:30` | `h.HandleView` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/reconstruct` | `internal/modules/documents/http/reconstruct_handler.go:27` | `h.HandleReconstruct` | â€” | â€” | â€” | Spec missing |  |
 
 Module contract status: Contracted
 Owner: leandro
@@ -258,7 +258,7 @@ Owner: leandro
 
 ## 6. Runtime View
 
-### 6.1 listDocuments (read) â€” `GET /api/v2/documents`
+### 6.1 listDocuments (read) â€” `GET /api/v1/documents`
 
 ```mermaid
 sequenceDiagram
@@ -268,7 +268,7 @@ sequenceDiagram
     participant S as Service
     participant R as Repository
     participant DB as Postgres
-    C->>H: GET /api/v2/documents?page&pageSize&status&...
+    C->>H: GET /api/v1/documents?page&pageSize&status&...
     H->>H: hasAnyRole(admin|filler) â€” 403 else
     H->>H: parseListOptions (cap pageSize=50)
     H->>H: effectiveUserID/CreatedBy scoping (non-admin)
@@ -286,7 +286,7 @@ sequenceDiagram
 
 Source: `_artifacts/02-flow-listDocuments.md`. No transaction; read-only.
 
-### 6.2 renameDocument (write) â€” `PATCH /api/v2/documents/{id}`
+### 6.2 renameDocument (write) â€” `PATCH /api/v1/documents/{id}`
 
 ```mermaid
 sequenceDiagram
@@ -297,7 +297,7 @@ sequenceDiagram
     participant R as Repository
     participant A as Audit sink
     participant DB as Postgres
-    C->>H: PATCH /api/v2/documents/{id} {name}
+    C->>H: PATCH /api/v1/documents/{id} {name}
     H->>H: authorizeDocumentScope (admin OR filler+owner)
     H->>H: json.Decode req.Name (400 on fail)
     H->>S: RenameDocument(tenantID, userID, docID, name)
@@ -312,7 +312,7 @@ sequenceDiagram
 
 Source: `_artifacts/02-flow-renameDocument.md` (corrected against `handler.go:285..308` during Phase 6.75 â€” response is `204 No Content`, not a re-fetched JSON body). Spec drift (T-002) â€” route absent from openapi.yaml. Duplicate registration (T-004). No tier-2 authz, no tripwire on `documents` table (T-003). Latent: error path at `handler.go:303-304` calls `httpErr(w, status, msg)` **twice** for a single `RenameDocument` error â€” second call writes a header after a status is already written; visible as a "superfluous WriteHeader" log only.
 
-### 6.3 finalizeDocument (state transition) â€” `POST /api/v2/documents/{id}/finalize`
+### 6.3 finalizeDocument (state transition) â€” `POST /api/v1/documents/{id}/finalize`
 
 ```mermaid
 sequenceDiagram
@@ -324,7 +324,7 @@ sequenceDiagram
     participant EM as EventEmitter
     participant S as Service
     participant DB as Postgres
-    C->>H: POST /api/v2/documents/{id}/finalize
+    C->>H: POST /api/v1/documents/{id}/finalize
     H->>H: hasAnyRole(admin|filler) â€” 403 else
     H->>H: load draft guard (status==draft else 409)
     H->>H: resolve approval route + content hash (409 if missing)
@@ -472,7 +472,7 @@ Summary counts (T-008 closed Plan 4; all rows counted by tally including closed)
 - Minor: 4
 
 Top 3 (by severity, then blast radius):
-1. OpenAPI spec drift on `/api/v2/documents/*` â€” see tech-debt T-002 (Critical; blocks RFC 9457 migration; multiple handlers without spec ops)
+1. OpenAPI spec drift on `/api/v1/documents/*` â€” see tech-debt T-002 (Critical; blocks RFC 9457 migration; multiple handlers without spec ops)
 2. `renameDocument` audit write outside SQL tx â€” see tech-debt T-005 (Major; audit-trail atomicity broken) â€” replaces T-003 in top-3 (T-003 closed Plan 5)
 3. `renameDocument` audit write outside SQL tx â€” see tech-debt T-005 (Major; audit-trail atomicity broken)
 
@@ -499,7 +499,7 @@ Top 3 (by severity, then blast radius):
 
 - Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0011-cd-atomic-create.md`, `wiki/decisions/0012-contract-first-api.md`
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`
-- Upstream template publisher: [`wiki/modules/templates_v2.md`](templates_v2.md) â€” publishes the `template_version` rows (with `placeholder_schema`) that documents instantiates from; `documents` snapshots `placeholder_schema` at create time (Â§8.7 of that doc)
+- Upstream template publisher: [`wiki/modules/templates.md`](templates.md) â€” publishes the `template_version` rows (with `placeholder_schema`) that documents instantiates from; `documents` snapshots `placeholder_schema` at create time (Â§8.7 of that doc)
 - Frontend counterpart: `frontend/apps/web/src/features/documents/` â€” Library, Wizard, Editor, Published view (see `wiki/architecture/frontend-structure.md`)
 - Predecessor stub: `wiki/modules/documents-v2.md` â€” DEPRECATED, retired by R-100
 - Backlog: `wiki/backlog/documents-refactor.md`, `wiki/backlog/contract-first-followups.md`

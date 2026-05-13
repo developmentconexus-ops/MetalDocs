@@ -1,10 +1,10 @@
-# Phase 2 — Data-flow trace: DELETE /api/v2/taxonomy/families/{code} (deactivateFamily)
+# Phase 2 — Data-flow trace: DELETE /api/v1/taxonomy/families/{code} (deactivateFamily)
 
 ## 1. Entry point
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| Route registration | `mux.HandleFunc("DELETE /api/v2/taxonomy/families/{code}", h.deactivateFamily)` | `internal/modules/taxonomy/delivery/http/handler.go:68` |
+| Route registration | `mux.HandleFunc("DELETE /api/v1/taxonomy/families/{code}", h.deactivateFamily)` | `internal/modules/taxonomy/delivery/http/handler.go:68` |
 | Handler | `(*Handler).deactivateFamily` | `internal/modules/taxonomy/delivery/http/routes_families.go:90-96` |
 | OpenAPI op / generated stub | n/a — no OpenAPI spec | — |
 

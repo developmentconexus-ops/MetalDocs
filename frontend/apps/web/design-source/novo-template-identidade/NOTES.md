@@ -1,6 +1,6 @@
 # NOTES — novo-template-identidade
 
-**Target route:** `/templates-v2/new?step=2`
+**Target route:** `/templates/new?step=2`
 **Owning feature:** `frontend/apps/web/src/features/templates/`
 **Tier:** Light (per `metaldocs-screen-implementation` skill v1.3)
 
@@ -26,9 +26,9 @@ See `artifacts/phase0-audit.md` for the full Keep/Cut/Defer table. Headline:
 
 | Field | Status |
 |---|---|
-| `name` | exists — `POST /api/v2/templates` body |
+| `name` | exists — `POST /api/v1/templates` body |
 | `description` | exists — same body |
-| code preview | mocked client-side; needs `GET /api/v2/templates/next-code` |
+| code preview | mocked client-side; needs `GET /api/v1/templates/next-code` |
 | `key` | deferred — auto-slug from name at Step 5 submit |
 | tags | cut — no backend taxonomy |
 

@@ -55,7 +55,7 @@ No persisted state. No debounced inputs.
 | Field | Endpoint | Status |
 |---|---|---|
 | starting-point choice | client-only flag → drives editor handoff post-create | **deferred** → backlog `step3-editor-handoff` |
-| docx upload | `POST /api/v2/templates/{id}/{n}/docx-upload-url` | exists — but requires template id (created at Step 5). **Deferred** → backlog `step3-docx-upload`. Step 3 mocks file pick. |
+| docx upload | `POST /api/v1/templates/{id}/{n}/docx-upload-url` | exists — but requires template id (created at Step 5). **Deferred** → backlog `step3-docx-upload`. Step 3 mocks file pick. |
 | placeholder extraction | none — `POST /publish` only | **deferred** → backlog `step3-placeholder-extract` |
 
 ## 1.7 Step 3 → 2 / 4 advance/back rules

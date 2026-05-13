@@ -93,4 +93,4 @@ Backend substitution map: `{ customer_name: "Acme", revision: "1.2", ... }` — 
 - [placeholders.md](placeholders.md) — full concept
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — migration ADR
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md) — T4 used `{name}` fixture, validated approach
-- [modules/templates_v2.md §2](../modules/templates_v2.md) — architecture constraint: `{name}` single-brace eigenpal-native syntax required by the templates_v2 backend (oapi-codegen + `ValidatePlaceholders`)
+- [modules/templates.md §2](../modules/templates.md) — architecture constraint: `{name}` single-brace eigenpal-native syntax required by the templates backend (oapi-codegen + `ValidatePlaceholders`)

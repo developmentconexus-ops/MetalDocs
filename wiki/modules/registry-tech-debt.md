@@ -51,7 +51,7 @@ The category names are useful only when paired with concrete triggers. Use the t
 ### T-003 · Legacy `{code, message}` error envelope across module — CLOSED 2026-05-12 (Plan 7)
 - **Severity:** major (closed)
 - **Surface (resolved):** `internal/platform/httpresponse/response.go:16-18` — `WriteError` now delegates to `problem.Write(w, problem.New(status, code, message))`. All registry routes that called `httpresponse.WriteError` inherit RFC 9457 `application/problem+json` output. `internal/modules/registry/delivery/http/routes.go:470-471` — `ErrTemplateProfileMismatch` branch directly calls `problem.Write` with 422 `template_invalid`.
-- **Observation (original):** Errors emitted JSON object `{"code": "...", "message": "..."}` with default content-type. RFC 9457 Problem Details (`application/problem+json`) was not used. Peer modules (documents T-001, audit T-002, templates_v2 T-005, approval T-001) carried the same gap.
+- **Observation (original):** Errors emitted JSON object `{"code": "...", "message": "..."}` with default content-type. RFC 9457 Problem Details (`application/problem+json`) was not used. Peer modules (documents T-001, audit T-002, templates T-005, approval T-001) carried the same gap.
 - **Evidence:** `_artifacts/02-flow-atomic-create.md` §5; `_artifacts/05-industry.md` IP-001
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-003`](../backlog/registry-refactor.md) (merged Plan 7 2026-05-11, commit `11589032` + `395b0b24`)
 - **Linked ADR:** `wiki/architecture/api-design-system.md`
@@ -112,10 +112,10 @@ The category names are useful only when paired with concrete triggers. Use the t
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-010`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR
 
-### T-011 · OpenAPI partial at `v1/` despite `/api/v2/` HTTP path
+### T-011 · OpenAPI partial at `v1/` despite `/api/v1/` HTTP path
 - **Severity:** minor
-- **Surface:** `api/openapi/v1/partials/registry.yaml`; routes at `/api/v2/controlled-documents/*`
-- **Observation:** The spec partial lives under `api/openapi/v1/` while the HTTP path prefix is `/api/v2/`. Generated server stubs (`internal/modules/registry/api/api.gen.go`) and clients consequently encode the `v2` path strings without a matching `v2/` spec tree. Cosmetic but confusing for new contributors; potential breakage on future spec restructuring (e.g. when other modules grow a real `v2/` tree).
+- **Surface:** `api/openapi/v1/partials/registry.yaml`; routes at `/api/v1/controlled-documents/*`
+- **Observation:** The spec partial lives under `api/openapi/v1/` while the HTTP path prefix is `/api/v1/`. Generated server stubs (`internal/modules/registry/api/api.gen.go`) and clients consequently encode the `v2` path strings without a matching `v2/` spec tree. Cosmetic but confusing for new contributors; potential breakage on future spec restructuring (e.g. when other modules grow a real `v2/` tree).
 - **Evidence:** `_artifacts/02-flow-atomic-create.md` §1
 - **Linked backlog row:** [`backlog/registry-refactor.md#R-011`](../backlog/registry-refactor.md)
 - **Linked ADR:** missing-ADR

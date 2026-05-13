@@ -2,7 +2,7 @@
 
 > **Slug:** novo-template-escopo
 > **Owning feature:** features/templates
-> **Target route:** /templates-v2/new (step 1)
+> **Target route:** /templates/new (step 1)
 > **Reference:** ./novo-template-escopo.html + ./NOTES.md
 > **Skill version:** 1.2
 > **Started:** 2026-05-09
@@ -129,7 +129,7 @@ Mock fallback: document-clone tab rendered disabled with `aria-disabled title="E
 
 - [ ] OpenAPI codegen run (no new endpoints for Step 1)
 - [ ] `WizardShell` + `WizardFooter` promoted to `features/shared/components/wizard/` + doc wizard updated to import from new location
-- [ ] Route stub `/templates-v2/new` registered in `features/templates/routes.tsx`
+- [ ] Route stub `/templates/new` registered in `features/templates/routes.tsx`
 
 ---
 
@@ -172,12 +172,12 @@ Mock fallback: document-clone tab rendered disabled with `aria-disabled title="E
 ## Phase 4 — Verify (HARD GATE)
 
 Smoke steps:
-1. Navigate to `/templates-v2/new` — Step 1 renders, Stepper shows step 1 active
+1. Navigate to `/templates/new` — Step 1 renders, Stepper shows step 1 active
 2. Profile grid loads from API — 6 cards visible (CHK disabled)
 3. Select POP card — card highlights, Avançar enabled
 4. Click disabled CHK card — no selection change, tooltip "Em breve"
 5. "A partir de um documento" tab — click → no state change, tooltip "Em breve"
-6. Click Cancelar → navigate back to `/templates-v2`
+6. Click Cancelar → navigate back to `/templates`
 7. Select profile → Avançar → navigate to Step 2
 
 ---

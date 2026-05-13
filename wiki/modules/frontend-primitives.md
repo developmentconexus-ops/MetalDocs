@@ -118,7 +118,7 @@ export type RovingRadioGroupResult = {
 ## Cross-refs
 
 - [architecture/frontend-structure.md](../architecture/frontend-structure.md) Ã¢â‚¬â€ canonical rule: `components/ui/` is design-system only; domain-agnostic; no imports from `features/`
-- [modules/templates-v2.md](templates-v2.md) Ã¢â‚¬â€ primary consumer of both primitives
+- [modules/templates.md](templates.md) Ã¢â‚¬â€ primary consumer of both primitives
 - [backlog/novo-documento.md](../backlog/novo-documento.md) Ã¢â‚¬â€ deferred `SelectableCardGroup` wrapper (held until 2nd consumer of group pattern appears)
 
 ---

@@ -18,7 +18,7 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-001 (merged Plan 7 2026-05-11, commit `5b792150`)
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`; `wiki/architecture/api-design-system.md`
 
-### T-002 · OpenAPI spec drift on `/api/v2/documents/*` routes
+### T-002 · OpenAPI spec drift on `/api/v1/documents/*` routes
 - **Severity:** critical
 - **Surface:** `internal/modules/documents/delivery/http/handler.go:86, :111, :115, :116` (registrations) · `api/openapi/v1/openapi.yaml:3156, :3251`
 - **Observation:** `renameDocument`, `duplicateDocument`, `comments` CRUD, and `archiveDocument` have handlers but no spec operations. `finalizeDocument` has a spec path (`openapi.yaml:3251`) with **no `operationId`** set. `listDocuments` handler exists; spec exposes `listDocumentsV2` (`openapi.yaml:3156`) — drift between handler name and spec id. Contract violation surface on regulated paths — clients have no typed binding for these ops.
@@ -34,10 +34,10 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-003
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 
-### T-004 · Duplicate route registration for `PATCH /api/v2/documents/{id}`
+### T-004 · Duplicate route registration for `PATCH /api/v1/documents/{id}`
 - **Severity:** minor
 - **Surface:** `internal/modules/documents/delivery/http/handler.go:86` · `internal/modules/documents/delivery/http/handler.go:115`
-- **Observation:** Both lines register `mux.HandleFunc("PATCH /api/v2/documents/{id}", h.renameDocument)`. stdlib mux is last-wins. Same handler reference → no behavioral change today, but a future edit could swap the second binding without anyone noticing the first.
+- **Observation:** Both lines register `mux.HandleFunc("PATCH /api/v1/documents/{id}", h.renameDocument)`. stdlib mux is last-wins. Same handler reference → no behavioral change today, but a future edit could swap the second binding without anyone noticing the first.
 - **Evidence:** `_artifacts/02-flow-renameDocument.md` §1.
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-004
 - **Linked ADR:** missing-ADR
@@ -50,7 +50,7 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-005
 - **Linked ADR:** missing-ADR
 
-### T-006 · `POST /api/v2/documents/{id}/finalize` lacks HTTP `Idempotency-Key` integration
+### T-006 · `POST /api/v1/documents/{id}/finalize` lacks HTTP `Idempotency-Key` integration
 - **Severity:** major
 - **Surface:** `internal/modules/documents/delivery/http/handler.go:316` (handler entry) · `internal/modules/documents/approval/application/submit_service.go:61` (internal key compute) · `internal/modules/documents/approval/application/idempotency.go:20` (ComputeIdempotencyKey)
 - **Observation:** Submit path computes a deterministic internal key but does not read the `Idempotency-Key` header nor write `metaldocs.idempotency_keys`. Replay safety relies entirely on the partial unique index `ux_approval_instances_active` (`migrations/0135_*.sql:33`) — a retry returns 409, not a replayed 201. Contract drift vs. Stripe-style idempotency (`internal/platform/idempotency/`).

@@ -148,7 +148,7 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 | IAM | `iam/delivery/http/routes_memberships.go:146` | `tenantIDFromRequest` → `tenant.FromContext` |
 | registry | `registry/delivery/http/routes.go:488` | `tenantIDFromRequest` → `tenant.FromContext` |
 | registry | `registry/delivery/http/handler.go:50` | `injectTenant` middleware → `tenant.FromContext` |
-| templates_v2 | `templates_v2/delivery/http/handler.go:83` | `tenantIDFromReq` → `tenant.FromContext` |
+| templates | `templates/delivery/http/handler.go:83` | `tenantIDFromReq` → `tenant.FromContext` |
 | taxonomy | `taxonomy/delivery/http/routes_profiles.go:230` | `tenantIDFromRequest` → `tenant.FromContext` |
 | documents | `documents/delivery/http/handler.go` | `tenant.FromContext` |
 | documents/approval | `documents/approval/http/handler.go` | `tenant.FromContext` |
@@ -173,6 +173,6 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 - `wiki/modules/iam.md §8.2` — tenant scoping in IAM tables
 - `wiki/modules/registry.md §8.7` — registry tenant scoping
 - `wiki/modules/taxonomy.md §8` — taxonomy tenant scoping (T-001 resolved)
-- `wiki/modules/templates_v2-tech-debt.md#T-003` — templates_v2 header-trust (T-003 resolved)
+- `wiki/modules/templates-tech-debt.md#T-003` — templates header-trust (T-003 resolved)
 - `wiki/concepts/authz-tiers.md` — how tenant context feeds into tier-1 and tier-2 authz
 - `wiki/backlog/roadmap.md` — Plan 3 entry

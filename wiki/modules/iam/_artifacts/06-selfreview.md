@@ -30,7 +30,7 @@ Minor rows: T-008 (latent cache gap), T-009 (collision — closed Plan 4), T-010
 | §5.1 Container | `mw`, `adminH`, `memH`, `adminSvc`, `memSvc`, `capSvc`, `authz`, `roleProv`, `db` | yes — §5.2 surface table covers every container. `authzSvc` and `memberPkg` removed in Plan 4 sweep. |
 | §6.1 / §6.2 / §6.3 sequence | Standard layers | yes |
 
-One residual concern: §3 collapses `documents/approval/templates_v2` into a single `System` box. When approval gets its own module doc, refactor this into two boxes (one for documents+approval, one for templates_v2). Not a current debt — log as `_artifacts/00-context.md` note for next module sweep.
+One residual concern: §3 collapses `documents/approval/templates` into a single `System` box. When approval gets its own module doc, refactor this into two boxes (one for documents+approval, one for templates). Not a current debt — log as `_artifacts/00-context.md` note for next module sweep.
 
 ### 3. Top-3 in §11 ordered by severity-then-blast-radius
 
@@ -38,7 +38,7 @@ T-001/T-002 closed. Current order: T-005 (Critical — regulated audit gap), T-0
 
 ### 4. Cross-link existence
 
-Verified earlier in review session: `wiki/concepts/authz-tiers.md`, `wiki/concepts/iso-segregation.md`, `wiki/modules/approval.md`, `wiki/modules/documents.md`, `wiki/modules/templates-v2.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0012-contract-first-api.md`, `wiki/architecture/api-design-system.md`, `wiki/architecture/api-contract.md` all exist. `wiki/modules/iam-rbac.md` correctly removed (R-014).
+Verified earlier in review session: `wiki/concepts/authz-tiers.md`, `wiki/concepts/iso-segregation.md`, `wiki/modules/approval.md`, `wiki/modules/documents.md`, `wiki/modules/templates.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0012-contract-first-api.md`, `wiki/architecture/api-design-system.md`, `wiki/architecture/api-contract.md` all exist. `wiki/modules/iam-rbac.md` correctly removed (R-014).
 
 ### 5. Key Files freshness
 

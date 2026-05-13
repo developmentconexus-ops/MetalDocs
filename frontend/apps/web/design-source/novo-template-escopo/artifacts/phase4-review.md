@@ -47,12 +47,12 @@ Resolves to `features/shared/components/wizard/WizardFooter`. Correct canonical 
 |----|---------|--------|
 | C1 (prior) | StepAreaCodeVisibility broken import after shim deletion | RESOLVED |
 | C2 | Re-export shim `documents/components/wizard/WizardFooter.tsx` | RESOLVED |
-| C3 | Duplicate route + path rename (`templates-v2/novo` → `templates-v2/new`) | RESOLVED |
+| C3 | Duplicate route + path rename (`templates/novo` → `templates/new`) | RESOLVED |
 | M1 | WizardFooter divider hardcoded `-32px` | RESOLVED |
 | M3 | `.disabledBadge` undefined token with raw hex fallback | RESOLVED |
 | M4 | Disabled SelectableCard missing `title="Em breve"` | RESOLVED |
 | M5 | `wiki/backlog/novo-template-wizard.md` did not exist | RESOLVED |
-| M6 | `wiki/modules/templates-v2.md` stale | RESOLVED |
+| M6 | `wiki/modules/templates.md` stale | RESOLVED |
 | m1 | IMPLEMENTATION.md Open Questions Log Q1 unresolved | RESOLVED |
 | minor-1 | SelectableCard missing prefers-reduced-motion | CARRIED — pre-existing primitive gap |
 | minor-2 | parity-diff inferred rows not measured | CARRIED — hygiene only |
@@ -63,7 +63,7 @@ Resolves to `features/shared/components/wizard/WizardFooter`. Correct canonical 
 
 - Every Critical and Major from the prior two review passes is now closed. The fix was surgical — one import path, no collateral changes.
 - `features/documents/queries/useProfilesQuery.ts` confirmed deleted. No re-export shims remain.
-- `features/templates/routes.tsx` is clean: one lazy entry for `templates-v2/new`, no duplicates, no `HashRouter`, no string-pattern dispatchers.
+- `features/templates/routes.tsx` is clean: one lazy entry for `templates/new`, no duplicates, no `HashRouter`, no string-pattern dispatchers.
 - `StepScope.module.css` `.disabledBadge` correctly uses `var(--surface-3)` with no raw hex fallback.
 - `StepScope.tsx` disabled SelectableCard has `title={isDisabled ? 'Em breve' : undefined}` — correct a11y pattern.
 - `WizardFooter.module.css` divider uses `calc(-1 * var(--sp-7))` with responsive mobile override to `calc(-1 * var(--sp-4))`. Token-correct and responsive.

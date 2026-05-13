@@ -1,6 +1,6 @@
 # NOTES — novo-template-confirmacao
 
-**Target route:** `/templates-v2/new?step=5`
+**Target route:** `/templates/new?step=5`
 **Owning feature:** `frontend/apps/web/src/features/templates/`
 **Tier:** Light (no @media, ≤100 lines CSS, no new shared primitives; 1 checkbox → leakage-probe required)
 
@@ -13,7 +13,7 @@ See `artifacts/phase0-audit.md`. Headline:
 - **Keep (computed):** Origem row (`state.startingPoint` + `state.selectedDocxName`), Permissões row (derived from permissionsMode + selections).
 - **Cut:** Auto-fill row ("2 campos automáticos") — no placeholder extraction endpoint.
 - **Keep (adapted):** "Ao confirmar" ol item 4 — removed hardcoded `QUA-COORD`; generic text.
-- **Keep (mocked):** CTA submit → navigate to `/templates-v2` (no API call). Backlog: `confirmacao-backend-submit`.
+- **Keep (mocked):** CTA submit → navigate to `/templates` (no API call). Backlog: `confirmacao-backend-submit`.
 - **Checkbox gate:** local `useState(false)` — no reducer needed.
 
 ## Reused primitives
@@ -33,7 +33,7 @@ See `artifacts/phase0-audit.md`. Headline:
 
 | Item | Backlog row |
 |---|---|
-| Real `POST /api/v2/templates` + permissions/structure wiring | `confirmacao-backend-submit` |
+| Real `POST /api/v1/templates` + permissions/structure wiring | `confirmacao-backend-submit` |
 
 ## Leakage probe
 

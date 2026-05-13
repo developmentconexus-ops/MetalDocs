@@ -19,7 +19,7 @@
 | **Subtitle/description paragraph** | No description field in model | Cut | Field doesn't exist |
 | **"Visualizar documento" button** | Navigate to `/documents-v2/:id` | Keep | Real route exists |
 | **"Baixar PDF" button** | PDF download endpoint | Defer | No endpoint today |
-| **"Iniciar revisão" button** | `POST /api/v2/controlled-documents/:id/revisions` | Keep (RBAC-gated) | Real endpoint; disabled for non-authors |
+| **"Iniciar revisão" button** | `POST /api/v1/controlled-documents/:id/revisions` | Keep (RBAC-gated) | Real endpoint; disabled for non-authors |
 | **"Copiar link" button** | `navigator.clipboard.writeText(window.location.href)` | Keep | Client-only |
 | **KPI — Versão atual** | `document.revision_version` | Keep | Real field |
 | **KPI — Cobertura %** | Fanout coverage API | Defer | No endpoint |
@@ -35,12 +35,12 @@
 | **Fact — Selo ISO (hash)** | `values_hash` — NOT in API response | Defer | Deferred with AuditCard (Q1) |
 | **CoverageCard** | Fanout coverage API | Defer | No endpoint |
 | **AuditCard** (ISO hash + tooltip) | `values_hash` — not returned by API | Defer | No backend change approved; goes to backlog |
-| **SignoffPipeline** (stepper) | `GET /api/v2/documents/:id/approval-instance` → `stages[]` + `signoffs[]` | Keep | Real endpoint; display names included |
+| **SignoffPipeline** (stepper) | `GET /api/v1/documents/:id/approval-instance` → `stages[]` + `signoffs[]` | Keep | Real endpoint; display names included |
 | **VersionTimeline** (interactive pins) | Revision history | Defer | No revision list endpoint exists |
 | **Version tags** (major/minor/patch) | No tag field | Cut | No such classification in data model |
 | **Diff stats** (+added ~modified) | No diff tracking | Cut | No diff data available |
 | **RelatedGrid** | No related-documents backend | Defer | No relationship model |
-| **CommentsCard** (thread + reply) | `GET/POST /api/v2/documents/:id/comments` — content is ProseMirror JSON | Defer | Needs brainstorm on storage structure + rendering approach; goes to backlog |
+| **CommentsCard** (thread + reply) | `GET/POST /api/v1/documents/:id/comments` — content is ProseMirror JSON | Defer | Needs brainstorm on storage structure + rendering approach; goes to backlog |
 | **Comments attachment button** | No attachment flow | Cut | No backend support |
 | **ObsoleteBanner** ("OBSOLETO" stamp) | `document.status === 'obsolete'` or `cd.status === 'obsolete'` | Keep | Real state |
 | **ISOSeal** (hash tooltip on hover) | Tied to AuditCard `values_hash` | Defer | Deferred with AuditCard |

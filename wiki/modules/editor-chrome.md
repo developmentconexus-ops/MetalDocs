@@ -6,7 +6,7 @@
 **Last verified:** 2026-05-11 | **Owner:** unassigned (frontend) | **Status:** active | **Maturity:** L2
 
 > **Scope:** Shared React primitive that wraps an eigenpal editor canvas, projects a custom toolbar via 3 absolute overlays, and applies MetalDocs visual contract to eigenpal DOM via scoped `:global(.ep-root ...)` CSS overrides. Mounted by `TemplateEditorPage` and `DocumentEditorPage`.
-> **Out of scope:** Eigenpal internals (see [modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md)), template authoring business logic (see [modules/templates_v2.md](templates_v2.md) and [modules/templates-v2.md](templates-v2.md)), document editor business logic (see [modules/documents.md](documents.md)), placeholder rendering (see [concepts/placeholders.md](../concepts/placeholders.md)).
+> **Out of scope:** Eigenpal internals (see [modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md)), template authoring business logic (see [modules/templates.md](templates.md) and [modules/templates.md](templates.md)), document editor business logic (see [modules/documents.md](documents.md)), placeholder rendering (see [concepts/placeholders.md](../concepts/placeholders.md)).
 > **Key files:**
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.tsx:31` â€” `EditorChrome` component + `EditorChromeProps` slot API + `editorChromeStyles` re-export
 > - `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.module.css:1` â€” wrapper, overlay layout, button/text primitives, 17 eigenpal `:global` overrides
@@ -300,7 +300,7 @@ Top 3 (by severity, then by blast-radius):
 - Concepts: [wiki/concepts/placeholders.md](../concepts/placeholders.md), [wiki/architecture/frontend-structure.md](../architecture/frontend-structure.md)
 - Backlog: [wiki/backlog/editor-chrome-refactor.md](../backlog/editor-chrome-refactor.md)
 - Tech debt: [wiki/modules/editor-chrome-tech-debt.md](editor-chrome-tech-debt.md)
-- Sibling modules: [wiki/modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md), [wiki/modules/templates_v2.md](templates_v2.md), [wiki/modules/templates-v2.md](templates-v2.md), [wiki/modules/documents.md](documents.md)
+- Sibling modules: [wiki/modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md), [wiki/modules/templates.md](templates.md), [wiki/modules/templates.md](templates.md), [wiki/modules/documents.md](documents.md)
 - References: [wiki/references/eigenpal-controlled-package.md](../references/eigenpal-controlled-package.md)
 
 ## Changelog (this doc)

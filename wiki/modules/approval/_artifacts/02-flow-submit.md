@@ -1,4 +1,4 @@
-# Data-flow Trace — POST /api/v2/documents/{id}/finalize (submit revision for review)
+# Data-flow Trace — POST /api/v1/documents/{id}/finalize (submit revision for review)
 
 ## 1. Entry point
 
@@ -18,10 +18,10 @@
 
 ## 2. Call chain
 
-1. `internal/modules/documents/delivery/http/handler.go:316` `(*Handler).finalizeDocument` — documents-module entry for `POST /api/v2/documents/{id}/finalize`.
+1. `internal/modules/documents/delivery/http/handler.go:316` `(*Handler).finalizeDocument` — documents-module entry for `POST /api/v1/documents/{id}/finalize`.
    ? calls: `internal/modules/documents/delivery/http/handler.go:403` `submitSvc.SubmitRevisionForReview`
 
-2. `internal/modules/documents/approval/http/submit_handler.go:14` `(*Handler).SubmitHandler` — approval-module direct entry for `POST /api/v2/documents/{id}/submit`.
+2. `internal/modules/documents/approval/http/submit_handler.go:14` `(*Handler).SubmitHandler` — approval-module direct entry for `POST /api/v1/documents/{id}/submit`.
    ? calls: `internal/modules/documents/approval/http/submit_handler.go:50` `submitSvc.SubmitRevisionForReview`
 
 3. `internal/modules/documents/approval/application/submit_service.go:43` `(*SubmitService).SubmitRevisionForReview` — core submit flow.
@@ -110,7 +110,7 @@ Tripwire pairing (same tx):
 
 ## 5. Response shape
 
-- Finalize path (`/api/v2/documents/{id}/finalize`):
+- Finalize path (`/api/v1/documents/{id}/finalize`):
 - Declared responses: `200`, `409` at `api/openapi/v1/openapi.yaml:3255`.
 - 2xx schema ref: `(unclear: no response content schema declared on this path in openapi.yaml)`.
 - Problem `type` URI: `(unclear: v1 finalize path does not declare Problem type URI fields)`.
