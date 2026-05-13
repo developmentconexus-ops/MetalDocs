@@ -21,6 +21,24 @@ Each phase produces an artifact under `design-source/<slug>/artifacts/`. Missing
 
 Load `metaldocs-frontend` first. It owns feature-sliced layout, OpenAPI codegen, CSS Modules + tokens, no `HashRouter`, and no legacy paths. If the screen wires real API calls, query hooks, query keys, invalidation, optimistic updates, polling, prefetching, or freshness policy, also load `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
 
+## Phase -1: Runnable Checkpoint
+
+Artifact: `design-source/<slug>/artifacts/phase-1-runnable.md`
+
+Before Phase 0, write the checkpoint results in `phase-1-runnable.md`:
+1. Fresh build truth: run the canonical startup flow from the current repo docs/scripts, record the exact commands used, and note whether the frontend build/dev boot succeeds from a clean start.
+2. Runnable truth: with the local system up, open the app and record whether the shell, target screen entry path, and required backend process are actually runnable now.
+3. Auth/session truth: verify login plus session bootstrap, then record the observed auth state source, post-login landing behavior, and any bootstrap failure.
+4. Target route truth: identify the screen's primary API route(s), hit the flow in the running system, and record the runtime owner/module for each route you depend on.
+5. Contract truth: compare runtime route owner, OpenAPI path, generated frontend types, and the feature API wrapper for the target module; record `match` or the concrete mismatch.
+
+Phase 0 cannot start until `phase-1-runnable.md` exists and all five checks pass.
+
+If any checkpoint fails:
+- classify the issue
+- if the issue is strictly screen-local, repair it, rerun Phase -1, and do not start Phase 0 until all five checks pass
+- otherwise stop before Phase 0 and route runtime or shared contract failures to the prerequisite workflow
+
 ## Tier classification (FIRST ACTION)
 
 After Phase 0+1, classify the screen. **Default to Light unless any Heavy trigger fires.**
@@ -40,6 +58,7 @@ Stop when: backend shape ambiguous, design element unmapped to state/role, two v
 
 | Phase | Executor | Tier | Artifact |
 |---|---|---|---|
+| -1 � Runnable checkpoint | Main inline | both | `phase-1-runnable.md` |
 | 0 — Audit | Main inline | both | `phase0-audit.md` (Keep/Cut/Defer + user OK) |
 | 1 — Map | Main inline | both | `phase1-map.md` |
 | 2 — Pre-flight | Subagent worktree | both | `phase2-preflight.md` |
@@ -56,14 +75,15 @@ Stop when: backend shape ambiguous, design element unmapped to state/role, two v
 1. Read `design-source/<slug>/NOTES.md`, view `<slug>.html` + `<slug>.png`.
 2. `mkdir design-source/<slug>/artifacts/screenshots`.
 3. Copy `templates/IMPLEMENTATION.md` → `design-source/<slug>/IMPLEMENTATION.md`. Fill header (slug, tier, date).
-4. Phase 0 with user → `phase0-audit.md`.
-5. Phase 1 with user → `phase1-map.md`. **Classify tier here.**
-6. Dispatch Phase 2 subagent (`templates/subagent-phase2.md`) → `phase2-preflight.md`.
-7. **If Light:** dispatch combined Phase 3 (`templates/subagent-phase3-combined.md`). User approves screenshots + parity-diff. Skip 3a/3b/3c.
-8. **If Heavy:** Phase 3a inline (mirror DOM in TSX skeleton), then Phase 3b subagent, then Phase 3c subagent.
-9. Phase 4 main session → `phase4-behavior.md`.
-10. Phase 4.5 `frontend-screen-reviewer` → `phase4-review.md`. Resolve Critical+Major before merge.
-11. Phase 5: wiki update + dispatch `wiki-curator`.
+4. Run Phase -1 and write `phase-1-runnable.md`. If it fails, stop before Phase 0.
+5. Phase 0 with user → `phase0-audit.md`.
+6. Phase 1 with user → `phase1-map.md`. **Classify tier here.**
+7. Dispatch Phase 2 subagent (`templates/subagent-phase2.md`) → `phase2-preflight.md`.
+8. **If Light:** dispatch combined Phase 3 (`templates/subagent-phase3-combined.md`). User approves screenshots + parity-diff. Skip 3a/3b/3c.
+9. **If Heavy:** Phase 3a inline (mirror DOM in TSX skeleton), then Phase 3b subagent, then Phase 3c subagent.
+10. Phase 4 main session → `phase4-behavior.md`.
+11. Phase 4.5 `frontend-screen-reviewer` → `phase4-review.md`. Resolve Critical+Major before merge.
+12. Phase 5: wiki update + dispatch `wiki-curator`.
 
 ## Phase 0 — Audit
 
@@ -183,3 +203,6 @@ After run, report: files changed · reusability classifications · tier · works
 - 1.2 (2026-05-07) — Visual-parity-loop refactor. `parity-diff.md` + `leakage-probe.md` HARD artifacts. Pixel Parity Playbook.
 - 1.1 (2026-05-07) — Iron Law. Phase 4.5 reviewer split.
 - 1.0 (2026-05-06) — initial release.
+
+
+

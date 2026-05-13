@@ -39,8 +39,10 @@ Do not put server-derived data in Zustand or component `useEffect` fetches.
 ### 2. Design the API wrapper
 
 - Put pure request functions in `features/<domain>/api/<domain>.ts`.
-- Use `lib/api/client.ts` or existing `lib/api/apiFetch.ts`; never call `fetch` directly.
+- The canonical API client surface is `frontend/apps/web/src/lib/api/client.ts` plus the shared helpers it exports or composes, including the repo's `apiFetch` path. Feature wrappers call that surface; never call `fetch` directly.
 - Use `lib/api-types/` generated types when OpenAPI covers the route.
+- For the module in scope, generated API types and `lib/api/client.ts` behavior are authoritative unless the task is explicitly a prerequisite sync.
+- If a feature wrapper behavior diverges from runtime/spec or from the canonical API client surface and affects more than the local task, classify it as a shared contract prerequisite and stop.
 - Throw errors from API functions. TanStack Query only treats a query as errored when the query function throws or returns a rejected promise.
 - Keep request functions React-free so they can be unit tested and reused by prefetching.
 
@@ -213,3 +215,4 @@ Stop and report when:
 ## Reference
 
 Read `references/tanstack-query-v5-notes.md` when making policy decisions about current TanStack Query behavior, freshness, query options, optimistic updates, or supply-chain-sensitive dependency updates.
+
