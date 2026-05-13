@@ -11,4 +11,8 @@ ALTER TABLE documents
 
 DROP TABLE IF EXISTS document_editable_zone_content;
 
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('0196', 'drop editable zone columns and content table')
+ON CONFLICT (version) DO NOTHING;
+
 COMMIT;
