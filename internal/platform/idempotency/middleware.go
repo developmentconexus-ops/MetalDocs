@@ -14,6 +14,32 @@ import (
 
 var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
+// IsValidKey reports whether an idempotency key matches the required UUID shape.
+func IsValidKey(key string) bool {
+	return uuidRE.MatchString(key)
+}
+
+// RequestHash computes a deterministic hash of method + path + query + body.
+// This prevents replaying a key across different resource paths with identical bodies.
+func RequestHash(r *http.Request) (string, error) {
+	buf, err := io.ReadAll(r.Body)
+	if err != nil {
+		return "", err
+	}
+	_ = r.Body.Close()
+	r.Body = io.NopCloser(bytes.NewReader(buf))
+
+	sum := sha256.New()
+	sum.Write([]byte(r.Method))
+	sum.Write([]byte{'\n'})
+	sum.Write([]byte(r.URL.Path))
+	sum.Write([]byte{'?'})
+	sum.Write([]byte(r.URL.RawQuery))
+	sum.Write([]byte{'\n'})
+	sum.Write(buf)
+	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
 // Require returns middleware that enforces the Idempotency-Key header.
 // actorFromCtx extracts (tenantID, actorID) from the request context.
 // On a replay hit, the stored response is written and the handler is not called.
@@ -27,23 +53,18 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string)) 
 				writeErrJSON(w, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key header required")
 				return
 			}
-			if !uuidRE.MatchString(key) {
+			if !IsValidKey(key) {
 				writeErrJSON(w, 400, "IDEMPOTENCY_KEY_INVALID", "Idempotency-Key must be a UUID")
 				return
 			}
 
 			tenantID, actorID := actorFromCtx(r.Context())
 
-			buf, err := io.ReadAll(r.Body)
+			hash, err := RequestHash(r)
 			if err != nil {
 				writeErrJSON(w, 400, "BAD_REQUEST", "cannot read body")
 				return
 			}
-			_ = r.Body.Close()
-			r.Body = io.NopCloser(bytes.NewReader(buf))
-
-			sum := sha256.Sum256(buf)
-			hash := hex.EncodeToString(sum[:])
 
 			replay, err := store.CheckReplay(r.Context(), tenantID, actorID, key, hash)
 			if errors.Is(err, ErrConflict) {

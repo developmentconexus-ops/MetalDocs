@@ -352,6 +352,20 @@ func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
 	}
 }
 
+func TestFinalizeDocument_InvalidIdempotencyKey_Returns400(t *testing.T) {
+	mux := newMux(t, &fakeSvc{})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/finalize", nil)
+	withAuthHeaders(req, "document_filler")
+	req.Header.Set("Idempotency-Key", "not-a-uuid")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
 func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	key := "11111111-1111-4111-8111-111111111111"
 	body := []byte(`{"instanceId":"inst_1"}`)

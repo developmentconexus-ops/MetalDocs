@@ -112,3 +112,21 @@ func TestMiddleware_Conflict_Returns422(t *testing.T) {
 		t.Fatalf("conflict status: got %d want 422", rec2.Code)
 	}
 }
+
+func TestMiddleware_SameKeyDifferentResourcePath_Returns422(t *testing.T) {
+	db := pgtest.OpenAndMigrate(t)
+	store := idempotency.New(db, "POST /test/{id}")
+	h := withIDs(testTenantMW, testActorMW)(idempotency.Require(store, actorFromCtx)(handler201(`{"ok":true}`)))
+
+	req := httptest.NewRequest("POST", "/test/one", bytes.NewReader([]byte(`{}`)))
+	req.Header.Set("Idempotency-Key", "33333333-3333-4333-8333-333333333333")
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	req2 := httptest.NewRequest("POST", "/test/two", bytes.NewReader([]byte(`{}`)))
+	req2.Header.Set("Idempotency-Key", "33333333-3333-4333-8333-333333333333")
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req2)
+	if rec2.Code != 422 {
+		t.Fatalf("status: got %d want 422", rec2.Code)
+	}
+}

@@ -1,14 +1,10 @@
 package http
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -347,6 +343,10 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_REQUIRED")
 		return
 	}
+	if !idempotency.IsValidKey(idempotencyKey) {
+		httpErr(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_INVALID")
+		return
+	}
 
 	if h.submitSvc == nil || h.db == nil {
 		// Fallback: legacy status-only transition when submit service not wired.
@@ -365,7 +365,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payloadHash, err := hashRequestBody(r)
+	payloadHash, err := idempotency.RequestHash(r)
 	if err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
 		return
@@ -492,17 +492,6 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, respBody)
-}
-
-func hashRequestBody(r *http.Request) (string, error) {
-	buf, err := io.ReadAll(r.Body)
-	if err != nil {
-		return "", err
-	}
-	_ = r.Body.Close()
-	r.Body = io.NopCloser(bytes.NewReader(buf))
-	sum := sha256.Sum256(buf)
-	return hex.EncodeToString(sum[:]), nil
 }
 
 func (h *Handler) archiveDocument(w http.ResponseWriter, r *http.Request) {
