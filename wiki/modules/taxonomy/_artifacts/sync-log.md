@@ -13,3 +13,19 @@
 - **Tally gate:** PASS
 - **Patched files:** wiki/modules/taxonomy-tech-debt.md · wiki/backlog/taxonomy-refactor.md
 - **Structural changes noted (sweep needed):** AuditGovernanceAdapter new type in taxonomy/application; AuditWriter field added to Dependencies; govLogger field added to FamilyService — §5 Key Files not yet updated
+
+## 2026-05-13 - Plan 10 taxonomy route canonicalization
+
+- **Context:** uncommitted Plan 10 implementation diff (/api/v2/taxonomy* to /api/v1/taxonomy*)
+- **Mode:** structural refresh
+- **Anchors moved:** taxonomy endpoints canonicalized to /api/v1
+- **Public surface:** no semantic capability model change
+- **Routes/API:** route truth/artifacts refreshed to v1 paths
+- **Runtime flows:** unchanged behavior
+- **Persistence:** none
+- **Dependencies:** permission resolver checks aligned to v1 paths
+- **T-NNN touched:** T-013/T-015 evidence continuity maintained
+- **R-NNN touched:** R-013/R-015 plan linkage maintained
+- **Counts after:** Critical=5 Major=5 Minor=6; missing-ADR=14
+- **Tally gate:** PASS
+- **Patched files:** wiki/modules/taxonomy.md; wiki/modules/taxonomy-tech-debt.md; wiki/backlog/taxonomy-refactor.md; wiki/modules/taxonomy/_artifacts/*

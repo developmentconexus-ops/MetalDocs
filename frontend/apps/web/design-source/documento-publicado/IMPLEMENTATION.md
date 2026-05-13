@@ -16,7 +16,7 @@ Append a row whenever you must pause for user input. Phase cannot pass while ope
 
 | # | Phase | Question | User answer | Resolved |
 |---|---|---|---|---|
-| 1 | 0 | `GET /api/v2/documents/:id` exists (confirmed). It does NOT return `values_hash` (the ISO seal). Should we add `values_hash` to the backend SELECT (3-line change) or defer the AuditCard entirely? | Defer AuditCard. No backend change. | ✅ |
+| 1 | 0 | `GET /api/v1/documents/:id` exists (confirmed). It does NOT return `values_hash` (the ISO seal). Should we add `values_hash` to the backend SELECT (3-line change) or defer the AuditCard entirely? | Defer AuditCard. No backend change. | ✅ |
 | 2 | 0 | Comments backend exists. `content` field is ProseMirror rich JSON (`unknown[]`). Render as extracted plain text (write `extractPlainText` util) or use eigenpal ReadonlyEditor for rich rendering? | Defer CommentsCard entirely — needs brainstorm on storage structure first. Goes to backlog. | ✅ |
 | 3 | 3b | Phase 3b screenshot triple-diff: `mcp__Claude_Preview__preview_screenshot` returns inline image data, no file save to disk. Skip artifact PNG files? | Yes — parity verified via numerical computed-style diff (`parity-diff.md`) which is the load-bearing evidence per Skill v1.2. Screenshot files documented as deferred until preview tool gains `save_to_disk`. | ✅ |
 
@@ -38,7 +38,7 @@ Append a row whenever you must pause for user input. Phase cannot pass while ope
 | **Subtitle/description paragraph** | No current field | Defer | No description field exists today; open Q5 |
 | **"Visualizar documento" button** | Navigate to `/documents-v2/:id` (editor/viewer) | Keep | Real route exists |
 | **"Baixar PDF" button** | PDF download endpoint | Defer | Fanout PDF may exist; backend TBD |
-| **"Iniciar revisão" button** | `POST /api/v2/controlled-documents/:id/revisions` | Keep (RBAC-gated) | Real endpoint; disabled for non-authors |
+| **"Iniciar revisão" button** | `POST /api/v1/controlled-documents/:id/revisions` | Keep (RBAC-gated) | Real endpoint; disabled for non-authors |
 | **"Copiar link" button** | `navigator.clipboard.writeText(window.location.href)` | Keep | Client-side only |
 | **KPI — Versão atual** | `document.revision_number` / `revision_label` | Keep | Real field |
 | **KPI — Cobertura %** | Fanout read coverage | Defer | Needs fanout data API; no endpoint today |

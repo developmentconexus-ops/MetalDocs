@@ -23,4 +23,4 @@
 | Metadata row "Autor" | `user.displayName` from auth store | Keep (real) | |
 | "Ao confirmar" ol (4 items) | static + adapted | Keep | item 4 generic (no QUA-COORD hardcode) |
 | Checkbox "código definitivo" | `useState(false)` | Keep | gates submit |
-| CTA "Criar e abrir editor →" | mocked → navigate('/templates-v2') | Keep (mock) | `confirmacao-backend-submit` backlog |
+| CTA "Criar e abrir editor →" | mocked → navigate('/templates') | Keep (mock) | `confirmacao-backend-submit` backlog |

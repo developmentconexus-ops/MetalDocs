@@ -26,3 +26,19 @@ One line per `metaldocs-module-doc-sync` run. Append-only.
 - **Patched files:** wiki/modules/iam.md · wiki/modules/iam-tech-debt.md · wiki/backlog/iam-refactor.md
 
 - 2026-05-11 · Plan 3 (session-bound tenant resolution, post-merge sweep). Patched anchors shifted by ~3 lines in `admin_handler.go` and `middleware.go` / `routes_memberships.go` (file growth from `tenant.FromContext` migration). Files: `wiki/modules/iam.md` (§2 + §6.4 envelope anchors :129→:132, :137→:150); `wiki/modules/iam-tech-debt.md` (T-005 :316→:319/:457→:454; T-006 :129→:132/:137→:150; Last verified bump); `wiki/backlog/iam-refactor.md` (Last verified bump); `wiki/README.md` (iam-tech-debt + iam-refactor index stamps). T-NNN affected: T-005, T-006 (anchors only — severity unchanged, debt not resolved). R-NNN affected: none. Escalation: no — verified no Plan 3 ADR exists in `wiki/decisions/` (flagged to caller).
+
+## 2026-05-13 - Plan 10 IAM memberships route canonicalization
+
+- **Context:** uncommitted Plan 10 implementation diff (/api/v2/iam/area-memberships -> /api/v1/iam/area-memberships)
+- **Mode:** structural refresh
+- **Anchors moved:** memberships route canonicalized to /api/v1
+- **Public surface:** no semantic change
+- **Routes/API:** IAM route references/artifacts updated to v1
+- **Runtime flows:** unchanged behavior
+- **Persistence:** none
+- **Dependencies:** permission resolver path mapping aligned
+- **T-NNN touched:** IAM T-010 note remains docs-only and deferred ADR linkage
+- **R-NNN touched:** IAM backlog wording canonicalized
+- **Counts after:** Critical=2 Major=5 Minor=5; missing-ADR=11
+- **Tally gate:** PASS
+- **Patched files:** wiki/modules/iam.md; wiki/modules/iam-tech-debt.md; wiki/backlog/iam-refactor.md; wiki/modules/iam/_artifacts/*

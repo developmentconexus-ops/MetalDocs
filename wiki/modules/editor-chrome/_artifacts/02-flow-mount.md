@@ -8,7 +8,7 @@
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| Route | `/templates-v2/:id/versions/:n` | (verify in `features/templates/routes.tsx`) |
+| Route | `/templates/:id/versions/:n` | (verify in `features/templates/routes.tsx`) |
 | Page component | `TemplateEditorPage` | `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` |
 | Editor primitive | `EditorChrome` | `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.tsx:31` |
 | Editor canvas | `DocxEditor` (eigenpal native) | `@eigenpal/docx-js-editor` |

@@ -126,14 +126,14 @@ Sources scanned: `src/styles.css` + `src/styles/base.css`
 
 ## 7. Route stub commit hash
 
-`c44e07cd` — `feat(templates): register /templates-v2/new route with TemplateWizardPage stub`
+`c44e07cd` — `feat(templates): register /templates/new route with TemplateWizardPage stub`
 
 Full commit log for this phase:
 - `cad11410` — `refactor(taxonomy): move useProfilesQuery from documents to taxonomy queries`
 - `815638bc` — `refactor(shared): promote WizardFooter to features/shared/components/wizard`
 - `4ad5a4ed` — `refactor(shared): promote WizardShell to features/shared, parameterize kicker/title/steps`
 - `262e504f` — `fix(shared): replace raw values with design tokens in WizardShell`
-- `c44e07cd` — `feat(templates): register /templates-v2/new route with TemplateWizardPage stub`
+- `c44e07cd` — `feat(templates): register /templates/new route with TemplateWizardPage stub`
 - `ee270e9a` — `feat(templates): add templateWizard reducer (step 1 + profile fields)`
 
 ---

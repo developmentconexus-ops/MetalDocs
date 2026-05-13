@@ -1,19 +1,19 @@
 # Phase 2 — Flow trace: GetActiveDocument
 
-`GET /api/v2/controlled-documents/{id}/active-document`
+`GET /api/v1/controlled-documents/{id}/active-document`
 
 ### 1. Entry point
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| HTTP mux registration | `mux.HandleFunc("GET /api/v2/controlled-documents/{id}/active-document", generated.GetActiveDocument)` | `internal/modules/registry/delivery/http/handler.go:86` |
+| HTTP mux registration | `mux.HandleFunc("GET /api/v1/controlled-documents/{id}/active-document", generated.GetActiveDocument)` | `internal/modules/registry/delivery/http/handler.go:86` |
 | Generated wrapper | `(*ServerInterfaceWrapper).GetActiveDocument` | `internal/modules/registry/api/api.gen.go:992` |
 | Wrapper dispatch | `siw.Handler.GetActiveDocument(w, r, id)` | `internal/modules/registry/api/api.gen.go:1007` |
 | Concrete handler | `(*Handler).GetActiveDocument` | `internal/modules/registry/delivery/http/routes.go:205` |
 
 ### 2. Call chain (6 layers)
 
-1. `ServeMux` matches `GET /api/v2/controlled-documents/{id}/active-document` → `generated.GetActiveDocument` (`handler.go:86`). No idempotency middleware on GET.
+1. `ServeMux` matches `GET /api/v1/controlled-documents/{id}/active-document` → `generated.GetActiveDocument` (`handler.go:86`). No idempotency middleware on GET.
 2. Generated wrapper enters at `api.gen.go:992`.
 3. Path param bind/validate for `{id}` into `openapi_types.UUID` (`api.gen.go:1000`).
 4. Wrapper invokes `siw.Handler.GetActiveDocument(w, r, id)` (`api.gen.go:1007`).

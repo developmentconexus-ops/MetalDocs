@@ -341,7 +341,7 @@ Top 3 (by severity, then by blast-radius):
 - ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0003-token-syntax-migration.md`, `wiki/decisions/0008-placeholder-fixed-catalog.md`
 - Concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`
 - Sibling module: `wiki/modules/editor-chrome.md` (overlay + eigenpal CSS overrides; consumes wrapper output)
-- Consumers: `wiki/modules/documents.md` (DocumentEditorPage); `wiki/modules/templates-v2.md` (TemplateEditorPage â€” migrated to adapter 2026-05-11)
+- Consumers: `wiki/modules/documents.md` (DocumentEditorPage); `wiki/modules/templates.md` (TemplateEditorPage â€” migrated to adapter 2026-05-11)
 - References: `wiki/references/eigenpal-spike.md`, `wiki/references/eigenpal-controlled-package.md`
 - Backlog: `wiki/backlog/editor-ui-eigenpal-refactor.md`
 - Tech debt: `wiki/modules/editor-ui-eigenpal-tech-debt.md`

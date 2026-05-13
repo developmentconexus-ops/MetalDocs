@@ -37,20 +37,20 @@
 | Slim doc bar — autosave indicator (`Salvo · há 12s`) | `autosave.status` from `useDocumentAutosave` | Keep | Already exists, needs design port |
 | Slim doc bar — "Revisões" button | Maps to existing Checkpoints dialog (`setCheckpointsOpen`) | Keep | Same concept, rename button label |
 | Slim doc bar — "Salvar" button | `handleSave()` | Keep | Already exists |
-| Slim doc bar — "Submeter para revisão" button | `handleFinalize()` → `POST /api/v2/documents/:id/finalize` | Keep (⚠️ Q3 open) | Likely same as "Finalizar". Label change. |
+| Slim doc bar — "Submeter para revisão" button | `handleFinalize()` → `POST /api/v1/documents/:id/finalize` | Keep (⚠️ Q3 open) | Likely same as "Finalizar". Label change. |
 | Formatting toolbar (heading select, B/I/U, lists, link) | Eigenpal's own toolbar — already inside `ep-root.docx-editor` | CUT (⚠️ Q1 open) | Eigenpal renders its own toolbar. Shell-level duplicate = two toolbars |
 | Word count (`1.247 palavras · 7 seções`) | Eigenpal internal — not exposed via `MetalDocsEditorRef` | CUT | No API to read word count from eigenpal. Can defer if eigenpal exposes it later |
 | Paper canvas (eigenpal editor area) | `MetalDocsEditor` component — `buffer`, `isEditable`, session state | Keep | Just give it proper space. No implementation needed from us |
 | Paper document header (code/version/status printed on page) | DOCX template content inside eigenpal's DOCX | CUT | Inside the DOCX, not our shell. Template controls this |
 | Right sidebar — "Metadados" heading | Section header, no data | Keep (shell) | Static label |
 | Right sidebar — Código row | `doc.Code` | Keep | Available |
-| Right sidebar — Perfil row | Profile name — NOT in `DocumentResponse` | DEFER | Backend must extend `/api/v2/documents/:id` to return profile name |
+| Right sidebar — Perfil row | Profile name — NOT in `DocumentResponse` | DEFER | Backend must extend `/api/v1/documents/:id` to return profile name |
 | Right sidebar — Área row | Area name — NOT in `DocumentResponse` | DEFER | Backend must extend endpoint to return area name |
 | Right sidebar — Vigência atual row | `doc.RevisionVersion` + approval date | Defer (partial) | RevisionVersion available, approval date not in response |
 | Right sidebar — Próx. revisão row | Next review date — NOT in `DocumentResponse` | DEFER | Backend must extend endpoint |
 | Right sidebar — Visibilidade row | Visibility scope — NOT in `DocumentResponse` | DEFER | Backend must extend endpoint |
-| Right sidebar — "Revisões" timeline (list v1..v5) | Full revision history list — NOT available. Only `CurrentRevisionID` + `RevisionVersion` in current `DocumentResponse` | DEFER | Needs `GET /api/v2/documents/:id/revisions` returning list |
-| Right sidebar — "Próximos aprovadores" section | Approval signoff list — exists in approval module but not wired to editor | DEFER | Needs `GET /api/v2/documents/:id/signoffs` or equivalent, wired from editor |
+| Right sidebar — "Revisões" timeline (list v1..v5) | Full revision history list — NOT available. Only `CurrentRevisionID` + `RevisionVersion` in current `DocumentResponse` | DEFER | Needs `GET /api/v1/documents/:id/revisions` returning list |
+| Right sidebar — "Próximos aprovadores" section | Approval signoff list — exists in approval module but not wired to editor | DEFER | Needs `GET /api/v1/documents/:id/signoffs` or equivalent, wired from editor |
 
 ### 0.2 Cut list confirmed
 
@@ -129,9 +129,9 @@ Remove the inline `statusPillClass` record from `DocumentEditorPage.tsx` — it 
 
 | Endpoint | Path | Status | Shape (if needed) | Backlog issue |
 |---|---|---|---|---|
-| Get document | `GET /api/v2/documents/:id` | Existing — but missing fields | Needs `ProfileName`, `AreaName`, `NextReviewAt`, `Visibility` added to response | wiki/backlog/editor.md |
-| Revision history list | `GET /api/v2/documents/:id/revisions` | NEEDED | `[{ ID, VersionNum, Label, CreatedAt, CreatedBy }]` | wiki/backlog/editor.md |
-| Approver list | `GET /api/v2/documents/:id/signoffs` | NEEDED | `[{ ActorID, ActorName, Role, Status: 'next'\|'wait' }]` | wiki/backlog/editor.md |
+| Get document | `GET /api/v1/documents/:id` | Existing — but missing fields | Needs `ProfileName`, `AreaName`, `NextReviewAt`, `Visibility` added to response | wiki/backlog/editor.md |
+| Revision history list | `GET /api/v1/documents/:id/revisions` | NEEDED | `[{ ID, VersionNum, Label, CreatedAt, CreatedBy }]` | wiki/backlog/editor.md |
+| Approver list | `GET /api/v1/documents/:id/signoffs` | NEEDED | `[{ ActorID, ActorName, Role, Status: 'next'\|'wait' }]` | wiki/backlog/editor.md |
 
 Mock strategy: all three "needed" fields/endpoints use hardcoded MOCK consts inside `EditorMetaSidebar` with `// TODO(editor:meta)` trail + `wiki/backlog/editor.md` row.
 

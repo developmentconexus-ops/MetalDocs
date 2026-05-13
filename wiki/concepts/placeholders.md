@@ -10,7 +10,7 @@
 > - `packages/editor-ui/src/MetalDocsEditor.tsx:55` — eigenpal `templatePlugin` wired here (plugins array, mode-gated)
 > - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — catalog panel, auto-detect via `getVariables()` (renamed from `TemplateAuthorPage` 2026-05-11)
 > - `frontend/apps/web/src/features/templates/placeholder-types.ts` — `CatalogPlaceholder` type
-> - `internal/modules/templates_v2/application/validate_placeholders.go` — `ValidatePlaceholders` rejects non-catalog names
+> - `internal/modules/templates/application/validate_placeholders.go` — `ValidatePlaceholders` rejects non-catalog names
 > - `internal/modules/render/fanout/` — server-side substitution at freeze/finalize (Go)
 > - `internal/modules/render/fanout/resolvers/approvers_resolver.go` — `ApproversResolver`
 
@@ -102,7 +102,7 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - [modules/render-fanout.md](../modules/render-fanout.md) — server substitution code
 - [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
-- [modules/templates_v2.md §8.8](../modules/templates_v2.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
+- [modules/templates.md §8.8](../modules/templates.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
 - [modules/registry.md](../modules/registry.md) — owns the `controlled_documents` catalog; `{doc_code}` resolver source is the CD's `AutoCode` (`{PROFILE}-{AREA}-{NNN}`)
 
 ## Composition system (deprecated 2026-04-27)

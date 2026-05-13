@@ -14,7 +14,7 @@ Run against the composed `wiki/modules/taxonomy.md`, `taxonomy-tech-debt.md`, `b
    - No rating downgraded against rubric.
 
 2. **Mermaid box ↔ prose.** Three diagrams (Context, Container, three Sequence). All boxes named in prose:
-   - Context: taxonomy, registry, documents_v2, documents, templates_v2, pg, admin — all referenced in §1, §3.1, §3.2, §8.9.
+   - Context: taxonomy, registry, documents_v2, documents, templates, pg, admin — all referenced in §1, §3.1, §3.2, §8.9.
    - Container: http, svc, domain, repo, db, tplv2 — all referenced in §5.1 prose + §5.2 table.
    - Sequences: every participant resolves to a file in Key Files.
 
@@ -34,7 +34,7 @@ Run against the composed `wiki/modules/taxonomy.md`, `taxonomy-tech-debt.md`, `b
    - `wiki/concepts/error-ux.md` ✓
    - `wiki/modules/registry.md` ✓
    - `wiki/modules/documents.md` ✓
-   - `wiki/modules/templates_v2.md` ✓
+   - `wiki/modules/templates.md` ✓
    - `wiki/modules/audit.md` ✓
 
 5. **Key Files freshness.** Spot-checked:

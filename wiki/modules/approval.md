@@ -9,7 +9,7 @@
 
 ## 1. Introduction & Goals
 
-The approval module owns the ISO 9001 sign-off chain for controlled documents. It accepts a document's finalize request, snapshots the eligible approver pool per stage, accumulates per-stage signoffs under quorum rules, freezes the approved revision, and emits the governance audit trail. It was the first MetalDocs module whose mutating SQL was paired with a Postgres tripwire (`enforce_capability_asserted`), and it remains the canonical defense-in-depth showcase. Plan 5 (migration 0188) extended tripwire coverage to 10 additional tables across IAM, documents, registry, taxonomy, and templates_v2.
+The approval module owns the ISO 9001 sign-off chain for controlled documents. It accepts a document's finalize request, snapshots the eligible approver pool per stage, accumulates per-stage signoffs under quorum rules, freezes the approved revision, and emits the governance audit trail. It was the first MetalDocs module whose mutating SQL was paired with a Postgres tripwire (`enforce_capability_asserted`), and it remains the canonical defense-in-depth showcase. Plan 5 (migration 0188) extended tripwire coverage to 10 additional tables across IAM, documents, registry, taxonomy, and templates.
 
 ### 1.1 Requirements overview
 
@@ -170,43 +170,43 @@ Source: `_artifacts/01-surface.md` Â§3. Wired via `internal/modules/documents/
 
 | Method | Path | Handler | Authz area / cap |
 |---|---|---|---|
-| POST | `/api/v2/documents/{id}/submit` | `SubmitHandler` (`submit_handler.go:14`) | `doc.submit` + areaCode |
-| POST | `/api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `SignoffHandler` (`signoff_handler.go:18`) | `doc.signoff` + areaCode |
-| POST | `/api/v2/documents/{id}/signoff` | `SignoffByDocumentHandler` (`doc_approval_handler.go:51`) | `doc.signoff` + areaCode |
-| POST | `/api/v2/documents/{id}/publish` | `PublishHandler` (`publish_handler.go:30`) | `doc.publish` |
-| POST | `/api/v2/documents/{id}/schedule-publish` | `SchedulePublishHandler` (`publish_handler.go:69`) | `doc.publish` |
-| POST | `/api/v2/documents/{id}/supersede` | `SupersedeHandler` (`supersede_handler.go:21`) | `doc.publish` |
-| POST | `/api/v2/documents/{id}/obsolete` | `ObsoleteHandler` (`obsolete_handler.go:21`) | `doc.obsolete` |
-| POST | `/api/v2/approval/instances/{instance_id}/cancel` | `CancelHandler` (`cancel_handler.go:21`) | `doc.cancel` |
-| POST | `/api/v2/documents/{id}/cancel` | `CancelByDocumentHandler` (`doc_approval_handler.go:146`) | `doc.cancel` |
-| GET | `/api/v2/approval/instances/{instance_id}` | `GetInstanceHandler` (`get_instance_handler.go:14`) | tier-1 only |
-| GET | `/api/v2/documents/{id}/approval-instance` | `GetInstanceByDocumentHandler` (`doc_approval_handler.go:16`) | tier-1 only |
-| GET | `/api/v2/approval/inbox` | `InboxHandler` (`inbox_handler.go:15`) | tier-1 only (JSONB `@>` actor scoping) |
-| POST | `/api/v2/approval/routes` | `CreateRouteHandler` (`route_admin_handler.go:16`) | `route.admin` |
-| PUT | `/api/v2/approval/routes/{id}` | `UpdateRouteHandler` (`route_admin_handler.go:59`) | `route.admin` |
-| DELETE | `/api/v2/approval/routes/{id}` | `DeactivateRouteHandler` (`route_admin_handler.go:108`) | `route.admin` |
-| GET | `/api/v2/approval/routes` | `ListRoutesHandler` (`route_admin_handler.go:144`) | `route.admin` |
+| POST | `/api/v1/documents/{id}/submit` | `SubmitHandler` (`submit_handler.go:14`) | `doc.submit` + areaCode |
+| POST | `/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `SignoffHandler` (`signoff_handler.go:18`) | `doc.signoff` + areaCode |
+| POST | `/api/v1/documents/{id}/signoff` | `SignoffByDocumentHandler` (`doc_approval_handler.go:51`) | `doc.signoff` + areaCode |
+| POST | `/api/v1/documents/{id}/publish` | `PublishHandler` (`publish_handler.go:30`) | `doc.publish` |
+| POST | `/api/v1/documents/{id}/schedule-publish` | `SchedulePublishHandler` (`publish_handler.go:69`) | `doc.publish` |
+| POST | `/api/v1/documents/{id}/supersede` | `SupersedeHandler` (`supersede_handler.go:21`) | `doc.publish` |
+| POST | `/api/v1/documents/{id}/obsolete` | `ObsoleteHandler` (`obsolete_handler.go:21`) | `doc.obsolete` |
+| POST | `/api/v1/approval/instances/{instance_id}/cancel` | `CancelHandler` (`cancel_handler.go:21`) | `doc.cancel` |
+| POST | `/api/v1/documents/{id}/cancel` | `CancelByDocumentHandler` (`doc_approval_handler.go:146`) | `doc.cancel` |
+| GET | `/api/v1/approval/instances/{instance_id}` | `GetInstanceHandler` (`get_instance_handler.go:14`) | tier-1 only |
+| GET | `/api/v1/documents/{id}/approval-instance` | `GetInstanceByDocumentHandler` (`doc_approval_handler.go:16`) | tier-1 only |
+| GET | `/api/v1/approval/inbox` | `InboxHandler` (`inbox_handler.go:15`) | tier-1 only (JSONB `@>` actor scoping) |
+| POST | `/api/v1/approval/routes` | `CreateRouteHandler` (`route_admin_handler.go:16`) | `route.admin` |
+| PUT | `/api/v1/approval/routes/{id}` | `UpdateRouteHandler` (`route_admin_handler.go:59`) | `route.admin` |
+| DELETE | `/api/v1/approval/routes/{id}` | `DeactivateRouteHandler` (`route_admin_handler.go:108`) | `route.admin` |
+| GET | `/api/v1/approval/routes` | `ListRoutesHandler` (`route_admin_handler.go:144`) | `route.admin` |
 
 ## API Route Truth Table (Plan 8 Baseline)
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| POST | `/api/v2/documents/{id}/submit` | `internal/modules/documents/approval/http/router.go:8` | `h.SubmitHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `internal/modules/documents/approval/http/router.go:9` | `h.SignoffHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/documents/{id}/publish` | `internal/modules/documents/approval/http/router.go:10` | `h.PublishHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/documents/{id}/schedule-publish` | `internal/modules/documents/approval/http/router.go:11` | `h.SchedulePublishHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/documents/{id}/supersede` | `internal/modules/documents/approval/http/router.go:12` | `h.SupersedeHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/documents/{id}/obsolete` | `internal/modules/documents/approval/http/router.go:13` | `h.ObsoleteHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/approval/instances/{instance_id}/cancel` | `internal/modules/documents/approval/http/router.go:14` | `h.CancelHandler` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v2/approval/instances/{instance_id}` | `internal/modules/documents/approval/http/router.go:17` | `h.GetInstanceHandler` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v2/documents/{id}/approval-instance` | `internal/modules/documents/approval/http/router.go:18` | `h.GetInstanceByDocumentHandler` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v2/approval/inbox` | `internal/modules/documents/approval/http/router.go:19` | `h.InboxHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/documents/{id}/signoff` | `internal/modules/documents/approval/http/router.go:22` | `h.SignoffByDocumentHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/documents/{id}/cancel` | `internal/modules/documents/approval/http/router.go:23` | `h.CancelByDocumentHandler` | â€” | â€” | â€” | Spec missing |  |
-| POST | `/api/v2/approval/routes` | `internal/modules/documents/approval/http/router.go:26` | `h.CreateRouteHandler` | â€” | â€” | â€” | Spec missing |  |
-| PUT | `/api/v2/approval/routes/{id}` | `internal/modules/documents/approval/http/router.go:27` | `h.UpdateRouteHandler` | â€” | â€” | â€” | Spec missing |  |
-| DELETE | `/api/v2/approval/routes/{id}` | `internal/modules/documents/approval/http/router.go:28` | `h.DeactivateRouteHandler` | â€” | â€” | â€” | Spec missing |  |
-| GET | `/api/v2/approval/routes` | `internal/modules/documents/approval/http/router.go:29` | `h.ListRoutesHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/submit` | `internal/modules/documents/approval/http/router.go:8` | `h.SubmitHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `internal/modules/documents/approval/http/router.go:9` | `h.SignoffHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/publish` | `internal/modules/documents/approval/http/router.go:10` | `h.PublishHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/schedule-publish` | `internal/modules/documents/approval/http/router.go:11` | `h.SchedulePublishHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/supersede` | `internal/modules/documents/approval/http/router.go:12` | `h.SupersedeHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/obsolete` | `internal/modules/documents/approval/http/router.go:13` | `h.ObsoleteHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/approval/instances/{instance_id}/cancel` | `internal/modules/documents/approval/http/router.go:14` | `h.CancelHandler` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/approval/instances/{instance_id}` | `internal/modules/documents/approval/http/router.go:17` | `h.GetInstanceHandler` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/documents/{id}/approval-instance` | `internal/modules/documents/approval/http/router.go:18` | `h.GetInstanceByDocumentHandler` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/approval/inbox` | `internal/modules/documents/approval/http/router.go:19` | `h.InboxHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/signoff` | `internal/modules/documents/approval/http/router.go:22` | `h.SignoffByDocumentHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/documents/{id}/cancel` | `internal/modules/documents/approval/http/router.go:23` | `h.CancelByDocumentHandler` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v1/approval/routes` | `internal/modules/documents/approval/http/router.go:26` | `h.CreateRouteHandler` | â€” | â€” | â€” | Spec missing |  |
+| PUT | `/api/v1/approval/routes/{id}` | `internal/modules/documents/approval/http/router.go:27` | `h.UpdateRouteHandler` | â€” | â€” | â€” | Spec missing |  |
+| DELETE | `/api/v1/approval/routes/{id}` | `internal/modules/documents/approval/http/router.go:28` | `h.DeactivateRouteHandler` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v1/approval/routes` | `internal/modules/documents/approval/http/router.go:29` | `h.ListRoutesHandler` | â€” | â€” | â€” | Spec missing |  |
 
 Module contract status: Contracted
 Owner: leandro
@@ -228,7 +228,7 @@ sequenceDiagram
     participant Z as iam.authz
     participant R as repo
     participant DB as Postgres
-    C->>H: POST /api/v2/documents/{id}/finalize
+    C->>H: POST /api/v1/documents/{id}/finalize
     H->>S: SubmitRevisionForReview(req)
     S->>S: ValidateEventPayload + ComputeContentHash + ComputeIdempotencyKey
     S->>DB: BEGIN
@@ -285,7 +285,7 @@ sequenceDiagram
     participant F as FreezeInvoker
     participant O as PDFOutboxEnqueuer
     participant DB as Postgres
-    C->>H: POST /api/v2/documents/{id}/signoff (Idempotency-Key: K)
+    C->>H: POST /api/v1/documents/{id}/signoff (Idempotency-Key: K)
     H->>I: CheckReplay(K) â†’ idempotency_keys
     H->>D: RecordSignoff(req)
     D->>DB: BEGIN
@@ -352,7 +352,7 @@ sequenceDiagram
     participant H as InboxHandler
     participant S as ReadService
     participant DB as Postgres
-    C->>H: GET /api/v2/approval/inbox?area_code=&limit=&offset=
+    C->>H: GET /api/v1/approval/inbox?area_code=&limit=&offset=
     H->>S: ListInboxItems
     S->>DB: SELECT ... JOIN approval_instances ai + approval_stage_instances asi (active) + LEFT JOIN documents + signoff-count subquery WHERE ai.tenant_id=$1 AND asi.eligible_actor_ids @> $2::jsonb
     DB-->>S: []InboxView
@@ -500,7 +500,7 @@ Top 3 (by severity, then by blast-radius):
 - Related concepts: `wiki/concepts/iso-segregation.md`, `wiki/concepts/authz-tiers.md`, `wiki/concepts/error-ux.md`, `wiki/concepts/placeholders.md` (revision lifecycle)
 - Related workflows: `wiki/workflows/approval.md`, `wiki/workflows/freeze-and-fanout.md`
 - Related modules: `wiki/modules/documents.md`, `wiki/modules/auth.md`, `wiki/modules/iam.md`, `wiki/modules/iam-tech-debt.md`
-- Template authoring upstream: [`wiki/modules/templates_v2.md`](templates_v2.md) â€” Â§8.7 / Â§1.1 defines `author_id`, `reviewer_id`, `approver_id` columns as the SoD probe surface; `TemplateAuthorChecker` previously referenced `iam.AuthorizationService` (deleted Plan 4 â€” T-003 closed); SoD is enforced via approval's own `domain/sod.go:15` `CheckSoD`
+- Template authoring upstream: [`wiki/modules/templates.md`](templates.md) â€” Â§8.7 / Â§1.1 defines `author_id`, `reviewer_id`, `approver_id` columns as the SoD probe surface; `TemplateAuthorChecker` previously referenced `iam.AuthorizationService` (deleted Plan 4 â€” T-003 closed); SoD is enforced via approval's own `domain/sod.go:15` `CheckSoD`
 - See also: [`modules/audit.md`](audit.md) â€” approval does not emit `audit.*` action strings today (no `approval.*` entries in the action catalogue); governance events go to `governance_events` table in the same tx instead. Latent gap if a separate regulated audit trail is required. See `wiki/modules/audit.md` Â§3 C4 context.
 - Backlog: `wiki/backlog/approval-refactor.md`, `wiki/backlog/caixa-aprovacao.md` (frontend deferred items)
 - Tech debt: `wiki/modules/approval-tech-debt.md`

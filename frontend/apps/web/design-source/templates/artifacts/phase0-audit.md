@@ -1,6 +1,6 @@
 # Phase 0 — Audit
 
-**Screen:** Templates List (`/templates-v2`)
+**Screen:** Templates List (`/templates`)
 **Design source:** `design-source/templates/templates.html`
 **User confirmation:** 2026-05-07
 

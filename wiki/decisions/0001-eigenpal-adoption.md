@@ -52,13 +52,13 @@ As of 2026-05-01, MetalDocs consumes a controlled EigenPal package artifact from
 
 - `TemplateEditorPage` — eigenpal in `template-draft` mode; `templatePlugin` detects `{name}` tokens. See `wiki/modules/editor-ui-eigenpal.md`.
 - `DocumentEditorPage` — eigenpal in `document-edit` / `readonly` mode (no `templatePlugin`). See `wiki/modules/documents.md`.
-- `templates_v2` — backend module whose authoring constraints (placeholder syntax, editor wiring) are grounded in this decision. See [`wiki/modules/templates_v2.md`](../modules/templates_v2.md).
+- `templates` — backend module whose authoring constraints (placeholder syntax, editor wiring) are grounded in this decision. See [`wiki/modules/templates.md`](../modules/templates.md).
 
 ## Cross-refs
 
 - [references/eigenpal-spike.md](../references/eigenpal-spike.md)
 - [references/eigenpal-controlled-package.md](../references/eigenpal-controlled-package.md)
 - [modules/editor-ui-eigenpal.md](../modules/editor-ui-eigenpal.md)
-- [modules/templates_v2.md](../modules/templates_v2.md) — backend module that authors against eigenpal (§2 Architecture Constraints)
+- [modules/templates.md](../modules/templates.md) — backend module that authors against eigenpal (§2 Architecture Constraints)
 - [decisions/0002-zone-purge.md](0002-zone-purge.md)
 - [decisions/0003-token-syntax-migration.md](0003-token-syntax-migration.md)

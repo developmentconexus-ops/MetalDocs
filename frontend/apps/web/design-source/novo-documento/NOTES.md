@@ -26,17 +26,17 @@ User policy: **render every designed feature**, even features without backend su
 
 | Element | UI behavior | Submit behavior | Trail |
 |---|---|---|---|
-| Step 1 — Profile cards (real list from `/api/v2/profiles`) | Render + selectable | `profileCode` sent in `POST /controlled-documents` payload | — |
+| Step 1 — Profile cards (real list from `/api/v1/profiles`) | Render + selectable | `profileCode` sent in `POST /controlled-documents` payload | — |
 | Profile card "count" badge (mock "12 docs") | Render `—` placeholder | — | TODO — needs aggregate endpoint |
 | Profile card "soon" / disabled badge | **DROP** — no model field, would mislead | — | — |
-| Step 2 — Area `<select>` (real list from `/api/v2/process-areas`) | Render + selectable | `processAreaCode` sent | — |
+| Step 2 — Area `<select>` (real list from `/api/v1/process-areas`) | Render + selectable | `processAreaCode` sent | — |
 | Step 2 — Title input | Render + required | `title` + `name` sent | — |
 | Step 2 — Code preview "POP-QUA-120" | Render `≈ POP-QUA-???` with tooltip "Código final atribuído ao confirmar" | Server assigns | — |
 | Step 2 — Visibility radios (area / people / company / external) | Render + selectable, default "Toda empresa" | **NOT submitted** (no backend field today) | TODO — needs visibility model |
 | Step 2 — People-invite chips (when visibility=people) | Render + interactive | No-op | TODO — needs share model |
 | Step 2 — External: password / watermark / expiry | Render + interactive | No-op | TODO — needs share model |
-| Step 3 — Template cards per profile (real list from `/api/v2/templates?profile=X`) | Render + selectable, default = published version | `template_version_id` sent | — |
-| Step 3 — Prior version radios | **Simplified:** per-template selection only (no per-version radios). Card is disabled when no published version exists (tooltip "Em breve"). Full per-version radio rows deferred to wiki/backlog/novo-documento.md#template-versions — requires `GET /api/v2/templates/:id/versions` endpoint. | Published version ID sent | TODO — deferred |
+| Step 3 — Template cards per profile (real list from `/api/v1/templates?profile=X`) | Render + selectable, default = published version | `template_version_id` sent | — |
+| Step 3 — Prior version radios | **Simplified:** per-template selection only (no per-version radios). Card is disabled when no published version exists (tooltip "Em breve"). Full per-version radio rows deferred to wiki/backlog/novo-documento.md#template-versions — requires `GET /api/v1/templates/:id/versions` endpoint. | Published version ID sent | TODO — deferred |
 | Step 3 — "Em branco" template option | Render + grayed disabled + tooltip "Em breve" | Not selectable | TODO — needs no-template POST path |
 | Step 4 — Summary card (Perfil / Área / Código / Título / Visibilidade / Template) | Render derived from prior steps | Read-only | — |
 | Step 4 — Author + Created at | Render (`useAuthStore` user + `new Date()`) | Set server-side | — |
@@ -75,8 +75,8 @@ Single route `/documents-v2/new` with `?step=1..4` URL param. Internal step stat
 
 - **Visibility model.** Define enum + storage on `controlled_documents` (or `documents`). Design uses 4 options (area/people/company/external) — different from earlier 3-option (`public/area/restricted`) attempted in 0164. Decide before backlog can be cleared.
 - **Share controls** — invitee list + external password/watermark/expiry. Schema work + sharing module.
-- **Sequence preview endpoint** — `GET /api/v2/controlled-documents/next-code?profile=X&area=Y` (optional UX polish; placeholder works fine in v1).
-- **Template versions list** — `GET /api/v2/templates/:id/versions` returning `[{ID, VersionNum, IsPublished, CreatedAt, Label}]`.
+- **Sequence preview endpoint** — `GET /api/v1/controlled-documents/next-code?profile=X&area=Y` (optional UX polish; placeholder works fine in v1).
+- **Template versions list** — `GET /api/v1/templates/:id/versions` returning `[{ID, VersionNum, IsPublished, CreatedAt, Label}]`.
 - **No-template POST path** — `POST /documents` with `template_version_id: null` allowed; wizard surfaces "Em branco" option.
 - **Slot rollback / atomic create** — if `POST /documents` fails after `POST /controlled-documents` succeeded, document the orphan-slot recovery path. Today: orphan stays + code consumed.
 - **Profile doc-count aggregate** — for Step 1 card badge. Low priority.

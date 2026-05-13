@@ -15,7 +15,7 @@
 
 Accepted — 2026-05-08
 
-Commits: `aa867b6c` (tooling bootstrap), `c968b8e0` (root-cause fix), `9fccd8e7` (registry full migration), `f7f9c58d` (templates_v2 full migration), `81e7ec23` (documents bootstrap).
+Commits: `aa867b6c` (tooling bootstrap), `c968b8e0` (root-cause fix), `9fccd8e7` (registry full migration), `f7f9c58d` (templates full migration), `81e7ec23` (documents bootstrap).
 
 ---
 

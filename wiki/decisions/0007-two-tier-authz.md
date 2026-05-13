@@ -1,6 +1,6 @@
 # ADR 0007 — Two-Tier Authorization
 
-> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected); amended 2026-05-11 Plan 5 (tier-2 + tier-3 tripwire extended to all regulated modules: IAM, documents, registry, taxonomy, templates_v2)
+> **Status:** accepted 2026-05-03; amended 2026-05-05 (J2 wiring); amended 2026-05-10 (codegen rejected); amended 2026-05-11 Plan 5 (tier-2 + tier-3 tripwire extended to all regulated modules: IAM, documents, registry, taxonomy, templates)
 > **Last verified:** 2026-05-11
 > **Scope:** Authorization boundary between HTTP middleware (tier 1) and in-transaction area checks (tier 2).
 > **Out of scope:** Authentication; Role/capability table definitions — see `wiki/modules/iam.md`.

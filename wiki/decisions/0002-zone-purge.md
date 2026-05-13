@@ -33,13 +33,13 @@ After zones were built, the team realized:
 - Service: `SetZoneContent`, `LoadZonesSchema` in `fillin_service.go`
 - Freeze: `zoneMap` in `freeze_service.go`
 - Repository: `UpsertZoneContent`, `LoadZoneContents`, `ZoneContent` in `fillin_repository.go` + `snapshot_repository.go`
-- templates_v2: `EditableZones` field in `UpdateSchemasCmd`, repo + domain
+- templates: `EditableZones` field in `UpdateSchemasCmd`, repo + domain
 - Domain: `ZonesSchemaJSON` field on snapshot
 
 **Database (migration `0157_drop_editable_zones.sql`):**
-- DROP COLUMN `editable_zones_schema_snapshot` from `templates_v2_template_version`
-- DROP COLUMN `editable_zones_schema` from `templates_v2_template_version` and `documents`
-- DROP COLUMN `editable_zones` from `templates_v2_template_version`
+- DROP COLUMN `editable_zones_schema_snapshot` from `templates_template_version`
+- DROP COLUMN `editable_zones_schema` from `templates_template_version` and `documents`
+- DROP COLUMN `editable_zones` from `templates_template_version`
 - DROP TABLE `document_editable_zone_content`
 
 **Misc:**

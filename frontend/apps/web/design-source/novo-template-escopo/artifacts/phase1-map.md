@@ -75,7 +75,7 @@ TemplateWizardPage  (features/templates/pages/TemplateWizardPage.tsx)
 
         └── WizardFooter [features/shared]
               showBack=false (step 1)
-              onCancel → navigate('/templates-v2')
+              onCancel → navigate('/templates')
               onAdvance → dispatch goToStep(2)
               primaryDisabled={advanceDisabled}
               stepLabel="Etapa 1 de 5 · Selecione um perfil para continuar"
@@ -127,7 +127,7 @@ Backlog file: `wiki/backlog/novo-template-wizard.md`
 Phase 2 subagent will:
 1. Move `useProfilesQuery` → `features/taxonomy/queries/useProfilesQuery.ts`; update `features/documents/` import
 2. Promote `WizardShell` + `WizardFooter` + `WizardShell.module.css` → `features/shared/components/wizard/`; parameterize `WizardShell`; update `NewDocumentWizardPage` import
-3. Register route `/templates-v2/new` in `features/templates/routes.tsx`
+3. Register route `/templates/new` in `features/templates/routes.tsx`
 4. Create `features/templates/state/templateWizard.reducer.ts` (step 1 + step fields only)
 5. Stub `TemplateWizardPage.tsx` + `StepScope.tsx` (empty renders, no logic)
 

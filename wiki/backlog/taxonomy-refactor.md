@@ -16,7 +16,7 @@
 | R-006 | Add tier-2 authz.Require + DB tripwire (assert_caps) on document_profiles, document_process_areas, document_families | T-006 | L | Major | R-001, R-002 | — | merged (partial) | Plan 5 (2026-05-11): Create+Update methods + tripwire on all 3 tables done; archive/deactivate paths residual |
 | R-007 | Wrap FamilyService.Deactivate in a single tx with row lock; add tenant_id predicate to HasActiveProfiles | T-007 | M | Major | — | — | open | — |
 | R-008 | Migrate taxonomy error responses to RFC 9457 Problem+JSON | T-008 | M | Major | — | — | merged | Plan 7 (2026-05-11, alias cascade via commit 11589032 + test fix f0bb64c0) |
-| R-009 | Author OpenAPI spec for /api/v2/taxonomy/* and re-mount routes via oapi-codegen | T-009 | L | Major | — | — | open | — |
+| R-009 | Author OpenAPI spec for /api/v1/taxonomy/* and re-mount routes via oapi-codegen | T-009 | L | Major | — | — | open | — |
 | R-010 | Unify governance_events under audit.Writer or write an ADR justifying the parallel sink | T-010 | L | Major | — | — | merged | Plan 6a (2026-05-11, commit 71a2dc53) |
 | R-011 | Add 23505 → 409 RESOURCE_CONFLICT mapping in writeProfileError / writeFamilyError / writeAreaError | T-011 | XS | Minor | R-008 | — | open | — |
 | R-012 | Add cursor pagination to listProfiles / listAreas / listFamilies | T-012 | M | Minor | R-009 | — | open | — |

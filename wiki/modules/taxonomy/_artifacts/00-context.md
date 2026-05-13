@@ -3,7 +3,7 @@
 ## Existing wiki state
 
 - Stub: `wiki/modules/taxonomy.md` (Last verified 2026-05-02 — STALE)
-- Sibling shipped Arc42 docs: `iam.md`, `auth.md`, `documents.md`, `templates_v2.md`, `approval.md`, `audit.md`, `registry.md`
+- Sibling shipped Arc42 docs: `iam.md`, `auth.md`, `documents.md`, `templates.md`, `approval.md`, `audit.md`, `registry.md`
 - `wiki/modules/registry.md` cross-refs taxonomy as the source of profiles + areas; CD code derives from `{profile_code}-{area_code}-{seq}`.
 
 ## Boundary vs registry (confirmed)
@@ -42,7 +42,7 @@ Surfaced now so Phase 1/2/4/6 do not miss them:
 
 - `registry` — reads profile + area for CD creation (FK).
 - `documents` — `documents_area_name_snapshot` (migration 0175) suggests area name is snapshotted into documents row at creation.
-- `templates_v2` — profile holds `default_template_version_id`; taxonomy imports `TemplateVersionChecker` adapter wired from templates_v2.
+- `templates` — profile holds `default_template_version_id`; taxonomy imports `TemplateVersionChecker` adapter wired from templates.
 - `iam` — capability namespace `taxonomy.manage` (capabilities.go:16); `process_areas` cross-cuts with `user_process_areas` membership table.
 - `approval` — `process_area.default_approver_role` informs approval routing.
 

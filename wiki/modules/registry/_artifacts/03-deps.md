@@ -50,7 +50,7 @@ Total external importers: 2 packages (main, documents); 13 file-level entries sh
 | Site | File:line | What is wired |
 |---|---|---|
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:203` | `registry.New(registry.Dependencies{DB, Logger})` — constructs the module; internally builds `PostgresControlledDocumentRepository`, `PostgresSequenceAllocator`, `PostgresTemplateVersionChecker`, `TaxonomyProfileReader`, `TaxonomyAreaReader`, `NewDBGovernanceLogger`, `RegistryService`, `Handler` |
-| `apps/api/cmd/metaldocs-api/main.go` | `main.go:207` | `registryModule.RegisterRoutes(mux)` — registers all `/api/v2/controlled-documents/*` routes onto the shared `http.ServeMux` |
+| `apps/api/cmd/metaldocs-api/main.go` | `main.go:207` | `registryModule.RegisterRoutes(mux)` — registers all `/api/v1/controlled-documents/*` routes onto the shared `http.ServeMux` |
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:209` | `registryModule.RunStartupMigrations(ctx, db, logger)` — runs `BackfillLegacyDocuments` on startup |
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:213` | `registryModule.Service()` — retrieved to build `registryControlledDocumentDuplicator` adapter passed into documents module |
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:325` | `registryModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))` — post-construction setter that breaks the registry↔documents cycle; called after `docMod` is fully built |
@@ -90,9 +90,9 @@ Feature folder: `frontend/apps/web/src/features/registry/`
 
 | Entry file | Role |
 |---|---|
-| `api/controlledDocuments.ts` | API client functions for `/api/v2/controlled-documents` CRUD |
+| `api/controlledDocuments.ts` | API client functions for `/api/v1/controlled-documents` CRUD |
 | `api/catalog.ts` | Catalog API helpers (aggregated registry + taxonomy data) |
-| `queries/usePreviewCodeQuery.ts` | TanStack Query hook over `GET /api/v2/controlled-documents/preview-code` |
+| `queries/usePreviewCodeQuery.ts` | TanStack Query hook over `GET /api/v1/controlled-documents/preview-code` |
 | `pages/RegistryV2Page.tsx` | List page for v2 controlled documents |
 | `pages/RegistryExplorerPage.tsx` | Explorer view combining registry and taxonomy |
 | `RegistryListPage.tsx` | Legacy list page (still referenced) |
@@ -104,7 +104,7 @@ Feature folder: `frontend/apps/web/src/features/registry/`
 | `routes.tsx` | Per-feature route declarations |
 | `index.ts` | Feature barrel export |
 
-`lib/api-types/index.d.ts` — contains generated types for all `/api/v2/controlled-documents/*` operations (`listControlledDocuments`, `atomicCreateControlledDocument`, `previewControlledDocumentCode`, `getControlledDocument`, `createControlledDocumentRevision`, `obsoleteControlledDocument`, `supersedeControlledDocument`, `getActiveDocument`).
+`lib/api-types/index.d.ts` — contains generated types for all `/api/v1/controlled-documents/*` operations (`listControlledDocuments`, `atomicCreateControlledDocument`, `previewControlledDocumentCode`, `getControlledDocument`, `createControlledDocumentRevision`, `obsoleteControlledDocument`, `supersedeControlledDocument`, `getActiveDocument`).
 
 Other features consuming registry endpoints:
 - `features/documents/pages/NewDocumentWizardPage.tsx` — calls preview-code and create CD as part of the wizard flow

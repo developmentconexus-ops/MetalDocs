@@ -31,7 +31,7 @@
    - `wiki/concepts/placeholders.md` — exists.
    - `wiki/architecture/frontend-structure.md` — exists.
    - `wiki/references/eigenpal-controlled-package.md` — exists.
-   - `wiki/modules/editor-ui-eigenpal.md`, `templates_v2.md`, `templates-v2.md`, `documents.md` — all exist.
+   - `wiki/modules/editor-ui-eigenpal.md`, `templates.md`, `templates.md`, `documents.md` — all exist.
    - `wiki/modules/editor-chrome-tech-debt.md`, `wiki/backlog/editor-chrome-refactor.md` — created in this commit.
 
 5. **Key Files freshness.** Spot-checked 3 anchors:

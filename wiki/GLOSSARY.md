@@ -53,7 +53,7 @@
 
 ## I
 
-**ISO Segregation** - Workflow rule: the user who submits cannot approve. Enforced by approval module. Error: `templates_v2: iso_segregation_violation`.
+**ISO Segregation** - Workflow rule: the user who submits cannot approve. Enforced by approval module. Error: `templates: iso_segregation_violation`.
 
 ## M
 
@@ -75,7 +75,7 @@
 
 ## S
 
-**Schema** - JSON definition of a template's variables (placeholders). Stored on `templates_v2_template_version.placeholder_schema_snapshot`.
+**Schema** - JSON definition of a template's variables (placeholders). Stored on `templates_template_version.placeholder_schema_snapshot`.
 
 **Search module** - `internal/modules/search/` — aggregates documents across sources for the hub list. The v2 reader (`infrastructure/v2documents/reader.go`) queries `public.documents LEFT JOIN controlled_documents cd` to return the real document code and sequence number. Bug fixed 2026-04-27: prior to the fix, `d.code` was always empty for v2 docs; the reader now uses `COALESCE(cd.code, '')` and `COALESCE(cd.sequence_num, d.revision_number, 0)`.
 

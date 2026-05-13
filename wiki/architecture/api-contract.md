@@ -11,15 +11,15 @@
 > - `internal/modules/registry/api/cfg.yaml:1` — registry codegen config (include-tags: registry)
 > - `internal/modules/registry/api/gen.go:1` — `//go:generate` invocation for registry
 > - `internal/modules/registry/api/api.gen.go:1` — generated; DO NOT EDIT
-> - `internal/modules/templates_v2/api/cfg.yaml:1` — templates codegen config (include-tags: templates)
-> - `internal/modules/templates_v2/api/gen.go:1` — `//go:generate` invocation for templates_v2
-> - `internal/modules/templates_v2/api/api.gen.go:1` — generated; DO NOT EDIT
+> - `internal/modules/templates/api/cfg.yaml:1` — templates codegen config (include-tags: templates)
+> - `internal/modules/templates/api/gen.go:1` — `//go:generate` invocation for templates
+> - `internal/modules/templates/api/api.gen.go:1` — generated; DO NOT EDIT
 > - `internal/modules/documents/api/cfg.yaml:1` — documents codegen config (include-tags: documents)
 > - `internal/modules/documents/api/gen.go:1` — `//go:generate` invocation for documents (bootstrap only)
 > - `internal/modules/documents/api/api.gen.go:1` — generated; DO NOT EDIT
 > - `internal/modules/documents/approval/http/contracts/strictjson.go:23` — `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
 > - `internal/modules/registry/delivery/http/handler.go:72` — `ServerInterfaceWrapper` wiring pattern (registry)
-> - `internal/modules/templates_v2/delivery/http/handler.go:32` — `ServerInterfaceWrapper` wiring pattern (templates_v2)
+> - `internal/modules/templates/delivery/http/handler.go:32` — `ServerInterfaceWrapper` wiring pattern (templates)
 > - `migrations/0183_documents_name_not_empty.sql:27` — DB invariant floor for `documents.name`
 > - `.github/workflows/api-contract.yml:1` — CI drift guard (3 jobs)
 > - `frontend/apps/web/package.json:13` — `gen:api` script (`openapi-typescript`)
@@ -54,7 +54,7 @@ The generated file provides:
 
 ```bash
 GOFLAGS=-mod=mod go generate ./internal/modules/registry/api/...
-GOFLAGS=-mod=mod go generate ./internal/modules/templates_v2/api/...
+GOFLAGS=-mod=mod go generate ./internal/modules/templates/api/...
 GOFLAGS=-mod=mod go generate ./internal/modules/documents/api/...
 ```
 
@@ -139,7 +139,7 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 | Module | Path prefix | Codegen status | Handler migration |
 |--------|------------|----------------|------------------|
 | `registry` | `/api/v2/controlled-documents` | Full (`include-tags: registry`) | Complete (commits `aa867b6c`, `9fccd8e7`) |
-| `templates_v2` | `/api/v2/templates` | Full (`include-tags: templates`) | Complete (commit `f7f9c58d`) |
+| `templates` | `/api/v2/templates` | Full (`include-tags: templates`) | Complete (commit `f7f9c58d`) |
 | `documents` | `/api/v2/documents` | Bootstrap only (`include-tags: documents`) | Deferred — see below |
 | `approval` | `/api/v2/approvals` | No spec coverage | Not started |
 | `taxonomy` | `/api/v2/taxonomy` | No spec coverage | Not started |
@@ -156,7 +156,7 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 |--------|------------|-----------------|-------|
 | `documents` | `/api/v2/documents` | `Partial` | Mixed aligned+raw surface; includes one path signature mismatch (`{version}` vs `{versionNum}`) |
 | `approval` | `/api/v2/approval`, `/api/v2/documents/* approval routes` | `Raw` | Runtime routes are mounted but not yet represented in OpenAPI/codegen |
-| `templates_v2` | `/api/v2/templates`, `/api/v2/signed` | `Partial` | Core generated routes aligned; several runtime routes still spec-missing |
+| `templates` | `/api/v2/templates`, `/api/v2/signed` | `Partial` | Core generated routes aligned; several runtime routes still spec-missing |
 | `registry` | `/api/v2/controlled-documents` | `Wrapper-only` | Fully mounted through `ServerInterfaceWrapper` and aligned with spec/codegen |
 | `taxonomy` | `/api/v2/taxonomy` | `Raw` | Runtime routes present; no OpenAPI coverage yet |
 | `audit` | `/api/v1/audit` | `Partial` | Runtime path aligns with spec (`/audit/events` + `/api/v1` server prefix); operationId missing |
@@ -167,7 +167,7 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 
 - [Documents route table](../modules/documents.md#api-route-truth-table-plan-8-baseline)
 - [Approval route table](../modules/approval.md#api-route-truth-table-plan-8-baseline)
-- [Templates_v2 route table](../modules/templates_v2.md#api-route-truth-table-plan-8-baseline)
+- [templates route table](../modules/templates.md#api-route-truth-table-plan-8-baseline)
 - [Registry route table](../modules/registry.md#api-route-truth-table-plan-8-baseline)
 - [Taxonomy route table](../modules/taxonomy.md#api-route-truth-table-plan-8-baseline)
 - [Audit route table](../modules/audit.md#api-route-truth-table-plan-8-baseline)

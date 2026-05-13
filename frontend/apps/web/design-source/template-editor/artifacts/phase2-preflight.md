@@ -61,7 +61,7 @@ Outline icon ships in Phase 3c. No backlog defer.
 
 ## Route stub
 
-Existing route `/templates-v2/:templateId/versions/:versionNum` (already wired) stays. Page rename is Vite-friendly — `routes.tsx` import path updated in same commit as file rename. No URL change.
+Existing route `/templates/:templateId/versions/:versionNum` (already wired) stays. Page rename is Vite-friendly — `routes.tsx` import path updated in same commit as file rename. No URL change.
 
 ## Phase 3 entry conditions
 

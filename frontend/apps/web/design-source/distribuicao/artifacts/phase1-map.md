@@ -95,10 +95,10 @@ Mock data lives in `features/documents/lib/distributionMeta.ts`.
 
 TODO comments block:
 ```ts
-// TODO(distribuicao): wire GET /api/v2/documents/:id/distribution — KPI metrics + facts
-// TODO(distribuicao): wire GET /api/v2/documents/:id/distribution/recipients — paginated recipient table
-// TODO(distribuicao): wire GET /api/v2/documents/:id/distribution/coverage — by-area breakdown
-// TODO(distribuicao): wire GET /api/v2/documents/:id/distribution/timeline — cumulative daily reads
+// TODO(distribuicao): wire GET /api/v1/documents/:id/distribution — KPI metrics + facts
+// TODO(distribuicao): wire GET /api/v1/documents/:id/distribution/recipients — paginated recipient table
+// TODO(distribuicao): wire GET /api/v1/documents/:id/distribution/coverage — by-area breakdown
+// TODO(distribuicao): wire GET /api/v1/documents/:id/distribution/timeline — cumulative daily reads
 // See wiki/backlog/distribuicao.md
 ```
 

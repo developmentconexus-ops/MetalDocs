@@ -17,7 +17,7 @@
 The adapter emits `ArrayBuffer` (DOCX bytes) to the parent's `onAutoSave` callback. The parent (`DocumentEditorPage`) is responsible for uploading via `templatesV2`/`documents` backend modules, which own their own tables. Persistence concerns belong in those module docs:
 
 - `wiki/modules/documents.md` — `public.documents`, snapshot columns, finalize tripwire.
-- `wiki/modules/templates_v2.md` — `public.template_versions`, DOCX storage in MinIO.
+- `wiki/modules/templates.md` — `public.template_versions`, DOCX storage in MinIO.
 
 ## In-memory state held by the adapter
 

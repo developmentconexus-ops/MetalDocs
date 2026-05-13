@@ -14,20 +14,20 @@ Pre-existing errors out of scope (auth tests, useAreasQuery v5 API drift, Rail.t
 - 4 failures all in `template-author-page-convergence.test.tsx` (TemplateAuthorPage, raw `fetch()` in `catalog.ts` — jsdom URL parsing issue, pre-existing, separate page)
 - Zero failures touch TemplatesListPage / TemplateCard / useTemplatesQuery
 
-## Smoke trace (live browser /templates-v2)
+## Smoke trace (live browser /templates)
 
 | Step | Expected | Observed |
 |---|---|---|
-| Load `/templates-v2` | Hero + tabs + 4 cards from API | OK — 4 templates rendered |
+| Load `/templates` | Hero + tabs + 4 cards from API | OK — 4 templates rendered |
 | Tab counts | Real counts from data | Todos·4 / Publicados·3 / Rascunhos·1 / Arquivados·0 |
 | Click "Rascunhos" tab | List filters to 1 draft | OK — 1 card shown, aria-label "Abrir template teste" |
 | Click "Arquivados" | Empty state shown | OK — "Nenhum ... encontrado" rendered |
-| Card click | Navigate to `/templates-v2/:id/versions/:n` | OK — navigated to `/templates-v2/<uuid>/versions/1` |
+| Card click | Navigate to `/templates/:id/versions/:n` | OK — navigated to `/templates/<uuid>/versions/1` |
 | Card focus | role=button + tabIndex=0 + visible focus ring | OK — focusable, aria-label correct |
 
 ## Console / network
 
-No errors during smoke trace. Single `GET /api/v2/templates` request resolved 200 with 4 templates.
+No errors during smoke trace. Single `GET /api/v1/templates` request resolved 200 with 4 templates.
 
 ## Verdict
 

@@ -86,7 +86,7 @@ No new query keys, no new server-state surface.
 
 Zero new endpoints. All existing:
 - `useTemplateDraft` / `useTemplateAutosave` / `useTemplateSchemas` (existing hooks)
-- `submitForReview` (`POST /api/v2/templates/:id/versions/:n/submit-for-review`)
+- `submitForReview` (`POST /api/v1/templates/:id/versions/:n/submit-for-review`)
 - `fetchPlaceholderCatalog` (existing)
 - `autosave.importDocx` (existing autosave hook method)
 

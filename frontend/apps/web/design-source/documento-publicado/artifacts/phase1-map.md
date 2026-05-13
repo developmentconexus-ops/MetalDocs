@@ -48,7 +48,7 @@ DocumentPublishedPage
 │   ├── <h1> document.name
 │   └── <div> Action buttons
 │       ├── "Visualizar documento" → navigate(`/documents-v2/${id}`)
-│       ├── "Iniciar revisão" → POST /api/v2/controlled-documents/:cdId/revisions (RBAC-gated, disabled if not author)
+│       ├── "Iniciar revisão" → POST /api/v1/controlled-documents/:cdId/revisions (RBAC-gated, disabled if not author)
 │       └── "Copiar link" → navigator.clipboard.writeText(href)
 ├── <section> KPI strip
 │   └── Versão atual: document.revision_version
@@ -103,19 +103,19 @@ No localStorage state. No debounced inputs. No persisted state.
 ### Existing — use as-is
 | Endpoint | Frontend function | Query key |
 |---|---|---|
-| `GET /api/v2/documents/:id` | `documentsV2.ts#getDocument` | `QK.documents.detail(id)` |
-| `GET /api/v2/profiles` | `taxonomy.ts#fetchProfiles` via `useProfilesQuery` | `QK.taxonomy.profiles()` |
-| `GET /api/v2/areas` | `taxonomy.ts#fetchAreas` via `useAreasQuery` | `QK.taxonomy.areas()` |
+| `GET /api/v1/documents/:id` | `documentsV2.ts#getDocument` | `QK.documents.detail(id)` |
+| `GET /api/v1/profiles` | `taxonomy.ts#fetchProfiles` via `useProfilesQuery` | `QK.taxonomy.profiles()` |
+| `GET /api/v1/areas` | `taxonomy.ts#fetchAreas` via `useAreasQuery` | `QK.taxonomy.areas()` |
 
 ### New — add to documentsV2.ts
 | Endpoint | New function | Query key |
 |---|---|---|
-| `GET /api/v2/documents/:id/approval-instance` | `getApprovalInstance(id)` | `QK.approval.instance(id)` |
+| `GET /api/v1/documents/:id/approval-instance` | `getApprovalInstance(id)` | `QK.approval.instance(id)` |
 
 ### New — mutation
 | Endpoint | New function | Notes |
 |---|---|---|
-| `POST /api/v2/controlled-documents/:cdId/revisions` | `createRevision(cdId)` in new `controlledDocumentsApi.ts` or existing registry api | RBAC-gated; disabled when user is not author |
+| `POST /api/v1/controlled-documents/:cdId/revisions` | `createRevision(cdId)` in new `controlledDocumentsApi.ts` or existing registry api | RBAC-gated; disabled when user is not author |
 
 ### Approval instance response types (to add to documentsV2.ts or new approvalApi.ts)
 ```ts

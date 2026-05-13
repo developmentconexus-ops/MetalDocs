@@ -6,7 +6,7 @@
 | Handler | `Handler.listDocuments` | `internal/modules/documents/delivery/http/handler.go:145` (route registration at `:111` and `:82`) |
 
 ### 2. Call chain
-1. `internal/modules/documents/delivery/http/handler.go:111` route registration — binds `GET /api/v2/documents` to handler.
+1. `internal/modules/documents/delivery/http/handler.go:111` route registration — binds `GET /api/v1/documents` to handler.
    -> calls: `internal/modules/documents/delivery/http/handler.go:145` `(*Handler).listDocuments`
 2. `internal/modules/documents/delivery/http/handler.go:145` `(*Handler).listDocuments` — enforces role gate (`admin` or `document_filler`), parses query/pagination, invokes app service, returns paginated JSON.
    -> calls: `internal/modules/documents/delivery/http/handler.go:200` `parseListOptions`

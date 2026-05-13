@@ -1,6 +1,6 @@
 # Phase 1 — Map
 
-**Screen:** Templates List (`/templates-v2`)
+**Screen:** Templates List (`/templates`)
 
 ## §1.1 Existing primitives
 
@@ -48,7 +48,7 @@ Reuse existing `StatusPill` type union. Template status derived:
 
 ## §1.6 Backend
 
-- `GET /api/v2/templates` — exists, returns `TemplateDTO[]`
+- `GET /api/v1/templates` — exists, returns `TemplateDTO[]`
 - **Gap:** `created_by` is user_id (no display name). Mock: show id. TODO backlog.
 - **Gap:** No `updated_at`. Fallback: `created_at`.
 - **Migration:** `templatesV2.ts` uses raw `fetch()` → migrate `listTemplates` to `apiFetch`

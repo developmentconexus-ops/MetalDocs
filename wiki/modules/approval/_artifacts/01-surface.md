@@ -46,7 +46,7 @@ internal/modules/documents/approval/
 │   ├── route_admin_handler.go            — CreateRouteHandler, UpdateRouteHandler, DeactivateRouteHandler, ListRoutesHandler
 │   ├── router.go                         — RegisterRoutes (15 routes onto *http.ServeMux)
 │   ├── signoff_handler.go                — SignoffHandler (instance/stage path) + signoffOutcome
-│   ├── submit_handler.go                 — SubmitHandler (POST /api/v2/documents/{id}/submit)
+│   ├── submit_handler.go                 — SubmitHandler (POST /api/v1/documents/{id}/submit)
 │   ├── supersede_handler.go              — SupersedeHandler
 │   └── contracts/                        — request/response DTOs + Validate(): cancel, errors, instance_read, obsolete, publish, route, signoff, strictjson, submit, supersede
 ├── infra/signature/                      (pluggable signature providers)
@@ -231,22 +231,22 @@ Source: `internal/modules/documents/approval/http/router.go:6-30`. All wired ont
 
 | Method | Path | Handler | Source |
 |---|---|---|---|
-| POST | `/api/v2/documents/{id}/submit` | `Handler.SubmitHandler` | `submit_handler.go:14` |
-| POST | `/api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `Handler.SignoffHandler` | `signoff_handler.go:18` |
-| POST | `/api/v2/documents/{id}/publish` | `Handler.PublishHandler` | `publish_handler.go:30` |
-| POST | `/api/v2/documents/{id}/schedule-publish` | `Handler.SchedulePublishHandler` | `publish_handler.go:69` |
-| POST | `/api/v2/documents/{id}/supersede` | `Handler.SupersedeHandler` | `supersede_handler.go:21` |
-| POST | `/api/v2/documents/{id}/obsolete` | `Handler.ObsoleteHandler` | `obsolete_handler.go:21` |
-| POST | `/api/v2/approval/instances/{instance_id}/cancel` | `Handler.CancelHandler` | `cancel_handler.go:21` |
-| GET | `/api/v2/approval/instances/{instance_id}` | `Handler.GetInstanceHandler` | `get_instance_handler.go:14` |
-| GET | `/api/v2/documents/{id}/approval-instance` | `Handler.GetInstanceByDocumentHandler` | `doc_approval_handler.go:16` |
-| GET | `/api/v2/approval/inbox` | `Handler.InboxHandler` | `inbox_handler.go:15` |
-| POST | `/api/v2/documents/{id}/signoff` | `Handler.SignoffByDocumentHandler` | `doc_approval_handler.go:51` |
-| POST | `/api/v2/documents/{id}/cancel` | `Handler.CancelByDocumentHandler` | `doc_approval_handler.go:146` |
-| POST | `/api/v2/approval/routes` | `Handler.CreateRouteHandler` | `route_admin_handler.go:16` |
-| PUT | `/api/v2/approval/routes/{id}` | `Handler.UpdateRouteHandler` | `route_admin_handler.go:59` |
-| DELETE | `/api/v2/approval/routes/{id}` | `Handler.DeactivateRouteHandler` | `route_admin_handler.go:108` |
-| GET | `/api/v2/approval/routes` | `Handler.ListRoutesHandler` | `route_admin_handler.go:144` |
+| POST | `/api/v1/documents/{id}/submit` | `Handler.SubmitHandler` | `submit_handler.go:14` |
+| POST | `/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `Handler.SignoffHandler` | `signoff_handler.go:18` |
+| POST | `/api/v1/documents/{id}/publish` | `Handler.PublishHandler` | `publish_handler.go:30` |
+| POST | `/api/v1/documents/{id}/schedule-publish` | `Handler.SchedulePublishHandler` | `publish_handler.go:69` |
+| POST | `/api/v1/documents/{id}/supersede` | `Handler.SupersedeHandler` | `supersede_handler.go:21` |
+| POST | `/api/v1/documents/{id}/obsolete` | `Handler.ObsoleteHandler` | `obsolete_handler.go:21` |
+| POST | `/api/v1/approval/instances/{instance_id}/cancel` | `Handler.CancelHandler` | `cancel_handler.go:21` |
+| GET | `/api/v1/approval/instances/{instance_id}` | `Handler.GetInstanceHandler` | `get_instance_handler.go:14` |
+| GET | `/api/v1/documents/{id}/approval-instance` | `Handler.GetInstanceByDocumentHandler` | `doc_approval_handler.go:16` |
+| GET | `/api/v1/approval/inbox` | `Handler.InboxHandler` | `inbox_handler.go:15` |
+| POST | `/api/v1/documents/{id}/signoff` | `Handler.SignoffByDocumentHandler` | `doc_approval_handler.go:51` |
+| POST | `/api/v1/documents/{id}/cancel` | `Handler.CancelByDocumentHandler` | `doc_approval_handler.go:146` |
+| POST | `/api/v1/approval/routes` | `Handler.CreateRouteHandler` | `route_admin_handler.go:16` |
+| PUT | `/api/v1/approval/routes/{id}` | `Handler.UpdateRouteHandler` | `route_admin_handler.go:59` |
+| DELETE | `/api/v1/approval/routes/{id}` | `Handler.DeactivateRouteHandler` | `route_admin_handler.go:108` |
+| GET | `/api/v1/approval/routes` | `Handler.ListRoutesHandler` | `route_admin_handler.go:144` |
 
 Total: **16 HTTP operations** (6 v2 doc-action POSTs, 2 instance-scoped, 2 reads, 1 inbox, 1 doc-scoped signoff, 1 doc-scoped cancel, 4 route admin).
 

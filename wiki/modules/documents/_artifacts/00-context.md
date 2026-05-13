@@ -12,7 +12,7 @@
 - `wiki/modules/documents-v2.md` — DEPRECATED stub (`renamed to documents` post-migration 0167/0168). **Decision:** retire after this run; wiki-curator removes/redirects in Phase 7. The current `documents.md` already supersedes it.
 - `wiki/decisions/0001-eigenpal-adoption.md` — DOCX editor choice.
 - `wiki/decisions/0007-two-tier-authz.md` — tier-1 / tier-2 split; documents wired via `NewCapabilityChecker` adapter (J2 amendment).
-- `wiki/decisions/0011-cd-atomic-create.md` — atomic CD+document create; `CreateDocumentTx` port crosses registry→documents boundary; `POST /api/v2/documents` deleted.
+- `wiki/decisions/0011-cd-atomic-create.md` — atomic CD+document create; `CreateDocumentTx` port crosses registry→documents boundary; `POST /api/v1/documents` deleted.
 - `wiki/decisions/0012-contract-first-api.md` — oapi-codegen bootstrap on documents; handler migration deferred due to spec drift.
 - `wiki/concepts/placeholders.md` — fixed 7-token catalog substituted at freeze; `placeholder_schema_snapshot` populated by `application.SnapshotService`; `enforce_snapshot_on_submit_trg` enforces non-NULL pre-`under_review`.
 - `wiki/concepts/token-syntax.md` — `{name}` single-brace tokens; relevant to fillin / freeze paths.
@@ -45,11 +45,11 @@ Search range (rough): 0001..0014 (legacy), 0103 (`docx_v2_documents`), 0105 (`do
 
 Per skill rubric (one read, one write, one state-transition):
 
-1. **Read:** `GET /api/v2/documents` (`listDocuments`, paginated list with stats sibling). Hits tier-1 cap check + RBAC scoping via `effectiveUserID`, two-query pagination, no tx.
-2. **Write:** `PUT /api/v2/documents/:id/revisions` (autosave). Acquires writer session implicitly, commits new revision, updates `storage_key`. Touches `document_revisions`.
-3. **State transition:** `POST /api/v2/documents/:id/finalize`. Atomic `draft → under_review` + approval-instance create. Owned by `internal/modules/documents/approval/` sub-package OR delegated to `internal/modules/approval/` — Codex must determine. Cross-module call surface is the most important thing to map.
+1. **Read:** `GET /api/v1/documents` (`listDocuments`, paginated list with stats sibling). Hits tier-1 cap check + RBAC scoping via `effectiveUserID`, two-query pagination, no tx.
+2. **Write:** `PUT /api/v1/documents/:id/revisions` (autosave). Acquires writer session implicitly, commits new revision, updates `storage_key`. Touches `document_revisions`.
+3. **State transition:** `POST /api/v1/documents/:id/finalize`. Atomic `draft → under_review` + approval-instance create. Owned by `internal/modules/documents/approval/` sub-package OR delegated to `internal/modules/approval/` — Codex must determine. Cross-module call surface is the most important thing to map.
 
-`POST /api/v2/controlled-documents` (CD + draft create) is in **registry**, not documents — but it consumes the `documents.CreateDocumentTx` port. Note as OUT-edge in §3, not a documents-owned op.
+`POST /api/v1/controlled-documents` (CD + draft create) is in **registry**, not documents — but it consumes the `documents.CreateDocumentTx` port. Note as OUT-edge in §3, not a documents-owned op.
 
 ## RFC 9457 envelope status
 
@@ -60,7 +60,7 @@ ADR 0012 + iam T-006 evidence: documents is **mid-migration**. The codegen boots
 - `internal/modules/documents/approval/` vs `internal/modules/approval/` — naming collision: which is canonical for approval instances on documents? Will be answered by Phase 2 + Phase 3 artifacts.
 - Comments CRUD has handlers (per `wiki/backlog/contract-first-followups.md` "spec gaps") but no spec ops. Surface in tech-debt.
 - `renameDocument`, `duplicateDocument` likewise have no spec ops. Surface in tech-debt.
-- Idempotency middleware coverage: per ADR 0011, only `/api/v2/controlled-documents` + revisions route are idempotent. `POST /finalize` is NOT idempotent — flag in tech-debt if confirmed by Phase 2.
+- Idempotency middleware coverage: per ADR 0011, only `/api/v1/controlled-documents` + revisions route are idempotent. `POST /finalize` is NOT idempotent — flag in tech-debt if confirmed by Phase 2.
 
 ## Phase skips
 

@@ -16,15 +16,15 @@ Each row: pattern ID → applies-here verdict → MetalDocs file:line anchor →
 
 - **Source:** https://docs.stripe.com/api/idempotent_requests (accessed 2026-05-10) — "Keys are eligible to be removed from the system after they're at least 24 hours old."
 - **Applies here, partially:**
-  - `POST /api/v2/controlled-documents` and the revisions write route are header-idempotent via `internal/platform/idempotency` (ADR 0011).
-  - `POST /api/v2/documents/{id}/finalize` is **not** header-idempotent. Submit-side computes an internal deterministic `ComputeIdempotencyKey` (`internal/modules/documents/approval/application/idempotency.go:20`, called at `submit_service.go:61`) but no `Idempotency-Key` header is read and `metaldocs.idempotency_keys` is not written.
+  - `POST /api/v1/controlled-documents` and the revisions write route are header-idempotent via `internal/platform/idempotency` (ADR 0011).
+  - `POST /api/v1/documents/{id}/finalize` is **not** header-idempotent. Submit-side computes an internal deterministic `ComputeIdempotencyKey` (`internal/modules/documents/approval/application/idempotency.go:20`, called at `submit_service.go:61`) but no `Idempotency-Key` header is read and `metaldocs.idempotency_keys` is not written.
   - Replay safety on finalize relies on `ux_approval_instances_active` partial unique index (`migrations/0135_*.sql:33`): second call fails with 409 rather than silently double-instancing.
 - **Gap → debt:** T-006 (Major — surface for duplicate submit exists; index prevents double-write but client gets 409, not idempotent replay).
 
 ## IP-003 · Cursor pagination (Relay Connections)
 
 - **Source:** https://relay.dev/graphql/connections.htm (Relay Connections, 2021) — "Pagination should be done with a forward-only cursor."
-- **Applies here:** `GET /api/v2/documents` uses offset pagination — `parseListOptions` reads `page` + `pageSize` (`handler.go:200`), repo `LIMIT/OFFSET` at `repository.go:343`, cap `pageSize ≤ 50`.
+- **Applies here:** `GET /api/v1/documents` uses offset pagination — `parseListOptions` reads `page` + `pageSize` (`handler.go:200`), repo `LIMIT/OFFSET` at `repository.go:343`, cap `pageSize ≤ 50`.
 - **Verdict:** not-applicable today — offset is acceptable for the current library scale (`pageSize` capped at 50, totals shown). Cursor pagination would be a forward-looking refactor, not current debt.
 - **Gap:** none surfaced as debt; recorded as a future consideration only.
 

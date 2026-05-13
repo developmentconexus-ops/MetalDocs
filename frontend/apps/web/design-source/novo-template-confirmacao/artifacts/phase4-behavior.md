@@ -30,17 +30,17 @@ Pre-existing errors (not in scope): `features/auth/`, `features/documents/`, `fe
 | Checkbox leakage fix: `.checkLabel input { width: auto }` | ✅ |
 | `void description; void scopeType;` suppress unused-prop warnings | ✅ |
 | TODO tags present (next-code-preview, confirmacao-backend-submit) | ✅ |
-| `handleSubmit` → navigate('/templates-v2') mock | ✅ |
+| `handleSubmit` → navigate('/templates') mock | ✅ |
 | `step 5 && scopeType !== null` guard | ✅ |
 
 ## Smoke trace
 
-- Navigate `/templates-v2/new?step=1` → scope screen loads
+- Navigate `/templates/new?step=1` → scope screen loads
 - Select scope → step 2 → enter name → step 3 → select starting point → step 4 → step 5
 - Step 5 renders: paper thumbnail, code chip, StatusPill draft, v1.0, metadata grid (5 rows), "Ao confirmar" block, checkbox
 - Checkbox unchecked → CTA "Criar e abrir editor" disabled
 - Checkbox checked → CTA enabled
-- Click CTA → navigate to /templates-v2 (mocked)
+- Click CTA → navigate to /templates (mocked)
 - Back button → returns to step 4
 
 ## Console errors

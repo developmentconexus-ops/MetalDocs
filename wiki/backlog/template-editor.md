@@ -1,4 +1,4 @@
-# Backlog: Template editor screen (`/templates-v2/:templateId/versions/:n`)
+# Backlog: Template editor screen (`/templates/:templateId/versions/:n`)
 
 > Last updated: 2026-05-10 (Phase 5 docs after rebuild)
 

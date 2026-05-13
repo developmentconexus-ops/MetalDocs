@@ -45,5 +45,5 @@ Queue rail items + ghost cards = inline sub-components within InboxStack.
 
 All tracked in `wiki/backlog/caixa-aprovacao.md`:
 1. `InboxItem.code`, `.kind`, `.deadline_at`, `.urgent`, `.summary`, `.changes`, `.version`
-2. `GET /api/v2/approval/my-decisions?days=14` (heatmap)
+2. `GET /api/v1/approval/my-decisions?days=14` (heatmap)
 3. Signoff flow (approve/reject path + password challenge)

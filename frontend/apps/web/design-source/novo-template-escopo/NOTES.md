@@ -1,7 +1,7 @@
 # Novo Template — Etapa 1 · Escopo
 
 ## Target route
-`/templates-v2/new` (Step 1 of 5)
+`/templates/new` (Step 1 of 5)
 
 ## Owning feature
 `features/templates/`

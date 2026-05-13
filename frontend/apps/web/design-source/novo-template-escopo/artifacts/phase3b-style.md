@@ -159,6 +159,6 @@ Screenshots taken from main repo dev server (worktree has no node_modules). Serv
 ## Notes
 
 - Phase 3a gap: `TemplateWizardPage` was missing `Component` named export — fixed in this phase alongside CSS.
-- Route navigated to `/templates-v2/novo`.
+- Route navigated to `/templates/novo`.
 - Responsive single-column collapse at ≤600px verified at 375px viewport.
 - `profileCard.padding` intentionally overrides SelectableCard's `var(--sp-4)` default with the same value — this is a no-op on padding but documents the design intent explicitly and allows future delta if needed.

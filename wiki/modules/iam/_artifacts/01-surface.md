@@ -181,9 +181,9 @@
 
 | Method | Path | Handler symbol | Source file:line |
 |---|---|---|---|
-| `GET` | `/api/v2/iam/area-memberships` | `(*MembershipHandler).listMemberships` | `internal/modules/iam/delivery/http/routes_memberships.go:30` |
-| `POST` | `/api/v2/iam/area-memberships` | `(*MembershipHandler).grantMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:31` |
-| `DELETE` | `/api/v2/iam/area-memberships` | `(*MembershipHandler).revokeMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:32` |
+| `GET` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).listMemberships` | `internal/modules/iam/delivery/http/routes_memberships.go:30` |
+| `POST` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).grantMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:31` |
+| `DELETE` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).revokeMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:32` |
 | `GET` | `/api/v1/iam/users` | `(*AdminHandler).handleListUsers` | `internal/modules/iam/delivery/http/admin_handler.go:88` |
 | `POST` | `/api/v1/iam/users` | `(*AdminHandler).handleCreateUser` | `internal/modules/iam/delivery/http/admin_handler.go:90` |
 | `GET` | `/api/v1/iam/admin/overview` | `(*AdminHandler).handleAdminOverview` | `internal/modules/iam/delivery/http/admin_handler.go:85` |

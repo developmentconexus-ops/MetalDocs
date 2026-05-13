@@ -10,7 +10,7 @@
 | metaldocs/internal/modules/iam/application | present | internal/modules/documents\delivery\http\handler.go:17 |
 | metaldocs/internal/modules/iam/authz | present | internal/modules/documents\http\fillin_handler.go:15 |
 | metaldocs/internal/modules/registry/domain | present | internal/modules/documents\application\create_document_snapshot_integration_test.go:15 |
-| metaldocs/internal/modules/templates_v2/domain | present | internal/modules/documents\repository\fillin_repository_integration_test.go:14 |
+| metaldocs/internal/modules/templates/domain | present | internal/modules/documents\repository\fillin_repository_integration_test.go:14 |
 | metaldocs/internal/modules/render | present | internal/modules/documents\repository\resolver_readers.go:9 |
 | metaldocs/internal/modules/audit/domain | absent | absent |
 | metaldocs/internal/platform/idempotency | present | internal/modules/documents\approval\infrastructure\postgres_signoff_idemp_store.go:9 |
@@ -37,8 +37,8 @@ Other internal OUT imports observed (non-self):
 | .\\internal\\modules\\jobs\\effective_date_publisher\\job_test.go | .\\internal\\modules\\jobs\\effective_date_publisher\\job_test.go:13 |
 | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job.go | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job.go:10 |
 | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job_test.go | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job_test.go:14 |
-| .\\internal\\platform\\docgenv2\\templates_v2_snapshot_reader.go | .\\internal\\platform\\docgenv2\\templates_v2_snapshot_reader.go:8 |
-| .\\internal\\platform\\docgenv2\\templates_v2_snapshot_reader_test.go | .\\internal\\platform\\docgenv2\\templates_v2_snapshot_reader_test.go:6 |
+| .\\internal\\platform\\docgenv2\\templates_snapshot_reader.go | .\\internal\\platform\\docgenv2\\templates_snapshot_reader.go:8 |
+| .\\internal\\platform\\docgenv2\\templates_snapshot_reader_test.go | .\\internal\\platform\\docgenv2\\templates_snapshot_reader_test.go:6 |
 | .\\internal\\platform\\objectstore\\document_presigner.go | .\\internal\\platform\\objectstore\\document_presigner.go:17 |
 
 Expected-path verification:
@@ -47,7 +47,7 @@ Expected-path verification:
 - apps/api/cmd/metaldocs-api/main.go: present (apps/api/cmd/metaldocs-api/main.go:22)
 - apps/api/internal/wiring/documents.go: present (apps/api/internal/wiring/documents.go:6)
 - internal/modules/render: absent
-- internal/modules/templates_v2: absent
+- internal/modules/templates: absent
 - internal/modules/search: absent
 
 ## 3) DI / wiring touchpoints

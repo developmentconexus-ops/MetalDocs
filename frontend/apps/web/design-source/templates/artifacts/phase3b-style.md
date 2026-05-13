@@ -1,6 +1,6 @@
 # Phase 3b — Style port
 
-**Screen:** Templates List (`/templates-v2`)
+**Screen:** Templates List (`/templates`)
 **Date:** 2026-05-07
 
 ## Token map

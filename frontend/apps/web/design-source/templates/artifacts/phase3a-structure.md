@@ -1,6 +1,6 @@
 # Phase 3a — Structure Mirror
 
-**Screen:** Templates List (`/templates-v2`)
+**Screen:** Templates List (`/templates`)
 **Date:** 2026-05-07
 
 ## DOM tree

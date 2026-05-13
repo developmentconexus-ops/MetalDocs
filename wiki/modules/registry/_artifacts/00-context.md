@@ -16,7 +16,7 @@
 
 ## Cross-deps preview (validated in Phase 3)
 
-- **IN-edges:** templates_v2 (template version clone), documents (CreateDocumentTx port), approval (CD-scoped sign-off routes), search, frontend `features/registry/`, novo-documento wizard.
+- **IN-edges:** templates (template version clone), documents (CreateDocumentTx port), approval (CD-scoped sign-off routes), search, frontend `features/registry/`, novo-documento wizard.
 - **OUT-edges:** documents (`CreateDocumentTx`), taxonomy (profile/area reader), `internal/platform/idempotency`, audit (governance logger; currently via `taxonomyapp.NewDBGovernanceLogger`).
 - **Capability namespace:** `registry.create` seeded in migration `0165_role_capabilities_reseed.sql` for roles `editor`, `author`, `system_admin`. T-001 dual-namespace applies — check if both `registry.*` and legacy capability codes exist; document gap.
 
@@ -30,9 +30,9 @@
 
 ## Phase 2 op picks
 
-- **Read op:** `GET /api/v2/controlled-documents/{id}/active-document` — FULL OUTER JOIN published-vs-active resolution (interesting query, E10 fix history).
-- **Write op:** `POST /api/v2/controlled-documents` — atomic CD + first revision (multi-module tx, idempotency middleware, sequence allocation, cross-module port call).
-- **State-transition:** `PUT /api/v2/controlled-documents/{id}/obsolete` and `/supersede` — lifecycle transitions. The CD itself has a slim status (`active | obsolete | superseded`), distinct from document revision approval state. Document one transition trace (obsolete). If lifecycle is trivial (status-only flip with no guards), record "minimal state machine — see §6" rather than skipping §6 entirely.
+- **Read op:** `GET /api/v1/controlled-documents/{id}/active-document` — FULL OUTER JOIN published-vs-active resolution (interesting query, E10 fix history).
+- **Write op:** `POST /api/v1/controlled-documents` — atomic CD + first revision (multi-module tx, idempotency middleware, sequence allocation, cross-module port call).
+- **State-transition:** `PUT /api/v1/controlled-documents/{id}/obsolete` and `/supersede` — lifecycle transitions. The CD itself has a slim status (`active | obsolete | superseded`), distinct from document revision approval state. Document one transition trace (obsolete). If lifecycle is trivial (status-only flip with no guards), record "minimal state machine — see §6" rather than skipping §6 entirely.
 
 ## Open questions deferred to tech-debt
 

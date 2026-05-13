@@ -24,7 +24,7 @@
 
 ## 1. Introduction & Goals
 
-`internal/modules/taxonomy` owns the **flat, code-keyed classification catalog** that other modules bind controlled documents to: 3 entities â€” `DocumentFamily`, `DocumentProfile`, `ProcessArea` â€” each a row in its own Postgres table. Profiles bind to families; areas are flat with optional `parent_code` self-FK and cycle prevention. The module exposes 16 HTTP routes under `/api/v2/taxonomy/*` and serves three downstream consumers: registry (CD code prefix `{profile}-{area}-{seq}`), documents_v2 (template defaults via `profileDefaultsAdapter`), documents (live read of `process_areas.name` for snapshot).
+`internal/modules/taxonomy` owns the **flat, code-keyed classification catalog** that other modules bind controlled documents to: 3 entities â€” `DocumentFamily`, `DocumentProfile`, `ProcessArea` â€” each a row in its own Postgres table. Profiles bind to families; areas are flat with optional `parent_code` self-FK and cycle prevention. The module exposes 16 HTTP routes under `/api/v1/taxonomy/*` and serves three downstream consumers: registry (CD code prefix `{profile}-{area}-{seq}`), documents_v2 (template defaults via `profileDefaultsAdapter`), documents (live read of `process_areas.name` for snapshot).
 
 ### 1.1 Requirements overview
 
@@ -76,15 +76,15 @@ C4Context
         System_Ext(registry, "registry", "Reads profile + area codes for CD prefix")
         System_Ext(documents_v2, "documents_v2", "Reads profile.default_template_version_id via adapter")
         System_Ext(documents, "documents", "Reads process_areas.name for snapshot")
-        System_Ext(templates_v2, "templates_v2", "Owns templates_v2_template_version (FK target)")
+        System_Ext(templates, "templates", "Owns templates_template_version (FK target)")
     }
     System_Ext(pg, "Postgres", "metaldocs.document_families Â· _profiles Â· _process_areas")
-    Rel(admin, taxonomy, "HTTP /api/v2/taxonomy/*")
+    Rel(admin, taxonomy, "HTTP /api/v1/taxonomy/*")
     Rel(taxonomy, pg, "SQL (sql.DB; no tx)")
     Rel(registry, pg, "Direct SQL on _profiles + _process_areas (TaxonomyProfileReader / TaxonomyAreaReader)")
     Rel(documents_v2, taxonomy, "Go: profileDefaultsAdapter.GetDefaultTemplateVersionID")
     Rel(documents, pg, "Direct SQL: SELECT name FROM _process_areas at document-create")
-    Rel(taxonomy, templates_v2, "READ join: _template_version for IsPublished check")
+    Rel(taxonomy, templates, "READ join: _template_version for IsPublished check")
 ```
 
 ### 3.1 Business Context
@@ -97,12 +97,12 @@ Inbound interfaces (Go):
 - `taxonomyapp.NewDBGovernanceLogger(db)` â€” reused by `registry/module.go:31` to write to `governance_events` from outside the module.
 - `taxonomydomain.{DocumentProfile, ProcessArea, GovernanceEvent, GovernanceLogger, sentinel errors}` â€” consumed by `registry/application/service.go:13`, `registry/delivery/http/routes.go:17`, `registry/infrastructure/repository.go:15`.
 - `taxonomyinfra.NewProfileRepository(db)` â€” constructed standalone in `main.go:225` for `profileDefaultsAdapter`.
-- `taxonomyinfra.NewTemplateVersionChecker(db)` â€” joins to `templates_v2_template{_version}` for `IsPublished` (`template_version_checker.go:14-17`).
+- `taxonomyinfra.NewTemplateVersionChecker(db)` â€” joins to `templates_template{_version}` for `IsPublished` (`template_version_checker.go:14-17`).
 
 Inbound interfaces (HTTP) â€” 16 routes (full table in Â§5.3).
 
 Outbound interfaces:
-- DB: 3 owned tables; READ join to `templates_v2_template_version` + `templates_v2_template`.
+- DB: 3 owned tables; READ join to `templates_template_version` + `templates_template`.
 - Go: `internal/platform/authn` (UserID), `internal/platform/httpresponse` (envelope), `internal/platform/tenant` (DevTenantID fallback). No `internal/platform/authz`, no `internal/audit`, no `internal/modules/iam`.
 
 ---
@@ -125,12 +125,12 @@ Outbound interfaces:
 ```mermaid
 C4Container
     title Container View â€” taxonomy
-    Container(http, "HTTP Handler", "Go (http.ServeMux)", "16 routes: /api/v2/taxonomy/{profiles,areas,families}")
+    Container(http, "HTTP Handler", "Go (http.ServeMux)", "16 routes: /api/v1/taxonomy/{profiles,areas,families}")
     Container(svc, "Service Layer", "Go", "FamilyService Â· ProfileService Â· AreaService")
     Container(domain, "Domain", "Go", "DocumentFamily Â· DocumentProfile Â· ProcessArea Â· GovernanceEvent Â· sentinel errors")
     Container(repo, "Repository Layer", "Go + database/sql", "FamilyRepository Â· ProfileRepository Â· AreaRepository Â· TemplateVersionChecker Â· DBGovernanceLogger")
     ContainerDb(db, "metaldocs.document_*", "Postgres", "document_families Â· document_profiles Â· document_process_areas (+ governance_events)")
-    System_Ext(tplv2, "templates_v2_template_version", "Postgres (templates_v2)", "READ join for IsPublished")
+    System_Ext(tplv2, "templates_template_version", "Postgres (templates)", "READ join for IsPublished")
     Rel(http, svc, "calls")
     Rel(svc, domain, "uses")
     Rel(svc, repo, "calls (repository interfaces)")
@@ -168,43 +168,43 @@ C4Container
 
 | Method | Path | OperationID | Handler | Authz cap |
 |---|---|---|---|---|
-| GET | `/api/v2/taxonomy/profiles` | _missing_ | `listProfiles` | `doc.view` |
-| POST | `/api/v2/taxonomy/profiles` | _missing_ | `createProfile` | `taxonomy.manage` |
-| GET | `/api/v2/taxonomy/profiles/{code}` | _missing_ | `getProfile` | `doc.view` |
-| PATCH | `/api/v2/taxonomy/profiles/{code}` | _missing_ | `updateProfile` | `taxonomy.manage` |
-| DELETE | `/api/v2/taxonomy/profiles/{code}` | _missing_ | `archiveProfile` | `taxonomy.manage` |
-| PUT | `/api/v2/taxonomy/profiles/{code}/default-template` | _missing_ | `setDefaultTemplate` | `taxonomy.manage` |
-| GET | `/api/v2/taxonomy/areas` | _missing_ | `listAreas` | `doc.view` |
-| POST | `/api/v2/taxonomy/areas` | _missing_ | `createArea` | `taxonomy.manage` |
-| GET | `/api/v2/taxonomy/areas/{code}` | _missing_ | `getArea` | `doc.view` |
-| PUT | `/api/v2/taxonomy/areas/{code}` | _missing_ | `updateArea` | `taxonomy.manage` |
-| DELETE | `/api/v2/taxonomy/areas/{code}` | _missing_ | `archiveArea` | `taxonomy.manage` |
-| GET | `/api/v2/taxonomy/families` | _missing_ | `listFamilies` | `doc.view` |
-| POST | `/api/v2/taxonomy/families` | _missing_ | `createFamily` | `taxonomy.manage` |
-| GET | `/api/v2/taxonomy/families/{code}` | _missing_ | `getFamily` | `doc.view` |
-| **PATCH** | `/api/v2/taxonomy/families/{code}` | _missing_ | `updateFamily` | `taxonomy.manage` (T-003 closed Plan 5 â€” PATCH added to dispatcher) |
-| DELETE | `/api/v2/taxonomy/families/{code}` | _missing_ | `deactivateFamily` | `taxonomy.manage` |
+| GET | `/api/v1/taxonomy/profiles` | _missing_ | `listProfiles` | `doc.view` |
+| POST | `/api/v1/taxonomy/profiles` | _missing_ | `createProfile` | `taxonomy.manage` |
+| GET | `/api/v1/taxonomy/profiles/{code}` | _missing_ | `getProfile` | `doc.view` |
+| PATCH | `/api/v1/taxonomy/profiles/{code}` | _missing_ | `updateProfile` | `taxonomy.manage` |
+| DELETE | `/api/v1/taxonomy/profiles/{code}` | _missing_ | `archiveProfile` | `taxonomy.manage` |
+| PUT | `/api/v1/taxonomy/profiles/{code}/default-template` | _missing_ | `setDefaultTemplate` | `taxonomy.manage` |
+| GET | `/api/v1/taxonomy/areas` | _missing_ | `listAreas` | `doc.view` |
+| POST | `/api/v1/taxonomy/areas` | _missing_ | `createArea` | `taxonomy.manage` |
+| GET | `/api/v1/taxonomy/areas/{code}` | _missing_ | `getArea` | `doc.view` |
+| PUT | `/api/v1/taxonomy/areas/{code}` | _missing_ | `updateArea` | `taxonomy.manage` |
+| DELETE | `/api/v1/taxonomy/areas/{code}` | _missing_ | `archiveArea` | `taxonomy.manage` |
+| GET | `/api/v1/taxonomy/families` | _missing_ | `listFamilies` | `doc.view` |
+| POST | `/api/v1/taxonomy/families` | _missing_ | `createFamily` | `taxonomy.manage` |
+| GET | `/api/v1/taxonomy/families/{code}` | _missing_ | `getFamily` | `doc.view` |
+| **PATCH** | `/api/v1/taxonomy/families/{code}` | _missing_ | `updateFamily` | `taxonomy.manage` (T-003 closed Plan 5 â€” PATCH added to dispatcher) |
+| DELETE | `/api/v1/taxonomy/families/{code}` | _missing_ | `deactivateFamily` | `taxonomy.manage` |
 
 ## API Route Truth Table (Plan 8 Baseline)
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v2/taxonomy/profiles` | `internal/modules/taxonomy/delivery/http/handler.go:51` | `listProfiles` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| POST | `/api/v2/taxonomy/profiles` | `internal/modules/taxonomy/delivery/http/handler.go:52` | `createProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| GET | `/api/v2/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:53` | `getProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| PATCH | `/api/v2/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:54` | `updateProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| DELETE | `/api/v2/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:55` | `archiveProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| PUT | `/api/v2/taxonomy/profiles/{code}/default-template` | `internal/modules/taxonomy/delivery/http/handler.go:56` | `setDefaultTemplate` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| GET | `/api/v2/taxonomy/areas` | `internal/modules/taxonomy/delivery/http/handler.go:58` | `listAreas` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| POST | `/api/v2/taxonomy/areas` | `internal/modules/taxonomy/delivery/http/handler.go:59` | `createArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| GET | `/api/v2/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:60` | `getArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| PUT | `/api/v2/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:61` | `updateArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| DELETE | `/api/v2/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:62` | `archiveArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| GET | `/api/v2/taxonomy/families` | `internal/modules/taxonomy/delivery/http/handler.go:64` | `listFamilies` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| POST | `/api/v2/taxonomy/families` | `internal/modules/taxonomy/delivery/http/handler.go:65` | `createFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| GET | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:66` | `getFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| PATCH | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:67` | `updateFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
-| DELETE | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:68` | `deactivateFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v1/taxonomy/profiles` | `internal/modules/taxonomy/delivery/http/handler.go:51` | `listProfiles` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| POST | `/api/v1/taxonomy/profiles` | `internal/modules/taxonomy/delivery/http/handler.go:52` | `createProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v1/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:53` | `getProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PATCH | `/api/v1/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:54` | `updateProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| DELETE | `/api/v1/taxonomy/profiles/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:55` | `archiveProfile` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PUT | `/api/v1/taxonomy/profiles/{code}/default-template` | `internal/modules/taxonomy/delivery/http/handler.go:56` | `setDefaultTemplate` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v1/taxonomy/areas` | `internal/modules/taxonomy/delivery/http/handler.go:58` | `listAreas` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| POST | `/api/v1/taxonomy/areas` | `internal/modules/taxonomy/delivery/http/handler.go:59` | `createArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v1/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:60` | `getArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PUT | `/api/v1/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:61` | `updateArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| DELETE | `/api/v1/taxonomy/areas/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:62` | `archiveArea` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v1/taxonomy/families` | `internal/modules/taxonomy/delivery/http/handler.go:64` | `listFamilies` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| POST | `/api/v1/taxonomy/families` | `internal/modules/taxonomy/delivery/http/handler.go:65` | `createFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| GET | `/api/v1/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:66` | `getFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| PATCH | `/api/v1/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:67` | `updateFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
+| DELETE | `/api/v1/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:68` | `deactivateFamily` | â€” | â€” | â€” | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
 
 - Module contract status: Wrapper-only
 - Owner: leandro
@@ -223,7 +223,7 @@ sequenceDiagram
     participant S as FamilyService.List
     participant R as FamilyRepository.List
     participant DB as document_families
-    C->>H: GET /api/v2/taxonomy/families[?includeInactive]
+    C->>H: GET /api/v1/taxonomy/families[?includeInactive]
     H->>S: List(ctx, includeInactive)
     S->>R: List(ctx, includeInactive)
     R->>DB: SELECT ... [WHERE is_active=TRUE] ORDER BY code
@@ -246,7 +246,7 @@ sequenceDiagram
     participant S as ProfileService.Create
     participant R as ProfileRepository.Create
     participant DB as document_profiles
-    C->>H: POST /api/v2/taxonomy/profiles {code,familyCode,...}
+    C->>H: POST /api/v1/taxonomy/profiles {code,familyCode,...}
     H->>T: tenant.FromContext (session-bound tenant_id, Plan 3)
     T-->>H: tenantID (TRUSTED â€” no verification)
     H->>S: Create(ctx, DocumentProfile{TenantID, ...})
@@ -270,7 +270,7 @@ sequenceDiagram
     participant S as FamilyService.Deactivate
     participant R as FamilyRepository
     participant DB as Postgres
-    C->>H: DELETE /api/v2/taxonomy/families/{code}
+    C->>H: DELETE /api/v1/taxonomy/families/{code}
     H->>S: Deactivate(ctx, code)
     S->>R: GetByCode(ctx, code)
     R->>DB: SELECT FROM document_families
@@ -426,7 +426,7 @@ Top 3 (by severity, then by blast-radius):
 
 - Related ADRs: `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0010-soft-archive-via-timestamp.md`, `wiki/decisions/0012-contract-first-api.md`
 - Related concepts: `wiki/concepts/authz-tiers.md`, `wiki/concepts/controlled-documents.md`, `wiki/concepts/iso-segregation.md`, `wiki/concepts/error-ux.md`
-- Cross-module: `wiki/modules/registry.md` (CD code prefix consumer), `wiki/modules/documents.md` (live area-name read), `wiki/modules/templates_v2.md` (template-version FK target), `wiki/modules/audit.md` (parallel sink rationale)
+- Cross-module: `wiki/modules/registry.md` (CD code prefix consumer), `wiki/modules/documents.md` (live area-name read), `wiki/modules/templates.md` (template-version FK target), `wiki/modules/audit.md` (parallel sink rationale)
 - Backlog: `wiki/backlog/taxonomy-refactor.md`
 - Tech debt: `wiki/modules/taxonomy-tech-debt.md`
 - Artifacts: `wiki/modules/taxonomy/_artifacts/`

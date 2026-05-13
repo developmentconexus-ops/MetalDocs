@@ -77,7 +77,7 @@ Strategy: **implement full visual fidelity**. Missing API fields → hardcoded m
 - `InboxItem.summary` — revision summary text
 - `InboxItem.changes` — edit count integer
 - `InboxItem.version` — version transition string (e.g. `v2.3 → v2.4`)
-- `GET /api/v2/approval/my-decisions?days=14` — history for heatmap sparkline
+- `GET /api/v1/approval/my-decisions?days=14` — history for heatmap sparkline
 - Signoff flow — "Aprovar e assinar" / "Devolver" → design + implement approval path
 
 ---
@@ -165,8 +165,8 @@ export function enrichInboxItem(item: InboxItem, idx: number): RichInboxItem
 
 | Endpoint | Path | Status | Missing for full design | Backlog |
 |---|---|---|---|---|
-| List inbox | `GET /api/v2/approval/inbox` | existing | `code`, `kind`, `deadline_at`, `urgent`, `summary`, `changes`, `version` | `wiki/backlog/caixa-aprovacao.md` |
-| Decision history | `GET /api/v2/approval/my-decisions?days=14` | **needed** | `{ date: string; count: number }[]` | `wiki/backlog/caixa-aprovacao.md` |
+| List inbox | `GET /api/v1/approval/inbox` | existing | `code`, `kind`, `deadline_at`, `urgent`, `summary`, `changes`, `version` | `wiki/backlog/caixa-aprovacao.md` |
+| Decision history | `GET /api/v1/approval/my-decisions?days=14` | **needed** | `{ date: string; count: number }[]` | `wiki/backlog/caixa-aprovacao.md` |
 | Signoff flow | design + endpoint TBD | **needed** | approve/reject path + password challenge | `wiki/backlog/caixa-aprovacao.md` |
 
 Mock fallback strategy:

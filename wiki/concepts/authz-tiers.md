@@ -44,7 +44,7 @@ MetalDocs has **two authorization tiers**.
 | approval | `submit_service` (doc.submit), `signoff_service` (doc.signoff) | `approval_instances`, `approval_signoffs` |
 | registry | `Create`, `CreateTx` (registry.create); `changeStatus` (registry.obsolete\|supersede) | `controlled_documents`, `cd_sequence_counters` |
 | taxonomy | `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update` | `document_profiles`, `document_process_areas`, `document_families` |
-| templates_v2 | `CreateTemplate`, `SubmitForReview`, `Review`, `Approve`, `PublishTemplateVersion`, `ArchiveTemplate` | `templates_v2_template`, `templates_v2_template_version` |
+| templates | `CreateTemplate`, `SubmitForReview`, `Review`, `Approve`, `PublishTemplateVersion`, `ArchiveTemplate` | `templates_template`, `templates_template_version` |
 | iam | `UpsertUserAndAssignRole`, `ReplaceUserRoles` (user.manage); `Insert`, `CloseActive`, `GrantAtomic` (membership.manage) | `iam_user_roles`, `user_process_areas` |
 
 ## Common pitfalls

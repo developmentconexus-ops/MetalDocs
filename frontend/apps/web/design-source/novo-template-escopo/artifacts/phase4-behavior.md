@@ -30,7 +30,7 @@ All 17 failures are pre-existing (approval, auth, documents, template-author-pag
 
 | Step | Action | Expected | Observed | Result |
 |---|---|---|---|---|
-| 1 | Navigate to `/templates-v2/new` | Route renders, stepper shows step 1 active | "TEMPLATES / NOVO" kicker + "Novo template reutilizável" h1 + 5-step stepper with step 1 filled circle | ✅ PASS |
+| 1 | Navigate to `/templates/new` | Route renders, stepper shows step 1 active | "TEMPLATES / NOVO" kicker + "Novo template reutilizável" h1 + 5-step stepper with step 1 filled circle | ✅ PASS |
 | 2 | Profile grid load | Profiles from taxonomy API visible | "dc Documento Controlado" + "proc Procedimento Operacional" (real API data) | ✅ PASS |
 | 3 | URL sync | `?step=1` in URL | `window.location.search === "?step=1"` | ✅ PASS |
 | 4 | Select profile card | Card gets brand border + checkmark; Avançar enables | "dc" card selected with `✓`; `advanceDisabled: false` | ✅ PASS |

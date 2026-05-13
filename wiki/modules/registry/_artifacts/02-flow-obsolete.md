@@ -6,8 +6,8 @@ Lifecycle state-transitions on `controlled_documents`. Both ops share `changeSta
 
 | Op | Method | Route | Handler | File:line |
 |---|---|---|---|---|
-| Obsolete | PUT | `/api/v2/controlled-documents/{id}/obsolete` | `(*Handler).ObsoleteControlledDocument` | `internal/modules/registry/delivery/http/handler.go:87`, `routes.go:328` |
-| Supersede | PUT | `/api/v2/controlled-documents/{id}/supersede` | `(*Handler).SupersedeControlledDocument` | `internal/modules/registry/delivery/http/handler.go:88`, `routes.go:337` |
+| Obsolete | PUT | `/api/v1/controlled-documents/{id}/obsolete` | `(*Handler).ObsoleteControlledDocument` | `internal/modules/registry/delivery/http/handler.go:87`, `routes.go:328` |
+| Supersede | PUT | `/api/v1/controlled-documents/{id}/supersede` | `(*Handler).SupersedeControlledDocument` | `internal/modules/registry/delivery/http/handler.go:88`, `routes.go:337` |
 
 ### 2. Call chain
 

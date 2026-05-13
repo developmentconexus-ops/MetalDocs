@@ -34,7 +34,7 @@ Each module under `internal/modules/` is self-contained:
 - `module.go` - DI wiring
 
 Modules:
-- `templates_v2` - template authoring + schema versioning
+- `templates` - template authoring + schema versioning
 - `documents` - document instances, creation-time snapshots, freeze, view, approval (renamed from `documents_v2`)
 - `taxonomy` - profiles, areas, departments, subjects
 - `iam` - users, roles, capabilities, area memberships

@@ -6,7 +6,7 @@
 > **Out of scope:** Migration history (see `internal/platform/db/migrations/`).
 > **Key files:**
 > - `internal/platform/db/migrations/` — source of truth for schema
-> - `internal/modules/templates_v2/infrastructure/repo/` — template tables
+> - `internal/modules/templates/infrastructure/repo/` — template tables
 > - `internal/modules/documents/repository/repository.go:37` — document tables; `CreateDocument` INSERT (accepts `requiredPlaceholders`; seeds `document_placeholder_values` atomically)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:11` — document_families SQL impl
 > - `internal/modules/taxonomy/infrastructure/repo/` — profiles, areas
@@ -114,5 +114,5 @@ Index note: `(tenant_id, status)` and `(tenant_id, process_area_code_snapshot)` 
 
 - [architecture/system-overview.md](system-overview.md)
 - [modules/documents.md](../modules/documents.md)
-- [modules/templates-v2.md](../modules/templates-v2.md)
+- [modules/templates.md](../modules/templates.md)
 - [modules/taxonomy.md](../modules/taxonomy.md)

@@ -24,3 +24,19 @@
 - **§11 counts after:** Critical=1 Major=5 Minor=3
 - **Tally gate:** PASS
 - **Patched files:** wiki/modules/documents.md · wiki/modules/documents-tech-debt.md · wiki/backlog/documents-refactor.md
+
+## 2026-05-13 - Plan 10 documents route + approval linkage canonicalization
+
+- **Context:** uncommitted Plan 10 implementation diff (/api/v2/documents* -> /api/v1/documents*; approval instance linkage column rename)
+- **Mode:** structural refresh
+- **Anchors moved:** documents endpoints and approval-related document routes to /api/v1
+- **Public surface:** no new endpoints; canonical path updates only
+- **Routes/API:** route truth/artifacts refreshed to v1 paths
+- **Runtime flows:** unchanged behavior
+- **Persistence:** approval_instances document_id rename reflected in debt narrative
+- **Dependencies:** idempotency route templates and resolver mapping aligned
+- **T-NNN touched:** documents debt references updated to v1 naming
+- **R-NNN touched:** documents refactor rows remain linked; wording canonicalized
+- **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
+- **Tally gate:** PASS
+- **Patched files:** wiki/modules/documents.md; wiki/modules/documents-tech-debt.md; wiki/backlog/documents-refactor.md; wiki/modules/documents/_artifacts/*

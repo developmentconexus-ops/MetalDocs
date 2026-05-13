@@ -29,7 +29,7 @@ Walked each C4 box.
 ## 3. Top-3 in §11
 
 Ordered by severity then blast-radius:
-1. T-002 (Critical, surface = all /api/v2/documents/* routes, blocks RFC 9457 migration)
+1. T-002 (Critical, surface = all /api/v1/documents/* routes, blocks RFC 9457 migration)
 2. T-003 (Major, surface = every documents-table mutation, defense-in-depth)
 3. T-005 (Major, surface = rename code path, atomicity broken on QMS rename audit)
 

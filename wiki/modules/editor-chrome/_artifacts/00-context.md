@@ -64,7 +64,7 @@ OUT-edges expected:
 ## Out of scope (explicit)
 
 - Eigenpal internals — owned by `modules/editor-ui-eigenpal.md` and the EigenPal fork
-- Template authoring business logic — `modules/templates_v2.md` (backend) + `modules/templates-v2.md` (frontend, retired pending R-100)
+- Template authoring business logic — `modules/templates.md` (backend) + `modules/templates.md` (frontend, retired pending R-100)
 - Document editor business logic — `modules/documents.md`
 - StatusPill component — owned by `frontend-primitives.md` story (verify which module)
 

@@ -1,7 +1,7 @@
 # Parity-diff · novo-template-identidade
 
 Reference: `design-source` preview port 4181 `/novo-template-identidade/novo-template-identidade.html`.
-Implementation: `metaldocs-web` preview port 4174 `/templates-v2/new?step=2` (generic scope).
+Implementation: `metaldocs-web` preview port 4174 `/templates/new?step=2` (generic scope).
 
 | Region | Field | Reference | Implementation | Delta | Status |
 |---|---|---|---|---|---|

@@ -1,6 +1,6 @@
 # Templates List Screen
 
-**Route:** `/templates-v2`
+**Route:** `/templates`
 **Feature:** `features/templates/`
 **Design:** `design-source/templates/templates.html` (renders `Templates` from `screens-2.jsx`)
 
