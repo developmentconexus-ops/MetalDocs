@@ -3027,6 +3027,101 @@ paths:
       tags: [templates]
       operationId: listTemplatePlaceholderCatalogV2
       responses: { '200': { description: ok } }
+  /api/v2/taxonomy/profiles:
+    get:
+      tags: [taxonomy]
+      operationId: listTaxonomyProfilesV2
+      responses: { '200': { description: ok } }
+    post:
+      tags: [taxonomy]
+      operationId: createTaxonomyProfileV2
+      responses: { '200': { description: ok } }
+  /api/v2/taxonomy/profiles/{code}:
+    get:
+      tags: [taxonomy]
+      operationId: getTaxonomyProfileV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+    patch:
+      tags: [taxonomy]
+      operationId: updateTaxonomyProfileV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+    delete:
+      tags: [taxonomy]
+      operationId: archiveTaxonomyProfileV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+  /api/v2/taxonomy/profiles/{code}/default-template:
+    put:
+      tags: [taxonomy]
+      operationId: setTaxonomyProfileDefaultTemplateV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+  /api/v2/taxonomy/areas:
+    get:
+      tags: [taxonomy]
+      operationId: listTaxonomyAreasV2
+      responses: { '200': { description: ok } }
+    post:
+      tags: [taxonomy]
+      operationId: createTaxonomyAreaV2
+      responses: { '200': { description: ok } }
+  /api/v2/taxonomy/areas/{code}:
+    get:
+      tags: [taxonomy]
+      operationId: getTaxonomyAreaV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+    put:
+      tags: [taxonomy]
+      operationId: updateTaxonomyAreaV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+    delete:
+      tags: [taxonomy]
+      operationId: archiveTaxonomyAreaV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+  /api/v2/taxonomy/families:
+    get:
+      tags: [taxonomy]
+      operationId: listTaxonomyFamiliesV2
+      parameters:
+        - name: includeInactive
+          in: query
+          schema: { type: boolean }
+      responses: { '200': { description: ok } }
+    post:
+      tags: [taxonomy]
+      operationId: createTaxonomyFamilyV2
+      responses: { '200': { description: ok } }
+  /api/v2/taxonomy/families/{code}:
+    get:
+      tags: [taxonomy]
+      operationId: getTaxonomyFamilyV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+    patch:
+      tags: [taxonomy]
+      operationId: updateTaxonomyFamilyV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
+    delete:
+      tags: [taxonomy]
+      operationId: deactivateTaxonomyFamilyV2
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      responses: { '200': { description: ok } }
   /api/v2/controlled-documents:
     get:
       summary: List controlled documents
@@ -5667,4 +5762,5 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
+
 
