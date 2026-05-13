@@ -2,26 +2,55 @@ BEGIN;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
+  IF EXISTS (
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'approval_instances'
       AND column_name = 'document_v2_id'
   ) THEN
-    RAISE EXCEPTION 'expected column not found: public.approval_instances.document_v2_id';
+    ALTER TABLE public.approval_instances
+      RENAME COLUMN document_v2_id TO document_id;
+  ELSIF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'approval_instances'
+      AND column_name = 'document_id'
+  ) THEN
+    RAISE EXCEPTION 'expected column not found: public.approval_instances.document_v2_id or document_id';
   END IF;
 
-  IF NOT EXISTS (
+  IF EXISTS (
     SELECT 1
     FROM pg_constraint
     WHERE conname = 'approval_instances_document_v2_id_idempotency_key_key'
       AND conrelid = 'public.approval_instances'::regclass
   ) THEN
-    RAISE EXCEPTION 'expected constraint not found: public.approval_instances.approval_instances_document_v2_id_idempotency_key_key';
+    ALTER TABLE public.approval_instances
+      RENAME CONSTRAINT approval_instances_document_v2_id_idempotency_key_key
+      TO approval_instances_document_id_idempotency_key_key;
+  ELSIF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'approval_instances_document_id_idempotency_key_key'
+      AND conrelid = 'public.approval_instances'::regclass
+  ) THEN
+    RAISE EXCEPTION 'expected unique constraint not found on public.approval_instances document idempotency key';
   END IF;
 
-  IF NOT EXISTS (
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'approval_instances_document_v2_id_fkey'
+      AND conrelid = 'public.approval_instances'::regclass
+  ) THEN
+    ALTER TABLE public.approval_instances
+      RENAME CONSTRAINT approval_instances_document_v2_id_fkey
+      TO approval_instances_document_id_fkey;
+  END IF;
+
+  IF EXISTS (
     SELECT 1
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -29,10 +58,20 @@ BEGIN
       AND c.relkind = 'i'
       AND c.relname = 'ux_approval_instances_active'
   ) THEN
-    RAISE EXCEPTION 'expected index not found: public.ux_approval_instances_active';
+    ALTER INDEX public.ux_approval_instances_active
+      RENAME TO ux_approval_instances_active_document_id;
+  ELSIF NOT EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'i'
+      AND c.relname = 'ux_approval_instances_active_document_id'
+  ) THEN
+    RAISE EXCEPTION 'expected active approval_instances index not found';
   END IF;
 
-  IF NOT EXISTS (
+  IF EXISTS (
     SELECT 1
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -40,22 +79,19 @@ BEGIN
       AND c.relkind = 'i'
       AND c.relname = 'ix_approval_instances_tenant_doc'
   ) THEN
-    RAISE EXCEPTION 'expected index not found: public.ix_approval_instances_tenant_doc';
+    ALTER INDEX public.ix_approval_instances_tenant_doc
+      RENAME TO ix_approval_instances_tenant_document_id;
+  ELSIF NOT EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind = 'i'
+      AND c.relname = 'ix_approval_instances_tenant_document_id'
+  ) THEN
+    RAISE EXCEPTION 'expected tenant/document approval_instances index not found';
   END IF;
 END $$;
-
-ALTER TABLE approval_instances
-  RENAME COLUMN document_v2_id TO document_id;
-
-ALTER TABLE approval_instances
-  RENAME CONSTRAINT approval_instances_document_v2_id_idempotency_key_key
-  TO approval_instances_document_id_idempotency_key_key;
-
-ALTER INDEX ux_approval_instances_active
-  RENAME TO ux_approval_instances_active_document_id;
-
-ALTER INDEX ix_approval_instances_tenant_doc
-  RENAME TO ix_approval_instances_tenant_document_id;
 
 CREATE OR REPLACE FUNCTION enforce_signoff_sod() RETURNS trigger AS $$
 DECLARE
@@ -75,5 +111,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql
    SET search_path = pg_catalog, pg_temp;
+
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('0194', 'rename approval_instances document_v2_id to document_id')
+ON CONFLICT (version) DO NOTHING;
 
 COMMIT;

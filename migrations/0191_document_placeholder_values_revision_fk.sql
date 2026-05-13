@@ -9,4 +9,8 @@ ALTER TABLE document_placeholder_values
   ADD CONSTRAINT document_placeholder_values_revision_id_fkey
   FOREIGN KEY (revision_id) REFERENCES document_revisions(id) ON DELETE CASCADE;
 
+INSERT INTO public.schema_migrations (version, description)
+VALUES ('0191', 'point document_placeholder_values revision FK at document_revisions')
+ON CONFLICT (version) DO NOTHING;
+
 COMMIT;
