@@ -129,7 +129,7 @@ export function TemplateListPanel({ profileCode }: TemplateListPanelProps) {
           <button data-testid="template-import-open-btn" type="button" className="ghost-button" onClick={() => setShowImport(true)}>
             Importar
           </button>
-          <button data-testid="template-create-btn" type="button" onClick={() => navigate('/templates-v2/new')}>
+          <button data-testid="template-create-btn" type="button" onClick={() => navigate('/templates/new')}>
             Novo template
           </button>
         </span>

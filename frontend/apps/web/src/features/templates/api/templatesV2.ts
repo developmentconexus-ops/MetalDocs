@@ -98,7 +98,7 @@ export async function createTemplate(cmd: {
   description?: string;
   doc_type_code?: string;
 }): Promise<{ template: TemplateDTO; version: VersionDTO }> {
-  const res = await fetch('/api/v2/templates', {
+  const res = await fetch('/api/v1/templates', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(cmd),
@@ -125,7 +125,7 @@ export async function listTemplates(params?: {
   const body = await apiFetch<{
     data: { templates: TemplateDTO[] };
     meta: { limit: number; offset: number };
-  }>(`/api/v2/templates${suffix}`);
+  }>(`/api/v1/templates${suffix}`);
 
   return {
     templates: body.data.templates,
@@ -134,13 +134,13 @@ export async function listTemplates(params?: {
 }
 
 export async function getTemplate(id: string): Promise<{ template: TemplateDTO; latest_version: VersionDTO }> {
-  const res = await fetch(`/api/v2/templates/${id}`);
+  const res = await fetch(`/api/v1/templates/${id}`);
   const body = await apiJson<{ data: { template: TemplateDTO; latest_version: VersionDTO } }>(res);
   return body.data;
 }
 
 export async function getVersion(templateId: string, n: number): Promise<VersionDTO> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${n}`);
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${n}`);
   const body = await apiJson<{ data: { version: VersionDTO } }>(res);
   return body.data.version;
 }
@@ -149,7 +149,7 @@ export async function presignAutosave(
   templateId: string,
   versionNum: number,
 ): Promise<{ upload_url: string; storage_key: string; expires_at: string }> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/autosave/presign`, {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/presign`, {
     method: 'POST',
   });
   const body = await apiJson<{
@@ -163,7 +163,7 @@ export async function commitAutosave(
   versionNum: number,
   expectedContentHash: string,
 ): Promise<VersionDTO> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/autosave/commit`, {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/commit`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ expected_content_hash: expectedContentHash }),
@@ -208,7 +208,7 @@ export async function publishVersion(
   docxKey: string,
   schemaKey: string,
 ): Promise<PublishSuccess | PublishError> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/publish`, {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/publish`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ docx_key: docxKey, schema_key: schemaKey }),
@@ -223,7 +223,7 @@ export async function publishVersion(
 }
 
 export async function getDocxURL(templateId: string, versionNum: number): Promise<string> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/docx-url`);
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/docx-url`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
@@ -234,7 +234,7 @@ export async function getDocxURL(templateId: string, versionNum: number): Promis
 
 export async function submitForReview(templateId: string, versionNum: number): Promise<VersionDTO> {
   const data = await apiFetch<{ data: { version: VersionDTO } }>(
-    `/api/v2/templates/${templateId}/versions/${versionNum}/submit`,
+    `/api/v1/templates/${templateId}/versions/${versionNum}/submit`,
     { method: 'POST' },
   );
   return data.data.version;
@@ -246,7 +246,7 @@ export async function reviewVersion(
   accept: boolean,
   reason?: string,
 ): Promise<VersionDTO> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/review`, {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/review`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ accept, reason: reason || '' }),
@@ -265,7 +265,7 @@ export async function approveVersion(
   accept: boolean,
   reason?: string,
 ): Promise<VersionDTO> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/approve`, {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ accept, reason: reason || '' }),
@@ -320,7 +320,7 @@ function placeholderToWire(p: Placeholder): WirePlaceholder {
 }
 
 export async function getTemplateSchemas(templateId: string, versionNum: number): Promise<TemplateSchemas> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}`);
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}`);
   const body = await apiJson<{ data: { version: VersionDTO & { placeholder_schema: WirePlaceholder[] | null } } }>(res);
   const v = body.data.version;
   return {
@@ -330,7 +330,7 @@ export async function getTemplateSchemas(templateId: string, versionNum: number)
 }
 
 export async function putTemplateSchemas(templateId: string, versionNum: number, schemas: TemplateSchemas): Promise<void> {
-  const res = await fetch(`/api/v2/templates/${templateId}/versions/${versionNum}/schema`, {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/schema`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({

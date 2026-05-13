@@ -114,7 +114,7 @@ export function TemplateWizardPage(): JSX.Element {
         name: state.name,
         description: state.description.trim() || undefined,
       });
-      navigate(`/templates-v2/${template.id}/versions/${version.version_number}`);
+      navigate(`/templates/${template.id}/versions/${version.version_number}`);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Erro ao criar template.');
       setIsSubmitting(false);
@@ -122,7 +122,7 @@ export function TemplateWizardPage(): JSX.Element {
   }
 
   function handleCancel() {
-    navigate('/templates-v2');
+    navigate('/templates');
   }
 
   function handleStepClick(id: string) {

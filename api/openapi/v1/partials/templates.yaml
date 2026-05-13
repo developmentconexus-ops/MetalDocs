@@ -1,5 +1,5 @@
 paths:
-  /api/v2/templates:
+  /api/v1/templates:
     get:
       summary: List templates for tenant (docx-v2)
       tags: [templates]
@@ -47,7 +47,7 @@ paths:
                 properties:
                   id: { type: string, format: uuid }
                   version_id: { type: string, format: uuid }
-  /api/v2/templates/{id}/versions/{n}:
+  /api/v1/templates/{id}/versions/{n}:
     get:
       summary: Get template version metadata (docx-v2)
       tags: [templates]
@@ -57,7 +57,7 @@ paths:
       responses:
         '200': { description: ok }
         '404': { description: not_found }
-  /api/v2/templates/{id}/versions/{n}/docx-upload-url:
+  /api/v1/templates/{id}/versions/{n}/docx-upload-url:
     post:
       summary: Presign PUT URL for draft .docx upload
       tags: [templates]
@@ -74,7 +74,7 @@ paths:
                 properties:
                   url: { type: string }
                   storage_key: { type: string }
-  /api/v2/templates/{id}/versions/{n}/schema-upload-url:
+  /api/v1/templates/{id}/versions/{n}/schema-upload-url:
     post:
       summary: Presign PUT URL for draft schema.json upload
       tags: [templates]
@@ -91,7 +91,7 @@ paths:
                 properties:
                   url: { type: string }
                   storage_key: { type: string }
-  /api/v2/signed:
+  /api/v1/signed:
     get:
       summary: Redirect to presigned GET URL for a stored object
       tags: [templates]
@@ -99,7 +99,7 @@ paths:
         - { in: query, name: key, required: true, schema: { type: string } }
       responses:
         '302': { description: redirect }
-  /api/v2/templates/{id}/versions/{n}/draft:
+  /api/v1/templates/{id}/versions/{n}/draft:
     put:
       summary: Save draft (CAS via expected_lock_version)
       tags: [templates]
@@ -122,7 +122,7 @@ paths:
       responses:
         '204': { description: ok }
         '409': { description: template_draft_stale }
-  /api/v2/templates/{id}/versions/{n}/publish:
+  /api/v1/templates/{id}/versions/{n}/publish:
     post:
       summary: Publish draft (delegates to docgen-v2 /validate/template)
       tags: [templates]

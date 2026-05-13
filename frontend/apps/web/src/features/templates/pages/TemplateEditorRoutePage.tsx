@@ -15,9 +15,9 @@ export function Component() {
       templateId={templateId}
       versionNum={parsedVersion}
       onNavigateToVersion={(nextTemplateId, nextVersionNum) =>
-        navigate(`/templates-v2/${nextTemplateId}/versions/${nextVersionNum}`)
+        navigate(`/templates/${nextTemplateId}/versions/${nextVersionNum}`)
       }
-      onBack={() => navigate("/templates-v2")}
+      onBack={() => navigate("/templates")}
     />
   );
 }
