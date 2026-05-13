@@ -26,7 +26,7 @@ import type {
   UpdateRouteResponse,
 } from './approvalTypes';
 
-const BASE = '/api/v2';
+const BASE = '/api/v1';
 
 async function getJSON<T>(url: string): Promise<{ data: T; etag?: string }> {
   const res = await fetch(url);

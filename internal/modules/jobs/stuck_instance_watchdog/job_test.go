@@ -136,7 +136,7 @@ func (s *watchdogStmt) Query(_ []driver.Value) (driver.Rows, error) {
 			})
 		}
 		return &watchdogRows{
-			cols: []string{"id", "tenant_id", "document_v2_id", "submitted_by", "drift_policy"},
+			cols: []string{"id", "tenant_id", "document_id", "submitted_by", "drift_policy"},
 			rows: out,
 		}, nil
 	}

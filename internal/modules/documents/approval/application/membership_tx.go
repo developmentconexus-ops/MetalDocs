@@ -1,4 +1,4 @@
-package application
+﻿package application
 
 import (
 	"context"
@@ -70,3 +70,4 @@ func WithMembershipContext(
 	}
 	return nil
 }
+

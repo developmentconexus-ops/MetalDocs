@@ -10,7 +10,7 @@ import (
 
 	"github.com/minio/minio-go/v7"
 
-	"metaldocs/internal/modules/templates_v2/domain"
+	"metaldocs/internal/modules/templates/domain"
 )
 
 // TemplatesV2Presigner implements templates_v2/application.Presigner.

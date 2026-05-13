@@ -41,7 +41,7 @@ func TestAreasHandler_CreateUniqueViolationReturns409(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/taxonomy/areas", strings.NewReader(`{"code":"A1","name":"Area"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/areas", strings.NewReader(`{"code":"A1","name":"Area"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)

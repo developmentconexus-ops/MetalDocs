@@ -32,7 +32,7 @@ type execer interface {
 func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx *sql.Tx, inst domain.Instance) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO approval_instances
-		  (id, tenant_id, document_v2_id, route_id, route_version_snapshot,
+		  (id, tenant_id, document_id, route_id, route_version_snapshot,
 		   status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 		inst.ID,
@@ -196,9 +196,9 @@ type rowScanner interface {
 func scanSignoff(row rowScanner) (*domain.Signoff, error) {
 	var (
 		id, instanceID, stageID, actorUserID, actorTenantID string
-		decision, comment, signatureMethod, contentHash      string
-		signedAt                                             time.Time
-		sigPayload                                           []byte
+		decision, comment, signatureMethod, contentHash     string
+		signedAt                                            time.Time
+		sigPayload                                          []byte
 	)
 	err := row.Scan(&id, &instanceID, &stageID, &actorUserID, &actorTenantID,
 		&decision, &comment, &signedAt, &signatureMethod, &sigPayload, &contentHash)
@@ -231,7 +231,7 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx *sql.T
 	var completedAt sql.NullTime
 
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, document_v2_id, route_id, route_version_snapshot,
+		SELECT id, tenant_id, document_id, route_id, route_version_snapshot,
 		       status, submitted_by, submitted_at, completed_at,
 		       content_hash_at_submit, idempotency_key
 		FROM approval_instances
@@ -267,11 +267,11 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	var completedAt sql.NullTime
 
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, document_v2_id, route_id, route_version_snapshot,
+		SELECT id, tenant_id, document_id, route_id, route_version_snapshot,
 		       status, submitted_by, submitted_at, completed_at,
 		       content_hash_at_submit, idempotency_key
 		FROM approval_instances
-		WHERE document_v2_id = $1
+		WHERE document_id = $1
 		  AND tenant_id = $2
 		  AND status IN ('in_progress', 'approved')
 			ORDER BY submitted_at DESC
@@ -407,10 +407,10 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 	for rows.Next() {
 		var (
 			id, instID, stageID, actorUserID, actorTenantID string
-			decision, comment, signatureMethod, contentHash  string
-			displayName                                      string
-			signedAt                                         time.Time
-			sigPayload                                       []byte
+			decision, comment, signatureMethod, contentHash string
+			displayName                                     string
+			signedAt                                        time.Time
+			sigPayload                                      []byte
 		)
 		if err := rows.Scan(&id, &instID, &stageID, &actorUserID, &actorTenantID,
 			&decision, &comment, &signedAt, &signatureMethod, &sigPayload,

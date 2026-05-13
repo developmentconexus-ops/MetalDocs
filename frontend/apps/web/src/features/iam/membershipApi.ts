@@ -16,7 +16,7 @@ export interface GrantMembershipRequest {
   role: 'viewer' | 'editor' | 'reviewer' | 'author' | 'approver' | 'signer' | 'area_admin' | 'qms_admin';
 }
 
-const BASE = "/api/v2/iam/area-memberships";
+const BASE = "/api/v1/iam/area-memberships";
 
 export async function fetchMemberships(userId: string): Promise<AreaMembership[]> {
   return apiFetch<AreaMembership[]>(`${BASE}?userId=${encodeURIComponent(userId)}`);

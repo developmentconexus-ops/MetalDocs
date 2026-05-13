@@ -2,9 +2,9 @@ import styles from './ActivityPanel.module.css';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TODO(library/activity): wire to real backend.
-//   - INBOX → GET /api/v2/users/me/inbox (pending approvals for current user,
+//   - INBOX → GET /api/v1/users/me/inbox (pending approvals for current user,
 //     joined with document due dates). Endpoint not yet defined.
-//   - AUDIT → GET /api/v2/audit?scope=documents&limit=8h (existing audit log
+//   - AUDIT → GET /api/v1/audit?scope=documents&limit=8h (existing audit log
 //     filtered to last 8h, current user's tenant). Endpoint exists but not
 //     surfaced via openapi codegen.
 // Keep mock arrays below as design fixtures until both endpoints land. Do NOT

@@ -89,73 +89,73 @@ func NewHandlerWithSubmit(svc Service, db *sql.DB, submitSvc approvalSubmitter) 
 func NewHandlerWithSubmitAndFinalizeStore(svc Service, db *sql.DB, submitSvc approvalSubmitter, store finalizeIdempotencyStore) *Handler {
 	h := &Handler{svc: svc, db: db, submitSvc: submitSvc, idempFinalize: store}
 	if h.idempFinalize == nil && db != nil {
-		h.idempFinalize = idempotency.New(db, "POST /api/v2/documents/{id}/finalize")
+		h.idempFinalize = idempotency.New(db, "POST /api/v1/documents/{id}/finalize")
 	}
 	return h
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v2/documents", h.listDocuments)
-	mux.HandleFunc("GET /api/v2/documents/stats", h.documentStats)
+	mux.HandleFunc("GET /api/v1/documents", h.listDocuments)
+	mux.HandleFunc("GET /api/v1/documents/stats", h.documentStats)
 
-	mux.HandleFunc("GET /api/v2/documents/{id}", h.getDocument)
-	mux.HandleFunc("PATCH /api/v2/documents/{id}", h.renameDocument)
-	mux.HandleFunc("POST /api/v2/documents/{id}/finalize", h.finalizeDocument)
-	mux.HandleFunc("POST /api/v2/documents/{id}/archive", h.archiveDocument)
-	mux.HandleFunc("POST /api/v2/documents/{id}/duplicate", h.duplicateDocument)
+	mux.HandleFunc("GET /api/v1/documents/{id}", h.getDocument)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}", h.renameDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", h.finalizeDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/archive", h.archiveDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/duplicate", h.duplicateDocument)
 
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/acquire", h.acquireSession)
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/heartbeat", h.heartbeatSession)
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/release", h.releaseSession)
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/force-release", h.forceReleaseSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/acquire", h.acquireSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/heartbeat", h.heartbeatSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/release", h.releaseSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/force-release", h.forceReleaseSession)
 
-	mux.HandleFunc("POST /api/v2/documents/{id}/autosave/presign", h.presignAutosave)
-	mux.HandleFunc("POST /api/v2/documents/{id}/autosave/commit", h.commitAutosave)
+	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/presign", h.presignAutosave)
+	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/commit", h.commitAutosave)
 
-	mux.HandleFunc("GET /api/v2/documents/{id}/checkpoints", h.listCheckpoints)
-	mux.HandleFunc("POST /api/v2/documents/{id}/checkpoints", h.createCheckpoint)
-	mux.HandleFunc("POST /api/v2/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
+	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
+	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
+	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
 
-	mux.HandleFunc("GET /api/v2/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
-	mux.HandleFunc("GET /api/v2/documents/{id}/comments", h.listComments)
-	mux.HandleFunc("POST /api/v2/documents/{id}/comments", h.createComment)
-	mux.HandleFunc("PATCH /api/v2/documents/{id}/comments/{libraryID}", h.updateComment)
-	mux.HandleFunc("DELETE /api/v2/documents/{id}/comments/{libraryID}", h.deleteComment)
+	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
+	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
+	mux.HandleFunc("POST /api/v1/documents/{id}/comments", h.createComment)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{libraryID}", h.updateComment)
+	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{libraryID}", h.deleteComment)
 }
 
 func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
-	mux.HandleFunc("GET /api/v2/documents", h.listDocuments)
-	mux.HandleFunc("GET /api/v2/documents/stats", h.documentStats)
+	mux.HandleFunc("GET /api/v1/documents", h.listDocuments)
+	mux.HandleFunc("GET /api/v1/documents/stats", h.documentStats)
 
-	mux.HandleFunc("GET /api/v2/documents/{id}", h.getDocument)
-	mux.HandleFunc("PATCH /api/v2/documents/{id}", h.renameDocument)
-	mux.HandleFunc("POST /api/v2/documents/{id}/finalize", h.finalizeDocument)
-	mux.HandleFunc("POST /api/v2/documents/{id}/archive", h.archiveDocument)
-	mux.HandleFunc("POST /api/v2/documents/{id}/duplicate", h.duplicateDocument)
+	mux.HandleFunc("GET /api/v1/documents/{id}", h.getDocument)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}", h.renameDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/finalize", h.finalizeDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/archive", h.archiveDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/duplicate", h.duplicateDocument)
 
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/acquire", h.acquireSession)
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/heartbeat", h.heartbeatSession)
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/release", h.releaseSession)
-	mux.HandleFunc("POST /api/v2/documents/{id}/session/force-release", h.forceReleaseSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/acquire", h.acquireSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/heartbeat", h.heartbeatSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/release", h.releaseSession)
+	mux.HandleFunc("POST /api/v1/documents/{id}/session/force-release", h.forceReleaseSession)
 
 	mux.Handle(
-		"POST /api/v2/documents/{id}/autosave/presign",
+		"POST /api/v1/documents/{id}/autosave/presign",
 		rl.Limit(ratelimit.RouteAutosavePresign, userFn, http.HandlerFunc(h.presignAutosave)),
 	)
 	mux.Handle(
-		"POST /api/v2/documents/{id}/autosave/commit",
+		"POST /api/v1/documents/{id}/autosave/commit",
 		rl.Limit(ratelimit.RouteAutosaveCommit, userFn, http.HandlerFunc(h.commitAutosave)),
 	)
 
-	mux.HandleFunc("GET /api/v2/documents/{id}/checkpoints", h.listCheckpoints)
-	mux.HandleFunc("POST /api/v2/documents/{id}/checkpoints", h.createCheckpoint)
-	mux.HandleFunc("POST /api/v2/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
+	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
+	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
+	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
 
-	mux.HandleFunc("GET /api/v2/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
-	mux.HandleFunc("GET /api/v2/documents/{id}/comments", h.listComments)
-	mux.HandleFunc("POST /api/v2/documents/{id}/comments", h.createComment)
-	mux.HandleFunc("PATCH /api/v2/documents/{id}/comments/{libraryID}", h.updateComment)
-	mux.HandleFunc("DELETE /api/v2/documents/{id}/comments/{libraryID}", h.deleteComment)
+	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
+	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
+	mux.HandleFunc("POST /api/v1/documents/{id}/comments", h.createComment)
+	mux.HandleFunc("PATCH /api/v1/documents/{id}/comments/{libraryID}", h.updateComment)
+	mux.HandleFunc("DELETE /api/v1/documents/{id}/comments/{libraryID}", h.deleteComment)
 }
 
 func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
@@ -378,7 +378,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	actorForReplay := userIDFromReq(r)
 	idempStore := h.idempFinalize
 	if idempStore == nil && h.db != nil {
-		idempStore = idempotency.New(h.db, "POST /api/v2/documents/{id}/finalize")
+		idempStore = idempotency.New(h.db, "POST /api/v1/documents/{id}/finalize")
 	}
 	if idempStore != nil {
 		replay, err := idempStore.CheckReplay(r.Context(), tenantForReplay, actorForReplay, idempotencyKey, payloadHash)

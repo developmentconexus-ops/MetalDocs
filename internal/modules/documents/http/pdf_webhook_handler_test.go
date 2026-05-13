@@ -47,7 +47,7 @@ func TestPDFWebhookHandler_ValidSignaturePersists(t *testing.T) {
 	h := NewPDFWebhookHandler(writer, "shh")
 
 	body := `{"tenant_id":"t-1","final_pdf_s3_key":"final/r.docx.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/pdf-complete", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
 	req.SetPathValue("id", "doc-1")
 	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
 	rec := httptest.NewRecorder()
@@ -74,7 +74,7 @@ func TestPDFWebhookHandler_ValidSignaturePersists(t *testing.T) {
 func TestPDFWebhookHandler_MissingSignatureRejected401(t *testing.T) {
 	h := NewPDFWebhookHandler(&fakePDFWriter{}, "shh")
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/pdf-complete",
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete",
 		bytes.NewReader([]byte(`{"tenant_id":"t-1"}`)))
 	req.SetPathValue("id", "doc-1")
 	rec := httptest.NewRecorder()
@@ -89,7 +89,7 @@ func TestPDFWebhookHandler_WrongSignatureRejected401(t *testing.T) {
 	h := NewPDFWebhookHandler(&fakePDFWriter{}, "shh")
 
 	body := `{"tenant_id":"t-1"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/pdf-complete",
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete",
 		strings.NewReader(body))
 	req.SetPathValue("id", "doc-1")
 	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "other-secret"))
@@ -105,7 +105,7 @@ func TestPDFWebhookHandler_MalformedBodyRejected400(t *testing.T) {
 	h := NewPDFWebhookHandler(&fakePDFWriter{}, "shh")
 
 	body := `not-json`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/pdf-complete",
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete",
 		strings.NewReader(body))
 	req.SetPathValue("id", "doc-1")
 	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))

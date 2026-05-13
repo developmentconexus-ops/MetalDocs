@@ -713,28 +713,28 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List controlled documents
-	// (GET /api/v2/controlled-documents)
+	// (GET /api/v1/controlled-documents)
 	ListControlledDocuments(w http.ResponseWriter, r *http.Request, params ListControlledDocumentsParams)
 	// Atomically create controlled document and initial revision
-	// (POST /api/v2/controlled-documents)
+	// (POST /api/v1/controlled-documents)
 	AtomicCreateControlledDocument(w http.ResponseWriter, r *http.Request, params AtomicCreateControlledDocumentParams)
 	// Preview the next auto-generated document code without allocating it
-	// (GET /api/v2/controlled-documents/preview-code)
+	// (GET /api/v1/controlled-documents/preview-code)
 	PreviewControlledDocumentCode(w http.ResponseWriter, r *http.Request, params PreviewControlledDocumentCodeParams)
 	// Get controlled document by ID
-	// (GET /api/v2/controlled-documents/{id})
+	// (GET /api/v1/controlled-documents/{id})
 	GetControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Get the active document instance for a controlled document
-	// (GET /api/v2/controlled-documents/{id}/active-document)
+	// (GET /api/v1/controlled-documents/{id}/active-document)
 	GetActiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Mark controlled document as obsolete
-	// (PUT /api/v2/controlled-documents/{id}/obsolete)
+	// (PUT /api/v1/controlled-documents/{id}/obsolete)
 	ObsoleteControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Create a new revision for a controlled document
-	// (POST /api/v2/controlled-documents/{id}/revisions)
+	// (POST /api/v1/controlled-documents/{id}/revisions)
 	CreateControlledDocumentRevision(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params CreateControlledDocumentRevisionParams)
 	// Mark controlled document as superseded
-	// (PUT /api/v2/controlled-documents/{id}/supersede)
+	// (PUT /api/v1/controlled-documents/{id}/supersede)
 	SupersedeControlledDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
@@ -1240,14 +1240,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/controlled-documents", wrapper.ListControlledDocuments)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/controlled-documents", wrapper.AtomicCreateControlledDocument)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/controlled-documents/preview-code", wrapper.PreviewControlledDocumentCode)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/controlled-documents/{id}", wrapper.GetControlledDocument)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/controlled-documents/{id}/active-document", wrapper.GetActiveDocument)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/controlled-documents/{id}/obsolete", wrapper.ObsoleteControlledDocument)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/controlled-documents/{id}/revisions", wrapper.CreateControlledDocumentRevision)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/controlled-documents/{id}/supersede", wrapper.SupersedeControlledDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents", wrapper.ListControlledDocuments)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/controlled-documents", wrapper.AtomicCreateControlledDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents/preview-code", wrapper.PreviewControlledDocumentCode)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents/{id}", wrapper.GetControlledDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/active-document", wrapper.GetActiveDocument)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/obsolete", wrapper.ObsoleteControlledDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/revisions", wrapper.CreateControlledDocumentRevision)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/controlled-documents/{id}/supersede", wrapper.SupersedeControlledDocument)
 
 	return m
 }
@@ -1608,28 +1608,28 @@ func (response SupersedeControlledDocument409Response) VisitSupersedeControlledD
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List controlled documents
-	// (GET /api/v2/controlled-documents)
+	// (GET /api/v1/controlled-documents)
 	ListControlledDocuments(ctx context.Context, request ListControlledDocumentsRequestObject) (ListControlledDocumentsResponseObject, error)
 	// Atomically create controlled document and initial revision
-	// (POST /api/v2/controlled-documents)
+	// (POST /api/v1/controlled-documents)
 	AtomicCreateControlledDocument(ctx context.Context, request AtomicCreateControlledDocumentRequestObject) (AtomicCreateControlledDocumentResponseObject, error)
 	// Preview the next auto-generated document code without allocating it
-	// (GET /api/v2/controlled-documents/preview-code)
+	// (GET /api/v1/controlled-documents/preview-code)
 	PreviewControlledDocumentCode(ctx context.Context, request PreviewControlledDocumentCodeRequestObject) (PreviewControlledDocumentCodeResponseObject, error)
 	// Get controlled document by ID
-	// (GET /api/v2/controlled-documents/{id})
+	// (GET /api/v1/controlled-documents/{id})
 	GetControlledDocument(ctx context.Context, request GetControlledDocumentRequestObject) (GetControlledDocumentResponseObject, error)
 	// Get the active document instance for a controlled document
-	// (GET /api/v2/controlled-documents/{id}/active-document)
+	// (GET /api/v1/controlled-documents/{id}/active-document)
 	GetActiveDocument(ctx context.Context, request GetActiveDocumentRequestObject) (GetActiveDocumentResponseObject, error)
 	// Mark controlled document as obsolete
-	// (PUT /api/v2/controlled-documents/{id}/obsolete)
+	// (PUT /api/v1/controlled-documents/{id}/obsolete)
 	ObsoleteControlledDocument(ctx context.Context, request ObsoleteControlledDocumentRequestObject) (ObsoleteControlledDocumentResponseObject, error)
 	// Create a new revision for a controlled document
-	// (POST /api/v2/controlled-documents/{id}/revisions)
+	// (POST /api/v1/controlled-documents/{id}/revisions)
 	CreateControlledDocumentRevision(ctx context.Context, request CreateControlledDocumentRevisionRequestObject) (CreateControlledDocumentRevisionResponseObject, error)
 	// Mark controlled document as superseded
-	// (PUT /api/v2/controlled-documents/{id}/supersede)
+	// (PUT /api/v1/controlled-documents/{id}/supersede)
 	SupersedeControlledDocument(ctx context.Context, request SupersedeControlledDocumentRequestObject) (SupersedeControlledDocumentResponseObject, error)
 }
 
@@ -1910,33 +1910,33 @@ var swaggerSpec = []string{
 	"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",
-	"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",
-	"xM4mz6qLuQj3j/v/BQAA//8=",
+	"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",
+	"9cTOJs+6iwn3j/v/BQAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

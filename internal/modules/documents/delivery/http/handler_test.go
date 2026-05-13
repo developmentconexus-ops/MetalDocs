@@ -218,7 +218,7 @@ func withAuthHeaders(req *http.Request, roles string) {
 func TestListDocuments_Happy(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -231,7 +231,7 @@ func TestListDocuments_Happy(t *testing.T) {
 func TestListDocuments_Forbidden(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
 	withAuthHeaders(req, "template_author")
 	rr := httptest.NewRecorder()
 
@@ -247,7 +247,7 @@ func TestListDocuments_Forbidden(t *testing.T) {
 func TestAcquireSession_Happy(t *testing.T) {
 	mux := newMux(t, &fakeSvc{acquireSession: &domain.Session{ID: "sess_1"}})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -260,7 +260,7 @@ func TestAcquireSession_Happy(t *testing.T) {
 func TestAcquireSession_Forbidden(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
 	withAuthHeaders(req, "template_author")
 	rr := httptest.NewRecorder()
 
@@ -274,7 +274,7 @@ func TestCommitAutosave_IdempotentReplay_Returns200(t *testing.T) {
 	mux := newMux(t, &fakeSvc{commitResult: &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2, AlreadyConsumed: true}})
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1}}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/autosave/commit", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -296,7 +296,7 @@ func TestForceReleaseSession_RequiresAdmin(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	body := []byte(`{"session_id":"sess_1"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/session/force-release", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/force-release", bytes.NewReader(body))
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -311,7 +311,7 @@ func TestRenameDocument_Happy(t *testing.T) {
 	mux := newMux(t, svc)
 
 	body := []byte(`{"name":"Updated Name"}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v2/documents/doc_1", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -329,7 +329,7 @@ func TestRenameDocument_EmptyName_Returns400(t *testing.T) {
 	mux := newMux(t, svc)
 
 	body := []byte(`{"name":"   "}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v2/documents/doc_1", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -342,7 +342,7 @@ func TestRenameDocument_EmptyName_Returns400(t *testing.T) {
 func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/finalize", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -355,7 +355,7 @@ func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
 func TestFinalizeDocument_InvalidIdempotencyKey_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/finalize", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
 	withAuthHeaders(req, "document_filler")
 	req.Header.Set("Idempotency-Key", "not-a-uuid")
 	rr := httptest.NewRecorder()
@@ -376,7 +376,7 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/finalize", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
 	withAuthHeaders(req, "document_filler")
 	req.Header.Set("Idempotency-Key", key)
 	if tid, err := tenant.FromContext(req.Context()); err != nil || tid == "" {

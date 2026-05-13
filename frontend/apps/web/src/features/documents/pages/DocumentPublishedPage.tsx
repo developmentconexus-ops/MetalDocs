@@ -11,7 +11,7 @@ import { useAuthStore } from '../../../store/auth.store';
 import { formatPublishedAt, formatSignedAt, formatShortDate } from '../lib/documentDetailMeta';
 import styles from './DocumentPublishedPage.module.css';
 
-// TODO(backlog): Replace with real revision list from GET /api/v2/documents/:id/revisions
+// TODO(backlog): Replace with real revision list from GET /api/v1/documents/:id/revisions
 // See wiki/backlog/documento-publicado.md
 const PLACEHOLDER_VERSIONS = [
   { v: 'v2.3', when: '18 mar 2025', author: 'A. Tavares', current: false,
@@ -26,7 +26,7 @@ const PLACEHOLDER_VERSIONS = [
     summary: 'Inclusão de procedimento para painéis CCM-04. Atualização da matriz de risco para fontes hidráulicas.' },
 ];
 
-// TODO(backlog): wire relationship model — GET /api/v2/documents/:id/relationships
+// TODO(backlog): wire relationship model — GET /api/v1/documents/:id/relationships
 // See wiki/backlog/documento-publicado.md
 const PLACEHOLDER_RELATED = [
   { code: 'IT-EHS-021', title: 'Inspeção de cadeados e travas', type: 'Instrução', rel: 'referenciado por' },
@@ -34,7 +34,7 @@ const PLACEHOLDER_RELATED = [
   { code: 'PR-MAN-103', title: 'Manutenção preventiva CCM-04', type: 'Procedimento', rel: 'invoca este PR' },
 ];
 
-// TODO(backlog): wire GET /api/v2/documents/:id/display-comments — architecture brainstorm needed
+// TODO(backlog): wire GET /api/v1/documents/:id/display-comments — architecture brainstorm needed
 // See wiki/backlog/documento-publicado.md
 const PLACEHOLDER_COMMENTS = [
   { who: 'Marcos Lima', role: 'Gerente Industrial', when: '13 mar · 09:42',
@@ -181,12 +181,12 @@ export function DocumentPublishedPage() {
               <Icon name="eye" size={15} />
               Visualizar documento
             </button>
-            {/* TODO(backlog): wire PDF download — GET /api/v2/documents/:id/pdf */}
+            {/* TODO(backlog): wire PDF download — GET /api/v1/documents/:id/pdf */}
             <button className="btn" type="button" aria-disabled="true" title="Em breve">
               <Icon name="download" size={13} />
               Baixar PDF
             </button>
-            {/* TODO(backlog): wire POST /api/v2/controlled-documents/:cdId/revisions */}
+            {/* TODO(backlog): wire POST /api/v1/controlled-documents/:cdId/revisions */}
             <button
               className="btn"
               type="button"
@@ -327,7 +327,7 @@ export function DocumentPublishedPage() {
           )}
         </section>
 
-        {/* Section: Histórico de versões — TODO(backlog): wire GET /api/v2/documents/:id/revisions */}
+        {/* Section: Histórico de versões — TODO(backlog): wire GET /api/v1/documents/:id/revisions */}
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <div>

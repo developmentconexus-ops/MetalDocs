@@ -727,91 +727,91 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List documents for tenant
-	// (GET /api/v2/documents)
+	// (GET /api/v1/documents)
 	ListDocumentsV2(w http.ResponseWriter, r *http.Request, params ListDocumentsV2Params)
 	// Documents stats by status and area
-	// (GET /api/v2/documents/stats)
+	// (GET /api/v1/documents/stats)
 	DocumentStatsV2(w http.ResponseWriter, r *http.Request, params DocumentStatsV2Params)
 
-	// (GET /api/v2/documents/{id})
+	// (GET /api/v1/documents/{id})
 	GetDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (PATCH /api/v2/documents/{id})
+	// (PATCH /api/v1/documents/{id})
 	RenameDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/archive)
+	// (POST /api/v1/documents/{id}/archive)
 	ArchiveDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/autosave/commit)
+	// (POST /api/v1/documents/{id}/autosave/commit)
 	CommitDocumentAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/autosave/presign)
+	// (POST /api/v1/documents/{id}/autosave/presign)
 	PresignDocumentAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v2/documents/{id}/checkpoints)
+	// (GET /api/v1/documents/{id}/checkpoints)
 	ListDocumentCheckpointsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/checkpoints)
+	// (POST /api/v1/documents/{id}/checkpoints)
 	CreateDocumentCheckpointV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Forward-only restore - clones the checkpoint rev into a new head revision
-	// (POST /api/v2/documents/{id}/checkpoints/{version}/restore)
+	// (POST /api/v1/documents/{id}/checkpoints/{version}/restore)
 	RestoreDocumentCheckpointV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, version int)
 
-	// (GET /api/v2/documents/{id}/comments)
+	// (GET /api/v1/documents/{id}/comments)
 	ListDocumentCommentsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/comments)
+	// (POST /api/v1/documents/{id}/comments)
 	CreateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (DELETE /api/v2/documents/{id}/comments/{libraryID})
+	// (DELETE /api/v1/documents/{id}/comments/{libraryID})
 	DeleteDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
 
-	// (PATCH /api/v2/documents/{id}/comments/{libraryID})
+	// (PATCH /api/v1/documents/{id}/comments/{libraryID})
 	UpdateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
 
-	// (POST /api/v2/documents/{id}/duplicate)
+	// (POST /api/v1/documents/{id}/duplicate)
 	DuplicateDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v2/documents/{id}/export/docx-url)
+	// (GET /api/v1/documents/{id}/export/docx-url)
 	GetDocumentDocxURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/export/pdf)
+	// (POST /api/v1/documents/{id}/export/pdf)
 	ExportDocumentPDF(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v2/documents/{id}/fill-in-schema)
+	// (GET /api/v1/documents/{id}/fill-in-schema)
 	GetDocumentFillInSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/finalize)
+	// (POST /api/v1/documents/{id}/finalize)
 	FinalizeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params FinalizeDocumentV2Params)
 
-	// (GET /api/v2/documents/{id}/placeholder-options/{pid})
+	// (GET /api/v1/documents/{id}/placeholder-options/{pid})
 	GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
 
-	// (GET /api/v2/documents/{id}/placeholders)
+	// (GET /api/v1/documents/{id}/placeholders)
 	ListDocumentPlaceholderValuesV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (PUT /api/v2/documents/{id}/placeholders/{pid})
+	// (PUT /api/v1/documents/{id}/placeholders/{pid})
 	PutDocumentPlaceholderValueV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
 
-	// (POST /api/v2/documents/{id}/reconstruct)
+	// (POST /api/v1/documents/{id}/reconstruct)
 	ReconstructDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v2/documents/{id}/revisions/{rid}/url)
+	// (GET /api/v1/documents/{id}/revisions/{rid}/url)
 	GetDocumentRevisionUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, rid openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/session/acquire)
+	// (POST /api/v1/documents/{id}/session/acquire)
 	AcquireDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/session/force-release)
+	// (POST /api/v1/documents/{id}/session/force-release)
 	ForceReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/session/heartbeat)
+	// (POST /api/v1/documents/{id}/session/heartbeat)
 	HeartbeatDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/session/release)
+	// (POST /api/v1/documents/{id}/session/release)
 	ReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v2/documents/{id}/view)
+	// (GET /api/v1/documents/{id}/view)
 	ViewDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
@@ -1898,35 +1898,35 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents", wrapper.ListDocumentsV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/stats", wrapper.DocumentStatsV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}", wrapper.GetDocumentV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v2/documents/{id}", wrapper.RenameDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/archive", wrapper.ArchiveDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/autosave/commit", wrapper.CommitDocumentAutosaveV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/autosave/presign", wrapper.PresignDocumentAutosaveV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/checkpoints", wrapper.ListDocumentCheckpointsV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/checkpoints", wrapper.CreateDocumentCheckpointV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/checkpoints/{version}/restore", wrapper.RestoreDocumentCheckpointV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/comments", wrapper.ListDocumentCommentsV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/comments", wrapper.CreateDocumentCommentV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v2/documents/{id}/comments/{libraryID}", wrapper.DeleteDocumentCommentV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v2/documents/{id}/comments/{libraryID}", wrapper.UpdateDocumentCommentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/duplicate", wrapper.DuplicateDocumentV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/export/docx-url", wrapper.GetDocumentDocxURL)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/export/pdf", wrapper.ExportDocumentPDF)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/fill-in-schema", wrapper.GetDocumentFillInSchemaV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/finalize", wrapper.FinalizeDocumentV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/placeholder-options/{pid}", wrapper.GetDocumentPlaceholderOptionsV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/placeholders", wrapper.ListDocumentPlaceholderValuesV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/documents/{id}/placeholders/{pid}", wrapper.PutDocumentPlaceholderValueV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/reconstruct", wrapper.ReconstructDocumentV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/revisions/{rid}/url", wrapper.GetDocumentRevisionUrlV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/acquire", wrapper.AcquireDocumentSessionV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/force-release", wrapper.ForceReleaseDocumentSessionV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/heartbeat", wrapper.HeartbeatDocumentSessionV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/session/release", wrapper.ReleaseDocumentSessionV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/view", wrapper.ViewDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents", wrapper.ListDocumentsV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/stats", wrapper.DocumentStatsV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}", wrapper.GetDocumentV2)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/documents/{id}", wrapper.RenameDocumentV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/archive", wrapper.ArchiveDocumentV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/autosave/commit", wrapper.CommitDocumentAutosaveV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/autosave/presign", wrapper.PresignDocumentAutosaveV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints", wrapper.ListDocumentCheckpointsV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints", wrapper.CreateDocumentCheckpointV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints/{version}/restore", wrapper.RestoreDocumentCheckpointV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/comments", wrapper.ListDocumentCommentsV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/comments", wrapper.CreateDocumentCommentV2)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/documents/{id}/comments/{libraryID}", wrapper.DeleteDocumentCommentV2)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/documents/{id}/comments/{libraryID}", wrapper.UpdateDocumentCommentV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/duplicate", wrapper.DuplicateDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/export/docx-url", wrapper.GetDocumentDocxURL)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/export/pdf", wrapper.ExportDocumentPDF)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/fill-in-schema", wrapper.GetDocumentFillInSchemaV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/finalize", wrapper.FinalizeDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/placeholder-options/{pid}", wrapper.GetDocumentPlaceholderOptionsV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/placeholders", wrapper.ListDocumentPlaceholderValuesV2)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/documents/{id}/placeholders/{pid}", wrapper.PutDocumentPlaceholderValueV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/reconstruct", wrapper.ReconstructDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/revisions/{rid}/url", wrapper.GetDocumentRevisionUrlV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/acquire", wrapper.AcquireDocumentSessionV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/force-release", wrapper.ForceReleaseDocumentSessionV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/heartbeat", wrapper.HeartbeatDocumentSessionV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/release", wrapper.ReleaseDocumentSessionV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/view", wrapper.ViewDocumentV2)
 
 	return m
 }
@@ -2690,91 +2690,91 @@ func (response ViewDocumentV2200Response) VisitViewDocumentV2Response(w http.Res
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List documents for tenant
-	// (GET /api/v2/documents)
+	// (GET /api/v1/documents)
 	ListDocumentsV2(ctx context.Context, request ListDocumentsV2RequestObject) (ListDocumentsV2ResponseObject, error)
 	// Documents stats by status and area
-	// (GET /api/v2/documents/stats)
+	// (GET /api/v1/documents/stats)
 	DocumentStatsV2(ctx context.Context, request DocumentStatsV2RequestObject) (DocumentStatsV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id})
+	// (GET /api/v1/documents/{id})
 	GetDocumentV2(ctx context.Context, request GetDocumentV2RequestObject) (GetDocumentV2ResponseObject, error)
 
-	// (PATCH /api/v2/documents/{id})
+	// (PATCH /api/v1/documents/{id})
 	RenameDocumentV2(ctx context.Context, request RenameDocumentV2RequestObject) (RenameDocumentV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/archive)
+	// (POST /api/v1/documents/{id}/archive)
 	ArchiveDocumentV2(ctx context.Context, request ArchiveDocumentV2RequestObject) (ArchiveDocumentV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/autosave/commit)
+	// (POST /api/v1/documents/{id}/autosave/commit)
 	CommitDocumentAutosaveV2(ctx context.Context, request CommitDocumentAutosaveV2RequestObject) (CommitDocumentAutosaveV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/autosave/presign)
+	// (POST /api/v1/documents/{id}/autosave/presign)
 	PresignDocumentAutosaveV2(ctx context.Context, request PresignDocumentAutosaveV2RequestObject) (PresignDocumentAutosaveV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/checkpoints)
+	// (GET /api/v1/documents/{id}/checkpoints)
 	ListDocumentCheckpointsV2(ctx context.Context, request ListDocumentCheckpointsV2RequestObject) (ListDocumentCheckpointsV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/checkpoints)
+	// (POST /api/v1/documents/{id}/checkpoints)
 	CreateDocumentCheckpointV2(ctx context.Context, request CreateDocumentCheckpointV2RequestObject) (CreateDocumentCheckpointV2ResponseObject, error)
 	// Forward-only restore - clones the checkpoint rev into a new head revision
-	// (POST /api/v2/documents/{id}/checkpoints/{version}/restore)
+	// (POST /api/v1/documents/{id}/checkpoints/{version}/restore)
 	RestoreDocumentCheckpointV2(ctx context.Context, request RestoreDocumentCheckpointV2RequestObject) (RestoreDocumentCheckpointV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/comments)
+	// (GET /api/v1/documents/{id}/comments)
 	ListDocumentCommentsV2(ctx context.Context, request ListDocumentCommentsV2RequestObject) (ListDocumentCommentsV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/comments)
+	// (POST /api/v1/documents/{id}/comments)
 	CreateDocumentCommentV2(ctx context.Context, request CreateDocumentCommentV2RequestObject) (CreateDocumentCommentV2ResponseObject, error)
 
-	// (DELETE /api/v2/documents/{id}/comments/{libraryID})
+	// (DELETE /api/v1/documents/{id}/comments/{libraryID})
 	DeleteDocumentCommentV2(ctx context.Context, request DeleteDocumentCommentV2RequestObject) (DeleteDocumentCommentV2ResponseObject, error)
 
-	// (PATCH /api/v2/documents/{id}/comments/{libraryID})
+	// (PATCH /api/v1/documents/{id}/comments/{libraryID})
 	UpdateDocumentCommentV2(ctx context.Context, request UpdateDocumentCommentV2RequestObject) (UpdateDocumentCommentV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/duplicate)
+	// (POST /api/v1/documents/{id}/duplicate)
 	DuplicateDocumentV2(ctx context.Context, request DuplicateDocumentV2RequestObject) (DuplicateDocumentV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/export/docx-url)
+	// (GET /api/v1/documents/{id}/export/docx-url)
 	GetDocumentDocxURL(ctx context.Context, request GetDocumentDocxURLRequestObject) (GetDocumentDocxURLResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/export/pdf)
+	// (POST /api/v1/documents/{id}/export/pdf)
 	ExportDocumentPDF(ctx context.Context, request ExportDocumentPDFRequestObject) (ExportDocumentPDFResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/fill-in-schema)
+	// (GET /api/v1/documents/{id}/fill-in-schema)
 	GetDocumentFillInSchemaV2(ctx context.Context, request GetDocumentFillInSchemaV2RequestObject) (GetDocumentFillInSchemaV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/finalize)
+	// (POST /api/v1/documents/{id}/finalize)
 	FinalizeDocumentV2(ctx context.Context, request FinalizeDocumentV2RequestObject) (FinalizeDocumentV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/placeholder-options/{pid})
+	// (GET /api/v1/documents/{id}/placeholder-options/{pid})
 	GetDocumentPlaceholderOptionsV2(ctx context.Context, request GetDocumentPlaceholderOptionsV2RequestObject) (GetDocumentPlaceholderOptionsV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/placeholders)
+	// (GET /api/v1/documents/{id}/placeholders)
 	ListDocumentPlaceholderValuesV2(ctx context.Context, request ListDocumentPlaceholderValuesV2RequestObject) (ListDocumentPlaceholderValuesV2ResponseObject, error)
 
-	// (PUT /api/v2/documents/{id}/placeholders/{pid})
+	// (PUT /api/v1/documents/{id}/placeholders/{pid})
 	PutDocumentPlaceholderValueV2(ctx context.Context, request PutDocumentPlaceholderValueV2RequestObject) (PutDocumentPlaceholderValueV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/reconstruct)
+	// (POST /api/v1/documents/{id}/reconstruct)
 	ReconstructDocumentV2(ctx context.Context, request ReconstructDocumentV2RequestObject) (ReconstructDocumentV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/revisions/{rid}/url)
+	// (GET /api/v1/documents/{id}/revisions/{rid}/url)
 	GetDocumentRevisionUrlV2(ctx context.Context, request GetDocumentRevisionUrlV2RequestObject) (GetDocumentRevisionUrlV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/session/acquire)
+	// (POST /api/v1/documents/{id}/session/acquire)
 	AcquireDocumentSessionV2(ctx context.Context, request AcquireDocumentSessionV2RequestObject) (AcquireDocumentSessionV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/session/force-release)
+	// (POST /api/v1/documents/{id}/session/force-release)
 	ForceReleaseDocumentSessionV2(ctx context.Context, request ForceReleaseDocumentSessionV2RequestObject) (ForceReleaseDocumentSessionV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/session/heartbeat)
+	// (POST /api/v1/documents/{id}/session/heartbeat)
 	HeartbeatDocumentSessionV2(ctx context.Context, request HeartbeatDocumentSessionV2RequestObject) (HeartbeatDocumentSessionV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/session/release)
+	// (POST /api/v1/documents/{id}/session/release)
 	ReleaseDocumentSessionV2(ctx context.Context, request ReleaseDocumentSessionV2RequestObject) (ReleaseDocumentSessionV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/view)
+	// (GET /api/v1/documents/{id}/view)
 	ViewDocumentV2(ctx context.Context, request ViewDocumentV2RequestObject) (ViewDocumentV2ResponseObject, error)
 }
 
@@ -3642,66 +3642,66 @@ func (sh *strictHandler) ViewDocumentV2(w http.ResponseWriter, r *http.Request, 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"7Dxdc9yoln+F0u5DpkqKkkzurVq/+drxXe94E5ed5OVuqosWp7uZIFAAtd3j6f++BehbSC05dhxP3Se3",
+	"4JwDHM434LsgEWkmOHCtgqO7QCUbSLH9eZzRd1IKaX5nUmQgNQXbkwgC5q/eZRAcBUpLytfBPgwIaEyZ",
+	"hcGEUE0Fx+yygatlDmGJJ5a/Q6INXgpK4bWfppY4gQUlns59GEj4llMJJDj6l5tWTayeToPIF8/o5ULf",
+	"8S0wkUF/wVDy4T8lrIKj4D/immtxwbK44ld3Xg7bN/KpSPIUuL6gSl+BygRXntGphrT9Y2waJc3rPE2x",
+	"3FkWunGxlNh+Z21eU65hDbLsuaZ/DPRqoTEzXSshU6xd59/fBmEPtsMBN/Fi4MYoJckx3lxrrNUwc5a7",
+	"Ywl4WOImTNYz+HJnhs3Vw9LtcKUaJCxXMcqHYj97HDhONN3CNShFBT8/9SrRsUw2dAvkWLdmTrCGSNPU",
+	"7ATPGcNLBh0lrWmcDGn9ieBaCsaAlHN1szhMUQLWo5MaQvnHzj+TXErg+gq2dIQZZ0Kmp1jj/7n+8L41",
+	"8nKnvYMO0HmPUz9DLqVIQCmzpYZp1xxnaiP0JJ5cSrGiDGbjlWv+DNL8mSigtZQDz1MjlETilQ7CIOcE",
+	"5ELClsJNEAY4y6TYAgmMCBvRtD+NzSE5s7+zfMmo2rj2PAOpgNgPsVSCgYaGdNfT/ghpxrCGYtoDnP4I",
+	"HJdS1ev8lJG5UvQZsxzUmRR/AL+/SnTU+fw0aMzUt7RCZCq2d0TRJ7/9jQ17Ct9UpCY7mtpSqO+YgSnn",
+	"e0aBkWsm9HtBYNjwrgzYb5STpvSoBDMsvTvt9eDGF+iN3+/vnCcuSdvxIsWE9pDvbIXttUMWA4SN6U7h",
+	"wQVeAhtf/8B6NNzqSethZoh5S7G0p0y/O3MCKpE009YwBJeUCY1UvlSgY5UvE8F/z7kWKDMdmAhEMPpf",
+	"0JidikQhXRBFp9cXITLGgyfWHZoRATGaUouEkfHrIVKQmIGilcQphMiuM0T19oVI0mRT/oQMsLYfCJA2",
+	"2mY/XprwjZpZp5Rj7aKvFGeZ4VEpfU4aDsRB42IdFvswkUhfLspoahr+JV5DB73BgalUriyKZy0VYydT",
+	"osnGQ6e1hVNpXTukM4PToVfv61RiHw1Gb2bGXjgl3Dnn61RhHwaCw4dVcPSvabHx4Hbsw3kEBtc8l1Bf",
+	"sOZS8Mv3XCpegZhNxC+fc8kMyMAXj8HrbWQ/Z91QRiTw2XmU16Z6kqohf9Ax+9ZazLL61cynWP4B1k/z",
+	"3s4UPYr3blq5x3ffXimeyAOabB6HA5Vtfvz1D5qln0ctqGYwiW9tX/R4muO3NtOExvq3R5Gahud8aLEx",
+	"6JSvRD9APL48R5TThGKGiGiEgi+2r395id6pRGQCYZ1jhhSkNiZcS5xggRKRovPjl/9n8pRij4Ma//jy",
+	"PAiDbZmiBq9fvnr5yrrvDDjOaHAU/Pry1ctfiwVYhsc4Mcl0lAlGE7cJ+zCIcUbj7evY5aWYxZQvxe1g",
+	"n9KYJ6Diu/LngpL9POg4Mb/YTCSl8do02r+uha65WK2G1iFFrmG8M77rTT6pSjARKeRaHYaIM5ffR0VB",
+	"9xD4tHEtWIxtklq1TkWrigUT4WWRHaupCFVpoo3Q5FqwBpvCGbXHRiXOSXAUXFClS5uhPr+xImpMkgap",
+	"bOBJjUR/y0GabJu78LQoeDrjaVMYymlqVPu1r2g6TKQolzYI4VtH6G+vwoNU2+p9cv0ZKVuBQCvKNMgQ",
+	"YaYEMoqWaVXkZECQnQeyy1TGsHjmpspKRj2znpHyrwoX1bH74GZ1kew+6N/ug0R5wnICZSXVR2IpBAPM",
+	"g/3+i7HMzoVYiXrz6pU7ODHZsxUunGWMJla84t+VK9jVBKd44NahgbXm7W0WX41lffuAI/cOSjyjXhmH",
+	"pKjxBZRvMaMEu2m8/qHTeI8FwrkZiyaYCDeFX3/oFK4hRRnIlCqFhXXWqizhW2OCKpuDVkIibSuHNlle",
+	"K1uJrUzSl73PUhnfMmKvWucnU+3Vz63OP0Kr2sdN/1arZ6VWlX+2/k2h5a50dJgTZER0jn4V4Y5fvf4J",
+	"VTQwqFxFEF46EHd4Usbr7kih5kt1ApHnrtg7Tfj9wvm238WFXqxEzonlmY8JNuhONv21XoFZwhMs91sO",
+	"Sv9DkN0sCWsnbNx/StfJnXg7uWzmSO017Kduw36mpFVRflQmEAMRagHt4hC7XqE8AloEKj+pkM7nTq6F",
+	"wlswZiOlenjdJ7a/XPZxgfbMhNYMtCBY44VqHAL3ahgZcEL5epFnTGBSXJI5MMkwUO7kcBp4R08auL7h",
+	"v0OD7skpSiDNhMFcSMgY3vnicTOiyxOn8qiCt3WYQ3lbi0XNoTqE/Oxpa0eJgJygmzxMSFQvExXLrF1v",
+	"G7/cIWPvN4IRkOjPKtS0reKGu9N/r58oN7XhLwzkf/UhU6qWBgD9iSqx4C7vN00aM1gssSsLvn3tMQRw",
+	"mxmmFfKD/kSFIBnfXuzD2zdv+niFqCw2WG0McGrd1nfYlEyComs+bFQuHcAztypmMxZzNaHJ7KLwcAF8",
+	"rTfB0d/f2tJD8/PxjE1v8p2pPZjzLoQBCMolGxR+n8T7NK+pBrMF1Fdy7IJsIPmaCTq1dHVSwz+PkCAc",
+	"8vP2bkt/Wc9MJ4vrB774tCfOffF97TGO7s7PfaStFo34rijS72MJSgs5EmheOYCn2onQS3Rb3ZYapjzq",
+	"0788UpTS3zAzLXSzAY4+vEcnH96fXZyffEQvKpdNSYialu4XtDLrQRFK3HUxtAFMEGYSMNkh6wxB1Zxq",
+	"REEcbmbb/xbOhGgoDJTIZQKLWpwWxW7cI5jqztgzn7DJ3WkRlhVYgl5wuHHMq4IunJn4B8gv6MNVM+ji",
+	"IhIZekFXfqbDtxwzhfQGUL1sZHfrewM1T3Q1GLs1WN5O9+sSyZmQN1iSSHC2QwUnjCgxwaG3AAlbRLkW",
+	"CKMeq4LZ5kWk009YTgrgv5SPcmv66R3UPcKoh/VDxd7Hd4wuJZa789O9o1+cDHYr3bb9Sbjsdz7VtEdp",
+	"T3A5HhV3TLhHEc/dC/6LcOmHCfZDla9I7iY2EkedliBPXbJ7UGWG20xIbVpvI5NPTainn4rk9tPVxRMa",
+	"/ntGeXNDK5dmLgq21OCSHk6Na9R2cWtKAHTt0tt/vvuIPl1d2NPHMqqpAqGXZscGs1/TWZdp7isUGVkN",
+	"q8M7C1PKxOXp2TNL6zhRCc6K6/crnDMdHK0wU+ALzDOcgVyo4uVdBR8cvw3C6i6Y/bgArUH6L4NNSBi/",
+	"R7wTnGyA+Our9jBPUQ1VnWi4pPoI2mGg/4DFcqcnv80zkS9ew+Ir7A4fDzWBw7bydVbemklY8my+jl6e",
+	"niGbW0zUwTB4+8YDJLGGhX2iAbaQ+7dXnnrq2uQ4S5DrxQpTNmzmw+A2MgQjS9BZPKssamHEN6U8Nw7u",
+	"zav9iO6vKGMR5VEtZYf8wRll7JxfW/jnfoy1ohyzQs39du+sgPixUUAZopkUD2RN9rxMgZNd9JsV/h90",
+	"gu2R5eLiw0JpI9RaYq7sw9x7bIP/mmEHKGM4AZeZR8JOQsV32cRLAZc18geH+5SxdnaA6o9TgAZTp1UC",
+	"Gox0zzafuwlocqCWpyz3HTvlg2x4dtL07FK24kHzqImQkAiutMwTPVYgr4CezR2aJ+R7daU7vpPme2LW",
+	"WL6T/iTZU+qGfGC786svYJNAqIREIy1QcVZpEub5vC4f8EdThL0oQ8c4sYsbuXrkAKorlQ7vJ7LbJrC2",
+	"BfAXmAu9AYlyBRIZ86rKarst3HuLITeSapCoYMN9iiIlJ1dCJhBJYIDVWEhowK4c1M/L1DJy8xx1rIRc",
+	"UkKAfwevNoClXgIeMbT/XYL8/EyacKPgO3h1UKKehTDNX757WjVuxPKly13HQMafCDko+49RhvzSZwo3",
+	"z/bmJcVpjCXgKIV0CVJtaNZ5XuV8TrtN41vBRbqzqGqsL75LBIH9AMgKp5T13vn1useJFC8K1IHuaUQK",
+	"qLgoy0XlP8TooBWtaqA53r5pZZQJ1piJ9RB0/61du6++LpwIvqLrcdjqsvAITE66etGBKE7x1SSg+I7v",
+	"JwMWi4EZCL3rwHMR6zt/EzHdEYa9oVicZMxCnIVh/wnTZHBv8DaGUPxbp8nwlRmaBX8vZrXts9Y42RRG",
+	"t/44t4fEZSZjAY3wxrBtvnvN9SZONpivIcqwUjdCkmYXE2vKOw0i182WtBTI0lBGHvtV9RHIsNTNp7e+",
+	"rgHkjtWr2juGrNce3zUeT+2nQcXLnBMGE4HXYguSN94jHEJoCcs04MZ1Mxv71Mb1EH4pSlbJujgqt+mr",
+	"Gmof2IuuJa87dtlAY3xn/vwGuwHmdrFUfFf+PCf70c6mEkwG7GoLETe8o4sDRJZS3CiQERCqhYz8q2mj",
+	"JIIxvBQu/ImZSL7OgTd2GPrS1cNpqvs4ULmGacAewRmA5FjXTvQArDvanAAogZtoYDK8s6njsDP2rnE8",
+	"Pw54eFRnuaOVkFEZm4wjlHoWYWU8cXpwf8eUvQPaiVUOQMWEVmnDCrDOJUQrZqNk27YBzIyHqLe/aHEn",
+	"dK7Jhs0kpTw2FrPhYE1Hrly9u/Ud35k/tQHod8RGOXTXf/ngRO0kPN05b6hlClrSpITmQtNVUQj0tsV3",
+	"zU83qUoWqrRHxUpLwGnRnrl/gRk1k4FWW9v2KjAhas9camBgZruLU0LSSG0wETdRY7NuhPy6YuJm0CQW",
+	"gqgmwteHShbDvl+Q2zJrs8azjGKC/Zf9/wcAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -5,7 +5,7 @@ package docx_v2_test
 import (
 	"testing"
 
-	"metaldocs/internal/modules/templates_v2/domain"
+	"metaldocs/internal/modules/templates/domain"
 )
 
 func TestScaffoldCompiles(t *testing.T) {

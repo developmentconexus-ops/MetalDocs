@@ -16,12 +16,12 @@ test('autosave-crash real-blob replay advances current_revision_id', async ({ br
   await expect(tab1.locator('[data-status="saved"]')).toBeVisible({ timeout: 15_000 });
 
   const revBefore = await tab1.evaluate(async (id) => {
-    const res = await fetch(`/api/v2/documents/${id}`, { credentials: 'include' });
+    const res = await fetch(`/api/v1/documents/${id}`, { credentials: 'include' });
     const json = await res.json();
     return json.current_revision_id as string;
   }, docID);
 
-  await tab1.route(`**/api/v2/documents/${docID}/autosave/commit`, (route) => route.abort('failed'));
+  await tab1.route(`**/api/v1/documents/${docID}/autosave/commit`, (route) => route.abort('failed'));
 
   await tab1.locator('[data-editor-root]').click();
   await tab1.keyboard.type(' edit-for-crash-test');
@@ -35,7 +35,7 @@ test('autosave-crash real-blob replay advances current_revision_id', async ({ br
   await expect(tab2.locator('[data-status="saved"]')).toBeVisible({ timeout: 20_000 });
 
   const revAfter = await tab2.evaluate(async (id) => {
-    const res = await fetch(`/api/v2/documents/${id}`, { credentials: 'include' });
+    const res = await fetch(`/api/v1/documents/${id}`, { credentials: 'include' });
     const json = await res.json();
     return json.current_revision_id as string;
   }, docID);

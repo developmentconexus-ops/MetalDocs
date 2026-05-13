@@ -1,4 +1,4 @@
-package application
+﻿package application
 
 import (
 	"context"
@@ -127,3 +127,4 @@ func TestMembershipTxEmptyActorRejected(t *testing.T) {
 		t.Error("no SQL should execute when actor is empty")
 	}
 }
+

@@ -1,4 +1,4 @@
-ï»¿import { randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { test, expect, type APIRequestContext, type BrowserContext, type Page, type Request } from '@playwright/test';
 
@@ -56,7 +56,7 @@ function requireBaseURL(baseURL: string | undefined): string {
 }
 
 function isSubmitRequest(request: Request, docId: string): boolean {
-  return request.method() === 'POST' && request.url().includes(`/api/v2/documents/${docId}/submit`);
+  return request.method() === 'POST' && request.url().includes(`/api/v1/documents/${docId}/submit`);
 }
 
 function isSignoffRequest(request: Request): boolean {
@@ -64,7 +64,7 @@ function isSignoffRequest(request: Request): boolean {
     return false;
   }
   const url = request.url();
-  return url.includes('/api/v2/signoff') || url.includes('/signoff');
+  return url.includes('/api/v1/signoff') || url.includes('/signoff');
 }
 
 function stateBadge(page: Page) {
@@ -87,10 +87,10 @@ async function submitAsAuthor(page: Page, docId: string): Promise<{ request: Req
 
   const submitRequestPromise = page.waitForRequest((request) => isSubmitRequest(request, docId));
   const submitResponsePromise = page.waitForResponse(
-    (response) => response.request().method() === 'POST' && response.url().includes(`/api/v2/documents/${docId}/submit`),
+    (response) => response.request().method() === 'POST' && response.url().includes(`/api/v1/documents/${docId}/submit`),
   );
 
-  await page.getByRole('button', { name: 'Submeter para revisÃ£o' }).click();
+  await page.getByRole('button', { name: 'Submeter para revisão' }).click();
   await page.getByRole('button', { name: /^Submeter$/ }).click();
 
   const submitRequest = await submitRequestPromise;
@@ -168,8 +168,8 @@ test.describe.serial('happy_path', () => {
     const idempotencyKey = request.headerValue('idempotency-key');
     expect(idempotencyKey).toMatch(UUID_HEADER_RE);
 
-    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisÃ£o');
-    await expect(page.getByRole('button', { name: /Documento em revisÃ£o/i })).toBeVisible();
+    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisão');
+    await expect(page.getByRole('button', { name: /Documento em revisão/i })).toBeVisible();
   });
 
   test('reviewer signs stage 1', async ({ browser, baseURL }) => {
@@ -197,14 +197,14 @@ test.describe.serial('happy_path', () => {
     await loginAs(page, seeded.cookies, 'author');
     await page.goto(`/documents/${primaryDocId}`);
 
-    const timelineNodes = page.locator('section[aria-label="Timeline de aprovaÃ§Ã£o"] li');
+    const timelineNodes = page.locator('section[aria-label="Timeline de aprovação"] li');
     await expect(timelineNodes).toHaveCount(4);
     await expect(page.getByText(seeded.users.author.id)).toBeVisible();
     await expect(page.getByText(seeded.users.reviewer.id)).toBeVisible();
     await expect(page.getByText(seeded.users.approver.id)).toBeVisible();
   });
 
-  test('idempotent replay â€” same key returns Idempotent-Replay: true', async ({ page, request }) => {
+  test('idempotent replay — same key returns Idempotent-Replay: true', async ({ page, request }) => {
     const { request: firstSubmitRequest, responseBody } = await submitAsAuthor(page, secondaryDocId);
     const firstBody = firstSubmitRequest.postDataJSON() as SubmitBody;
     const idempotencyKey = firstSubmitRequest.headerValue('idempotency-key');
@@ -219,7 +219,7 @@ test.describe.serial('happy_path', () => {
       replayHeaders['If-Match'] = ifMatch;
     }
 
-    const replayResponse = await page.request.post(`/api/v2/documents/${secondaryDocId}/submit`, {
+    const replayResponse = await page.request.post(`/api/v1/documents/${secondaryDocId}/submit`, {
       data: firstBody,
       headers: replayHeaders,
     });
@@ -240,7 +240,7 @@ test.describe.serial('happy_path', () => {
     const firstBody = firstSubmitRequest.postDataJSON() as SubmitBody;
     const idempotencyKey = firstSubmitRequest.headerValue('idempotency-key') ?? randomUUID();
 
-    const response = await page.request.post(`/api/v2/documents/${docId}/submit`, {
+    const response = await page.request.post(`/api/v1/documents/${docId}/submit`, {
       data: {
         ...firstBody,
         content_hash: `${firstBody.content_hash}-mutated`,
@@ -266,7 +266,7 @@ test.describe.serial('happy_path', () => {
     const { request: firstSubmitRequest } = await submitAsAuthor(page, docId);
     const firstBody = firstSubmitRequest.postDataJSON() as SubmitBody;
 
-    const staleResponse = await page.request.post(`/api/v2/documents/${docId}/submit`, {
+    const staleResponse = await page.request.post(`/api/v1/documents/${docId}/submit`, {
       data: firstBody,
       headers: {
         'Idempotency-Key': randomUUID(),
@@ -277,10 +277,10 @@ test.describe.serial('happy_path', () => {
     expect(staleResponse.status()).toBe(412);
 
     await expect(page.locator('[data-testid="app-toast-error"], [role="alert"]')).toContainText(/documento foi alterado/i);
-    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisÃ£o');
+    await expect.poll(() => stateBadgeText(page), { timeout: 5000 }).toBe('Em revisão');
   });
 
-  test('governance event chain â€” exact types and order', async ({ request }) => {
+  test('governance event chain — exact types and order', async ({ request }) => {
     const events = await governanceEvents(request, {
       tenantId: seeded.tenantId,
       docId: primaryDocId,

@@ -109,14 +109,14 @@ function PendingRow({ item, rank }: { item: InboxItem; rank: number }) {
   );
 }
 
-// TODO: replace with real API data when /api/v2/approval/stats endpoint is available
+// TODO: replace with real API data when /api/v1/approval/stats endpoint is available
 const MOCK_STATS = [
   { label: 'Aprovados', value: '—', sub: 'esta semana', color: 'var(--success)' as const },
   { label: 'Devolvidos', value: '—', sub: 'aguardando', color: 'var(--warning)' as const },
   { label: 'Tempo médio', value: '—', sub: 'por decisão', color: 'var(--brand)' as const },
 ];
 
-// TODO: replace with real API data when /api/v2/activity or audit endpoint supports it
+// TODO: replace with real API data when /api/v1/activity or audit endpoint supports it
 const MOCK_ACTIVITY = [
   { who: 'Sistema', what: 'Nenhuma atividade recente carregada.', code: '', time: '' },
 ];

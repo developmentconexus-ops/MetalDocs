@@ -47,7 +47,7 @@ func (b *DocumentContextBuilder) loadDocumentSnapshot(ctx context.Context, tenan
 
 const activeInstanceSQL = `
 SELECT id FROM approval_instances
- WHERE tenant_id = $1::uuid AND document_v2_id = $2::uuid
+ WHERE tenant_id = $1::uuid AND document_id = $2::uuid
    AND status IN ('approved', 'in_progress')
  ORDER BY submitted_at DESC LIMIT 1`
 

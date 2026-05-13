@@ -30,7 +30,7 @@ test.describe('m_of_n quorum (2 of 3)', () => {
     const adminReq = adminCtx.request;
 
     // Create m_of_n route via API
-    const routeResp = await adminReq.post('/api/v2/routes', {
+    const routeResp = await adminReq.post('/api/v1/routes', {
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': randomUUID(),
@@ -142,7 +142,7 @@ test.describe('m_of_n quorum (2 of 3)', () => {
     await loginAs(page, seed.cookies, 'author');
 
     // Submit doc2 via API (UI navigation to doc2 may not exist in seed, use request)
-    const submitResp = await page.request.post(`/api/v2/documents/${doc2Id}/submit`, {
+    const submitResp = await page.request.post(`/api/v1/documents/${doc2Id}/submit`, {
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': randomUUID(),

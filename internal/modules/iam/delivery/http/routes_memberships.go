@@ -28,9 +28,9 @@ func NewMembershipHandler(svc *iamapp.AreaMembershipService) *MembershipHandler 
 }
 
 func (h *MembershipHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v2/iam/area-memberships", h.listMemberships)
-	mux.HandleFunc("POST /api/v2/iam/area-memberships", h.grantMembership)
-	mux.HandleFunc("DELETE /api/v2/iam/area-memberships", h.revokeMembership)
+	mux.HandleFunc("GET /api/v1/iam/area-memberships", h.listMemberships)
+	mux.HandleFunc("POST /api/v1/iam/area-memberships", h.grantMembership)
+	mux.HandleFunc("DELETE /api/v1/iam/area-memberships", h.revokeMembership)
 }
 
 func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Request) {

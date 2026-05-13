@@ -32,9 +32,9 @@ import (
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	jobscheduler "metaldocs/internal/modules/jobs/scheduler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
-	tv2app "metaldocs/internal/modules/templates_v2/application"
-	tv2http "metaldocs/internal/modules/templates_v2/delivery/http"
-	tv2repo "metaldocs/internal/modules/templates_v2/repository"
+	tv2app "metaldocs/internal/modules/templates/application"
+	tv2http "metaldocs/internal/modules/templates/delivery/http"
+	tv2repo "metaldocs/internal/modules/templates/repository"
 
 	"metaldocs/apps/api/internal/wiring"
 	auditapp "metaldocs/internal/modules/audit/application"
@@ -222,7 +222,7 @@ func main() {
 	}
 	iamdelivery.NewMembershipHandler(membershipService).RegisterRoutes(mux)
 
-	// Legacy templates module routes removed — templates_v2 owns /api/v2/templates/*
+	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
 	cdRepo := registryinfra.NewPostgresControlledDocumentRepository(deps.SQLDB)

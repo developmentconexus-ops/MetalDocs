@@ -26,7 +26,7 @@ func (f fakeViewService) GetViewURL(_ context.Context, _, _, _ string) (ViewResu
 }
 
 func newViewReq(docID string) *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents/"+docID+"/view", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/"+docID+"/view", nil)
 	req.SetPathValue("id", docID)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{}))

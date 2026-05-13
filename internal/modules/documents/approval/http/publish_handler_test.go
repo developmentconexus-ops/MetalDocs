@@ -45,8 +45,8 @@ func (f *fakeReadServicePublish) CountPendingForActor(_ context.Context, _ *sql.
 
 func publishTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v2/documents/{id}/publish", h.PublishHandler)
-	mux.HandleFunc("POST /api/v2/documents/{id}/schedule-publish", h.SchedulePublishHandler)
+	mux.HandleFunc("POST /api/v1/documents/{id}/publish", h.PublishHandler)
+	mux.HandleFunc("POST /api/v1/documents/{id}/schedule-publish", h.SchedulePublishHandler)
 	return mux
 }
 
@@ -96,7 +96,7 @@ func TestPublishHandler(t *testing.T) {
 			fakeRead := &fakeReadServicePublish{
 				inst: &domain.Instance{ID: "inst-1", DocumentID: "doc-1"},
 			}
-			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/publish", nil)
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/publish", nil)
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 			req.Header.Set("Idempotency-Key", "idem-1")
@@ -172,7 +172,7 @@ func TestSchedulePublishHandler(t *testing.T) {
 				}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/schedule-publish", strings.NewReader(`{"effective_from":"2026-05-01T12:00:00Z"}`))
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/schedule-publish", strings.NewReader(`{"effective_from":"2026-05-01T12:00:00Z"}`))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))

@@ -1,5 +1,5 @@
 paths:
-  /api/v2/controlled-documents:
+  /api/v1/controlled-documents:
     get:
       summary: List controlled documents
       tags: [registry]
@@ -72,7 +72,7 @@ paths:
         '409': { description: code_taken or domain conflict }
         '422': { description: template_invalid }
 
-  /api/v2/controlled-documents/preview-code:
+  /api/v1/controlled-documents/preview-code:
     get:
       summary: Preview the next auto-generated document code without allocating it
       tags: [registry]
@@ -96,7 +96,7 @@ paths:
         '400': { description: validation_error }
         '401': { description: unauthenticated }
 
-  /api/v2/controlled-documents/{id}:
+  /api/v1/controlled-documents/{id}:
     get:
       summary: Get controlled document by ID
       tags: [registry]
@@ -116,7 +116,7 @@ paths:
         '401': { description: unauthenticated }
         '404': { description: not_found }
 
-  /api/v2/controlled-documents/{id}/revisions:
+  /api/v1/controlled-documents/{id}/revisions:
     post:
       summary: Create a new revision for a controlled document
       tags: [registry]
@@ -148,7 +148,7 @@ paths:
         '404': { description: controlled_document_not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v2/controlled-documents/{id}/active-document:
+  /api/v1/controlled-documents/{id}/active-document:
     get:
       summary: Get the active document instance for a controlled document
       tags: [registry]
@@ -168,7 +168,7 @@ paths:
         '401': { description: unauthenticated }
         '404': { description: no_active_instance }
 
-  /api/v2/controlled-documents/{id}/obsolete:
+  /api/v1/controlled-documents/{id}/obsolete:
     put:
       summary: Mark controlled document as obsolete
       tags: [registry]
@@ -184,7 +184,7 @@ paths:
         '404': { description: not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v2/controlled-documents/{id}/supersede:
+  /api/v1/controlled-documents/{id}/supersede:
     put:
       summary: Mark controlled document as superseded
       tags: [registry]

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { computeSidebarModel } from '../src/plugins/mergefieldPlugin';
+import { computeSidebarModel } from '../src/plugins/sidebarModelData';
 
-describe('mergefieldPlugin.computeSidebarModel', () => {
+describe('sidebarModelData.computeSidebarModel', () => {
   it('returns used/missing/orphan segments', () => {
     const m = computeSidebarModel(
       [{ kind: 'var', ident: 'name', start: 0, end: 6, run_id: 'r0' }],

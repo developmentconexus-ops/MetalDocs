@@ -47,7 +47,7 @@ func TestProfilesHandler_ErrorEnvelopeContract(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/taxonomy/profiles/missing", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/profiles/missing", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -70,7 +70,7 @@ func TestProfilesHandler_UpdateUsesPatch(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPatch, "/api/v2/taxonomy/profiles/foo", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/taxonomy/profiles/foo", strings.NewReader(`{}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -85,7 +85,7 @@ func TestProfilesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/taxonomy/profiles", strings.NewReader(`{"code":"P1","familyCode":"F1","name":"Profile"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/profiles", strings.NewReader(`{"code":"P1","familyCode":"F1","name":"Profile"}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)

@@ -93,7 +93,7 @@ export function useDocumentSession(documentID: string) {
     // Acquire on mount.
     acquire();
     // Release on unmount + on page hide (best-effort -- browser may block async fetch).
-    const onHide = () => { if (stateRef.current.phase === 'writer') navigator.sendBeacon(`/api/v2/documents/${documentID}/session/release`, JSON.stringify({ session_id: (stateRef.current as any).sessionID })); };
+    const onHide = () => { if (stateRef.current.phase === 'writer') navigator.sendBeacon(`/api/v1/documents/${documentID}/session/release`, JSON.stringify({ session_id: (stateRef.current as any).sessionID })); };
     const onVisibilityChange = () => {
       if (document.hidden) {
         hiddenAtRef.current = Date.now();

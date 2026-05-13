@@ -17,7 +17,7 @@ test('export-pdf rate limit — 21st request in 1 min returns 429', async ({ pag
   const statuses = await page.evaluate(async ({ id, count }: { id: string; count: number }) => {
     const results: number[] = [];
     for (let i = 0; i < count; i++) {
-      const r = await fetch(`/api/v2/documents/${id}/export/pdf`, {
+      const r = await fetch(`/api/v1/documents/${id}/export/pdf`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ paper_size: 'A4' }),

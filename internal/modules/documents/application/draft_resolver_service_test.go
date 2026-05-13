@@ -7,7 +7,7 @@ import (
 
 	"metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/render/resolvers"
-	tmpldom "metaldocs/internal/modules/templates_v2/domain"
+	tmpldom "metaldocs/internal/modules/templates/domain"
 )
 
 // fakeComputedResolver is a resolver with configurable return value and call counter.

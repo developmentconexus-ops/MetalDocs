@@ -13,7 +13,7 @@ import (
 	"github.com/lib/pq"
 
 	"metaldocs/internal/modules/documents/domain"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"

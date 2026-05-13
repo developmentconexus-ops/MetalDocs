@@ -101,7 +101,7 @@ func listStuckInstances(ctx context.Context, db *sql.DB) ([]StuckInstance, error
 SELECT
     ai.id::text,
     ai.tenant_id::text,
-    ai.document_v2_id::text,
+    ai.document_id::text,
     ai.submitted_by,
     COALESCE(ar.on_eligibility_drift, '') AS drift_policy
 FROM approval_instances ai

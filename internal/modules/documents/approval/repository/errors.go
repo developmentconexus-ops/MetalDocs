@@ -26,7 +26,7 @@ var (
 
 // MapHints carries constraint-name hints for SQLSTATE 23505 disambiguation.
 type MapHints struct {
-	UniqueConstraint string // e.g. "ux_approval_instances_active"
+	UniqueConstraint string // e.g. "ux_approval_instances_active_document_id"
 }
 
 // MapPgError translates *pgconn.PgError to domain errors.
@@ -39,7 +39,9 @@ func MapPgError(err error, hints MapHints) error {
 	switch pgErr.Code {
 	case "23505": // unique_violation
 		switch pgErr.ConstraintName {
-		case "ux_approval_instances_active", "approval_instances_document_v2_id_idempotency_key_key":
+		case "ux_approval_instances_active",
+			"ux_approval_instances_active_document_id",
+			"approval_instances_document_id_idempotency_key_key":
 			return ErrDuplicateSubmission
 		case "approval_signoffs_approval_instance_id_actor_user_id_key",
 			"approval_signoffs_stage_instance_id_actor_user_id_key":

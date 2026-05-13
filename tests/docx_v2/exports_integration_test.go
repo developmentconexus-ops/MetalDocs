@@ -6,12 +6,12 @@ package docx_v2_test
 import "testing"
 
 // TestExportsV2_HappyPath drives the full PDF export happy path over HTTP:
-// POST /api/v2/documents/{id}/export/pdf (cold miss) →
+// POST /api/v1/documents/{id}/export/pdf (cold miss) →
 // assert 200, cached=false, signed_url non-empty, size_bytes > 0 →
 // verify row inserted in document_exports with matching composite_hash →
-// POST /api/v2/documents/{id}/export/pdf (warm hit, same content) →
+// POST /api/v1/documents/{id}/export/pdf (warm hit, same content) →
 // assert 200, cached=true, same storage_key returned →
-// GET /api/v2/documents/{id}/export/docx-url →
+// GET /api/v1/documents/{id}/export/docx-url →
 // assert 200, signed_url non-empty, revision_id matches current revision.
 //
 // Table-level effects checked after cold miss:

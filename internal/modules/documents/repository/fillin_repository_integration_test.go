@@ -11,7 +11,7 @@ import (
 
 	"metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/platform/tenant"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/tests/integration/testdb"
 )
 

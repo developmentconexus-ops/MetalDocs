@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -32,7 +32,7 @@ func NewPlaceholderOptionsHandler(schema placeholderOptionsSchemaReader, iam pla
 }
 
 func (h *PlaceholderOptionsHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v2/documents/{id}/placeholder-options/{pid}", h.HandleGetOptions)
+	mux.HandleFunc("GET /api/v1/documents/{id}/placeholder-options/{pid}", h.HandleGetOptions)
 }
 
 func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *http.Request) {

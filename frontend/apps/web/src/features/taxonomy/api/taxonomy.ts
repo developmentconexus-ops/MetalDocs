@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import { request as apiRequest } from "../../../lib/api/client";
 
-const BASE = "/api/v2/taxonomy";
+const BASE = "/api/v1/taxonomy";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return apiRequest<T>(`${BASE}${path}`, options);

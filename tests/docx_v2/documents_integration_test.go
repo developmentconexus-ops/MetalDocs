@@ -6,7 +6,7 @@ package docx_v2_test
 import "testing"
 
 // TestDocumentsV2_HappyPath_AllRoutes drives the owned document_filler happy path over HTTP:
-// POST /api/v2/documents -> POST /autosave/presign -> PUT S3 -> POST /autosave/commit
+// POST /api/v1/documents -> POST /autosave/presign -> PUT S3 -> POST /autosave/commit
 // -> POST /session/heartbeat -> POST /checkpoints -> GET /checkpoints
 // -> POST /checkpoints/{versionNum}/restore -> POST /session/release
 // -> POST /finalize -> POST /archive.

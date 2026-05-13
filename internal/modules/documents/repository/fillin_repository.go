@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 // FillInRepository manages document_placeholder_values rows.

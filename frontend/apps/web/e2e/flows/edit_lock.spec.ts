@@ -166,7 +166,7 @@ test.describe('edit_lock', () => {
     await submitAsAuthor(page, isolated);
 
     await loginAs(page, roleCookies(isolated), 'reviewer');
-    const response = await page.request.put(`/api/v2/documents/${isolated.docId}`, {
+    const response = await page.request.put(`/api/v1/documents/${isolated.docId}`, {
       data: { title: 'hacked' },
       headers: { 'If-Match': 'any' },
     });

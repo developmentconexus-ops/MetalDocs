@@ -38,7 +38,7 @@ func (f *fakeSubmitService) SubmitRevisionForReview(_ context.Context, _ *sql.DB
 
 func submitTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v2/documents/{id}/submit", h.SubmitHandler)
+	mux.HandleFunc("POST /api/v1/documents/{id}/submit", h.SubmitHandler)
 	return mux
 }
 
@@ -108,7 +108,7 @@ func TestSubmitHandler(t *testing.T) {
 			h := &Handler{submitSvc: svc}
 			mux := submitTestMux(h)
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/submit", strings.NewReader(tt.body))
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/submit", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))

@@ -67,7 +67,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 			"name":                fmt.Sprintf("FanoutE2E-%d", time.Now().UnixNano()),
 			"form_data":           map[string]any{},
 		}
-		resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v2/documents", body, map[string]string{
+		resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v1/documents", body, map[string]string{
 			"X-Tenant-ID": tenantID,
 			"X-User-ID":   userID,
 		})
@@ -88,7 +88,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 	t.Run("Submit", func(t *testing.T) {
 		body := map[string]any{"route_id": routeID, "content_hash": contentHash}
 		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v2/documents/%s/submit", baseURL, documentID), body, map[string]string{
+			fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), body, map[string]string{
 				"X-Tenant-ID":     tenantID,
 				"X-User-ID":       userID,
 				"Idempotency-Key": "fanout-e2e-submit-1",
@@ -110,7 +110,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 	// Step 3: Fetch first stage ID
 	t.Run("GetFirstStage", func(t *testing.T) {
 		resp, raw := doJSONRequest(t, client, http.MethodGet,
-			fmt.Sprintf("%s/api/v2/approval/instances/%s", baseURL, instanceID), nil, map[string]string{
+			fmt.Sprintf("%s/api/v1/approval/instances/%s", baseURL, instanceID), nil, map[string]string{
 				"X-Tenant-ID": tenantID,
 				"X-User-ID":   userID,
 			})
@@ -135,7 +135,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 	t.Run("Signoff", func(t *testing.T) {
 		body := map[string]any{"decision": "signoff", "comment": "LGTM"}
 		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v2/approval/instances/%s/stages/%s/decision", baseURL, instanceID, stageID),
+			fmt.Sprintf("%s/api/v1/approval/instances/%s/stages/%s/decision", baseURL, instanceID, stageID),
 			body, map[string]string{
 				"X-Tenant-ID": tenantID,
 				"X-User-ID":   approverID,
@@ -149,7 +149,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 	t.Run("Approve", func(t *testing.T) {
 		body := map[string]any{"decision": "approve"}
 		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v2/approval/instances/%s/approve", baseURL, instanceID),
+			fmt.Sprintf("%s/api/v1/approval/instances/%s/approve", baseURL, instanceID),
 			body, map[string]string{
 				"X-Tenant-ID": tenantID,
 				"X-User-ID":   approverID,
@@ -162,7 +162,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 	// Step 6: Publish
 	t.Run("Publish", func(t *testing.T) {
 		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v2/documents/%s/publish", baseURL, documentID), nil, map[string]string{
+			fmt.Sprintf("%s/api/v1/documents/%s/publish", baseURL, documentID), nil, map[string]string{
 				"X-Tenant-ID": tenantID,
 				"X-User-ID":   userID,
 			})
@@ -183,7 +183,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 
 	t.Run("VerifySnapshotFrozen", func(t *testing.T) {
 		resp, raw := doJSONRequest(t, client, http.MethodGet,
-			fmt.Sprintf("%s/api/v2/documents/%s/snapshot", baseURL, documentID), nil, map[string]string{
+			fmt.Sprintf("%s/api/v1/documents/%s/snapshot", baseURL, documentID), nil, map[string]string{
 				"X-Tenant-ID": tenantID,
 				"X-User-ID":   userID,
 			})

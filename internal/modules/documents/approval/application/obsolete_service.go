@@ -111,7 +111,7 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, db *sql.DB, req Mark
 		UPDATE approval_instances
 		   SET status       = 'cancelled',
 		       completed_at = now()
-		 WHERE document_v2_id = $1
+		 WHERE document_id = $1
 		   AND status         = 'in_progress'`,
 		req.DocumentID,
 	)

@@ -33,7 +33,7 @@ func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/taxonomy/families/missing", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/families/missing", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -55,7 +55,7 @@ func TestFamiliesHandler_ListReturns200(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/taxonomy/families", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/taxonomy/families", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -69,7 +69,7 @@ func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

@@ -18,7 +18,7 @@ import (
 
 func obsoleteTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v2/documents/{id}/obsolete", h.ObsoleteHandler)
+	mux.HandleFunc("POST /api/v1/documents/{id}/obsolete", h.ObsoleteHandler)
 	return mux
 }
 
@@ -76,7 +76,7 @@ func TestObsoleteHandler(t *testing.T) {
 				return application.MarkObsoleteResult{PriorStatus: "published"}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-3/obsolete", strings.NewReader(tt.body))
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-3/obsolete", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))

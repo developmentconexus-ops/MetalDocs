@@ -34,8 +34,13 @@ func TestMapPgError(t *testing.T) {
 			wantTarget: ErrDuplicateSubmission,
 		},
 		{
+			name:       "unique_active_instance_document_id",
+			err:        makePgErr("23505", "ux_approval_instances_active_document_id", ""),
+			wantTarget: ErrDuplicateSubmission,
+		},
+		{
 			name:       "unique_idempotency_key",
-			err:        makePgErr("23505", "approval_instances_document_v2_id_idempotency_key_key", ""),
+			err:        makePgErr("23505", "approval_instances_document_id_idempotency_key_key", ""),
 			wantTarget: ErrDuplicateSubmission,
 		},
 		{
@@ -118,7 +123,7 @@ type fakeResult struct {
 }
 
 func (f fakeResult) LastInsertId() (int64, error) { return 0, nil }
-func (f fakeResult) RowsAffected() (int64, error)  { return f.rowsAffected, nil }
+func (f fakeResult) RowsAffected() (int64, error) { return f.rowsAffected, nil }
 
 // ---------------------------------------------------------------------------
 // TestUpdateStageStatusOCC — verify ErrStageNotActive on 0 rows affected

@@ -452,59 +452,7 @@ func TestValidateLegacyCutoverReady_DBError(t *testing.T) {
 	}
 }
 
-// ============================================================
-// 9. WithMembershipContext — GUC failure paths
-//
-// We reuse recordingConn.failAt to inject failures at specific statements.
-// ============================================================
-
-func TestMembershipTx_SetRoleFailure(t *testing.T) {
-	conn := &recordingConn{
-		failAt: "SET LOCAL ROLE metaldocs_membership_writer",
-	}
-	db := newTestDB(t, conn)
-
-	err := WithMembershipContext(context.Background(), db, "actor-1", "cap", func(_ *sql.Tx) error {
-		return nil
-	})
-	if err == nil {
-		t.Fatal("expected error when SET LOCAL ROLE fails")
-	}
-	if !strings.Contains(err.Error(), "SET LOCAL ROLE") {
-		t.Errorf("error should mention SET LOCAL ROLE; got %v", err)
-	}
-}
-
-func TestMembershipTx_SetActorIDFailure(t *testing.T) {
-	conn := &recordingConn{
-		failAt: "SET LOCAL metaldocs.actor_id = $1",
-	}
-	db := newTestDB(t, conn)
-
-	err := WithMembershipContext(context.Background(), db, "actor-1", "cap", func(_ *sql.Tx) error {
-		return nil
-	})
-	if err == nil {
-		t.Fatal("expected error when SET LOCAL actor_id fails")
-	}
-}
-
-func TestMembershipTx_SetCapabilityFailure(t *testing.T) {
-	conn := &recordingConn{
-		failAt: "SET LOCAL metaldocs.verified_capability = $1",
-	}
-	db := newTestDB(t, conn)
-
-	err := WithMembershipContext(context.Background(), db, "actor-1", "cap", func(_ *sql.Tx) error {
-		return nil
-	})
-	if err == nil {
-		t.Fatal("expected error when SET LOCAL capability fails")
-	}
-}
-
-// ============================================================
-// 10. SubmitRevisionForReview — error paths
+// ============================================================`r`n// 10. SubmitRevisionForReview — error paths
 // ============================================================
 
 // submitRouteNotFoundConn returns empty rows for approval_routes (simulates not found).
@@ -2799,88 +2747,7 @@ func TestSubmitRevisionForReview_StageQueryError(t *testing.T) {
 	}
 }
 
-// ============================================================
-// WithMembershipContext — panic recovery path
-// ============================================================
-
-func TestMembershipTx_PanicRecovery(t *testing.T) {
-	conn := &recordingConn{}
-	db := newTestDB(t, conn)
-
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic to propagate after rollback")
-		}
-	}()
-
-	_ = WithMembershipContext(context.Background(), db, "actor-1", "cap", func(_ *sql.Tx) error {
-		panic("test panic")
-	})
-}
-
-// ============================================================
-// WithMembershipContext — commit failure path
-// ============================================================
-
-func TestMembershipTx_CommitError(t *testing.T) {
-	// The commit error path is at membership_tx.go:67.
-	// We need a conn whose Commit fails. Use a separate conn.
-	commitConn := &membershipCommitFailConn{}
-	commitDB := newMembershipCommitFailDB(t, commitConn)
-
-	err := WithMembershipContext(context.Background(), commitDB, "actor-1", "cap", func(_ *sql.Tx) error {
-		return nil
-	})
-	if err == nil {
-		t.Fatal("expected commit error; got nil")
-	}
-	if !strings.Contains(err.Error(), "commit") {
-		t.Errorf("error should mention commit; got %v", err)
-	}
-}
-
-type membershipCommitFailConn struct{}
-
-type membershipCommitFailStmt struct{}
-
-func (s *membershipCommitFailStmt) Close() error  { return nil }
-func (s *membershipCommitFailStmt) NumInput() int { return -1 }
-func (s *membershipCommitFailStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	return noopResult{}, nil
-}
-func (s *membershipCommitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	return emptyRows{}, nil
-}
-
-func (c *membershipCommitFailConn) Prepare(_ string) (driver.Stmt, error) {
-	return &membershipCommitFailStmt{}, nil
-}
-func (c *membershipCommitFailConn) Close() error              { return nil }
-func (c *membershipCommitFailConn) Begin() (driver.Tx, error) { return c, nil }
-func (c *membershipCommitFailConn) Commit() error             { return errors.New("commit failed") }
-func (c *membershipCommitFailConn) Rollback() error           { return nil }
-
-type membershipCommitFailDriver struct{ conn *membershipCommitFailConn }
-
-func (d *membershipCommitFailDriver) Open(_ string) (driver.Conn, error) { return d.conn, nil }
-
-var membershipCommitFailDBCounter int
-
-func newMembershipCommitFailDB(t *testing.T, conn *membershipCommitFailConn) *sql.DB {
-	t.Helper()
-	membershipCommitFailDBCounter++
-	name := fmt.Sprintf("membership_commit_fail_%d", membershipCommitFailDBCounter)
-	sql.Register(name, &membershipCommitFailDriver{conn: conn})
-	db, err := sql.Open(name, "")
-	if err != nil {
-		t.Fatalf("open membership commit fail db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	return db
-}
-
-// ============================================================
-// RecordSignoff — activeStage == nil (no active stage)
+// ============================================================`r`n// RecordSignoff — activeStage == nil (no active stage)
 // ============================================================
 
 // buildAllCompletedInstance returns an instance where all stages are Completed (no active stage).

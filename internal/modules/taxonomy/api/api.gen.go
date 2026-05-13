@@ -570,52 +570,52 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /api/v2/taxonomy/areas)
+	// (GET /api/v1/taxonomy/areas)
 	ListTaxonomyAreasV2(w http.ResponseWriter, r *http.Request)
 
-	// (POST /api/v2/taxonomy/areas)
+	// (POST /api/v1/taxonomy/areas)
 	CreateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v2/taxonomy/areas/{code})
+	// (DELETE /api/v1/taxonomy/areas/{code})
 	ArchiveTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v2/taxonomy/areas/{code})
+	// (GET /api/v1/taxonomy/areas/{code})
 	GetTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PUT /api/v2/taxonomy/areas/{code})
+	// (PUT /api/v1/taxonomy/areas/{code})
 	UpdateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v2/taxonomy/families)
+	// (GET /api/v1/taxonomy/families)
 	ListTaxonomyFamiliesV2(w http.ResponseWriter, r *http.Request, params ListTaxonomyFamiliesV2Params)
 
-	// (POST /api/v2/taxonomy/families)
+	// (POST /api/v1/taxonomy/families)
 	CreateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v2/taxonomy/families/{code})
+	// (DELETE /api/v1/taxonomy/families/{code})
 	DeactivateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v2/taxonomy/families/{code})
+	// (GET /api/v1/taxonomy/families/{code})
 	GetTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PATCH /api/v2/taxonomy/families/{code})
+	// (PATCH /api/v1/taxonomy/families/{code})
 	UpdateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v2/taxonomy/profiles)
+	// (GET /api/v1/taxonomy/profiles)
 	ListTaxonomyProfilesV2(w http.ResponseWriter, r *http.Request)
 
-	// (POST /api/v2/taxonomy/profiles)
+	// (POST /api/v1/taxonomy/profiles)
 	CreateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v2/taxonomy/profiles/{code})
+	// (DELETE /api/v1/taxonomy/profiles/{code})
 	ArchiveTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (GET /api/v2/taxonomy/profiles/{code})
+	// (GET /api/v1/taxonomy/profiles/{code})
 	GetTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PATCH /api/v2/taxonomy/profiles/{code})
+	// (PATCH /api/v1/taxonomy/profiles/{code})
 	UpdateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string)
 
-	// (PUT /api/v2/taxonomy/profiles/{code}/default-template)
+	// (PUT /api/v1/taxonomy/profiles/{code}/default-template)
 	SetTaxonomyProfileDefaultTemplateV2(w http.ResponseWriter, r *http.Request, code string)
 }
 
@@ -1111,22 +1111,22 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/taxonomy/areas", wrapper.ListTaxonomyAreasV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/taxonomy/areas", wrapper.CreateTaxonomyAreaV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v2/taxonomy/areas/{code}", wrapper.ArchiveTaxonomyAreaV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/taxonomy/areas/{code}", wrapper.GetTaxonomyAreaV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/taxonomy/areas/{code}", wrapper.UpdateTaxonomyAreaV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/taxonomy/families", wrapper.ListTaxonomyFamiliesV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/taxonomy/families", wrapper.CreateTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v2/taxonomy/families/{code}", wrapper.DeactivateTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/taxonomy/families/{code}", wrapper.GetTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v2/taxonomy/families/{code}", wrapper.UpdateTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/taxonomy/profiles", wrapper.ListTaxonomyProfilesV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/taxonomy/profiles", wrapper.CreateTaxonomyProfileV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v2/taxonomy/profiles/{code}", wrapper.ArchiveTaxonomyProfileV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/taxonomy/profiles/{code}", wrapper.GetTaxonomyProfileV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v2/taxonomy/profiles/{code}", wrapper.UpdateTaxonomyProfileV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/taxonomy/profiles/{code}/default-template", wrapper.SetTaxonomyProfileDefaultTemplateV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.ListTaxonomyAreasV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.CreateTaxonomyAreaV2)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.ArchiveTaxonomyAreaV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.GetTaxonomyAreaV2)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.UpdateTaxonomyAreaV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.ListTaxonomyFamiliesV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.CreateTaxonomyFamilyV2)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.DeactivateTaxonomyFamilyV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.GetTaxonomyFamilyV2)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.UpdateTaxonomyFamilyV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.ListTaxonomyProfilesV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.CreateTaxonomyProfileV2)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.ArchiveTaxonomyProfileV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.GetTaxonomyProfileV2)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.UpdateTaxonomyProfileV2)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}/default-template", wrapper.SetTaxonomyProfileDefaultTemplateV2)
 
 	return m
 }
@@ -1457,52 +1457,52 @@ func (response SetTaxonomyProfileDefaultTemplateV2200Response) VisitSetTaxonomyP
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
-	// (GET /api/v2/taxonomy/areas)
+	// (GET /api/v1/taxonomy/areas)
 	ListTaxonomyAreasV2(ctx context.Context, request ListTaxonomyAreasV2RequestObject) (ListTaxonomyAreasV2ResponseObject, error)
 
-	// (POST /api/v2/taxonomy/areas)
+	// (POST /api/v1/taxonomy/areas)
 	CreateTaxonomyAreaV2(ctx context.Context, request CreateTaxonomyAreaV2RequestObject) (CreateTaxonomyAreaV2ResponseObject, error)
 
-	// (DELETE /api/v2/taxonomy/areas/{code})
+	// (DELETE /api/v1/taxonomy/areas/{code})
 	ArchiveTaxonomyAreaV2(ctx context.Context, request ArchiveTaxonomyAreaV2RequestObject) (ArchiveTaxonomyAreaV2ResponseObject, error)
 
-	// (GET /api/v2/taxonomy/areas/{code})
+	// (GET /api/v1/taxonomy/areas/{code})
 	GetTaxonomyAreaV2(ctx context.Context, request GetTaxonomyAreaV2RequestObject) (GetTaxonomyAreaV2ResponseObject, error)
 
-	// (PUT /api/v2/taxonomy/areas/{code})
+	// (PUT /api/v1/taxonomy/areas/{code})
 	UpdateTaxonomyAreaV2(ctx context.Context, request UpdateTaxonomyAreaV2RequestObject) (UpdateTaxonomyAreaV2ResponseObject, error)
 
-	// (GET /api/v2/taxonomy/families)
+	// (GET /api/v1/taxonomy/families)
 	ListTaxonomyFamiliesV2(ctx context.Context, request ListTaxonomyFamiliesV2RequestObject) (ListTaxonomyFamiliesV2ResponseObject, error)
 
-	// (POST /api/v2/taxonomy/families)
+	// (POST /api/v1/taxonomy/families)
 	CreateTaxonomyFamilyV2(ctx context.Context, request CreateTaxonomyFamilyV2RequestObject) (CreateTaxonomyFamilyV2ResponseObject, error)
 
-	// (DELETE /api/v2/taxonomy/families/{code})
+	// (DELETE /api/v1/taxonomy/families/{code})
 	DeactivateTaxonomyFamilyV2(ctx context.Context, request DeactivateTaxonomyFamilyV2RequestObject) (DeactivateTaxonomyFamilyV2ResponseObject, error)
 
-	// (GET /api/v2/taxonomy/families/{code})
+	// (GET /api/v1/taxonomy/families/{code})
 	GetTaxonomyFamilyV2(ctx context.Context, request GetTaxonomyFamilyV2RequestObject) (GetTaxonomyFamilyV2ResponseObject, error)
 
-	// (PATCH /api/v2/taxonomy/families/{code})
+	// (PATCH /api/v1/taxonomy/families/{code})
 	UpdateTaxonomyFamilyV2(ctx context.Context, request UpdateTaxonomyFamilyV2RequestObject) (UpdateTaxonomyFamilyV2ResponseObject, error)
 
-	// (GET /api/v2/taxonomy/profiles)
+	// (GET /api/v1/taxonomy/profiles)
 	ListTaxonomyProfilesV2(ctx context.Context, request ListTaxonomyProfilesV2RequestObject) (ListTaxonomyProfilesV2ResponseObject, error)
 
-	// (POST /api/v2/taxonomy/profiles)
+	// (POST /api/v1/taxonomy/profiles)
 	CreateTaxonomyProfileV2(ctx context.Context, request CreateTaxonomyProfileV2RequestObject) (CreateTaxonomyProfileV2ResponseObject, error)
 
-	// (DELETE /api/v2/taxonomy/profiles/{code})
+	// (DELETE /api/v1/taxonomy/profiles/{code})
 	ArchiveTaxonomyProfileV2(ctx context.Context, request ArchiveTaxonomyProfileV2RequestObject) (ArchiveTaxonomyProfileV2ResponseObject, error)
 
-	// (GET /api/v2/taxonomy/profiles/{code})
+	// (GET /api/v1/taxonomy/profiles/{code})
 	GetTaxonomyProfileV2(ctx context.Context, request GetTaxonomyProfileV2RequestObject) (GetTaxonomyProfileV2ResponseObject, error)
 
-	// (PATCH /api/v2/taxonomy/profiles/{code})
+	// (PATCH /api/v1/taxonomy/profiles/{code})
 	UpdateTaxonomyProfileV2(ctx context.Context, request UpdateTaxonomyProfileV2RequestObject) (UpdateTaxonomyProfileV2ResponseObject, error)
 
-	// (PUT /api/v2/taxonomy/profiles/{code}/default-template)
+	// (PUT /api/v1/taxonomy/profiles/{code}/default-template)
 	SetTaxonomyProfileDefaultTemplateV2(ctx context.Context, request SetTaxonomyProfileDefaultTemplateV2RequestObject) (SetTaxonomyProfileDefaultTemplateV2ResponseObject, error)
 }
 
@@ -1946,43 +1946,43 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplateV2(w http.ResponseWrit
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
