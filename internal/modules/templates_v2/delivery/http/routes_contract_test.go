@@ -12,8 +12,8 @@ import (
 
 func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{
-		ID:            "tpl-1",
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{
+		ID:            "11111111-1111-1111-1111-111111111111",
 		TenantID:      "tenant-a",
 		Key:           "contract",
 		Name:          "Contract",
@@ -23,10 +23,10 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 	}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:             "ver-1",
-		TemplateID:     "tpl-1",
+		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 		ContentHash:    "hash_abc",
 		AuthorID:       "original-author",
 		CreatedAt:      fakeClock{}.Now(),
@@ -42,20 +42,20 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 	}{
 		{name: "listTemplatesV2", method: http.MethodGet, path: "/api/v2/templates", want: http.StatusOK},
 		{name: "createTemplateV2", method: http.MethodPost, path: "/api/v2/templates", body: jsonBody(t, map[string]any{"key": "new-contract", "name": "New Contract", "description": "Default"}), want: http.StatusCreated},
-		{name: "getTemplateVersionV2", method: http.MethodGet, path: "/api/v2/templates/tpl-1/versions/1", want: http.StatusOK},
-		{name: "presignTemplateDocxUploadUrlV2", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/1/docx-upload-url", want: http.StatusOK},
-		{name: "presignTemplateSchemaUploadUrlV2", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/1/schema-upload-url", want: http.StatusOK},
-		{name: "redirectSignedUrlV2", method: http.MethodGet, path: "/api/v2/signed?key=templates/tpl-1/versions/1.docx", want: http.StatusFound},
-		{name: "saveTemplateDraftV2", method: http.MethodPut, path: "/api/v2/templates/tpl-1/versions/1/draft", body: jsonBody(t, map[string]any{
+		{name: "getTemplateVersionV2", method: http.MethodGet, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1", want: http.StatusOK},
+		{name: "presignTemplateDocxUploadUrlV2", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/docx-upload-url", want: http.StatusOK},
+		{name: "presignTemplateSchemaUploadUrlV2", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/schema-upload-url", want: http.StatusOK},
+		{name: "redirectSignedUrlV2", method: http.MethodGet, path: "/api/v2/signed?key=templates/11111111-1111-1111-1111-111111111111/versions/1.docx", want: http.StatusFound},
+		{name: "saveTemplateDraftV2", method: http.MethodPut, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: jsonBody(t, map[string]any{
 			"expected_lock_version": 0,
-			"docx_storage_key":      "templates/tpl-1/versions/1.docx",
-			"schema_storage_key":    "templates/tpl-1/versions/1.schema.json",
+			"docx_storage_key":      "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
+			"schema_storage_key":    "templates/11111111-1111-1111-1111-111111111111/versions/1.schema.json",
 			"docx_content_hash":     "hash_saved",
 			"schema_content_hash":   "schema_hash",
 		}), want: http.StatusNoContent},
-		{name: "publishTemplateVersionV2", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/1/publish", body: jsonBody(t, map[string]any{
-			"docx_key":   "templates/tpl-1/versions/1.docx",
-			"schema_key": "templates/tpl-1/versions/1.schema.json",
+		{name: "publishTemplateVersionV2", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: jsonBody(t, map[string]any{
+			"docx_key":   "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
+			"schema_key": "templates/11111111-1111-1111-1111-111111111111/versions/1.schema.json",
 		}), want: http.StatusOK},
 	}
 
@@ -75,13 +75,13 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 
 func TestGeneratedTemplatesRoutes_RejectInvalidBodies(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:             "ver-1",
-		TemplateID:     "tpl-1",
+		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
@@ -93,10 +93,10 @@ func TestGeneratedTemplatesRoutes_RejectInvalidBodies(t *testing.T) {
 	}{
 		{name: "create unknown field", method: http.MethodPost, path: "/api/v2/templates", body: `{"key":"contract","name":"Contract","extra":true}`},
 		{name: "create missing key", method: http.MethodPost, path: "/api/v2/templates", body: `{"name":"Contract"}`},
-		{name: "draft unknown field", method: http.MethodPut, path: "/api/v2/templates/tpl-1/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","schema_storage_key":"s","docx_content_hash":"h","schema_content_hash":"sh","extra":true}`},
-		{name: "draft missing schema key", method: http.MethodPut, path: "/api/v2/templates/tpl-1/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","docx_content_hash":"h","schema_content_hash":"sh"}`},
-		{name: "publish unknown field", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/1/publish", body: `{"docx_key":"d","schema_key":"s","extra":true}`},
-		{name: "publish missing docx key", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/1/publish", body: `{"schema_key":"s"}`},
+		{name: "draft unknown field", method: http.MethodPut, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","schema_storage_key":"s","docx_content_hash":"h","schema_content_hash":"sh","extra":true}`},
+		{name: "draft missing schema key", method: http.MethodPut, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","docx_content_hash":"h","schema_content_hash":"sh"}`},
+		{name: "publish unknown field", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"docx_key":"d","schema_key":"s","extra":true}`},
+		{name: "publish missing docx key", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s"}`},
 	}
 
 	for _, tt := range tests {
@@ -115,13 +115,13 @@ func TestGeneratedTemplatesRoutes_RejectInvalidBodies(t *testing.T) {
 
 func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:             "ver-1",
-		TemplateID:     "tpl-1",
+		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
@@ -133,12 +133,12 @@ func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 	}{
 		{name: "listTemplatesV2 invalid limit", method: http.MethodGet, path: "/api/v2/templates?limit=bad"},
 		{name: "createTemplateV2 missing key", method: http.MethodPost, path: "/api/v2/templates", body: `{"name":"Contract"}`},
-		{name: "getTemplateVersionV2 invalid version", method: http.MethodGet, path: "/api/v2/templates/tpl-1/versions/not-int"},
-		{name: "presignTemplateDocxUploadUrlV2 invalid version", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/not-int/docx-upload-url"},
-		{name: "presignTemplateSchemaUploadUrlV2 invalid version", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/not-int/schema-upload-url"},
+		{name: "getTemplateVersionV2 invalid version", method: http.MethodGet, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/not-int"},
+		{name: "presignTemplateDocxUploadUrlV2 invalid version", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/not-int/docx-upload-url"},
+		{name: "presignTemplateSchemaUploadUrlV2 invalid version", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/not-int/schema-upload-url"},
 		{name: "redirectSignedUrlV2 missing key", method: http.MethodGet, path: "/api/v2/signed"},
-		{name: "saveTemplateDraftV2 missing schema key", method: http.MethodPut, path: "/api/v2/templates/tpl-1/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","docx_content_hash":"h","schema_content_hash":"sh"}`},
-		{name: "publishTemplateVersionV2 missing docx key", method: http.MethodPost, path: "/api/v2/templates/tpl-1/versions/1/publish", body: `{"schema_key":"s"}`},
+		{name: "saveTemplateDraftV2 missing schema key", method: http.MethodPut, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","docx_content_hash":"h","schema_content_hash":"sh"}`},
+		{name: "publishTemplateVersionV2 missing docx key", method: http.MethodPost, path: "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s"}`},
 	}
 
 	for _, tt := range tests {
@@ -163,3 +163,4 @@ func jsonBody(t *testing.T, body map[string]any) []byte {
 	}
 	return raw
 }
+

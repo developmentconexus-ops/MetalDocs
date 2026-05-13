@@ -11,3 +11,4 @@ func TestTemplatesHandler_ErrorHandlerFuncIsProblemJSON(t *testing.T) {
 	_ = httptest.NewRecorder()
 	_ = http.StatusBadRequest
 }
+

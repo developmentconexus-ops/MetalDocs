@@ -570,21 +570,60 @@ type ServerInterface interface {
 	// Create template (docx-v2)
 	// (POST /api/v2/templates)
 	CreateTemplateV2(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v2/templates/v2/placeholder-catalog)
+	ListTemplatePlaceholderCatalogV2(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v2/templates/{id})
+	GetTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v2/templates/{id}/approval-config)
+	UpsertTemplateApprovalConfigV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v2/templates/{id}/archive)
+	ArchiveTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v2/templates/{id}/audit)
+	ListTemplateAuditV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v2/templates/{id}/versions)
+	CreateTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Get template version metadata (docx-v2)
 	// (GET /api/v2/templates/{id}/versions/{n})
 	GetTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/approve)
+	ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/autosave/commit)
+	CommitTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/autosave/presign)
+	PresignTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Presign PUT URL for draft .docx upload
 	// (POST /api/v2/templates/{id}/versions/{n}/docx-upload-url)
 	PresignTemplateDocxUploadUrlV2(w http.ResponseWriter, r *http.Request, id string, n int)
+
+	// (GET /api/v2/templates/{id}/versions/{n}/docx-url)
+	GetTemplateDocxUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Save draft (CAS via expected_lock_version)
 	// (PUT /api/v2/templates/{id}/versions/{n}/draft)
 	SaveTemplateDraftV2(w http.ResponseWriter, r *http.Request, id string, n int)
 	// Publish draft (delegates to docgen-v2 /validate/template)
 	// (POST /api/v2/templates/{id}/versions/{n}/publish)
 	PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/review)
+	ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
+
+	// (PUT /api/v2/templates/{id}/versions/{n}/schema)
+	UpdateTemplateSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 	// Presign PUT URL for draft schema.json upload
 	// (POST /api/v2/templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter, r *http.Request, id string, n int)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/submit)
+	SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -657,6 +696,150 @@ func (siw *ServerInterfaceWrapper) CreateTemplateV2(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListTemplatePlaceholderCatalogV2 operation middleware
+func (siw *ServerInterfaceWrapper) ListTemplatePlaceholderCatalogV2(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTemplatePlaceholderCatalogV2(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTemplateV2 operation middleware
+func (siw *ServerInterfaceWrapper) GetTemplateV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTemplateV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpsertTemplateApprovalConfigV2 operation middleware
+func (siw *ServerInterfaceWrapper) UpsertTemplateApprovalConfigV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpsertTemplateApprovalConfigV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ArchiveTemplateV2 operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveTemplateV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArchiveTemplateV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTemplateAuditV2 operation middleware
+func (siw *ServerInterfaceWrapper) ListTemplateAuditV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTemplateAuditV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTemplateVersionV2 operation middleware
+func (siw *ServerInterfaceWrapper) CreateTemplateVersionV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTemplateVersionV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetTemplateVersionV2 operation middleware
 func (siw *ServerInterfaceWrapper) GetTemplateVersionV2(w http.ResponseWriter, r *http.Request) {
 
@@ -692,6 +875,111 @@ func (siw *ServerInterfaceWrapper) GetTemplateVersionV2(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// ApproveTemplateVersionV2 operation middleware
+func (siw *ServerInterfaceWrapper) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveTemplateVersionV2(w, r, id, n)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CommitTemplateAutosaveV2 operation middleware
+func (siw *ServerInterfaceWrapper) CommitTemplateAutosaveV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CommitTemplateAutosaveV2(w, r, id, n)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PresignTemplateAutosaveV2 operation middleware
+func (siw *ServerInterfaceWrapper) PresignTemplateAutosaveV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PresignTemplateAutosaveV2(w, r, id, n)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PresignTemplateDocxUploadUrlV2 operation middleware
 func (siw *ServerInterfaceWrapper) PresignTemplateDocxUploadUrlV2(w http.ResponseWriter, r *http.Request) {
 
@@ -718,6 +1006,41 @@ func (siw *ServerInterfaceWrapper) PresignTemplateDocxUploadUrlV2(w http.Respons
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PresignTemplateDocxUploadUrlV2(w, r, id, n)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTemplateDocxUrlV2 operation middleware
+func (siw *ServerInterfaceWrapper) GetTemplateDocxUrlV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTemplateDocxUrlV2(w, r, id, n)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -797,6 +1120,76 @@ func (siw *ServerInterfaceWrapper) PublishTemplateVersionV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// ReviewTemplateVersionV2 operation middleware
+func (siw *ServerInterfaceWrapper) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReviewTemplateVersionV2(w, r, id, n)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTemplateSchemaV2 operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTemplateSchemaV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTemplateSchemaV2(w, r, id, n)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PresignTemplateSchemaUploadUrlV2 operation middleware
 func (siw *ServerInterfaceWrapper) PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter, r *http.Request) {
 
@@ -823,6 +1216,41 @@ func (siw *ServerInterfaceWrapper) PresignTemplateSchemaUploadUrlV2(w http.Respo
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PresignTemplateSchemaUploadUrlV2(w, r, id, n)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SubmitTemplateVersionV2 operation middleware
+func (siw *ServerInterfaceWrapper) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "n" -------------
+	var n int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "n", r.PathValue("n"), &n, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "n", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SubmitTemplateVersionV2(w, r, id, n)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -955,11 +1383,24 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/signed", wrapper.RedirectSignedUrlV2)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/templates", wrapper.ListTemplatesV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates", wrapper.CreateTemplateV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/templates/v2/placeholder-catalog", wrapper.ListTemplatePlaceholderCatalogV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/templates/{id}", wrapper.GetTemplateV2)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/templates/{id}/approval-config", wrapper.UpsertTemplateApprovalConfigV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/archive", wrapper.ArchiveTemplateV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/templates/{id}/audit", wrapper.ListTemplateAuditV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions", wrapper.CreateTemplateVersionV2)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}", wrapper.GetTemplateVersionV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/approve", wrapper.ApproveTemplateVersionV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/autosave/commit", wrapper.CommitTemplateAutosaveV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/autosave/presign", wrapper.PresignTemplateAutosaveV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/docx-upload-url", wrapper.PresignTemplateDocxUploadUrlV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/docx-url", wrapper.GetTemplateDocxUrlV2)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/draft", wrapper.SaveTemplateDraftV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/publish", wrapper.PublishTemplateVersionV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/review", wrapper.ReviewTemplateVersionV2)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/schema", wrapper.UpdateTemplateSchemaV2)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/schema-upload-url", wrapper.PresignTemplateSchemaUploadUrlV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/templates/{id}/versions/{n}/submit", wrapper.SubmitTemplateVersionV2)
 
 	return m
 }
@@ -1041,6 +1482,101 @@ func (response CreateTemplateV2201JSONResponse) VisitCreateTemplateV2Response(w 
 	return err
 }
 
+type ListTemplatePlaceholderCatalogV2RequestObject struct {
+}
+
+type ListTemplatePlaceholderCatalogV2ResponseObject interface {
+	VisitListTemplatePlaceholderCatalogV2Response(w http.ResponseWriter) error
+}
+
+type ListTemplatePlaceholderCatalogV2200Response struct {
+}
+
+func (response ListTemplatePlaceholderCatalogV2200Response) VisitListTemplatePlaceholderCatalogV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type GetTemplateV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetTemplateV2ResponseObject interface {
+	VisitGetTemplateV2Response(w http.ResponseWriter) error
+}
+
+type GetTemplateV2200Response struct {
+}
+
+func (response GetTemplateV2200Response) VisitGetTemplateV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpsertTemplateApprovalConfigV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type UpsertTemplateApprovalConfigV2ResponseObject interface {
+	VisitUpsertTemplateApprovalConfigV2Response(w http.ResponseWriter) error
+}
+
+type UpsertTemplateApprovalConfigV2200Response struct {
+}
+
+func (response UpsertTemplateApprovalConfigV2200Response) VisitUpsertTemplateApprovalConfigV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type ArchiveTemplateV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ArchiveTemplateV2ResponseObject interface {
+	VisitArchiveTemplateV2Response(w http.ResponseWriter) error
+}
+
+type ArchiveTemplateV2200Response struct {
+}
+
+func (response ArchiveTemplateV2200Response) VisitArchiveTemplateV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type ListTemplateAuditV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListTemplateAuditV2ResponseObject interface {
+	VisitListTemplateAuditV2Response(w http.ResponseWriter) error
+}
+
+type ListTemplateAuditV2200Response struct {
+}
+
+func (response ListTemplateAuditV2200Response) VisitListTemplateAuditV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type CreateTemplateVersionV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type CreateTemplateVersionV2ResponseObject interface {
+	VisitCreateTemplateVersionV2Response(w http.ResponseWriter) error
+}
+
+type CreateTemplateVersionV2200Response struct {
+}
+
+func (response CreateTemplateVersionV2200Response) VisitCreateTemplateVersionV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
 type GetTemplateVersionV2RequestObject struct {
 	Id string `json:"id"`
 	N  int    `json:"n"`
@@ -1063,6 +1599,57 @@ type GetTemplateVersionV2404Response struct {
 
 func (response GetTemplateVersionV2404Response) VisitGetTemplateVersionV2Response(w http.ResponseWriter) error {
 	w.WriteHeader(404)
+	return nil
+}
+
+type ApproveTemplateVersionV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+	N  int                `json:"n"`
+}
+
+type ApproveTemplateVersionV2ResponseObject interface {
+	VisitApproveTemplateVersionV2Response(w http.ResponseWriter) error
+}
+
+type ApproveTemplateVersionV2200Response struct {
+}
+
+func (response ApproveTemplateVersionV2200Response) VisitApproveTemplateVersionV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type CommitTemplateAutosaveV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+	N  int                `json:"n"`
+}
+
+type CommitTemplateAutosaveV2ResponseObject interface {
+	VisitCommitTemplateAutosaveV2Response(w http.ResponseWriter) error
+}
+
+type CommitTemplateAutosaveV2200Response struct {
+}
+
+func (response CommitTemplateAutosaveV2200Response) VisitCommitTemplateAutosaveV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type PresignTemplateAutosaveV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+	N  int                `json:"n"`
+}
+
+type PresignTemplateAutosaveV2ResponseObject interface {
+	VisitPresignTemplateAutosaveV2Response(w http.ResponseWriter) error
+}
+
+type PresignTemplateAutosaveV2200Response struct {
+}
+
+func (response PresignTemplateAutosaveV2200Response) VisitPresignTemplateAutosaveV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
 	return nil
 }
 
@@ -1090,6 +1677,23 @@ func (response PresignTemplateDocxUploadUrlV2200JSONResponse) VisitPresignTempla
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
+}
+
+type GetTemplateDocxUrlV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+	N  int                `json:"n"`
+}
+
+type GetTemplateDocxUrlV2ResponseObject interface {
+	VisitGetTemplateDocxUrlV2Response(w http.ResponseWriter) error
+}
+
+type GetTemplateDocxUrlV2200Response struct {
+}
+
+func (response GetTemplateDocxUrlV2200Response) VisitGetTemplateDocxUrlV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
 }
 
 type SaveTemplateDraftV2RequestObject struct {
@@ -1165,6 +1769,40 @@ func (response PublishTemplateVersionV2422JSONResponse) VisitPublishTemplateVers
 	return err
 }
 
+type ReviewTemplateVersionV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+	N  int                `json:"n"`
+}
+
+type ReviewTemplateVersionV2ResponseObject interface {
+	VisitReviewTemplateVersionV2Response(w http.ResponseWriter) error
+}
+
+type ReviewTemplateVersionV2200Response struct {
+}
+
+func (response ReviewTemplateVersionV2200Response) VisitReviewTemplateVersionV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpdateTemplateSchemaV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+	N  int                `json:"n"`
+}
+
+type UpdateTemplateSchemaV2ResponseObject interface {
+	VisitUpdateTemplateSchemaV2Response(w http.ResponseWriter) error
+}
+
+type UpdateTemplateSchemaV2200Response struct {
+}
+
+func (response UpdateTemplateSchemaV2200Response) VisitUpdateTemplateSchemaV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
 type PresignTemplateSchemaUploadUrlV2RequestObject struct {
 	Id string `json:"id"`
 	N  int    `json:"n"`
@@ -1191,6 +1829,23 @@ func (response PresignTemplateSchemaUploadUrlV2200JSONResponse) VisitPresignTemp
 	return err
 }
 
+type SubmitTemplateVersionV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+	N  int                `json:"n"`
+}
+
+type SubmitTemplateVersionV2ResponseObject interface {
+	VisitSubmitTemplateVersionV2Response(w http.ResponseWriter) error
+}
+
+type SubmitTemplateVersionV2200Response struct {
+}
+
+func (response SubmitTemplateVersionV2200Response) VisitSubmitTemplateVersionV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Redirect to presigned GET URL for a stored object
@@ -1202,21 +1857,60 @@ type StrictServerInterface interface {
 	// Create template (docx-v2)
 	// (POST /api/v2/templates)
 	CreateTemplateV2(ctx context.Context, request CreateTemplateV2RequestObject) (CreateTemplateV2ResponseObject, error)
+
+	// (GET /api/v2/templates/v2/placeholder-catalog)
+	ListTemplatePlaceholderCatalogV2(ctx context.Context, request ListTemplatePlaceholderCatalogV2RequestObject) (ListTemplatePlaceholderCatalogV2ResponseObject, error)
+
+	// (GET /api/v2/templates/{id})
+	GetTemplateV2(ctx context.Context, request GetTemplateV2RequestObject) (GetTemplateV2ResponseObject, error)
+
+	// (PUT /api/v2/templates/{id}/approval-config)
+	UpsertTemplateApprovalConfigV2(ctx context.Context, request UpsertTemplateApprovalConfigV2RequestObject) (UpsertTemplateApprovalConfigV2ResponseObject, error)
+
+	// (POST /api/v2/templates/{id}/archive)
+	ArchiveTemplateV2(ctx context.Context, request ArchiveTemplateV2RequestObject) (ArchiveTemplateV2ResponseObject, error)
+
+	// (GET /api/v2/templates/{id}/audit)
+	ListTemplateAuditV2(ctx context.Context, request ListTemplateAuditV2RequestObject) (ListTemplateAuditV2ResponseObject, error)
+
+	// (POST /api/v2/templates/{id}/versions)
+	CreateTemplateVersionV2(ctx context.Context, request CreateTemplateVersionV2RequestObject) (CreateTemplateVersionV2ResponseObject, error)
 	// Get template version metadata (docx-v2)
 	// (GET /api/v2/templates/{id}/versions/{n})
 	GetTemplateVersionV2(ctx context.Context, request GetTemplateVersionV2RequestObject) (GetTemplateVersionV2ResponseObject, error)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/approve)
+	ApproveTemplateVersionV2(ctx context.Context, request ApproveTemplateVersionV2RequestObject) (ApproveTemplateVersionV2ResponseObject, error)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/autosave/commit)
+	CommitTemplateAutosaveV2(ctx context.Context, request CommitTemplateAutosaveV2RequestObject) (CommitTemplateAutosaveV2ResponseObject, error)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/autosave/presign)
+	PresignTemplateAutosaveV2(ctx context.Context, request PresignTemplateAutosaveV2RequestObject) (PresignTemplateAutosaveV2ResponseObject, error)
 	// Presign PUT URL for draft .docx upload
 	// (POST /api/v2/templates/{id}/versions/{n}/docx-upload-url)
 	PresignTemplateDocxUploadUrlV2(ctx context.Context, request PresignTemplateDocxUploadUrlV2RequestObject) (PresignTemplateDocxUploadUrlV2ResponseObject, error)
+
+	// (GET /api/v2/templates/{id}/versions/{n}/docx-url)
+	GetTemplateDocxUrlV2(ctx context.Context, request GetTemplateDocxUrlV2RequestObject) (GetTemplateDocxUrlV2ResponseObject, error)
 	// Save draft (CAS via expected_lock_version)
 	// (PUT /api/v2/templates/{id}/versions/{n}/draft)
 	SaveTemplateDraftV2(ctx context.Context, request SaveTemplateDraftV2RequestObject) (SaveTemplateDraftV2ResponseObject, error)
 	// Publish draft (delegates to docgen-v2 /validate/template)
 	// (POST /api/v2/templates/{id}/versions/{n}/publish)
 	PublishTemplateVersionV2(ctx context.Context, request PublishTemplateVersionV2RequestObject) (PublishTemplateVersionV2ResponseObject, error)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/review)
+	ReviewTemplateVersionV2(ctx context.Context, request ReviewTemplateVersionV2RequestObject) (ReviewTemplateVersionV2ResponseObject, error)
+
+	// (PUT /api/v2/templates/{id}/versions/{n}/schema)
+	UpdateTemplateSchemaV2(ctx context.Context, request UpdateTemplateSchemaV2RequestObject) (UpdateTemplateSchemaV2ResponseObject, error)
 	// Presign PUT URL for draft schema.json upload
 	// (POST /api/v2/templates/{id}/versions/{n}/schema-upload-url)
 	PresignTemplateSchemaUploadUrlV2(ctx context.Context, request PresignTemplateSchemaUploadUrlV2RequestObject) (PresignTemplateSchemaUploadUrlV2ResponseObject, error)
+
+	// (POST /api/v2/templates/{id}/versions/{n}/submit)
+	SubmitTemplateVersionV2(ctx context.Context, request SubmitTemplateVersionV2RequestObject) (SubmitTemplateVersionV2ResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1329,6 +2023,160 @@ func (sh *strictHandler) CreateTemplateV2(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// ListTemplatePlaceholderCatalogV2 operation middleware
+func (sh *strictHandler) ListTemplatePlaceholderCatalogV2(w http.ResponseWriter, r *http.Request) {
+	var request ListTemplatePlaceholderCatalogV2RequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTemplatePlaceholderCatalogV2(ctx, request.(ListTemplatePlaceholderCatalogV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTemplatePlaceholderCatalogV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTemplatePlaceholderCatalogV2ResponseObject); ok {
+		if err := validResponse.VisitListTemplatePlaceholderCatalogV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetTemplateV2 operation middleware
+func (sh *strictHandler) GetTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetTemplateV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTemplateV2(ctx, request.(GetTemplateV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTemplateV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTemplateV2ResponseObject); ok {
+		if err := validResponse.VisitGetTemplateV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpsertTemplateApprovalConfigV2 operation middleware
+func (sh *strictHandler) UpsertTemplateApprovalConfigV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpsertTemplateApprovalConfigV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpsertTemplateApprovalConfigV2(ctx, request.(UpsertTemplateApprovalConfigV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpsertTemplateApprovalConfigV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpsertTemplateApprovalConfigV2ResponseObject); ok {
+		if err := validResponse.VisitUpsertTemplateApprovalConfigV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ArchiveTemplateV2 operation middleware
+func (sh *strictHandler) ArchiveTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ArchiveTemplateV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ArchiveTemplateV2(ctx, request.(ArchiveTemplateV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ArchiveTemplateV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ArchiveTemplateV2ResponseObject); ok {
+		if err := validResponse.VisitArchiveTemplateV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTemplateAuditV2 operation middleware
+func (sh *strictHandler) ListTemplateAuditV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListTemplateAuditV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTemplateAuditV2(ctx, request.(ListTemplateAuditV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTemplateAuditV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTemplateAuditV2ResponseObject); ok {
+		if err := validResponse.VisitListTemplateAuditV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateTemplateVersionV2 operation middleware
+func (sh *strictHandler) CreateTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreateTemplateVersionV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateTemplateVersionV2(ctx, request.(CreateTemplateVersionV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateTemplateVersionV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateTemplateVersionV2ResponseObject); ok {
+		if err := validResponse.VisitCreateTemplateVersionV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetTemplateVersionV2 operation middleware
 func (sh *strictHandler) GetTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int) {
 	var request GetTemplateVersionV2RequestObject
@@ -1356,6 +2204,87 @@ func (sh *strictHandler) GetTemplateVersionV2(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// ApproveTemplateVersionV2 operation middleware
+func (sh *strictHandler) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	var request ApproveTemplateVersionV2RequestObject
+
+	request.Id = id
+	request.N = n
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ApproveTemplateVersionV2(ctx, request.(ApproveTemplateVersionV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ApproveTemplateVersionV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ApproveTemplateVersionV2ResponseObject); ok {
+		if err := validResponse.VisitApproveTemplateVersionV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CommitTemplateAutosaveV2 operation middleware
+func (sh *strictHandler) CommitTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	var request CommitTemplateAutosaveV2RequestObject
+
+	request.Id = id
+	request.N = n
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CommitTemplateAutosaveV2(ctx, request.(CommitTemplateAutosaveV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CommitTemplateAutosaveV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CommitTemplateAutosaveV2ResponseObject); ok {
+		if err := validResponse.VisitCommitTemplateAutosaveV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PresignTemplateAutosaveV2 operation middleware
+func (sh *strictHandler) PresignTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	var request PresignTemplateAutosaveV2RequestObject
+
+	request.Id = id
+	request.N = n
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PresignTemplateAutosaveV2(ctx, request.(PresignTemplateAutosaveV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PresignTemplateAutosaveV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PresignTemplateAutosaveV2ResponseObject); ok {
+		if err := validResponse.VisitPresignTemplateAutosaveV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // PresignTemplateDocxUploadUrlV2 operation middleware
 func (sh *strictHandler) PresignTemplateDocxUploadUrlV2(w http.ResponseWriter, r *http.Request, id string, n int) {
 	var request PresignTemplateDocxUploadUrlV2RequestObject
@@ -1376,6 +2305,33 @@ func (sh *strictHandler) PresignTemplateDocxUploadUrlV2(w http.ResponseWriter, r
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PresignTemplateDocxUploadUrlV2ResponseObject); ok {
 		if err := validResponse.VisitPresignTemplateDocxUploadUrlV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetTemplateDocxUrlV2 operation middleware
+func (sh *strictHandler) GetTemplateDocxUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	var request GetTemplateDocxUrlV2RequestObject
+
+	request.Id = id
+	request.N = n
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTemplateDocxUrlV2(ctx, request.(GetTemplateDocxUrlV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTemplateDocxUrlV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTemplateDocxUrlV2ResponseObject); ok {
+		if err := validResponse.VisitGetTemplateDocxUrlV2Response(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1451,6 +2407,60 @@ func (sh *strictHandler) PublishTemplateVersionV2(w http.ResponseWriter, r *http
 	}
 }
 
+// ReviewTemplateVersionV2 operation middleware
+func (sh *strictHandler) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	var request ReviewTemplateVersionV2RequestObject
+
+	request.Id = id
+	request.N = n
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReviewTemplateVersionV2(ctx, request.(ReviewTemplateVersionV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReviewTemplateVersionV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReviewTemplateVersionV2ResponseObject); ok {
+		if err := validResponse.VisitReviewTemplateVersionV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateTemplateSchemaV2 operation middleware
+func (sh *strictHandler) UpdateTemplateSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	var request UpdateTemplateSchemaV2RequestObject
+
+	request.Id = id
+	request.N = n
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTemplateSchemaV2(ctx, request.(UpdateTemplateSchemaV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTemplateSchemaV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateTemplateSchemaV2ResponseObject); ok {
+		if err := validResponse.VisitUpdateTemplateSchemaV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // PresignTemplateSchemaUploadUrlV2 operation middleware
 func (sh *strictHandler) PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter, r *http.Request, id string, n int) {
 	var request PresignTemplateSchemaUploadUrlV2RequestObject
@@ -1478,48 +2488,82 @@ func (sh *strictHandler) PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter,
 	}
 }
 
+// SubmitTemplateVersionV2 operation middleware
+func (sh *strictHandler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+	var request SubmitTemplateVersionV2RequestObject
+
+	request.Id = id
+	request.N = n
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SubmitTemplateVersionV2(ctx, request.(SubmitTemplateVersionV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SubmitTemplateVersionV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SubmitTemplateVersionV2ResponseObject); ok {
+		if err := validResponse.VisitSubmitTemplateVersionV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"AwAA//8=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -14,7 +14,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
-		TemplateID:    "tpl-1",
+		TemplateID:    "11111111-1111-1111-1111-111111111111",
 		VersionNumber: 1,
 		Status:        domain.VersionStatusDraft,
 		ContentHash:   "hash_abc",
@@ -38,7 +38,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 	}
 	raw, _ := json.Marshal(body)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/v2/templates/tpl-1/versions/1/schema", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPut, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/schema", bytes.NewReader(raw))
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -73,13 +73,13 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 
 func TestPresignAutosave_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:             "ver-1",
-		TemplateID:     "tpl-1",
+		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 	}
 
 	var gotAction string
@@ -89,7 +89,7 @@ func TestPresignAutosave_Happy(t *testing.T) {
 	}
 	mux := newMux(t, authz, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/autosave/presign", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/autosave/presign", nil)
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -116,18 +116,18 @@ func TestPresignAutosave_Happy(t *testing.T) {
 
 func TestCommitAutosave_Happy(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:             "ver-1",
-		TemplateID:     "tpl-1",
+		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	raw, _ := json.Marshal(map[string]any{"expected_content_hash": "hash_abc"})
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/autosave/commit", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/autosave/commit", bytes.NewReader(raw))
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -153,18 +153,18 @@ func TestCommitAutosave_Happy(t *testing.T) {
 
 func TestCommitAutosave_HashMismatch(t *testing.T) {
 	repo := newFakeRepo()
-	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:             "ver-1",
-		TemplateID:     "tpl-1",
+		TemplateID:     "11111111-1111-1111-1111-111111111111",
 		VersionNumber:  1,
 		Status:         domain.VersionStatusDraft,
-		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+		DocxStorageKey: "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 	}
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
 	raw, _ := json.Marshal(map[string]any{"expected_content_hash": "hash_expected"})
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/tpl-1/versions/1/autosave/commit", bytes.NewReader(raw))
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/templates/11111111-1111-1111-1111-111111111111/versions/1/autosave/commit", bytes.NewReader(raw))
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 
@@ -183,3 +183,4 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 		t.Fatalf("expected error.code=content_hash_mismatch, got %q", out.Code)
 	}
 }
+
