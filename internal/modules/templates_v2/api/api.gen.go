@@ -296,6 +296,16 @@ type CreateTemplateV2JSONBody struct {
 	Name        string  `json:"name"`
 }
 
+// CreateTemplateV2Params defines parameters for CreateTemplateV2.
+type CreateTemplateV2Params struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// ApproveTemplateVersionV2Params defines parameters for ApproveTemplateVersionV2.
+type ApproveTemplateVersionV2Params struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
 // SaveTemplateDraftV2JSONBody defines parameters for SaveTemplateDraftV2.
 type SaveTemplateDraftV2JSONBody struct {
 	DocxContentHash     string `json:"docx_content_hash"`
@@ -309,6 +319,21 @@ type SaveTemplateDraftV2JSONBody struct {
 type PublishTemplateVersionV2JSONBody struct {
 	DocxKey   string `json:"docx_key"`
 	SchemaKey string `json:"schema_key"`
+}
+
+// PublishTemplateVersionV2Params defines parameters for PublishTemplateVersionV2.
+type PublishTemplateVersionV2Params struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// ReviewTemplateVersionV2Params defines parameters for ReviewTemplateVersionV2.
+type ReviewTemplateVersionV2Params struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
+}
+
+// SubmitTemplateVersionV2Params defines parameters for SubmitTemplateVersionV2.
+type SubmitTemplateVersionV2Params struct {
+	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
 // CreateTemplateV2JSONRequestBody defines body for CreateTemplateV2 for application/json ContentType.
@@ -569,7 +594,7 @@ type ServerInterface interface {
 	ListTemplatesV2(w http.ResponseWriter, r *http.Request)
 	// Create template (docx-v2)
 	// (POST /api/v2/templates)
-	CreateTemplateV2(w http.ResponseWriter, r *http.Request)
+	CreateTemplateV2(w http.ResponseWriter, r *http.Request, params CreateTemplateV2Params)
 
 	// (GET /api/v2/templates/v2/placeholder-catalog)
 	ListTemplatePlaceholderCatalogV2(w http.ResponseWriter, r *http.Request)
@@ -593,7 +618,7 @@ type ServerInterface interface {
 	GetTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int)
 
 	// (POST /api/v2/templates/{id}/versions/{n}/approve)
-	ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
+	ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ApproveTemplateVersionV2Params)
 
 	// (POST /api/v2/templates/{id}/versions/{n}/autosave/commit)
 	CommitTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
@@ -611,10 +636,10 @@ type ServerInterface interface {
 	SaveTemplateDraftV2(w http.ResponseWriter, r *http.Request, id string, n int)
 	// Publish draft (delegates to docgen-v2 /validate/template)
 	// (POST /api/v2/templates/{id}/versions/{n}/publish)
-	PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int)
+	PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int, params PublishTemplateVersionV2Params)
 
 	// (POST /api/v2/templates/{id}/versions/{n}/review)
-	ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
+	ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ReviewTemplateVersionV2Params)
 
 	// (PUT /api/v2/templates/{id}/versions/{n}/schema)
 	UpdateTemplateSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
@@ -623,7 +648,7 @@ type ServerInterface interface {
 	PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter, r *http.Request, id string, n int)
 
 	// (POST /api/v2/templates/{id}/versions/{n}/submit)
-	SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int)
+	SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionV2Params)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -685,8 +710,39 @@ func (siw *ServerInterfaceWrapper) ListTemplatesV2(w http.ResponseWriter, r *htt
 // CreateTemplateV2 operation middleware
 func (siw *ServerInterfaceWrapper) CreateTemplateV2(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateTemplateV2Params
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateTemplateV2(w, r)
+		siw.Handler.CreateTemplateV2(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -899,8 +955,36 @@ func (siw *ServerInterfaceWrapper) ApproveTemplateVersionV2(w http.ResponseWrite
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ApproveTemplateVersionV2Params
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ApproveTemplateVersionV2(w, r, id, n)
+		siw.Handler.ApproveTemplateVersionV2(w, r, id, n, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1109,8 +1193,36 @@ func (siw *ServerInterfaceWrapper) PublishTemplateVersionV2(w http.ResponseWrite
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishTemplateVersionV2Params
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PublishTemplateVersionV2(w, r, id, n)
+		siw.Handler.PublishTemplateVersionV2(w, r, id, n, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1144,8 +1256,36 @@ func (siw *ServerInterfaceWrapper) ReviewTemplateVersionV2(w http.ResponseWriter
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReviewTemplateVersionV2Params
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReviewTemplateVersionV2(w, r, id, n)
+		siw.Handler.ReviewTemplateVersionV2(w, r, id, n, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1249,8 +1389,36 @@ func (siw *ServerInterfaceWrapper) SubmitTemplateVersionV2(w http.ResponseWriter
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SubmitTemplateVersionV2Params
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey openapi_types.UUID
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SubmitTemplateVersionV2(w, r, id, n)
+		siw.Handler.SubmitTemplateVersionV2(w, r, id, n, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1458,7 +1626,8 @@ func (response ListTemplatesV2403Response) VisitListTemplatesV2Response(w http.R
 }
 
 type CreateTemplateV2RequestObject struct {
-	Body *CreateTemplateV2JSONRequestBody
+	Params CreateTemplateV2Params
+	Body   *CreateTemplateV2JSONRequestBody
 }
 
 type CreateTemplateV2ResponseObject interface {
@@ -1603,8 +1772,9 @@ func (response GetTemplateVersionV2404Response) VisitGetTemplateVersionV2Respons
 }
 
 type ApproveTemplateVersionV2RequestObject struct {
-	Id openapi_types.UUID `json:"id"`
-	N  int                `json:"n"`
+	Id     openapi_types.UUID `json:"id"`
+	N      int                `json:"n"`
+	Params ApproveTemplateVersionV2Params
 }
 
 type ApproveTemplateVersionV2ResponseObject interface {
@@ -1722,10 +1892,19 @@ func (response SaveTemplateDraftV2409Response) VisitSaveTemplateDraftV2Response(
 	return nil
 }
 
+type SaveTemplateDraftV2412Response struct {
+}
+
+func (response SaveTemplateDraftV2412Response) VisitSaveTemplateDraftV2Response(w http.ResponseWriter) error {
+	w.WriteHeader(412)
+	return nil
+}
+
 type PublishTemplateVersionV2RequestObject struct {
-	Id   string `json:"id"`
-	N    int    `json:"n"`
-	Body *PublishTemplateVersionV2JSONRequestBody
+	Id     string `json:"id"`
+	N      int    `json:"n"`
+	Params PublishTemplateVersionV2Params
+	Body   *PublishTemplateVersionV2JSONRequestBody
 }
 
 type PublishTemplateVersionV2ResponseObject interface {
@@ -1770,8 +1949,9 @@ func (response PublishTemplateVersionV2422JSONResponse) VisitPublishTemplateVers
 }
 
 type ReviewTemplateVersionV2RequestObject struct {
-	Id openapi_types.UUID `json:"id"`
-	N  int                `json:"n"`
+	Id     openapi_types.UUID `json:"id"`
+	N      int                `json:"n"`
+	Params ReviewTemplateVersionV2Params
 }
 
 type ReviewTemplateVersionV2ResponseObject interface {
@@ -1830,8 +2010,9 @@ func (response PresignTemplateSchemaUploadUrlV2200JSONResponse) VisitPresignTemp
 }
 
 type SubmitTemplateVersionV2RequestObject struct {
-	Id openapi_types.UUID `json:"id"`
-	N  int                `json:"n"`
+	Id     openapi_types.UUID `json:"id"`
+	N      int                `json:"n"`
+	Params SubmitTemplateVersionV2Params
 }
 
 type SubmitTemplateVersionV2ResponseObject interface {
@@ -1993,8 +2174,10 @@ func (sh *strictHandler) ListTemplatesV2(w http.ResponseWriter, r *http.Request)
 }
 
 // CreateTemplateV2 operation middleware
-func (sh *strictHandler) CreateTemplateV2(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) CreateTemplateV2(w http.ResponseWriter, r *http.Request, params CreateTemplateV2Params) {
 	var request CreateTemplateV2RequestObject
+
+	request.Params = params
 
 	var body CreateTemplateV2JSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -2205,11 +2388,12 @@ func (sh *strictHandler) GetTemplateVersionV2(w http.ResponseWriter, r *http.Req
 }
 
 // ApproveTemplateVersionV2 operation middleware
-func (sh *strictHandler) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (sh *strictHandler) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ApproveTemplateVersionV2Params) {
 	var request ApproveTemplateVersionV2RequestObject
 
 	request.Id = id
 	request.N = n
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ApproveTemplateVersionV2(ctx, request.(ApproveTemplateVersionV2RequestObject))
@@ -2374,11 +2558,12 @@ func (sh *strictHandler) SaveTemplateDraftV2(w http.ResponseWriter, r *http.Requ
 }
 
 // PublishTemplateVersionV2 operation middleware
-func (sh *strictHandler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int) {
+func (sh *strictHandler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int, params PublishTemplateVersionV2Params) {
 	var request PublishTemplateVersionV2RequestObject
 
 	request.Id = id
 	request.N = n
+	request.Params = params
 
 	var body PublishTemplateVersionV2JSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -2408,11 +2593,12 @@ func (sh *strictHandler) PublishTemplateVersionV2(w http.ResponseWriter, r *http
 }
 
 // ReviewTemplateVersionV2 operation middleware
-func (sh *strictHandler) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (sh *strictHandler) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params ReviewTemplateVersionV2Params) {
 	var request ReviewTemplateVersionV2RequestObject
 
 	request.Id = id
 	request.N = n
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ReviewTemplateVersionV2(ctx, request.(ReviewTemplateVersionV2RequestObject))
@@ -2489,11 +2675,12 @@ func (sh *strictHandler) PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter,
 }
 
 // SubmitTemplateVersionV2 operation middleware
-func (sh *strictHandler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (sh *strictHandler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, params SubmitTemplateVersionV2Params) {
 	var request SubmitTemplateVersionV2RequestObject
 
 	request.Id = id
 	request.N = n
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.SubmitTemplateVersionV2(ctx, request.(SubmitTemplateVersionV2RequestObject))
@@ -2520,50 +2707,51 @@ func (sh *strictHandler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7Ftdb9s41v4rhN73ooOVrDTtzeYum8wMgulOg6bdm25g0OSRzYYiVZJy4jX83xekZEnWJ50mO22Rq9jk",
-	"cw4PzzdpZhsQmWZSgDA6ONsGmqwgxe7jpSR5CsJ8hDTj2MBvDDi94dL8KSl8AJ1JocECMyUzUIaBI0ss",
-	"7A8mqP0CIk+Ds8+BJphjFdyGgdlkEJwF2igmlsEuDJgDdoYzbFa9E8VAzdqtF2kuTQ/7XRgo+JozBdRi",
-	"3axbslwgbIhbU8vFFyDGLtbWwTu8AD6+/4H9GHgwXvvhdonjtuJ4+4jflpyCJoplhkkRnAXXjEuDdL7Q",
-	"YGKdL4gUX3JhJMrsBKYSUYz+CQbzS0k0MiVTdHnzLkRMGBCESYG5XREQZylzRBhleAkh0kDsQlGicAoh",
-	"cvsMUW2+EClGVvuPkAE27gsCZPCCg/syC8KAMit1ygQ2UtltpDjLrI723ld4w1nwf3Ht3HHp2bGfW4el",
-	"HTyZdP3COtgSfOmv8RJa5A0N+HL54Eh69lIp1psTI6sePgcm9OV1UxD9Zmla/Gq7+jL7aCk6ktl8UQTh",
-	"5s9CMhcKuzCQAt4nwdnnbfD/CpJHm2MXHsdgcM/HMuo61rEc+v37WC69DnE0k37/PJbNgA/c9iS8jiE7",
-	"6ZqsGKcKhEvdBlI3eIw0bUcskzBWCm9G6ls77btscVTWryT3yfwDqver3kUqepbq3cxyz1++e73YUweM",
-	"rJ5HA1Vufv79D6al7ycsmOHgpbfDWvR8kdOfbfycxtW3Z/GaRuV8arex5Ewkstsgnl9fISYYYZgjKhut",
-	"4Kv1619m6FdNZCYRNjnmSEPqesKlwgRLRGSKrs5n/xZBZeOgpj+/vgrCYA1KFwu9np3MTlz5zkDgjAVn",
-	"wZvZyexNuQGn8BgTAlpHmeSMFEbYhUGMMxavT2OcZUquMY+ZWMiHwTltsCCg4+3+45zR3XHomNhP/Egi",
-	"bfDSDrq/xQhbCpkkQ/tQMjcwPhlvO8ITKYySnAONaOnXehoRZwrWDO4jIil4wP3WdbAYE8PWUI36ksmF",
-	"lhyMrzSx3YB1Ju1LoPMMlIb2fge0VhNrg4cnu4ppa6O0YLR3jnG0Iiu2nsDkRmq8BpujU2b8sJkC636j",
-	"4D43b0NWQO4yycS4Rpq4eFtGvTWZNlKN785uCibZl6B4y9lCYbW5uhy3As0zzgg242vDQyaVsaMPUa64",
-	"DzajySgsYdyaPiqK6ARUYM7+My5if5S0QBnHBFaSU1CRdKldx9tsylMbVNob6MM3X3CmV6MYBUQKbVRO",
-	"zASuDPp4q+z3KStZtdOcQ+QjhAZteceYuMrqhU2kIhAp4IC1H8UKsDIL2237oL04F3VlHJMvpnLFVH4s",
-	"ULZqHAIYTmOsAEcppAtQesWylv9YAcG1Q0twV2S2rcLWL69ocBZ8AMoUEHPjYJ8U/9epawNs22ecM37e",
-	"Bsx2DV9zUJsgDERxBXAHm6DZCBmVQxhUodZpmm4tuGjvXIPx5uS02wKpUhrXZOk8TbHaNIRERqIymQJF",
-	"v//6EX368A4lUiGMXHajqGyzwsDgpXbtWdlo6uB211CLwQ9SyHTjtNdS2eFcvLV1ejcASXDKeKc/6kyP",
-	"M8mUTBgfZLKf9mNSomIKCc65ifYKaJFVahnyjHdMV126dl5xYL/TkxN3kpHCFI1GgLMiz9vQ+aKlqC+8",
-	"D445h439gf23Q518IlVqgzbI8+JKtg2z3thH7oQ386r33QYpEyy1Xf7rio1rpEFZfOHcPYzyjGIDdO5S",
-	"Ry2PHYwMSyGYOiY4uYugcYt0ZOs7LR0e6yzLw3iRdxb19uRNN5QSqRaMUhCtWLJmrS6XtQseAwILg165",
-	"2rs+/WUgesIgk7rHUS4U2INciSw95WsO2vxD0s1RTnKcb1BJ5nZwXjbS7Qv3IiCQnUWvYLacocuLEF2/",
-	"v/5lht6nzCCpkMg5d0pYggDFSK2a2TF+NuA3LR9omL//YHiYTnedkHv9Ddr0jKTSHede8F3vLg7NQJx7",
-	"0JYbFk5T/8ox5Xx9qct+abZbBBvM5dIro13XdBcF2WCK64bc7ggZy0NKv0S/gzmIm766W94plGXXWWG4",
-	"6k7Z6/a5tliftYgUCXNGyPKeLX/KNKhq1+cl1YUj+uF1UJ0gB1LleQH4aWyeU9fXTofbuUX+6NstU6Me",
-	"tm+rFBb4n2Xb8Vb4ZbKn3Han4PQyET48qjbPX1e2t3rbnRLSzBOZi3ZR+x3q1gqVakMpGEyxwY8rcR0L",
-	"lIl2LMkUgL/ECx9jnrGO/H/k1j33ekMR7ubrtFaQvSjXS7n1ReiAdq8LwIt6j1FvcWWacYlpeXPqp91L",
-	"SR4+ObKxa5/vNls/8hikjVR4CfOhk1ypwUccdEpL1uWg1De6/lRfVFGFE4Nm1maosFnwBMYvZJ4qzM7g",
-	"T2XqnzaarIEGTy83uC6slxb5vcfNk9zDSPIwL2nnK6xXQ7cxD/Op6IKHDIgBOueS3DWv5bpXcYU00+uW",
-	"uPGVWxcx/WL07KGXfdijkX55H3fL83a4Gf17d2rvzHPnuXNtMIdWIrJeW2aeVxfnN2jNMOpVwTe2pvUP",
-	"PUMVqAD8YCeFJ4uhoagoXcfLdStGB2SPc7RvqaMCHkzpcgOvbRqI/aWie17TF+yl5wCdH94/juuilyps",
-	"iTYoyK1HTa9WQH9Dlk0ZRdWdZhi8PT39Bi2mTGsmlnMj76C4WKh+Jxl4pFS/8ZIqW2HxKNIMKw1zUEqq",
-	"XsqhXyDCYI35gWUWUnLAwq9Dqs7GTBR8Wv1Soex9pqLAYel+pDASUUmWIKL1KYodKTZQpaJvzFrFa5zh",
-	"pPXBzb8cp49QacPd+++AaeOa7MaBXxQ6rdDHnPIK7b6c8/6Sc14h3MzK+iSnveolyYDtb9z8S6qqVGoM",
-	"JqvyBU395co9Y9u7lQPmlJkY1s3Xb7lZxWSFxRKiDGt9LxVtTnG5ZKI1IHPTHEn3jy7273iinhcl1RyF",
-	"DCvTfIDXNzVA3HqHUo23npZ0xuNt+emij2s/Kl7kgnLwBC/lGpRovL6cIjh4rucHbrxzdC9g6+cuU/R7",
-	"j3EXKW0anbskoIfGB2zRfFtzOLHJBgbjrf3zB2wGlNum0vF2//GK7kYnm0HgDWxHC5X3olF6RpgslLzX",
-	"oCKgzEgV9e/mkIRIzvFCFnkstufRY/CZAg1d7+rQNMN9HLTfgx+4x3EGkAKb+n3xBLZ+2zoBVCAoqMgb",
-	"X5ahUewRtms82x0HTq9aFLcokSraPyYYJ9jHWYS1rb/ppH3Hgr0FbfzW64GKKavegCaATa4gSrgrSm5s",
-	"BZjbClGbvxxRgN21gh1ybzlpykRsM2bjraedyHX9Mrj6Hm/tnzoBdCdiGxymXb/6cLIuEj3TuWiEZQpG",
-	"MbJHC2lYUnZlvWPxtvm1EKryhap/0bE2CnBajmdKuv8/aT7PPBg7zL0asCKrTro0wMFKu4lTStNIrzCV",
-	"91HDWPdS3SVc3g+mxNIRtSfeKCw0q1Rh20RQ633X5ZJn2ei9Dna3u/8GAAD//w==",
+	"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",
+	"CgvNKlHYUhTUel/ZueBZFpOnwe5u9/8AAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

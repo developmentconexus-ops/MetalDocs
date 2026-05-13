@@ -2786,6 +2786,11 @@ paths:
       summary: Create template (docx-v2)
       tags: [templates]
       operationId: createTemplateV2
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -2888,6 +2893,8 @@ paths:
       responses:
         '204': { description: ok }
         '409': { description: template_draft_stale }
+        '412':
+          description: stale expected_lock_version
   /api/v2/templates/{id}/versions/{n}/publish:
     post:
       summary: Publish draft (delegates to docgen-v2 /validate/template)
@@ -2896,6 +2903,10 @@ paths:
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
         - { in: path, name: n, required: true, schema: { type: integer } }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -2969,6 +2980,10 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
   /api/v2/templates/{id}/versions/{n}/review:
     post:
@@ -2977,6 +2992,10 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
   /api/v2/templates/{id}/versions/{n}/approve:
     post:
@@ -2985,6 +3004,10 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
   /api/v2/templates/{id}/archive:
     post:
@@ -3484,7 +3507,12 @@ paths:
     post:
       tags: [documents]
       operationId: finalizeDocumentV2
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
       responses: { '200': { description: ok }, '409': { description: invalid_state_transition } }
   /api/v2/documents/{id}/archive:
     post:

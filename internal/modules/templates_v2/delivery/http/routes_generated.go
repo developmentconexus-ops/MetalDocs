@@ -17,7 +17,7 @@ func (h *Handler) ListTemplatesV2(w http.ResponseWriter, r *http.Request) {
 	h.listTemplates(w, r)
 }
 
-func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateV2Params) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
@@ -195,7 +195,7 @@ func missingSaveTemplateDraftV2Field(req templatesapi.SaveTemplateDraftV2JSONReq
 	}
 }
 
-func (h *Handler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int) {
+func (h *Handler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionV2Params) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
@@ -268,15 +268,15 @@ func (h *Handler) CommitTemplateAutosaveV2(w http.ResponseWriter, r *http.Reques
 	h.commitAutosave(w, r)
 }
 
-func (h *Handler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (h *Handler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.SubmitTemplateVersionV2Params) {
 	h.submitForReview(w, r)
 }
 
-func (h *Handler) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (h *Handler) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ReviewTemplateVersionV2Params) {
 	h.review(w, r)
 }
 
-func (h *Handler) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (h *Handler) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ApproveTemplateVersionV2Params) {
 	h.approve(w, r)
 }
 

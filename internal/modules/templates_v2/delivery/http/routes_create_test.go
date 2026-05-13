@@ -23,6 +23,7 @@ type fakeRepo struct {
 	versions        map[string]*domain.TemplateVersion
 	audit           []*domain.AuditEvent
 	approvalConfigs map[string]*domain.ApprovalConfig
+	lockVersions    map[string]int
 }
 
 func newFakeRepo() *fakeRepo {
@@ -31,6 +32,7 @@ func newFakeRepo() *fakeRepo {
 		versions:        map[string]*domain.TemplateVersion{},
 		audit:           []*domain.AuditEvent{},
 		approvalConfigs: map[string]*domain.ApprovalConfig{},
+		lockVersions:    map[string]int{},
 	}
 }
 
@@ -75,8 +77,15 @@ func (r *fakeRepo) UpdateTemplate(_ context.Context, t *domain.Template) error {
 }
 
 func (r *fakeRepo) CreateVersion(_ context.Context, v *domain.TemplateVersion) error {
+	if _, ok := r.lockVersions[v.ID]; !ok {
+		r.lockVersions[v.ID] = 0
+	}
 	r.versions[v.ID] = v
 	return nil
+}
+
+func (r *fakeRepo) CreateVersionTx(_ context.Context, _ *sql.Tx, v *domain.TemplateVersion) error {
+	return r.CreateVersion(context.Background(), v)
 }
 
 func (r *fakeRepo) GetVersion(_ context.Context, templateID string, n int) (*domain.TemplateVersion, error) {
@@ -116,6 +125,21 @@ func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) e
 	return nil
 }
 
+func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	v, ok := r.versions[versionID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	current := r.lockVersions[versionID]
+	if current != expectedLockVersion {
+		return domain.ErrStaleLockVersion
+	}
+	v.DocxStorageKey = docxStorageKey
+	v.ContentHash = docxContentHash
+	r.lockVersions[versionID] = current + 1
+	return nil
+}
+
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.Status == domain.VersionStatusPublished && v.ID != keepVersionID {
@@ -125,6 +149,10 @@ func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keep
 		}
 	}
 	return nil
+}
+
+func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ *sql.Tx, templateID, keepVersionID string) error {
+	return r.ObsoletePreviousPublished(context.Background(), templateID, keepVersionID)
 }
 
 func (r *fakeRepo) GetApprovalConfig(_ context.Context, templateID string) (*domain.ApprovalConfig, error) {
@@ -140,9 +168,17 @@ func (r *fakeRepo) UpsertApprovalConfig(_ context.Context, c *domain.ApprovalCon
 	return nil
 }
 
+func (r *fakeRepo) UpsertApprovalConfigTx(_ context.Context, _ *sql.Tx, c *domain.ApprovalConfig) error {
+	return r.UpsertApprovalConfig(context.Background(), c)
+}
+
 func (r *fakeRepo) AppendAudit(_ context.Context, e *domain.AuditEvent) error {
 	r.audit = append(r.audit, e)
 	return nil
+}
+
+func (r *fakeRepo) AppendAuditTx(_ context.Context, _ *sql.Tx, e *domain.AuditEvent) error {
+	return r.AppendAudit(context.Background(), e)
 }
 
 func (r *fakeRepo) ListAudit(_ context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
@@ -209,6 +245,7 @@ func createBody(key string) []byte {
 
 func withHeaders(req *http.Request) {
 	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Idempotency-Key", "11111111-1111-1111-1111-111111111111")
 	*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant-a"))
 	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))
 }
@@ -314,4 +351,3 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		t.Fatalf("expected error.code=key_conflict, got %q", out.Code)
 	}
 }
-

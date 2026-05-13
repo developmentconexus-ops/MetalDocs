@@ -61,7 +61,7 @@ func scanTemplateVersion(row rowScanner) (*domain.TemplateVersion, error) {
 		&v.ID, &v.TemplateID, &v.VersionNumber, &status, &v.DocxStorageKey, &v.ContentHash,
 		&metadataJSON, &placeholderJSON, &v.AuthorID,
 		&pendingReviewerRole, &v.PendingApproverRole, &reviewerID, &approverID,
-		&submittedAt, &reviewedAt, &approvedAt, &publishedAt, &obsoletedAt, &v.CreatedAt,
+		&submittedAt, &reviewedAt, &approvedAt, &publishedAt, &obsoletedAt, &v.LockVersion, &v.CreatedAt,
 	); err != nil {
 		return nil, err
 	}

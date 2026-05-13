@@ -188,3 +188,35 @@ func TestCommitAutosave_UploadMissing(t *testing.T) {
 		t.Fatalf("expected DeleteCalled 0, got %d", presigner.DeleteCalled)
 	}
 }
+
+func TestSaveTemplateDraft_StaleLockVersion(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{
+		ID:       "tpl-1",
+		TenantID: "tenant-a",
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+	}
+	repo.lockVersions["ver-1"] = 2
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	err := svc.SaveTemplateDraft(context.Background(), application.SaveTemplateDraftCmd{
+		TenantID:            "tenant-a",
+		ActorUserID:         "user-a",
+		TemplateID:          "tpl-1",
+		VersionNumber:       1,
+		ExpectedLockVersion: 1,
+		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
+		SchemaStorageKey:    "templates/tpl-1/versions/1.schema.json",
+		DocxContentHash:     "hash_new",
+		SchemaContentHash:   "schema_hash",
+	})
+	if !errors.Is(err, domain.ErrStaleLockVersion) {
+		t.Fatalf("expected ErrStaleLockVersion, got %v", err)
+	}
+}

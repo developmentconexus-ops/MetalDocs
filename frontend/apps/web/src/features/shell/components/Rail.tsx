@@ -41,6 +41,7 @@ function NavButton({ item }: { item: NavItem }) {
 export function Rail() {
   const user = useAuthStore((s) => s.user);
   const { handleLogout } = useAuthSession();
+  const avatarName = user ? user.displayName || user.email || user.username : '';
 
   return (
     <aside className={styles.rail}>
@@ -64,8 +65,8 @@ export function Rail() {
       <div className={styles.bottom}>
         <div className={styles.divider} />
         {user && (
-          <span title={user.displayName ?? user.email}>
-            <Avatar name={user.displayName || user.email} size="sm" />
+          <span title={avatarName}>
+            <Avatar name={avatarName} size="sm" />
           </span>
         )}
         <button

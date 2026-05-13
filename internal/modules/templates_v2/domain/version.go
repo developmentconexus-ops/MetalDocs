@@ -34,6 +34,7 @@ type TemplateVersion struct {
 	ApprovedAt          *time.Time
 	PublishedAt         *time.Time
 	ObsoletedAt         *time.Time
+	LockVersion         int
 	CreatedAt           time.Time
 }
 
@@ -69,4 +70,5 @@ var (
 	ErrInvalidStateTransition = errors.New("templates_v2: invalid_state_transition")
 	ErrContentHashMismatch    = errors.New("templates_v2: content_hash_mismatch")
 	ErrStaleBase              = errors.New("templates_v2: stale_base")
+	ErrStaleLockVersion       = errors.New("templates_v2: stale_lock_version")
 )

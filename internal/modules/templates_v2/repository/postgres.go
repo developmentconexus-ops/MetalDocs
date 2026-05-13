@@ -181,18 +181,44 @@ INSERT INTO templates_v2_template_version (
 	id, template_id, version_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
-	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, created_at
+	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6,
 	$7, $8, $9,
 	$10, $11, $12, $13,
-	$14, $15, $16, $17, $18, $19
+	$14, $15, $16, $17, $18, $19, $20
 )`
 	_, err = r.db.ExecContext(ctx, q,
 		v.ID, v.TemplateID, v.VersionNumber, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON, v.AuthorID,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
-		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.CreatedAt,
+		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) CreateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error {
+	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
+	if err != nil {
+		return err
+	}
+	const q = `
+INSERT INTO templates_v2_template_version (
+	id, template_id, version_number, status, docx_storage_key, content_hash,
+	metadata_schema, placeholder_schema, author_id,
+	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
+	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
+) VALUES (
+	$1, $2, $3, $4, $5, $6,
+	$7, $8, $9,
+	$10, $11, $12, $13,
+	$14, $15, $16, $17, $18, $19, $20
+)`
+	_, err = tx.ExecContext(ctx, q,
+		v.ID, v.TemplateID, v.VersionNumber, string(v.Status), v.DocxStorageKey, v.ContentHash,
+		metadataJSON, placeholderJSON, v.AuthorID,
+		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
+		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
 	)
 	return err
 }
@@ -203,7 +229,7 @@ SELECT
 	id::text, template_id::text, version_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
-	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, created_at
+	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 FROM templates_v2_template_version
 WHERE template_id = $1 AND version_number = $2`
 
@@ -223,7 +249,7 @@ SELECT
 	id::text, template_id::text, version_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
-	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, created_at
+	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 FROM templates_v2_template_version
 WHERE id = $1`
 
@@ -259,13 +285,14 @@ SET
 	reviewed_at = $12,
 	approved_at = $13,
 	published_at = $14,
-	obsoleted_at = $15
+	obsoleted_at = $15,
+	lock_version = $16
 WHERE id = $1`
 	res, err := r.db.ExecContext(ctx, q,
 		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
-		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt,
+		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion,
 	)
 	if err != nil {
 		return err
@@ -351,13 +378,14 @@ SET
 	reviewed_at = $12,
 	approved_at = $13,
 	published_at = $14,
-	obsoleted_at = $15
+	obsoleted_at = $15,
+	lock_version = $16
 WHERE id = $1`
 	res, err := tx.ExecContext(ctx, q,
 		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
-		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt,
+		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion,
 	)
 	if err != nil {
 		return err
@@ -369,12 +397,49 @@ WHERE id = $1`
 	return nil
 }
 
+func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	const q = `
+UPDATE templates_v2_template_version
+SET
+	docx_storage_key = $3,
+	content_hash = $4,
+	lock_version = lock_version + 1
+WHERE id = $1
+  AND lock_version = $2`
+	res, err := r.db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n > 0 {
+		return nil
+	}
+
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM templates_v2_template_version WHERE id = $1)", versionID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return domain.ErrNotFound
+	}
+	return domain.ErrStaleLockVersion
+}
+
 func (r *Repository) ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error {
 	const q = `
 UPDATE templates_v2_template_version
 SET status = 'obsolete', obsoleted_at = now()
 WHERE template_id = $1 AND status = 'published' AND id <> $2`
 	_, err := r.db.ExecContext(ctx, q, templateID, keepVersionID)
+	return err
+}
+
+func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx *sql.Tx, templateID, keepVersionID string) error {
+	const q = `
+UPDATE templates_v2_template_version
+SET status = 'obsolete', obsoleted_at = now()
+WHERE template_id = $1 AND status = 'published' AND id <> $2`
+	_, err := tx.ExecContext(ctx, q, templateID, keepVersionID)
 	return err
 }
 
@@ -411,6 +476,17 @@ SET reviewer_role = EXCLUDED.reviewer_role,
 	return err
 }
 
+func (r *Repository) UpsertApprovalConfigTx(ctx context.Context, tx *sql.Tx, c *domain.ApprovalConfig) error {
+	const q = `
+INSERT INTO templates_v2_approval_config (template_id, reviewer_role, approver_role)
+VALUES ($1, $2, $3)
+ON CONFLICT (template_id) DO UPDATE
+SET reviewer_role = EXCLUDED.reviewer_role,
+    approver_role = EXCLUDED.approver_role`
+	_, err := tx.ExecContext(ctx, q, c.TemplateID, c.ReviewerRole, c.ApproverRole)
+	return err
+}
+
 func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) error {
 	if r.audit == nil {
 		return nil
@@ -432,6 +508,10 @@ func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) 
 		PayloadJSON:  string(payload),
 		TenantID:     tenantID,
 	})
+}
+
+func (r *Repository) AppendAuditTx(ctx context.Context, _ *sql.Tx, entry *domain.AuditEvent) error {
+	return r.AppendAudit(ctx, entry)
 }
 
 func (r *Repository) ListAudit(ctx context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {

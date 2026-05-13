@@ -219,6 +219,8 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusBadRequest, "PROFILE_CODE_IMMUTABLE", "profile code is immutable")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", pgErr.Message)
+	case errors.As(err, &pgErr) && pgErr.Code == "23505":
+		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_ALREADY_EXISTS", "profile code already exists")
 	case errors.As(err, &pgErr) && pgErr.Code == "23503":
 		httpresponse.WriteError(w, http.StatusConflict, "FAMILY_NOT_FOUND", "referenced family does not exist")
 	default:

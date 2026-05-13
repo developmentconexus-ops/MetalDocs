@@ -27,6 +27,7 @@ import (
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/documents/jobs"
 	docrepo "metaldocs/internal/modules/documents/repository"
+	"metaldocs/internal/modules/jobs/audit_integrity_validator"
 	"metaldocs/internal/modules/jobs/effective_date_publisher"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	jobscheduler "metaldocs/internal/modules/jobs/scheduler"
@@ -35,6 +36,7 @@ import (
 	tv2http "metaldocs/internal/modules/templates_v2/delivery/http"
 	tv2repo "metaldocs/internal/modules/templates_v2/repository"
 
+	"metaldocs/apps/api/internal/wiring"
 	auditapp "metaldocs/internal/modules/audit/application"
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
 	authapp "metaldocs/internal/modules/auth/application"
@@ -55,14 +57,13 @@ import (
 	"metaldocs/internal/modules/taxonomy"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
-	"metaldocs/apps/api/internal/wiring"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/bootstrap"
 	"metaldocs/internal/platform/config"
-	"metaldocs/internal/platform/httpclient"
 	docgenv2 "metaldocs/internal/platform/docgenv2"
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
+	"metaldocs/internal/platform/httpclient"
 	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
@@ -365,6 +366,14 @@ func main() {
 			Name:     "idempotency-janitor",
 			Interval: 15 * time.Minute,
 			Fn:       idempotency_janitor.New(deps.SQLDB),
+			Policy:   jobscheduler.SkipOnPressure,
+		})
+	}
+	if jobEnabled("ENABLE_JOB_AUDIT_INTEGRITY_VALIDATOR") && deps.AuditValidator != nil {
+		s.Register(jobscheduler.JobConfig{
+			Name:     "audit-integrity-validator",
+			Interval: time.Hour,
+			Fn:       audit_integrity_validator.New(deps.AuditValidator),
 			Policy:   jobscheduler.SkipOnPressure,
 		})
 	}

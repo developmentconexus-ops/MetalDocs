@@ -87,34 +87,55 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		if err := s.repo.CreateTemplateTx(ctx, tx, template); err != nil {
 			return nil, err
 		}
+		if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
+			return nil, err
+		}
+		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &domain.ApprovalConfig{
+			TemplateID:   template.ID,
+			ApproverRole: cmd.ApproverRole,
+			ReviewerRole: cmd.ReviewerRole,
+		}); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
+			TenantID:   cmd.TenantID,
+			TemplateID: template.ID,
+			VersionID:  &version.ID,
+			ActorID:    cmd.ActorUserID,
+			Action:     domain.AuditCreated,
+			Details:    map[string]any{},
+			OccurredAt: s.clock.Now(),
+		}); err != nil {
+			return nil, err
+		}
 		if err := tx.Commit(); err != nil {
 			return nil, err
 		}
-	} else if err := s.repo.CreateTemplate(ctx, template); err != nil {
-		return nil, err
-	}
-	if err := s.repo.CreateVersion(ctx, version); err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.UpsertApprovalConfig(ctx, &domain.ApprovalConfig{
-		TemplateID:   template.ID,
-		ApproverRole: cmd.ApproverRole,
-		ReviewerRole: cmd.ReviewerRole,
-	}); err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: template.ID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditCreated,
-		Details:    map[string]any{},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
-		return nil, err
+	} else {
+		if err := s.repo.CreateTemplate(ctx, template); err != nil {
+			return nil, err
+		}
+		if err := s.repo.CreateVersion(ctx, version); err != nil {
+			return nil, err
+		}
+		if err := s.repo.UpsertApprovalConfig(ctx, &domain.ApprovalConfig{
+			TemplateID:   template.ID,
+			ApproverRole: cmd.ApproverRole,
+			ReviewerRole: cmd.ReviewerRole,
+		}); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
+			TenantID:   cmd.TenantID,
+			TemplateID: template.ID,
+			VersionID:  &version.ID,
+			ActorID:    cmd.ActorUserID,
+			Action:     domain.AuditCreated,
+			Details:    map[string]any{},
+			OccurredAt: s.clock.Now(),
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return &CreateTemplateResult{

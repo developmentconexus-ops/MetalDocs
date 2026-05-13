@@ -18,6 +18,10 @@ func NewRoleAdminRepository(db *sql.DB) *RoleAdminRepository {
 	return &RoleAdminRepository{db: db}
 }
 
+func (r *RoleAdminRepository) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) {
+	return r.db.BeginTx(ctx, opts)
+}
+
 func (r *RoleAdminRepository) HasAnyRole(ctx context.Context, role iamdomain.Role, tenantID string) (bool, error) {
 	var count int
 	if err := r.db.QueryRowContext(ctx, `
@@ -79,6 +83,13 @@ func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, disp
 		return fmt.Errorf("begin iam replace tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := r.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, roles, assignedBy); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *RoleAdminRepository) ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
 	if err := authz.Require(ctx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
 		return fmt.Errorf("require iam user.manage authorization: %w", err)
 	}
@@ -106,7 +117,7 @@ DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
 		}
 	}
 	if lastRole == "" {
-		return tx.Commit()
+		return nil
 	}
 
 	if _, err := tx.ExecContext(ctx, `
@@ -115,6 +126,5 @@ VALUES ($1, $2::uuid, $3, NOW(), $4)
 `, userID, tenantID, lastRole, assignedBy); err != nil {
 		return fmt.Errorf("insert iam role: %w", err)
 	}
-
-	return tx.Commit()
+	return nil
 }

@@ -6,7 +6,7 @@ import { STALE_FIVE_MINUTES } from './_constants';
 export function useAreasQuery() {
   return useQuery({
     queryKey: QK.taxonomy.areas(),
-    queryFn: fetchAreas,
+    queryFn: () => fetchAreas(),
     staleTime: STALE_FIVE_MINUTES,
   });
 }

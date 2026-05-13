@@ -22,6 +22,7 @@ func TestMapErr(t *testing.T) {
 		{name: "invalid visibility", err: domain.ErrInvalidVisibility, wantStatus: http.StatusBadRequest, wantCode: "invalid_visibility"},
 		{name: "invalid state transition", err: domain.ErrInvalidStateTransition, wantStatus: http.StatusConflict, wantCode: "invalid_state_transition"},
 		{name: "stale base", err: domain.ErrStaleBase, wantStatus: http.StatusConflict, wantCode: "stale_base"},
+		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: "stale_lock_version"},
 		{name: "content hash mismatch", err: domain.ErrContentHashMismatch, wantStatus: http.StatusConflict, wantCode: "content_hash_mismatch"},
 		{name: "upload missing", err: domain.ErrUploadMissing, wantStatus: http.StatusConflict, wantCode: "upload_missing"},
 		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: "iso_segregation_violation"},
@@ -48,4 +49,3 @@ func TestMapErr(t *testing.T) {
 		})
 	}
 }
-

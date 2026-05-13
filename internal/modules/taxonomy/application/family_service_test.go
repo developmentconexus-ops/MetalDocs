@@ -5,12 +5,19 @@ import (
 	"testing"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeFamilyRepo struct {
 	families       map[string]*domain.DocumentFamily
 	activeProfiles map[string]bool
+	lastTenantID   string
 }
+
+type fakeFamilyTx struct{}
+
+func (fakeFamilyTx) Commit() error   { return nil }
+func (fakeFamilyTx) Rollback() error { return nil }
 
 func newFakeFamilyRepo() *fakeFamilyRepo {
 	return &fakeFamilyRepo{
@@ -50,8 +57,25 @@ func (r *fakeFamilyRepo) Update(_ context.Context, f *domain.DocumentFamily) err
 	return nil
 }
 
-func (r *fakeFamilyRepo) HasActiveProfiles(_ context.Context, familyCode string) (bool, error) {
+func (r *fakeFamilyRepo) HasActiveProfiles(_ context.Context, _ string, familyCode string) (bool, error) {
 	return r.activeProfiles[familyCode], nil
+}
+
+func (r *fakeFamilyRepo) BeginTx(_ context.Context) (domain.FamilyTx, error) {
+	return fakeFamilyTx{}, nil
+}
+
+func (r *fakeFamilyRepo) GetByCodeForUpdate(_ context.Context, _ domain.FamilyTx, code string) (*domain.DocumentFamily, error) {
+	return r.GetByCode(context.Background(), code)
+}
+
+func (r *fakeFamilyRepo) HasActiveProfilesTx(_ context.Context, _ domain.FamilyTx, tenantID, familyCode string) (bool, error) {
+	r.lastTenantID = tenantID
+	return r.activeProfiles[familyCode], nil
+}
+
+func (r *fakeFamilyRepo) UpdateTx(_ context.Context, _ domain.FamilyTx, f *domain.DocumentFamily) error {
+	return r.Update(context.Background(), f)
 }
 
 func TestFamilyService_Create(t *testing.T) {
@@ -80,8 +104,12 @@ func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 	repo.activeProfiles["policy"] = true
 	svc := NewFamilyService(repo, nil)
 
-	if err := svc.Deactivate(context.Background(), "policy"); err != domain.ErrFamilyHasProfiles {
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	if err := svc.Deactivate(ctx, "policy"); err != domain.ErrFamilyHasProfiles {
 		t.Fatalf("want ErrFamilyHasProfiles, got %v", err)
+	}
+	if repo.lastTenantID != "tenant-a" {
+		t.Fatalf("tenantID = %q, want tenant-a", repo.lastTenantID)
 	}
 }
 
@@ -90,7 +118,8 @@ func TestFamilyService_Deactivate_OK(t *testing.T) {
 	repo.families["orphan"] = &domain.DocumentFamily{Code: "orphan", IsActive: true}
 	svc := NewFamilyService(repo, nil)
 
-	if err := svc.Deactivate(context.Background(), "orphan"); err != nil {
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	if err := svc.Deactivate(ctx, "orphan"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got, _ := repo.GetByCode(context.Background(), "orphan")

@@ -148,6 +148,8 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "AREA_CODE_IMMUTABLE", "area code is immutable")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
 		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", pgErr.Message)
+	case errors.As(err, &pgErr) && pgErr.Code == "23505":
+		writeError(w, http.StatusConflict, "AREA_ALREADY_EXISTS", "area code already exists")
 	default:
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 	}

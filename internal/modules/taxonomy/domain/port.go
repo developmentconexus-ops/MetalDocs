@@ -31,10 +31,19 @@ type GovernanceEvent struct {
 	PayloadJSON  []byte
 }
 
+type FamilyTx interface {
+	Commit() error
+	Rollback() error
+}
+
 type FamilyRepository interface {
 	GetByCode(ctx context.Context, code string) (*DocumentFamily, error)
 	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)
 	Create(ctx context.Context, f *DocumentFamily) error
 	Update(ctx context.Context, f *DocumentFamily) error
-	HasActiveProfiles(ctx context.Context, familyCode string) (bool, error)
+	HasActiveProfiles(ctx context.Context, tenantID, familyCode string) (bool, error)
+	BeginTx(ctx context.Context) (FamilyTx, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, code string) (*DocumentFamily, error)
+	HasActiveProfilesTx(ctx context.Context, tx FamilyTx, tenantID, familyCode string) (bool, error)
+	UpdateTx(ctx context.Context, tx FamilyTx, f *DocumentFamily) error
 }
