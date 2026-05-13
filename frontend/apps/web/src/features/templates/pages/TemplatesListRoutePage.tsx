@@ -7,9 +7,9 @@ export function Component() {
   return (
     <TemplatesListPage
       onOpenTemplate={(templateId, versionNum) =>
-        navigate(`/templates-v2/${templateId}/versions/${versionNum}`)
+        navigate(`/templates/${templateId}/versions/${versionNum}`)
       }
-      onCreate={() => navigate("/templates-v2/new")}
+      onCreate={() => navigate("/templates/new")}
     />
   );
 }

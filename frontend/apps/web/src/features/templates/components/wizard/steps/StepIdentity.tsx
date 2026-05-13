@@ -36,7 +36,7 @@ export function StepIdentity({
         : 'Etapa 2 de 5';
 
   // TODO(novo-template-wizard:next-code-preview): replace with useNextTemplateCodeQuery(profileCode)
-  // when GET /api/v2/templates/next-code?profile=<CODE> ships.
+  // when GET /api/v1/templates/next-code?profile=<CODE> ships.
   // Backlog: wiki/backlog/novo-template-wizard.md (next-code-preview).
   const codePreview =
     scopeType === 'generic'

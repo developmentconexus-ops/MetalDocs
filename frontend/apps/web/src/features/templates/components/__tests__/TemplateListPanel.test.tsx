@@ -91,11 +91,11 @@ describe("TemplateListPanel — api integration", () => {
     vi.clearAllMocks();
   });
 
-  it("'Novo template' button navigates to /templates-v2/new wizard", () => {
+  it("'Novo template' button navigates to /templates/new wizard", () => {
     // The create button no longer calls createTemplate directly — it routes to
-    // the wizard at /templates-v2/new where the user selects profile + name.
+    // the wizard at /templates/new where the user selects profile + name.
     // This is a navigation-only action; no API call at button click time.
-    // Verified by the button's onClick={() => navigate('/templates-v2/new')} in TemplateListPanel.tsx.
+    // Verified by the button's onClick={() => navigate('/templates/new')} in TemplateListPanel.tsx.
     expect(true).toBe(true); // placeholder — behavior covered by e2e / smoke test
   });
 
