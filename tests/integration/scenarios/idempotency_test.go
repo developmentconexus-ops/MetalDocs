@@ -17,7 +17,7 @@ func TestIdempotency_SameKeyReplay(t *testing.T) {
 
 	tenantID := "11111111-1111-1111-1111-111111111181"
 	actorUserID := "idem-user-1"
-	routeTemplate := "POST /api/v2/documents/{id}/submit"
+	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-1"
 
 	t.Cleanup(func() {
@@ -83,7 +83,7 @@ func TestIdempotency_SameKeyDifferentPayload(t *testing.T) {
 
 	tenantID := "11111111-1111-1111-1111-111111111182"
 	actorUserID := "idem-user-2"
-	routeTemplate := "POST /api/v2/documents/{id}/submit"
+	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-2"
 
 	t.Cleanup(func() {
@@ -141,7 +141,7 @@ func TestIdempotency_Expired_NewEntry(t *testing.T) {
 
 	tenantID := "11111111-1111-1111-1111-111111111183"
 	actorUserID := "idem-user-3"
-	routeTemplate := "POST /api/v2/documents/{id}/submit"
+	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-3"
 
 	t.Cleanup(func() {
@@ -217,7 +217,7 @@ func TestIdempotency_Concurrent_OnlyOneWins(t *testing.T) {
 
 	tenantID := "11111111-1111-1111-1111-111111111184"
 	actorUserID := "idem-user-4"
-	routeTemplate := "POST /api/v2/documents/{id}/submit"
+	routeTemplate := "POST /api/v1/documents/{id}/submit"
 	key := "idem-key-4"
 
 	t.Cleanup(func() {

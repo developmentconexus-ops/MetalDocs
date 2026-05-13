@@ -14,7 +14,7 @@ import (
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/tenant"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 type fakeFillInService struct {
@@ -63,7 +63,7 @@ func TestFillInHandler_PutPlaceholderValue(t *testing.T) {
 			h := NewFillInHandler(svc)
 			mux := fillInTestMux(h)
 
-			req := httptest.NewRequest(http.MethodPut, "/api/v2/documents/rev-1/placeholders/p1", bytes.NewBufferString(tt.body))
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/documents/rev-1/placeholders/p1", bytes.NewBufferString(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{}))

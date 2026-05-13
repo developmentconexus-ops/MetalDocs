@@ -19,7 +19,7 @@ import (
 
 func cancelTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v2/approval/instances/{instance_id}/cancel", h.CancelHandler)
+	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/cancel", h.CancelHandler)
 	return mux
 }
 
@@ -77,7 +77,7 @@ func TestCancelHandler(t *testing.T) {
 				return application.CancelResult{DocumentID: "doc-4"}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-4/cancel", strings.NewReader(tt.body))
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-4/cancel", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))

@@ -11,7 +11,7 @@ import (
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 type fakeRegistryReader struct {

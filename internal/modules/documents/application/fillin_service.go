@@ -12,7 +12,7 @@ import (
 
 	v2domain "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 type SchemaReader interface {

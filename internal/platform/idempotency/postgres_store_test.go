@@ -26,7 +26,7 @@ const (
 
 func TestStore_RecordAndReplay_Hit(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
-	s := idempotency.New(db, "POST /api/v2/test/{id}")
+	s := idempotency.New(db, "POST /api/v1/test/{id}")
 	ctx := context.Background()
 	body := []byte(`{"ok":true}`)
 	err := s.RecordReplay(ctx, testTenantA, "actor-1", "key-1", "hash-a", 201, body)
@@ -44,7 +44,7 @@ func TestStore_RecordAndReplay_Hit(t *testing.T) {
 
 func TestStore_CheckReplay_Conflict(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
-	s := idempotency.New(db, "POST /api/v2/test/{id}")
+	s := idempotency.New(db, "POST /api/v1/test/{id}")
 	ctx := context.Background()
 	_ = s.RecordReplay(ctx, testTenantA, "actor-1", "key-2", "hash-a", 201, []byte(`{}`))
 	_, err := s.CheckReplay(ctx, testTenantA, "actor-1", "key-2", "hash-b")
@@ -55,7 +55,7 @@ func TestStore_CheckReplay_Conflict(t *testing.T) {
 
 func TestStore_CheckReplay_Miss(t *testing.T) {
 	db := pgtest.OpenAndMigrate(t)
-	s := idempotency.New(db, "POST /api/v2/test/{id}")
+	s := idempotency.New(db, "POST /api/v1/test/{id}")
 	replay, err := s.CheckReplay(context.Background(), testTenantB, "actor-x", "missing", "h")
 	if err != nil || replay != nil {
 		t.Fatalf("expected nil replay, got %+v err=%v", replay, err)

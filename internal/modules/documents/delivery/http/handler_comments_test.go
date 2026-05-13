@@ -131,7 +131,7 @@ func TestCreateComment_RoundTrip(t *testing.T) {
 
 	content := json.RawMessage(`[{"type":"paragraph","children":[{"text":"hello"}]}]`)
 	payload := []byte(`{"library_comment_id":42,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"hello"}]}]}`)
-	postReq := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/comments", bytes.NewReader(payload))
+	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader(payload))
 	withAuthHeaders(postReq, "document_filler")
 	postRR := httptest.NewRecorder()
 	mux.ServeHTTP(postRR, postReq)
@@ -139,7 +139,7 @@ func TestCreateComment_RoundTrip(t *testing.T) {
 		t.Fatalf("expected 201, got %d", postRR.Code)
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v2/documents/doc_1/comments", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/comments", nil)
 	withAuthHeaders(getReq, "document_filler")
 	getRR := httptest.NewRecorder()
 	mux.ServeHTTP(getRR, getReq)
@@ -164,7 +164,7 @@ func TestResolveComment_DerivedDoneField(t *testing.T) {
 	svc := newCommentsStatefulSvc()
 	mux := newMuxWithCommentsSvc(t, svc)
 
-	postReq := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":7,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"todo"}]}]}`)))
+	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":7,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"todo"}]}]}`)))
 	withAuthHeaders(postReq, "document_filler")
 	postRR := httptest.NewRecorder()
 	mux.ServeHTTP(postRR, postReq)
@@ -172,7 +172,7 @@ func TestResolveComment_DerivedDoneField(t *testing.T) {
 		t.Fatalf("expected 201, got %d", postRR.Code)
 	}
 
-	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v2/documents/doc_1/comments/7", bytes.NewReader([]byte(`{"done":true}`)))
+	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1/comments/7", bytes.NewReader([]byte(`{"done":true}`)))
 	withAuthHeaders(patchReq, "document_filler")
 	patchRR := httptest.NewRecorder()
 	mux.ServeHTTP(patchRR, patchReq)
@@ -191,7 +191,7 @@ func TestResolveComment_DerivedDoneField(t *testing.T) {
 		t.Fatalf("expected done=true with resolved_at, got %+v", patchOut)
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v2/documents/doc_1/comments", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/comments", nil)
 	withAuthHeaders(getReq, "document_filler")
 	getRR := httptest.NewRecorder()
 	mux.ServeHTTP(getRR, getReq)
@@ -214,7 +214,7 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 	svc := newCommentsStatefulSvc()
 	mux := newMuxWithCommentsSvc(t, svc)
 
-	rootReq := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":100,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"root"}]}]}`)))
+	rootReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":100,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"root"}]}]}`)))
 	withAuthHeaders(rootReq, "document_filler")
 	rootReq = rootReq.WithContext(iamdomain.WithAuthContext(rootReq.Context(), "user_root", []iamdomain.Role{}))
 	rootRR := httptest.NewRecorder()
@@ -223,7 +223,7 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 		t.Fatalf("expected 201, got %d", rootRR.Code)
 	}
 
-	replyReq := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":101,"parent_library_id":100,"author_display":"Bob","content":[{"type":"paragraph","children":[{"text":"reply"}]}]}`)))
+	replyReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":101,"parent_library_id":100,"author_display":"Bob","content":[{"type":"paragraph","children":[{"text":"reply"}]}]}`)))
 	withAuthHeaders(replyReq, "document_filler")
 	replyReq = replyReq.WithContext(iamdomain.WithAuthContext(replyReq.Context(), "user_reply", []iamdomain.Role{}))
 	replyRR := httptest.NewRecorder()
@@ -232,7 +232,7 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 		t.Fatalf("expected 201, got %d", replyRR.Code)
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v2/documents/doc_1/comments", nil)
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/comments", nil)
 	withAuthHeaders(getReq, "document_filler")
 	getRR := httptest.NewRecorder()
 	mux.ServeHTTP(getRR, getReq)

@@ -163,7 +163,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 	rows, err := db.QueryContext(ctx, `
 		SELECT
 			ai.id,
-			ai.document_v2_id,
+			ai.document_id,
 			COALESCE(d.controlled_document_id::text, '') AS controlled_document_id,
 			COALESCE(d.name, '') AS doc_title,
 			COALESCE(asi.area_code_snapshot, '') AS area_code,
@@ -188,7 +188,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 		  ON asi.approval_instance_id = ai.id
 		 AND asi.status = 'active'
 		LEFT JOIN documents d
-		  ON d.id = ai.document_v2_id AND d.tenant_id = ai.tenant_id
+		  ON d.id = ai.document_id AND d.tenant_id = ai.tenant_id
 		WHERE ai.tenant_id = $1::uuid
 		  AND ai.status = 'in_progress'
 		  AND asi.eligible_actor_ids @> $2::jsonb

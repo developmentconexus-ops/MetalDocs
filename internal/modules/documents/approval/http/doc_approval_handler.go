@@ -11,7 +11,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 )
 
-// GetInstanceByDocumentHandler handles GET /api/v2/documents/{id}/approval-instance.
+// GetInstanceByDocumentHandler handles GET /api/v1/documents/{id}/approval-instance.
 // It looks up the active approval instance for the document and returns it.
 func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
@@ -49,7 +49,7 @@ type docSignoffRequest struct {
 	ContentHash string `json:"content_hash"`
 }
 
-// SignoffByDocumentHandler handles POST /api/v2/documents/{id}/signoff.
+// SignoffByDocumentHandler handles POST /api/v1/documents/{id}/signoff.
 // It finds the active instance+stage for the document and records the signoff.
 func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
@@ -147,7 +147,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-// CancelByDocumentHandler handles POST /api/v2/documents/{id}/cancel.
+// CancelByDocumentHandler handles POST /api/v1/documents/{id}/cancel.
 // It finds the active instance for the document and cancels it.
 func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)

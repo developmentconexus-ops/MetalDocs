@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"metaldocs/internal/platform/tenant"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 type fakeOptionsSchemaReader struct {
@@ -30,7 +30,7 @@ func (f fakeOptionsIAMReader) ListUserOptions(_ context.Context, _ string) ([]Us
 }
 
 func newOptionsReq(docID, pid string) *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents/"+docID+"/placeholder-options/"+pid, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/"+docID+"/placeholder-options/"+pid, nil)
 	req.SetPathValue("id", docID)
 	req.SetPathValue("pid", pid)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))

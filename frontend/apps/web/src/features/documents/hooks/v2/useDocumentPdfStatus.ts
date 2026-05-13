@@ -28,7 +28,7 @@ export function useDocumentPdfStatus(documentID: string, enabled: boolean): Docu
     const poll = async () => {
       try {
         const v = await apiFetch<ViewResponse>(
-          `/api/v2/documents/${encodeURIComponent(documentID)}/view`,
+          `/api/v1/documents/${encodeURIComponent(documentID)}/view`,
         );
         if (cancelled) return;
         setData({ status: v.pdf_status, url: v.pdf_url });

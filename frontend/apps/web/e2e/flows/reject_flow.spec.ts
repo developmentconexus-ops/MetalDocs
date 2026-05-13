@@ -32,7 +32,7 @@ async function stateBadgeText(page: Page): Promise<string> {
 }
 
 function isSubmitRequest(request: Request, docId: string): boolean {
-  return request.method() === 'POST' && request.url().includes(`/api/v2/documents/${docId}/submit`);
+  return request.method() === 'POST' && request.url().includes(`/api/v1/documents/${docId}/submit`);
 }
 
 function isSignoffRequest(request: Request): boolean {
@@ -41,7 +41,7 @@ function isSignoffRequest(request: Request): boolean {
   }
 
   const url = request.url();
-  return url.includes('/api/v2/signoff') || url.includes('/signoff');
+  return url.includes('/api/v1/signoff') || url.includes('/signoff');
 }
 
 async function seedExtraDocument(request: APIRequestContext, tenantId: string): Promise<string> {

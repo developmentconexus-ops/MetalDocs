@@ -27,7 +27,7 @@ info:
     - internal.db_privilege_missing
     - internal.capability_tripwire
 servers:
-  - url: /api/v2
+  - url: /api/v1
 
 paths:
   /documents/{id}/submit:

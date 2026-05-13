@@ -37,16 +37,16 @@ type exportDocxURLResp struct {
 func NewExportHandler(svc *application.ExportService) *ExportHandler { return &ExportHandler{svc: svc} }
 
 func (h *ExportHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v2/documents/{id}/export/pdf", h.exportPDF)
-	mux.HandleFunc("GET /api/v2/documents/{id}/export/docx-url", h.exportDocxURL)
+	mux.HandleFunc("POST /api/v1/documents/{id}/export/pdf", h.exportPDF)
+	mux.HandleFunc("GET /api/v1/documents/{id}/export/docx-url", h.exportDocxURL)
 }
 
 func (h *ExportHandler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.Middleware, userFn func(*http.Request) string) {
 	mux.Handle(
-		"POST /api/v2/documents/{id}/export/pdf",
+		"POST /api/v1/documents/{id}/export/pdf",
 		rl.Limit(ratelimit.RouteExportPDF, userFn, http.HandlerFunc(h.exportPDF)),
 	)
-	mux.HandleFunc("GET /api/v2/documents/{id}/export/docx-url", h.exportDocxURL)
+	mux.HandleFunc("GET /api/v1/documents/{id}/export/docx-url", h.exportDocxURL)
 }
 
 func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {

@@ -17,7 +17,7 @@ func TestListDocuments_Paginated_Envelope(t *testing.T) {
 	}
 	mux := newMux(t, svc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents?page=1&pageSize=5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?page=1&pageSize=5", nil)
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -43,7 +43,7 @@ func TestListDocuments_Paginated_Envelope(t *testing.T) {
 func TestListDocuments_PageSizeCap_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents?page=1&pageSize=999", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?page=1&pageSize=999", nil)
 	withAuthHeaders(req, "document_filler")
 	rr := httptest.NewRecorder()
 
@@ -62,7 +62,7 @@ func TestDocumentStats_OK(t *testing.T) {
 	}
 	mux := newMux(t, svc)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/documents/stats", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/stats", nil)
 	withAuthHeaders(req, "system_admin")
 	rr := httptest.NewRecorder()
 

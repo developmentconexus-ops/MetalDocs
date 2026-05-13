@@ -3,12 +3,12 @@ import styles from './LibraryStatCards.module.css';
 // ─────────────────────────────────────────────────────────────────────────────
 // TODO(library/stat-cards): three of four cards are mocked.
 //   - "Em revisão"         → REAL: wired to statsByStatus.under_review.
-//   - "Aprovação pendente" → MOCK: needs GET /api/v2/documents/stats extended
+//   - "Aprovação pendente" → MOCK: needs GET /api/v1/documents/stats extended
 //     with pending_my_approval count (docs awaiting the current user's
 //     signature, distinct from system-wide under_review).
 //   - "Frozen este mês"    → MOCK: needs stats endpoint to return frozen_this_month
 //     count + delta vs prior month. Backend issue not yet filed.
-//   - "Próx. revisão"      → MOCK: needs GET /api/v2/documents?nextReviewWithin=60d
+//   - "Próx. revisão"      → MOCK: needs GET /api/v1/documents?nextReviewWithin=60d
 //     count. No endpoint yet.
 // Trend strings are illustrative only. Replace all MOCK values once endpoints land.
 // ─────────────────────────────────────────────────────────────────────────────

@@ -63,7 +63,7 @@ func (f *fakeReadServiceInbox) CountPendingForActor(_ context.Context, _ *sql.DB
 
 func inboxTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v2/approval/inbox", h.InboxHandler)
+	mux.HandleFunc("GET /api/v1/approval/inbox", h.InboxHandler)
 	return mux
 }
 
@@ -72,7 +72,7 @@ func TestInboxHandler_HappyEmptyList(t *testing.T) {
 	h := &Handler{readSvc: fakeSvc}
 	mux := inboxTestMux(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/inbox", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
@@ -95,7 +95,7 @@ func TestInboxHandler_ValidLimitParam(t *testing.T) {
 	h := &Handler{readSvc: fakeSvc}
 	mux := inboxTestMux(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox?area_code=finance&limit=40&offset=10", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/inbox?area_code=finance&limit=40&offset=10", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
@@ -118,7 +118,7 @@ func TestInboxHandler_InvalidLimitTooLarge(t *testing.T) {
 	h := &Handler{readSvc: fakeSvc}
 	mux := inboxTestMux(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox?limit=101", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/inbox?limit=101", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
@@ -150,7 +150,7 @@ func TestInboxHandler_PopulatesTitleQuorumAndTotal(t *testing.T) {
 	h := &Handler{readSvc: fakeSvc}
 	mux := inboxTestMux(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/inbox?limit=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/inbox?limit=1", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()

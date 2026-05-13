@@ -14,7 +14,7 @@ test.describe('Code Immutability', () => {
     await page.getByRole('button', { name: /create|save|submit/i }).click(); // Assumption: submit button label may vary.
 
     const result = await page.evaluate(async (originalCode) => {
-      const response = await fetch(`/api/v2/taxonomy/profiles/${originalCode}`, {
+      const response = await fetch(`/api/v1/taxonomy/profiles/${originalCode}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: `newcode-${Date.now()}` }),

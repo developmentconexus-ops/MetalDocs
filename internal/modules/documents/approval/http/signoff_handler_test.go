@@ -12,7 +12,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
-	approvalsignature "metaldocs/internal/modules/documents/approval/infra/signature"
+	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/problem"
@@ -35,7 +35,7 @@ func (f *fakeDecisionService) RecordSignoff(_ context.Context, _ *sql.DB, req ap
 
 func signoffTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoff", h.SignoffHandler)
+	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoff", h.SignoffHandler)
 	return mux
 }
 
@@ -45,7 +45,7 @@ func TestSignoffHandler_HappyApprove(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
@@ -89,7 +89,7 @@ func TestSignoffHandler_HappyReject(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"reject","reason":"wrong value","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
@@ -115,7 +115,7 @@ func TestSignoffHandler_SoDViolation(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
@@ -134,7 +134,7 @@ func TestSignoffHandler_SignatureInvalid(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password_token":"bad","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
@@ -153,7 +153,7 @@ func TestSignoffHandler_ContentHashMismatch(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
@@ -172,7 +172,7 @@ func TestSignoffHandler_MissingIdempotencyKey(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("If-Match", "v1")
@@ -197,7 +197,7 @@ func TestSignoffHandler_MissingIfMatch(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
@@ -215,7 +215,7 @@ func TestSignoffHandler_MalformedIfMatch(t *testing.T) {
 	mux := signoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password_token":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-1/stages/stg-1/signoff", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
@@ -277,7 +277,7 @@ func (f *fakeIdempStore) RecordReplay(_ context.Context, tenantID, actorID, key,
 
 func docSignoffTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v2/documents/{id}/signoff", h.SignoffByDocumentHandler)
+	mux.HandleFunc("POST /api/v1/documents/{id}/signoff", h.SignoffByDocumentHandler)
 	return mux
 }
 
@@ -296,7 +296,7 @@ func TestSignoffByDocumentHandler_ReplayAfterClose(t *testing.T) {
 	mux := docSignoffTestMux(h)
 
 	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-1/signoff", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))

@@ -9,7 +9,7 @@ import (
 	"metaldocs/internal/platform/idempotency"
 )
 
-const signoffRouteTemplate = "POST /api/v2/documents/{id}/signoff"
+const signoffRouteTemplate = "POST /api/v1/documents/{id}/signoff"
 
 type PostgresSignoffIdempStore struct {
 	inner *idempotency.Store

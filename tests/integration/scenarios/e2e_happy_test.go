@@ -37,7 +37,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 	var submitETag string
 	var stageIDs []string
 
-	// 1) POST /api/v2/controlled-documents -> atomic create (CD + document)
+	// 1) POST /api/v1/controlled-documents -> atomic create (CD + document)
 	t.Run("CreateControlledDocument", func(t *testing.T) {
 		body := map[string]any{
 			"profileCode":     "PO",
@@ -46,7 +46,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			"ownerUserId":     userID,
 		}
 
-		resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v2/controlled-documents", body, map[string]string{
+		resp, raw := doJSONRequest(t, client, http.MethodPost, baseURL+"/api/v1/controlled-documents", body, map[string]string{
 			"X-Tenant-ID":     tenantID,
 			"X-User-ID":       userID,
 			"X-User-Roles":    userRoles,
@@ -71,7 +71,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 	})
 
-	// 1b) GET /api/v2/documents/{id} and verify storage_key is populated
+	// 1b) GET /api/v1/documents/{id} and verify storage_key is populated
 	t.Run("VerifyStorageKeyViaDB", func(t *testing.T) {
 		db := openOptionalDirectDB(t)
 		if db == nil {
@@ -95,14 +95,14 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 	})
 
-	// 2) POST /api/v2/documents/{id}/submit with Idempotency-Key + If-Match
+	// 2) POST /api/v1/documents/{id}/submit with Idempotency-Key + If-Match
 	t.Run("SubmitForReview", func(t *testing.T) {
 		submitBody := map[string]any{
 			"route_id":     routeID,
 			"content_hash": contentHash,
 		}
 
-		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v2/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
+		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
 			"X-Tenant-ID":      tenantID,
 			"X-User-ID":        userID,
 			"Idempotency-Key":  "e2e-submit-idem-1",
@@ -138,7 +138,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 			"content_hash": contentHash,
 		}
 
-		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v2/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
+		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/submit", baseURL, documentID), submitBody, map[string]string{
 			"X-Tenant-ID":     tenantID,
 			"X-User-ID":       userID,
 			"Idempotency-Key": "e2e-submit-idem-1",
@@ -156,7 +156,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 	})
 
-	// 3) GET /api/v2/documents/{id}/approval-instance (fallback to approval instance route)
+	// 3) GET /api/v1/documents/{id}/approval-instance (fallback to approval instance route)
 	t.Run("GetApprovalInstanceAfterSubmit", func(t *testing.T) {
 		status, raw := getApprovalInstance(t, client, baseURL, tenantID, userID, userRoles, documentID, instanceID)
 		if status != http.StatusOK {
@@ -198,7 +198,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 
 		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v2/approval/instances/%s/stages/%s/signoffs", baseURL, instanceID, stageID),
+			fmt.Sprintf("%s/api/v1/approval/instances/%s/stages/%s/signoffs", baseURL, instanceID, stageID),
 			map[string]any{
 				"decision":       "approve",
 				"password_token": "e2e-token-1",
@@ -225,7 +225,7 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 
 		resp, raw := doJSONRequest(t, client, http.MethodPost,
-			fmt.Sprintf("%s/api/v2/approval/instances/%s/stages/%s/signoffs", baseURL, instanceID, stageID),
+			fmt.Sprintf("%s/api/v1/approval/instances/%s/stages/%s/signoffs", baseURL, instanceID, stageID),
 			map[string]any{
 				"decision":       "approve",
 				"password_token": "e2e-token-2",
@@ -262,9 +262,9 @@ func TestE2E_HappyPath_HTTP(t *testing.T) {
 		}
 	})
 
-	// 7) POST /api/v2/documents/{id}/publish
+	// 7) POST /api/v1/documents/{id}/publish
 	t.Run("Publish", func(t *testing.T) {
-		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v2/documents/%s/publish", baseURL, documentID), nil, map[string]string{
+		resp, raw := doJSONRequest(t, client, http.MethodPost, fmt.Sprintf("%s/api/v1/documents/%s/publish", baseURL, documentID), nil, map[string]string{
 			"X-Tenant-ID":     tenantID,
 			"X-User-ID":       userID,
 			"Idempotency-Key": "e2e-publish-1",
@@ -349,7 +349,7 @@ func getApprovalInstance(t *testing.T, client *http.Client, baseURL, tenantID, u
 		"X-User-Roles": userRoles,
 	}
 
-	resp, raw := doJSONRequest(t, client, http.MethodGet, fmt.Sprintf("%s/api/v2/documents/%s/approval-instance", baseURL, documentID), nil, headers)
+	resp, raw := doJSONRequest(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/documents/%s/approval-instance", baseURL, documentID), nil, headers)
 	if resp.StatusCode != http.StatusNotFound && resp.StatusCode != http.StatusMethodNotAllowed {
 		return resp.StatusCode, raw
 	}
@@ -358,7 +358,7 @@ func getApprovalInstance(t *testing.T, client *http.Client, baseURL, tenantID, u
 		return resp.StatusCode, raw
 	}
 
-	resp2, raw2 := doJSONRequest(t, client, http.MethodGet, fmt.Sprintf("%s/api/v2/approval/instances/%s", baseURL, instanceID), nil, headers)
+	resp2, raw2 := doJSONRequest(t, client, http.MethodGet, fmt.Sprintf("%s/api/v1/approval/instances/%s", baseURL, instanceID), nil, headers)
 	return resp2.StatusCode, raw2
 }
 

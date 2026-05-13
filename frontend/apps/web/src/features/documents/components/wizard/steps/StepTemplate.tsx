@@ -70,7 +70,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
         <div className={styles.templateStack}>
           {/* TODO(novo-documento:template-versions): only published version is
               selectable; older versions rendered disabled with "Em breve" tooltip.
-              GET /api/v2/templates/:id/versions endpoint not yet shipped.
+              GET /api/v1/templates/:id/versions endpoint not yet shipped.
               See wiki/backlog/novo-documento.md#template-versions. */}
           {templates.map((template) => {
             const publishedID = template.published_version_id;
@@ -116,7 +116,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
           })}
 
           {/* TODO(novo-documento:blank-template): "Em branco" rendered disabled —
-              POST /api/v2/documents does not support template_version_id: null today.
+              POST /api/v1/documents does not support template_version_id: null today.
               See wiki/backlog/novo-documento.md#blank-template. */}
           <SelectableCard
             selected={false}

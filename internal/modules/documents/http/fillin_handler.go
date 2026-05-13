@@ -14,7 +14,7 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -33,9 +33,9 @@ func NewFillInHandler(service FillInService) *FillInHandler {
 }
 
 func (h *FillInHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v2/documents/{id}/fill-in-schema", h.GetFillInSchema)
-	mux.HandleFunc("GET /api/v2/documents/{id}/placeholders", h.ListPlaceholderValues)
-	mux.HandleFunc("PUT /api/v2/documents/{id}/placeholders/{pid}", h.PutPlaceholderValue)
+	mux.HandleFunc("GET /api/v1/documents/{id}/fill-in-schema", h.GetFillInSchema)
+	mux.HandleFunc("GET /api/v1/documents/{id}/placeholders", h.ListPlaceholderValues)
+	mux.HandleFunc("PUT /api/v1/documents/{id}/placeholders/{pid}", h.PutPlaceholderValue)
 }
 
 func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) {

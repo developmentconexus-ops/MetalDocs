@@ -1,4 +1,4 @@
-Ôªøimport { randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { type APIResponse, type Page, type Request } from '@playwright/test';
 
@@ -20,7 +20,7 @@ type SubmitContext = {
 
 const SOD_ERROR_CODE = 'sod.submitter_cannot_sign';
 const INLINE_DIALOG_ERROR = 'Erro interno do servidor. Tente novamente em instantes.';
-const PERMISSION_DENIED_TOAST = 'Permiss√£o negada.';
+const PERMISSION_DENIED_TOAST = 'Permiss„o negada.';
 
 function roleCookies(isolated: IsolatedFixture): RoleCookies {
   return {
@@ -55,13 +55,13 @@ async function submitAsAuthor(page: Page, isolated: IsolatedFixture): Promise<Su
   await page.goto(`/documents/${isolated.docId}`);
 
   const submitRequestPromise = page.waitForRequest((request) => {
-    return request.method() === 'POST' && request.url().includes(`/api/v2/documents/${isolated.docId}/submit`);
+    return request.method() === 'POST' && request.url().includes(`/api/v1/documents/${isolated.docId}/submit`);
   });
   const submitResponsePromise = page.waitForResponse((response) => {
-    return response.request().method() === 'POST' && response.url().includes(`/api/v2/documents/${isolated.docId}/submit`);
+    return response.request().method() === 'POST' && response.url().includes(`/api/v1/documents/${isolated.docId}/submit`);
   });
 
-  await page.getByRole('button', { name: 'Submeter para revis√£o' }).click();
+  await page.getByRole('button', { name: 'Submeter para revis„o' }).click();
   await page.getByRole('button', { name: /^Submeter$/ }).click();
 
   const submitRequest = await submitRequestPromise;
@@ -128,11 +128,11 @@ async function addAuthorAsStageMember(params: {
 
   const candidateURLs: string[] = [];
   if (stageId) {
-    candidateURLs.push(`/api/v2/routes/${routeId}/stages/${stageId}/members`);
-    candidateURLs.push(`/api/v2/approval/routes/${routeId}/stages/${stageId}/members`);
+    candidateURLs.push(`/api/v1/routes/${routeId}/stages/${stageId}/members`);
+    candidateURLs.push(`/api/v1/approval/routes/${routeId}/stages/${stageId}/members`);
   }
-  candidateURLs.push(`/api/v2/routes/${routeId}/stages/1/members`);
-  candidateURLs.push(`/api/v2/approval/routes/${routeId}/stages/1/members`);
+  candidateURLs.push(`/api/v1/routes/${routeId}/stages/1/members`);
+  candidateURLs.push(`/api/v1/approval/routes/${routeId}/stages/1/members`);
 
   const payloads: Array<Record<string, unknown>> = [
     { user_id: authorUserId },
@@ -292,7 +292,7 @@ test.describe.serial('sod_violation', () => {
         };
       };
 
-      const crossTenantResponse = await page.request.post(`/api/v2/documents/${isolated.docId}/signoff`, {
+      const crossTenantResponse = await page.request.post(`/api/v1/documents/${isolated.docId}/signoff`, {
         headers: {
           Cookie: `metaldocs_session=${tenantB.cookies.reviewer}`,
           'Idempotency-Key': randomUUID(),

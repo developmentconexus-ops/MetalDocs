@@ -66,7 +66,7 @@ export interface DistributionMock {
 }
 
 // TODO(distribuicao:distribution): replace with useDistributionQuery(documentId)
-// when GET /api/v2/documents/:id/distribution ships.
+// when GET /api/v1/documents/:id/distribution ships.
 // Backlog: wiki/backlog/distribuicao.md
 export const MOCK_DISTRIBUTION: DistributionMock = {
   code: 'PR-EHS-014',
@@ -110,7 +110,7 @@ export const MOCK_DISTRIBUTION: DistributionMock = {
     { area: 'Administrativo',     total: 18, read: 5,  ack: 3  },
   ],
   // TODO(distribuicao:recipients): replace with useRecipientsQuery(documentId, { tab, search, page })
-  // when GET /api/v2/documents/:id/distribution/recipients ships.
+  // when GET /api/v1/documents/:id/distribution/recipients ships.
   // Backlog: wiki/backlog/distribuicao.md
   people: [
     { who: 'Roberto Carvalho',   role: 'Op. Empilhadeira',    area: 'Logística',          status: 'pending', overdue: false, last: 'nunca abriu',          when: '—' },

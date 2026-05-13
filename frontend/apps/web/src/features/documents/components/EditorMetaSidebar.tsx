@@ -9,7 +9,7 @@ type EditorMetaSidebarProps = {
   code?: string;
 };
 
-// TODO(editor:meta): replace MOCK_META with real data when GET /api/v2/documents/:id
+// TODO(editor:meta): replace MOCK_META with real data when GET /api/v1/documents/:id
 // returns ProfileName, AreaName, NextReviewAt, Visibility.
 // Backlog: wiki/backlog/editor.md (row 1)
 const MOCK_META = [
@@ -21,7 +21,7 @@ const MOCK_META = [
 ] as const;
 
 // TODO(editor:revisions): replace MOCK_REVISIONS with real data when
-// GET /api/v2/documents/:id/revisions ships.
+// GET /api/v1/documents/:id/revisions ships.
 // Backlog: wiki/backlog/editor.md (row 2)
 const MOCK_REVISIONS = [
   { id: 'v5', title: 'v5', subtitle: 'Você · em edição', aside: 'agora', active: true },
@@ -32,7 +32,7 @@ const MOCK_REVISIONS = [
 ];
 
 // TODO(editor:approvers): replace MOCK_APPROVERS with real data when
-// GET /api/v2/documents/:id/signoffs ships.
+// GET /api/v1/documents/:id/signoffs ships.
 // Backlog: wiki/backlog/editor.md (row 3)
 const MOCK_APPROVERS = [
   { id: '1', name: 'Rafael Castro', role: 'Líder Qualidade', status: 'next' as const },

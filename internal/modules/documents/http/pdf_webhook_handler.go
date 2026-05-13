@@ -30,7 +30,7 @@ func NewPDFWebhookHandler(w PDFWriter, secret string) *PDFWebhookHandler {
 }
 
 func (h *PDFWebhookHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v2/documents/{id}/pdf-complete", h.HandlePDFComplete)
+	mux.HandleFunc("POST /api/v1/documents/{id}/pdf-complete", h.HandlePDFComplete)
 }
 
 type pdfCompleteBody struct {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"metaldocs/internal/modules/documents/domain"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 // SnapshotTemplateReader loads a template's artifact data for snapshotting.

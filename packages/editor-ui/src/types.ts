@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Comment, EditorPlugin } from '@eigenpal/docx-js-editor';
-import type { SidebarModel } from './plugins/mergefieldPlugin';
+import type { SidebarModel } from './plugins/sidebarModelData';
 
 export type EditorMode = 'template-draft' | 'document-edit' | 'readonly';
 
@@ -28,7 +28,6 @@ export interface MetalDocsEditorProps {
    * outline refresh). Do NOT trigger heavy async work here.
    */
   onChange?: () => void;
-  onLockLost?: () => void;
   showRuler?: boolean;
 }
 

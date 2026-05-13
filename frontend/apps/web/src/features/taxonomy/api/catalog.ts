@@ -23,7 +23,7 @@ function normalizeDocumentProfile(value: Partial<DocumentProfileItem>): Document
 }
 
 export async function listTaxonomyProfiles(): Promise<{ items: DocumentProfileItem[] }> {
-  const response = await request<{ items: TaxonomyProfileItem[] }>("/api/v2/taxonomy/profiles");
+  const response = await request<{ items: TaxonomyProfileItem[] }>("/api/v1/taxonomy/profiles");
   return {
     items: Array.isArray(response.items)
       ? response.items

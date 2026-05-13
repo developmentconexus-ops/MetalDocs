@@ -42,7 +42,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v2/iam/area-memberships?userId=user-1&areaCode=ops&revokedBy=attacker", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships?userId=user-1&areaCode=ops&revokedBy=attacker", nil)
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "session-user", nil))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()

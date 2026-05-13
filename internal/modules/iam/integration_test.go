@@ -223,7 +223,7 @@ func TestProbeE_TripwireWithoutAssertedCap(t *testing.T) {
 
 	_, err := tx.ExecContext(ctx, `
 INSERT INTO approval_instances
-  (id, tenant_id, document_v2_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
+  (id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 VALUES
   ('11111111-1111-1111-1111-111111111111', $1::uuid, '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333', 1, 'in_progress', 'probe-e-user', now(), 'hash', 'probe-e-key')`,
 		probeTenantID,
@@ -301,7 +301,7 @@ RETURNING id::text`,
 
 	_, err = tx.ExecContext(ctx, `
 INSERT INTO approval_instances
-  (id, tenant_id, document_v2_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
+  (id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 VALUES
   ('44444444-4444-4444-4444-444444444444', $1::uuid, $2::uuid, $3::uuid, 1, 'cancelled', $4, now(), 'hash', 'probe-g-key')`,
 		tenantID, documentID, routeID, submittedBy,
@@ -388,7 +388,7 @@ func TestProbeJ_AreaMismatchTriggersError(t *testing.T) {
 
 	_, err := tx.ExecContext(ctx, `
 INSERT INTO approval_instances
-  (id, tenant_id, document_v2_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
+  (id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 VALUES
   ('55555555-5555-5555-5555-555555555555', $1::uuid, '66666666-6666-6666-6666-666666666666', '77777777-7777-7777-7777-777777777777', 1, 'in_progress', 'probe-j-user', now(), 'hash', 'probe-j-key')`,
 		probeTenantID,

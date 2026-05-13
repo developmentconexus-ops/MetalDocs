@@ -265,7 +265,7 @@ SELECT active.id,
             WHEN 'cancelled'   THEN 'cancelled'
           END
           FROM approval_instances ai
-          WHERE ai.document_v2_id = active.id
+          WHERE ai.document_id = active.id
           ORDER BY ai.submitted_at DESC
           LIMIT 1),
          'draft'
@@ -337,7 +337,7 @@ SELECT active.id,
 		_ = h.db.QueryRowContext(r.Context(), `
 SELECT id::text
   FROM approval_instances
- WHERE document_v2_id = $1::uuid
+ WHERE document_id = $1::uuid
    AND tenant_id = $2::uuid
    AND status = 'in_progress'
  ORDER BY submitted_at DESC

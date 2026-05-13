@@ -39,7 +39,7 @@ test.describe('route admin', () => {
     await page.keyboard.press('Enter');
 
     const routeResp = page.waitForResponse(
-      r => r.url().includes('/api/v2/routes') && r.request().method() === 'POST'
+      r => r.url().includes('/api/v1/routes') && r.request().method() === 'POST'
     );
     await page.getByRole('button', { name: /salvar/i }).click();
     const resp = await routeResp;
@@ -77,7 +77,7 @@ test.describe('route admin', () => {
     // Author submits doc using the route → creates active instance
     await loginAs(page, seed.cookies, 'author');
     await page.goto(`/docs/${seed.docId}`);
-    await page.request.post(`/api/v2/documents/${seed.docId}/submit`, {
+    await page.request.post(`/api/v1/documents/${seed.docId}/submit`, {
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': randomUUID(),
@@ -125,7 +125,7 @@ test.describe('route admin', () => {
 
     // New submission with this route → 409
     const newDocId = randomUUID();
-    const submitResp = await page.request.post(`/api/v2/documents/${newDocId}/submit`, {
+    const submitResp = await page.request.post(`/api/v1/documents/${newDocId}/submit`, {
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': randomUUID(),
@@ -137,7 +137,7 @@ test.describe('route admin', () => {
 
     // Existing in-progress instance unaffected
     const instanceResp = await page.request.get(
-      `/api/v2/documents/${seed.docId}/instance`,
+      `/api/v1/documents/${seed.docId}/instance`,
       { headers: { 'X-Tenant-ID': seed.tenantId } }
     );
     const instanceBody = await instanceResp.json();
@@ -149,7 +149,7 @@ test.describe('route admin', () => {
     await loginAs(page, seed.cookies, 'admin');
 
     // Create a fresh route to test ESC without side effects
-    const freshResp = await page.request.post('/api/v2/routes', {
+    const freshResp = await page.request.post('/api/v1/routes', {
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': randomUUID(),
@@ -175,7 +175,7 @@ test.describe('route admin', () => {
     await expect(dialog).not.toBeVisible({ timeout: 3000 });
 
     // Route still active
-    const checkResp = await page.request.get(`/api/v2/routes/${freshId}`, {
+    const checkResp = await page.request.get(`/api/v1/routes/${freshId}`, {
       headers: { 'X-Tenant-ID': seed.tenantId },
     });
     const routeBody = await checkResp.json();
@@ -186,7 +186,7 @@ test.describe('route admin', () => {
     await loginAs(page, seed.cookies, 'admin');
 
     // Create another fresh route
-    const freshResp = await page.request.post('/api/v2/routes', {
+    const freshResp = await page.request.post('/api/v1/routes', {
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': randomUUID(),

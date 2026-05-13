@@ -271,7 +271,7 @@ SELECT
     NULLIF(ge.payload_json->>'doc_id', ''),
     NULLIF(ge.payload_json->>'document_id', ''),
     CASE WHEN ge.resource_type = 'document' THEN ge.resource_id ELSE '' END,
-    ai.document_v2_id::text
+    ai.document_id::text
   ) AS doc_id
 FROM governance_events ge
 LEFT JOIN approval_instances ai
@@ -282,7 +282,7 @@ WHERE ge.tenant_id = $1
        ge.resource_id = $2 OR
        ge.payload_json->>'doc_id' = $2 OR
        ge.payload_json->>'document_id' = $2 OR
-       ai.document_v2_id::text = $2)
+       ai.document_id::text = $2)
   AND ($3 = '' OR
        ge.resource_id = $3 OR
        ge.payload_json->>'instance_id' = $3)

@@ -27,7 +27,7 @@ func NewViewHandler(svc ViewService) *ViewHandler {
 }
 
 func (h *ViewHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v2/documents/{id}/view", h.HandleView)
+	mux.HandleFunc("GET /api/v1/documents/{id}/view", h.HandleView)
 }
 
 func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {

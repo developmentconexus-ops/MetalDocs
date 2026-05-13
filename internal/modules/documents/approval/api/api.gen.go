@@ -522,52 +522,52 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /api/v2/approval/inbox)
+	// (GET /api/v1/approval/inbox)
 	ListApprovalInboxV2(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/v2/approval/instances/{instance_id})
+	// (GET /api/v1/approval/instances/{instance_id})
 	GetApprovalInstanceV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 
-	// (POST /api/v2/approval/instances/{instance_id}/cancel)
+	// (POST /api/v1/approval/instances/{instance_id}/cancel)
 	CancelApprovalInstanceV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 
-	// (POST /api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
+	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoffV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID)
 
-	// (GET /api/v2/approval/routes)
+	// (GET /api/v1/approval/routes)
 	ListApprovalRoutesV2(w http.ResponseWriter, r *http.Request)
 
-	// (POST /api/v2/approval/routes)
+	// (POST /api/v1/approval/routes)
 	CreateApprovalRouteV2(w http.ResponseWriter, r *http.Request)
 
-	// (DELETE /api/v2/approval/routes/{id})
+	// (DELETE /api/v1/approval/routes/{id})
 	DeactivateApprovalRouteV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (PUT /api/v2/approval/routes/{id})
+	// (PUT /api/v1/approval/routes/{id})
 	UpdateApprovalRouteV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v2/documents/{id}/approval-instance)
+	// (GET /api/v1/documents/{id}/approval-instance)
 	GetApprovalInstanceByDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/cancel)
+	// (POST /api/v1/documents/{id}/cancel)
 	CancelDocumentApprovalV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/obsolete)
+	// (POST /api/v1/documents/{id}/obsolete)
 	ObsoleteDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/publish)
+	// (POST /api/v1/documents/{id}/publish)
 	PublishDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/schedule-publish)
+	// (POST /api/v1/documents/{id}/schedule-publish)
 	ScheduleDocumentPublishV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/signoff)
+	// (POST /api/v1/documents/{id}/signoff)
 	RecordDocumentSignoffV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/submit)
+	// (POST /api/v1/documents/{id}/submit)
 	SubmitDocumentForApprovalV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v2/documents/{id}/supersede)
+	// (POST /api/v1/documents/{id}/supersede)
 	SupersedeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
@@ -1089,22 +1089,22 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/approval/inbox", wrapper.ListApprovalInboxV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/approval/instances/{instance_id}", wrapper.GetApprovalInstanceV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/approval/instances/{instance_id}/cancel", wrapper.CancelApprovalInstanceV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoffV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/approval/routes", wrapper.ListApprovalRoutesV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/approval/routes", wrapper.CreateApprovalRouteV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v2/approval/routes/{id}", wrapper.DeactivateApprovalRouteV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v2/approval/routes/{id}", wrapper.UpdateApprovalRouteV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v2/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/cancel", wrapper.CancelDocumentApprovalV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/obsolete", wrapper.ObsoleteDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/publish", wrapper.PublishDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublishV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/signoff", wrapper.RecordDocumentSignoffV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/submit", wrapper.SubmitDocumentForApprovalV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v2/documents/{id}/supersede", wrapper.SupersedeDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/inbox", wrapper.ListApprovalInboxV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}", wrapper.GetApprovalInstanceV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/cancel", wrapper.CancelApprovalInstanceV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoffV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.ListApprovalRoutesV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.CreateApprovalRouteV2)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.DeactivateApprovalRouteV2)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.UpdateApprovalRouteV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocumentV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/cancel", wrapper.CancelDocumentApprovalV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/obsolete", wrapper.ObsoleteDocumentV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/publish", wrapper.PublishDocumentV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublishV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/signoff", wrapper.RecordDocumentSignoffV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/submit", wrapper.SubmitDocumentForApprovalV2)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/supersede", wrapper.SupersedeDocumentV2)
 
 	return m
 }
@@ -1366,52 +1366,52 @@ func (response SupersedeDocumentV2200Response) VisitSupersedeDocumentV2Response(
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
-	// (GET /api/v2/approval/inbox)
+	// (GET /api/v1/approval/inbox)
 	ListApprovalInboxV2(ctx context.Context, request ListApprovalInboxV2RequestObject) (ListApprovalInboxV2ResponseObject, error)
 
-	// (GET /api/v2/approval/instances/{instance_id})
+	// (GET /api/v1/approval/instances/{instance_id})
 	GetApprovalInstanceV2(ctx context.Context, request GetApprovalInstanceV2RequestObject) (GetApprovalInstanceV2ResponseObject, error)
 
-	// (POST /api/v2/approval/instances/{instance_id}/cancel)
+	// (POST /api/v1/approval/instances/{instance_id}/cancel)
 	CancelApprovalInstanceV2(ctx context.Context, request CancelApprovalInstanceV2RequestObject) (CancelApprovalInstanceV2ResponseObject, error)
 
-	// (POST /api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
+	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoffV2(ctx context.Context, request RecordApprovalStageSignoffV2RequestObject) (RecordApprovalStageSignoffV2ResponseObject, error)
 
-	// (GET /api/v2/approval/routes)
+	// (GET /api/v1/approval/routes)
 	ListApprovalRoutesV2(ctx context.Context, request ListApprovalRoutesV2RequestObject) (ListApprovalRoutesV2ResponseObject, error)
 
-	// (POST /api/v2/approval/routes)
+	// (POST /api/v1/approval/routes)
 	CreateApprovalRouteV2(ctx context.Context, request CreateApprovalRouteV2RequestObject) (CreateApprovalRouteV2ResponseObject, error)
 
-	// (DELETE /api/v2/approval/routes/{id})
+	// (DELETE /api/v1/approval/routes/{id})
 	DeactivateApprovalRouteV2(ctx context.Context, request DeactivateApprovalRouteV2RequestObject) (DeactivateApprovalRouteV2ResponseObject, error)
 
-	// (PUT /api/v2/approval/routes/{id})
+	// (PUT /api/v1/approval/routes/{id})
 	UpdateApprovalRouteV2(ctx context.Context, request UpdateApprovalRouteV2RequestObject) (UpdateApprovalRouteV2ResponseObject, error)
 
-	// (GET /api/v2/documents/{id}/approval-instance)
+	// (GET /api/v1/documents/{id}/approval-instance)
 	GetApprovalInstanceByDocumentV2(ctx context.Context, request GetApprovalInstanceByDocumentV2RequestObject) (GetApprovalInstanceByDocumentV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/cancel)
+	// (POST /api/v1/documents/{id}/cancel)
 	CancelDocumentApprovalV2(ctx context.Context, request CancelDocumentApprovalV2RequestObject) (CancelDocumentApprovalV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/obsolete)
+	// (POST /api/v1/documents/{id}/obsolete)
 	ObsoleteDocumentV2(ctx context.Context, request ObsoleteDocumentV2RequestObject) (ObsoleteDocumentV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/publish)
+	// (POST /api/v1/documents/{id}/publish)
 	PublishDocumentV2(ctx context.Context, request PublishDocumentV2RequestObject) (PublishDocumentV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/schedule-publish)
+	// (POST /api/v1/documents/{id}/schedule-publish)
 	ScheduleDocumentPublishV2(ctx context.Context, request ScheduleDocumentPublishV2RequestObject) (ScheduleDocumentPublishV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/signoff)
+	// (POST /api/v1/documents/{id}/signoff)
 	RecordDocumentSignoffV2(ctx context.Context, request RecordDocumentSignoffV2RequestObject) (RecordDocumentSignoffV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/submit)
+	// (POST /api/v1/documents/{id}/submit)
 	SubmitDocumentForApprovalV2(ctx context.Context, request SubmitDocumentForApprovalV2RequestObject) (SubmitDocumentForApprovalV2ResponseObject, error)
 
-	// (POST /api/v2/documents/{id}/supersede)
+	// (POST /api/v1/documents/{id}/supersede)
 	SupersedeDocumentV2(ctx context.Context, request SupersedeDocumentV2RequestObject) (SupersedeDocumentV2ResponseObject, error)
 }
 
@@ -1860,38 +1860,38 @@ func (sh *strictHandler) SupersedeDocumentV2(w http.ResponseWriter, r *http.Requ
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

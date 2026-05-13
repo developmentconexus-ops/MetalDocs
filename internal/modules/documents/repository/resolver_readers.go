@@ -96,7 +96,7 @@ func (r *WorkflowReader) GetFinalApprovalDate(ctx context.Context, tenantID, rev
 		SELECT coalesce(max(s.signed_at), now())
 		  FROM approval_signoffs s
 		  JOIN approval_instances ai ON ai.id = s.approval_instance_id
-		 WHERE ai.tenant_id=$1::uuid AND ai.document_v2_id=$2::uuid
+		 WHERE ai.tenant_id=$1::uuid AND ai.document_id=$2::uuid
 		   AND s.decision='approve'`,
 		tenantID, revisionID).Scan(&t)
 	return t, err

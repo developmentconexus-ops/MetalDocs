@@ -78,7 +78,7 @@ func newSupersedeTestDB(t *testing.T, revVersion int64) *sql.DB {
 
 func supersedeTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v2/documents/{id}/supersede", h.SupersedeHandler)
+	mux.HandleFunc("POST /api/v1/documents/{id}/supersede", h.SupersedeHandler)
 	return mux
 }
 
@@ -128,7 +128,7 @@ func TestSupersedeHandler(t *testing.T) {
 				}, nil
 			}
 
-			req := httptest.NewRequest(http.MethodPost, "/api/v2/documents/doc-2/supersede", strings.NewReader(`{"superseded_document_id":"11111111-1111-1111-1111-111111111111"}`))
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-2/supersede", strings.NewReader(`{"superseded_document_id":"11111111-1111-1111-1111-111111111111"}`))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))

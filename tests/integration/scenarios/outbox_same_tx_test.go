@@ -46,7 +46,7 @@ func TestOutbox_ApprovalInstanceInsertHasGovernanceEvent(t *testing.T) {
 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO metaldocs.approval_instances
-			(id, tenant_id, document_v2_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
+			(id, tenant_id, document_id, route_id, route_version_snapshot, status, submitted_by, submitted_at, content_hash_at_submit, idempotency_key)
 		VALUES
 			($1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'in_progress', $5, now(), 'outbox-hash', 'outbox-idem')`,
 		instanceID, tenantID, docID, routeID, authorID,

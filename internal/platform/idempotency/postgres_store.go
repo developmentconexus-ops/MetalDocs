@@ -17,7 +17,7 @@ type Replay struct {
 }
 
 // Store is a Postgres-backed idempotency store scoped to a single route
-// template (e.g. "POST /api/v2/documents/{id}/submit").
+// template (e.g. "POST /api/v1/documents/{id}/submit").
 type Store struct {
 	db            *sql.DB
 	routeTemplate string

@@ -42,7 +42,7 @@ describe('useDocumentComments load', () => {
 
     await waitFor(() => expect(result.current.comments.length).toBe(2));
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v2/documents/doc-1/comments');
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/documents/doc-1/comments');
     expect(typeof result.current.comments[0].id).toBe('number');
     expect(result.current.comments[1].parentId).toBe(42);
     expect(typeof result.current.comments[1].done).toBe('boolean');

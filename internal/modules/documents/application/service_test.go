@@ -11,7 +11,7 @@ import (
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
-	templatesdomain "metaldocs/internal/modules/templates_v2/domain"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 type fakeRepo struct {

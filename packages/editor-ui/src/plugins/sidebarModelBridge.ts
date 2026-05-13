@@ -1,6 +1,6 @@
 import type { EditorPlugin, ReactSidebarItem } from '@eigenpal/docx-js-editor';
 import { createElement } from 'react';
-import type { SidebarModel } from './mergefieldPlugin';
+import type { SidebarModel } from './sidebarModelData';
 
 const SIDEBAR_PLUGIN_ID = 'metaldocs-sidebar-model';
 const SIDEBAR_PLUGIN_NAME = 'metaldocs-sidebar-model';

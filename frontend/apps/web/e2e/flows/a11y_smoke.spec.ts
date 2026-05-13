@@ -115,7 +115,7 @@ test.describe('a11y smoke — all approval routes', () => {
 
   test('doc detail page (under_review) — no critical axe violations', async ({ page }) => {
     // Submit to get under_review state
-    await page.request.post(`/api/v2/documents/${seed.docId}/submit`, {
+    await page.request.post(`/api/v1/documents/${seed.docId}/submit`, {
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': randomUUID(),

@@ -32,7 +32,7 @@ function asApiError(error: unknown, fallbackCode: string): ApiError {
 }
 
 export async function fetchLibrary(params: DocumentListQueryParams): Promise<DocumentListResponse> {
-  const { data, error } = await api.GET('/api/v2/documents', {
+  const { data, error } = await api.GET('/api/v1/documents', {
     params: {
       query: cleanParams(params),
     },
@@ -44,7 +44,7 @@ export async function fetchLibrary(params: DocumentListQueryParams): Promise<Doc
 }
 
 export async function fetchLibraryStats(): Promise<DocumentStatsResponse> {
-  const { data, error } = await api.GET('/api/v2/documents/stats');
+  const { data, error } = await api.GET('/api/v1/documents/stats');
 
   if (error) throw asApiError(error, 'library.stats_failed');
   if (!data) throw new ApiError('library.empty_response', 0, 'Resposta vazia ao carregar estatísticas.');

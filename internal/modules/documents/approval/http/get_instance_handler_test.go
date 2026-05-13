@@ -54,7 +54,7 @@ func (f *fakeReadServiceGetInstance) CountPendingForActor(_ context.Context, _ *
 
 func getInstanceTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v2/approval/instances/{instance_id}", h.GetInstanceHandler)
+	mux.HandleFunc("GET /api/v1/approval/instances/{instance_id}", h.GetInstanceHandler)
 	return mux
 }
 
@@ -74,7 +74,7 @@ func TestGetInstanceHandler_HappyPath(t *testing.T) {
 	h := &Handler{readSvc: fakeSvc}
 	mux := getInstanceTestMux(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/instances/inst-1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/instances/inst-1", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
@@ -111,7 +111,7 @@ func TestGetInstanceHandler_NotFound(t *testing.T) {
 	h := &Handler{readSvc: fakeSvc}
 	mux := getInstanceTestMux(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/instances/inst-missing", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/instances/inst-missing", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()
@@ -137,7 +137,7 @@ func TestGetInstanceHandler_NoTenantHeader(t *testing.T) {
 	h := &Handler{readSvc: fakeSvc}
 	mux := getInstanceTestMux(h)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/approval/instances/inst-2", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/instances/inst-2", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), tenant.DevTenantID))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
 	rr := httptest.NewRecorder()

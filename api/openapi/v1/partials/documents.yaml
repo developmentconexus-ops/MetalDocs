@@ -1,5 +1,5 @@
 paths:
-  /api/v2/documents:
+  /api/v1/documents:
     get:
       summary: List documents for tenant
       tags: [documents]
@@ -52,47 +52,47 @@ paths:
         '403': { description: forbidden }
         '422': { description: form_data_invalid or template parse error }
 
-  /api/v2/documents/{id}:
+  /api/v1/documents/{id}:
     get:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '404': { description: not_found } }
 
-  /api/v2/documents/{id}/finalize:
+  /api/v1/documents/{id}/finalize:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '409': { description: invalid_state_transition } }
-  /api/v2/documents/{id}/archive:
+  /api/v1/documents/{id}/archive:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/session/acquire:
+  /api/v1/documents/{id}/session/acquire:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '201': { description: writer acquired }
         '200': { description: readonly (another user holds session) }
-  /api/v2/documents/{id}/session/heartbeat:
+  /api/v1/documents/{id}/session/heartbeat:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '409': { description: session_inactive } }
-  /api/v2/documents/{id}/session/release:
+  /api/v1/documents/{id}/session/release:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/session/force-release:
+  /api/v1/documents/{id}/session/force-release:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '403': { description: forbidden } }
 
-  /api/v2/documents/{id}/autosave/presign:
+  /api/v1/documents/{id}/autosave/presign:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
@@ -110,7 +110,7 @@ paths:
       responses:
         '200': { description: presigned url }
         '409': { description: session_inactive | session_not_holder | stale_base }
-  /api/v2/documents/{id}/autosave/commit:
+  /api/v1/documents/{id}/autosave/commit:
     post:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
@@ -146,7 +146,7 @@ paths:
         '410': { description: expired_upload | upload_missing }
         '422': { description: content_hash_mismatch }
 
-  /api/v2/documents/{id}/checkpoints:
+  /api/v1/documents/{id}/checkpoints:
     get:
       tags: [documents]
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
@@ -160,7 +160,7 @@ paths:
             schema: { type: object, properties: { label: { type: string } } }
       responses: { '201': { description: created } }
 
-  /api/v2/documents/{id}/checkpoints/{versionNum}/restore:
+  /api/v1/documents/{id}/checkpoints/{versionNum}/restore:
     post:
       tags: [documents]
       summary: Forward-only restore - clones the checkpoint rev into a new head revision
@@ -183,7 +183,7 @@ paths:
         '403': { description: session_not_holder | document_not_owner | session_inactive }
         '404': { description: checkpoint_not_found }
 
-  /api/v2/documents/{id}/revisions/{rid}/url:
+  /api/v1/documents/{id}/revisions/{rid}/url:
     get:
       tags: [documents]
       parameters:
@@ -192,7 +192,7 @@ paths:
       responses:
         '302': { description: redirect to signed URL }
 
-  /api/v2/documents/{id}/export/pdf:
+  /api/v1/documents/{id}/export/pdf:
     post:
       operationId: exportDocumentPDF
       tags: [documents]
@@ -226,7 +226,7 @@ paths:
         '429': { description: rate_limited }
         '502': { description: gotenberg_failed }
 
-  /api/v2/documents/{id}/export/docx-url:
+  /api/v1/documents/{id}/export/docx-url:
     get:
       operationId: getDocumentDocxURL
       tags: [documents]

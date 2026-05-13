@@ -2657,7 +2657,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
-  /api/v2/iam/area-memberships:
+  /api/v1/iam/area-memberships:
     get:
       summary: List active area memberships for the current tenant
       tags: [iam]
@@ -2759,7 +2759,7 @@ paths:
         '405':
           description: Method not allowed
       security: []
-  /api/v2/templates:
+  /api/v1/templates:
     get:
       summary: List templates for tenant (docx-v2)
       tags: [templates]
@@ -2813,7 +2813,7 @@ paths:
                 properties:
                   id: { type: string, format: uuid }
                   version_id: { type: string, format: uuid }
-  /api/v2/templates/{id}/versions/{n}:
+  /api/v1/templates/{id}/versions/{n}:
     get:
       summary: Get template version metadata (docx-v2)
       tags: [templates]
@@ -2824,7 +2824,7 @@ paths:
       responses:
         '200': { description: ok }
         '404': { description: not_found }
-  /api/v2/templates/{id}/versions/{n}/docx-upload-url:
+  /api/v1/templates/{id}/versions/{n}/docx-upload-url:
     post:
       summary: Presign PUT URL for draft .docx upload
       tags: [templates]
@@ -2842,7 +2842,7 @@ paths:
                 properties:
                   url: { type: string }
                   storage_key: { type: string }
-  /api/v2/templates/{id}/versions/{n}/schema-upload-url:
+  /api/v1/templates/{id}/versions/{n}/schema-upload-url:
     post:
       summary: Presign PUT URL for draft schema.json upload
       tags: [templates]
@@ -2860,7 +2860,7 @@ paths:
                 properties:
                   url: { type: string }
                   storage_key: { type: string }
-  /api/v2/signed:
+  /api/v1/signed:
     get:
       summary: Redirect to presigned GET URL for a stored object
       tags: [templates]
@@ -2869,7 +2869,7 @@ paths:
         - { in: query, name: key, required: true, schema: { type: string } }
       responses:
         '302': { description: redirect }
-  /api/v2/templates/{id}/versions/{n}/draft:
+  /api/v1/templates/{id}/versions/{n}/draft:
     put:
       summary: Save draft (CAS via expected_lock_version)
       tags: [templates]
@@ -2895,7 +2895,7 @@ paths:
         '409': { description: template_draft_stale }
         '412':
           description: stale expected_lock_version
-  /api/v2/templates/{id}/versions/{n}/publish:
+  /api/v1/templates/{id}/versions/{n}/publish:
     post:
       summary: Publish draft (delegates to docgen-v2 /validate/template)
       tags: [templates]
@@ -2942,14 +2942,14 @@ paths:
                   orphan_tokens: { type: array, items: { type: string } }
 
   # ── Registry: Controlled Documents ────────────────────────────────────────
-  /api/v2/templates/{id}/versions:
+  /api/v1/templates/{id}/versions:
     post:
       tags: [templates]
       operationId: createTemplateVersionV2
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/versions/{n}/schema:
+  /api/v1/templates/{id}/versions/{n}/schema:
     put:
       tags: [templates]
       operationId: updateTemplateSchemaV2
@@ -2957,7 +2957,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/versions/{n}/autosave/presign:
+  /api/v1/templates/{id}/versions/{n}/autosave/presign:
     post:
       tags: [templates]
       operationId: presignTemplateAutosaveV2
@@ -2965,7 +2965,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/versions/{n}/autosave/commit:
+  /api/v1/templates/{id}/versions/{n}/autosave/commit:
     post:
       tags: [templates]
       operationId: commitTemplateAutosaveV2
@@ -2973,7 +2973,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/versions/{n}/submit:
+  /api/v1/templates/{id}/versions/{n}/submit:
     post:
       tags: [templates]
       operationId: submitTemplateVersionV2
@@ -2985,7 +2985,7 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/versions/{n}/review:
+  /api/v1/templates/{id}/versions/{n}/review:
     post:
       tags: [templates]
       operationId: reviewTemplateVersionV2
@@ -2997,7 +2997,7 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/versions/{n}/approve:
+  /api/v1/templates/{id}/versions/{n}/approve:
     post:
       tags: [templates]
       operationId: approveTemplateVersionV2
@@ -3009,28 +3009,28 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/archive:
+  /api/v1/templates/{id}/archive:
     post:
       tags: [templates]
       operationId: archiveTemplateV2
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/approval-config:
+  /api/v1/templates/{id}/approval-config:
     put:
       tags: [templates]
       operationId: upsertTemplateApprovalConfigV2
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}:
+  /api/v1/templates/{id}:
     get:
       tags: [templates]
       operationId: getTemplateV2
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/versions/{n}/docx-url:
+  /api/v1/templates/{id}/versions/{n}/docx-url:
     get:
       tags: [templates]
       operationId: getTemplateDocxUrlV2
@@ -3038,19 +3038,19 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/{id}/audit:
+  /api/v1/templates/{id}/audit:
     get:
       tags: [templates]
       operationId: listTemplateAuditV2
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v2/templates/v2/placeholder-catalog:
+  /api/v1/templates/v2/placeholder-catalog:
     get:
       tags: [templates]
       operationId: listTemplatePlaceholderCatalogV2
       responses: { '200': { description: ok } }
-  /api/v2/taxonomy/profiles:
+  /api/v1/taxonomy/profiles:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyProfilesV2
@@ -3071,7 +3071,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentProfileItem'
-  /api/v2/taxonomy/profiles/{code}:
+  /api/v1/taxonomy/profiles/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyProfileV2
@@ -3102,14 +3102,14 @@ paths:
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '204': { description: archived } }
-  /api/v2/taxonomy/profiles/{code}/default-template:
+  /api/v1/taxonomy/profiles/{code}/default-template:
     put:
       tags: [taxonomy]
       operationId: setTaxonomyProfileDefaultTemplateV2
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '200': { description: ok } }
-  /api/v2/taxonomy/areas:
+  /api/v1/taxonomy/areas:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyAreasV2
@@ -3130,7 +3130,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProcessAreaItem'
-  /api/v2/taxonomy/areas/{code}:
+  /api/v1/taxonomy/areas/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyAreaV2
@@ -3161,7 +3161,7 @@ paths:
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '204': { description: archived } }
-  /api/v2/taxonomy/families:
+  /api/v1/taxonomy/families:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyFamiliesV2
@@ -3186,7 +3186,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentFamilyItem'
-  /api/v2/taxonomy/families/{code}:
+  /api/v1/taxonomy/families/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyFamilyV2
@@ -3217,7 +3217,7 @@ paths:
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '204': { description: deactivated } }
-  /api/v2/controlled-documents:
+  /api/v1/controlled-documents:
     get:
       summary: List controlled documents
       tags: [registry]
@@ -3290,7 +3290,7 @@ paths:
         '409': { description: code_taken or domain conflict }
         '422': { description: template_invalid }
 
-  /api/v2/controlled-documents/preview-code:
+  /api/v1/controlled-documents/preview-code:
     get:
       summary: Preview the next auto-generated document code without allocating it
       tags: [registry]
@@ -3314,7 +3314,7 @@ paths:
         '400': { description: validation_error }
         '401': { description: unauthenticated }
 
-  /api/v2/controlled-documents/{id}:
+  /api/v1/controlled-documents/{id}:
     get:
       summary: Get controlled document by ID
       tags: [registry]
@@ -3334,7 +3334,7 @@ paths:
         '401': { description: unauthenticated }
         '404': { description: not_found }
 
-  /api/v2/controlled-documents/{id}/revisions:
+  /api/v1/controlled-documents/{id}/revisions:
     post:
       summary: Create a new revision for a controlled document
       tags: [registry]
@@ -3366,7 +3366,7 @@ paths:
         '404': { description: controlled_document_not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v2/controlled-documents/{id}/active-document:
+  /api/v1/controlled-documents/{id}/active-document:
     get:
       summary: Get the active document instance for a controlled document
       tags: [registry]
@@ -3386,7 +3386,7 @@ paths:
         '401': { description: unauthenticated }
         '404': { description: no_active_instance }
 
-  /api/v2/controlled-documents/{id}/obsolete:
+  /api/v1/controlled-documents/{id}/obsolete:
     put:
       summary: Mark controlled document as obsolete
       tags: [registry]
@@ -3402,7 +3402,7 @@ paths:
         '404': { description: not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v2/controlled-documents/{id}/supersede:
+  /api/v1/controlled-documents/{id}/supersede:
     put:
       summary: Mark controlled document as superseded
       tags: [registry]
@@ -3418,7 +3418,7 @@ paths:
         '404': { description: not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v2/documents:
+  /api/v1/documents:
     get:
       summary: List documents for tenant
       tags: [documents]
@@ -3482,7 +3482,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
 
-  /api/v2/documents/{id}:
+  /api/v1/documents/{id}:
     get:
       tags: [documents]
       operationId: getDocumentV2
@@ -3503,7 +3503,7 @@ paths:
                 name: { type: string }
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/finalize:
+  /api/v1/documents/{id}/finalize:
     post:
       tags: [documents]
       operationId: finalizeDocumentV2
@@ -3514,20 +3514,20 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses: { '200': { description: ok }, '409': { description: invalid_state_transition } }
-  /api/v2/documents/{id}/archive:
+  /api/v1/documents/{id}/archive:
     post:
       tags: [documents]
       operationId: archiveDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/duplicate:
+  /api/v1/documents/{id}/duplicate:
     post:
       tags: [documents]
       operationId: duplicateDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '201': { description: created } }
 
-  /api/v2/documents/stats:
+  /api/v1/documents/stats:
     get:
       summary: Documents stats by status and area
       tags: [documents]
@@ -3571,7 +3571,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
 
-  /api/v2/documents/{id}/session/acquire:
+  /api/v1/documents/{id}/session/acquire:
     post:
       tags: [documents]
       operationId: acquireDocumentSessionV2
@@ -3579,26 +3579,26 @@ paths:
       responses:
         '201': { description: writer acquired }
         '200': { description: readonly (another user holds session) }
-  /api/v2/documents/{id}/session/heartbeat:
+  /api/v1/documents/{id}/session/heartbeat:
     post:
       tags: [documents]
       operationId: heartbeatDocumentSessionV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '409': { description: session_inactive } }
-  /api/v2/documents/{id}/session/release:
+  /api/v1/documents/{id}/session/release:
     post:
       tags: [documents]
       operationId: releaseDocumentSessionV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/session/force-release:
+  /api/v1/documents/{id}/session/force-release:
     post:
       tags: [documents]
       operationId: forceReleaseDocumentSessionV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '403': { description: forbidden } }
 
-  /api/v2/documents/{id}/autosave/presign:
+  /api/v1/documents/{id}/autosave/presign:
     post:
       tags: [documents]
       operationId: presignDocumentAutosaveV2
@@ -3617,7 +3617,7 @@ paths:
       responses:
         '200': { description: presigned url }
         '409': { description: session_inactive | session_not_holder | stale_base }
-  /api/v2/documents/{id}/autosave/commit:
+  /api/v1/documents/{id}/autosave/commit:
     post:
       tags: [documents]
       operationId: commitDocumentAutosaveV2
@@ -3654,7 +3654,7 @@ paths:
         '410': { description: expired_upload | upload_missing }
         '422': { description: content_hash_mismatch }
 
-  /api/v2/documents/{id}/checkpoints:
+  /api/v1/documents/{id}/checkpoints:
     get:
       tags: [documents]
       operationId: listDocumentCheckpointsV2
@@ -3670,7 +3670,7 @@ paths:
             schema: { type: object, properties: { label: { type: string } } }
       responses: { '201': { description: created } }
 
-  /api/v2/documents/{id}/checkpoints/{version}/restore:
+  /api/v1/documents/{id}/checkpoints/{version}/restore:
     post:
       tags: [documents]
       operationId: restoreDocumentCheckpointV2
@@ -3694,7 +3694,7 @@ paths:
         '403': { description: session_not_holder | document_not_owner | session_inactive }
         '404': { description: checkpoint_not_found }
 
-  /api/v2/documents/{id}/revisions/{rid}/url:
+  /api/v1/documents/{id}/revisions/{rid}/url:
     get:
       tags: [documents]
       operationId: getDocumentRevisionUrlV2
@@ -3704,7 +3704,7 @@ paths:
       responses:
         '302': { description: redirect to signed URL }
 
-  /api/v2/documents/{id}/comments:
+  /api/v1/documents/{id}/comments:
     get:
       tags: [documents]
       operationId: listDocumentCommentsV2
@@ -3722,7 +3722,7 @@ paths:
               type: object
       responses: { '201': { description: created } }
 
-  /api/v2/documents/{id}/comments/{libraryID}:
+  /api/v1/documents/{id}/comments/{libraryID}:
     patch:
       tags: [documents]
       operationId: updateDocumentCommentV2
@@ -3744,7 +3744,7 @@ paths:
         - { name: libraryID, in: path, required: true, schema: { type: integer } }
       responses: { '204': { description: deleted } }
 
-  /api/v2/documents/{id}/export/pdf:
+  /api/v1/documents/{id}/export/pdf:
     post:
       operationId: exportDocumentPDF
       tags: [documents]
@@ -3778,7 +3778,7 @@ paths:
         '429': { description: rate_limited }
         '502': { description: gotenberg_failed }
 
-  /api/v2/documents/{id}/export/docx-url:
+  /api/v1/documents/{id}/export/docx-url:
     get:
       operationId: getDocumentDocxURL
       tags: [documents]
@@ -3797,21 +3797,21 @@ paths:
                   revision_id: { type: string, format: uuid }
         '409': { description: docx_missing }
 
-  /api/v2/documents/{id}/fill-in-schema:
+  /api/v1/documents/{id}/fill-in-schema:
     get:
       tags: [documents]
       operationId: getDocumentFillInSchemaV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/placeholders:
+  /api/v1/documents/{id}/placeholders:
     get:
       tags: [documents]
       operationId: listDocumentPlaceholderValuesV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/placeholders/{pid}:
+  /api/v1/documents/{id}/placeholders/{pid}:
     put:
       tags: [documents]
       operationId: putDocumentPlaceholderValueV2
@@ -3826,14 +3826,14 @@ paths:
               type: object
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/view:
+  /api/v1/documents/{id}/view:
     get:
       tags: [documents]
       operationId: viewDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/reconstruct:
+  /api/v1/documents/{id}/reconstruct:
     post:
       tags: [documents]
       operationId: reconstructDocumentV2
@@ -3846,7 +3846,7 @@ paths:
               type: object
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/placeholder-options/{pid}:
+  /api/v1/documents/{id}/placeholder-options/{pid}:
     get:
       tags: [documents]
       operationId: getDocumentPlaceholderOptionsV2
@@ -3855,13 +3855,13 @@ paths:
         - { name: pid, in: path, required: true, schema: { type: string } }
       responses: { '200': { description: ok } }
 
-  /api/v2/documents/{id}/submit:
+  /api/v1/documents/{id}/submit:
     post:
       tags: [approval]
       operationId: submitDocumentForApprovalV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/approval/instances/{instance_id}/stages/{stage_id}/signoffs:
+  /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs:
     post:
       tags: [approval]
       operationId: recordApprovalStageSignoffV2
@@ -3869,66 +3869,66 @@ paths:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/publish:
+  /api/v1/documents/{id}/publish:
     post:
       tags: [approval]
       operationId: publishDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/schedule-publish:
+  /api/v1/documents/{id}/schedule-publish:
     post:
       tags: [approval]
       operationId: scheduleDocumentPublishV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/supersede:
+  /api/v1/documents/{id}/supersede:
     post:
       tags: [approval]
       operationId: supersedeDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/obsolete:
+  /api/v1/documents/{id}/obsolete:
     post:
       tags: [approval]
       operationId: obsoleteDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/approval/instances/{instance_id}/cancel:
+  /api/v1/approval/instances/{instance_id}/cancel:
     post:
       tags: [approval]
       operationId: cancelApprovalInstanceV2
       parameters: [{ name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/approval/instances/{instance_id}:
+  /api/v1/approval/instances/{instance_id}:
     get:
       tags: [approval]
       operationId: getApprovalInstanceV2
       parameters: [{ name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/approval-instance:
+  /api/v1/documents/{id}/approval-instance:
     get:
       tags: [approval]
       operationId: getApprovalInstanceByDocumentV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/approval/inbox:
+  /api/v1/approval/inbox:
     get:
       tags: [approval]
       operationId: listApprovalInboxV2
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/signoff:
+  /api/v1/documents/{id}/signoff:
     post:
       tags: [approval]
       operationId: recordDocumentSignoffV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/documents/{id}/cancel:
+  /api/v1/documents/{id}/cancel:
     post:
       tags: [approval]
       operationId: cancelDocumentApprovalV2
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v2/approval/routes:
+  /api/v1/approval/routes:
     post:
       tags: [approval]
       operationId: createApprovalRouteV2
@@ -3937,7 +3937,7 @@ paths:
       tags: [approval]
       operationId: listApprovalRoutesV2
       responses: { '200': { description: ok } }
-  /api/v2/approval/routes/{id}:
+  /api/v1/approval/routes/{id}:
     put:
       tags: [approval]
       operationId: updateApprovalRouteV2

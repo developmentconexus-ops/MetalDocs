@@ -15,19 +15,19 @@ func TestRegisterRoutes_AllRoutesRegistered(t *testing.T) {
 		method string
 		path   string
 	}{
-		{method: http.MethodPost, path: "/api/v2/documents/doc-1/submit"},
-		{method: http.MethodPost, path: "/api/v2/approval/instances/i-1/stages/s-1/signoffs"},
-		{method: http.MethodPost, path: "/api/v2/documents/doc-1/publish"},
-		{method: http.MethodPost, path: "/api/v2/documents/doc-1/schedule-publish"},
-		{method: http.MethodPost, path: "/api/v2/documents/doc-1/supersede"},
-		{method: http.MethodPost, path: "/api/v2/documents/doc-1/obsolete"},
-		{method: http.MethodPost, path: "/api/v2/approval/instances/i-1/cancel"},
-		{method: http.MethodGet, path: "/api/v2/approval/instances/i-1"},
-		{method: http.MethodGet, path: "/api/v2/approval/inbox"},
-		{method: http.MethodPost, path: "/api/v2/approval/routes"},
-		{method: http.MethodPut, path: "/api/v2/approval/routes/r-1"},
-		{method: http.MethodDelete, path: "/api/v2/approval/routes/r-1"},
-		{method: http.MethodGet, path: "/api/v2/approval/routes"},
+		{method: http.MethodPost, path: "/api/v1/documents/doc-1/submit"},
+		{method: http.MethodPost, path: "/api/v1/approval/instances/i-1/stages/s-1/signoffs"},
+		{method: http.MethodPost, path: "/api/v1/documents/doc-1/publish"},
+		{method: http.MethodPost, path: "/api/v1/documents/doc-1/schedule-publish"},
+		{method: http.MethodPost, path: "/api/v1/documents/doc-1/supersede"},
+		{method: http.MethodPost, path: "/api/v1/documents/doc-1/obsolete"},
+		{method: http.MethodPost, path: "/api/v1/approval/instances/i-1/cancel"},
+		{method: http.MethodGet, path: "/api/v1/approval/instances/i-1"},
+		{method: http.MethodGet, path: "/api/v1/approval/inbox"},
+		{method: http.MethodPost, path: "/api/v1/approval/routes"},
+		{method: http.MethodPut, path: "/api/v1/approval/routes/r-1"},
+		{method: http.MethodDelete, path: "/api/v1/approval/routes/r-1"},
+		{method: http.MethodGet, path: "/api/v1/approval/routes"},
 	}
 
 	for _, rt := range routes {
