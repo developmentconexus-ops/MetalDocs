@@ -412,7 +412,7 @@ Summary counts (all items; closed rows still counted by tally — see register f
 - Critical: 2
 - Major: 5
 - Minor: 5
-- Decisions without ADR link: 12
+- Decisions without ADR link: 11
 
 Top 3 (by severity, then by blast-radius):
 1. T-005 — `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not emit `recordAudit`; role assignments missing from ISO 9001 audit trail. Critical.

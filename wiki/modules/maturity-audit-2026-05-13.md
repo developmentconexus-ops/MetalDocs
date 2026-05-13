@@ -19,7 +19,7 @@ The module wiki is on the right path. The strongest pages already work as LLM/de
 The maturity gap is consistency, not concept. Ten modules have the full living-doc shape. Five module pages are partial and need promotion before they can participate in cheap post-implementation sync.
 
 Hard blockers before calling the module wiki mature:
-- Five full living docs currently fail `tally_check.sh`.
+- `tally_check.sh` now passes on all ten full living docs (resolved during this audit follow-up), but warning-level backlog linkage remains in `documents` for T-007 and T-010.
 - No module page records the new explicit `Maturity: Lx` field yet.
 - `wiki/modules/README.md` is stale relative to current module docs and Plan 8 stamps.
 - Some full modules lack sync logs or key-file blocks.
@@ -33,30 +33,30 @@ Hard blockers before calling the module wiki mature:
 | `documents` | L3 candidate | Full trio, artifacts, sync log, route truth table, key files, tally PASS. | Tally warns T-007/T-010 have no backlog rows; add maturity stamp. |
 | `taxonomy` | L3 candidate | Full trio, artifacts, sync log, route truth table, key files, tally PASS. | Add maturity stamp; sync after latest implementation to reach L4. |
 | `templates_v2` | L3 candidate | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing key-file block; many spec-missing routes remain documented debt. |
-| `approval` | L2 | Full trio and artifacts, route truth table present. | Tally FAIL: doc says Critical=1, register has Critical=2; no sync log; no key-file block. |
-| `auth` | L2 | Full trio, artifacts, sync log, route truth table. | Tally FAIL: doc missing-ADR count says 9, register grep count is 8. |
-| `editor-chrome` | L2 | Full trio and artifacts; frontend module with route table n/a. | Tally FAIL: doc says Major=3, register has Major=4; no sync log. |
-| `editor-ui-eigenpal` | L2 | Full trio and artifacts; frontend module with route table n/a. | Tally FAIL: doc says Critical=0/Major=0, register has Critical=1/Major=2; no key-file block. |
-| `iam` | L2 | Full trio, artifacts, sync log, route truth table. | Tally FAIL: doc missing-ADR count says 12, register grep count is 11. |
-| `registry` | L2 | Full trio, artifacts, sync log, route truth table. | Tally FAIL: doc missing-ADR count says 10, register grep count is 9. |
+| `approval` | L2 | Full trio and artifacts, route truth table present, tally PASS. | No sync log; no key-file block; missing maturity stamp. |
+| `auth` | L2 | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing maturity stamp; L4 not yet evidenced. |
+| `editor-chrome` | L2 | Full trio and artifacts, tally PASS. | No sync log; frontend maturity profile not explicitly stamped. |
+| `editor-ui-eigenpal` | L2 | Full trio and artifacts, tally PASS. | No key-file block; missing maturity stamp. |
+| `iam` | L2 | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing maturity stamp; still partial contract-first. |
+| `registry` | L2 | Full trio, artifacts, sync log, route truth table, tally PASS. | Missing maturity stamp; contract status still wrapper-only. |
 | `frontend-primitives` | L1 | Useful page exists with key files. | Missing tech-debt register, refactor backlog, artifacts. |
 | `novo-documento-wizard` | L1 | Useful page exists with key files. | Missing tech-debt register, refactor backlog, artifacts. |
 | `templates-v2` | L1 | Useful predecessor/frontend page exists. | Missing trio/artifacts; likely predecessor of `templates_v2` and should be retired or explicitly scoped. |
 | `render-fanout` | L0 | 31-line TBD/stub page. | Needs full promotion or retirement. |
 | `search` | L0 | 30-line stub page. | Needs full promotion or retirement. |
 
-## Tally Gate Results
+## Tally Gate Results (After Follow-up Fixes)
 
 | Module | Result | Detail |
 |---|---|---|
-| `approval` | FAIL | Severity mismatch: actual 2/4/6, stated 1/4/6. |
+| `approval` | PASS | Counts aligned. |
 | `audit` | PASS | Actual 2/4/6 matches stated. |
-| `auth` | FAIL | Missing-ADR mismatch: register count 8, doc stated 9. |
+| `auth` | PASS | Counts aligned. |
 | `documents` | PASS with warnings | T-007 and T-010 have no backlog rows. |
-| `editor-chrome` | FAIL | Severity mismatch: actual 0/4/5, stated 0/3/5. |
-| `editor-ui-eigenpal` | FAIL | Severity mismatch: actual 1/2/5, stated 0/0/5. |
-| `iam` | FAIL | Missing-ADR mismatch: register count 11, doc stated 12. |
-| `registry` | FAIL | Missing-ADR mismatch: register count 9, doc stated 10. |
+| `editor-chrome` | PASS | Counts aligned. |
+| `editor-ui-eigenpal` | PASS | Counts aligned. |
+| `iam` | PASS | Counts aligned. |
+| `registry` | PASS | Counts aligned. |
 | `taxonomy` | PASS | Actual 5/5/6 matches stated. |
 | `templates_v2` | PASS | Actual 4/6/4 matches stated. |
 
@@ -77,8 +77,8 @@ Frontend-only modules correctly do not require API route truth tables unless the
 
 ## Immediate Fix Order
 
-1. Fix mechanical tally failures in existing L2 modules.
-2. Add missing sync logs/key-file blocks and explicit `Maturity:` stamps to the 10 full living docs.
+1. Add missing sync logs/key-file blocks and explicit `Maturity:` stamps to the 10 full living docs.
+2. Resolve warning-level backlog linkage in `documents` (T-007, T-010).
 3. Refresh `wiki/modules/README.md` so the index matches current Last verified dates, maturity levels, and predecessor/partial status.
 4. Promote or retire partial pages:
    - `search`
@@ -90,8 +90,7 @@ Frontend-only modules correctly do not require API route truth tables unless the
 
 ## Recommendation
 
-Do not start by rewriting the good docs. Start with the small mechanical blockers:
-- `approval`, `auth`, `editor-chrome`, `editor-ui-eigenpal`, `iam`, and `registry` count fixes.
+Do not start by rewriting the good docs. Start with the small consistency blockers:
 - Add maturity stamps.
 - Add missing sync-log headers.
 - Update the module index.

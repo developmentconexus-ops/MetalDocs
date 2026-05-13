@@ -306,8 +306,8 @@ The adapter's central job is to be the only file that imports `@eigenpal/docx-js
 
 Pointer-only. Body in `wiki/modules/editor-ui-eigenpal-tech-debt.md`. Severity rubric (concrete triggers) is in the same file; do not invent local definitions.
 
-- Critical: 0
-- Major: 0
+- Critical: 1
+- Major: 2
 - Minor: 5
 
 Coverage stats (computed at compose time):
