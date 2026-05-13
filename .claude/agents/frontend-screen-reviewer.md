@@ -21,9 +21,10 @@ You run after `metaldocs-screen-implementation` Phase 4 finishes. Your job is to
 
 1. `.claude/skills/metaldocs-frontend/SKILL.md` — canonical frontend rules
 2. `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow + hard gates
-3. `wiki/architecture/frontend-structure.md` — feature-sliced layout, routing, state
-4. `wiki/concepts/error-ux.md` — `ApiError` + `resolveErrorMessage` + sonner toasts + `role="alert"`
-5. `wiki/concepts/design-workflow-audit.md` — Keep/Cut/Defer audit pattern
+3. `.agents/skills/metaldocs-tanstack-query/SKILL.md` — required when the screen renders server state, query hooks, mutations, cache invalidation, polling, prefetching, or generated frontend API types
+4. `wiki/architecture/frontend-structure.md` — feature-sliced layout, routing, state
+5. `wiki/concepts/error-ux.md` — `ApiError` + `resolveErrorMessage` + sonner toasts + `role="alert"`
+6. `wiki/concepts/design-workflow-audit.md` — Keep/Cut/Defer audit pattern
 
 Read every invocation. Rules drift. Cite by file path + section.
 

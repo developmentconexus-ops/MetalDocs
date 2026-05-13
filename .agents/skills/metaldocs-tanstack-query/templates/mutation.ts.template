@@ -1,0 +1,27 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { resolveQueryError } from "../../../lib/api/resolveQueryError";
+import { QK } from "../../../lib/queryKeys";
+import { updateDomainEntity } from "../api/domain";
+
+type UpdateDomainEntityInput = {
+  id: string;
+  body: Parameters<typeof updateDomainEntity>[1];
+};
+
+export function useUpdateDomainEntityMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, body }: UpdateDomainEntityInput) =>
+      updateDomainEntity(id, body),
+    onSuccess: (entity, variables) => {
+      queryClient.setQueryData(QK.domain.detail(variables.id), entity);
+      queryClient.invalidateQueries({ queryKey: QK.domain.lists() });
+    },
+    onError: (error) => {
+      toast.error(resolveQueryError(error, "Could not update this item."));
+    },
+  });
+}

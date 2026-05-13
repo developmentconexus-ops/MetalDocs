@@ -1,0 +1,28 @@
+import { api } from "../../../lib/api/client";
+
+// Replace these aliases with generated OpenAPI request/response types when the
+// route is covered by `frontend/apps/web/src/lib/api-types/`.
+type DomainEntity = unknown;
+type DomainRequest = unknown;
+
+export async function getDomainEntity(id: string): Promise<DomainEntity> {
+  const { data, error } = await api.GET("/api/v1/domain/{id}", {
+    params: { path: { id } },
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateDomainEntity(
+  id: string,
+  body: DomainRequest,
+): Promise<DomainEntity> {
+  const { data, error } = await api.PATCH("/api/v1/domain/{id}", {
+    params: { path: { id } },
+    body,
+  });
+
+  if (error) throw error;
+  return data;
+}

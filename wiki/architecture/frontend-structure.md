@@ -23,6 +23,7 @@
 ## Related skills
 
 - `.claude/skills/metaldocs-frontend/SKILL.md` — architecture rulebook (use for any frontend work).
+- `.agents/skills/metaldocs-tanstack-query/SKILL.md` — TanStack Query/API workflow for query keys, cache invalidation, optimistic updates, freshness, and query tests.
 - `.claude/skills/metaldocs-screen-implementation/SKILL.md` — 6-phase workflow for implementing designed screens from `design-source/<slug>/`. Use when the task is "implement screen X".
 
 ---
@@ -236,6 +237,19 @@ export async function getDocument(id: string) {
 
 ## 8. Server state (TanStack Query)
 
+For implementation workflow, cache policy, mutation invalidation, and performance review, use `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
+
+TanStack Query is the canonical server-state layer for the web app. It owns remote data, freshness, loading/error state, mutation state, invalidation, polling, prefetching, and optimistic updates. It is not a local UI state store and should not be wrapped by a project-specific framework unless repetition proves that need.
+
+Durable rules:
+
+- API request functions live in `features/<domain>/api/`, use `lib/api/`, and use generated `lib/api-types/` shapes when OpenAPI covers the route.
+- Query and mutation hooks live in `features/<domain>/queries/`.
+- Reusable queries should expose `queryOptions(...)` factories when the same query is used by hooks, prefetching, tests, or cache writes.
+- Mutations must explicitly update exact detail cache entries when the server response is authoritative and invalidate dependent lists, aggregates, inbox/activity, and audit queries.
+- Optimistic updates are opt-in. Avoid them for approval, publication, archive, finalization, permission, signature, and audit-sensitive workflow state unless the rollback model is obvious and safe.
+- Use `.agents/skills/metaldocs-tanstack-query/templates/` when adding a new API/query/mutation surface. Templates are scaffolds, not mandatory boilerplate for tiny edits.
+
 ```ts
 // lib/queryKeys.ts — centralized constants (frontend/apps/web/src/lib/queryKeys.ts:27)
 export const QK = {
@@ -267,6 +281,7 @@ queryClient.invalidateQueries({ queryKey: QK.documents.detail(id) });
 - **Never inline raw string arrays** as query keys. Import from `lib/queryKeys.ts`. This ensures invalidation consistency across the codebase.
 - Mutations co-located with their query in `features/<x>/queries/`.
 - `QueryClient` instance lives in `app/RootProviders.tsx`. Single instance.
+- Tests that exercise query hooks or mutations must create an isolated `QueryClient` per test.
 
 ---
 

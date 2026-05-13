@@ -1,0 +1,15 @@
+# <Feature> TanStack Invalidation Map
+
+Use this when adding or changing mutations. Keep it near the feature query files
+or copy the final table into the module/wiki note when the invalidation graph is
+important.
+
+| Mutation | Writes exact cache | Invalidates | Optimistic? | Reason |
+|---|---|---|---|---|
+| `useUpdateDomainEntityMutation` | `QK.domain.detail(id)` | `QK.domain.lists()` | No | Server response is source of truth; list ordering/filter membership may change. |
+
+Rules:
+
+- Prefer targeted invalidation over global invalidation.
+- Add `all`, `lists`, or `details` roots to `QK` before inventing partial keys in callsites.
+- Avoid optimistic updates for regulated workflow state unless rollback is safe and obvious.

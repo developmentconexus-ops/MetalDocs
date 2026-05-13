@@ -1,0 +1,18 @@
+# <Feature> Cache Policy
+
+Use this for features with non-obvious freshness, polling, prefetching, or
+optimistic update behavior.
+
+| Query | Key | staleTime | gcTime | Refetch/polling | Why |
+|---|---|---:|---:|---|---|
+| Domain detail | `QK.domain.detail(id)` | `30_000` | repo default | none | Normal detail screen; mutation invalidation keeps it fresh. |
+| Domain reference data | `QK.domain.reference()` | `300_000` | repo default | none | Low volatility catalog data. |
+
+Decision checklist:
+
+- Volatile workflow state: prefer `10_000` to `30_000`.
+- Normal list/detail screens: prefer `30_000` to `60_000`.
+- Reference/catalog data: prefer around `300_000`.
+- Use `Infinity` only for data that changes on login/session boundary.
+- Do not use `"static"` unless manual invalidation must be ignored.
+- Add polling only for live-ish surfaces and document the interval rationale.

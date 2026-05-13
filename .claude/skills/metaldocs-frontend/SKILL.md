@@ -18,6 +18,7 @@ The canonical structure, hard rules, naming, decision rules, anti-patterns, and 
 Companion docs to consult when relevant:
 
 - [wiki/concepts/error-ux.md](../../../wiki/concepts/error-ux.md) — `apiFetch` / `ApiError` / auth-bus contract for error handling
+- [metaldocs-tanstack-query](../../../.agents/skills/metaldocs-tanstack-query/SKILL.md) — required for feature API wrappers, query keys, cache invalidation, optimistic updates, generated frontend API types, and server-state performance
 - [wiki/modules/editor-ui-eigenpal.md](../../../wiki/modules/editor-ui-eigenpal.md) — eigenpal integration if you touch editor code
 - [wiki/README.md](../../../wiki/README.md) — index for everything else
 
@@ -48,7 +49,8 @@ Use the right tool for the right job. The defaults are not negotiable because th
 
 - **Server state** — TanStack Query hooks in `features/<x>/queries/`. Never `useEffect` + `setState` for fetching.
 - **API call** — thin function in `features/<x>/api/<domain>.ts` using `lib/api/client.ts` (the `openapi-fetch` instance) with types from `lib/api-types/`.
-- **Local UI state** — `useState`/`useReducer`. Cross-cutting UI state — `store/ui.store.ts`. Domain state spanning components — `features/<x>/state/<x>.store.ts`.
+- **Server-state workflow** — when API calls, query hooks, query keys, invalidation, optimistic updates, generated API types, polling, prefetching, or freshness are involved, also load `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
+- **Local UI state** — `useState`/`useReducer`. Cross-cutting UI state — `store/ui.store.ts` or `store/auth.store.ts`. Domain state spanning components should use lifted state or a subtree-scoped context/reducer, not feature-scoped Zustand.
 - **Routing** — feature `routes.tsx` exporting `RouteObject[]`, lazy-loaded pages. Composed in `app/AppRouter.tsx`. Never `HashRouter`. Never string-pattern path dispatchers.
 - **Styling** — CSS Modules (`<Component>.module.css`) using tokens from `styles/tokens.css` or `@metaldocs/shared-tokens`. No inline theme styles. No CSS-in-JS.
 - **Error UX** — `ApiError` + `resolveErrorMessage` from `lib/api/`, toasts via `sonner`. Never raw `alert`.

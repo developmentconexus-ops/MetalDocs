@@ -8,6 +8,24 @@ For ANY work on MetalDocs backend HTTP routes, OpenAPI, oapi-codegen, handler wi
 
 Do not duplicate the backend/API rules here. The wiki is the source of truth and the skill is the required workflow.
 
+## Frontend
+
+For ANY work under `frontend/apps/web/`, use the `metaldocs-frontend` skill at `.agents/skills/metaldocs-frontend/SKILL.md`.
+
+For designed screens under `frontend/apps/web/design-source/`, also use `metaldocs-screen-implementation` at `.agents/skills/metaldocs-screen-implementation/SKILL.md`.
+
+## Frontend API / TanStack Query
+
+For ANY work on MetalDocs frontend API calls, TanStack Query hooks, query keys, cache invalidation, optimistic updates, generated frontend API types, or server-state performance under `frontend/apps/web/src/`, use the `metaldocs-tanstack-query` skill at `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
+
+Use it alongside the broader frontend architecture workflow. The wiki remains the source of truth; do not duplicate the TanStack rules here.
+
+## Module Wiki Memory
+
+For full module documentation, maturity promotion, deep module mapping, or rebuilding a module wiki trio/artifacts, use `metaldocs-module-doc` at `.agents/skills/metaldocs-module-doc/SKILL.md`.
+
+After implementation work touches an already documented module, use `metaldocs-module-doc-sync` at `.agents/skills/metaldocs-module-doc-sync/SKILL.md` to update module docs, tech-debt, backlog, route truth, artifacts, and sync logs from the concrete change context.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.
@@ -62,3 +80,16 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+<!-- context7 -->
+Use Context7 MCP to fetch current documentation whenever the user asks about a library, framework, SDK, API, CLI tool, or cloud service -- even well-known ones like React, Next.js, Prisma, Express, Tailwind, Django, or Spring Boot. This includes API syntax, configuration, version migration, library-specific debugging, setup instructions, and CLI tool usage. Use even when you think you know the answer -- your training data may not reflect recent changes. Prefer this over web search for library docs.
+
+Do not use for: refactoring, writing scripts from scratch, debugging business logic, code review, or general programming concepts.
+
+## Steps
+
+1. Always start with `resolve-library-id` using the library name and the user's question, unless the user provides an exact library ID in `/org/project` format
+2. Pick the best match (ID format: `/org/project`) by: exact name match, description relevance, code snippet count, source reputation (High/Medium preferred), and benchmark score (higher is better). If results don't look right, try alternate names or queries (e.g., "next.js" not "nextjs", or rephrase the question). Use version-specific IDs when the user mentions a version
+3. `query-docs` with the selected library ID and the user's full question (not single words)
+4. Answer using the fetched docs
+<!-- context7 -->
