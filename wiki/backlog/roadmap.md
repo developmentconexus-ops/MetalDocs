@@ -1,6 +1,6 @@
 # Refactor Roadmap
 
-> **Last verified:** 2026-05-12 (Plan 7)
+> **Last verified:** 2026-05-13 (Plan 8)
 > **Scope:** Ordered sequence of cross-module refactor sub-plans from current state → professional structured architecture. Each sub-plan = one fresh implementation session = one PR series.
 > **Out of scope:** Implementation detail. Sub-plans are written one-at-a-time in their own session under `docs/superpowers/specs/` and linked back here.
 > **Source evidence:** Every `Closes` row cites a T-NNN (tech-debt) or R-NNN (refactor backlog) in `wiki/modules/<m>-tech-debt.md` / `wiki/backlog/<m>-refactor.md`.
@@ -29,7 +29,7 @@
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
 | P2 | 6a | Audit-trail completeness sweep (emission + sink consolidation) | 11 commits | done 2026-05-11 |
 | P3 | 7 | RFC 9457 envelope rollout | 11 commits | done 2026-05-11 |
-| P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | pending |
+| P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | done 2026-05-13 |
 | P4 | 9 | Transactional + idempotency hardening + audit hash chain (6b absorbed) | ~6 | pending |
 | P4 | 10 | Legacy purge + rename sweep (`templates_v2 → templates`, `v2 → v1`) | ~6 | pending |
 | P5 | 12 | Screen finalization × 7 (per `metaldocs-screen-implementation`) | ~7 | pending |
@@ -64,7 +64,7 @@
 - **Closes:** editor-ui-eigenpal T-002/R-002, T-003/R-003, R-004..R-010; editor-chrome R-001..R-009.
 - **Critical rows closed:** 0.
 - **Blockers:** Plan 3 (tarball restored).
-- **Status:** pending.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
 
 ## Plan 5 · Tier-2 `authz.Require` + Postgres tripwire on regulated tables
 
@@ -104,7 +104,7 @@ Rationale: hash-chain INSERT requires advisory lock / `SELECT … FOR UPDATE` on
 - **Closes:** documents T-002/R-002, T-004/R-004, T-010; approval T-002/R-002; templates_v2 T-006/R-006; registry T-007/R-007, T-011/R-011; audit T-008/R-008; taxonomy T-009/R-009.
 - **Critical rows closed:** 2 (documents T-002, approval T-002).
 - **Blockers:** Plan 7 (error schema referenced by every spec).
-- **Status:** pending.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
 
 ## Plan 9 · Transactional + idempotency hardening + template workflow alignment
 
@@ -114,7 +114,7 @@ Rationale: hash-chain INSERT requires advisory lock / `SELECT … FOR UPDATE` on
 - **Closes:** auth T-004/R-004; documents T-006/R-006, T-009/R-009; templates_v2 T-007/R-007, T-009/R-009, T-010/R-010; taxonomy T-007/R-007, T-011/R-011; audit T-004/R-004 (hash chain — absorbed from Plan 6b); templates_v2 workflow-alignment (new backlog row).
 - **Critical rows closed:** 0 (all Major).
 - **Blockers:** Plan 5 (authz wiring on templates must land first so Review method gets cap-checked on arrival).
-- **Status:** pending.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
 
 ## Plan 10 · Legacy purge + rename sweep
 
@@ -128,7 +128,7 @@ Rationale: hash-chain INSERT requires advisory lock / `SELECT … FOR UPDATE` on
 - **Closes:** templates_v2 R-100, R-101, T-012/R-012; documents R-100; registry R-100, T-010/R-010; approval T-007/R-007, T-008/R-008, T-009/R-009, T-011/R-011; auth T-012/R-012; editor-ui-eigenpal T-004/R-004, T-005/R-005, T-006/R-006; taxonomy T-013/R-013, T-015/R-015.
 - **Critical rows closed:** 0.
 - **Blockers:** Plans 4 / 5 / 6 / 7 / 8 done — rename + purge conflict w/ in-flight semantic work.
-- **Status:** pending.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
 
 ## Plan 11 · Editor frontend stabilization
 
@@ -142,7 +142,7 @@ See above (P1, parallel to Plan 4).
 - **PRs:** 1 per screen.
 - **Blockers:** Plan 7 (stable error envelope), Plan 8 (codegen), Plan 9 (idempotency on wizards' POSTs), Plan 11 (editor chrome stable).
 - **Workflow:** each screen runs the 6-phase `metaldocs-screen-implementation` skill with mandatory design audit per `wiki/concepts/design-workflow-audit.md`.
-- **Status:** pending.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
 
 ## Plan 13 · Doc-comment + ADR sweep
 
@@ -153,7 +153,7 @@ See above (P1, parallel to Plan 4).
 - **Closes:** every remaining `missing-ADR` link across all 10 tech-debt registers (~80 cells) + every doc-comment R-row.
 - **Critical rows closed:** 0.
 - **Blockers:** ratifies decisions Plans 3–10 made — do last.
-- **Status:** pending.
+- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
 
 ---
 
@@ -172,3 +172,4 @@ When splitting a Plan (e.g. 6 → 6a + 6b):
 1. Edit the row in the execution-order table to two rows.
 2. Author a new section here. Keep the original Plan number, append a/b suffix.
 3. Move `Closes` rows between the two halves so each half is shippable alone.
+

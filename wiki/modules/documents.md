@@ -251,7 +251,7 @@ Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 an
 | GET | `/api/v2/documents/{id}/view` | `internal/modules/documents/http/view_handler.go:30` | `h.HandleView` | — | — | — | Spec missing |  |
 | POST | `/api/v2/documents/{id}/reconstruct` | `internal/modules/documents/http/reconstruct_handler.go:27` | `h.HandleReconstruct` | — | — | — | Spec missing |  |
 
-Module contract status: Partial  
+Module contract status: Contracted
 Owner: leandro
 
 ---
@@ -514,3 +514,4 @@ Top 3 (by severity, then blast radius):
 ## Changelog (this doc)
 
 - 2026-05-10 — Full Arc42 + C4 rewrite via `metaldocs-module-doc` skill (Phases 0–8). Supersedes prior FE-leaning doc; FE Key files now live under `wiki/architecture/frontend-structure.md` cross-link.
+

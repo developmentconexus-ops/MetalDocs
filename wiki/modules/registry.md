@@ -188,7 +188,7 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 | PUT | `/api/v2/controlled-documents/{id}/obsolete` | `internal/modules/registry/delivery/http/handler.go:87` | `generated.ObsoleteControlledDocument` | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `ObsoleteControlledDocument` | Aligned |  |
 | PUT | `/api/v2/controlled-documents/{id}/supersede` | `internal/modules/registry/delivery/http/handler.go:88` | `generated.SupersedeControlledDocument` | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `SupersedeControlledDocument` | Aligned |  |
 
-Module contract status: Wrapper-only  
+Module contract status: Wrapper-only
 Owner: leandro
 
 ---
@@ -460,3 +460,4 @@ Top 3 (by severity, then blast-radius):
 
 - 2026-05-11 — Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; §5.3 T-006 note updated; §6.2 sequence + tripwire note updated; §8.7 tenant-scoping paragraph added; Key files updated.
 - 2026-05-11 — initial Arc42 + C4 publish; supersedes 2026-05-07 stub.
+

@@ -233,7 +233,7 @@ Hand-rolled rows (12 of 20) are absent from the OpenAPI spec → spec/handler dr
 | GET | `/api/v2/templates/{id}/audit` | `internal/modules/templates_v2/delivery/http/handler.go:60` | `h.listAudit` | — | — | — | Spec missing |  |
 | GET | `/api/v2/templates/v2/placeholder-catalog` | `internal/modules/templates_v2/delivery/http/handler.go:61` | `h.listPlaceholderCatalog` | — | — | — | Spec missing |  |
 
-Module contract status: Partial  
+Module contract status: Wrapper-only
 Owner: leandro
 
 ---
@@ -494,3 +494,4 @@ Top 3 (by severity, then blast-radius):
 ## Changelog
 
 - 2026-05-10 — initial publish (Arc42 + C4); supersedes the frontend-heavy `templates-v2.md` (kebab) stub (retire scheduled in same backlog row R-100). Path-rename `templates_v2/ → templates/` + `/api/v2/ → /api/v1/` deferred to a single follow-up commit (R-101).
+

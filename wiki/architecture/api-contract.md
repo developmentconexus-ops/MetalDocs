@@ -211,3 +211,4 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 - `wiki/backlog/contract-first-followups.md` - deferred handler migrations + documents spec/handler gap inventory
 - `wiki/references/oapi-codegen.md` - operational how-to (regenerate, vendor mode, add module)
 - `wiki/architecture/frontend-structure.md §7` - frontend API call patterns using generated types
+

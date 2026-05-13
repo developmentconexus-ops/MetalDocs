@@ -206,7 +206,7 @@ C4Container
 | PATCH | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:67` | `updateFamily` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
 | DELETE | `/api/v2/taxonomy/families/{code}` | `internal/modules/taxonomy/delivery/http/handler.go:68` | `deactivateFamily` | — | — | — | Spec missing | Runtime mounted; no taxonomy OpenAPI path yet. |
 
-- Module contract status: Raw
+- Module contract status: Wrapper-only
 - Owner: leandro
 
 ---
@@ -434,3 +434,4 @@ Top 3 (by severity, then by blast-radius):
 ## Changelog (this doc)
 
 - 2026-05-11 — initial publish (metaldocs-module-doc skill v1.2). Supersedes the 2026-05-02 stub which incorrectly claimed `ErrFamilyCodeImmutable` exists.
+
