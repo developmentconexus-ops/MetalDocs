@@ -1,23 +1,40 @@
 # Modules
 
-> **Last verified:** 2026-05-11
-> **Scope:** Per-module deep dives. One file per backend module / frontend feature area.
+> **Last verified:** 2026-05-13
+> **Scope:** Per-module deep dives. One file per backend module or frontend feature area.
+> **Maturity model:** See [maturity-audit-2026-05-13.md](maturity-audit-2026-05-13.md).
 
-- [editor-ui-eigenpal.md](editor-ui-eigenpal.md) — eigenpal integration layer (Last verified: 2026-05-10)
-- [editor-chrome.md](editor-chrome.md) — shared toolbar overlay + eigenpal CSS overrides for eigenpal-based pages; slot API, `VersionBadge`, `AutosaveStatus`; consumed by templates + documents (Last verified: 2026-05-10)
-- **[templates_v2.md](templates_v2.md)** — **Arc42 + C4 living doc** — templates_v2 backend: authoring lifecycle, 20 HTTP routes, placeholder catalog enforcement, SoD probing, MinIO presigned upload/download, downstream snapshot contract for `documents` (Last verified: 2026-05-10)
-- [templates_v2-tech-debt.md](templates_v2-tech-debt.md) — templates_v2 tech-debt register (14 items: 4 Critical / 6 Major / 4 Minor) (Last verified: 2026-05-10)
-- [templates-v2.md](templates-v2.md) — (predecessor — retire pending R-100) frontend-heavy doc: List screen, creation wizard Steps 1–5, `TemplateEditorPage`, `EditorChrome` wiring (Last verified: 2026-05-10)
-- [frontend-primitives.md](frontend-primitives.md) — generic `components/ui/` primitives: `SelectableCard` (forwardRef) + `useRovingRadioGroup` hook (Last verified: 2026-05-10)
-- [documents.md](documents.md) — **Arc42 + C4** — document instance lifecycle; §5 Container view; §6 finalize trace; §8.1 two-tier authz + tripwire; `CreateDocumentTx` port; `internal/modules/documents/`, table `public.documents` (Last verified: 2026-05-10)
-- [documents-tech-debt.md](documents-tech-debt.md) — documents tech-debt register (T-001..T-010) (Last verified: 2026-05-10)
-- [registry.md](registry.md) — controlled-document catalog, code generation, active-document FULL OUTER JOIN (E10), registry detail page, PublishedDownloadCell (Last verified: 2026-05-04)
-- **[taxonomy.md](taxonomy.md)** — **Arc42 + C4 living doc** — taxonomy: document families (global), profiles, areas; 16 HTTP routes `/api/v2/taxonomy/*`; per-tenant scoping; deactivation guards; 5C/5M/6m debt; companion tech-debt register + refactor backlog (Last verified: 2026-05-11)
-- [taxonomy-tech-debt.md](taxonomy-tech-debt.md) — taxonomy tech-debt register (16 items: T-001..T-005 Critical; T-006..T-010 Major; T-011..T-016 Minor) (Last verified: 2026-05-11)
-- **[approval.md](approval.md)** — Arc42 + C4 living doc — 16-route sign-off chain; SoD, J1 eligibility, quorum, transactional outbox, 4-layer defense-in-depth authz; §6 Submit/Signoff/Inbox sequence diagrams (Last verified: 2026-05-10)
-- [approval-tech-debt.md](approval-tech-debt.md) — approval tech-debt register (12 items: T-001 RFC 9457 Critical; T-002 OpenAPI gap Critical; T-003..T-006 Major; T-007..T-012 Minor) (Last verified: 2026-05-10)
-- render-fanout.md — TBD (Last verified: 2026-05-04)
-- [iam.md](iam.md) — IAM module (Arc42 + C4): capabilities, roles, area memberships, tier-1 `CapabilityService.CanDo`, tier-2 `authz.Require`, Postgres tripwire, system_admin bypass, group grants (Last verified: 2026-05-10)
-- [iam-tech-debt.md](iam-tech-debt.md) — IAM tech-debt register (T-001..T-012) (Last verified: 2026-05-10)
-- [auth.md](auth.md) — auth module (Arc42 + C4): session cookie authn, bcrypt, per-account lockout, HMAC-signed opaque tokens, ManagedUser admin ops; 2 Critical / 3 Major / 7 Minor tech-debt items (Last verified: 2026-05-10)
-- [auth-tech-debt.md](auth-tech-debt.md) — auth tech-debt register (T-001..T-012) (Last verified: 2026-05-10)
+## Full Living-Doc Modules (Trio + Artifacts)
+
+- [approval.md](approval.md) - Arc42 + C4 approval/signoff chain (Maturity: L2, Last verified: 2026-05-12)
+- [approval-tech-debt.md](approval-tech-debt.md) - approval tech-debt register
+- [audit.md](audit.md) - Arc42 + C4 audit event pipeline (Maturity: L3, Last verified: 2026-05-12)
+- [audit-tech-debt.md](audit-tech-debt.md) - audit tech-debt register
+- [auth.md](auth.md) - Arc42 + C4 session/cookie authentication module (Maturity: L2, Last verified: 2026-05-12)
+- [auth-tech-debt.md](auth-tech-debt.md) - auth tech-debt register
+- [documents.md](documents.md) - Arc42 + C4 document lifecycle module (Maturity: L3, Last verified: 2026-05-12)
+- [documents-tech-debt.md](documents-tech-debt.md) - documents tech-debt register
+- [editor-chrome.md](editor-chrome.md) - shared editor chrome frontend layer (Maturity: L2, Last verified: 2026-05-11)
+- [editor-chrome-tech-debt.md](editor-chrome-tech-debt.md) - editor-chrome tech-debt register
+- [editor-ui-eigenpal.md](editor-ui-eigenpal.md) - eigenpal adapter frontend layer (Maturity: L2, Last verified: 2026-05-11)
+- [editor-ui-eigenpal-tech-debt.md](editor-ui-eigenpal-tech-debt.md) - editor-ui-eigenpal tech-debt register
+- [iam.md](iam.md) - Arc42 + C4 IAM capabilities/roles/memberships module (Maturity: L2, Last verified: 2026-05-12)
+- [iam-tech-debt.md](iam-tech-debt.md) - IAM tech-debt register
+- [registry.md](registry.md) - Arc42 + C4 controlled-documents registry module (Maturity: L2, Last verified: 2026-05-12)
+- [registry-tech-debt.md](registry-tech-debt.md) - registry tech-debt register
+- [taxonomy.md](taxonomy.md) - Arc42 + C4 taxonomy module (Maturity: L3, Last verified: 2026-05-12)
+- [taxonomy-tech-debt.md](taxonomy-tech-debt.md) - taxonomy tech-debt register
+- [templates_v2.md](templates_v2.md) - Arc42 + C4 templates backend module (Maturity: L3, Last verified: 2026-05-12)
+- [templates_v2-tech-debt.md](templates_v2-tech-debt.md) - templates_v2 tech-debt register
+
+## Partial / Legacy Module Pages
+
+- [frontend-primitives.md](frontend-primitives.md) - frontend primitives notes (L1 partial)
+- [novo-documento-wizard.md](novo-documento-wizard.md) - wizard feature notes (L1 partial)
+- [templates-v2.md](templates-v2.md) - predecessor frontend-heavy templates page (L1 partial, candidate retire/promote)
+- [render-fanout.md](render-fanout.md) - stub (L0)
+- [search.md](search.md) - stub (L0)
+
+## Audit
+
+- [maturity-audit-2026-05-13.md](maturity-audit-2026-05-13.md) - current module maturity baseline and promotion order

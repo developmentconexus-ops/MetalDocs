@@ -2,42 +2,42 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-12 (Plan 8 baseline) · **Owner:** unassigned · **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes)
+**Last verified:** 2026-05-12 (Plan 8 baseline) | **Owner:** unassigned | **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes) | **Maturity:** L2
 
 > **Key files:**
-> - `internal/modules/iam/application/capability_service.go:31` — tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
-> - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require` (in-tx area check); system_admin bypass `:58`
-> - `internal/modules/iam/authz/context.go:13` — `ErrActorContextMissing` / `ErrTenantContextMissing`; `MustActorID` `:21`, `MustTenantID` `:34`
-> - `internal/modules/iam/delivery/http/middleware.go:31` — `NewMiddleware`; `Wrap` `:49`; tenant resolution: prefers `tenant.FromContext`, falls back to `X-Tenant-ID` header then `DevTenantID` (legacy-header mode only)
-> - `internal/modules/iam/delivery/http/middleware.go:77` — `tenant.FromContext` call (primary tenant source post-Plan 3)
-> - `internal/modules/iam/delivery/http/admin_handler.go:82` — admin routes registration; `handleAdminOverview` reads `tenant.FromContext` at `:109`
-> - `internal/modules/iam/delivery/http/routes_memberships.go:30` — area-membership routes; `tenantIDFromRequest` delegates to `tenant.FromContext` at `:146`
-> - `internal/modules/iam/application/admin_service.go:23` — `UpsertUserAndAssignRole`
-> - `internal/modules/iam/application/area_membership_service.go:49` — `Grant` use case
-> - `internal/modules/iam/application/cached_role_provider.go:18` — TTL-cached role provider
-> - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` — tenant-scoped `RolesByUserID`
-> - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:34` — `UpsertUserAndAssignRole` (BEGIN-authz.Require-DELETE-INSERT); `ReplaceUserRoles` at `:76` — both now call `authz.Require(CapUserManage)` (Plan 5 closed T-004 partial)
-> - `internal/modules/iam/infrastructure/postgres/user_area_repository.go:52` — `Insert` (tier-2 `authz.Require(CapMembershipManage)`); `CloseActive` at `:84`; `GrantAtomic` at `:109` — all three write methods now have tier-2 enforcement (Plan 5 closed T-004 partial)
-> - `internal/modules/iam/domain/model.go:13` — single typed `Capability` namespace (20 consts including `CapRegistryObsolete` + `CapRegistrySupersede` added Plan 5; Plan 4 closed T-001)
-> - `apps/api/cmd/metaldocs-api/permissions.go:54,196` — `(method,path)→Cap*` resolver
-> - `apps/api/internal/wiring/documents.go:24` — `NewCapabilityChecker` adapter (J2 fix)
-> - `migrations/0142b_role_capabilities_v2_enforce.sql:67-179` — original `enforce_capability_asserted()` function (approval tables only; superseded by 0188)
-> - `migrations/0188_tripwire_extend.sql:18` — Plan 5: extended `enforce_capability_asserted()` covering 12 tables; trigger attachments at `:186-233`
-> - `internal/platform/tenant/const.go:4` — `DevTenantID` sentinel
+> - `internal/modules/iam/application/capability_service.go:31` â€” tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
+> - `internal/modules/iam/authz/authz.go:44` â€” tier-2 `Require` (in-tx area check); system_admin bypass `:58`
+> - `internal/modules/iam/authz/context.go:13` â€” `ErrActorContextMissing` / `ErrTenantContextMissing`; `MustActorID` `:21`, `MustTenantID` `:34`
+> - `internal/modules/iam/delivery/http/middleware.go:31` â€” `NewMiddleware`; `Wrap` `:49`; tenant resolution: prefers `tenant.FromContext`, falls back to `X-Tenant-ID` header then `DevTenantID` (legacy-header mode only)
+> - `internal/modules/iam/delivery/http/middleware.go:77` â€” `tenant.FromContext` call (primary tenant source post-Plan 3)
+> - `internal/modules/iam/delivery/http/admin_handler.go:82` â€” admin routes registration; `handleAdminOverview` reads `tenant.FromContext` at `:109`
+> - `internal/modules/iam/delivery/http/routes_memberships.go:30` â€” area-membership routes; `tenantIDFromRequest` delegates to `tenant.FromContext` at `:146`
+> - `internal/modules/iam/application/admin_service.go:23` â€” `UpsertUserAndAssignRole`
+> - `internal/modules/iam/application/area_membership_service.go:49` â€” `Grant` use case
+> - `internal/modules/iam/application/cached_role_provider.go:18` â€” TTL-cached role provider
+> - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` â€” tenant-scoped `RolesByUserID`
+> - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:34` â€” `UpsertUserAndAssignRole` (BEGIN-authz.Require-DELETE-INSERT); `ReplaceUserRoles` at `:76` â€” both now call `authz.Require(CapUserManage)` (Plan 5 closed T-004 partial)
+> - `internal/modules/iam/infrastructure/postgres/user_area_repository.go:52` â€” `Insert` (tier-2 `authz.Require(CapMembershipManage)`); `CloseActive` at `:84`; `GrantAtomic` at `:109` â€” all three write methods now have tier-2 enforcement (Plan 5 closed T-004 partial)
+> - `internal/modules/iam/domain/model.go:13` â€” single typed `Capability` namespace (20 consts including `CapRegistryObsolete` + `CapRegistrySupersede` added Plan 5; Plan 4 closed T-001)
+> - `apps/api/cmd/metaldocs-api/permissions.go:54,196` â€” `(method,path)â†’Cap*` resolver
+> - `apps/api/internal/wiring/documents.go:24` â€” `NewCapabilityChecker` adapter (J2 fix)
+> - `migrations/0142b_role_capabilities_v2_enforce.sql:67-179` â€” original `enforce_capability_asserted()` function (approval tables only; superseded by 0188)
+> - `migrations/0188_tripwire_extend.sql:18` â€” Plan 5: extended `enforce_capability_asserted()` covering 12 tables; trigger attachments at `:186-233`
+> - `internal/platform/tenant/const.go:4` â€” `DevTenantID` sentinel
 
 ---
 
 ## 1. Introduction & Goals
 
-IAM owns identity-derived authorization for MetalDocs: it answers "can user X perform capability C in tenant T (and area A, when area-scoped)?". It does NOT authenticate (login/JWT) — that lives in `internal/modules/auth/`. IAM publishes the role catalogue, capability catalogue, role↔capability map, tenant-scoped role assignments, area-scoped membership grants, HTTP middleware that enforces tier-1, in-transaction helpers that enforce tier-2, and an admin HTTP surface for managing users + roles + memberships. The Postgres tripwire trigger that backs both tiers at the database layer is owned conceptually by IAM (migration 0142b) even though it attaches to approval tables.
+IAM owns identity-derived authorization for MetalDocs: it answers "can user X perform capability C in tenant T (and area A, when area-scoped)?". It does NOT authenticate (login/JWT) â€” that lives in `internal/modules/auth/`. IAM publishes the role catalogue, capability catalogue, roleâ†”capability map, tenant-scoped role assignments, area-scoped membership grants, HTTP middleware that enforces tier-1, in-transaction helpers that enforce tier-2, and an admin HTTP surface for managing users + roles + memberships. The Postgres tripwire trigger that backs both tiers at the database layer is owned conceptually by IAM (migration 0142b) even though it attaches to approval tables.
 
 ### 1.1 Requirements overview
 
-- **Tenant-scoped capability checks at the HTTP edge** — drivers: regulated QMS (ISO 9001) needs per-tenant role boundaries; source: `wiki/decisions/0007-two-tier-authz.md`.
-- **Area-scoped grants for QMS process areas** — drivers: ISO segregation per process area; source: `wiki/concepts/iso-segregation.md`, `wiki/decisions/0007-two-tier-authz.md`.
-- **DB-layer enforcement floor** — drivers: bug J2 (`permissiveAuthzChecker` returned nil); source: ADR 0007 amendment (J2) + `migrations/0142b_role_capabilities_v2_enforce.sql`.
-- **Group-derived grants** — drivers: scale role admin to teams; source: migration 0163.
-- **Tenant isolation by row** — drivers: multi-tenant data hygiene; source: Group B fix (audit 2026-05-03 B5/B6), migration 0162.
+- **Tenant-scoped capability checks at the HTTP edge** â€” drivers: regulated QMS (ISO 9001) needs per-tenant role boundaries; source: `wiki/decisions/0007-two-tier-authz.md`.
+- **Area-scoped grants for QMS process areas** â€” drivers: ISO segregation per process area; source: `wiki/concepts/iso-segregation.md`, `wiki/decisions/0007-two-tier-authz.md`.
+- **DB-layer enforcement floor** â€” drivers: bug J2 (`permissiveAuthzChecker` returned nil); source: ADR 0007 amendment (J2) + `migrations/0142b_role_capabilities_v2_enforce.sql`.
+- **Group-derived grants** â€” drivers: scale role admin to teams; source: migration 0163.
+- **Tenant isolation by row** â€” drivers: multi-tenant data hygiene; source: Group B fix (audit 2026-05-03 B5/B6), migration 0162.
 
 ### 1.2 Quality Goals
 
@@ -64,7 +64,7 @@ IAM owns identity-derived authorization for MetalDocs: it answers "can user X pe
 - Authz model: two-tier per ADR 0007; system_admin bypass on both tiers.
 - DB enforcement floor: `metaldocs.asserted_caps` GUC + `enforce_capability_asserted` trigger. Plan 5 migration 0188 expanded coverage to 10 tables: `approval_instances`, `approval_signoffs`, `iam_user_roles`, `user_process_areas`, `documents`, `controlled_documents`, `cd_sequence_counters`, `document_profiles`, `document_process_areas`, `document_families`, `templates_v2_template`, `templates_v2_template_version`.
 - IAM is NOT under oapi-codegen yet (ADR 0012 documents the partial rollout). Membership routes have no `operationId`; admin POST `/api/v1/iam/users/{userId}/roles` has request/response schemas (`api/openapi/v1/openapi.yaml:5043,5054`) but no codegen stub.
-- Error envelope: IAM emits `{error:{code,message,details,trace_id}}` (`delivery/http/middleware.go:132`) — does NOT yet match the RFC 9457 Problem envelope named in `wiki/architecture/api-design-system.md`.
+- Error envelope: IAM emits `{error:{code,message,details,trace_id}}` (`delivery/http/middleware.go:132`) â€” does NOT yet match the RFC 9457 Problem envelope named in `wiki/architecture/api-design-system.md`.
 - Tenant sentinel: `DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` (`internal/platform/tenant/const.go:4`). Primary tenant source is `tenant.FromContext` (injected by auth middleware from `auth_sessions.tenant_id`). IAM middleware falls back to `X-Tenant-ID` header only in legacy-header mode; see `wiki/architecture/tenant-context.md` for the full pattern.
 
 ---
@@ -73,7 +73,7 @@ IAM owns identity-derived authorization for MetalDocs: it answers "can user X pe
 
 ```mermaid
 C4Context
-    title System Context — iam
+    title System Context â€” iam
     Person(actor, "End user / admin", "HTTP client")
     System_Boundary(b1, "MetalDocs API") {
         System(iam, "iam", "Capabilities, roles, memberships, authz")
@@ -87,20 +87,20 @@ C4Context
     Rel(iam, docs, "Tier-1 middleware wraps all routes")
     Rel(docs, iam, "Tier-2 authz.Require in approval/finalize tx")
     Rel(auth, iam, "Imports iamdomain.Role / WithAuthContext")
-    Rel(iam, audit, "AdminHandler.recordAudit → audit.Writer")
+    Rel(iam, audit, "AdminHandler.recordAudit â†’ audit.Writer")
     Rel(iam, platform, "tenant.DevTenantID, authn.UserIDFromContext, httpresponse.WriteJSON")
     Rel(iam, db, "SQL: roles, memberships, capability check")
 ```
 
 ### 3.1 Business Context
 
-Auditors verify three things per controlled document: (a) only authorised roles act on it (tier-1), (b) per ISO 9001 the actor's role is bound to the document's process area (tier-2), (c) the submitter cannot sign-off their own work (SoD, enforced in approval, not here). IAM owns (a) and (b). The role↔capability matrix is the contract operators rely on; migrations 0165 (reseed) and 0169 (process-area backfill) define the current 40-row matrix.
+Auditors verify three things per controlled document: (a) only authorised roles act on it (tier-1), (b) per ISO 9001 the actor's role is bound to the document's process area (tier-2), (c) the submitter cannot sign-off their own work (SoD, enforced in approval, not here). IAM owns (a) and (b). The roleâ†”capability matrix is the contract operators rely on; migrations 0165 (reseed) and 0169 (process-area backfill) define the current 40-row matrix.
 
 ### 3.2 Technical Context
 
-Inbound HTTP routes (own): see §5.3. Inbound Go imports: 17 importers (`apps/api/cmd/metaldocs-api`, `apps/api/internal/wiring`, `internal/modules/documents/**` including `documents/approval`, `internal/modules/templates_v2/delivery/http`, `internal/modules/auth/**`, `internal/platform/{bootstrap,authn,security}`, `internal/testsupport/http`). See `_artifacts/03-deps.md` §2 for full table.
+Inbound HTTP routes (own): see Â§5.3. Inbound Go imports: 17 importers (`apps/api/cmd/metaldocs-api`, `apps/api/internal/wiring`, `internal/modules/documents/**` including `documents/approval`, `internal/modules/templates_v2/delivery/http`, `internal/modules/auth/**`, `internal/platform/{bootstrap,authn,security}`, `internal/testsupport/http`). See `_artifacts/03-deps.md` Â§2 for full table.
 
-Outbound Go imports: 5 packages — `internal/modules/audit/domain`, `internal/modules/auth/domain`, `internal/platform/authn`, `internal/platform/httpresponse`, `internal/platform/tenant`.
+Outbound Go imports: 5 packages â€” `internal/modules/audit/domain`, `internal/modules/auth/domain`, `internal/platform/authn`, `internal/platform/httpresponse`, `internal/platform/tenant`.
 
 Outbound DB writes (owned): `iam_users`, `iam_user_roles`, `iam_groups`, `iam_group_members`, `iam_group_roles`, `role_capabilities` (read-only at runtime; reseeded by migrations), `user_process_areas`. Reads (not owned): `governance_events`, `document_process_areas` (taxonomy, via FK).
 
@@ -108,20 +108,20 @@ Outbound DB writes (owned): `iam_users`, `iam_user_roles`, `iam_groups`, `iam_gr
 
 ## 4. Solution Strategy
 
-- **Two distinct authz tiers**, not a unification gap — driver: `wiki/decisions/0007-two-tier-authz.md`. Tier-1 reads `iam_user_roles`; tier-2 reads `user_process_areas`. Shared `role_capabilities`.
-- **DB tripwire as enforcer of last resort** — driver: bug J2 + ADR 0007 codegen-rejected amendment. Originally backed approval tables only (0142b); Plan 5 (migration 0188) extended to 12 tables across all regulated modules.
-- **DELETE-then-INSERT for role replacement** — driver: idempotent semantics under unique `(tenant_id, user_id)` constraint added in 0166; chosen over upsert to keep `assigned_at` truthful.
-- **Tenant-scoped role provider with TTL cache** — driver: hot path on every request; `CachedRoleProvider` wraps the Postgres impl with key `userID|tenantID` and explicit `InvalidateUser` on admin writes (`application/admin_service.go:42`).
+- **Two distinct authz tiers**, not a unification gap â€” driver: `wiki/decisions/0007-two-tier-authz.md`. Tier-1 reads `iam_user_roles`; tier-2 reads `user_process_areas`. Shared `role_capabilities`.
+- **DB tripwire as enforcer of last resort** â€” driver: bug J2 + ADR 0007 codegen-rejected amendment. Originally backed approval tables only (0142b); Plan 5 (migration 0188) extended to 12 tables across all regulated modules.
+- **DELETE-then-INSERT for role replacement** â€” driver: idempotent semantics under unique `(tenant_id, user_id)` constraint added in 0166; chosen over upsert to keep `assigned_at` truthful.
+- **Tenant-scoped role provider with TTL cache** â€” driver: hot path on every request; `CachedRoleProvider` wraps the Postgres impl with key `userID|tenantID` and explicit `InvalidateUser` on admin writes (`application/admin_service.go:42`).
 
 ---
 
 ## 5. Building Block View (C4 Level 2)
 
-### 5.1 Whitebox — iam
+### 5.1 Whitebox â€” iam
 
 ```mermaid
 C4Container
-    title Container View — iam
+    title Container View â€” iam
     Container(mw, "HTTP middleware", "Go stdlib", "Wrap + tier-1 enforcement")
     Container(adminH, "AdminHandler", "Go stdlib mux", "/api/v1/iam/users/* + /api/v1/iam/admin/overview")
     Container(memH, "MembershipHandler", "Go stdlib mux", "/api/v2/iam/area-memberships")
@@ -147,7 +147,7 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 
 | File | Exports |
 |---|---|
-| `domain/model.go` | `Role` type + 5 consts (`RoleApprover`, `RoleAuthor`, `RoleEditor`, `RoleSystemAdmin`, `RoleViewer`); `Capability` type + 20 typed consts (`CapDocument{View,Create,Edit,Submit,Signoff}`, `CapWorkflow{Review,Approve}`, `CapTemplate{View,Create,Edit,Submit,Approve,Publish}`, `CapRegistryCreate`, `CapRegistryObsolete`, `CapRegistrySupersede`, `CapTaxonomyManage`, `CapMembershipManage`, `CapRouteManage`, `CapUserManage`) — Plan 4 collapsed the dual namespace; Plan 5 added `CapRegistryObsolete`/`CapRegistrySupersede` |
+| `domain/model.go` | `Role` type + 5 consts (`RoleApprover`, `RoleAuthor`, `RoleEditor`, `RoleSystemAdmin`, `RoleViewer`); `Capability` type + 20 typed consts (`CapDocument{View,Create,Edit,Submit,Signoff}`, `CapWorkflow{Review,Approve}`, `CapTemplate{View,Create,Edit,Submit,Approve,Publish}`, `CapRegistryCreate`, `CapRegistryObsolete`, `CapRegistrySupersede`, `CapTaxonomyManage`, `CapMembershipManage`, `CapRouteManage`, `CapUserManage`) â€” Plan 4 collapsed the dual namespace; Plan 5 added `CapRegistryObsolete`/`CapRegistrySupersede` |
 | `domain/context.go` | `WithAuthContext`, `UserIDFromContext`, `RolesFromContext` |
 | `domain/errors.go` | `ErrUserNotFound`, `ErrUserInactive` |
 | `domain/port.go` | `RoleProvider`, `RoleAdminRepository` interfaces (all methods tenant-scoped) |
@@ -162,10 +162,10 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 | `delivery/http/middleware.go` | `PermissionResolver`, `Middleware`, `NewMiddleware`, `WithPermissionResolver`, `Wrap` |
 | `delivery/http/admin_handler.go` | `UserAdminService` iface, `AdminHandler`, `Upsert/Replace/Create/Update/ResetPassword` request structs, `NewAdminHandler`, `WithAuditReader`, `RegisterRoutes` |
 | `delivery/http/routes_memberships.go` | `MembershipHandler`, `NewMembershipHandler`, `RegisterRoutes` |
-| `infrastructure/memory/role_admin_repository.go` | `RoleAdminRepository`, `New…`, `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` (dev-only) |
-| `infrastructure/postgres/role_admin_repository.go` | `RoleAdminRepository`, `New…`, `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` |
-| `infrastructure/postgres/role_provider.go` | `RoleProvider`, `New…`, `RolesByUserID` |
-| `infrastructure/postgres/user_area_repository.go` | `UserAreaRepository`, `New…`, `ListActive`, `Insert`, `CloseActive`, `GrantAtomic`, `GetActiveByUserAndArea` |
+| `infrastructure/memory/role_admin_repository.go` | `RoleAdminRepository`, `Newâ€¦`, `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` (dev-only) |
+| `infrastructure/postgres/role_admin_repository.go` | `RoleAdminRepository`, `Newâ€¦`, `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` |
+| `infrastructure/postgres/role_provider.go` | `RoleProvider`, `Newâ€¦`, `RolesByUserID` |
+| `infrastructure/postgres/user_area_repository.go` | `UserAreaRepository`, `Newâ€¦`, `ListActive`, `Insert`, `CloseActive`, `GrantAtomic`, `GetActiveByUserAndArea` |
 
 ### 5.3 HTTP operations
 
@@ -187,17 +187,17 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:31` | `listMemberships` | — | — | — | Spec missing | Runtime mounted route has no OpenAPI path yet. |
-| POST | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:32` | `grantMembership` | — | — | — | Spec missing | Runtime mounted route has no OpenAPI path yet. |
-| DELETE | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:33` | `revokeMembership` | — | — | — | Spec missing | Runtime mounted route has no OpenAPI path yet. |
-| GET | `/api/v1/iam/users` | `internal/modules/iam/delivery/http/admin_handler.go:84` | `handleUsers` (`GET` branch) | `/iam/users` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
-| POST | `/api/v1/iam/users` | `internal/modules/iam/delivery/http/admin_handler.go:84` | `handleUsers` (`POST` branch) | `/iam/users` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
-| PATCH | `/api/v1/iam/users/{userId}` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handlePatchUser` | `/iam/users/{userId}` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
-| POST | `/api/v1/iam/users/{userId}/reset-password` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleResetPassword` | `/iam/users/{userId}/reset-password` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
-| POST | `/api/v1/iam/users/{userId}/unlock` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleUnlockUser` | `/iam/users/{userId}/unlock` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
-| POST | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleUserRoleUpsert` | `/iam/users/{userId}/roles` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
-| PUT | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleReplaceUserRoles` | `/iam/users/{userId}/roles` | — | — | Aligned | Routed through path suffix dispatcher; operationId not defined. |
-| GET | `/api/v1/iam/admin/overview` | `internal/modules/iam/delivery/http/admin_handler.go:86` | `handleAdminOverview` | `/iam/admin/overview` | — | — | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| GET | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:31` | `listMemberships` | â€” | â€” | â€” | Spec missing | Runtime mounted route has no OpenAPI path yet. |
+| POST | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:32` | `grantMembership` | â€” | â€” | â€” | Spec missing | Runtime mounted route has no OpenAPI path yet. |
+| DELETE | `/api/v2/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:33` | `revokeMembership` | â€” | â€” | â€” | Spec missing | Runtime mounted route has no OpenAPI path yet. |
+| GET | `/api/v1/iam/users` | `internal/modules/iam/delivery/http/admin_handler.go:84` | `handleUsers` (`GET` branch) | `/iam/users` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| POST | `/api/v1/iam/users` | `internal/modules/iam/delivery/http/admin_handler.go:84` | `handleUsers` (`POST` branch) | `/iam/users` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| PATCH | `/api/v1/iam/users/{userId}` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handlePatchUser` | `/iam/users/{userId}` | â€” | â€” | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| POST | `/api/v1/iam/users/{userId}/reset-password` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleResetPassword` | `/iam/users/{userId}/reset-password` | â€” | â€” | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| POST | `/api/v1/iam/users/{userId}/unlock` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleUnlockUser` | `/iam/users/{userId}/unlock` | â€” | â€” | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| POST | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleUserRoleUpsert` | `/iam/users/{userId}/roles` | â€” | â€” | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| PUT | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleReplaceUserRoles` | `/iam/users/{userId}/roles` | â€” | â€” | Aligned | Routed through path suffix dispatcher; operationId not defined. |
+| GET | `/api/v1/iam/admin/overview` | `internal/modules/iam/delivery/http/admin_handler.go:86` | `handleAdminOverview` | `/iam/admin/overview` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
 
 - Module contract status: Contracted
 - Owner: leandro
@@ -208,7 +208,7 @@ Permission resolver: `apps/api/cmd/metaldocs-api/permissions.go:54,196`. None of
 
 ## 6. Runtime View
 
-### 6.1 listAreaMemberships — GET /api/v2/iam/area-memberships
+### 6.1 listAreaMemberships â€” GET /api/v2/iam/area-memberships
 
 ```mermaid
 sequenceDiagram
@@ -241,7 +241,7 @@ sequenceDiagram
 
 Read-only. Tripwire pairing: N/A. State transitions: none.
 
-### 6.2 grantAreaMembership — POST /api/v2/iam/area-memberships
+### 6.2 grantAreaMembership â€” POST /api/v2/iam/area-memberships
 
 ```mermaid
 sequenceDiagram
@@ -264,7 +264,7 @@ sequenceDiagram
         S->>R: Insert(new)
     end
     R-->>S: nil
-    S->>S: governance logger (nil in prod) — skipped
+    S->>S: governance logger (nil in prod) â€” skipped
     S-->>H: nil
     H-->>C: 201 {userId,tenantId,areaCode,role}
 ```
@@ -276,9 +276,9 @@ State transitions:
 | `public.user_process_areas` row | active (`effective_to IS NULL`) | closed (`effective_to = newMembership.effective_from`) + new active row | `POST /api/v2/iam/area-memberships` via `GrantAtomic` | `membership.manage` |
 | `public.user_process_areas` row | absent | new active row | `POST /api/v2/iam/area-memberships` via `Insert` | `membership.manage` |
 
-Tripwire pairing: **active** — `trg_require_cap_asserted` attached to `user_process_areas` by migration 0188 (Plan 5). Tier-2 `authz.Require(CapMembershipManage)` is called inside each write method (`Insert` at `user_area_repository.go:59`, `CloseActive` at `:91`, `GrantAtomic` at `:118`). T-004 (IAM write paths lack tier-2) partially closed for the user_area side.
+Tripwire pairing: **active** â€” `trg_require_cap_asserted` attached to `user_process_areas` by migration 0188 (Plan 5). Tier-2 `authz.Require(CapMembershipManage)` is called inside each write method (`Insert` at `user_area_repository.go:59`, `CloseActive` at `:91`, `GrantAtomic` at `:118`). T-004 (IAM write paths lack tier-2) partially closed for the user_area side.
 
-### 6.3 upsertUserRole — POST /api/v1/iam/users/{userId}/roles
+### 6.3 upsertUserRole â€” POST /api/v1/iam/users/{userId}/roles
 
 ```mermaid
 sequenceDiagram
@@ -309,7 +309,7 @@ State transitions:
 |---|---|---|---|---|
 | `metaldocs.iam_user_roles` row for `(tenant_id, user_id)` | any role or none | requested role | `POST /api/v1/iam/users/{userId}/roles` | `user.manage` |
 
-Tripwire pairing: **active** — `trg_require_cap_asserted` attached to `iam_user_roles` by migration 0188 (Plan 5). Tier-2 `authz.Require(CapUserManage)` is called inside `UpsertUserAndAssignRole` (`role_admin_repository.go:40`) and `ReplaceUserRoles` (`:82`). Audit log emission: **none** still (T-005 remains open).
+Tripwire pairing: **active** â€” `trg_require_cap_asserted` attached to `iam_user_roles` by migration 0188 (Plan 5). Tier-2 `authz.Require(CapUserManage)` is called inside `UpsertUserAndAssignRole` (`role_admin_repository.go:40`) and `ReplaceUserRoles` (`:82`). Audit log emission: **none** still (T-005 remains open).
 
 ### 6.4 Failure modes (current envelope)
 
@@ -329,9 +329,9 @@ RFC 9457 Problem envelope is **not used** in IAM responses (T-006).
 
 - Single Go binary `apps/api/cmd/metaldocs-api` (port `:8081`).
 - IAM constructors wired in `apps/api/cmd/metaldocs-api/main.go:163-219`: `NewCapabilityService(SQLDB)`, `NewCachedRoleProvider(provider, authn.CacheTTL())`, `NewMiddleware(...)`, `NewAdminService(...)`, `NewAdminHandler(...)`, `NewMembershipHandler(NewAreaMembershipService(NewUserAreaRepository(SQLDB), nil))`.
-- The membership service's `MembershipGovernanceLogger` argument is wired with **`nil`** (`main.go:217`) — governance log emission is dead in this binary. Recorded as T-007.
+- The membership service's `MembershipGovernanceLogger` argument is wired with **`nil`** (`main.go:217`) â€” governance log emission is dead in this binary. Recorded as T-007.
 - Migrations applied externally (forward-only). `application/startup.go` was deleted in Plan 4 (its only role was `CheckRoleCapabilitiesVersion`, closed T-012). No boot-time drift check remains.
-- No env-var flags for IAM (e.g. `IAM_AUTHZ_ENFORCED` does NOT exist; the `enabled` boolean reaches `NewMiddleware` via `authn.Enabled()` — artifact 03 §3).
+- No env-var flags for IAM (e.g. `IAM_AUTHZ_ENFORCED` does NOT exist; the `enabled` boolean reaches `NewMiddleware` via `authn.Enabled()` â€” artifact 03 Â§3).
 
 ---
 
@@ -341,7 +341,7 @@ RFC 9457 Problem envelope is **not used** in IAM responses (T-006).
 
 - Authentication: `auth` module owns it; IAM consumes `auth.domain.ManagedUser` only from `AdminHandler`.
 - Tier-1 (edge): `CapabilityService.CanDo`. Resolver: `apps/api/cmd/metaldocs-api/permissions.go`.
-- Tier-2 (in-tx): `authz.Require` — consumed BY `documents/**` (5 import sites), `registry` (changeStatus), `taxonomy` (FamilyRepository.Create/Update, ProfileRepository.Create/Update, AreaRepository.Create/Update), `templates_v2` (CreateTemplate, SubmitForReview, Review, Approve, PublishTemplateVersion, ArchiveTemplate), AND NOW also by IAM itself (`role_admin_repository.go`, `user_area_repository.go`). See `_artifacts/03-deps.md` for full import table.
+- Tier-2 (in-tx): `authz.Require` â€” consumed BY `documents/**` (5 import sites), `registry` (changeStatus), `taxonomy` (FamilyRepository.Create/Update, ProfileRepository.Create/Update, AreaRepository.Create/Update), `templates_v2` (CreateTemplate, SubmitForReview, Review, Approve, PublishTemplateVersion, ArchiveTemplate), AND NOW also by IAM itself (`role_admin_repository.go`, `user_area_repository.go`). See `_artifacts/03-deps.md` for full import table.
 - Tier-3 (DB enforcer): `enforce_capability_asserted` trigger on 12 tables (expanded by Plan 5, migration 0188). Reads `metaldocs.asserted_caps` GUC.
 - system_admin: bypasses tier-1 (`capability_service.go:33-45`) and tier-2 (`authz/authz.go:58`).
 
@@ -351,16 +351,16 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 
 ### 8.3 Caching
 
-`CachedRoleProvider` (`application/cached_role_provider.go:18`) wraps the postgres provider with TTL cache keyed by `userID|tenantID`. `InvalidateUser(userID)` runs after every `AdminService` write (`admin_service.go:42`). No `InvalidateGroup` exists — group-membership writes do not invalidate (T-008).
+`CachedRoleProvider` (`application/cached_role_provider.go:18`) wraps the postgres provider with TTL cache keyed by `userID|tenantID`. `InvalidateUser(userID)` runs after every `AdminService` write (`admin_service.go:42`). No `InvalidateGroup` exists â€” group-membership writes do not invalidate (T-008).
 
 ### 8.4 Cross-deps (consumers)
 
-- `internal/modules/documents/application/fillin_authz.go:9` — tier-2 + `iamdomain.Capability`
-- `internal/modules/documents/approval/application/cancel_service.go:12` — tier-2 + `BypassSystem`
-- `internal/modules/documents/delivery/http/handler.go:17` — `iamapp.ErrCapabilityDenied` (sentinel from `application/capability_service.go`); `authz.ErrCapDenied` (struct from `authz/authz.go`, carries capability/area — T-009 closed by Plan 4)
-- `internal/modules/templates_v2/delivery/http/routes_lifecycle.go:8` — `iamdomain.RolesFromContext`
-- `internal/modules/auth/{application,delivery,domain,infrastructure}` — 4 sites import `iamdomain.Role` (circular concern; auth shouldn't depend on iam's role enum if iam can depend on auth — see T-010)
-- `internal/platform/{bootstrap,authn,security,testsupport}` — 4 sites use IAM context helpers
+- `internal/modules/documents/application/fillin_authz.go:9` â€” tier-2 + `iamdomain.Capability`
+- `internal/modules/documents/approval/application/cancel_service.go:12` â€” tier-2 + `BypassSystem`
+- `internal/modules/documents/delivery/http/handler.go:17` â€” `iamapp.ErrCapabilityDenied` (sentinel from `application/capability_service.go`); `authz.ErrCapDenied` (struct from `authz/authz.go`, carries capability/area â€” T-009 closed by Plan 4)
+- `internal/modules/templates_v2/delivery/http/routes_lifecycle.go:8` â€” `iamdomain.RolesFromContext`
+- `internal/modules/auth/{application,delivery,domain,infrastructure}` â€” 4 sites import `iamdomain.Role` (circular concern; auth shouldn't depend on iam's role enum if iam can depend on auth â€” see T-010)
+- `internal/platform/{bootstrap,authn,security,testsupport}` â€” 4 sites use IAM context helpers
 
 ### 8.5 Concurrency / Transactions
 
@@ -375,7 +375,7 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 
 ### 8.6 Error namespace
 
-`iamapp.ErrCapabilityDenied` (`application/capability_service.go:10`) — sentinel `var`, suitable for `errors.Is`. `authz.ErrCapDenied` (`authz/authz.go:11`) — typed struct carrying capability + area context. Names no longer collide (Plan 4, T-009 closed).
+`iamapp.ErrCapabilityDenied` (`application/capability_service.go:10`) â€” sentinel `var`, suitable for `errors.Is`. `authz.ErrCapDenied` (`authz/authz.go:11`) â€” typed struct carrying capability + area context. Names no longer collide (Plan 4, T-009 closed).
 
 ---
 
@@ -384,12 +384,12 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 | Decision | Link / Status |
 |---|---|
 | Two-tier authz (CapabilityService + authz.Require) | [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) |
-| DB tripwire (`enforce_capability_asserted`) as enforcement floor | ADR 0007 — codegen-rejected amendment (2026-05-10) |
-| `document.create` via `CapabilityChecker` adapter | ADR 0007 — J2 amendment (2026-05-05) |
-| `tenant_id` per IAM table (Group B) | ADR 0007 references migration 0162; tenant-isolation rule is implicit. No standalone ADR. **missing-ADR** → T-011 |
-| Collapse dual capability namespaces — typed `iamdomain.Capability` wins; `capabilities.go` deleted; DB reseeded to `document.*` | Plan 4 (2026-05-11). No standalone ADR — **ADR-TODO** per Plan 13. |
-| Delete `AuthorizationService` (third authz surface); Plan 5 wired tier-2 per module (IAM repos, registry, taxonomy, templates_v2, documents) | Plan 4 (2026-05-11). No standalone ADR — **ADR-TODO** per Plan 13. |
-| Delete `area_membership/` Go wrapper; canonical write surface is `UserAreaRepository.GrantAtomic`; SECURITY DEFINER SQL funcs stay for e2e seed | Plan 4 (2026-05-11). No standalone ADR — **ADR-TODO** per Plan 13. |
+| DB tripwire (`enforce_capability_asserted`) as enforcement floor | ADR 0007 â€” codegen-rejected amendment (2026-05-10) |
+| `document.create` via `CapabilityChecker` adapter | ADR 0007 â€” J2 amendment (2026-05-05) |
+| `tenant_id` per IAM table (Group B) | ADR 0007 references migration 0162; tenant-isolation rule is implicit. No standalone ADR. **missing-ADR** â†’ T-011 |
+| Collapse dual capability namespaces â€” typed `iamdomain.Capability` wins; `capabilities.go` deleted; DB reseeded to `document.*` | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
+| Delete `AuthorizationService` (third authz surface); Plan 5 wired tier-2 per module (IAM repos, registry, taxonomy, templates_v2, documents) | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
+| Delete `area_membership/` Go wrapper; canonical write surface is `UserAreaRepository.GrantAtomic`; SECURITY DEFINER SQL funcs stay for e2e seed | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
 
 ---
 
@@ -397,8 +397,8 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 
 | Goal | Scenario | Pass criteria |
 |---|---|---|
-| Correctness — tier-1 denial | Authn'd user without `user.manage` POSTs `/api/v1/iam/users/{id}/roles` | 403 `forbidden`; no row in `iam_user_roles` |
-| Correctness — tier-2 GUC missing | Caller forgets `SET LOCAL metaldocs.actor_id` before `authz.Require` | `ErrActorContextMissing` returned; tx not advanced |
+| Correctness â€” tier-1 denial | Authn'd user without `user.manage` POSTs `/api/v1/iam/users/{id}/roles` | 403 `forbidden`; no row in `iam_user_roles` |
+| Correctness â€” tier-2 GUC missing | Caller forgets `SET LOCAL metaldocs.actor_id` before `authz.Require` | `ErrActorContextMissing` returned; tx not advanced |
 | Tenant isolation | User has `author` in tenant A; `RolesByUserID(user, B)` | empty slice (verified by `tests/integration/iam/tenant_isolation_test.go`) |
 | system_admin bypass | system_admin user calls any guarded route | tier-1 short-circuit at `capability_service.go:33-45`; tier-2 short-circuit at `authz/authz.go:58` |
 
@@ -408,16 +408,16 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 
 Pointer-only. Body in [`wiki/modules/iam-tech-debt.md`](iam-tech-debt.md). Severity rubric (concrete triggers) lives in the register, not here.
 
-Summary counts (all items; closed rows still counted by tally — see register for CLOSED markers):
+Summary counts (all items; closed rows still counted by tally â€” see register for CLOSED markers):
 - Critical: 2
 - Major: 5
 - Minor: 5
 - Decisions without ADR link: 11
 
 Top 3 (by severity, then by blast-radius):
-1. T-005 — `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not emit `recordAudit`; role assignments missing from ISO 9001 audit trail. Critical.
-2. T-004 — IAM mutations (`iam_user_roles`, `user_process_areas`) now have tier-2 `authz.Require` + Postgres tripwire (Plan 5). `iam_users` INSERT still tier-1 only — residual gap. Major (partially closed).
-3. T-006 — IAM error envelopes not RFC 9457; two non-standard shapes in `middleware.go` + `routes_memberships.go`. Major.
+1. T-005 â€” `handleUserRoleUpsert` (POST `/api/v1/iam/users/{userId}/roles`) does not emit `recordAudit`; role assignments missing from ISO 9001 audit trail. Critical.
+2. T-004 â€” IAM mutations (`iam_user_roles`, `user_process_areas`) now have tier-2 `authz.Require` + Postgres tripwire (Plan 5). `iam_users` INSERT still tier-1 only â€” residual gap. Major (partially closed).
+3. T-006 â€” IAM error envelopes not RFC 9457; two non-standard shapes in `middleware.go` + `routes_memberships.go`. Major.
 
 Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
@@ -432,9 +432,9 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 | Tier-1 | Edge / HTTP middleware authz check using `CapabilityService.CanDo`. |
 | Tier-2 | In-tx area-scoped authz check using `authz.Require(ctx, tx, cap, areaCode)`. |
 | Tripwire | DB-side `enforce_capability_asserted()` trigger that rejects mutating rows on guarded tables when `metaldocs.asserted_caps` GUC does not contain the required capability. Migration 0188 (Plan 5) extended coverage from 2 tables to 12: `approval_instances`, `approval_signoffs`, `iam_user_roles`, `user_process_areas`, `documents`, `controlled_documents`, `cd_sequence_counters`, `document_profiles`, `document_process_areas`, `document_families`, `templates_v2_template`, `templates_v2_template_version`. |
-| GUC | Grand Unified Configuration — Postgres session/local setting. IAM reads `metaldocs.actor_id`, `metaldocs.tenant_id`, `metaldocs.asserted_caps`. |
-| Area membership | Row in `public.user_process_areas` granting a user a role within a process area for an `effective_from`→`effective_to` window. |
-| SECURITY DEFINER | Postgres function attribute that executes with the function owner's privileges, reading `metaldocs.actor_id` GUC. Used by `metaldocs.grant_area_membership` / `revoke_area_membership` (migration 0137) — called only by e2e seed + integration tests; the Go `area_membership/` wrapper was deleted in Plan 4. |
+| GUC | Grand Unified Configuration â€” Postgres session/local setting. IAM reads `metaldocs.actor_id`, `metaldocs.tenant_id`, `metaldocs.asserted_caps`. |
+| Area membership | Row in `public.user_process_areas` granting a user a role within a process area for an `effective_from`â†’`effective_to` window. |
+| SECURITY DEFINER | Postgres function attribute that executes with the function owner's privileges, reading `metaldocs.actor_id` GUC. Used by `metaldocs.grant_area_membership` / `revoke_area_membership` (migration 0137) â€” called only by e2e seed + integration tests; the Go `area_membership/` wrapper was deleted in Plan 4. |
 
 ---
 
@@ -443,17 +443,17 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 - ADRs: [`decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md), [`decisions/0012-contract-first-api.md`](../decisions/0012-contract-first-api.md)
 - Concepts: [`concepts/authz-tiers.md`](../concepts/authz-tiers.md), [`concepts/iso-segregation.md`](../concepts/iso-segregation.md)
 - Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md), [`architecture/tenant-context.md`](../architecture/tenant-context.md)
-- Modules: [`modules/approval.md`](approval.md) (tier-2 consumer), [`modules/documents.md`](documents.md) (tier-2 consumer), [`modules/templates-v2.md`](templates-v2.md) (predecessor frontend doc), [`modules/templates_v2.md`](templates_v2.md) (Arc42 backend doc — consumer of `template.*` capability namespace; T-001 closed Plan 4), [`modules/auth.md`](auth.md) (bidirectional dep: auth imports `iamdomain`; `iam.AdminHandler` imports `authdomain.ManagedUser/OnlineUser/UpdateUserParams`)
-- See also: [`modules/audit.md`](audit.md) — iam `AdminHandler.recordAudit` calls `audit.Writer.Record` for role/user admin ops; T-005 tracks the gap where `handleUserRoleUpsert` does not yet emit
-- See also: [`modules/registry.md §8.1`](registry.md#81-authentication--authorization) — registry now has tier-2 `authz.Require` for Create + changeStatus and tier-3 DB tripwire on `controlled_documents` + `cd_sequence_counters` (registry T-001/T-004 closed Plan 5)
+- Modules: [`modules/approval.md`](approval.md) (tier-2 consumer), [`modules/documents.md`](documents.md) (tier-2 consumer), [`modules/templates-v2.md`](templates-v2.md) (predecessor frontend doc), [`modules/templates_v2.md`](templates_v2.md) (Arc42 backend doc â€” consumer of `template.*` capability namespace; T-001 closed Plan 4), [`modules/auth.md`](auth.md) (bidirectional dep: auth imports `iamdomain`; `iam.AdminHandler` imports `authdomain.ManagedUser/OnlineUser/UpdateUserParams`)
+- See also: [`modules/audit.md`](audit.md) â€” iam `AdminHandler.recordAudit` calls `audit.Writer.Record` for role/user admin ops; T-005 tracks the gap where `handleUserRoleUpsert` does not yet emit
+- See also: [`modules/registry.md Â§8.1`](registry.md#81-authentication--authorization) â€” registry now has tier-2 `authz.Require` for Create + changeStatus and tier-3 DB tripwire on `controlled_documents` + `cd_sequence_counters` (registry T-001/T-004 closed Plan 5)
 - Backlog: [`backlog/iam-refactor.md`](../backlog/iam-refactor.md)
 - Tech debt: [`iam-tech-debt.md`](iam-tech-debt.md)
 - Source artifacts: [`iam/_artifacts/00-context.md`](iam/_artifacts/00-context.md) through [`05-industry.md`](iam/_artifacts/05-industry.md)
 
 ## Changelog
 
-- 2026-05-11 — Plan 5 (tier-2 authz.Require + Postgres tripwire expansion): `role_admin_repository.go` `UpsertUserAndAssignRole`/`ReplaceUserRoles` now call `authz.Require(CapUserManage)`; `user_area_repository.go` `Insert`/`CloseActive`/`GrantAtomic` call `authz.Require(CapMembershipManage)`. Import aliased to `iamdomain`. `domain/model.go` gained `CapRegistryObsolete`/`CapRegistrySupersede`. Migration 0188 attaches `trg_require_cap_asserted` to 10 new tables. §2 DB floor, §6.2/§6.3 tripwire-pairing, §8.1 tiers, §8.5 concurrency, §9, §11, §12 all updated.
-- 2026-05-11 — Plan 4 (capability namespace collapse + IAM dual-surface consolidation): collapsed `capabilities.go` + `model.go` into single typed `Capability` namespace (18 consts); deleted `area_membership/`, `application/authorization.go`, `domain/role_capabilities.go`, `application/startup.go`; renamed `authz.ErrCapabilityDenied` → `authz.ErrCapDenied`; §5.1 C4 updated; §5.2 file table pruned; §5.4 removed; §8.5/§8.6 updated; §9/§10/§11/§12 refreshed. Closed T-001/T-002/T-003/T-009/T-012.
-- 2026-05-11 — Plan 3 (module sweep): IAM middleware now calls `tenant.FromContext` as primary tenant source; legacy fallback to `X-Tenant-ID` header preserved under `legacyHeader` mode; `handleAdminOverview` + `tenantIDFromRequest` updated; Key files, §2, cross-links updated.
-- 2026-05-10 — initial publish; supersedes retired `iam-rbac.md` stub. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.
+- 2026-05-11 â€” Plan 5 (tier-2 authz.Require + Postgres tripwire expansion): `role_admin_repository.go` `UpsertUserAndAssignRole`/`ReplaceUserRoles` now call `authz.Require(CapUserManage)`; `user_area_repository.go` `Insert`/`CloseActive`/`GrantAtomic` call `authz.Require(CapMembershipManage)`. Import aliased to `iamdomain`. `domain/model.go` gained `CapRegistryObsolete`/`CapRegistrySupersede`. Migration 0188 attaches `trg_require_cap_asserted` to 10 new tables. Â§2 DB floor, Â§6.2/Â§6.3 tripwire-pairing, Â§8.1 tiers, Â§8.5 concurrency, Â§9, Â§11, Â§12 all updated.
+- 2026-05-11 â€” Plan 4 (capability namespace collapse + IAM dual-surface consolidation): collapsed `capabilities.go` + `model.go` into single typed `Capability` namespace (18 consts); deleted `area_membership/`, `application/authorization.go`, `domain/role_capabilities.go`, `application/startup.go`; renamed `authz.ErrCapabilityDenied` â†’ `authz.ErrCapDenied`; Â§5.1 C4 updated; Â§5.2 file table pruned; Â§5.4 removed; Â§8.5/Â§8.6 updated; Â§9/Â§10/Â§11/Â§12 refreshed. Closed T-001/T-002/T-003/T-009/T-012.
+- 2026-05-11 â€” Plan 3 (module sweep): IAM middleware now calls `tenant.FromContext` as primary tenant source; legacy fallback to `X-Tenant-ID` header preserved under `legacyHeader` mode; `handleAdminOverview` + `tenantIDFromRequest` updated; Key files, Â§2, cross-links updated.
+- 2026-05-10 â€” initial publish; supersedes retired `iam-rbac.md` stub. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.
 
