@@ -2,42 +2,42 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-12 (Plan 8) · **Owner:** unassigned · **Status:** active
+**Last verified:** 2026-05-12 (Plan 8) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
 
 > **Key files:**
-> - `internal/modules/registry/module.go:25` — module wiring (`New`, dependencies)
-> - `internal/modules/registry/application/service.go:104` — `RegistryService.Create` (atomic create)
-> - `internal/modules/registry/application/service.go:293` — `Obsolete` / `Supersede` via `changeStatus`
-> - `internal/modules/registry/delivery/http/handler.go:48` — `injectTenant` middleware (reads tenant via `tenant.FromContext`)
-> - `internal/modules/registry/delivery/http/handler.go:60` — `tenantIDFromContext` (local context accessor)
-> - `internal/modules/registry/delivery/http/routes.go:43` — `AtomicCreateControlledDocument` handler
-> - `internal/modules/registry/delivery/http/routes.go:232` — `GetActiveDocument` handler (FULL OUTER JOIN)
-> - `internal/modules/registry/delivery/http/routes.go:488` — `tenantIDFromRequest` → `tenant.FromContext`
-> - `internal/modules/registry/domain/document_initializer.go:30` — `DocumentInitializer` port (consumed by documents)
-> - `internal/modules/registry/infrastructure/repository.go:184` — `UpdateStatus` (lifecycle mutation)
-> - `migrations/0124_registry_controlled_documents.sql` — initial table
-> - `migrations/0182_cd_sequence_per_area.sql` — per-area sequence (ADR 0011)
+> - `internal/modules/registry/module.go:25` â€” module wiring (`New`, dependencies)
+> - `internal/modules/registry/application/service.go:104` â€” `RegistryService.Create` (atomic create)
+> - `internal/modules/registry/application/service.go:293` â€” `Obsolete` / `Supersede` via `changeStatus`
+> - `internal/modules/registry/delivery/http/handler.go:48` â€” `injectTenant` middleware (reads tenant via `tenant.FromContext`)
+> - `internal/modules/registry/delivery/http/handler.go:60` â€” `tenantIDFromContext` (local context accessor)
+> - `internal/modules/registry/delivery/http/routes.go:43` â€” `AtomicCreateControlledDocument` handler
+> - `internal/modules/registry/delivery/http/routes.go:232` â€” `GetActiveDocument` handler (FULL OUTER JOIN)
+> - `internal/modules/registry/delivery/http/routes.go:488` â€” `tenantIDFromRequest` â†’ `tenant.FromContext`
+> - `internal/modules/registry/domain/document_initializer.go:30` â€” `DocumentInitializer` port (consumed by documents)
+> - `internal/modules/registry/infrastructure/repository.go:184` â€” `UpdateStatus` (lifecycle mutation)
+> - `migrations/0124_registry_controlled_documents.sql` â€” initial table
+> - `migrations/0182_cd_sequence_per_area.sql` â€” per-area sequence (ADR 0011)
 
 ---
 
 ## 1. Introduction & Goals
 
-The **registry** module owns the catalog of code-numbered Controlled Documents (CDs). Each row in `public.controlled_documents` is a numbered slot binding a (`profile_code`, `process_area_code`) pair to a chain of `documents` revisions. The CD itself carries no content — it owns the identity, the per-(tenant, profile, area) sequence number, and the lifecycle status (`active | obsolete | superseded`).
+The **registry** module owns the catalog of code-numbered Controlled Documents (CDs). Each row in `public.controlled_documents` is a numbered slot binding a (`profile_code`, `process_area_code`) pair to a chain of `documents` revisions. The CD itself carries no content â€” it owns the identity, the per-(tenant, profile, area) sequence number, and the lifecycle status (`active | obsolete | superseded`).
 
 ### 1.1 Requirements overview
 
-- Atomic CD + first-revision create — source: [wiki/decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md)
-- Per-(profile, area) monotonic 3-digit sequence (`DC-RH-001`) — source: [wiki/concepts/controlled-documents.md](concepts/controlled-documents.md)
-- `Idempotency-Key` replay safety on creation paths — source: ADR 0011
-- Preview endpoint returns next code without sequence reservation — source: ADR 0011
-- Active-document lookup tolerates published-only state (FULL OUTER JOIN) — source: E10 fix (commit 1dfcf3da)
+- Atomic CD + first-revision create â€” source: [wiki/decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md)
+- Per-(profile, area) monotonic 3-digit sequence (`DC-RH-001`) â€” source: [wiki/concepts/controlled-documents.md](concepts/controlled-documents.md)
+- `Idempotency-Key` replay safety on creation paths â€” source: ADR 0011
+- Preview endpoint returns next code without sequence reservation â€” source: ADR 0011
+- Active-document lookup tolerates published-only state (FULL OUTER JOIN) â€” source: E10 fix (commit 1dfcf3da)
 
 ### 1.2 Quality Goals
 
 | Rank | Goal | How verified |
 |---|---|---|
-| 1 | Numbering integrity — no duplicate / out-of-band CD codes | `cd_sequence_counters` PK on (tenant_id, profile_code, process_area_code); UNIQUE (tenant_id, profile_code, code) on `controlled_documents`; `domain/sequence_test.go` |
-| 2 | No orphan slots — CD row + first revision either both commit or both roll back | `application/integration_test.go` covering Create+CloneTemplate in single `*sql.Tx` (`service.go:243-257`) |
+| 1 | Numbering integrity â€” no duplicate / out-of-band CD codes | `cd_sequence_counters` PK on (tenant_id, profile_code, process_area_code); UNIQUE (tenant_id, profile_code, code) on `controlled_documents`; `domain/sequence_test.go` |
+| 2 | No orphan slots â€” CD row + first revision either both commit or both roll back | `application/integration_test.go` covering Create+CloneTemplate in single `*sql.Tx` (`service.go:243-257`) |
 | 3 | Replay safety on creation paths | `internal/platform/idempotency` middleware + body-hash check; `routes_contract_test.go` |
 
 ### 1.3 Stakeholders
@@ -55,11 +55,11 @@ The **registry** module owns the catalog of code-numbered Controlled Documents (
 
 - Language / runtime: Go 1.25
 - Persistence: Postgres (per [wiki/architecture/data-model.md](architecture/data-model.md))
-- API contract: OpenAPI 3.0.3 via oapi-codegen v2 — partial at `api/openapi/v1/partials/registry.yaml` (path prefix `/api/v2/` despite the v1 spec tree)
+- API contract: OpenAPI 3.0.3 via oapi-codegen v2 â€” partial at `api/openapi/v1/partials/registry.yaml` (path prefix `/api/v2/` despite the v1 spec tree)
 - Authz: two-tier per [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md); Plan 5 wired `authz.Require` + tripwire on `controlled_documents` and `cd_sequence_counters` (T-001/T-004 closed); `Obsolete`/`Supersede` now pass typed `CapRegistryObsolete`/`CapRegistrySupersede` from `iamdomain` (migration 0187 seeded both caps)
 - Idempotency: shared platform `internal/platform/idempotency` per ADR 0011
 - Numbering: 3-segment `{PROFILE}-{AREA}-{NNN}` per ADR 0011
-- Error envelope: **RFC 9457** `application/problem+json` via `httpresponse.WriteError` → `problem.Write` (T-003 closed Plan 7); `ErrTemplateProfileMismatch` → 422 `template_invalid` via direct `problem.Write` (T-007 closed Plan 7)
+- Error envelope: **RFC 9457** `application/problem+json` via `httpresponse.WriteError` â†’ `problem.Write` (T-003 closed Plan 7); `ErrTemplateProfileMismatch` â†’ 422 `template_invalid` via direct `problem.Write` (T-007 closed Plan 7)
 
 ---
 
@@ -67,7 +67,7 @@ The **registry** module owns the catalog of code-numbered Controlled Documents (
 
 ```mermaid
 C4Context
-    title System Context — Registry
+    title System Context â€” Registry
     Person(author, "Author / QA", "Web client")
     System_Boundary(b1, "MetalDocs") {
         System(registry, "Registry", "Controlled-document catalog: code generation + lifecycle")
@@ -87,11 +87,11 @@ C4Context
 
 ### 3.1 Business Context
 
-Registry owns the **identity** of every controlled document under QMS. A row exists from the moment a numbered slot is issued; it is the durable anchor that approval, audit, and downstream PDFs key against. Taxonomy owns the abstract classification (families → profiles → areas); registry owns the concrete catalog.
+Registry owns the **identity** of every controlled document under QMS. A row exists from the moment a numbered slot is issued; it is the durable anchor that approval, audit, and downstream PDFs key against. Taxonomy owns the abstract classification (families â†’ profiles â†’ areas); registry owns the concrete catalog.
 
 ### 3.2 Technical Context
 
-**Inbound:** 8 HTTP routes under `/api/v2/controlled-documents/*` (see §5.3). Go consumers: `internal/modules/documents` (imports `registrydomain` for `ControlledDocument`, `DocumentInitializer`, `DocumentRef`, `CloneTemplateRequest`).
+**Inbound:** 8 HTTP routes under `/api/v2/controlled-documents/*` (see Â§5.3). Go consumers: `internal/modules/documents` (imports `registrydomain` for `ControlledDocument`, `DocumentInitializer`, `DocumentRef`, `CloneTemplateRequest`).
 
 **Outbound:** Postgres (`controlled_documents`, `cd_sequence_counters`, reads of `documents`, `approval_instances`, `document_revisions`, `document_profiles`, `document_process_areas`, `templates_v2_template_version`). Cross-module Go: `taxonomy/domain`, `taxonomy/application` (governance logger), `platform/idempotency`, `platform/authn`, `platform/httpresponse`, `platform/tenant`.
 
@@ -99,21 +99,21 @@ Registry owns the **identity** of every controlled document under QMS. A row exi
 
 ## 4. Solution Strategy
 
-- **Atomic multi-row create in a single `*sql.Tx`** — driver: ADR 0011 (eliminate orphan slot risk). Registry opens the tx, allocates the sequence, inserts the CD, calls `DocumentInitializer.CloneTemplate` (documents materializes the first revision inside the same tx), commits, then emits governance events.
-- **Registry-owned port for the cross-module call** — driver: avoid circular imports. `domain/document_initializer.go:30` defines the interface; `documents/application/cd_initializer.go` implements it; main.go injects via `WithDocumentInitializer` post-construction.
-- **Per-(tenant, profile, area) sequence counter table** — driver: ADR 0011 (replaces single `profile_sequence_counters` keyed only on profile; no cross-area counter bleed).
-- **Shared idempotency platform on POST create + revisions** — driver: ADR 0011 (Stripe-style key replay; body-hash conflict detection).
-- **FULL OUTER JOIN for active-document lookup** — driver: E10 fix; published-only CDs must return 200 with `publishedDocumentId` so frontend renders download link.
+- **Atomic multi-row create in a single `*sql.Tx`** â€” driver: ADR 0011 (eliminate orphan slot risk). Registry opens the tx, allocates the sequence, inserts the CD, calls `DocumentInitializer.CloneTemplate` (documents materializes the first revision inside the same tx), commits, then emits governance events.
+- **Registry-owned port for the cross-module call** â€” driver: avoid circular imports. `domain/document_initializer.go:30` defines the interface; `documents/application/cd_initializer.go` implements it; main.go injects via `WithDocumentInitializer` post-construction.
+- **Per-(tenant, profile, area) sequence counter table** â€” driver: ADR 0011 (replaces single `profile_sequence_counters` keyed only on profile; no cross-area counter bleed).
+- **Shared idempotency platform on POST create + revisions** â€” driver: ADR 0011 (Stripe-style key replay; body-hash conflict detection).
+- **FULL OUTER JOIN for active-document lookup** â€” driver: E10 fix; published-only CDs must return 200 with `publishedDocumentId` so frontend renders download link.
 
 ---
 
-## 5. Building Block View (C4 Level 2 — Container)
+## 5. Building Block View (C4 Level 2 â€” Container)
 
-### 5.1 Whitebox — Registry
+### 5.1 Whitebox â€” Registry
 
 ```mermaid
 C4Container
-    title Container View — Registry
+    title Container View â€” Registry
     Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "8 routes under /api/v2/controlled-documents")
     Container(svc, "RegistryService", "Go", "Create / CreateRevision / Obsolete / Supersede / List / Get / PreviewCode")
     Container(repo, "PostgresControlledDocumentRepository", "Go + database/sql", "CRUD on controlled_documents")
@@ -172,8 +172,8 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 | GET | `/api/v2/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
 | GET | `/api/v2/controlled-documents/{id}` | `getControlledDocument` | `routes.go:190` | (read) |
 | GET | `/api/v2/controlled-documents/{id}/active-document` | `getActiveDocument` | `routes.go:232` | (read; tenant from `tenant.FromContext` via `injectTenant` middleware) |
-| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | `registry.obsolete` (`CapRegistryObsolete`) — T-001 closed Plan 5 |
-| PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | `registry.supersede` (`CapRegistrySupersede`) — T-001 closed Plan 5 |
+| PUT | `/api/v2/controlled-documents/{id}/obsolete` | `obsoleteControlledDocument` | `routes.go:328` | `registry.obsolete` (`CapRegistryObsolete`) â€” T-001 closed Plan 5 |
+| PUT | `/api/v2/controlled-documents/{id}/supersede` | `supersedeControlledDocument` | `routes.go:337` | `registry.supersede` (`CapRegistrySupersede`) â€” T-001 closed Plan 5 |
 
 ## API Route Truth Table (Plan 8 Baseline)
 
@@ -248,7 +248,7 @@ Failure modes:
 | Profile/area archived | 409 | `PROFILE_ARCHIVED` / `AREA_ARCHIVED` |
 | Override template mismatch | 409 | `TEMPLATE_PROFILE_MISMATCH` |
 | Code uniqueness violation | 409 | `CONTROLLED_DOCUMENT_CODE_TAKEN` |
-| Template/profile mismatch | 422 | `template_invalid` (`routes.go:470-471` — T-007 closed Plan 7) |
+| Template/profile mismatch | 422 | `template_invalid` (`routes.go:470-471` â€” T-007 closed Plan 7) |
 
 Detail: `_artifacts/02-flow-atomic-create.md`.
 
@@ -276,7 +276,7 @@ sequenceDiagram
 
 State transitions: none (read).
 
-Tripwire pairing: VIOLATION — no `authz.Require`, no `metaldocs.assert_caps`, no GUC; tenant is now sourced from `tenant.FromContext` (via `injectTenant` middleware) rather than `X-Tenant-ID` header (Plan 3 fix). Authz gap on this read path persists — see T-006.
+Tripwire pairing: VIOLATION â€” no `authz.Require`, no `metaldocs.assert_caps`, no GUC; tenant is now sourced from `tenant.FromContext` (via `injectTenant` middleware) rather than `X-Tenant-ID` header (Plan 3 fix). Authz gap on this read path persists â€” see T-006.
 
 Detail: `_artifacts/02-flow-get-active.md`.
 
@@ -313,10 +313,10 @@ State transitions:
 
 | Entity | From | To | Trigger | Guard | Audit emitted? |
 |---|---|---|---|---|---|
-| `controlled_documents` | `active` | `obsolete` | `Obsolete` op | `ErrCDNotActive` if not active | **NO — T-002** |
-| `controlled_documents` | `active` | `superseded` | `Supersede` op | `ErrCDNotActive` if not active | **NO — T-002** |
+| `controlled_documents` | `active` | `obsolete` | `Obsolete` op | `ErrCDNotActive` if not active | **NO â€” T-002** |
+| `controlled_documents` | `active` | `superseded` | `Supersede` op | `ErrCDNotActive` if not active | **NO â€” T-002** |
 
-Tripwire pairing: active — `authz.Require(CapRegistryObsolete|CapRegistrySupersede)` called inside `changeStatus` tx (`service.go:327`); `trg_require_cap_asserted` on `controlled_documents` (UPDATE, OR-logic accepts either cap, migration 0188 line 201). T-001/T-004 closed Plan 5.
+Tripwire pairing: active â€” `authz.Require(CapRegistryObsolete|CapRegistrySupersede)` called inside `changeStatus` tx (`service.go:327`); `trg_require_cap_asserted` on `controlled_documents` (UPDATE, OR-logic accepts either cap, migration 0188 line 201). T-001/T-004 closed Plan 5.
 
 Detail: `_artifacts/02-flow-obsolete.md`.
 
@@ -326,9 +326,9 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 
 - Binary: single Go server (`apps/api/cmd/metaldocs-api`)
 - Process: `:8081` (see [wiki/references/local-dev-startup.md](references/local-dev-startup.md))
-- Migrations: applied at startup; files at repo-root `migrations/` (7 affect registry: 0124, 0126, 0127, 0128, 0167, 0182, 0183 — see `_artifacts/04-persistence.md` §6)
+- Migrations: applied at startup; files at repo-root `migrations/` (7 affect registry: 0124, 0126, 0127, 0128, 0167, 0182, 0183 â€” see `_artifacts/04-persistence.md` Â§6)
 - Startup hook: `Module.RunStartupMigrations` runs `BackfillLegacyDocuments` (`application/migration.go:13`)
-- Environment: module reads no env vars directly (`_artifacts/03-deps.md` §4)
+- Environment: module reads no env vars directly (`_artifacts/03-deps.md` Â§4)
 
 ---
 
@@ -347,19 +347,19 @@ RFC 9457 `application/problem+json`. `httpresponse.WriteError` at `internal/plat
 
 ### 8.3 Idempotency
 
-`Idempotency-Key` header required on POST create + POST revisions. Middleware: `internal/platform/idempotency/middleware.go:22`. Store: `postgres_store.go:19`. Body-hash conflict → 422 `IDEMPOTENCY_KEY_CONFLICT`. PUT lifecycle routes are NOT covered (T-008).
+`Idempotency-Key` header required on POST create + POST revisions. Middleware: `internal/platform/idempotency/middleware.go:22`. Store: `postgres_store.go:19`. Body-hash conflict â†’ 422 `IDEMPOTENCY_KEY_CONFLICT`. PUT lifecycle routes are NOT covered (T-008).
 
 ### 8.4 Pagination
 
-`List` uses domain `CDFilter` (`domain/port.go:19`) — simple LIMIT/OFFSET. No cursor pagination (not required by current consumers).
+`List` uses domain `CDFilter` (`domain/port.go:19`) â€” simple LIMIT/OFFSET. No cursor pagination (not required by current consumers).
 
 ### 8.5 Audit / Governance
 
-Create path emits governance events post-commit via `s.govLogger.Log(...)` (`service.go:267-271`), wired from `taxonomyapp.NewDBGovernanceLogger(deps.DB)` (`module.go:31`) — cross-module sink coupling (T-008). Obsolete / Supersede paths emit NO audit event (T-002).
+Create path emits governance events post-commit via `s.govLogger.Log(...)` (`service.go:267-271`), wired from `taxonomyapp.NewDBGovernanceLogger(deps.DB)` (`module.go:31`) â€” cross-module sink coupling (T-008). Obsolete / Supersede paths emit NO audit event (T-002).
 
 ### 8.6 Concurrency / Transactions
 
-`RegistryService.Create` owns the transaction. Sequence allocator and repository accept the caller's `*sql.Tx` (`infrastructure/repository.go:137`, `:239`). Cross-module `DocumentInitializer.CloneTemplate` runs inside the same tx — atomic CD + first revision per ADR 0011.
+`RegistryService.Create` owns the transaction. Sequence allocator and repository accept the caller's `*sql.Tx` (`infrastructure/repository.go:137`, `:239`). Cross-module `DocumentInitializer.CloneTemplate` runs inside the same tx â€” atomic CD + first revision per ADR 0011.
 
 ### 8.7 Tenant scoping
 
@@ -370,7 +370,7 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 ### 8.8 Numbering invariants
 
 - `cd_sequence_counters.next_seq` is monotonic per (tenant, profile_code, process_area_code).
-- Code format `{PROFILE}-{AREA}-{NNN}` zero-padded to 3 digits (`domain/sequence.go` → `AutoCode`).
+- Code format `{PROFILE}-{AREA}-{NNN}` zero-padded to 3 digits (`domain/sequence.go` â†’ `AutoCode`).
 - `controlled_documents.code` immutability is enforced by the `trg_controlled_documents_code_immutable` trigger calling `reject_code_update()` (`migrations/0124_registry_controlled_documents.sql:47-59`).
 
 ---
@@ -380,10 +380,10 @@ Tenant is sourced from `tenant.FromContext` via the `injectTenant` thin middlewa
 | Decision | Link / Status |
 |---|---|
 | Atomic CD + first-revision create + per-area numbering + `Idempotency-Key` | [wiki/decisions/0011-cd-atomic-create.md](decisions/0011-cd-atomic-create.md) |
-| Two-tier authz | [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) (tier-2/3 wired Plan 5 — T-001/T-004 closed) |
-| Contract-first API (OpenAPI + oapi-codegen) | [wiki/decisions/0012-contract-first-api.md](decisions/0012-contract-first-api.md) (422 `template_invalid` spec/handler drift — **CLOSED Plan 7 T-007**) |
+| Two-tier authz | [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md) (tier-2/3 wired Plan 5 â€” T-001/T-004 closed) |
+| Contract-first API (OpenAPI + oapi-codegen) | [wiki/decisions/0012-contract-first-api.md](decisions/0012-contract-first-api.md) (422 `template_invalid` spec/handler drift â€” **CLOSED Plan 7 T-007**) |
 | Which CD lifecycle events emit audit | tech-debt: missing-ADR (T-002) |
-| Capability granularity (separate `registry.create` / `registry.obsolete` / `registry.supersede`) | implemented Plan 5 (migration 0187 + `CapRegistryObsolete`/`CapRegistrySupersede` in `domain/model.go`); missing standalone ADR — ADR-TODO per Plan 13 |
+| Capability granularity (separate `registry.create` / `registry.obsolete` / `registry.supersede`) | implemented Plan 5 (migration 0187 + `CapRegistryObsolete`/`CapRegistrySupersede` in `domain/model.go`); missing standalone ADR â€” ADR-TODO per Plan 13 |
 | RFC 9457 envelope adoption | **CLOSED Plan 7** (T-003 + T-007) |
 | GUC-based tenant scoping vs query-arg only | tech-debt: missing-ADR (T-005) |
 | Read-path authz contract (e.g. `GetActiveDocument` tenant source) | tech-debt: missing-ADR (T-006) |
@@ -419,17 +419,17 @@ Detail in [wiki/modules/registry-tech-debt.md](modules/registry-tech-debt.md). S
 
 Top 3 (by severity, then blast-radius):
 
-1. T-002 — `Obsolete` / `Supersede` mutate a regulated QMS lifecycle without emitting `governance_events` (audit-trail gap on the canonical catalog). Still open.
-2. T-006 — `GetActiveDocument` has no authz check for the read path; residual gap after Plan 3 header-trust fix.
-3. T-005 — Tenant scoping relies on query-arg only; no GUC + RLS backstop on registry-owned tables.
+1. T-002 â€” `Obsolete` / `Supersede` mutate a regulated QMS lifecycle without emitting `governance_events` (audit-trail gap on the canonical catalog). Still open.
+2. T-006 â€” `GetActiveDocument` has no authz check for the read path; residual gap after Plan 3 header-trust fix.
+3. T-005 â€” Tenant scoping relies on query-arg only; no GUC + RLS backstop on registry-owned tables.
 (T-001 closed Plan 5: lifecycle authz wired. T-004 closed Plan 5: tripwire attached to `controlled_documents` + `cd_sequence_counters`.)
 
 ### Coverage stats
 
 - Public symbols undocumented: 79 / 90 (computed from `_artifacts/01-surface.md`; deferred to T-012)
 - Operations missing C4 placement: 0 / 8
-- Cross-deps missing in §5/§8: 0 / 13 (IN-edges) + 0 / 6 (OUT-edges)
-- State transitions missing in §6: 0 / 2 (Obsolete, Supersede both in §6.3; Create in §6.1)
+- Cross-deps missing in Â§5/Â§8: 0 / 13 (IN-edges) + 0 / 6 (OUT-edges)
+- State transitions missing in Â§6: 0 / 2 (Obsolete, Supersede both in Â§6.3; Create in Â§6.1)
 - Decisions without ADR link: 9 / 12
 
 ---
@@ -458,6 +458,6 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
-- 2026-05-11 — Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; §5.3 T-006 note updated; §6.2 sequence + tripwire note updated; §8.7 tenant-scoping paragraph added; Key files updated.
-- 2026-05-11 — initial Arc42 + C4 publish; supersedes 2026-05-07 stub.
+- 2026-05-11 â€” Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; Â§5.3 T-006 note updated; Â§6.2 sequence + tripwire note updated; Â§8.7 tenant-scoping paragraph added; Key files updated.
+- 2026-05-11 â€” initial Arc42 + C4 publish; supersedes 2026-05-07 stub.
 

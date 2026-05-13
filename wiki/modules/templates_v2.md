@@ -4,29 +4,29 @@
 >
 > **Naming note:** module dir is `internal/modules/templates_v2/` and routes still mount under `/api/v2/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates_v2 is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates_v2-refactor.md#R-101`).
 
-**Last verified:** 2026-05-12 (Plan 8) · **Owner:** unassigned · **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied; **Plan 5 wired `authz.Require` + tripwire on all 6 mutation paths**)
+**Last verified:** 2026-05-12 (Plan 8) | **Owner:** unassigned | **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on all 6 mutation paths) | **Maturity:** L3
 
 ---
 
 ## 1. Introduction & Goals
 
-`templates_v2` owns the lifecycle of DOCX-based document templates: authoring (DOCX upload + placeholder schema), versioning, two-stage approval (review → approve), publishing, and obsoletion of the previous published version. Every document instance in MetalDocs is instantiated from a *published* template version — `documents` is the downstream consumer that snapshots `placeholder_schema` at finalize.
+`templates_v2` owns the lifecycle of DOCX-based document templates: authoring (DOCX upload + placeholder schema), versioning, two-stage approval (review â†’ approve), publishing, and obsoletion of the previous published version. Every document instance in MetalDocs is instantiated from a *published* template version â€” `documents` is the downstream consumer that snapshots `placeholder_schema` at finalize.
 
 ### 1.1 Requirements overview
 
 - **Authoring of regulated DOCX templates** with eigenpal-native `{name}` placeholders restricted to the fixed 7-token catalog (per `wiki/concepts/placeholders.md`, ADR 0008).
-- **Two-stage approval lifecycle** (`draft → in_review → approved → published`, with `obsolete` for superseded versions) enforcing ISO segregation of duties (per `wiki/concepts/iso-segregation.md`).
-- **Snapshot contract for downstream consumers** — published `template_version.placeholder_schema` is read by `documents` at instantiation (`wiki/modules/documents.md §8.7`).
-- **Authoring identity carried on every version** — `author_id`, `reviewer_id`, `approver_id` columns are the SoD probe surface consumed by `approval` (per `wiki/modules/approval.md` SoD T-003).
-- **Per-tenant isolation** — every template scoped by `tenant_id` (origin: `wiki/architecture/data-model.md`).
+- **Two-stage approval lifecycle** (`draft â†’ in_review â†’ approved â†’ published`, with `obsolete` for superseded versions) enforcing ISO segregation of duties (per `wiki/concepts/iso-segregation.md`).
+- **Snapshot contract for downstream consumers** â€” published `template_version.placeholder_schema` is read by `documents` at instantiation (`wiki/modules/documents.md Â§8.7`).
+- **Authoring identity carried on every version** â€” `author_id`, `reviewer_id`, `approver_id` columns are the SoD probe surface consumed by `approval` (per `wiki/modules/approval.md` SoD T-003).
+- **Per-tenant isolation** â€” every template scoped by `tenant_id` (origin: `wiki/architecture/data-model.md`).
 
 ### 1.2 Quality Goals
 
 | Rank | Goal | How verified |
 |---|---|---|
-| 1 | Tenant isolation of templates and versions | tripwire on every `templates_v2_*` mutation; query-side tenant guard on `GetVersion*` (currently NOT met — see T-002) |
-| 2 | Approval contract correctness (no self-approve, no self-publish) | `domain.CheckSegregation` invoked on every state transition (currently NOT met for `PublishTemplateVersion` — see T-004) |
-| 3 | Placeholder catalog enforcement (no template-injection) | `application.ValidatePlaceholders` rejects non-catalog `PHType` at schema save; resolver registry check on `PHComputed` (resolver registry currently NOT wired — see T-008) |
+| 1 | Tenant isolation of templates and versions | tripwire on every `templates_v2_*` mutation; query-side tenant guard on `GetVersion*` (currently NOT met â€” see T-002) |
+| 2 | Approval contract correctness (no self-approve, no self-publish) | `domain.CheckSegregation` invoked on every state transition (currently NOT met for `PublishTemplateVersion` â€” see T-004) |
+| 3 | Placeholder catalog enforcement (no template-injection) | `application.ValidatePlaceholders` rejects non-catalog `PHType` at schema save; resolver registry check on `PHComputed` (resolver registry currently NOT wired â€” see T-008) |
 
 ### 1.3 Stakeholders
 
@@ -44,9 +44,9 @@
 
 - Language / runtime: Go (per repo defaults).
 - Persistence: Postgres; tables created in `migrations/0120_templates_v2_init.sql`.
-- Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md` — **applied Plan 5** (`WithDB` builder + `authz.Require` in all 6 mutation paths + DB tripwire on `templates_v2_template` + `templates_v2_template_version`; T-001 closed).
-- API contract: OpenAPI 3.0.3 generated via oapi-codegen — **partial** (8 of 20 routes generated; see T-006).
-- Error envelope: RFC 9457 Problem+JSON per `wiki/architecture/api-design-system.md` — **NOT applied** (see T-005).
+- Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md` â€” **applied Plan 5** (`WithDB` builder + `authz.Require` in all 6 mutation paths + DB tripwire on `templates_v2_template` + `templates_v2_template_version`; T-001 closed).
+- API contract: OpenAPI 3.0.3 generated via oapi-codegen â€” **partial** (8 of 20 routes generated; see T-006).
+- Error envelope: RFC 9457 Problem+JSON per `wiki/architecture/api-design-system.md` â€” **NOT applied** (see T-005).
 - Placeholder syntax + catalog: per `wiki/concepts/placeholders.md` (fixed 7-token) and `wiki/concepts/token-syntax.md` (`{name}` single-brace, eigenpal-native).
 - Editor: eigenpal `templatePlugin` for DOCX authoring (per ADR 0001 `wiki/decisions/0001-eigenpal-adoption.md`).
 
@@ -56,7 +56,7 @@
 
 ```mermaid
 C4Context
-    title System Context — templates_v2
+    title System Context â€” templates_v2
     Person(author, "Author", "QMS author / template editor")
     Person(reviewer, "Reviewer/Approver", "Role-gated workflow actor")
     System_Boundary(b1, "MetalDocs") {
@@ -83,44 +83,44 @@ C4Context
 
 ### 3.1 Business Context
 
-Quality teams author DOCX templates that downstream document instances inherit (placeholder schema, layout, content). A template is *not usable* until it is `published` and not yet `obsolete`. Publishing a new version automatically obsoletes the previous. ISO 9001 §7.5 places the audit-trail and approval-segregation burden on this module: who authored, who reviewed, who approved, when published.
+Quality teams author DOCX templates that downstream document instances inherit (placeholder schema, layout, content). A template is *not usable* until it is `published` and not yet `obsolete`. Publishing a new version automatically obsoletes the previous. ISO 9001 Â§7.5 places the audit-trail and approval-segregation burden on this module: who authored, who reviewed, who approved, when published.
 
 ### 3.2 Technical Context
 
 Inbound interfaces:
-- 20 HTTP routes mounted at `/api/v2/templates/*` (8 generated via oapi-codegen, 12 hand-rolled — see §5.3).
+- 20 HTTP routes mounted at `/api/v2/templates/*` (8 generated via oapi-codegen, 12 hand-rolled â€” see Â§5.3).
 - Go domain types consumed by `documents` (`Placeholder`, `TemplateVersion`, `TemplateSnapshot`, `PHType` constants).
 
 Outbound interfaces:
 - Postgres: 4 owned tables (`templates_v2_template`, `templates_v2_template_version`, `templates_v2_approval_config`, `templates_v2_audit_log`).
 - MinIO: presigned PUT for DOCX/schema upload; presigned GET for DOCX retrieval (TTL 10 minutes, max object size 25 MiB hard-coded at `apps/api/cmd/metaldocs-api/main.go:327`).
-- iam: capability namespace `template.*` (declared by seed) — currently unenforced (T-001).
+- iam: capability namespace `template.*` (declared by seed) â€” currently unenforced (T-001).
 - Canonical `audit` module: **not used**; templates_v2 writes its own `templates_v2_audit_log` parallel sink (see T-013).
 
 ---
 
 ## 4. Solution Strategy
 
-- **Hexagonal layout** — `domain/` (entities + invariants), `application/` (use-cases + ports), `delivery/http/` (handlers + routing), `repository/` (Postgres I/O). No ADR; same shape as `documents` and `auth` (missing-ADR — see T-014).
-- **Approval as state machine on `template_version.status`** — driver: ISO 9001 §7.5 traceability requirement. Transitions enforced by `domain.TemplateVersion.CanTransition` (`internal/modules/templates_v2/domain/version.go`).
-- **DOCX bytes via presigned MinIO PUT/GET** — driver: avoid round-tripping multi-MB DOCX through the API. Authored at `application/autosave.go`.
-- **Placeholder validation as a security boundary** — `application/schema.go:84 ValidatePlaceholders` enforces the fixed 7-token catalog (PHType enum) at schema-save. Resolver-key validation for `PHComputed` requires `ResolverRegistryReader`, currently nil at wiring (T-008).
-- **Two parallel publish paths** — `Service.Approve` (lifecycle.go:159, the canonical author-review-approve chain) and `Service.PublishTemplateVersion` (lifecycle.go:265, a direct draft → published path used by `POST /publish`). Different invariants — Approve enforces SoD, Publish does not. See T-004.
+- **Hexagonal layout** â€” `domain/` (entities + invariants), `application/` (use-cases + ports), `delivery/http/` (handlers + routing), `repository/` (Postgres I/O). No ADR; same shape as `documents` and `auth` (missing-ADR â€” see T-014).
+- **Approval as state machine on `template_version.status`** â€” driver: ISO 9001 Â§7.5 traceability requirement. Transitions enforced by `domain.TemplateVersion.CanTransition` (`internal/modules/templates_v2/domain/version.go`).
+- **DOCX bytes via presigned MinIO PUT/GET** â€” driver: avoid round-tripping multi-MB DOCX through the API. Authored at `application/autosave.go`.
+- **Placeholder validation as a security boundary** â€” `application/schema.go:84 ValidatePlaceholders` enforces the fixed 7-token catalog (PHType enum) at schema-save. Resolver-key validation for `PHComputed` requires `ResolverRegistryReader`, currently nil at wiring (T-008).
+- **Two parallel publish paths** â€” `Service.Approve` (lifecycle.go:159, the canonical author-review-approve chain) and `Service.PublishTemplateVersion` (lifecycle.go:265, a direct draft â†’ published path used by `POST /publish`). Different invariants â€” Approve enforces SoD, Publish does not. See T-004.
 
 ---
 
-## 5. Building Block View (C4 Level 2 — Container)
+## 5. Building Block View (C4 Level 2 â€” Container)
 
-### 5.1 Whitebox — templates_v2
+### 5.1 Whitebox â€” templates_v2
 
 ```mermaid
 C4Container
-    title Container View — templates_v2
+    title Container View â€” templates_v2
     Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "20 routes under /api/v2/templates")
-    Container(svc, "Service Layer", "Go", "CreateTemplate · CreateNextVersion · UpdateSchemas · SaveTemplateDraft · PresignTemplateUpload · CommitAutosave · SubmitForReview · Review · Approve · PublishTemplateVersion · ArchiveTemplate · UpsertApprovalConfig · queries")
-    Container(domain, "Domain", "Go", "Template · TemplateVersion · ApprovalConfig · MetadataSchema · Placeholder · VisibilityCondition · CheckSegregation")
+    Container(svc, "Service Layer", "Go", "CreateTemplate Â· CreateNextVersion Â· UpdateSchemas Â· SaveTemplateDraft Â· PresignTemplateUpload Â· CommitAutosave Â· SubmitForReview Â· Review Â· Approve Â· PublishTemplateVersion Â· ArchiveTemplate Â· UpsertApprovalConfig Â· queries")
+    Container(domain, "Domain", "Go", "Template Â· TemplateVersion Â· ApprovalConfig Â· MetadataSchema Â· Placeholder Â· VisibilityCondition Â· CheckSegregation")
     Container(repo, "Repository", "Go + database/sql + pgx pgconn", "Postgres I/O")
-    ContainerDb(db, "Postgres", "Postgres", "templates_v2_template · templates_v2_template_version · templates_v2_approval_config · templates_v2_audit_log")
+    ContainerDb(db, "Postgres", "Postgres", "templates_v2_template Â· templates_v2_template_version Â· templates_v2_approval_config Â· templates_v2_audit_log")
     Container_Ext(presigner, "Presigner", "Go (objectstore adapter)", "PresignPUT / PresignGET / HeadContentHash / Delete (MinIO)")
     Rel(http, svc, "calls")
     Rel(svc, domain, "uses entities + invariants")
@@ -131,7 +131,7 @@ C4Container
 
 ### 5.2 Public surface
 
-Grouped by file. Source of truth: `_artifacts/01-surface.md` §3.
+Grouped by file. Source of truth: `_artifacts/01-surface.md` Â§3.
 
 | File | Symbol | Kind | Purpose |
 |---|---|---|---|
@@ -143,9 +143,9 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` §3.
 | `internal/modules/templates_v2/domain/schemas.go:12` | `PHText`, `PHDate`, `PHNumber`, `PHSelect`, `PHUser`, `PHPicture`, `PHComputed` | const | Fixed 7-token catalog (per `wiki/concepts/placeholders.md`) |
 | `internal/modules/templates_v2/domain/schemas.go:22` | `VisibilityCondition` | struct | Conditional placeholder visibility primitive |
 | `internal/modules/templates_v2/domain/schemas.go:28` | `Placeholder` | struct | Placeholder entity (id, type, name, options, etc.) |
-| `internal/modules/templates_v2/domain/schemas.go:48` | `CompositionConfig` | struct | (Deprecated per ADR `wiki/decisions/0008-placeholder-fixed-catalog.md` — composition removed 2026-04-27; struct retained for backward compat) |
+| `internal/modules/templates_v2/domain/schemas.go:48` | `CompositionConfig` | struct | (Deprecated per ADR `wiki/decisions/0008-placeholder-fixed-catalog.md` â€” composition removed 2026-04-27; struct retained for backward compat) |
 | `internal/modules/templates_v2/domain/approval.go:3` | `ApprovalConfig` | struct | Reviewer/approver role binding per template |
-| `internal/modules/templates_v2/domain/approval.go:17` | `CheckSegregation` | func | SoD enforcement (author ≠ reviewer ≠ approver) |
+| `internal/modules/templates_v2/domain/approval.go:17` | `CheckSegregation` | func | SoD enforcement (author â‰  reviewer â‰  approver) |
 | `internal/modules/templates_v2/domain/audit.go:7` | `AuditCreated`, `AuditSaved`, `AuditSubmitted`, `AuditReviewed`, `AuditApproved`, `AuditRejected`, `AuditPublished`, `AuditObsoleted`, `AuditArchived`, `AuditRestored`, `AuditApprovalConfigUpdated` | const | Audit action enum |
 | `internal/modules/templates_v2/domain/audit.go:21` | `AuditEvent` | struct | Audit row written to `templates_v2_audit_log` |
 | `internal/modules/templates_v2/application/ports.go:10` | `Repository` | iface | Persistence port (used by service) |
@@ -160,7 +160,7 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` §3.
 | `internal/modules/templates_v2/application/schema.go:12` | `UpdateSchemasCmd` | struct | Schema update command |
 | `internal/modules/templates_v2/application/schema.go:84` | `ValidatePlaceholders` | func | Placeholder catalog enforcement (PHType + resolver_key when registry wired) |
 | `internal/modules/templates_v2/application/lifecycle.go:9..264` | `SubmitForReviewCmd`, `ReviewCmd`, `ApproveCmd`, `ArchiveCmd`, `PublishTemplateVersionCmd`, `PublishTemplateVersionResult` | struct | Lifecycle commands |
-| `internal/modules/templates_v2/application/lifecycle.go:14..316` | `Service.SubmitForReview`, `Service.Review`, `Service.Approve`, `Service.PublishTemplateVersion`, `Service.ArchiveTemplate` | method | Lifecycle ops; `Approve` (lifecycle.go:159) and `PublishTemplateVersion` (lifecycle.go:265) are two parallel publish paths (see §4) |
+| `internal/modules/templates_v2/application/lifecycle.go:14..316` | `Service.SubmitForReview`, `Service.Review`, `Service.Approve`, `Service.PublishTemplateVersion`, `Service.ArchiveTemplate` | method | Lifecycle ops; `Approve` (lifecycle.go:159) and `PublishTemplateVersion` (lifecycle.go:265) are two parallel publish paths (see Â§4) |
 | `internal/modules/templates_v2/application/autosave.go:13..171` | `PresignAutosaveCmd/Result`, `PresignTemplateUploadCmd`, `CommitAutosaveCmd`, `SaveTemplateDraftCmd` + their `Service` methods | struct + method | DOCX upload + autosave path |
 | `internal/modules/templates_v2/application/approval_config.go:9` | `UpsertApprovalConfigCmd` | struct | Approval-config command |
 | `internal/modules/templates_v2/application/queries.go:41` | `GetDocxURLCmd` | struct | Presigned GET for stored DOCX |
@@ -170,42 +170,42 @@ Grouped by file. Source of truth: `_artifacts/01-surface.md` §3.
 | `internal/modules/templates_v2/delivery/http/handler.go:24` | `New` | func | Handler constructor |
 | `internal/modules/templates_v2/application/service.go:22` | `WithDB` | method | Builder that injects `*sql.DB` enabling tx-backed `authz.Require` calls (added Plan 5) |
 | `internal/modules/templates_v2/delivery/http/handler.go:31` | `Handler.Register` | method | Mounts 20 routes on `*http.ServeMux` |
-| `internal/modules/templates_v2/delivery/http/errors.go:10` | `MapErr` | func | Domain error → HTTP status + code mapping |
+| `internal/modules/templates_v2/delivery/http/errors.go:10` | `MapErr` | func | Domain error â†’ HTTP status + code mapping |
 | `internal/modules/templates_v2/repository/postgres.go:21` | `Repository` | struct | Postgres adapter implementing `application.Repository` |
 | `internal/modules/templates_v2/repository/postgres.go:25` | `New` | func | Repository constructor |
 | `internal/modules/templates_v2/api/api.gen.go:*` | `ServerInterface`, `StrictServerInterface`, `*RequestObject`, `*ResponseObject`, `Handler*`, `NewStrictHandler*`, `GetSwagger`, `GetSpec`, etc. | iface + struct + func | oapi-codegen generated surface |
 
-`(undocumented)`: every exported symbol above lacks a Go doc comment (per `_artifacts/01-surface.md` §3). See T-014.
+`(undocumented)`: every exported symbol above lacks a Go doc comment (per `_artifacts/01-surface.md` Â§3). See T-014.
 
 ### 5.3 HTTP operations
 
-Source: `_artifacts/01-surface.md` §1a + §1b. **All routes still mount under `/api/v2/templates` — Plan 2 has not yet flipped this module to `/api/v1/`.**
+Source: `_artifacts/01-surface.md` Â§1a + Â§1b. **All routes still mount under `/api/v2/templates` â€” Plan 2 has not yet flipped this module to `/api/v1/`.**
 
 | Method | Path | OperationID | Handler | Authz cap (intended) |
 |---|---|---|---|---|
 | GET | `/api/v2/signed` | `RedirectSignedUrlV2` | `generated.RedirectSignedUrlV2` | (none) |
 | GET | `/api/v2/templates` | `ListTemplatesV2` | `generated.ListTemplatesV2` | `template.view` |
 | POST | `/api/v2/templates` | `CreateTemplateV2` | `generated.CreateTemplateV2` | `template.create` |
-| GET | `/api/v2/templates/{id}` | — (hand-rolled) | `Handler.getTemplate` | `template.view` |
+| GET | `/api/v2/templates/{id}` | â€” (hand-rolled) | `Handler.getTemplate` | `template.view` |
 | GET | `/api/v2/templates/{id}/versions/{n}` | `GetTemplateVersionV2` | `generated.GetTemplateVersionV2` | `template.view` |
-| POST | `/api/v2/templates/{id}/versions` | — (hand-rolled) | `Handler.createNextVersion` | `template.edit` |
+| POST | `/api/v2/templates/{id}/versions` | â€” (hand-rolled) | `Handler.createNextVersion` | `template.edit` |
 | PUT | `/api/v2/templates/{id}/versions/{n}/draft` | `SaveTemplateDraftV2` | `generated.SaveTemplateDraftV2` | `template.edit` |
-| PUT | `/api/v2/templates/{id}/versions/{n}/schema` | — (hand-rolled) | `Handler.updateSchemas` | `template.edit` |
+| PUT | `/api/v2/templates/{id}/versions/{n}/schema` | â€” (hand-rolled) | `Handler.updateSchemas` | `template.edit` |
 | POST | `/api/v2/templates/{id}/versions/{n}/docx-upload-url` | `PresignTemplateDocxUploadUrlV2` | `generated.PresignTemplateDocxUploadUrlV2` | `template.edit` |
 | POST | `/api/v2/templates/{id}/versions/{n}/schema-upload-url` | `PresignTemplateSchemaUploadUrlV2` | `generated.PresignTemplateSchemaUploadUrlV2` | `template.edit` |
-| POST | `/api/v2/templates/{id}/versions/{n}/autosave/presign` | — (hand-rolled) | `Handler.presignAutosave` | `template.edit` |
-| POST | `/api/v2/templates/{id}/versions/{n}/autosave/commit` | — (hand-rolled) | `Handler.commitAutosave` | `template.edit` |
-| POST | `/api/v2/templates/{id}/versions/{n}/submit` | — (hand-rolled) | `Handler.submitForReview` | `template.submit` |
-| POST | `/api/v2/templates/{id}/versions/{n}/review` | — (hand-rolled) | `Handler.review` | `template.approve` |
-| POST | `/api/v2/templates/{id}/versions/{n}/approve` | — (hand-rolled) | `Handler.approve` | `template.approve` |
+| POST | `/api/v2/templates/{id}/versions/{n}/autosave/presign` | â€” (hand-rolled) | `Handler.presignAutosave` | `template.edit` |
+| POST | `/api/v2/templates/{id}/versions/{n}/autosave/commit` | â€” (hand-rolled) | `Handler.commitAutosave` | `template.edit` |
+| POST | `/api/v2/templates/{id}/versions/{n}/submit` | â€” (hand-rolled) | `Handler.submitForReview` | `template.submit` |
+| POST | `/api/v2/templates/{id}/versions/{n}/review` | â€” (hand-rolled) | `Handler.review` | `template.approve` |
+| POST | `/api/v2/templates/{id}/versions/{n}/approve` | â€” (hand-rolled) | `Handler.approve` | `template.approve` |
 | POST | `/api/v2/templates/{id}/versions/{n}/publish` | `PublishTemplateVersionV2` | `generated.PublishTemplateVersionV2` | `template.publish` |
-| POST | `/api/v2/templates/{id}/archive` | — (hand-rolled) | `Handler.archiveTemplate` | `template.edit` |
-| PUT | `/api/v2/templates/{id}/approval-config` | — (hand-rolled) | `Handler.upsertApprovalConfig` | `template.edit` |
-| GET | `/api/v2/templates/{id}/versions/{n}/docx-url` | — (hand-rolled) | `Handler.getDocxURL` | `template.view` |
-| GET | `/api/v2/templates/{id}/audit` | — (hand-rolled) | `Handler.listAudit` | `template.view` |
-| GET | `/api/v2/templates/v2/placeholder-catalog` | — (hand-rolled) | `Handler.listPlaceholderCatalog` | (none) |
+| POST | `/api/v2/templates/{id}/archive` | â€” (hand-rolled) | `Handler.archiveTemplate` | `template.edit` |
+| PUT | `/api/v2/templates/{id}/approval-config` | â€” (hand-rolled) | `Handler.upsertApprovalConfig` | `template.edit` |
+| GET | `/api/v2/templates/{id}/versions/{n}/docx-url` | â€” (hand-rolled) | `Handler.getDocxURL` | `template.view` |
+| GET | `/api/v2/templates/{id}/audit` | â€” (hand-rolled) | `Handler.listAudit` | `template.view` |
+| GET | `/api/v2/templates/v2/placeholder-catalog` | â€” (hand-rolled) | `Handler.listPlaceholderCatalog` | (none) |
 
-Hand-rolled rows (12 of 20) are absent from the OpenAPI spec → spec/handler drift (T-006). All "intended" caps in the rightmost column are advisory; **no route enforces them at runtime** (T-001).
+Hand-rolled rows (12 of 20) are absent from the OpenAPI spec â†’ spec/handler drift (T-006). All "intended" caps in the rightmost column are advisory; **no route enforces them at runtime** (T-001).
 
 ## API Route Truth Table (Plan 8 Baseline)
 
@@ -219,19 +219,19 @@ Hand-rolled rows (12 of 20) are absent from the OpenAPI spec → spec/handler dr
 | POST | `/api/v2/templates/{id}/versions/{n}/schema-upload-url` | `internal/modules/templates_v2/delivery/http/handler.go:44` | `generated.PresignTemplateSchemaUploadUrlV2` | `/api/v2/templates/{id}/versions/{n}/schema-upload-url` | `presignTemplateSchemaUploadUrlV2` | `PresignTemplateSchemaUploadUrlV2` | Aligned | Wrapper-mounted |
 | PUT | `/api/v2/templates/{id}/versions/{n}/draft` | `internal/modules/templates_v2/delivery/http/handler.go:45` | `generated.SaveTemplateDraftV2` | `/api/v2/templates/{id}/versions/{n}/draft` | `saveTemplateDraftV2` | `SaveTemplateDraftV2` | Aligned | Wrapper-mounted |
 | POST | `/api/v2/templates/{id}/versions/{n}/publish` | `internal/modules/templates_v2/delivery/http/handler.go:46` | `generated.PublishTemplateVersionV2` | `/api/v2/templates/{id}/versions/{n}/publish` | `publishTemplateVersionV2` | `PublishTemplateVersionV2` | Aligned | Wrapper-mounted |
-| POST | `/api/v2/templates/{id}/versions` | `internal/modules/templates_v2/delivery/http/handler.go:48` | `h.createNextVersion` | — | — | — | Spec missing |  |
-| PUT | `/api/v2/templates/{id}/versions/{n}/schema` | `internal/modules/templates_v2/delivery/http/handler.go:49` | `h.updateSchemas` | — | — | — | Spec missing |  |
-| POST | `/api/v2/templates/{id}/versions/{n}/autosave/presign` | `internal/modules/templates_v2/delivery/http/handler.go:50` | `h.presignAutosave` | — | — | — | Spec missing |  |
-| POST | `/api/v2/templates/{id}/versions/{n}/autosave/commit` | `internal/modules/templates_v2/delivery/http/handler.go:51` | `h.commitAutosave` | — | — | — | Spec missing |  |
-| POST | `/api/v2/templates/{id}/versions/{n}/submit` | `internal/modules/templates_v2/delivery/http/handler.go:52` | `h.submitForReview` | — | — | — | Spec missing |  |
-| POST | `/api/v2/templates/{id}/versions/{n}/review` | `internal/modules/templates_v2/delivery/http/handler.go:53` | `h.review` | — | — | — | Spec missing |  |
-| POST | `/api/v2/templates/{id}/versions/{n}/approve` | `internal/modules/templates_v2/delivery/http/handler.go:54` | `h.approve` | — | — | — | Spec missing |  |
-| POST | `/api/v2/templates/{id}/archive` | `internal/modules/templates_v2/delivery/http/handler.go:55` | `h.archiveTemplate` | — | — | — | Spec missing |  |
-| PUT | `/api/v2/templates/{id}/approval-config` | `internal/modules/templates_v2/delivery/http/handler.go:56` | `h.upsertApprovalConfig` | — | — | — | Spec missing |  |
-| GET | `/api/v2/templates/{id}` | `internal/modules/templates_v2/delivery/http/handler.go:58` | `h.getTemplate` | — | — | — | Spec missing |  |
-| GET | `/api/v2/templates/{id}/versions/{n}/docx-url` | `internal/modules/templates_v2/delivery/http/handler.go:59` | `h.getDocxURL` | — | — | — | Spec missing |  |
-| GET | `/api/v2/templates/{id}/audit` | `internal/modules/templates_v2/delivery/http/handler.go:60` | `h.listAudit` | — | — | — | Spec missing |  |
-| GET | `/api/v2/templates/v2/placeholder-catalog` | `internal/modules/templates_v2/delivery/http/handler.go:61` | `h.listPlaceholderCatalog` | — | — | — | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions` | `internal/modules/templates_v2/delivery/http/handler.go:48` | `h.createNextVersion` | â€” | â€” | â€” | Spec missing |  |
+| PUT | `/api/v2/templates/{id}/versions/{n}/schema` | `internal/modules/templates_v2/delivery/http/handler.go:49` | `h.updateSchemas` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/autosave/presign` | `internal/modules/templates_v2/delivery/http/handler.go:50` | `h.presignAutosave` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/autosave/commit` | `internal/modules/templates_v2/delivery/http/handler.go:51` | `h.commitAutosave` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/submit` | `internal/modules/templates_v2/delivery/http/handler.go:52` | `h.submitForReview` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/review` | `internal/modules/templates_v2/delivery/http/handler.go:53` | `h.review` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v2/templates/{id}/versions/{n}/approve` | `internal/modules/templates_v2/delivery/http/handler.go:54` | `h.approve` | â€” | â€” | â€” | Spec missing |  |
+| POST | `/api/v2/templates/{id}/archive` | `internal/modules/templates_v2/delivery/http/handler.go:55` | `h.archiveTemplate` | â€” | â€” | â€” | Spec missing |  |
+| PUT | `/api/v2/templates/{id}/approval-config` | `internal/modules/templates_v2/delivery/http/handler.go:56` | `h.upsertApprovalConfig` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v2/templates/{id}` | `internal/modules/templates_v2/delivery/http/handler.go:58` | `h.getTemplate` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v2/templates/{id}/versions/{n}/docx-url` | `internal/modules/templates_v2/delivery/http/handler.go:59` | `h.getDocxURL` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v2/templates/{id}/audit` | `internal/modules/templates_v2/delivery/http/handler.go:60` | `h.listAudit` | â€” | â€” | â€” | Spec missing |  |
+| GET | `/api/v2/templates/v2/placeholder-catalog` | `internal/modules/templates_v2/delivery/http/handler.go:61` | `h.listPlaceholderCatalog` | â€” | â€” | â€” | Spec missing |  |
 
 Module contract status: Wrapper-only
 Owner: leandro
@@ -240,7 +240,7 @@ Owner: leandro
 
 ## 6. Runtime View (selected scenarios)
 
-### 6.1 ListTemplates (read) — `GET /api/v2/templates`
+### 6.1 ListTemplates (read) â€” `GET /api/v2/templates`
 
 Source: `_artifacts/02-flow-list.md` + `repository/postgres.go:88`.
 
@@ -253,8 +253,8 @@ sequenceDiagram
     participant R as Repository
     participant DB as Postgres
     C->>H: GET /api/v2/templates
-    H->>H: tenantIDFromReq(r) → tenant.FromContext (Plan 3: no longer reads X-Tenant-ID header)
-    H->>H: authz(r, tenant, area, action) → real capability check (T-001 closed Plan 5)
+    H->>H: tenantIDFromReq(r) â†’ tenant.FromContext (Plan 3: no longer reads X-Tenant-ID header)
+    H->>H: authz(r, tenant, area, action) â†’ real capability check (T-001 closed Plan 5)
     H->>S: List(ctx, ListFilter{TenantID, DocTypeCode, Areas, Visibility, IncludeArchived})
     S->>R: ListTemplates(ctx, filter)
     R->>DB: SELECT FROM templates_v2_template WHERE tenant_id = $1 AND ... (no LIMIT)
@@ -269,10 +269,10 @@ Failure modes:
 | Condition | HTTP | Body |
 |---|---|---|
 | empty result | 200 | `{"templates":[]}` |
-| db error | 500 | `{"error":{"code":"internal","message":"..."}}` (legacy envelope — T-005) |
-| tenant not in context (no active session) | 500 | `INTERNAL_ERROR` — `tenant.FromContext` returns `ErrTenantMissing`; resolved by T-003 fix (Plan 3) |
+| db error | 500 | `{"error":{"code":"internal","message":"..."}}` (legacy envelope â€” T-005) |
+| tenant not in context (no active session) | 500 | `INTERNAL_ERROR` â€” `tenant.FromContext` returns `ErrTenantMissing`; resolved by T-003 fix (Plan 3) |
 
-### 6.2 UpdateSchema (write — placeholder catalog enforcement) — `PUT /api/v2/templates/{id}/versions/{n}/schema`
+### 6.2 UpdateSchema (write â€” placeholder catalog enforcement) â€” `PUT /api/v2/templates/{id}/versions/{n}/schema`
 
 Source: `_artifacts/02-flow-update-schema.md` + `application/schema.go:84` + `application/lifecycle.go:14`.
 
@@ -288,10 +288,10 @@ sequenceDiagram
     C->>H: PUT .../schema {metadata, placeholders}
     H->>H: tenantIDFromReq, userIDFromReq, authz no-op
     H->>S: UpdateSchemas(cmd)
-    S->>S: GetTemplate(tenant, id) — tenant gate
-    S->>S: GetVersion(template_id, n) — NO tenant arg (T-002)
+    S->>S: GetTemplate(tenant, id) â€” tenant gate
+    S->>S: GetVersion(template_id, n) â€” NO tenant arg (T-002)
     S->>V: ValidatePlaceholders(placeholders, ResolverRegistryReader)
-    Note over V: registry is nil at wiring (T-008) → resolver_key skipped
+    Note over V: registry is nil at wiring (T-008) â†’ resolver_key skipped
     V-->>S: ok
     S->>R: UpdateVersion(version)  -- NO authz.Require (T-001)
     R->>DB: UPDATE templates_v2_template_version SET ...
@@ -316,15 +316,15 @@ State transitions on `templates_v2_template_version.status`:
 
 | From | To | Trigger | Authz cap (intended / actual) | SoD check |
 |---|---|---|---|---|
-| draft | in_review | `POST .../submit` | `template.submit` / **bypassed (T-001)** | — (no actor restriction at submit) |
-| in_review | approved | `POST .../review` (Accept) | `template.approve` / bypassed | `CheckSegregation("reviewer", actor, author, nil)` ✓ |
-| in_review | draft | `POST .../review` (Reject) | `template.approve` / bypassed | — |
-| approved | published | `POST .../approve` (Accept, hasReviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, reviewer)` ✓ |
-| in_review | published | `POST .../approve` (Accept, no reviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, nil)` ✓ |
-| draft | published | `POST .../publish` (`PublishTemplateVersion`) | `template.publish` / bypassed | **NONE — author can self-publish (T-004)** |
-| approved | draft | `POST .../approve` (Reject) | `template.approve` / bypassed | — |
-| published | obsolete | side-effect of `Approve(Accept)` or `PublishTemplateVersion` (`ObsoletePreviousPublished`) | implicit | — |
-| any | (template.archived_at NOT NULL) | `POST .../archive` | `template.edit` / bypassed | — |
+| draft | in_review | `POST .../submit` | `template.submit` / **bypassed (T-001)** | â€” (no actor restriction at submit) |
+| in_review | approved | `POST .../review` (Accept) | `template.approve` / bypassed | `CheckSegregation("reviewer", actor, author, nil)` âœ“ |
+| in_review | draft | `POST .../review` (Reject) | `template.approve` / bypassed | â€” |
+| approved | published | `POST .../approve` (Accept, hasReviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, reviewer)` âœ“ |
+| in_review | published | `POST .../approve` (Accept, no reviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, nil)` âœ“ |
+| draft | published | `POST .../publish` (`PublishTemplateVersion`) | `template.publish` / bypassed | **NONE â€” author can self-publish (T-004)** |
+| approved | draft | `POST .../approve` (Reject) | `template.approve` / bypassed | â€” |
+| published | obsolete | side-effect of `Approve(Accept)` or `PublishTemplateVersion` (`ObsoletePreviousPublished`) | implicit | â€” |
+| any | (template.archived_at NOT NULL) | `POST .../archive` | `template.edit` / bypassed | â€” |
 
 Publish sequence (`Service.PublishTemplateVersion`, `lifecycle.go:265`):
 
@@ -339,12 +339,12 @@ sequenceDiagram
     C->>H: POST .../publish
     H->>S: PublishTemplateVersion(cmd)
     S->>R: GetTemplate(tenant, id)
-    S->>R: GetVersion(id, n) — no tenant arg
-    Note over S: if status != draft → 409
+    S->>R: GetVersion(id, n) â€” no tenant arg
+    Note over S: if status != draft â†’ 409
     Note over S: NO CheckSegregation (T-004); NO content_hash check
     S->>R: ObsoletePreviousPublished(template_id, new_version_id)
     R->>DB: UPDATE templates_v2_template_version SET status='obsolete' WHERE ...
-    Note over S,DB: NOT in same tx (T-007) — race window for concurrent publish
+    Note over S,DB: NOT in same tx (T-007) â€” race window for concurrent publish
     S->>R: UpdateTemplate(template.PublishedVersionID = new)
     R->>DB: UPDATE templates_v2_template
     S->>R: UpdateVersion(version.status = published)
@@ -352,7 +352,7 @@ sequenceDiagram
     S->>R: AppendAudit(AuditPublished)
     R->>DB: INSERT templates_v2_audit_log
     Note over S: AuditObsoleted constant exists; never written for the obsolete side-effect
-    S->>S: CreateNextVersion(...)  — auto-spawn draft v(n+1)
+    S->>S: CreateNextVersion(...)  â€” auto-spawn draft v(n+1)
     S-->>H: PublishTemplateVersionResult{Published, NextDraft}
     H-->>C: 200
 ```
@@ -372,7 +372,7 @@ Failure modes:
 - Binary: `apps/api/cmd/metaldocs-api`
 - Process: single Go server, port `:8081` (per `wiki/references/local-dev-startup.md`)
 - Migrations: applied at startup via the global `migrations/` directory (golang-migrate; per `wiki/architecture/data-model.md`); no module-local `migrations/` subdirectory.
-- Environment / config: `MinioClient`, `MinioBucket`, max object size `25*1024*1024` — all consumed at `apps/api/cmd/metaldocs-api/main.go:327`. No env vars or feature flags read inside `internal/modules/templates_v2/**` (per `_artifacts/03-deps.md` §4).
+- Environment / config: `MinioClient`, `MinioBucket`, max object size `25*1024*1024` â€” all consumed at `apps/api/cmd/metaldocs-api/main.go:327`. No env vars or feature flags read inside `internal/modules/templates_v2/**` (per `_artifacts/03-deps.md` Â§4).
 
 ---
 
@@ -380,10 +380,10 @@ Failure modes:
 
 ### 8.1 Authentication & Authorization
 
-- Tier 1 (HTTP edge): `CapabilityService` now wired — `AuthzFunc` receives real `capabilityService` check (T-001 closed Plan 5).
+- Tier 1 (HTTP edge): `CapabilityService` now wired â€” `AuthzFunc` receives real `capabilityService` check (T-001 closed Plan 5).
 - Tier 2 (in-tx): `internal/modules/iam/authz.Require` called in `CreateTemplate` (`create.go:84`), `SubmitForReview` (`lifecycle.go:54`), `Review` (`:125`/`:148`), `Approve` (`:226`), `PublishTemplateVersion` (`:345`), `ArchiveTemplate` (`:406`) when `s.db != nil` (injected via `WithDB`).
 - Postgres tripwire: `migrations/0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_v2_template` and `public.templates_v2_template_version`.
-- Capabilities in seed (`migrations/0165_role_capabilities_reseed.sql`): `template.view/create/edit/submit/approve/publish` mapped to `viewer/editor/author/approver/system_admin` — currently advisory only. See T-001.
+- Capabilities in seed (`migrations/0165_role_capabilities_reseed.sql`): `template.view/create/edit/submit/approve/publish` mapped to `viewer/editor/author/approver/system_admin` â€” currently advisory only. See T-001.
 
 ### 8.2 Error envelope
 
@@ -404,20 +404,20 @@ Failure modes:
 
 ### 8.6 Concurrency / Transactions
 
-- Repository methods take `context.Context` and call `*sql.DB.ExecContext` directly — **no `pgx.Tx` parameter, no transactional wrapping at the service layer**.
-- Multi-step operations (publish, approve, create) emit 3–5 statements as independent `ExecContext` calls. Partial-failure leaves inconsistent state and missing audit rows. See T-007.
+- Repository methods take `context.Context` and call `*sql.DB.ExecContext` directly â€” **no `pgx.Tx` parameter, no transactional wrapping at the service layer**.
+- Multi-step operations (publish, approve, create) emit 3â€“5 statements as independent `ExecContext` calls. Partial-failure leaves inconsistent state and missing audit rows. See T-007.
 - No optimistic locking: `SaveTemplateDraftCmd.ExpectedLockVersion` field exists on the command but is never compared against the row before `UpdateVersion`. See T-010.
 
 ### 8.7 Tenant scoping
 
-- `tenantIDFromReq(r)` (handler.go:83) now calls `tenant.FromContext` — Plan 3 resolved T-003 (header trust removed).
-- `Repository.GetVersion(template_id, version_number)` and `GetVersionByID(version_id)` accept no tenant argument. The service layer fronts these with `GetTemplate(tenant, template_id)` as a "tenant gate" at most call sites — `CreateNextVersion` (`create.go:126`) bypasses the gate when `template.PublishedVersionID` is non-nil, calling `GetVersionByID` directly. See T-002.
+- `tenantIDFromReq(r)` (handler.go:83) now calls `tenant.FromContext` â€” Plan 3 resolved T-003 (header trust removed).
+- `Repository.GetVersion(template_id, version_number)` and `GetVersionByID(version_id)` accept no tenant argument. The service layer fronts these with `GetTemplate(tenant, template_id)` as a "tenant gate" at most call sites â€” `CreateNextVersion` (`create.go:126`) bypasses the gate when `template.PublishedVersionID` is non-nil, calling `GetVersionByID` directly. See T-002.
 
 ### 8.8 Placeholder catalog enforcement
 
 - `application.ValidatePlaceholders` (`schema.go:84`) is the only catalog gate. It enforces the `PHType` enum (`PHText/Date/Number/Select/User/Picture/Computed`).
-- For `PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader` — wired `nil` (per `_artifacts/03-deps.md` §3), so the check is skipped at runtime. See T-008.
-- Template-injection blast radius: a malicious resolver_key on a published template propagates to every document instantiated from that version (per `wiki/modules/documents.md §8.7` snapshot path).
+- For `PHComputed`, the resolver_key string is intended to be checked against `ResolverRegistryReader` â€” wired `nil` (per `_artifacts/03-deps.md` Â§3), so the check is skipped at runtime. See T-008.
+- Template-injection blast radius: a malicious resolver_key on a published template propagates to every document instantiated from that version (per `wiki/modules/documents.md Â§8.7` snapshot path).
 
 ---
 
@@ -428,8 +428,8 @@ Failure modes:
 | Eigenpal as DOCX editor | `wiki/decisions/0001-eigenpal-adoption.md` |
 | `{name}` single-brace token syntax | `wiki/decisions/0003-token-syntax-migration.md` |
 | Fixed 7-token placeholder catalog | `wiki/decisions/0008-placeholder-fixed-catalog.md` |
-| Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` — applied Plan 5 (T-001 closed); `PublishTemplateVersion` role-binding check still absent (T-004 partial) |
-| Contract-first via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (PARTIAL — T-006) |
+| Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` â€” applied Plan 5 (T-001 closed); `PublishTemplateVersion` role-binding check still absent (T-004 partial) |
+| Contract-first via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (PARTIAL â€” T-006) |
 | Hexagonal layer split (`domain/application/delivery/repository`) | tech-debt: missing-ADR (T-014) |
 | Two parallel publish paths (`Approve` vs `PublishTemplateVersion`) | tech-debt: missing-ADR (T-004) |
 | Module-local audit sink (`templates_v2_audit_log`) instead of canonical `metaldocs.audit_events` | tech-debt: missing-ADR (T-013) |
@@ -440,11 +440,11 @@ Failure modes:
 
 | Goal | Scenario | Pass criteria |
 |---|---|---|
-| Tenant isolation | Authn'd user from tenant A calls `GET /api/v2/templates/{id-from-tenant-B}/versions/1` with a known version_id | 404 not found (currently: 200 with the row — T-002) |
-| Authz enforcement | Authn'd user without `template.publish` calls `POST /publish` | 403 with Problem `metaldocs.authz.forbidden` (currently: 200 — T-001) |
-| Approval SoD | Author calls `POST /publish` on own draft | 409 with `{"code":"sod_violation"}` (currently: 200 — T-004) |
-| Placeholder injection | Template author saves schema with `{type:"computed", resolver_key:"; DROP TABLE …"}` | 422 invalid resolver_key (currently: 204 saved — T-008) |
-| Idempotency | Client retries `POST /publish` with same `Idempotency-Key` | second response equals first; one audit row (currently: header ignored, two audit rows or 409 — T-009) |
+| Tenant isolation | Authn'd user from tenant A calls `GET /api/v2/templates/{id-from-tenant-B}/versions/1` with a known version_id | 404 not found (currently: 200 with the row â€” T-002) |
+| Authz enforcement | Authn'd user without `template.publish` calls `POST /publish` | 403 with Problem `metaldocs.authz.forbidden` (currently: 200 â€” T-001) |
+| Approval SoD | Author calls `POST /publish` on own draft | 409 with `{"code":"sod_violation"}` (currently: 200 â€” T-004) |
+| Placeholder injection | Template author saves schema with `{type:"computed", resolver_key:"; DROP TABLE â€¦"}` | 422 invalid resolver_key (currently: 204 saved â€” T-008) |
+| Idempotency | Client retries `POST /publish` with same `Idempotency-Key` | second response equals first; one audit row (currently: header ignored, two audit rows or 409 â€” T-009) |
 
 ---
 
@@ -458,9 +458,9 @@ Pointer-only. Body lives in `wiki/modules/templates_v2-tech-debt.md`.
 
 Top 3 (by severity, then blast-radius):
 
-1. **T-001 closed Plan 5** — `authz.Require` wired in all 6 mutation paths via `WithDB` builder; tripwire on both templates_v2 tables (migration 0188).
-2. **Tenant sourced from `tenant.FromContext`** (`handler.go:83`) — Plan 3 closed the header-trust gap (T-003 resolved).
-3. **`PublishTemplateVersion` partially hardened Plan 5** (`lifecycle.go:320-347`) — `content_hash` gate + SoD check + `authz.Require(CapTemplatePublish)` added. Residual: `pending_approver_role` vs actor-role binding check still absent (T-004 partially open). — see tech-debt §T-004
+1. **T-001 closed Plan 5** â€” `authz.Require` wired in all 6 mutation paths via `WithDB` builder; tripwire on both templates_v2 tables (migration 0188).
+2. **Tenant sourced from `tenant.FromContext`** (`handler.go:83`) â€” Plan 3 closed the header-trust gap (T-003 resolved).
+3. **`PublishTemplateVersion` partially hardened Plan 5** (`lifecycle.go:320-347`) â€” `content_hash` gate + SoD check + `authz.Require(CapTemplatePublish)` added. Residual: `pending_approver_role` vs actor-role binding check still absent (T-004 partially open). â€” see tech-debt Â§T-004
 
 ---
 
@@ -483,15 +483,15 @@ Top 3 (by severity, then blast-radius):
 - Related ADRs: `wiki/decisions/0001-eigenpal-adoption.md`, `wiki/decisions/0003-token-syntax-migration.md`, `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0008-placeholder-fixed-catalog.md`, `wiki/decisions/0012-contract-first-api.md`
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`, `wiki/concepts/iso-segregation.md`, `wiki/concepts/error-ux.md`, `wiki/concepts/authz-tiers.md`
 - Downstream module: `wiki/modules/documents.md` (consumes published versions; snapshots placeholder schema at finalize)
-- Taxonomy coupling: `wiki/modules/taxonomy.md` — taxonomy's `TemplateVersionChecker` (`infrastructure/template_version_checker.go:11`) READ-joins `templates_v2_template_version` + `templates_v2_template` to verify `IsPublished` when binding a profile's default template; taxonomy §3.2 documents this IN-edge
-- Approval coupling: `wiki/modules/approval.md` (SoD probing of template author identity — iam T-003)
+- Taxonomy coupling: `wiki/modules/taxonomy.md` â€” taxonomy's `TemplateVersionChecker` (`infrastructure/template_version_checker.go:11`) READ-joins `templates_v2_template_version` + `templates_v2_template` to verify `IsPublished` when binding a profile's default template; taxonomy Â§3.2 documents this IN-edge
+- Approval coupling: `wiki/modules/approval.md` (SoD probing of template author identity â€” iam T-003)
 - Editor coupling: `wiki/modules/editor-ui-eigenpal.md`, `wiki/modules/editor-chrome.md`
-- Predecessor wiki stub: `wiki/modules/templates-v2.md` (kebab dash) — frontend-heavy; will be retired (see `backlog/templates_v2-refactor.md#R-100`).
-- See also: [`modules/registry.md`](registry.md) — registry holds a FK (`controlled_documents.template_version_id`) to published template versions; registry T-008 tracks the shared taxonomy audit-sink coupling that also affects this module
+- Predecessor wiki stub: `wiki/modules/templates-v2.md` (kebab dash) â€” frontend-heavy; will be retired (see `backlog/templates_v2-refactor.md#R-100`).
+- See also: [`modules/registry.md`](registry.md) â€” registry holds a FK (`controlled_documents.template_version_id`) to published template versions; registry T-008 tracks the shared taxonomy audit-sink coupling that also affects this module
 - Backlog: `wiki/backlog/templates_v2-refactor.md`
 - Tech debt: `wiki/modules/templates_v2-tech-debt.md`
 
 ## Changelog
 
-- 2026-05-10 — initial publish (Arc42 + C4); supersedes the frontend-heavy `templates-v2.md` (kebab) stub (retire scheduled in same backlog row R-100). Path-rename `templates_v2/ → templates/` + `/api/v2/ → /api/v1/` deferred to a single follow-up commit (R-101).
+- 2026-05-10 â€” initial publish (Arc42 + C4); supersedes the frontend-heavy `templates-v2.md` (kebab) stub (retire scheduled in same backlog row R-100). Path-rename `templates_v2/ â†’ templates/` + `/api/v2/ â†’ /api/v1/` deferred to a single follow-up commit (R-101).
 
