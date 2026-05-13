@@ -19,7 +19,7 @@ Each phase produces an artifact under `design-source/<slug>/artifacts/`. Missing
 
 ## Pre-requisite skill
 
-Load `metaldocs-frontend` first — feature-sliced layout, TanStack Query, OpenAPI codegen, CSS Modules + tokens, no `HashRouter`, no legacy paths.
+Load `metaldocs-frontend` first. It owns feature-sliced layout, OpenAPI codegen, CSS Modules + tokens, no `HashRouter`, and no legacy paths. If the screen wires real API calls, query hooks, query keys, invalidation, optimistic updates, polling, prefetching, or freshness policy, also load `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
 
 ## Tier classification (FIRST ACTION)
 
@@ -75,7 +75,7 @@ Every UI element maps to (state/role/persona/data) → Keep/Cut/Defer. Show cut 
 1.2 forward placement decision tree (generic→`components/ui/`, multi-feature→`features/shared/`, domain→`features/<domain>/components/`).
 1.3 component tree.
 1.4 status/enum SSOT (`features/<domain>/lib/<x>Meta.ts`).
-1.5 state design (server=TanStack, persisted=lazy initializer, debounced=`useDebouncedValue`).
+1.5 state design (server=TanStack via `metaldocs-tanstack-query`, persisted=lazy initializer, debounced=`useDebouncedValue`).
 1.6 backend contract (existing vs needed; needed→mock + `wiki/backlog/<screen>.md` row).
 1.7 **tier classification.**
 1.8 user checkpoint.
@@ -118,7 +118,7 @@ Main agent now writes the TSX skeleton + CSS Module skeleton with class names mi
 
 ## Phase 3c (Heavy) — State wiring (subagent)
 
-`templates/subagent-phase3c.md`. Query hooks, `ApiError` + `resolveErrorMessage`, `aria-disabled` + `title="Em breve"`, four states, `:focus-visible` outline.
+`templates/subagent-phase3c.md`. Query hooks follow `.agents/skills/metaldocs-tanstack-query/SKILL.md`: QK key factories, generated API types, targeted invalidation, conservative optimism, `ApiError` + `resolveErrorMessage`, `aria-disabled` + `title="Em breve"`, four states, `:focus-visible` outline.
 
 ## Phase 4 — Behavior verify
 

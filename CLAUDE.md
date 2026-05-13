@@ -21,9 +21,13 @@ When you change code referenced by a wiki doc, update its `Last verified:` stamp
 
 **After refactors / new implementations, dispatch the `wiki-curator` agent** (`.claude/agents/wiki-curator.md`). It owns wiki drift: refreshes Key files anchors, bumps `Last verified` stamps, updates `wiki/README.md` index, and creates new docs when a new module/concept/workflow is introduced. Invoke proactively — do not let wiki drift accumulate.
 
+For full module documentation, maturity promotion, or rebuilding a module wiki trio/artifacts, use **`metaldocs-module-doc`** (`.agents/skills/metaldocs-module-doc/SKILL.md`). After implementation work touches an already documented module, use **`metaldocs-module-doc-sync`** (`.agents/skills/metaldocs-module-doc-sync/SKILL.md`) to update module docs, tech-debt, backlog, route truth, artifacts, and sync logs from the concrete change context.
+
 ## Frontend
 
 For ANY work under `frontend/apps/web/src/` (new screens, components, refactors, design implementation, routing, state, API wiring), use the **`metaldocs-frontend`** skill (`.claude/skills/metaldocs-frontend/SKILL.md`). It enforces the canonical structure defined in `wiki/architecture/frontend-structure.md` — feature-sliced layout, `createBrowserRouter` + per-feature `routes.tsx`, TanStack Query for server state, OpenAPI-codegen types from `lib/api-types/`, CSS Modules + design tokens, no `HashRouter`, no string-pattern path dispatchers, no legacy `src/api/` or root flat files. **Never reintroduce legacy paths.** When you touch a file outside the canonical layout, migrate it in the same change (no shims, no re-exports).
+
+For frontend API calls, TanStack Query hooks, query keys, cache invalidation, optimistic updates, generated frontend API types, or server-state performance, also use **`metaldocs-tanstack-query`** (`.agents/skills/metaldocs-tanstack-query/SKILL.md`). It is the focused workflow for making API/UI integration fast, correct, and maintainable.
 
 Designed screens land in `frontend/apps/web/design-source/<slug>/` (HTML + screenshot + NOTES.md). For any task that says "implement screen X" or references a `design-source/<slug>/` directory, ALSO use the **`metaldocs-screen-implementation`** skill (`.claude/skills/metaldocs-screen-implementation/SKILL.md`) on top of `metaldocs-frontend`. It drives a 6-phase workflow (Audit → Map → Pre-flight → Page assembly → Verify → Document) with hard gates that captures lessons from the Library screen rollout.
 
