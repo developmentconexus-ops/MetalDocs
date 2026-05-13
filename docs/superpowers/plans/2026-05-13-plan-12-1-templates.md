@@ -14,6 +14,7 @@
 
 - `metaldocs-frontend`
 - `metaldocs-screen-implementation`
+- `metaldocs-backend-api` if any missing mock/data requires public HTTP contract, OpenAPI, generated API types, or handler changes
 - `metaldocs-tanstack-query` if any query/API wrapper changes are made
 - `verification-before-completion`
 
@@ -35,10 +36,34 @@ Do not implement this screen in the planning session. Start a fresh clean implem
 - Design source exists at `frontend/apps/web/design-source/templates/`.
 - Backlog lists 5 deferred items.
 - `frontend/apps/web/src/lib/api-types/index.d.ts` already contains `updated_at?: string` for a template list shape.
+- `api/openapi/v1/openapi.yaml` declares `GET /api/v1/templates` as an array response with `updated_at`, but the runtime handler returns `{ data: { templates }, meta }`.
+- `internal/modules/templates/delivery/http/routes_create.go` `toTemplateResponse` returns `description` and `created_at`, but not `updated_at`.
+- `internal/modules/templates/domain/template.go` has `Description`, `CreatedAt`, and `ArchivedAt`, but no `UpdatedAt`.
+- `migrations/0120_templates_v2_init.sql` creates `templates_v2_template.created_at`, but no `updated_at`.
 - `frontend/apps/web/src/features/templates/api/templatesV2.ts` has `TemplateListRow.updated_at?: string`, but `TemplateDTO` lacks `updated_at`.
 - `TemplatesListPage.tsx` still renders `updated: formatRelative(dto.created_at)`.
 - `TabBar.module.css` has no horizontal overflow handling.
 - `NOTES.md` already cuts profile pills, the review tab, and card description text.
+
+## Backend/API Planning Rule
+
+Do not automatically defer a frontend mock or missing field just because backend work is needed. Classify each item during Phase 0/1:
+
+| Classification | Meaning | Allowed in this screen PR? |
+|---|---|---|
+| Frontend-only Keep | Existing API/data supports it; only UI, query, or CSS changes are needed. | Yes. |
+| Screen-owned Backend + Frontend Keep | Missing API/logic is only for this screen, has clear product semantics, and can be implemented OpenAPI-first with tests in this PR. | Yes, but only with `metaldocs-backend-api` and `metaldocs-tanstack-query`. |
+| Shared Backend Prerequisite | API/logic affects multiple screens or a core model/identity concept. | No. Plan a prerequisite PR before the affected screen PR. |
+| Defer | Product/API semantics are unclear or too large for the screen slice. | No. Preserve in backlog with exact blocker. |
+
+Backend/API work allowed in this PR must follow:
+
+- Build a route truth table before editing routes or spec.
+- Update `api/openapi/v1/openapi.yaml` first.
+- Regenerate backend code for templates if the generated package changes.
+- Regenerate frontend API types if OpenAPI changes.
+- Update feature API/query code through generated or canonical API types; no hand-written contract drift.
+- Run backend tests plus frontend typecheck/tests.
 
 ## Candidate Keep/Cut/Defer Before Phase 0
 
@@ -46,11 +71,12 @@ These are planning hypotheses only. Phase 0 must confirm them against the design
 
 | Backlog item | Likely decision | Reason |
 |---|---|---|
-| `updated_at` timestamp | Keep if the runtime list response exposes it; otherwise Defer | Generated types suggest it may now exist, but `TemplateDTO` and the page still use `created_at`. |
-| `created_by` display name | Defer | Requires user lookup or API join; no existing source was identified in planning. |
-| Card grid gap | Keep if a token-supported adjustment preserves visual parity | Current CSS uses `var(--sp-4)`; backlog says design delta was accepted unless a token exists. |
-| Mobile tab clipping | Keep | `TabBar` can add horizontal scrolling without backend support. |
-| `formatRelative` promotion | Defer unless a second real caller exists in the fresh session | Backlog says promote only when a second caller appears. |
+| `updated_at` timestamp | Screen-owned Backend + Frontend Keep only if semantics are defined as template row update time; otherwise Shared Backend Prerequisite | OpenAPI/codegen mention `updated_at`, but runtime/domain/DB do not. This is contract drift, not frontend-only. |
+| `created_by` display name | Shared Backend Prerequisite | Requires user identity display surface or eager author display field that other screens will also need. |
+| Card grid gap | Frontend-only Keep if a token-supported adjustment preserves visual parity | Current CSS uses `var(--sp-4)`; backlog says design delta was accepted unless a token exists. |
+| Mobile tab clipping | Frontend-only Keep | `TabBar` can add horizontal scrolling without backend support. |
+| `formatRelative` promotion | Frontend-only Keep only if a second real caller exists; otherwise Defer | Backlog says promote only when a second caller appears. |
+| Card description text | Defer or Cut unless Phase 0 decides the design really needs it | Runtime returns `description`, but `NOTES.md` cut it from this screen; do not re-add just because the field exists. |
 
 ## File Structure
 
@@ -69,6 +95,16 @@ These are planning hypotheses only. Phase 0 must confirm them against the design
   - `frontend/apps/web/src/features/templates/api/templatesV2.ts`
   - `frontend/apps/web/src/components/ui/TabBar.module.css`
   - focused tests added near the touched code
+- Modify only if Phase 1 classifies a screen-owned backend Keep:
+  - `api/openapi/v1/openapi.yaml`
+  - `migrations/<next>_templates_updated_at.sql`
+  - `internal/modules/templates/api/api.gen.go`
+  - `internal/modules/templates/domain/template.go`
+  - `internal/modules/templates/repository/postgres.go`
+  - `internal/modules/templates/delivery/http/routes_create.go`
+  - `internal/modules/templates/delivery/http/routes_query.go`
+  - `internal/modules/templates/delivery/http/*_test.go`
+  - `frontend/apps/web/src/lib/api-types/index.d.ts`
 - Modify: `wiki/backlog/templates.md`
   - Close completed items and preserve deferred items with reason.
 
@@ -178,13 +214,34 @@ Record this placement map in `phase1-map.md`, updating it only with evidence fou
 
 - Copy the exact Defer bullets from `phase0-audit.md`, including the missing endpoint, field, or role contract for each item. If this section would be empty, write `None.`
 
+## Backend/API Classification
+
+| Item | Classification | Files/contract impact |
+|---|---|---|
+| updated_at | Decide in Phase 1 | If Keep, OpenAPI + templates domain/repository/handler/frontend codegen are in scope. |
+| created_by display name | Shared Backend Prerequisite unless existing author display field is found | Do not implement as a one-off lookup. |
+| profile pills | Shared Backend Prerequisite or Defer | Requires product decision on template-to-profile/area association display. |
+| description card text | Cut unless Phase 0 reclassifies it | Runtime field exists, but screen notes cut the UI element. |
+
 ## Tier
 
 - Light if only timestamp wiring and TabBar CSS are changed.
-- Heavy if Phase 0 requires new responsive layout, new shared primitive, or form/input work.
+- Heavy if Phase 0 requires backend/API contract work, new responsive layout, new shared primitive, or form/input work.
 ```
 
-- [ ] **Step 2: Stop if backend shape is ambiguous**
+- [ ] **Step 2: Build route truth table before backend/API edits**
+
+If any item is classified as Screen-owned Backend + Frontend Keep, add this table to `phase1-map.md` before editing `api/openapi/v1/openapi.yaml`:
+
+```markdown
+## Route Truth Table
+
+| Method | Runtime path | Owning file | Runtime handler | Spec path | OperationId | Generated method | Notes |
+|---|---|---|---|---|---|---|---|
+| GET | `/api/v1/templates` | `internal/modules/templates/delivery/http/handler.go` | `generated.ListTemplatesV2` -> `Handler.ListTemplatesV2` | `/api/v1/templates` | `listTemplatesV2` | `ListTemplatesV2` | Verify response envelope and `updated_at` drift before editing. |
+```
+
+- [ ] **Step 3: Stop if backend shape is ambiguous**
 
 If the implementation would require guessing whether `updated_at`, display names, descriptions, or profile bindings exist in the real list response, stop and report:
 
@@ -194,19 +251,118 @@ Files checked:
 - wiki/backlog/templates.md
 - frontend/apps/web/src/features/templates/api/templatesV2.ts
 - frontend/apps/web/src/lib/api-types/index.d.ts
+- api/openapi/v1/openapi.yaml
+- internal/modules/templates/delivery/http/routes_query.go
+- internal/modules/templates/delivery/http/routes_create.go
+- internal/modules/templates/domain/template.go
+- internal/modules/templates/repository/postgres.go
 ```
 
-## Task 3: Implement Confirmed Local Keeps Only
+## Task 3: Implement Confirmed Backend/API Keeps
 
 **Files:**
-- Potential modify after Phase 0: `frontend/apps/web/src/features/templates/TemplatesListPage.tsx`
-- Potential modify after Phase 0: `frontend/apps/web/src/features/templates/api/templatesV2.ts`
-- Potential modify after Phase 0: `frontend/apps/web/src/components/ui/TabBar.module.css`
+- Potential modify after Phase 1: `api/openapi/v1/openapi.yaml`
+- Potential create after Phase 1: `migrations/<next>_templates_updated_at.sql`
+- Potential modify after Phase 1: `internal/modules/templates/api/api.gen.go`
+- Potential modify after Phase 1: `internal/modules/templates/domain/template.go`
+- Potential modify after Phase 1: `internal/modules/templates/repository/postgres.go`
+- Potential modify after Phase 1: `internal/modules/templates/delivery/http/routes_create.go`
+- Potential modify after Phase 1: `internal/modules/templates/delivery/http/routes_query.go`
+- Potential modify after Phase 1: `internal/modules/templates/delivery/http/*_test.go`
+- Potential modify after Phase 1: `frontend/apps/web/src/lib/api-types/index.d.ts`
+
+- [ ] **Step 1: Implement `updated_at` only if Phase 1 defines semantics**
+
+If `updated_at` is classified as Screen-owned Backend + Frontend Keep, Phase 1 must define it as:
+
+```text
+updated_at is the template aggregate update timestamp. It changes when the template row changes, including create, metadata edits, archive/restore, and published-version pointer changes. It is not a latest-version content timestamp.
+```
+
+If the team wants "latest authoring activity" instead, stop and split a backend prerequisite because that requires version/activity semantics beyond this list screen.
+
+- [ ] **Step 2: Add backend contract test before implementation**
+
+Add or update a templates HTTP test proving list responses include `updated_at` inside the actual runtime envelope:
+
+```json
+{
+  "data": {
+    "templates": [
+      {
+        "id": "uuid",
+        "key": "pop-001",
+        "name": "Procedimento",
+        "updated_at": "2026-05-13T12:00:00Z"
+      }
+    ]
+  },
+  "meta": {
+    "limit": 50,
+    "offset": 0
+  }
+}
+```
+
+Run the focused backend test:
+
+```powershell
+go test ./internal/modules/templates/delivery/http -run ListTemplates -count=1
+```
+
+Expected before implementation:
+
+- The test fails because `updated_at` is absent from `toTemplateResponse`.
+
+- [ ] **Step 3: Update OpenAPI and generated types**
+
+Make the OpenAPI `GET /api/v1/templates` response match the runtime envelope, including `updated_at` on each template row.
+
+Run:
+
+```powershell
+$env:GOFLAGS = "-mod=mod"
+go generate ./internal/modules/templates/api/...
+cd frontend/apps/web
+pnpm gen:api
+```
+
+Expected:
+
+- `internal/modules/templates/api/api.gen.go` changes if the response schema changes.
+- `frontend/apps/web/src/lib/api-types/index.d.ts` changes if the frontend generated shape changes.
+
+- [ ] **Step 4: Update runtime model and response**
+
+If the DB column does not exist, add the smallest migration needed for `templates_v2_template.updated_at` and update repository scan/write paths. The implementation must not return `created_at` under the `updated_at` key.
+
+Update `toTemplateResponse` to emit:
+
+```go
+"updated_at": t.UpdatedAt.UTC().Format(time.RFC3339),
+```
+
+Run:
+
+```powershell
+go test ./internal/modules/templates/... -count=1
+```
+
+Expected:
+
+- Templates module tests pass.
+
+## Task 4: Implement Confirmed Frontend Keeps
+
+**Files:**
+- Potential modify after Phase 0/1: `frontend/apps/web/src/features/templates/TemplatesListPage.tsx`
+- Potential modify after Phase 0/1: `frontend/apps/web/src/features/templates/api/templatesV2.ts`
+- Potential modify after Phase 0/1: `frontend/apps/web/src/components/ui/TabBar.module.css`
 - Test: add a focused test for any behavior changed
 
-- [ ] **Step 1: Add a test for timestamp preference if `updated_at` is confirmed**
+- [ ] **Step 1: Add a test for timestamp preference if `updated_at` is implemented**
 
-If the real contract exposes `updated_at`, add a focused test that verifies the page prefers `updated_at` over `created_at`.
+If the PR implements `updated_at`, add a focused test that verifies the page prefers `updated_at` over `created_at`.
 
 Test target:
 
@@ -263,7 +419,7 @@ Expected before implementation:
 
 - The test fails because the page uses `created_at`.
 
-- [ ] **Step 2: Wire the minimal timestamp fix if the test was added**
+- [ ] **Step 2: Wire the timestamp fix if the test was added**
 
 Update `TemplateDTO` and mapping only if the contract supports `updated_at`:
 
@@ -319,7 +475,7 @@ Do not implement these unless Phase 0 finds real contract evidence:
 - Bound profile pills.
 - New backend fields or endpoints.
 
-## Task 4: Backlog And Notes Update
+## Task 5: Backlog And Notes Update
 
 **Files:**
 - Modify: `wiki/backlog/templates.md`
@@ -345,7 +501,7 @@ Expected:
 
 - No backlog item is closed without code or contract evidence.
 
-## Task 5: Verification And Review
+## Task 6: Verification And Review
 
 **Files:**
 - Create/update: `frontend/apps/web/design-source/templates/artifacts/phase4-behavior.md`
@@ -357,13 +513,20 @@ Expected:
 Run:
 
 ```powershell
+$env:GOFLAGS = "-mod=mod"
+go generate ./internal/modules/templates/api/...
+go test ./internal/modules/templates/... -count=1
 cd frontend/apps/web
+pnpm gen:api
 pnpm.cmd tsc --noEmit -p tsconfig.build.json
 pnpm test
 ```
 
 Expected:
 
+- Backend generated code is current when OpenAPI changed.
+- Templates backend tests exit `0` when backend code changed.
+- Frontend generated types are current when OpenAPI changed.
 - TypeScript exits `0`.
 - Vitest exits `0` or reports only pre-existing skipped tests.
 
@@ -405,7 +568,7 @@ Expected:
 - No unresolved Critical or Major findings.
 - Minor findings are either fixed or preserved in `wiki/backlog/templates.md`.
 
-## Task 6: Commit Screen PR
+## Task 7: Commit Screen PR
 
 **Files:**
 - Stage only files touched for the Templates screen PR.
@@ -417,7 +580,7 @@ Run:
 ```powershell
 git diff --check
 git status --short
-git diff -- frontend/apps/web/src/features/templates frontend/apps/web/src/components/ui/TabBar.module.css frontend/apps/web/design-source/templates wiki/backlog/templates.md
+git diff -- api/openapi/v1/openapi.yaml migrations internal/modules/templates frontend/apps/web/src/lib/api-types/index.d.ts frontend/apps/web/src/features/templates frontend/apps/web/src/components/ui/TabBar.module.css frontend/apps/web/design-source/templates wiki/backlog/templates.md
 ```
 
 Expected:
@@ -431,7 +594,7 @@ Expected:
 Run:
 
 ```powershell
-git add -- frontend/apps/web/src/features/templates frontend/apps/web/src/components/ui/TabBar.module.css frontend/apps/web/design-source/templates wiki/backlog/templates.md
+git add -- api/openapi/v1/openapi.yaml migrations internal/modules/templates frontend/apps/web/src/lib/api-types/index.d.ts frontend/apps/web/src/features/templates frontend/apps/web/src/components/ui/TabBar.module.css frontend/apps/web/design-source/templates wiki/backlog/templates.md
 git commit -m "feat: finalize templates list screen"
 ```
 
