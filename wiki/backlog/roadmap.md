@@ -1,6 +1,6 @@
 # Refactor Roadmap
 
-> **Last verified:** 2026-05-13 (Plan 8)
+> **Last verified:** 2026-05-13 (Plan 12 prep correction)
 > **Scope:** Ordered sequence of cross-module refactor sub-plans from current state → professional structured architecture. Each sub-plan = one fresh implementation session = one PR series.
 > **Out of scope:** Implementation detail. Sub-plans are written one-at-a-time in their own session under `docs/superpowers/specs/` and linked back here.
 > **Source evidence:** Every `Closes` row cites a T-NNN (tech-debt) or R-NNN (refactor backlog) in `wiki/modules/<m>-tech-debt.md` / `wiki/backlog/<m>-refactor.md`.
@@ -25,7 +25,7 @@
 |------|------|-------|-----|--------|
 | P0 | 3 | Supply-chain unblock + tenant resolution platform fix | PR2 (tenant platform), PR3 (module sweep) | done 2026-05-11 |
 | P1 | 4 | Capability namespace collapse + IAM dual-surface consolidation | 8 commits | done 2026-05-11 |
-| P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | ~3 | pending |
+| P1 | 11 | Editor frontend stabilization (parallel to Plan 4) | 8 commits | done 2026-05-13 |
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
 | P2 | 6a | Audit-trail completeness sweep (emission + sink consolidation) | 11 commits | done 2026-05-11 |
 | P3 | 7 | RFC 9457 envelope rollout | 11 commits | done 2026-05-11 |
@@ -143,7 +143,7 @@ See above (P1, parallel to Plan 4).
 - **PRs:** 1 per screen.
 - **Blockers:** Plan 7 (stable error envelope), Plan 8 (codegen), Plan 9 (idempotency on wizards' POSTs), Plan 11 (editor chrome stable).
 - **Workflow:** each screen runs the 6-phase `metaldocs-screen-implementation` skill with mandatory design audit per `wiki/concepts/design-workflow-audit.md`.
-- **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
+- **Status:** open 2026-05-13. Roadmap correction: this Plan was previously stamped `done` with unrelated commit evidence; implementation has not started. Execution guide: `docs/superpowers/specs/2026-05-13-plan-12-screens.md`.
 
 ## Plan 13 · Doc-comment + ADR sweep
 
@@ -173,4 +173,3 @@ When splitting a Plan (e.g. 6 → 6a + 6b):
 1. Edit the row in the execution-order table to two rows.
 2. Author a new section here. Keep the original Plan number, append a/b suffix.
 3. Move `Closes` rows between the two halves so each half is shippable alone.
-
