@@ -188,9 +188,9 @@ CREATE TRIGGER trg_require_cap_asserted
   BEFORE INSERT OR UPDATE OR DELETE ON metaldocs.iam_user_roles
   FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
 
-DROP TRIGGER IF EXISTS trg_require_cap_asserted ON metaldocs.user_process_areas;
+DROP TRIGGER IF EXISTS trg_require_cap_asserted ON public.user_process_areas;
 CREATE TRIGGER trg_require_cap_asserted
-  BEFORE INSERT OR UPDATE OR DELETE ON metaldocs.user_process_areas
+  BEFORE INSERT OR UPDATE OR DELETE ON public.user_process_areas
   FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
 
 DROP TRIGGER IF EXISTS trg_require_cap_asserted ON public.documents;
