@@ -26,6 +26,35 @@ For full module documentation, maturity promotion, deep module mapping, or rebui
 
 After implementation work touches an already documented module, use `metaldocs-module-doc-sync` at `.agents/skills/metaldocs-module-doc-sync/SKILL.md` to update module docs, tech-debt, backlog, route truth, artifacts, and sync logs from the concrete change context.
 
+## MetalDocs AI Operating System
+
+Use the MetalDocs operating model for all non-trivial work.
+Canonical design: `docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md`.
+
+Truth hierarchy:
+- Runtime truth: what actually runs now.
+- Contract truth: OpenAPI, generated backend surfaces, generated frontend API types.
+- Wiki truth: module docs, debt, backlog, roadmap, ADRs.
+- Execution truth: scripts, preflight checks, verification steps, skill gates.
+
+Required classification:
+- runtime prerequisite
+- shared contract prerequisite
+- module-local implementation
+- screen-local implementation
+- wiki-memory drift
+- workflow/tooling gap
+- defer
+
+Default mismatch rule:
+- detect mismatch
+- classify mismatch
+- continue only if local to the current task boundary
+- otherwise stop and surface the prerequisite work first
+
+Critical contradiction stop rule:
+Stop when contradictions affect route ownership/prefix, plan or prerequisite status, startup instructions, module ownership, API contract expectations, or verification expectations.
+
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 Tradeoff: These guidelines bias toward caution over speed. For trivial tasks, use judgment.

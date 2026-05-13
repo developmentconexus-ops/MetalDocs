@@ -37,6 +37,38 @@ For ANY work on MetalDocs backend HTTP routes, OpenAPI, oapi-codegen, handler wi
 
 Do not change public backend routes, generated `api.gen.go` wiring, or OpenAPI contract shape from memory. Build the route truth table first, compare runtime/spec/codegen/wiki, then implement from the canonical module pattern.
 
+## Mandatory Gates
+
+Canonical design: `docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md`.
+
+Before screen work:
+1. Fresh build truth
+2. Runnable truth
+3. Auth/session truth
+4. Target route truth
+5. Contract truth
+
+Before claiming module wiki sync success:
+1. Named change context
+2. Explicit affected modules
+3. Explicit affected surfaces
+4. Mode classification: lite patch / structural refresh / full rebuild
+5. Preflight/tally result
+6. Explicit skipped-module reporting
+
+Before resuming feature work after prerequisite repair:
+1. Root cause written
+2. Fix scope bounded
+3. Failed checkpoint rerun and passing
+4. No hidden drift left in the repaired boundary
+5. Skill/runbook/instruction updated if the failure exposed a workflow gap
+
+Startup uses script-truth policy:
+- canonical scripts are the supported entrypoint
+- ad hoc startup commands are not authoritative
+- scripts must rebuild or explicitly prove freshness
+- scripts must fail loudly on stale binary, blocked port, missing dependency, or broken prerequisite
+
 ---
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
