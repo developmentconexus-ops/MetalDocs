@@ -1,19 +1,19 @@
 # Module: render-fanout
 
-> **Last verified:** 2026-05-04
-> **Status:** Stub. Cross-references `workflows/freeze-and-fanout.md` which has the full pipeline.
-> **Scope:** DOCX → PDF rendering pipeline, token substitution engine, outbox-driven dispatch.
+> **Last verified:** 2026-05-13
+> **Status:** active (pipeline module)`r`n> **Maturity:** L2
+> **Scope:** DOCX ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ PDF rendering pipeline, token substitution engine, outbox-driven dispatch.
 > **Out of scope:** Approval-triggered freeze invocation (see `modules/approval.md`).
 > **Key files:**
-> - `internal/modules/render/fanout/client.go` — HTTP client to docgen-v2
-> - `internal/modules/render/fanout/pdf_dispatcher.go` — outbox publisher
-> - `internal/modules/render/fanout/pdf_dispatch_adapter.go` — invoker bridge
-> - `internal/modules/render/fanout/pdf_outbox_repository.go:97` — `ReadState(ctx, tenantID, revisionID)` — returns latest outbox status; used by `view_service.go` to report `pdf_status=failed`
-> - `internal/modules/render/fanout/pdf_outbox_worker.go` — background worker polls + dispatches
-> - `internal/platform/worker/pdf_job_runner.go` — outbox consumer
-> - `internal/modules/render/resolvers/builtins.go` — resolver implementations
-> - `apps/docgen-v2/src/routes/fanout.ts` — docgen-v2 fanout route
-> - `apps/docgen-v2/src/render/fanout.ts` — eigenpal headless substitution
+> - `internal/modules/render/fanout/client.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â HTTP client to docgen-v2
+> - `internal/modules/render/fanout/pdf_dispatcher.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â outbox publisher
+> - `internal/modules/render/fanout/pdf_dispatch_adapter.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â invoker bridge
+> - `internal/modules/render/fanout/pdf_outbox_repository.go:97` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â `ReadState(ctx, tenantID, revisionID)` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â returns latest outbox status; used by `view_service.go` to report `pdf_status=failed`
+> - `internal/modules/render/fanout/pdf_outbox_worker.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â background worker polls + dispatches
+> - `internal/platform/worker/pdf_job_runner.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â outbox consumer
+> - `internal/modules/render/resolvers/builtins.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â resolver implementations
+> - `apps/docgen-v2/src/routes/fanout.ts` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â docgen-v2 fanout route
+> - `apps/docgen-v2/src/render/fanout.ts` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â eigenpal headless substitution
 
 ## Pipeline (high-level)
 
@@ -25,6 +25,18 @@
 
 ## See also
 
-- [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md) — full pipeline (this is the canonical doc)
-- [concepts/placeholders.md](../concepts/placeholders.md) — what the resolvers substitute
-- [concepts/freeze-and-hashing.md](../concepts/freeze-and-hashing.md) — content/values/schema hashes
+- [workflows/freeze-and-fanout.md](../workflows/freeze-and-fanout.md) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â full pipeline (this is the canonical doc)
+- [concepts/placeholders.md](../concepts/placeholders.md) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â what the resolvers substitute
+- [concepts/freeze-and-hashing.md](../concepts/freeze-and-hashing.md) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â content/values/schema hashes
+
+- [render-fanout-tech-debt.md](render-fanout-tech-debt.md)
+- [backlog/render-fanout-refactor.md](../backlog/render-fanout-refactor.md)
+
+
+## 11. Risks & Technical Debt
+
+- Critical: 0
+- Major: 2
+- Minor: 1
+
+Refactor backlog: [../backlog/render-fanout-refactor.md](../backlog/render-fanout-refactor.md)

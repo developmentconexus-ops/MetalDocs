@@ -1,12 +1,13 @@
 # Module: Frontend UI Primitives (`components/ui/`)
 
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-13
 > **Scope:** Generic, domain-agnostic UI primitives living in `frontend/apps/web/src/components/ui/`. Covers `SelectableCard` and `useRovingRadioGroup`. Other primitives (WorkspaceHeroHeader, TabBar, StatusPill, Stepper) are documented inline in the feature modules that introduced them.
-> **Out of scope:** Feature-specific components (`features/<x>/components/`), shared wizard primitives (`features/shared/components/wizard/`), design-system tokens (see `architecture/frontend-structure.md`).
+
+> **Maturity:** L2
 > **Key files:**
-> - `frontend/apps/web/src/components/ui/SelectableCard.tsx:17` — `forwardRef` card button; `role="radio"` + `aria-checked`; accepts external `tabIndex` + `onKeyDown` for roving-focus integration
-> - `frontend/apps/web/src/components/ui/SelectableCard.module.css:1` — `.idle`, `.selected`, `.disabled` state classes; brand border + pale fill on selected
-> - `frontend/apps/web/src/components/ui/useRovingRadioGroup.ts:26` — roving-tabIndex hook for ARIA radiogroup pattern; returns `groupProps` + `getItemProps(index)`
+> - `frontend/apps/web/src/components/ui/SelectableCard.tsx:17` Ã¢â‚¬â€ `forwardRef` card button; `role="radio"` + `aria-checked`; accepts external `tabIndex` + `onKeyDown` for roving-focus integration
+> - `frontend/apps/web/src/components/ui/SelectableCard.module.css:1` Ã¢â‚¬â€ `.idle`, `.selected`, `.disabled` state classes; brand border + pale fill on selected
+> - `frontend/apps/web/src/components/ui/useRovingRadioGroup.ts:26` Ã¢â‚¬â€ roving-tabIndex hook for ARIA radiogroup pattern; returns `groupProps` + `getItemProps(index)`
 
 ---
 
@@ -14,7 +15,7 @@
 
 A generic selectable card button. Renders a `<button role="radio" aria-checked>` with design-token styles for idle/selected/disabled states.
 
-**Added:** initial version (exact commit not recorded). **`forwardRef` added:** commit 13595cdb — required so `useRovingRadioGroup.getItemProps(index).ref` can attach to the underlying `<button>` for programmatic focus on keyboard navigation.
+**Added:** initial version (exact commit not recorded). **`forwardRef` added:** commit 13595cdb Ã¢â‚¬â€ required so `useRovingRadioGroup.getItemProps(index).ref` can attach to the underlying `<button>` for programmatic focus on keyboard navigation.
 
 ### Props
 
@@ -39,16 +40,16 @@ export type SelectableCardProps = {
 
 | Class | When |
 |---|---|
-| `.idle` | `!selected && !disabled` — hover lifts border + background |
-| `.selected` | `selected === true` — brand 2px border + pale fill + shadow-1 |
-| `.disabled` | `disabled === true` — muted, cursor: not-allowed, opacity 0.7 |
+| `.idle` | `!selected && !disabled` Ã¢â‚¬â€ hover lifts border + background |
+| `.selected` | `selected === true` Ã¢â‚¬â€ brand 2px border + pale fill + shadow-1 |
+| `.disabled` | `disabled === true` Ã¢â‚¬â€ muted, cursor: not-allowed, opacity 0.7 |
 
 Focus ring: `2px solid var(--brand)` via `:focus-visible` on `.idle` and `.selected`.
 
 ### Usage pattern
 
 ```tsx
-// Paired with useRovingRadioGroup — see StepScope.tsx or StepPermissions.tsx
+// Paired with useRovingRadioGroup Ã¢â‚¬â€ see StepScope.tsx or StepPermissions.tsx
 const { groupProps, getItemProps } = useRovingRadioGroup({ ... });
 
 <div {...groupProps}>
@@ -97,9 +98,9 @@ export type RovingRadioGroupResult = {
 
 ### Behavior
 
-- `orientation: 'horizontal'` — ArrowLeft/ArrowRight + Home/End only.
-- `orientation: 'vertical'` — ArrowUp/ArrowDown + Home/End only.
-- `orientation: 'both'` (default) — all four arrow keys + Home/End.
+- `orientation: 'horizontal'` Ã¢â‚¬â€ ArrowLeft/ArrowRight + Home/End only.
+- `orientation: 'vertical'` Ã¢â‚¬â€ ArrowUp/ArrowDown + Home/End only.
+- `orientation: 'both'` (default) Ã¢â‚¬â€ all four arrow keys + Home/End.
 - Navigation wraps around (modulo `count`).
 - `tabIndex`: active index gets `0`; all others get `-1`. If `selectedIndex === -1`, first item gets `0`.
 - On key press: calls `onSelect(nextIndex)` and `refs.current[nextIndex]?.focus()` (programmatic focus requires `SelectableCard` to be a `forwardRef` component).
@@ -107,15 +108,31 @@ export type RovingRadioGroupResult = {
 
 ### Consumers
 
-- `StepScope.tsx` (template wizard Step 1) — profile cards radiogroup.
-- `StepPermissions.tsx` (template wizard Step 4) — mode segmented control.
+- `StepScope.tsx` (template wizard Step 1) Ã¢â‚¬â€ profile cards radiogroup.
+- `StepPermissions.tsx` (template wizard Step 4) Ã¢â‚¬â€ mode segmented control.
 
-`TabBar.tsx` predates this hook and manages its own roving logic inline — migration is deferred until a third consumer appears.
+`TabBar.tsx` predates this hook and manages its own roving logic inline Ã¢â‚¬â€ migration is deferred until a third consumer appears.
 
 ---
 
 ## Cross-refs
 
-- [architecture/frontend-structure.md](../architecture/frontend-structure.md) — canonical rule: `components/ui/` is design-system only; domain-agnostic; no imports from `features/`
-- [modules/templates-v2.md](templates-v2.md) — primary consumer of both primitives
-- [backlog/novo-documento.md](../backlog/novo-documento.md) — deferred `SelectableCardGroup` wrapper (held until 2nd consumer of group pattern appears)
+- [architecture/frontend-structure.md](../architecture/frontend-structure.md) Ã¢â‚¬â€ canonical rule: `components/ui/` is design-system only; domain-agnostic; no imports from `features/`
+- [modules/templates-v2.md](templates-v2.md) Ã¢â‚¬â€ primary consumer of both primitives
+- [backlog/novo-documento.md](../backlog/novo-documento.md) Ã¢â‚¬â€ deferred `SelectableCardGroup` wrapper (held until 2nd consumer of group pattern appears)
+
+---
+
+## Governance Links
+
+- [frontend-primitives-tech-debt.md](frontend-primitives-tech-debt.md)
+- [backlog/frontend-primitives-refactor.md](../backlog/frontend-primitives-refactor.md)
+
+
+## 11. Risks & Technical Debt
+
+- Critical: 0
+- Major: 1
+- Minor: 2
+
+Refactor backlog: [../backlog/frontend-primitives-refactor.md](../backlog/frontend-primitives-refactor.md)
