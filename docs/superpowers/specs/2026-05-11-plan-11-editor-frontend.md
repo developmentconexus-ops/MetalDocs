@@ -12,18 +12,24 @@
 
 **Out of scope (do NOT touch this round):**
 - editor-ui-eigenpal R-004..R-010 (dormant `createOutlinePlugin`, `mergefieldPlugin.ts` rename, `onLockLost` wiring, ADRs, doc cleanup, dep bump) — deferred.
-- Eigenpal 0.3.x features or any new wrapper prop.
+- Eigenpal 0.3.x features.
 - Redesign of `EditorChrome` slot shape.
 - Playwright/E2E.
+- `getAgent()` ref forwarding (deferred ACL violation — `TemplateEditorPage:89` calls `editorRef.current?.getAgent?.()?.getVariables?.()` to read detected tokens from eigenpal internals; after this migration the call silently returns undefined via optional chaining, so auto-detection of template variables from document content is broken but non-crashing; a follow-up task must add `getAgent()` forwarding to `MetalDocsEditorRef`).
 
-**Push back if asked to:** merge Plan 12 screen work in; redesign slot API; add eigenpal features; promote tokens that do not already exist.
+**Amended scope (post Plan-3 code read, 2026-05-11):**
+One new prop is required on `MetalDocsEditorProps` to complete the TemplateEditorPage migration without breaking placeholder/outline sync: `onChange?: () => void`. This is NOT an eigenpal feature — it is a lightweight change-notification hook forwarded alongside the internal debounce handler. Without it, `handleEditorChange` (which drives both placeholder sync and outline sync) has no trigger after migration.
+
+**Push back if asked to:** merge Plan 12 screen work in; redesign slot API; add eigenpal features beyond `onChange` forwarding; promote tokens that do not already exist.
 
 ---
 
 ## File map
 
 **Modify**
-- `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — replace `DocxEditor`/`DocxEditorRef`/`createEmptyDocument` import with `MetalDocsEditor`/`MetalDocsEditorRef`; rewire ref + mount.
+- `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — replace `DocxEditor`/`DocxEditorRef`/`createEmptyDocument` import with `MetalDocsEditor`/`MetalDocsEditorRef`; rewire ref + mount. Remove save call from `handleEditorChange`; wire `onAutoSave`; map `readOnly` → `mode`.
+- `packages/editor-ui/src/types.ts` — add `onChange?: () => void` to `MetalDocsEditorProps`. (New — required for TemplateEditorPage placeholder/outline sync.)
+- `packages/editor-ui/src/MetalDocsEditor.tsx` — forward `props.onChange` alongside internal `handleChange`. (New — required for the above.)
 - `packages/editor-ui/test/templatePlugin.wiring.test.tsx` — rewrite gating assertions.
 - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/AutosaveStatus.tsx` — widen union, branch on new states, add `role="status" aria-live` (polite default, `assertive` on error).
 - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/AutosaveStatus.module.css` — labels for new states (no new colors needed beyond existing dot variants; reuse `dotIdle`/`dotError`).
@@ -37,7 +43,6 @@
 - `frontend/apps/web/src/features/shared/components/editor-chrome/EditorChrome.test.tsx` — RTL specs for slot truthy-collapse, autosave 7 state branches, `aria-live` presence, `VersionBadge` passthrough.
 
 **Do not modify**
-- `packages/editor-ui/src/MetalDocsEditor.tsx` (mode gating unchanged).
 - `packages/editor-ui/src/index.ts` (public surface unchanged for this plan).
 - `frontend/apps/web/src/features/shared/components/editor-chrome/parts/VersionBadge.tsx`.
 
@@ -45,21 +50,96 @@
 
 ## Workstream A — `TemplateEditorPage` consumes `MetalDocsEditor`
 
-### Task A1 · Audit current direct-eigenpal touchpoints in `TemplateEditorPage`
+> **Amendment (2026-05-11 post-code-read):** Five issues discovered by reading TemplateEditorPage fully
+> before writing the original plan. All corrected below.
+> 1. `handleEditorChange` calls `editorRef.current?.save()` directly — must be removed; `onAutoSave` provides bytes.
+> 2. `autosave.commit(buf)` doesn't exist — correct API is `autosave.queueDocx(buf)`.
+> 3. `document={blankDoc}` uses `createEmptyDocument()` which creates a Doc object, not ArrayBuffer — `MetalDocsEditor` has no `document` prop; drop the fallback and let eigenpal render blank on `undefined` documentBuffer.
+> 4. `readOnly={!isDraft}` must map to `mode` prop.
+> 5. `MetalDocsEditor` has no `onChange` prop — needed for placeholder + outline sync; must add to `MetalDocsEditorProps` (Task A0 below).
+
+### Task A0 · Add `onChange` forwarding prop to `MetalDocsEditor`
+
+**Files:**
+- Modify: `packages/editor-ui/src/types.ts`
+- Modify: `packages/editor-ui/src/MetalDocsEditor.tsx`
+
+This is required so `TemplateEditorPage` can receive change notifications for placeholder + outline sync after the `DocxEditor.onChange` prop is no longer accessible directly.
+
+- [ ] **Step 1: Add `onChange` to `MetalDocsEditorProps`.**
+
+In `packages/editor-ui/src/types.ts`, add one field to `MetalDocsEditorProps`:
+```ts
+export interface MetalDocsEditorProps {
+  // ... existing fields unchanged ...
+  /**
+   * Called synchronously on every editor change event (before the autosave
+   * debounce fires). Use for lightweight side-effects (placeholder sync,
+   * outline refresh). Do NOT trigger heavy async work here.
+   */
+  onChange?: () => void;
+  // ... rest unchanged ...
+}
+```
+
+- [ ] **Step 2: Forward `onChange` in `MetalDocsEditor.tsx`.**
+
+Inside the existing `handleChange` function (which already fires on DocxEditor's onChange), call `props.onChange?.()` after the debounce scheduling:
+```ts
+const handleChange = () => {
+  if (props.mode === 'readonly') return;
+  if (!onAutoSaveRef.current) return;
+  if (timerRef.current) clearTimeout(timerRef.current);
+  timerRef.current = setTimeout(async () => {
+    // ... existing debounce body unchanged ...
+  }, AUTOSAVE_DEBOUNCE_MS);
+  // Notify consumers that a change occurred (synchronous, before debounce fires).
+  props.onChange?.();
+};
+```
+
+Pass `onChange={handleChange}` to `<DocxEditor>` (it already receives `handleChange` via `onChange={handleChange}` at `MetalDocsEditor.tsx:83` — no additional wiring needed since we're augmenting `handleChange` in-place, not adding a second handler).
+
+- [ ] **Step 3: Typecheck.**
+
+```powershell
+cd packages/editor-ui; npx tsc -p tsconfig.json --noEmit
+```
+Expected: exit 0.
+
+- [ ] **Step 4: Run editor-ui tests.**
+
+```powershell
+cd packages/editor-ui; npx vitest run
+```
+Expected: all green (existing tests unchanged; `onChange` is optional).
+
+- [ ] **Step 5: Commit.**
+
+```powershell
+git add packages/editor-ui/src/types.ts packages/editor-ui/src/MetalDocsEditor.tsx
+git commit -m "feat(editor-ui): add onChange forwarding prop to MetalDocsEditorProps`n`nMinimal hook for consumers (TemplateEditorPage) that need synchronous change notification alongside the autosave debounce — e.g. placeholder sync, outline refresh. Does not add eigenpal features."
+```
+
+### Task A1 · Audit confirmed direct-eigenpal touchpoints in `TemplateEditorPage`
 
 **Files:** read-only — `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx`
 
-- [ ] **Step 1: List every `DocxEditor` / `DocxEditorRef` / `createEmptyDocument` / `@eigenpal/docx-js-editor` usage in the file.**
+Confirmed reference points (as of 2026-05-11, full file read):
 
-Run:
-```powershell
-Grep -n "eigenpal|DocxEditor|createEmptyDocument" -- frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx
-```
-Confirmed reference points (as of 2026-05-11): line 1 (`styles.css`), line 4 (`DocxEditor`, `DocxEditorRef`), line 5 (`createEmptyDocument`), line 61 (`useRef<DocxEditorRef>`), line 66 (`createEmptyDocument()`), and the JSX `<DocxEditor ... ref={editorRef} />` mount site (`grep -n "<DocxEditor" frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx`).
+| Line | Symbol | Action required |
+|------|--------|----------------|
+| 1 | `import '@eigenpal/docx-js-editor/styles.css'` | Delete — wrapper imports it |
+| 4 | `DocxEditor, type DocxEditorRef` from `@eigenpal/docx-js-editor/react` | Replace with adapter import |
+| 5 | `createEmptyDocument` from `@eigenpal/docx-js-editor/core` | Delete — see Note below |
+| 61 | `useRef<DocxEditorRef>` | Change to `useRef<MetalDocsEditorRef>` |
+| 66 | `const blankDoc = useMemo(() => createEmptyDocument(), [])` | Delete — see Note below |
+| 86 | `const queueDocx = autosave.queueDocx` | Keep — still used by autosave chain |
+| 89 | `editorRef.current?.getAgent?.()?.getVariables?.()` | **Deferred ACL violation** — `MetalDocsEditorRef` has no `getAgent`; optional chaining means this silently returns `undefined`; variable auto-detection broken but non-crashing. Track as follow-up: add `getAgent()` forwarding to `MetalDocsEditorRef`. |
+| 111 | `editorRef.current?.save()` inside `handleEditorChange` | **Delete** — `onAutoSave` provides bytes; this call is the autosave trigger being replaced |
+| 331–340 | `<DocxEditor ref={editorRef} ... readOnly={!isDraft} ... document={blankDoc} ... />` | Replace — see Task A3 |
 
-- [ ] **Step 2: Note every prop currently passed to `<DocxEditor>`.**
-
-Read the JSX block and write down the prop list. The migration must keep behavior identical: same `mode`, same `documentBuffer`, same `author`, same comments/title handlers, same `onChange`/`onAutoSave` (whichever exists), same `renderTitleBarRight` (if used).
+**Note on `blankDoc` / `createEmptyDocument`:** The JSX at line 334 passes `document={draft.docxBytes ? undefined : blankDoc}`. `document` is an eigenpal-internal `Doc` object (not `ArrayBuffer`). `MetalDocsEditorProps` has no `document` prop — only `documentBuffer?: ArrayBuffer`. When `documentBuffer` is `undefined`, eigenpal renders a blank canvas by default. **Drop `blankDoc` and `createEmptyDocument` entirely.** If eigenpal fails to render blank with `documentBuffer={undefined}`, stop and flag — do not re-import eigenpal core.
 
 No commit on this step.
 
@@ -83,70 +163,127 @@ import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 ```
-Rationale: `MetalDocsEditor` already imports `'@eigenpal/docx-js-editor/styles.css'` inside the package (`packages/editor-ui/src/MetalDocsEditor.tsx:3`), so the top-level CSS import is redundant. The wrapper does not re-export `createEmptyDocument` — see Task A3 for the blank-doc replacement.
 
 - [ ] **Step 2: Update the editor ref type.**
 
-Find line 61 (`const editorRef = useRef<DocxEditorRef>(null);`) and change to:
+Line 61: `const editorRef = useRef<DocxEditorRef>(null);` → `const editorRef = useRef<MetalDocsEditorRef>(null);`
+
+- [ ] **Step 3: Delete `blankDoc` + `useMemo` for `createEmptyDocument`.**
+
+Line 66: delete `const blankDoc = useMemo(() => createEmptyDocument(), []);` entirely. Remove `useMemo` from the import if it is no longer used elsewhere.
+
+- [ ] **Step 4: Fix `handleEditorChange` — remove save call, keep sync triggers only.**
+
+Current lines 110–118:
 ```ts
-const editorRef = useRef<MetalDocsEditorRef>(null);
+const handleEditorChange = useCallback(() => {
+  editorRef.current?.save().then((buffer) => {
+    if (buffer) queueDocx(buffer);
+  }).catch(() => { /* ignore autosave serialization errors */ });
+  if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
+  variableSyncTimerRef.current = window.setTimeout(syncPlaceholdersFromDocument, VARIABLE_SYNC_DEBOUNCE_MS);
+  if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
+  outlineSyncTimerRef.current = window.setTimeout(syncOutline, OUTLINE_REFRESH_DEBOUNCE_MS);
+}, [queueDocx, syncPlaceholdersFromDocument, syncOutline]);
 ```
 
-- [ ] **Step 3: Audit every `editorRef.current.<member>` call site in this file.**
+Replace with (remove save/queueDocx — `onAutoSave` handles bytes now):
+```ts
+const handleEditorChange = useCallback(() => {
+  if (variableSyncTimerRef.current) window.clearTimeout(variableSyncTimerRef.current);
+  variableSyncTimerRef.current = window.setTimeout(syncPlaceholdersFromDocument, VARIABLE_SYNC_DEBOUNCE_MS);
+  if (outlineSyncTimerRef.current) window.clearTimeout(outlineSyncTimerRef.current);
+  outlineSyncTimerRef.current = window.setTimeout(syncOutline, OUTLINE_REFRESH_DEBOUNCE_MS);
+}, [syncPlaceholdersFromDocument, syncOutline]);
+```
 
-Run:
+Also remove `const queueDocx = autosave.queueDocx;` (line 86) if it is now only used in the autosave chain — it becomes used only in `onAutoSave` below.
+
+- [ ] **Step 5: Typecheck.**
+
 ```powershell
-Grep -n "editorRef" -- frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx
+cd frontend/apps/web; npx tsc -p tsconfig.json --noEmit
 ```
-The adapter ref surface is `{ getDocumentBuffer(): Promise<ArrayBuffer | null>; focus(): void }` (`packages/editor-ui/src/types.ts:29`). If any call site uses `editorRef.current.save()` or any other `DocxEditorRef` member that `MetalDocsEditorRef` does not expose, stop and surface the gap (do not silently change semantics). Switch `save()` calls to `getDocumentBuffer()` where they are equivalent (the wrapper's `getDocumentBuffer` delegates to `inner.save()` per `MetalDocsEditor.tsx:19-22`).
+Expected: exit 0. If `useMemo` now has zero remaining usages, TypeScript will not complain (it is still imported for other hooks); confirm with grep.
 
-- [ ] **Step 4: Commit.**
+- [ ] **Step 6: Commit.**
 
 ```powershell
 git add frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx
-git commit -m "refactor(templates): swap DocxEditor for MetalDocsEditor in TemplateEditorPage`n`nWorkstream A of Plan 11 — enforces the editor-ui ACL on the last direct-eigenpal consumer. Ref type narrows to MetalDocsEditorRef; styles.css import drops (wrapper handles it). Closes editor-ui-eigenpal T-002 first half."
+git commit -m "refactor(templates): swap DocxEditor for MetalDocsEditor in TemplateEditorPage`n`nRemoves direct @eigenpal imports; updates ref type to MetalDocsEditorRef; strips save call from handleEditorChange (onAutoSave provides bytes). Closes editor-ui-eigenpal T-002 first half."
 ```
 
 ### Task A3 · Replace the JSX mount `<DocxEditor>` with `<MetalDocsEditor>`
 
 **Files:** modify `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx`
 
-- [ ] **Step 1: Locate the JSX mount.**
+- [ ] **Step 1: Replace the autosave state ternary.**
 
-Run:
-```powershell
-Grep -n "<DocxEditor" -- frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx
+Lines 217–221 still use the old 4-state pattern (sufficient for template autosave which uses `useTemplateAutosave` — a 4-state hook). After Workstream C widens `AutosaveState` to 7 values, the template page's 4-value assignment (`autosave.status` from `useTemplateAutosave`) is still type-safe because the 4 values are a subset of the 7-value union. **No change needed** here.
+
+- [ ] **Step 2: Replace `<DocxEditor .../>` (lines 331–340) with `<MetalDocsEditor .../>`.**
+
+Current:
+```tsx
+<DocxEditor
+  ref={editorRef}
+  documentBuffer={draft.docxBytes ?? undefined}
+  document={draft.docxBytes ? undefined : blankDoc}
+  readOnly={!isDraft}
+  onChange={handleEditorChange}
+  externalPlugins={editorPlugins}
+  showRuler
+  showMarginGuides
+/>
 ```
 
-- [ ] **Step 2: Replace `<DocxEditor ... />` with `<MetalDocsEditor mode="template-draft" ... />`.**
+Replace with:
+```tsx
+<MetalDocsEditor
+  ref={editorRef}
+  mode={isDraft ? 'template-draft' : 'readonly'}
+  documentBuffer={draft.docxBytes ?? undefined}
+  onAutoSave={async (buf) => { autosave.queueDocx(buf); }}
+  onChange={handleEditorChange}
+  externalPlugins={editorPlugins}
+  showRuler
+/>
+```
 
-Keep every prop that is supported by `MetalDocsEditorProps` (see `packages/editor-ui/src/types.ts:7-27`): `documentBuffer`, `author`, `documentName`, `documentNameEditable`, `onDocumentNameChange`, `comments`, `onCommentsChange`, `onCommentAdd`, `onCommentResolve`, `onCommentDelete`, `onCommentReply`, `renderTitleBarRight`, `sidebarModel`, `externalPlugins`, `onAutoSave`, `showRuler`.
+Migration notes:
+- `readOnly={!isDraft}` → `mode={isDraft ? 'template-draft' : 'readonly'}`. Template-draft mode gates `templatePlugin` (placeholder chips). Non-draft templates (in_review, approved, published) render as readonly.
+- `document={draft.docxBytes ? undefined : blankDoc}` → **dropped**. `MetalDocsEditor` has no `document` prop; eigenpal renders a blank canvas when `documentBuffer` is `undefined`.
+- `onChange={handleEditorChange}` → kept. `MetalDocsEditor` now exposes `onChange?: () => void` (Task A0).
+- `onAutoSave={async (buf) => { autosave.queueDocx(buf); }}` — MetalDocsEditor fires after 1500ms internal debounce, then calls `onAutoSave(buf)`. `queueDocx` stores buf + restarts the `useTemplateAutosave` 15s timer. Total latency after last keystroke: ~16.5s. Acceptable for template authoring.
+- `showMarginGuides` → **dropped** — not in `MetalDocsEditorProps`; wrapper already forwards `showRuler` value to eigenpal's `showMarginGuides` internally (`MetalDocsEditor.tsx:80`).
+- `author` — not currently passed by TemplateEditorPage to DocxEditor; do not add (no existing behavior to preserve).
 
-Notes during migration:
-- `mode` must be `"template-draft"` (template authoring surface). The wrapper handles plugin gating (templatePlugin) + maps to eigenpal `editing` automatically.
-- The current page wires autosave via `useTemplateAutosave` (`TemplateEditorPage.tsx:59`) — pass that hook's commit callback as `onAutoSave={(buf) => autosave.commit(buf)}` (or the exact contract the hook exports — verify by reading the hook). The wrapper applies the 1500ms debounce + `inFlightRef` guard internally; remove any locally implemented debounce timers that duplicate it.
-- `editorPlugins` (existing `useMemo([filterTransactionGuard()])` at line 67) maps to `externalPlugins={editorPlugins}`. Confirm `filterTransactionGuard()` returns an `EditorPlugin` shape.
-- `blankDoc` from `createEmptyDocument()` (line 66): if the page only used it as the initial `documentBuffer` fallback when `draft.buffer` is undefined, the simpler shape is to pass `documentBuffer={draft.buffer}` and let the wrapper/eigenpal handle empty state. If the page relies on a non-null `ArrayBuffer` always, keep `createEmptyDocument` by adding a re-export later (deferred — out of scope). For this plan, only swap if the page already tolerates `undefined` (check the JSX). If a hard dependency on `createEmptyDocument` exists, stop and flag — do not introduce a re-export of eigenpal `core` (would re-violate the ACL).
+- [ ] **Step 3: Verify no remaining `@eigenpal` imports in the file.**
 
-- [ ] **Step 3: Run typecheck.**
+```powershell
+Select-String -Path "frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx" -Pattern "@eigenpal"
+```
+Expected: zero matches.
+
+- [ ] **Step 4: Typecheck.**
 
 ```powershell
 cd frontend/apps/web; npx tsc -p tsconfig.json --noEmit
 ```
-Expected: exit 0. If errors, fix the prop mismatch named in the diagnostic — do not relax types.
+Expected: exit 0.
 
-- [ ] **Step 4: Run the existing test suite for the templates feature (if any).**
+- [ ] **Step 5: Run templates feature tests.**
 
 ```powershell
 cd frontend/apps/web; npx vitest run src/features/templates
 ```
-Expected: green or "no test files found" (acceptable — there are no co-located tests for `TemplateEditorPage`).
+Expected: green or "no test files found".
 
-- [ ] **Step 5: Commit.**
+- [ ] **Step 6: Commit.**
 
 ```powershell
 git add frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx
-git commit -m "refactor(templates): mount MetalDocsEditor in template-draft mode`n`nReplaces direct <DocxEditor> mount with the ACL wrapper. Autosave + plugin gating now flow through MetalDocsEditor; local autosave debounce stays in useTemplateAutosave (commit pipeline). Closes editor-ui-eigenpal T-002 / R-002."
+git commit -m "refactor(templates): mount MetalDocsEditor in template-draft mode`n`nReplaces direct <DocxEditor> mount with ACL wrapper. mode prop drives plugin gating + readOnly. onAutoSave chains into useTemplateAutosave.queueDocx. document= blankDoc fallback dropped (eigenpal renders blank on undefined documentBuffer). Closes editor-ui-eigenpal T-002 / R-002."
 ```
 
 ### Task A4 · Manual smoke (template authoring)
