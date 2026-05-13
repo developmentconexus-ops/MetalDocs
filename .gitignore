@@ -14,6 +14,9 @@ tmp_api_err.log
 tmp_api_out.log
 tmp_web_err.log
 tmp_web_out.log
+tmp-*.log
+tmp-*.err.log
+tmp-*.out.log
 frontend/apps/web/node_modules/
 frontend/apps/web/dist/
 frontend/apps/web/*.tsbuildinfo
