@@ -27,6 +27,20 @@ function New-ModuleConfig {
                 FrontendWrapperPatterns = @('/api/v1/templates', 'submitForReview', 'approveVersion', 'putTemplateSchemas')
             }
         }
+        'approval' {
+            return @{
+                RuntimeFile = 'internal/modules/documents/approval/http/router.go'
+                RuntimePatterns = @('/api/v1/approval/inbox', '/api/v1/documents/{id}/signoff', '/api/v1/approval/routes')
+                OpenApiFile = 'api/openapi/v1/openapi.yaml'
+                OpenApiPatterns = @('/api/v1/approval/inbox:', '/api/v1/documents/{id}/signoff:', '/api/v1/documents/{id}/cancel:', '/api/v1/approval/routes:')
+                BackendFile = 'internal/modules/documents/approval/api/api.gen.go'
+                BackendPatterns = @('ListApprovalInboxV2', 'ListApprovalRoutesV2', 'CreateApprovalRouteV2')
+                FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
+                FrontendTypesPatterns = @('"/api/v1/approval/inbox":', '"/api/v1/documents/{id}/signoff":', '"/api/v1/documents/{id}/cancel":', '"/api/v1/approval/routes":')
+                FrontendWrapperFile = 'frontend/apps/web/src/features/approval/api/approvalApi.ts'
+                FrontendWrapperPatterns = @('/approval/inbox', '/documents/${documentId}/signoff', '/documents/${documentId}/cancel', '/approval/routes', 'listInbox', 'signoff', 'cancel', 'createRoute', 'listRoutes')
+            }
+        }
         default {
             $basePath = "/api/v1/$ModuleName"
             return @{
