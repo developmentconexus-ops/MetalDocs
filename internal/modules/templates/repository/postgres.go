@@ -41,14 +41,14 @@ func (r *Repository) CreateTemplate(ctx context.Context, t *domain.Template) err
 	const q = `
 INSERT INTO templates_v2_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
-	specific_areas, latest_version, published_version_id, created_by, created_at, archived_at
+	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8,
-	$9, $10, $11, $12, $13, $14
+	$9, $10, $11, $12, $13, $14, $15
 )`
 	_, err := r.db.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description, t.Areas, string(t.Visibility),
-		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.CreatedAt, t.ArchivedAt,
+		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -64,7 +64,7 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*dom
 	const q = `
 SELECT
 	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
-	latest_version, published_version_id::text, created_by, created_at, archived_at
+	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_v2_template
 WHERE id = $1 AND tenant_id = $2`
 
@@ -82,7 +82,7 @@ func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string)
 	const q = `
 SELECT
 	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
-	latest_version, published_version_id::text, created_by, created_at, archived_at
+	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_v2_template
 WHERE tenant_id = $1 AND key = $2`
 
@@ -100,9 +100,10 @@ func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter
 	const q = `
 SELECT
 	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
-	latest_version, published_version_id::text, created_by, created_at, archived_at
+	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_v2_template
 WHERE tenant_id = $1
+  AND system_owned = false
   AND ($2::text IS NULL OR doc_type_code = $2)
   AND (cardinality($3::text[]) = 0 OR areas && $3::text[])
   AND (
@@ -153,12 +154,13 @@ SET
 	specific_areas = $9,
 	latest_version = $10,
 	published_version_id = $11,
-	archived_at = $12
+	system_owned = $12,
+	archived_at = $13
 WHERE id = $1 AND tenant_id = $2`
 
 	res, err := r.db.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
-		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.ArchivedAt,
+		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
 	)
 	if err != nil {
 		return err
@@ -308,14 +310,14 @@ func (r *Repository) CreateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain
 	const q = `
 INSERT INTO templates_v2_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
-	specific_areas, latest_version, published_version_id, created_by, created_at, archived_at
+	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8,
-	$9, $10, $11, $12, $13, $14
+	$9, $10, $11, $12, $13, $14, $15
 )`
 	_, err := tx.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description, t.Areas, string(t.Visibility),
-		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.CreatedAt, t.ArchivedAt,
+		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -340,11 +342,12 @@ SET
 	specific_areas = $9,
 	latest_version = $10,
 	published_version_id = $11,
-	archived_at = $12
+	system_owned = $12,
+	archived_at = $13
 WHERE id = $1 AND tenant_id = $2`
 	res, err := tx.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
-		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.ArchivedAt,
+		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
 	)
 	if err != nil {
 		return err

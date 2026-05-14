@@ -108,6 +108,51 @@ describe('wizardReducer', () => {
     });
   });
 
+  describe('area visibility defaults', () => {
+    it('anchors visibilityAreaCodes to selected area when visibility=area', () => {
+      const withAreaVisibility = wizardReducer(
+        { ...INITIAL_STATE, visibility: 'area' },
+        { type: 'setArea', code: 'QA' },
+      );
+      expect(withAreaVisibility.visibilityAreaCodes).toEqual(['QA']);
+    });
+
+    it('sets current area as restricted area default when switching to area visibility', () => {
+      const next = wizardReducer(
+        { ...INITIAL_STATE, areaCode: 'MFG', visibility: 'company' },
+        { type: 'setVisibility', key: 'area' },
+      );
+      expect(next.visibilityAreaCodes).toEqual(['MFG']);
+    });
+
+    it('keeps selected document area when setting additional visibility areas', () => {
+      const seeded = {
+        ...INITIAL_STATE,
+        areaCode: 'QA',
+        visibility: 'area' as const,
+        visibilityAreaCodes: ['QA'],
+      };
+      const next = wizardReducer(seeded, {
+        type: 'setVisibilityAreas',
+        codes: ['RH'],
+      });
+      expect(next.visibilityAreaCodes).toEqual(['QA', 'RH']);
+    });
+
+    it('clears restricted grants when switching to company visibility', () => {
+      const seeded = {
+        ...INITIAL_STATE,
+        areaCode: 'QA',
+        visibility: 'area' as const,
+        visibilityAreaCodes: ['QA', 'RH'],
+        invitees: [{ id: 'user-1', label: 'User 1' }],
+      };
+      const next = wizardReducer(seeded, { type: 'setVisibility', key: 'company' });
+      expect(next.visibilityAreaCodes).toEqual([]);
+      expect(next.invitees).toEqual([]);
+    });
+  });
+
   describe('submit lifecycle', () => {
     it('submitStart sets submitting + clears error', () => {
       const next = wizardReducer(

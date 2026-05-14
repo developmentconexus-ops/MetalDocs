@@ -13,3 +13,11 @@ Mudanca destrutiva exige ADR, plano de rollback e janela de manutencao.
 ## Consequences
 - Positivas: menor risco operacional e maior previsibilidade.
 - Negativas: transicoes de schema podem ocorrer em mais de uma release.
+
+## Operational note (2026-05 baseline rollout)
+
+MetalDocs temporarily operates a dual-path migration model:
+- legacy chronological replay for existing database upgrades
+- canonical baseline bootstrap for fresh local environments
+
+This preserves additive-first upgrade safety while reducing bootstrap cost for new local installs.

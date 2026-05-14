@@ -29,20 +29,42 @@ func (r *PostgresControlledDocumentRepository) GetByID(ctx context.Context, tena
 	const q = `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
        code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
-       status, created_at, updated_at
+       visibility_scope, status, created_at, updated_at
 FROM controlled_documents
 WHERE tenant_id = $1 AND id = $2`
-	return scanControlledDocument(r.db.QueryRowContext(ctx, q, tenantID, id))
+	doc, err := scanControlledDocument(r.db.QueryRowContext(ctx, q, tenantID, id))
+	if err != nil {
+		return nil, err
+	}
+	if doc.Visibility.Scope == registrydomain.VisibilityScopeRestricted {
+		vis, err := r.loadVisibilityGrants(ctx, tenantID, doc.ID)
+		if err != nil {
+			return nil, err
+		}
+		doc.Visibility = vis
+	}
+	return doc, nil
 }
 
 func (r *PostgresControlledDocumentRepository) GetByCode(ctx context.Context, tenantID, profileCode, code string) (*registrydomain.ControlledDocument, error) {
 	const q = `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
        code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
-       status, created_at, updated_at
+       visibility_scope, status, created_at, updated_at
 FROM controlled_documents
 WHERE tenant_id = $1 AND profile_code = $2 AND code = $3`
-	return scanControlledDocument(r.db.QueryRowContext(ctx, q, tenantID, profileCode, code))
+	doc, err := scanControlledDocument(r.db.QueryRowContext(ctx, q, tenantID, profileCode, code))
+	if err != nil {
+		return nil, err
+	}
+	if doc.Visibility.Scope == registrydomain.VisibilityScopeRestricted {
+		vis, err := r.loadVisibilityGrants(ctx, tenantID, doc.ID)
+		if err != nil {
+			return nil, err
+		}
+		doc.Visibility = vis
+	}
+	return doc, nil
 }
 
 func (r *PostgresControlledDocumentRepository) CodeExists(ctx context.Context, tenantID, profileCode, code string) (bool, error) {
@@ -60,7 +82,7 @@ func (r *PostgresControlledDocumentRepository) List(ctx context.Context, tenantI
 	q := `
 SELECT id::text, tenant_id::text, profile_code, process_area_code, department_code,
        code, sequence_num, title, owner_user_id, coalesce(override_template_version_id::text, ''),
-       status, created_at, updated_at
+       visibility_scope, status, created_at, updated_at
 FROM controlled_documents
 WHERE tenant_id = $1`
 	args := []any{tenantID}
@@ -101,6 +123,41 @@ WHERE tenant_id = $1`
 		args = append(args, "%"+strings.TrimSpace(*filter.Query)+"%")
 		idx++
 	}
+	if filter.ActorUserID != nil {
+		q += fmt.Sprintf(`
+ AND (
+      visibility_scope = 'company'
+   OR owner_user_id = $%d
+   OR (
+        visibility_scope = 'restricted'
+        AND (
+             EXISTS (
+               SELECT 1
+                 FROM controlled_document_area_grants cdag
+                WHERE cdag.tenant_id = controlled_documents.tenant_id
+                  AND cdag.controlled_document_id = controlled_documents.id
+                  AND EXISTS (
+                    SELECT 1
+                      FROM user_process_areas upa
+                     WHERE upa.tenant_id = controlled_documents.tenant_id
+                       AND upa.user_id = $%d
+                       AND upa.area_code = cdag.area_code
+                       AND upa.effective_to IS NULL
+                  )
+             )
+             OR EXISTS (
+               SELECT 1
+                 FROM controlled_document_user_grants cdug
+                WHERE cdug.tenant_id = controlled_documents.tenant_id
+                  AND cdug.controlled_document_id = controlled_documents.id
+                  AND cdug.user_id = $%d
+             )
+        )
+      )
+ )`, idx, idx, idx)
+		args = append(args, *filter.ActorUserID)
+		idx++
+	}
 	q += " ORDER BY created_at DESC"
 	if filter.Limit > 0 {
 		q += fmt.Sprintf(" LIMIT $%d", idx)
@@ -129,7 +186,125 @@ WHERE tenant_id = $1`
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	if err := r.hydrateVisibilityGrants(ctx, tenantID, out); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+func (r *PostgresControlledDocumentRepository) loadVisibilityGrants(ctx context.Context, tenantID, controlledDocumentID string) (registrydomain.Visibility, error) {
+	areas, err := r.loadAreaGrants(ctx, tenantID, controlledDocumentID)
+	if err != nil {
+		return registrydomain.Visibility{}, err
+	}
+	users, err := r.loadUserGrants(ctx, tenantID, controlledDocumentID)
+	if err != nil {
+		return registrydomain.Visibility{}, err
+	}
+	return registrydomain.NewVisibility(string(registrydomain.VisibilityScopeRestricted), areas, users, "")
+}
+
+func (r *PostgresControlledDocumentRepository) loadAreaGrants(ctx context.Context, tenantID, controlledDocumentID string) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, `
+SELECT area_code
+FROM controlled_document_area_grants
+WHERE tenant_id = $1 AND controlled_document_id = $2
+ORDER BY area_code`, tenantID, controlledDocumentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []string{}
+	for rows.Next() {
+		var areaCode string
+		if err := rows.Scan(&areaCode); err != nil {
+			return nil, err
+		}
+		out = append(out, areaCode)
+	}
+	return out, rows.Err()
+}
+
+func (r *PostgresControlledDocumentRepository) loadUserGrants(ctx context.Context, tenantID, controlledDocumentID string) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, `
+SELECT user_id
+FROM controlled_document_user_grants
+WHERE tenant_id = $1 AND controlled_document_id = $2
+ORDER BY user_id`, tenantID, controlledDocumentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []string{}
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		out = append(out, userID)
+	}
+	return out, rows.Err()
+}
+
+func (r *PostgresControlledDocumentRepository) hydrateVisibilityGrants(ctx context.Context, tenantID string, docs []registrydomain.ControlledDocument) error {
+	ids := make([]string, 0, len(docs))
+	indexByID := make(map[string]int, len(docs))
+	for i := range docs {
+		if docs[i].Visibility.Scope != registrydomain.VisibilityScopeRestricted {
+			continue
+		}
+		ids = append(ids, docs[i].ID)
+		indexByID[docs[i].ID] = i
+		docs[i].Visibility.AreaCodes = []string{}
+		docs[i].Visibility.UserIDs = []string{}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	areaRows, err := r.db.QueryContext(ctx, `
+SELECT controlled_document_id::text, area_code
+FROM controlled_document_area_grants
+WHERE tenant_id = $1 AND controlled_document_id = ANY($2)
+ORDER BY controlled_document_id, area_code`, tenantID, pgtype.FlatArray[string](ids))
+	if err != nil {
+		return err
+	}
+	defer areaRows.Close()
+	for areaRows.Next() {
+		var docID, areaCode string
+		if err := areaRows.Scan(&docID, &areaCode); err != nil {
+			return err
+		}
+		if idx, ok := indexByID[docID]; ok {
+			docs[idx].Visibility.AreaCodes = append(docs[idx].Visibility.AreaCodes, areaCode)
+		}
+	}
+	if err := areaRows.Err(); err != nil {
+		return err
+	}
+
+	userRows, err := r.db.QueryContext(ctx, `
+SELECT controlled_document_id::text, user_id
+FROM controlled_document_user_grants
+WHERE tenant_id = $1 AND controlled_document_id = ANY($2)
+ORDER BY controlled_document_id, user_id`, tenantID, pgtype.FlatArray[string](ids))
+	if err != nil {
+		return err
+	}
+	defer userRows.Close()
+	for userRows.Next() {
+		var docID, userID string
+		if err := userRows.Scan(&docID, &userID); err != nil {
+			return err
+		}
+		if idx, ok := indexByID[docID]; ok {
+			docs[idx].Visibility.UserIDs = append(docs[idx].Visibility.UserIDs, userID)
+		}
+	}
+	return userRows.Err()
 }
 
 func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *registrydomain.ControlledDocument) error {
@@ -162,9 +337,9 @@ func (r *PostgresControlledDocumentRepository) createWithQueryer(ctx context.Con
 	const insertQ = `
 INSERT INTO controlled_documents
 	(tenant_id, profile_code, process_area_code, department_code, code, sequence_num, title, owner_user_id,
-	 override_template_version_id, status, created_at, updated_at)
+	 override_template_version_id, visibility_scope, status, created_at, updated_at)
 VALUES
-	($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING id::text`
 	var id string
 	err := qr.QueryRowContext(
@@ -179,13 +354,14 @@ RETURNING id::text`
 		doc.Title,
 		doc.OwnerUserID,
 		stringPtrToNull(doc.OverrideTemplateVersionID),
+		doc.Visibility.Scope,
 		doc.Status,
 		doc.CreatedAt,
 		doc.UpdatedAt,
 	).Scan(&id)
 	if err == nil {
 		doc.ID = id
-		return nil
+		return r.createVisibilityGrants(ctx, qr, doc)
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -196,6 +372,29 @@ RETURNING id::text`
 		return registrydomain.ErrCDCodeTaken
 	}
 	return err
+}
+
+func (r *PostgresControlledDocumentRepository) createVisibilityGrants(ctx context.Context, qr queryRower, doc *registrydomain.ControlledDocument) error {
+	if doc.Visibility.Scope != registrydomain.VisibilityScopeRestricted {
+		return nil
+	}
+	for _, areaCode := range doc.Visibility.AreaCodes {
+		if _, err := qr.ExecContext(ctx, `
+INSERT INTO controlled_document_area_grants (tenant_id, controlled_document_id, area_code)
+VALUES ($1, $2::uuid, $3)
+ON CONFLICT (tenant_id, controlled_document_id, area_code) DO NOTHING`, doc.TenantID, doc.ID, areaCode); err != nil {
+			return err
+		}
+	}
+	for _, userID := range doc.Visibility.UserIDs {
+		if _, err := qr.ExecContext(ctx, `
+INSERT INTO controlled_document_user_grants (tenant_id, controlled_document_id, user_id)
+VALUES ($1, $2::uuid, $3)
+ON CONFLICT (tenant_id, controlled_document_id, user_id) DO NOTHING`, doc.TenantID, doc.ID, userID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *PostgresControlledDocumentRepository) UpdateStatus(ctx context.Context, tenantID, id string, status registrydomain.CDStatus, updatedAt time.Time) error {
@@ -226,6 +425,51 @@ func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Contex
 		return registrydomain.ErrCDNotFound
 	}
 	return nil
+}
+
+func (r *PostgresControlledDocumentRepository) CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error) {
+	const q = `
+SELECT EXISTS (
+  SELECT 1
+    FROM controlled_documents cd
+   WHERE cd.tenant_id = $1
+     AND cd.id = $2::uuid
+     AND (
+          cd.visibility_scope = 'company'
+       OR cd.owner_user_id = $3
+       OR (
+            cd.visibility_scope = 'restricted'
+            AND (
+                 EXISTS (
+                   SELECT 1
+                     FROM controlled_document_area_grants cdag
+                    WHERE cdag.tenant_id = cd.tenant_id
+                      AND cdag.controlled_document_id = cd.id
+                      AND EXISTS (
+                        SELECT 1
+                          FROM user_process_areas upa
+                         WHERE upa.tenant_id = cd.tenant_id
+                           AND upa.user_id = $3
+                           AND upa.area_code = cdag.area_code
+                           AND upa.effective_to IS NULL
+                      )
+                 )
+                 OR EXISTS (
+                   SELECT 1
+                     FROM controlled_document_user_grants cdug
+                    WHERE cdug.tenant_id = cd.tenant_id
+                      AND cdug.controlled_document_id = cd.id
+                      AND cdug.user_id = $3
+                 )
+            )
+       )
+     )
+)`
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, q, tenantID, controlledDocumentID, actorUserID).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 type PostgresSequenceAllocator struct {
@@ -411,6 +655,7 @@ type rowScanner interface {
 
 type queryRower interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
 func scanControlledDocument(row rowScanner) (*registrydomain.ControlledDocument, error) {
@@ -419,6 +664,7 @@ func scanControlledDocument(row rowScanner) (*registrydomain.ControlledDocument,
 		departmentCode          sql.NullString
 		sequenceNum             sql.NullInt64
 		overrideTemplateVersion string
+		visibilityScope         string
 	)
 	if err := row.Scan(
 		&doc.ID,
@@ -431,6 +677,7 @@ func scanControlledDocument(row rowScanner) (*registrydomain.ControlledDocument,
 		&doc.Title,
 		&doc.OwnerUserID,
 		&overrideTemplateVersion,
+		&visibilityScope,
 		&doc.Status,
 		&doc.CreatedAt,
 		&doc.UpdatedAt,
@@ -448,6 +695,11 @@ func scanControlledDocument(row rowScanner) (*registrydomain.ControlledDocument,
 	if strings.TrimSpace(overrideTemplateVersion) != "" {
 		doc.OverrideTemplateVersionID = &overrideTemplateVersion
 	}
+	vis, err := registrydomain.NewVisibility(visibilityScope, nil, nil, "")
+	if err != nil {
+		return nil, err
+	}
+	doc.Visibility = vis
 	return &doc, nil
 }
 

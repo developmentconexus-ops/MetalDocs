@@ -25,8 +25,18 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION metaldocs.release_lease(text, text, bigint) OWNER TO metaldocs_admin;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_admin') THEN
+        ALTER FUNCTION metaldocs.release_lease(text, text, bigint) OWNER TO metaldocs_admin;
+    END IF;
+END $$;
 REVOKE EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint) TO metaldocs_writer;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_writer') THEN
+        GRANT EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint) TO metaldocs_writer;
+    END IF;
+END $$;
 
 COMMIT;

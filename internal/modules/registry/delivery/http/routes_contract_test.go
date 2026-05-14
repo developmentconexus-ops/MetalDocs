@@ -38,6 +38,9 @@ func (f fakeRegistryDocs) CodeExists(ctx context.Context, tenantID, profileCode,
 func (f fakeRegistryDocs) List(ctx context.Context, tenantID string, filter registrydomain.CDFilter) ([]registrydomain.ControlledDocument, error) {
 	return nil, nil
 }
+func (f fakeRegistryDocs) CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error) {
+	return true, nil
+}
 
 func (f fakeRegistryDocs) Create(ctx context.Context, doc *registrydomain.ControlledDocument) error {
 	return nil
@@ -224,9 +227,14 @@ func sampleControlledDocument() registrydomain.ControlledDocument {
 		Title:                     "Policy",
 		OwnerUserID:               "user-1",
 		OverrideTemplateVersionID: &overrideTemplateVersionID,
-		Status:                    registrydomain.CDStatusActive,
-		CreatedAt:                 now,
-		UpdatedAt:                 now,
+		Visibility: registrydomain.Visibility{
+			Scope:     registrydomain.VisibilityScopeRestricted,
+			AreaCodes: []string{"RH"},
+			UserIDs:   []string{"user-2"},
+		},
+		Status:    registrydomain.CDStatusActive,
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 }
 
@@ -288,6 +296,7 @@ func TestWriteDomainError_TemplateMismatchIs422(t *testing.T) {
 func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyRegistryService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
+		"visibility":{"scope":"restricted","areaCodes":["RH"],"userIds":[]},
 		"profileCode":"DC",
 		"processAreaCode":"RH",
 		"title":"Policy",
@@ -310,6 +319,7 @@ func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyRegistryService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
 		"documentName":"Policy v1",
+		"visibility":{"scope":"restricted","areaCodes":["RH"],"userIds":[]},
 		"profileCode":"DC",
 		"processAreaCode":"RH",
 		"title":"Policy",
@@ -334,6 +344,7 @@ func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
 		"documentName":"Policy v1",
+		"visibility":{"scope":"company","areaCodes":[],"userIds":[]},
 		"profileCode":"DC",
 		"processAreaCode":"RH",
 		"title":"Policy",
@@ -357,6 +368,9 @@ func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 	}
 	if spy.gotCreate.FormData["summary"] != "hello" {
 		t.Fatalf("FormData[summary] = %v, want hello", spy.gotCreate.FormData["summary"])
+	}
+	if spy.gotCreate.VisibilityScope != "company" {
+		t.Fatalf("VisibilityScope = %q, want company", spy.gotCreate.VisibilityScope)
 	}
 }
 
@@ -399,6 +413,9 @@ func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"items"`) {
 		t.Fatalf("body %q does not contain generated items response", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), `"userIds":["user-2"]`) {
+		t.Fatalf("body %q does not contain persisted visibility user grants", rec.Body.String())
 	}
 }
 

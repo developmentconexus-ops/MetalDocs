@@ -204,7 +204,7 @@ components:
   schemas:
     ControlledDocument:
       type: object
-      required: [id, tenantId, profileCode, processAreaCode, code, title, ownerUserId, status, createdAt, updatedAt]
+      required: [id, tenantId, profileCode, processAreaCode, code, title, ownerUserId, status, visibility, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string, format: uuid }
@@ -217,8 +217,22 @@ components:
         ownerUserId: { type: string }
         overrideTemplateVersionId: { type: string, format: uuid, nullable: true }
         status: { type: string, enum: [active, obsolete, superseded] }
+        visibility:
+          $ref: '#/components/schemas/ControlledDocumentVisibility'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    ControlledDocumentVisibility:
+      type: object
+      required: [scope, areaCodes, userIds]
+      properties:
+        scope: { type: string, enum: [company, restricted] }
+        areaCodes:
+          type: array
+          items: { type: string }
+        userIds:
+          type: array
+          items: { type: string }
 
     DocumentRef:
       type: object
@@ -229,7 +243,7 @@ components:
 
     CreateAtomicRequest:
       type: object
-      required: [profileCode, processAreaCode, title, ownerUserId, documentName]
+      required: [profileCode, processAreaCode, title, ownerUserId, documentName, visibility]
       properties:
         profileCode: { type: string, minLength: 1 }
         processAreaCode: { type: string, minLength: 1 }
@@ -237,6 +251,8 @@ components:
         title: { type: string, minLength: 1 }
         ownerUserId: { type: string, minLength: 1 }
         documentName: { type: string, minLength: 1 }
+        visibility:
+          $ref: '#/components/schemas/ControlledDocumentVisibility'
         templateVersionId: { type: string, format: uuid }
         formData: { type: object, additionalProperties: true }
         manualCode: { type: string }

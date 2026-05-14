@@ -26,6 +26,7 @@ type Template struct {
 	LatestVersion      int
 	PublishedVersionID *string
 	CreatedBy          string
+	SystemOwned        bool
 	CreatedAt          time.Time
 	ArchivedAt         *time.Time
 }
@@ -33,8 +34,9 @@ type Template struct {
 func (t *Template) IsArchived() bool { return t.ArchivedAt != nil }
 
 var (
-	ErrNotFound          = errors.New("templates_v2: not_found")
-	ErrKeyConflict       = errors.New("templates_v2: key_conflict")
-	ErrInvalidVisibility = errors.New("templates_v2: invalid_visibility")
-	ErrArchived          = errors.New("templates_v2: archived")
+	ErrNotFound                = errors.New("templates_v2: not_found")
+	ErrKeyConflict             = errors.New("templates_v2: key_conflict")
+	ErrInvalidVisibility       = errors.New("templates_v2: invalid_visibility")
+	ErrArchived                = errors.New("templates_v2: archived")
+	ErrSystemTemplateImmutable = errors.New("templates_v2: system_template_immutable")
 )

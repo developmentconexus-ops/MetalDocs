@@ -112,6 +112,24 @@
   opacity: 0.6;
   pointer-events: none;
 }
+.areaSubcontrolsCard {
+  margin-top: calc(-1 * var(--sp-3));
+  margin-bottom: var(--sp-6);
+}
+.areaChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 32px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  font-size: 13px;
+}
+.areaChoice input {
+  margin: 0;
+}
 .subcontrolsRow {
   display: flex;
   flex-wrap: wrap;

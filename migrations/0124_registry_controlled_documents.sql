@@ -24,9 +24,19 @@ CREATE TABLE IF NOT EXISTS controlled_documents (
   UNIQUE (tenant_id, profile_code, code)
 );
 
-ALTER TABLE controlled_documents
-  ADD CONSTRAINT IF NOT EXISTS controlled_document_code_format
-    CHECK (length(code) >= 2 AND length(code) <= 100);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'controlled_document_code_format'
+      AND conrelid = 'controlled_documents'::regclass
+  ) THEN
+    ALTER TABLE controlled_documents
+      ADD CONSTRAINT controlled_document_code_format
+      CHECK (length(code) >= 2 AND length(code) <= 100);
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS profile_sequence_counters (
   tenant_id     UUID NOT NULL,

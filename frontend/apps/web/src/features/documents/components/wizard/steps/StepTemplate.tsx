@@ -15,6 +15,9 @@ export type StepTemplateProps = {
   onRetry: () => void;
   selectedTemplateID: string | null;
   selectedVersionID: string | null;
+  blankTemplateID: string | null;
+  blankTemplateVersionID: string | null;
+  blankTemplateName: string;
   onSelect: (templateID: string, versionID: string | null) => void;
   onAdvance: () => void;
   onBack: () => void;
@@ -32,6 +35,9 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
     onRetry,
     selectedTemplateID,
     selectedVersionID,
+    blankTemplateID,
+    blankTemplateVersionID,
+    blankTemplateName,
     onSelect,
     onAdvance,
     onBack,
@@ -115,26 +121,46 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
             );
           })}
 
-          {/* TODO(novo-documento:blank-template): "Em branco" rendered disabled —
-              POST /api/v1/documents does not support template_version_id: null today.
-              See wiki/backlog/novo-documento.md#blank-template. */}
           <SelectableCard
-            selected={false}
-            disabled
-            title="Em breve"
-            onSelect={() => {}}
+            selected={isTemplateSelected(
+              blankTemplateID ?? '',
+              blankTemplateVersionID,
+              selectedTemplateID,
+              selectedVersionID,
+            )}
+            disabled={blankTemplateID === null || blankTemplateVersionID === null}
+            title={blankTemplateVersionID ? undefined : 'Em breve'}
+            onSelect={() => {
+              if (!blankTemplateID || !blankTemplateVersionID) return;
+              onSelect(blankTemplateID, blankTemplateVersionID);
+            }}
           >
             <div className={styles.templateRow}>
               <DocPaperPreview lines={0} variant="template" />
               <div className={styles.templateMain}>
                 <div className={styles.templateLabelRow}>
-                  <span className={styles.templateLabel}>Em branco</span>
-                  <span className="pill" title="Em breve">
-                    em breve
-                  </span>
+                  <span className={styles.templateLabel}>{blankTemplateName}</span>
+                  {blankTemplateVersionID ? (
+                    <span className="pill pill-frozen">
+                      <span className={styles.publishedDot} aria-hidden="true" />
+                      disponivel
+                    </span>
+                  ) : (
+                    <span className="pill" title="Em breve">
+                      em breve
+                    </span>
+                  )}
                 </div>
-                <p className="caption">Começar sem template (em breve).</p>
+                <p className="caption">Começar sem um template base.</p>
               </div>
+              {isTemplateSelected(
+                blankTemplateID ?? '',
+                blankTemplateVersionID,
+                selectedTemplateID,
+                selectedVersionID,
+              ) ? (
+                <Icon name="check" />
+              ) : null}
             </div>
           </SelectableCard>
         </div>

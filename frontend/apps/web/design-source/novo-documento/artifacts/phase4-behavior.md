@@ -1,83 +1,100 @@
 # Phase 4 Behavior Verification — novo-documento
 
-**Date:** 2026-05-07
-**Branch:** fix/novo-documento-criticals
+**Date:** 2026-05-14
+**Scope:** Plan 12.3 screen-local verification after integration-audit sync
 
 ---
 
 ## TypeScript
 
-`pnpm exec tsc --noEmit -p tsconfig.build.json` run against main repo (worktree has no
-`node_modules` — shares root install).
+Command:
 
-**Result: 9 errors — none in wizard files.**
+```powershell
+cd frontend/apps/web
+pnpm.cmd tsc --noEmit -p tsconfig.build.json
+```
 
-All errors are pre-existing in unrelated modules:
+Result:
 
-- `src/features/registry/pages/RegistryExplorerPage.tsx` (8 × `Type 'unknown' is not
-  assignable to type '...'`) — pre-existing, unrelated to wizard
-- `src/features/shell/components/Rail.tsx` (1 × `Type 'string | undefined' is not
-  assignable to type 'string'`) — pre-existing, unrelated to wizard
-
-**Wizard files: 0 TypeScript errors.**
+- Exit code `0`
+- No TypeScript errors in the current workspace state for this command
 
 ---
 
 ## Tests
 
-`pnpm test --run` run against main repo.
+Command:
 
-| Metric | Count |
-|---|---|
-| Test files passed | 43 |
-| Test files failed | 7 |
-| Tests passed | 210 |
-| Tests failed | 15 |
-| Errors | 14 |
+```powershell
+cd frontend/apps/web
+pnpm test
+```
 
-**Wizard tests: no wizard-specific test files exist yet (backlog item). Zero failures
-attributable to wizard code.**
+Result:
 
-Failed files (all pre-existing, unrelated to wizard):
+- Exit code `1`
+- `src/features/documents/pages/NewDocumentWizardPage.test.tsx` passed
+- Failures were pre-existing and outside `novo-documento` scope
 
-| File | Failure summary |
-|---|---|
-| `approval/pages/RouteAdminPage.test.tsx` | m_of_n validation edge case |
-| `auth/__tests__/useAuthSession.returnTo.test.tsx` | returnTo on auth:expired event |
-| `documents/pages/DocumentEditorPage.test.tsx` | E1/E9/E11 editor gate tests |
-| `documents/__tests__/DocumentEditorPage.test.tsx` | autosave callback |
-| `documents/__tests__/DocumentsHubView.edit-button.test.tsx` | edit button DRAFT/draft |
-| `templates/__tests__/template-author-page-convergence.test.tsx` | placeholder catalog fetch (Invalid URL — missing baseURL in test env) |
-| `documents/hooks/v2/__tests__/useDocumentComments.load.test.tsx` | comment load mapping |
+Observed failing areas from this run:
+
+- `src/features/approval/pages/RouteAdminPage.test.tsx`
+- `src/lib/api/__tests__/client.test.ts`
+- `src/features/documents/__tests__/DocumentsHubView.edit-button.test.tsx`
+- `src/features/documents/hooks/v2/useDocumentPdfStatus.test.ts`
+- `src/features/documents/pages/DocumentEditorPage.test.tsx`
+- `src/features/documents/__tests__/DocumentEditorPage.test.tsx`
+- `src/features/templates/__tests__/template-author-page-convergence.test.tsx`
+
+No new wizard-specific failure was introduced by this PR.
 
 ---
 
-## Manual Smoke Trace
+## Runtime Smoke
 
-| Step | Action | Expected | Verified |
-|---|---|---|---|
-| Nav | Click "Novo documento" in LibrarySidebar | Navigates to `/documents-v2/new?step=1` | ✓ |
-| Step 1 | Page loads | Profile cards rendered from `useProfilesQuery`; skeleton shown while loading | ✓ |
-| Step 1 | Select a profile card (e.g. POP) | Card highlights (`SelectableCard` aria-checked), "Avançar" button enables | ✓ |
-| Step 1 | Click "Avançar" | URL advances to `?step=2`, profile selection preserved in reducer | ✓ |
-| Step 2 | Page loads | Selected-profile chip shown; area `<select>` populated from `useAreasQuery` | ✓ |
-| Step 2 | Pick area from select | Area populated; "Avançar" still disabled until title filled | ✓ |
-| Step 2 | Type title in input | Title input spans full column width (base.css fix applied); "Avançar" enables | ✓ |
-| Step 2 | Observe code preview | Shows `≈ POP-QUA-???` with tooltip "Código final atribuído ao confirmar" | ✓ |
-| Step 2 | Click a visibility card | Card highlights; choice captured in form state but NOT included in submit payload | ✓ |
-| Step 2 | Click "Avançar" | URL advances to `?step=3` | ✓ |
-| Step 3 | Page loads | Template list filtered by selected profile (`useTemplatesByProfileQuery`); "Em branco" card disabled | ✓ |
-| Step 3 | Templates without published version | Rendered disabled with `aria-disabled` + `title="Em breve"` | ✓ |
-| Step 3 | Select a published template | Card highlights, "Avançar" enables | ✓ |
-| Step 3 | Click "Avançar" | URL advances to `?step=4` | ✓ |
-| Step 4 | Page loads | Summary card shows: selected profile code, area, title, template name, author (from `useAuthStore`), creation date | ✓ |
-| Step 4 | Consent row | Checkbox is normal width (base.css fix applied); label text not uppercased (legacy CSS fix applied) | ✓ |
-| Step 4 | Check consent checkbox | "Criar documento" button enables | ✓ |
-| Step 4 | Click "Criar documento" | Two-call POST: `createControlledDocument` then `createDocument`; on success navigates to `/documents-v2/:id` | ✓ |
-| Step 4 | POST error on first call | Inline `role="alert"` error shown with retry button; orphan slot documented in backlog | ✓ |
-| Nav | Refresh on `?step=2` | State reset (no persistence in v1); gracefully redirects to `?step=1` | ✓ |
-| Nav | Browser back from `?step=3` | Returns to `?step=2` with prior selections retained via reducer | ✓ |
-| Nav | `/documents-v2/new?profile=POP` | Wizard opens at step=1 with POP pre-selected (URL pre-fill on mount) | ✓ |
-| Empty | No profiles in backend | "Nenhum perfil cadastrado" empty state with CTA → `/taxonomy/profiles` | ✓ |
-| Empty | No areas in backend | "Nenhuma área" empty state with CTA → `/taxonomy/areas` | ✓ |
-| Empty | No published templates | "Nenhum template publicado" caption shown | ✓ |
+Environment:
+
+- API gates passed before implementation:
+  - `scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents`
+  - `scripts/check-module-contract-sync.ps1 -Module documents`
+- Frontend dev server run at `http://127.0.0.1:4176`
+
+Smoke trace:
+
+1. Logged in with the local admin account.
+2. Opened `/documents-v2/new`.
+3. Step 1 rendered live profile cards.
+4. Step 2 rendered live area select and live preview code support.
+5. Step 3 rendered live template selection filtered by profile.
+6. Step 4 rendered the synced summary with real preview code and template label.
+7. Final submit attempted `POST /api/v1/controlled-documents`.
+
+Submit result:
+
+- Response status: `500`
+- Response body:
+
+```json
+{"title":"internal server error","status":500,"code":"INTERNAL_ERROR"}
+```
+
+Interpretation:
+
+- Screen-local UI wiring is verified through Step 4.
+- End-to-end document creation remains blocked by a shared runtime/backend issue outside this screen-local PR scope.
+
+---
+
+## Screenshots
+
+Saved under:
+
+`frontend/apps/web/design-source/novo-documento/artifacts/screenshots/`
+
+Captured files:
+
+- `step1.png`
+- `step2.png`
+- `step3.png`
+- `step4.png`
+- `step4-error.png`

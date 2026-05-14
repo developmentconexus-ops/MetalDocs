@@ -30,6 +30,17 @@ VALUES
   ('rg', 'standard_approval', 365, TRUE, 3650, 0)
 ON CONFLICT (profile_code) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS metaldocs.document_departments (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_departments_is_active
+  ON metaldocs.document_departments (is_active);
+
 INSERT INTO metaldocs.document_departments (code, name, description)
 VALUES
   ('sgq', 'SGQ', 'Sistema de Gestao da Qualidade'),

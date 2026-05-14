@@ -1,4 +1,4 @@
-CREATE TABLE document_comments (
+CREATE TABLE IF NOT EXISTS document_comments (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id            UUID NOT NULL,
   document_id          UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -13,6 +13,6 @@ CREATE TABLE document_comments (
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_document_comments_doc_lib ON document_comments(document_id, library_comment_id);
-CREATE INDEX idx_document_comments_doc ON document_comments(document_id, created_at);
-CREATE INDEX idx_document_comments_parent ON document_comments(document_id, parent_library_id) WHERE parent_library_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_document_comments_doc_lib ON document_comments(document_id, library_comment_id);
+CREATE INDEX IF NOT EXISTS idx_document_comments_doc ON document_comments(document_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_document_comments_parent ON document_comments(document_id, parent_library_id) WHERE parent_library_id IS NOT NULL;

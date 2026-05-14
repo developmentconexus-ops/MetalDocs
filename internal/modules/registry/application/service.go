@@ -15,6 +15,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	registrydomain "metaldocs/internal/modules/registry/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/authn"
 )
 
 type TemplateVersionChecker interface {
@@ -59,6 +60,9 @@ type CreateControlledDocumentCmd struct {
 	TemplateVersionID         *string
 	DocumentName              string
 	FormData                  map[string]any
+	VisibilityScope           string
+	VisibilityAreaCodes       []string
+	VisibilityUserIDs         []string
 }
 
 // CreateResult is the atomic-create return: the persisted ControlledDocument
@@ -228,6 +232,15 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 	}
 
 	now := s.now().UTC()
+	visibility, err := registrydomain.NewVisibility(
+		cmd.VisibilityScope,
+		cmd.VisibilityAreaCodes,
+		cmd.VisibilityUserIDs,
+		cmd.ProcessAreaCode,
+	)
+	if err != nil {
+		return nil, err
+	}
 	doc := &registrydomain.ControlledDocument{
 		TenantID:                  cmd.TenantID,
 		ProfileCode:               cmd.ProfileCode,
@@ -238,6 +251,7 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 		Title:                     cmd.Title,
 		OwnerUserID:               cmd.OwnerUserID,
 		OverrideTemplateVersionID: overrideID,
+		Visibility:                visibility,
 		Status:                    registrydomain.CDStatusActive,
 		CreatedAt:                 now,
 		UpdatedAt:                 now,
@@ -303,10 +317,21 @@ func (s *RegistryService) Supersede(ctx context.Context, tenantID, controlledDoc
 }
 
 func (s *RegistryService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error) {
+	if actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx)); actorUserID != "" {
+		filter.ActorUserID = &actorUserID
+	}
 	return s.docs.List(ctx, tenantID, filter)
 }
 
 func (s *RegistryService) Get(ctx context.Context, tenantID, id string) (*ControlledDocument, error) {
+	actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx))
+	canRead, err := s.docs.CanRead(ctx, tenantID, id, actorUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !canRead {
+		return nil, registrydomain.ErrCDNotFound
+	}
 	return s.docs.GetByID(ctx, tenantID, id)
 }
 

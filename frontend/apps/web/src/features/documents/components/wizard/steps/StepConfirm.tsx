@@ -14,7 +14,12 @@ export type StepConfirmProps = {
   area: ProcessArea | null;
   title: string;
   visibility: VisibilityKey;
+  visibilityAreaCodes: string[];
+  inviteeCount: number;
   template: TemplateDTO | null;
+  isBlankTemplateSelected?: boolean;
+  blankTemplateName?: string;
+  previewCode: string | null;
   authorDisplayName: string;
   createdAt: Date;
   consent: boolean;
@@ -33,7 +38,12 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
     area,
     title,
     visibility,
+    visibilityAreaCodes,
+    inviteeCount,
     template,
+    isBlankTemplateSelected = false,
+    blankTemplateName = 'Em branco',
+    previewCode,
     authorDisplayName,
     createdAt,
     consent,
@@ -46,18 +56,24 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
     submitDisabled,
   } = props;
 
-  const codePreview = `${profile?.code ?? '???'}-${area?.code ?? '???'}-???`;
+  const codePreview = previewCode ?? `${profile?.code ?? '???'}-${area?.code ?? '???'}-???`;
   const versionLabel = 'v1'; // first version of a new doc; literal until version-bumping flow exists
-  const visibilityLabel = VISIBILITY_META[visibility].label;
+  const visibilityLabel = buildVisibilityLabel(visibility, visibilityAreaCodes, inviteeCount);
   const profileLabel = profile ? `${profile.code} — ${profile.name}` : '—';
   const areaLabel = area ? `${area.code} — ${area.name}` : '—';
-  const templateLabel = template ? `${template.name} v${template.latest_version} (publicada)` : '—';
+  const templateLabel = isBlankTemplateSelected
+    ? blankTemplateName
+    : template
+      ? `${template.name} v${template.latest_version} (publicada)`
+      : '—';
   const createdAtLabel = formatDateTime(createdAt);
 
   const summaryFields: ReadonlyArray<SummaryField> = [
+    { label: 'Código', value: codePreview },
     { label: 'Perfil', value: profileLabel },
     { label: 'Família', value: profile?.familyCode ?? '—' },
     { label: 'Área', value: areaLabel },
+    { label: 'Template', value: templateLabel },
     { label: 'Visibilidade', value: visibilityLabel },
     { label: 'Autor', value: authorDisplayName || '—' },
     { label: 'Criado em', value: createdAtLabel },
@@ -93,18 +109,16 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
 
       <div className={styles.nextStepsCallout}>
         <div className={`${styles.nextStepsKicker} kicker`}>Ao confirmar</div>
-        {/* TODO(novo-documento:slot-rollback): if doc-create fails after slot-create
-            succeeds, orphan slot persists + code is consumed. No compensation today.
-            See wiki/backlog/novo-documento.md#slot-rollback. */}
         <ol className={styles.nextStepsList}>
           <li>
             O slot <span className="mono">{codePreview}</span> será reservado permanentemente — códigos
             não são reutilizados mesmo após arquivamento.
           </li>
           <li>
-            Uma cópia do template <span className="mono">{template?.name ?? '—'}</span> será clonada como
+            Uma cópia do template <span className="mono">{isBlankTemplateSelected ? blankTemplateName : template?.name ?? '—'}</span> será clonada como
             rascunho.
           </li>
+          <li>A criação do slot e do primeiro rascunho acontece em uma única operação atômica.</li>
           <li>Você será direcionado para o editor para preencher o conteúdo.</li>
           <li>Tokens fixos (código, autor, vigência, aprovadores) serão resolvidos no momento do freeze.</li>
         </ol>
@@ -148,6 +162,25 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       />
     </div>
   );
+}
+
+function buildVisibilityLabel(
+  visibility: VisibilityKey,
+  visibilityAreaCodes: string[],
+  inviteeCount: number,
+): string {
+  if (visibility === 'company') return VISIBILITY_META.company.label;
+  if (visibility === 'area') {
+    if (visibilityAreaCodes.length === 0) return VISIBILITY_META.area.label;
+    return `${VISIBILITY_META.area.label} (${visibilityAreaCodes.join(', ')})`;
+  }
+  if (visibility === 'people') {
+    if (inviteeCount > 0 || visibilityAreaCodes.length > 0) {
+      return `${VISIBILITY_META.people.label} (${inviteeCount} pessoas, ${visibilityAreaCodes.length} areas)`;
+    }
+    return `${VISIBILITY_META.people.label} (sem selecao no momento)`;
+  }
+  return VISIBILITY_META.external.label;
 }
 
 const DATE_TIME_FMT = new Intl.DateTimeFormat('pt-BR', {

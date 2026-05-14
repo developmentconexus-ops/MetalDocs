@@ -125,6 +125,44 @@ func TestSubmitForReview_NoUpload(t *testing.T) {
 	}
 }
 
+func TestSubmitForReview_SystemOwnedTemplateImmutable(t *testing.T) {
+	repo := newFakeRepo()
+	templateID := "00000000-0000-0000-0000-000000000101"
+	repo.templates[templateID] = &domain.Template{
+		ID:          templateID,
+		TenantID:    "tenant-a",
+		SystemOwned: true,
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:            "ver-1",
+		TemplateID:    templateID,
+		VersionNumber: 1,
+		Status:        domain.VersionStatusDraft,
+		ContentHash:   "deadbeef",
+	}
+	repo.approvalConfigs[templateID] = &domain.ApprovalConfig{TemplateID: templateID, ApproverRole: "approver"}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions/1/submit", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "SYSTEM_TEMPLATE_IMMUTABLE" {
+		t.Fatalf("expected error.code=SYSTEM_TEMPLATE_IMMUTABLE, got %q", out.Code)
+	}
+}
+
 func TestReview_Accept_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	reviewerRole := "reviewer"
@@ -238,6 +276,32 @@ func TestArchiveTemplate_Happy(t *testing.T) {
 	}
 }
 
+func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
+	repo := newFakeRepo()
+	templateID := "00000000-0000-0000-0000-000000000101"
+	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "tenant-a", SystemOwned: true}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/archive", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "SYSTEM_TEMPLATE_IMMUTABLE" {
+		t.Fatalf("expected error.code=SYSTEM_TEMPLATE_IMMUTABLE, got %q", out.Code)
+	}
+}
+
 func TestUpsertApprovalConfig_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a", CreatedBy: "user-a"}
@@ -271,4 +335,3 @@ func TestUpsertApprovalConfig_Happy(t *testing.T) {
 		t.Fatalf("expected data.approval_config.approver_role=approver, got %q", out.Data.ApprovalConfig.ApproverRole)
 	}
 }
-

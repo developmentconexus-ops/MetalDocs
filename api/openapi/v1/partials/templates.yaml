@@ -1,4 +1,17 @@
 paths:
+  /api/v1/templates/system/blank:
+    get:
+      summary: Get system-owned blank template
+      tags: [templates]
+      operationId: getSystemBlankTemplate
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemBlankTemplateResponse'
+        '404': { description: not_found }
   /api/v1/templates:
     get:
       summary: List templates for tenant (docx-v2)
@@ -162,3 +175,13 @@ paths:
                   parse_errors: { type: array, items: { type: object } }
                   missing_tokens: { type: array, items: { type: string } }
                   orphan_tokens: { type: array, items: { type: string } }
+
+components:
+  schemas:
+    SystemBlankTemplateResponse:
+      type: object
+      required: [templateId, templateVersionId, name]
+      properties:
+        templateId: { type: string, format: uuid }
+        templateVersionId: { type: string, format: uuid }
+        name: { type: string }

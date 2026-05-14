@@ -14,9 +14,8 @@ export function PeopleSubcontrols({
   onAddInvitee: _onAddInvitee,
   onRemoveInvitee: _onRemoveInvitee,
 }: PeopleSubcontrolsProps): JSX.Element {
-  // Defer per NOTES.md audit — share/invite model not yet defined. Rendered
-  // disabled (aria-disabled + grayed) so the UI does not imply unsupported
-  // behavior. See wiki/backlog/novo-documento.md#sharing.
+  // Keep disabled until a real invite/search endpoint is available so the UI
+  // stays truthful about current capabilities.
   return (
     <div
       className={`card ${styles.subcontrolsCard}`}

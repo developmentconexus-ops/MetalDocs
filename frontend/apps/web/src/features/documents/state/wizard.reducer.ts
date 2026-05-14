@@ -19,6 +19,7 @@ export type WizardState = {
   areaCode: string;
   title: string;
   visibility: VisibilityKey;
+  visibilityAreaCodes: string[];
   invitees: WizardInvitee[];
   external: WizardExternalConfig;
   templateID: string | null;
@@ -35,6 +36,7 @@ export type WizardAction =
   | { type: 'setArea'; code: string }
   | { type: 'setTitle'; value: string }
   | { type: 'setVisibility'; key: VisibilityKey }
+  | { type: 'setVisibilityAreas'; codes: string[] }
   | { type: 'addInvitee'; invitee: WizardInvitee }
   | { type: 'removeInvitee'; id: string }
   | { type: 'setExternal'; patch: Partial<WizardExternalConfig> }
@@ -50,6 +52,7 @@ export const INITIAL_STATE: WizardState = {
   areaCode: '',
   title: '',
   visibility: 'company',
+  visibilityAreaCodes: [],
   invitees: [],
   external: { passwordRequired: false, watermark: false, expiresInDays: null },
   templateID: null,
@@ -90,12 +93,44 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
         templateVersionID: null,
         error: null,
       };
-    case 'setArea':
-      return { ...state, areaCode: action.code };
+    case 'setArea': {
+      const nextAreaCode = action.code;
+      const nextVisibilityAreaCodes =
+        state.visibilityAreaCodes.length > 0 || state.visibility === 'area'
+          ? nextAreaCode
+            ? [nextAreaCode]
+            : []
+          : state.visibilityAreaCodes;
+      return { ...state, areaCode: nextAreaCode, visibilityAreaCodes: nextVisibilityAreaCodes };
+    }
     case 'setTitle':
       return { ...state, title: action.value };
     case 'setVisibility':
-      return { ...state, visibility: action.key };
+      if (action.key === 'company') {
+        return {
+          ...state,
+          visibility: action.key,
+          visibilityAreaCodes: [],
+          invitees: [],
+          external: { passwordRequired: false, watermark: false, expiresInDays: null },
+        };
+      }
+      return {
+        ...state,
+        visibility: action.key,
+        visibilityAreaCodes:
+          action.key === 'area'
+            ? state.areaCode
+              ? [state.areaCode]
+              : []
+            : state.visibilityAreaCodes,
+      };
+    case 'setVisibilityAreas': {
+      const unique = Array.from(new Set(action.codes.filter(Boolean)));
+      const withOwnArea =
+        state.areaCode && !unique.includes(state.areaCode) ? [state.areaCode, ...unique] : unique;
+      return { ...state, visibilityAreaCodes: withOwnArea };
+    }
     case 'addInvitee': {
       if (state.invitees.some((row) => row.id === action.invitee.id)) return state;
       return { ...state, invitees: [...state.invitees, action.invitee] };

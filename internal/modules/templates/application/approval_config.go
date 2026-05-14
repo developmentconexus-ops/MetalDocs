@@ -21,6 +21,9 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 	if template.TenantID != cmd.TenantID {
 		return nil, domain.ErrNotFound
 	}
+	if template.SystemOwned {
+		return nil, domain.ErrSystemTemplateImmutable
+	}
 	if template.IsArchived() {
 		return nil, domain.ErrArchived
 	}

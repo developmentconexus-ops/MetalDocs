@@ -22,7 +22,7 @@ func scanTemplate(row rowScanner) (*domain.Template, error) {
 	)
 	if err := row.Scan(
 		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description, &areasJSON, &visibility, &specificAreasJSON,
-		&t.LatestVersion, &publishedVersionID, &t.CreatedBy, &t.CreatedAt, &archivedAt,
+		&t.LatestVersion, &publishedVersionID, &t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &archivedAt,
 	); err != nil {
 		return nil, err
 	}
