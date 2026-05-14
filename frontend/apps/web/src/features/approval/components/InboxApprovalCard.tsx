@@ -1,32 +1,34 @@
 import { Avatar } from '../../../components/ui/Avatar';
 import { Icon } from '../../../components/ui/Icon';
-import type { RichInboxItem } from '../lib/mockInboxData';
+import type { InboxItem } from '../api/approvalTypes';
 import styles from './InboxApprovalCard.module.css';
 
 interface InboxApprovalCardProps {
-  item: RichInboxItem;
+  item: InboxItem;
+  onOpenDocument?: () => void;
+  onApprove?: () => void;
+  onReject?: () => void;
 }
 
-export function InboxApprovalCard({ item }: InboxApprovalCardProps) {
+export function InboxApprovalCard({
+  item,
+  onOpenDocument,
+  onApprove,
+  onReject,
+}: InboxApprovalCardProps) {
   return (
     <article className={styles.card}>
-      <div className={`${styles.cardHeader}${item.urgent ? ` ${styles.cardHeaderUrgent}` : ''}`}>
+      <div className={styles.cardHeader}>
         <div className={styles.cardHeaderInner}>
-          <div className={styles.kindBadge}>{item.kind}</div>
           <div className={styles.cardHeaderMeta}>
-            <div className={`${styles.codeVersion} mono`}>{item.code} · {item.version}</div>
+            <div className={`${styles.codeVersion} mono`}>
+              {new Date(item.submitted_at).toLocaleString('pt-BR')}
+            </div>
             <h2 className={styles.cardTitle}>{item.document_title}</h2>
           </div>
-          {item.urgent && (
-            <div className={styles.deadlineBlock}>
-              <div className={styles.deadlineLabel}>VENCE EM</div>
-              <div className={styles.deadlineValue}>{item.deadline}</div>
-            </div>
-          )}
         </div>
       </div>
       <div className={styles.cardBody}>
-        <p className={styles.summary}>{item.summary}</p>
         <div className={styles.statsGrid}>
           <div className={styles.statCell}>
             <div className="kicker">AUTOR</div>
@@ -39,37 +41,35 @@ export function InboxApprovalCard({ item }: InboxApprovalCardProps) {
             </div>
           </div>
           <div className={styles.statCell}>
-            <div className="kicker">ALTERAÇÕES</div>
-            <div className={styles.changesRow}>
-              <span className={styles.changesNum}>{item.changes}</span>
-              <span className="caption">edições</span>
-            </div>
+            <div className="kicker">ÁREA</div>
+            <div className={styles.stageName}>{item.area_code}</div>
+            <div className="caption mono">{item.controlled_document_id}</div>
           </div>
           <div className={styles.statCell}>
             <div className="kicker">ESTÁGIO</div>
             <div className={styles.stageName}>{item.stage_label}</div>
-            <div className="caption">de 4 etapas</div>
+            <div className="caption mono">{item.quorum_progress}</div>
           </div>
         </div>
         <div className={styles.cardActions}>
           <button
             type="button"
             className={`${styles.btnOpen} btn`}
-            onClick={() => { /* TODO [BACKLOG: caixa-aprovacao.md]: navigate to doc */ }}
+            onClick={onOpenDocument}
           >
-            <Icon name="docs" size={14} /> Abrir documento
+            <Icon name="eye" size={14} /> Abrir documento
           </button>
           <button
             type="button"
             className={`${styles.btnReturn} btn`}
-            onClick={() => { /* TODO [BACKLOG: caixa-aprovacao.md]: return flow */ }}
+            onClick={onReject}
           >
             Devolver
           </button>
           <button
             type="button"
             className={`${styles.btnApprove} btn btn-primary`}
-            onClick={() => { /* TODO [BACKLOG: caixa-aprovacao.md]: signoff flow */ }}
+            onClick={onApprove}
           >
             Aprovar e assinar →
           </button>

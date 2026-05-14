@@ -3,7 +3,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNextSelectedIdx, InboxPage } from './InboxPage';
-import type { RichInboxItem } from '../lib/mockInboxData';
+import type { InboxItem } from '../api/approvalTypes';
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('../queries/useInboxQuery', () => ({
 
 import { useInboxQuery } from '../queries/useInboxQuery';
 
-function makeItem(overrides: Partial<RichInboxItem> = {}): RichInboxItem {
+function makeItem(overrides: Partial<InboxItem> = {}): InboxItem {
   return {
     instance_id: 'inst-1',
     document_id: 'doc-1',
@@ -26,15 +26,6 @@ function makeItem(overrides: Partial<RichInboxItem> = {}): RichInboxItem {
     submitted_at: '2026-04-14T10:00:00.000Z',
     stage_label: 'Revisão L2',
     quorum_progress: '1/2',
-    // RichInboxItem mock fields
-    code: 'POP-QUA-0001',
-    kind: 'POP',
-    deadline: '3h 28min',
-    urgent: false,
-    summary: 'Resumo do documento.',
-    changes: 5,
-    version: 'v1.0 → v1.1',
-    deadline_at: '2026-05-09T10:00:00.000Z',
     ...overrides,
   };
 }
@@ -115,8 +106,8 @@ describe('InboxPage', () => {
   });
 
   it('renders queue items from API data', async () => {
-    const item1 = makeItem({ instance_id: 'i1', document_title: 'POP Limpeza', code: 'POP-QUA-0001' });
-    const item2 = makeItem({ instance_id: 'i2', document_title: 'Manual Segurança', code: 'IT-PROD-0002' });
+    const item1 = makeItem({ instance_id: 'i1', document_title: 'POP Limpeza' });
+    const item2 = makeItem({ instance_id: 'i2', document_title: 'Manual Segurança' });
 
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [item1, item2], total: 2 },
@@ -171,5 +162,33 @@ describe('InboxPage', () => {
 
   it('next navigation does not underflow on empty list', () => {
     expect(getNextSelectedIdx(0, 0)).toBe(0);
+  });
+
+  it('timeline view renders submitted-time review stream and unavailable heatmap state', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: {
+        items: [
+          makeItem({
+            submitted_at: new Date().toISOString(),
+            stage_label: 'Revisão L2',
+            quorum_progress: '1/2',
+          }),
+        ],
+        total: 1,
+      },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Linha do tempo'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Histórico de decisões ainda não disponível')).toBeTruthy();
+    });
+
+    expect(screen.getByText('Revisão L2')).toBeTruthy();
+    expect(screen.queryByText('3h 28min')).toBeNull();
+    expect(screen.queryByText('POP-QUA-0148')).toBeNull();
   });
 });
