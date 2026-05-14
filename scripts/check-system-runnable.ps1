@@ -177,8 +177,11 @@ try {
     }
     Pass-Checkpoint -Name 'auth-me' -Message "GET $meRoute returned HTTP $([int]$meResponse.StatusCode)"
 
-    $resolvedTargetRoute = Resolve-TargetRoute -Route $TargetRoute
-    $targetResponse = Invoke-CheckedRequest -Client $client -Method Get -Route $resolvedTargetRoute
+	$resolvedTargetRoute = Resolve-TargetRoute -Route $TargetRoute
+	if ($resolvedTargetRoute -ne $TargetRoute) {
+	    Write-Host "WARN target-route-alias - requested $TargetRoute; using runtime route $resolvedTargetRoute"
+	}
+	$targetResponse = Invoke-CheckedRequest -Client $client -Method Get -Route $resolvedTargetRoute
     if (-not $targetResponse.IsSuccessStatusCode) {
         $targetBody = $targetResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
         $routeLabel = if ($resolvedTargetRoute -eq $TargetRoute) {

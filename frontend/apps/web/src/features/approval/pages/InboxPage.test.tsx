@@ -239,4 +239,23 @@ describe('InboxPage', () => {
       expect(screen.getByText(/Assinar/)).toBeTruthy();
     });
   });
+
+  it('approve action shows alert when active-document lookup fails', async () => {
+    vi.mocked(getActiveDocumentContext).mockRejectedValue(new Error('network failure'));
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Aprovar e assinar →'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy();
+      expect(screen.getByText('Fluxo de aprovação indisponível para este documento no momento.')).toBeTruthy();
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
 });

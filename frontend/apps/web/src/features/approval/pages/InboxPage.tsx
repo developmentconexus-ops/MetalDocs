@@ -58,19 +58,22 @@ export function InboxPage() {
 
   async function openDecisionFlow(item: InboxItem, initialDecision: 'approve' | 'reject') {
     setActionError(null);
-    const active = await getActiveDocumentContext(item.controlled_document_id);
+    try {
+      const active = await getActiveDocumentContext(item.controlled_document_id);
+      if (!active?.documentId || !active?.contentHash || !active?.approvalInstanceId) {
+        setActionError('Fluxo de aprovação indisponível para este documento no momento.');
+        return;
+      }
 
-    if (!active?.documentId || !active?.contentHash || !active?.approvalInstanceId) {
+      setDialogState({
+        documentId: active.documentId,
+        contentHash: active.contentHash,
+        instanceId: active.approvalInstanceId,
+        initialDecision,
+      });
+    } catch {
       setActionError('Fluxo de aprovação indisponível para este documento no momento.');
-      return;
     }
-
-    setDialogState({
-      documentId: active.documentId,
-      contentHash: active.contentHash,
-      instanceId: active.approvalInstanceId,
-      initialDecision,
-    });
   }
 
   useEffect(() => {
