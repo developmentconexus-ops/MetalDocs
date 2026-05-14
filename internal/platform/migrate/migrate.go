@@ -1,7 +1,6 @@
-// Package migrate applies SQL files from a migrations directory in version
-// order, skipping any whose version is already recorded in
-// public.schema_migrations. Each migration file is responsible for inserting
-// its own ledger row; this runner only orchestrates execution.
+// Package migrate applies post-baseline forward SQL files from a configured
+// migrations directory. It is not responsible for fresh database bootstrap;
+// curated baseline bootstrap is owned by scripts/dev-bootstrap-baseline.ps1.
 package migrate
 
 import (
