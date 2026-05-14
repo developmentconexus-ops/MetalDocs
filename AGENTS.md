@@ -8,6 +8,12 @@ For ANY work on MetalDocs backend HTTP routes, OpenAPI, oapi-codegen, handler wi
 
 Do not duplicate the backend/API rules here. The wiki is the source of truth and the skill is the required workflow.
 
+## Database
+
+For ANY work on MetalDocs database migrations, bootstrap, curated baseline, reference data, dev seeds, schema ownership, Postgres extensions, grants, triggers, functions, `schema_migrations`, or database dictionary/wiki pages, use the `metaldocs-database` skill at `.agents/skills/metaldocs-database/SKILL.md`.
+
+The database wiki under `wiki/database/` is the source of truth for schema ownership, dictionary entries, migration policy, reference data, and bootstrap rules. Do not duplicate those rules here.
+
 ## Frontend
 
 For ANY work under `frontend/apps/web/`, use the `metaldocs-frontend` skill at `.agents/skills/metaldocs-frontend/SKILL.md`.
@@ -39,6 +45,7 @@ Use the smallest skill set that matches the task boundary:
 - full module wiki build or maturity promotion -> `metaldocs-module-doc`
 - post-implementation wiki update for documented modules -> `metaldocs-module-doc-sync`
 - startup / auth / route / runtime-spec-generated-wrapper drift -> `runtime-contract-prereq`
+- database migrations / bootstrap / curated baseline / seeds / dictionary -> `metaldocs-database`
 
 If a task crosses boundaries, compose the skills. Do not force one skill to absorb unrelated prerequisite work.
 
