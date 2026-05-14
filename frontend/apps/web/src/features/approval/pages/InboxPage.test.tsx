@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { InboxPage } from './InboxPage';
+import { getNextSelectedIdx, InboxPage } from './InboxPage';
 import type { RichInboxItem } from '../lib/mockInboxData';
 
 vi.mock('react-router-dom', () => ({
@@ -80,7 +80,7 @@ describe('InboxPage', () => {
     });
   });
 
-  it('empty API response falls back to MOCK_INBOX_ITEMS (4 items)', async () => {
+  it('empty API response renders honest empty state instead of mock fallback', async () => {
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [], total: 0 },
       isLoading: false,
@@ -88,18 +88,41 @@ describe('InboxPage', () => {
     } as unknown as ReturnType<typeof useInboxQuery>);
 
     renderPage();
-    // Mock fallback has 4 items — counter shows 01 / 04
     await waitFor(() => {
-      expect(screen.getByText('01 / 04')).toBeTruthy();
+      expect(screen.getByText('Nenhuma aprovação pendente.')).toBeTruthy();
     });
+
+    expect(screen.queryByText('POP-QUA-0148')).toBeNull();
+    expect(screen.queryByText('01 / 04')).toBeNull();
+  });
+
+  it('invalid persisted view falls back to stack', async () => {
+    localStorage.setItem('md.inbox.v', 'deadline-mock');
+
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem()], total: 1 },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('01 / 01')).toBeTruthy();
+    });
+
+    expect(screen.queryByText('Suas 1 decisões na ordem que importam')).toBeNull();
   });
 
   it('renders queue items from API data', async () => {
     const item1 = makeItem({ instance_id: 'i1', document_title: 'POP Limpeza', code: 'POP-QUA-0001' });
     const item2 = makeItem({ instance_id: 'i2', document_title: 'Manual Segurança', code: 'IT-PROD-0002' });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(useInboxQuery).mockReturnValue({ data: { items: [item1, item2], total: 2 }, isLoading: false, isError: false } as any);
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [item1, item2], total: 2 },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useInboxQuery>);
 
     renderPage();
 
@@ -144,5 +167,9 @@ describe('InboxPage', () => {
     fireEvent.click(nextBtn);
 
     expect(screen.getByText('02 / 02')).toBeTruthy();
+  });
+
+  it('next navigation does not underflow on empty list', () => {
+    expect(getNextSelectedIdx(0, 0)).toBe(0);
   });
 });

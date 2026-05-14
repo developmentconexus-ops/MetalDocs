@@ -1,29 +1,29 @@
-import { useState } from 'react';
-import { MOCK_INBOX_ITEMS, enrichInboxItem } from '../lib/mockInboxData';
+import { useEffect, useState } from 'react';
 import { useInboxQuery } from '../queries/useInboxQuery';
 import { InboxStack } from '../components/InboxStack';
 import { InboxTimeline } from '../components/InboxTimeline';
 import { InboxToolbar } from '../components/InboxToolbar';
 import styles from './InboxPage.module.css';
 
+type ViewType = 'stack' | 'timeline';
+
+function readStoredView(): ViewType {
+  const raw = localStorage.getItem('md.inbox.v');
+  return raw === 'stack' || raw === 'timeline' ? raw : 'stack';
+}
+
+export function getNextSelectedIdx(prev: number, totalItems: number) {
+  return Math.min(prev + 1, Math.max(totalItems - 1, 0));
+}
+
 export function InboxPage() {
-  const [view, setView] = useState<string>(
-    () => localStorage.getItem('md.inbox.v') || 'stack',
-  );
+  const [view, setView] = useState<ViewType>(() => readStoredView());
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   const { data, isLoading, isError } = useInboxQuery();
+  const items = data?.items ?? [];
 
-  // Enrich API items with mock extras; fall back to canonical mock set on error/empty.
-  // TODO [BACKLOG: caixa-aprovacao.md]: Remove fallback when API returns all required fields.
-  const items =
-    data && data.items.length > 0
-      ? data.items.map((item, idx) => enrichInboxItem(item, idx))
-      : isLoading || isError
-        ? []
-        : MOCK_INBOX_ITEMS;
-
-  function handleViewChange(v: string) {
+  function handleViewChange(v: ViewType) {
     setView(v);
     localStorage.setItem('md.inbox.v', v);
   }
@@ -33,12 +33,18 @@ export function InboxPage() {
   }
 
   function handleNext() {
-    setSelectedIdx((prev) => Math.min(prev + 1, items.length - 1));
+    setSelectedIdx((prev) => getNextSelectedIdx(prev, items.length));
   }
 
   function handlePrev() {
     setSelectedIdx((prev) => Math.max(prev - 1, 0));
   }
+
+  useEffect(() => {
+    if (selectedIdx > 0 && selectedIdx >= items.length) {
+      setSelectedIdx(Math.max(items.length - 1, 0));
+    }
+  }, [items.length, selectedIdx]);
 
   return (
     <div className={styles.page}>
