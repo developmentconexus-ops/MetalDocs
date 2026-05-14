@@ -40,6 +40,16 @@ Do not change public backend routes, generated `api.gen.go` wiring, or OpenAPI c
 ## Mandatory Gates
 
 Canonical design: `docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md`.
+User/operator guide: `wiki/references/ai-operating-system.md`.
+
+Workflow selection quick map:
+- backend/API boundary -> `metaldocs-backend-api`
+- frontend boundary -> `metaldocs-frontend`
+- frontend API/query boundary -> `metaldocs-tanstack-query`
+- designed screen boundary -> `metaldocs-frontend` + `metaldocs-screen-implementation`
+- module wiki rebuild -> `metaldocs-module-doc`
+- module wiki sync after implementation -> `metaldocs-module-doc-sync`
+- runtime/auth/route/contract drift -> `runtime-contract-prereq`
 
 Before screen work:
 1. Fresh build truth
@@ -68,6 +78,9 @@ Startup uses script-truth policy:
 - ad hoc startup commands are not authoritative
 - scripts must rebuild or explicitly prove freshness
 - scripts must fail loudly on stale binary, blocked port, missing dependency, or broken prerequisite
+
+Do not continue feature work through a failing prerequisite boundary.
+If startup, auth/session, target route, or shared contract truth fails, switch to `runtime-contract-prereq`, repair the failing boundary, rerun the checkpoint, and only then return to the original task.
 
 ---
 
