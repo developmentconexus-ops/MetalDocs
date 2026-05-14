@@ -85,6 +85,12 @@ Approve before Phase 3 implementation:
 3. Ledger policy adopts explicit baseline+tail semantics (including whether baseline marker row is required).
 4. Governance updates will establish `wiki/database/` as canonical DB policy/dictionary location.
 
+## Runtime Backfill Decision
+
+| Backfill | Decision | Reason | Verification |
+|---|---|---|---|
+| `registry.BackfillLegacyDocuments` | `documented-legacy-maintenance-job` | `internal/modules/registry/application/migration.go` only mutates rows where `documents.controlled_document_id IS NULL`; fresh curated baselines should not have these legacy-null rows. `internal/modules/registry/module.go` now exposes this as legacy maintenance intent. | Fresh curated bootstrap + API startup should complete without durable backfill mutation; backfill logs should indicate no-op/zero processed on clean baseline. |
+
 ## Unresolved Questions to Carry into Phase 3 (Post-Approval)
 
 1. Should `governance_events` be owned in audit dictionary scope or separate governance scope?
