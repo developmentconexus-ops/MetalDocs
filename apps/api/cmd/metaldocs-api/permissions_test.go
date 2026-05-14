@@ -88,6 +88,34 @@ func TestPermissionResolver_TaxonomyAreasPATCH_RequiresTaxonomyManage(t *testing
 	}
 }
 
+func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
+	checker := newPublicPathChecker(newPermissionResolver())
+
+	testCases := []struct {
+		name   string
+		method string
+		path   string
+		want   bool
+	}{
+		{name: "health ready stays public", method: http.MethodGet, path: "/api/v1/health/ready", want: true},
+		{name: "auth login stays public", method: http.MethodPost, path: "/api/v1/auth/login", want: true},
+		{name: "feature flags stays public", method: http.MethodGet, path: "/api/v1/feature-flags", want: true},
+		{name: "auth me requires session", method: http.MethodGet, path: "/api/v1/auth/me", want: false},
+		{name: "documents list stays guarded", method: http.MethodGet, path: "/api/v1/documents", want: false},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := checker(tc.method, tc.path)
+			if got != tc.want {
+				t.Fatalf("checker(%s, %s) = %v, want %v", tc.method, tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestPermissionResolver_RegistryObsolete_RequiresRegistryObsoleteCap(t *testing.T) {
 	r := newPermissionResolver()
 	cap, ok := r(http.MethodPut, "/api/v1/controlled-documents/some-id/obsolete")
