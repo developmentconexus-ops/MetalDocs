@@ -13,8 +13,8 @@ docker compose -f deploy/compose/docker-compose.yml --env-file .env stop api web
 Write-Host "[dev-local] Starting Docker infra containers..."
 docker compose -f deploy/compose/docker-compose.yml --env-file .env up -d postgres redis minio | Out-Host
 
-Write-Host "[dev-local] Applying migrations (idempotent) ..."
-powershell -ExecutionPolicy Bypass -File scripts/dev-migrate.ps1 | Out-Host
+Write-Host "[dev-local] Applying curated baseline bootstrap with local dev seed..."
+powershell -ExecutionPolicy Bypass -File scripts/dev-bootstrap-baseline.ps1 -WithDevSeed | Out-Host
 
 Write-Host ""
 Write-Host "[dev-local] Fast local development mode is ready."
