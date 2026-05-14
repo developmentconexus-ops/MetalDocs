@@ -4,16 +4,6 @@ export const templatesRoutes: RouteObject[] = [
   {
     path: "templates",
     handle: { workspaceView: "templates" },
-    lazy: () => import("./pages/TemplatesRedirectPage"),
-  },
-  {
-    path: "templates/*",
-    handle: { workspaceView: "templates" },
-    lazy: () => import("./pages/TemplatesRedirectPage"),
-  },
-  {
-    path: "templates",
-    handle: { workspaceView: "templates" },
     lazy: () => import("./pages/TemplatesListRoutePage"),
   },
   {
