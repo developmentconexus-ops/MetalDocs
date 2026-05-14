@@ -24,7 +24,8 @@ const ERROR_MESSAGES: Record<Exclude<DialogState, 'idle' | 'submitting' | 'succe
   error_session_expired: 'Sessão expirada. Autentique novamente para assinar.',
   error_rate_limited: 'Muitas tentativas. Aguarde 30 segundos antes de tentar novamente.',
   error_network: 'Erro de conexão. Verifique sua internet e tente novamente.',
-  error_server: 'Erro interno do servidor. Tente novamente em instantes.',
+  error_server:
+    'Fluxo de aprovaÃ§Ã£o indisponÃ­vel no momento. Verifique se o documento ainda estÃ¡ elegÃ­vel para sua revisÃ£o.',
   // E2: SoD codes get Portuguese messages from shared errorMessages map.
   error_sod_submitter: resolveErrorMessage('sod.submitter_cannot_sign', 'Segregação de funções: submissão e aprovação pelo mesmo usuário não é permitida.'),
   error_sod_duplicate: resolveErrorMessage('sod.cross_stage_duplicate', 'Você já assinou este documento em uma etapa anterior.'),
@@ -34,6 +35,7 @@ interface SignoffDialogProps {
   documentId: string;
   contentHash: string;
   instanceId: string;
+  initialDecision?: Decision;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -45,11 +47,12 @@ export function SignoffDialog({
   documentId,
   contentHash,
   instanceId,
+  initialDecision,
   onClose,
   onSuccess,
 }: SignoffDialogProps) {
   const [state, setState] = useState<DialogState>('idle');
-  const [decision, setDecision] = useState<Decision>('approve');
+  const [decision, setDecision] = useState<Decision>(initialDecision ?? 'approve');
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
   const [reasonError, setReasonError] = useState<string | null>(null);

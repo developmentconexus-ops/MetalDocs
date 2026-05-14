@@ -4,14 +4,25 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNextSelectedIdx, InboxPage } from './InboxPage';
 import type { InboxItem } from '../api/approvalTypes';
+import { getActiveDocumentContext } from '../api/approvalApi';
+
+const navigateMock = vi.fn();
 
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigateMock,
 }));
 
 vi.mock('../queries/useInboxQuery', () => ({
   useInboxQuery: vi.fn(),
 }));
+
+vi.mock('../api/approvalApi', async () => {
+  const actual = await vi.importActual<typeof import('../api/approvalApi')>('../api/approvalApi');
+  return {
+    ...actual,
+    getActiveDocumentContext: vi.fn(),
+  };
+});
 
 import { useInboxQuery } from '../queries/useInboxQuery';
 
@@ -42,6 +53,7 @@ function renderPage() {
 describe('InboxPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    navigateMock.mockReset();
     // Default localStorage clear
     localStorage.removeItem('md.inbox.v');
   });
@@ -190,5 +202,41 @@ describe('InboxPage', () => {
     expect(screen.getByText('Revisão L2')).toBeTruthy();
     expect(screen.queryByText('3h 28min')).toBeNull();
     expect(screen.queryByText('POP-QUA-0148')).toBeNull();
+  });
+
+  it('Abrir documento navigates to the registry detail route', async () => {
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Abrir documento'));
+
+    expect(navigateMock).toHaveBeenCalledWith('/registry-v2/cd-123');
+  });
+
+  it('approve action opens signoff flow only when active-document context is complete', async () => {
+    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+      documentId: 'doc-1',
+      contentHash: 'hash-1',
+      approvalInstanceId: 'inst-1',
+    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Aprovar e assinar →'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeTruthy();
+      expect(screen.getByText(/Assinar/)).toBeTruthy();
+    });
   });
 });

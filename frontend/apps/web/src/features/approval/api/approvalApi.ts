@@ -1,5 +1,7 @@
 import { etagCache } from './etagCache';
 import { mutate, type MutateOptions } from './mutationClient';
+import { apiFetch, ApiError } from '../../../lib/api';
+import type { components } from '../../../lib/api-types';
 import type {
   ApprovalInstance,
   CancelRequest,
@@ -172,4 +174,21 @@ export function deactivateRoute(
     resourceId: routeId,
     ...opts,
   });
+}
+
+export type ActiveDocumentContext = components['schemas']['ActiveDocumentResponse'];
+
+export async function getActiveDocumentContext(
+  controlledDocumentId: string,
+): Promise<ActiveDocumentContext | null> {
+  try {
+    return await apiFetch<ActiveDocumentContext>(
+      `/api/v1/controlled-documents/${encodeURIComponent(controlledDocumentId)}/active-document`,
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
 }
