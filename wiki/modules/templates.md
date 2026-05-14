@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates/` and routes still mount under `/api/v1/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates-refactor.md#R-101`).
 
-**Last verified:** 2026-05-12 (Plan 8) | **Owner:** unassigned | **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on all 6 mutation paths) | **Maturity:** L3
+**Last verified:** 2026-05-14 (Plan 12.1 sync) | **Owner:** unassigned | **Status:** active (production module; partial Plan 2 alignment; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on all 6 mutation paths) | **Maturity:** L3
 
 ---
 
@@ -493,5 +493,5 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-05-14 - module-doc-sync (Plan 12.1 templates screen): frontend templates list integration moved to real API wiring on the web screen and design-source notes/backlog sync; no backend route, persistence, or contract change in this module.
 - 2026-05-10 â€” initial publish (Arc42 + C4); supersedes the frontend-heavy `templates.md` (kebab) stub (retire scheduled in same backlog row R-100). Path-rename `templates/ â†’ templates/` + `/api/v1/ â†’ /api/v1/` deferred to a single follow-up commit (R-101).
-
