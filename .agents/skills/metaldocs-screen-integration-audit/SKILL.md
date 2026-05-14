@@ -12,3 +12,4 @@ This bridge exists so Codex sessions can discover the canonical screen integrati
 Load this before `metaldocs-screen-implementation` when a `design-source/<slug>/` screen may include mock-era widgets, backlog items, missing APIs, legacy frontend API wrappers, or deferred product behavior.
 
 Stop if the canonical `.claude/skills/metaldocs-screen-integration-audit/SKILL.md` file is missing.
+Stop and ask the user a focused clarification question when classification would require assumptions.

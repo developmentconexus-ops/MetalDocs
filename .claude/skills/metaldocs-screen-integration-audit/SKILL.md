@@ -9,6 +9,19 @@ Use this before real screen finalization when a `design-source/<slug>/` screen m
 
 This skill does not implement code. It produces the integration boundary for the next implementation session.
 
+## Clarification Gate (No Assumptions)
+
+If any item cannot be classified from evidence, stop and ask the user a focused question before continuing.
+
+Ask when any of these are unclear:
+- product semantics (what the UI should mean or display)
+- backend capability existence or ownership
+- response shape/field meaning
+- role/status mapping for a visible design element
+- whether a gap is local to this screen or shared across modules
+
+Never guess or infer a default for ambiguous items.
+
 ## Required Skills
 
 Load only what the audit touches:
@@ -69,6 +82,7 @@ Stop before implementation if:
 - a design item requires a backend capability that does not exist
 - an API mismatch affects more than the current screen/module
 - the screen backlog and module wiki contradict route ownership, status enums, or capability existence
+- classification depends on an assumption instead of evidence
 
 If the issue is local, record it as a local integration fix. If it is shared, route it to prerequisite work.
 
