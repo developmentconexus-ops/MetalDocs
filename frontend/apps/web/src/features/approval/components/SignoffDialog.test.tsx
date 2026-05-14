@@ -18,7 +18,7 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
-function renderDialog() {
+function renderDialog(props: Partial<Parameters<typeof SignoffDialog>[0]> = {}) {
   const onClose = vi.fn();
   const onSuccess = vi.fn();
   const renderResult = render(
@@ -28,6 +28,7 @@ function renderDialog() {
       instanceId="inst-1"
       onClose={onClose}
       onSuccess={onSuccess}
+      {...props}
     />,
   );
   return { onClose, onSuccess, ...renderResult };
@@ -95,6 +96,11 @@ describe('SignoffDialog', () => {
     expect(vi.mocked(approvalApi.signoff)).not.toHaveBeenCalled();
   });
 
+  it('initialDecision reject preselects rejected state', () => {
+    renderDialog({ initialDecision: 'reject' });
+    expect((screen.getByLabelText('Rejeitado') as HTMLInputElement).checked).toBe(true);
+  });
+
   it('error_bad_password — code=authn.signature_invalid shows error message, password cleared, form values preserved', async () => {
     vi.mocked(approvalApi.signoff).mockRejectedValue(
       new ApprovalError('authn.signature_invalid', 403, 'invalid signature'),
@@ -130,6 +136,20 @@ describe('SignoffDialog', () => {
       expect(
         screen.getByText('Muitas tentativas. Aguarde 30 segundos antes de tentar novamente.'),
       ).toBeTruthy();
+    });
+  });
+
+  it('renders a specific message for signoff.not_eligible', async () => {
+    vi.mocked(approvalApi.signoff).mockRejectedValue(
+      new ApprovalError('signoff.not_eligible', 403, 'not eligible'),
+    );
+    renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toMatch(/Fluxo de aprova/i);
     });
   });
 
