@@ -237,7 +237,7 @@ func requiresSessionButNoPermission(method, path string) bool {
 	if method == http.MethodPost && path == "/api/v1/auth/change-password" {
 		return true
 	}
-	if strings.HasPrefix(path, "/api/v1/") {
+	if method == http.MethodPost && path == "/api/v1/auth/logout" {
 		return true
 	}
 	return false

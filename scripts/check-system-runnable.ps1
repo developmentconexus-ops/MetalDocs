@@ -65,23 +65,47 @@ function Wait-ForReady {
     param(
         [System.Net.Http.HttpClient]$Client,
         [int]$TimeoutSeconds = 180,
-        [System.Diagnostics.Process]$StartupProcess
+        [System.Diagnostics.Process]$StartupProcess,
+        [int]$ConsecutiveSuccesses = 2
     )
 
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastStatusCode = $null
+    $lastBody = $null
+    $successCount = 0
     do {
         try {
             $response = Invoke-CheckedRequest -Client $Client -Method Get -Route '/api/v1/health/ready'
-            return $response
+            if ($response.IsSuccessStatusCode) {
+                $successCount += 1
+                if ($successCount -ge $ConsecutiveSuccesses) {
+                    return $response
+                }
+
+                Start-Sleep -Seconds 1
+                continue
+            }
+
+            $lastStatusCode = [int]$response.StatusCode
+            $lastBody = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            $successCount = 0
         } catch {
+            $successCount = 0
         }
 
         if ($StartupProcess -and $StartupProcess.HasExited) {
+            if ($lastStatusCode -ne $null) {
+                throw "start-api.ps1 exited before readiness succeeded; last response HTTP $lastStatusCode; body=$lastBody"
+            }
             throw "start-api.ps1 exited before readiness succeeded"
         }
 
         Start-Sleep -Seconds 1
     } while ((Get-Date) -lt $deadline)
+
+    if ($lastStatusCode -ne $null) {
+        throw "timed out waiting for /api/v1/health/ready success; last response HTTP $lastStatusCode; body=$lastBody"
+    }
 
     throw "timed out waiting for /api/v1/health/ready"
 }
@@ -112,10 +136,6 @@ try {
             -WindowStyle Hidden
 
         $readyResponse = Wait-ForReady -Client $client -StartupProcess $startupProcess
-        if (-not $readyResponse.IsSuccessStatusCode) {
-            $readyBody = $readyResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            Fail-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode); body=$readyBody"
-        }
         Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) after start-api.ps1"
     }
 
