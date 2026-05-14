@@ -10,6 +10,7 @@ api_out.log
 .env
 backups/
 non_git/
+non_git/db/reference-schema/
 tmp_api_err.log
 tmp_api_out.log
 tmp_web_err.log
