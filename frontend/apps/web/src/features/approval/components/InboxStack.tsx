@@ -1,16 +1,19 @@
 import { useEffect } from 'react';
-import type { RichInboxItem } from '../lib/mockInboxData';
+import type { InboxItem } from '../api/approvalTypes';
 import { InboxApprovalCard } from './InboxApprovalCard';
 import styles from './InboxStack.module.css';
 
 interface InboxStackProps {
-  items: RichInboxItem[];
+  items: InboxItem[];
   selectedIdx: number;
   onSelect: (idx: number) => void;
   onNext: () => void;
   onPrev: () => void;
   isLoading?: boolean;
   isError?: boolean;
+  onOpenDocument?: (item: InboxItem) => void;
+  onApprove?: (item: InboxItem) => void;
+  onReject?: (item: InboxItem) => void;
 }
 
 export function InboxStack({
@@ -21,8 +24,13 @@ export function InboxStack({
   onPrev,
   isLoading,
   isError,
+  onOpenDocument,
+  onApprove,
+  onReject,
 }: InboxStackProps) {
-  const urgentCount = items.filter((i) => i.urgent).length;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayCount = items.filter((item) => new Date(item.submitted_at).getTime() >= todayStart.getTime()).length;
   const selectedItem = items[selectedIdx];
 
   // Keyboard navigation: A=approve, D=return, ←/→=prev/next
@@ -85,7 +93,14 @@ export function InboxStack({
         </div>
 
         <div className={styles.cardStack}>
-          {selectedItem && <InboxApprovalCard item={selectedItem} />}
+          {selectedItem && (
+            <InboxApprovalCard
+              item={selectedItem}
+              onOpenDocument={onOpenDocument ? () => onOpenDocument(selectedItem) : undefined}
+              onApprove={onApprove ? () => onApprove(selectedItem) : undefined}
+              onReject={onReject ? () => onReject(selectedItem) : undefined}
+            />
+          )}
         </div>
 
         <div className={styles.keyboardHints}>
@@ -104,9 +119,9 @@ export function InboxStack({
             <span className={styles.queueCountNum}>{items.length}</span>
             <span className="caption">decisões pendentes</span>
           </div>
-          {urgentCount > 0 && (
+          {todayCount > 0 && (
             <div className="caption">
-              <span className={styles.urgentToday}>{urgentCount} vencem hoje</span>
+              <span className={styles.urgentToday}>{todayCount} enviados hoje</span>
             </div>
           )}
         </div>
@@ -119,17 +134,18 @@ export function InboxStack({
             onClick={() => onSelect(idx)}
           >
             <div className={styles.queueItemNumber}>{String(idx + 1).padStart(2, '0')}</div>
-            <div className={styles.queueItemMeta}>
-              <div className={styles.queueItemTop}>
-                <span className={`${styles.queueItemCode} mono`}>{item.code}</span>
-                {item.urgent && <span className={styles.urgentDot} />}
-              </div>
-              <div className={styles.queueItemTitle}>{item.document_title}</div>
-              <div className={styles.queueItemSub}>
-                <span className={styles.queueItemDeadline}>{item.deadline}</span>
-                <span className={styles.dot}>·</span>
-                <span>{item.area_code}</span>
-              </div>
+              <div className={styles.queueItemMeta}>
+                <div className={styles.queueItemTop}>
+                  <span className={`${styles.queueItemCode} mono`}>{item.controlled_document_id}</span>
+                </div>
+                <div className={styles.queueItemTitle}>{item.document_title}</div>
+                <div className={styles.queueItemSub}>
+                  <span className={styles.queueItemDeadline}>
+                    {new Date(item.submitted_at).toLocaleDateString('pt-BR')}
+                  </span>
+                  <span className={styles.dot}>·</span>
+                  <span>{item.area_code}</span>
+                </div>
             </div>
           </button>
         ))}

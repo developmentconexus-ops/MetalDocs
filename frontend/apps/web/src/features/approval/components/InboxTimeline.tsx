@@ -1,52 +1,47 @@
 import { Avatar } from '../../../components/ui/Avatar';
-import type { RichInboxItem } from '../lib/mockInboxData';
+import type { InboxItem } from '../api/approvalTypes';
 import styles from './InboxTimeline.module.css';
 
 interface InboxTimelineProps {
-  items: RichInboxItem[];
+  items: InboxItem[];
+  onOpenDocument?: (item: InboxItem) => void;
 }
 
 interface Bucket {
   label: string;
   sub: string;
-  urgent: boolean;
-  items: RichInboxItem[];
+  items: InboxItem[];
 }
 
-function groupByDeadlineBucket(items: RichInboxItem[]): Bucket[] {
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
-  const tomorrowEnd = new Date(todayEnd);
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
-  const weekEnd = new Date(todayEnd);
-  weekEnd.setDate(weekEnd.getDate() + 7);
+function groupBySubmittedBucket(items: InboxItem[]): Bucket[] {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+  const weekStart = todayStart - 7 * 24 * 60 * 60 * 1000;
 
-  const today: RichInboxItem[] = [];
-  const tomorrow: RichInboxItem[] = [];
-  const thisWeek: RichInboxItem[] = [];
-  const nextMonth: RichInboxItem[] = [];
+  const today: InboxItem[] = [];
+  const yesterday: InboxItem[] = [];
+  const thisWeek: InboxItem[] = [];
+  const older: InboxItem[] = [];
 
   for (const item of items) {
-    const at = new Date(item.deadline_at).getTime();
-    if (at <= todayEnd.getTime()) {
+    const at = new Date(item.submitted_at).getTime();
+    if (at >= todayStart) {
       today.push(item);
-    } else if (at <= tomorrowEnd.getTime()) {
-      tomorrow.push(item);
-    } else if (at <= weekEnd.getTime()) {
+    } else if (at >= yesterdayStart) {
+      yesterday.push(item);
+    } else if (at >= weekStart) {
       thisWeek.push(item);
     } else {
-      nextMonth.push(item);
+      older.push(item);
     }
   }
 
-  const fmt = (d: Date) =>
-    d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
-
   return [
-    { label: 'Hoje', sub: 'até 18:00', urgent: true, items: today },
-    { label: 'Amanhã', sub: fmt(tomorrowEnd), urgent: false, items: tomorrow },
-    { label: 'Esta semana', sub: `até ${fmt(weekEnd)}`, urgent: false, items: thisWeek },
-    { label: 'Próximo mês', sub: 'até 31/05', urgent: false, items: nextMonth },
+    { label: 'Hoje', sub: 'enviados hoje', items: today },
+    { label: 'Ontem', sub: 'enviados ontem', items: yesterday },
+    { label: 'Últimos 7 dias', sub: 'enviados nesta semana', items: thisWeek },
+    { label: 'Mais antigos', sub: 'enviados antes desta semana', items: older },
   ];
 }
 
@@ -60,8 +55,8 @@ function handleRowKeyDown(
   }
 }
 
-export function InboxTimeline({ items }: InboxTimelineProps) {
-  const buckets = groupByDeadlineBucket(items);
+export function InboxTimeline({ items, onOpenDocument }: InboxTimelineProps) {
+  const buckets = groupBySubmittedBucket(items);
 
   return (
     <div className={styles.timelineContainer}>
@@ -73,31 +68,12 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
             <h1 className={styles.timelineTitle}>
               Suas <span className={styles.titleAccent}>{items.length} decisões</span> na ordem que importam
             </h1>
-            <p className="caption">Organizadas por prazo. As de hoje pulsam em laranja.</p>
+            <p className="caption">Organizadas por data de envio para revisão.</p>
           </div>
 
-          {/* Heatmap widget — hardcoded; real data deferred */}
-          {/* TODO [BACKLOG: caixa-aprovacao.md]: wire real heatmap data */}
           <div className={styles.heatmap}>
-            <div className="kicker">SUAS DECISÕES · 14 DIAS</div>
-            <div className={styles.heatmapBars}>
-              {[3, 5, 2, 7, 4, 6, 8, 5, 3, 9, 4, 7, 5, 2].map((v, i) => (
-                <div
-                  key={i}
-                  className={styles.heatmapBar}
-                  style={{
-                    height: `${(v / 9) * 100}%`,
-                    opacity: 0.3 + (v / 9) * 0.7,
-                    animationDelay: `${i * 30}ms`,
-                  }}
-                  title={`${v} decisões`}
-                />
-              ))}
-            </div>
-            <div className={styles.heatmapLabels}>
-              <span className={`${styles.heatmapLabel} mono`}>22/abr</span>
-              <span className={`${styles.heatmapLabel} mono`}>hoje</span>
-            </div>
+            <div className="kicker">SUAS DECISÕES</div>
+            <p className="caption">Histórico de decisões ainda não disponível</p>
           </div>
         </div>
 
@@ -110,8 +86,7 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
                 <div
                   className={[
                     styles.railDot,
-                    bucket.urgent ? styles.railDotUrgent : '',
-                    !bucket.urgent && bucket.items.length > 0 ? styles.railDotFilled : '',
+                    bucket.items.length > 0 ? styles.railDotFilled : '',
                   ].filter(Boolean).join(' ')}
                 />
                 {bIdx < buckets.length - 1 && (
@@ -127,15 +102,12 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
               {/* Content column */}
               <section className={styles.bucketSection}>
                 <div className={styles.bucketHeader}>
-                  <h2 className={`${styles.bucketLabel}${bucket.urgent ? ` ${styles.bucketLabelUrgent}` : ''}`}>
-                    {bucket.label}
-                  </h2>
+                  <h2 className={styles.bucketLabel}>{bucket.label}</h2>
                   <span className={`${styles.bucketSub} mono`}>{bucket.sub}</span>
                   <span className={styles.spacer} />
                   <span
                     className={[
                       styles.bucketCount,
-                      bucket.urgent && bucket.items.length > 0 ? styles.bucketCountUrgent : '',
                       bucket.items.length === 0 ? styles.bucketCountEmpty : '',
                     ].filter(Boolean).join(' ')}
                   >
@@ -149,7 +121,7 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
                   <div className={styles.bucketItems}>
                     {bucket.items.map((item) => {
                       const handleClick = () => {
-                        // TODO [BACKLOG: caixa-aprovacao.md]: open doc from timeline
+                        onOpenDocument?.(item);
                       };
                       return (
                         <div
@@ -161,13 +133,17 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
                           onKeyDown={(e) => handleRowKeyDown(e, handleClick)}
                         >
                           <div className={styles.itemTime}>
-                            <div className={`${styles.itemTimeValue} mono`}>—</div>
-                            <div className="caption">vence em {item.deadline}</div>
+                            <div className={`${styles.itemTimeValue} mono`}>
+                              {new Date(item.submitted_at).toLocaleTimeString('pt-BR', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                            <div className="caption">enviado para revisão</div>
                           </div>
                           <div className={styles.itemMeta}>
                             <div className={styles.itemMetaTop}>
-                              <span className={styles.itemKind}>{item.kind}</span>
-                              <span className={`${styles.itemCode} mono`}>{item.code}</span>
+                              <span className={`${styles.itemCode} mono`}>{item.controlled_document_id}</span>
                             </div>
                             <div className={styles.itemTitle}>{item.document_title}</div>
                             <div className={styles.itemAuthLine}>
@@ -176,17 +152,11 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
                               <span className={styles.itemDot}>·</span>
                               <span>{item.area_code}</span>
                               <span className={styles.itemDot}>·</span>
-                              <span>{item.changes} alterações</span>
+                              <span>{item.quorum_progress}</span>
                             </div>
                           </div>
                           <div className={styles.itemSpacer} />
                           <div className={styles.stageProgress}>
-                            <div className={styles.stageBars}>
-                              <span className={`${styles.stageBar} ${styles.stageBarFilled}${bucket.urgent ? ` ${styles.stageBarUrgent}` : ''}`} />
-                              <span className={`${styles.stageBar} ${styles.stageBarFilled}${bucket.urgent ? ` ${styles.stageBarUrgent}` : ''}`} />
-                              <span className={styles.stageBar} />
-                              <span className={styles.stageBar} />
-                            </div>
                             <div className={`${styles.stageLabel} caption mono`}>
                               {item.stage_label}
                             </div>
@@ -196,7 +166,7 @@ export function InboxTimeline({ items }: InboxTimelineProps) {
                             className={`${styles.reviewBtn} btn btn-primary btn-sm`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              // TODO [BACKLOG: caixa-aprovacao.md]: open doc from timeline
+                              onOpenDocument?.(item);
                             }}
                           >
                             Revisar →
