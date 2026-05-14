@@ -39,6 +39,30 @@ A common failure mode is treating wiki truth as if it proves runtime truth. It d
 - `Wiki Sync Gate` - no silent omissions; every affected module must be updated or explicitly skipped with a reason.
 - `Prerequisite Exit Gate` - after a prerequisite repair, rerun the failed checkpoint and update workflow guidance if the incident exposed a gap.
 
+## Skills we use
+
+These are the core MetalDocs skills. Pick the smallest set that matches the task.
+
+- `metaldocs-backend-api` - use for backend HTTP routes, OpenAPI, codegen, handler wiring, route migrations, and public API contract work.
+- `metaldocs-frontend` - use for frontend implementation under `frontend/apps/web/`.
+- `metaldocs-tanstack-query` - use when frontend work touches API wrappers, query hooks, generated frontend API types, cache invalidation, or server-state behavior.
+- `metaldocs-screen-implementation` - use on top of frontend workflow for designed screens under `frontend/apps/web/design-source/`.
+- `metaldocs-module-doc` - use for full module wiki creation, maturity promotion, or rebuilds.
+- `metaldocs-module-doc-sync` - use after implementation to sync affected module docs from a concrete change context.
+- `runtime-contract-prereq` - use when startup, auth, route truth, migrations, or runtime/spec/generated/frontend-wrapper alignment is unreliable and feature work must stop.
+
+If a task spans multiple boundaries, compose the skills rather than forcing one skill to do everything.
+
+## How to choose a workflow
+
+- If the task changes public HTTP behavior, start with `metaldocs-backend-api`.
+- If the task changes frontend screens or components, start with `metaldocs-frontend`.
+- If the frontend task also touches API calls or query state, add `metaldocs-tanstack-query`.
+- If the task is a designed screen from `design-source/`, add `metaldocs-screen-implementation` and pass the Screen Gate first.
+- If implementation exposed startup or contract drift, stop feature work and switch to `runtime-contract-prereq`.
+- If the code change touched an already documented module, finish with `metaldocs-module-doc-sync`.
+- If the module wiki is missing, stale beyond repair, or needs full structure, use `metaldocs-module-doc` instead of sync.
+
 ## How to start work safely
 
 1. Read the relevant wiki docs and the required skill guidance for the area you are touching.
@@ -49,6 +73,37 @@ A common failure mode is treating wiki truth as if it proves runtime truth. It d
 
 Example: a stale binary can make route evidence lie. If an old `metaldocs-api.exe` still answers on `:8081`, you might think a route rename failed or a handler still exists. In reality, you may just be looking at yesterday's binary. Under the operating system, that is a `runtime prerequisite`: restart from the canonical script, rebuild or prove freshness, then re-check the route.
 
+## Workflow recipes
+
+Use these as defaults.
+
+- Backend/API change:
+  1. Read the module wiki and API architecture docs.
+  2. Use `metaldocs-backend-api`.
+  3. Compare runtime, OpenAPI, and generated surfaces before editing.
+  4. Implement and verify.
+  5. Run `metaldocs-module-doc-sync` if the module is already documented.
+
+- Frontend screen change:
+  1. Use `metaldocs-frontend`.
+  2. If the screen comes from `design-source/`, add `metaldocs-screen-implementation`.
+  3. Pass the Startup Gate and Screen Gate before page assembly.
+  4. If API/query state changes are involved, add `metaldocs-tanstack-query`.
+  5. Stop and classify if runtime or contract drift appears.
+
+- Runtime or contract drift:
+  1. Stop the feature task.
+  2. Use `runtime-contract-prereq`.
+  3. Classify the issue.
+  4. Repair only the failing boundary.
+  5. Rerun the failed checkpoint before returning to feature work.
+
+- Wiki maintenance after implementation:
+  1. Name the exact change context.
+  2. Use `metaldocs-module-doc-sync`.
+  3. Update every affected module or explicitly report why not.
+  4. Escalate to `metaldocs-module-doc` if the module needs a rebuild, not a sync.
+
 ## How to know when to stop
 
 Keep going only when the mismatch is local to the current task boundary. Stop when the mismatch changes shared runtime or contract behavior.
@@ -56,6 +111,22 @@ Keep going only when the mismatch is local to the current task boundary. Stop wh
 Example: runtime route exists but the frontend wrapper and generated types still reflect an older contract. Even if the backend endpoint responds, this is not a screen-local fix. The runtime/spec/frontend mismatch is a `shared contract prerequisite` because other callers could be wrong too. Stop the screen task, repair the shared contract surfaces, then resume feature work.
 
 Example: during a screen task, you discover the backend endpoint the design expects does not exist at all. Do not stub around it and pretend the screen is done. Classify it as a prerequisite or `defer`, capture the missing backend work, and stop the screen implementation unless the assignment explicitly includes that backend slice.
+
+## How skills chain together
+
+The normal sequence is:
+
+1. choose the task skill
+2. pass the relevant gate
+3. implement inside the correct boundary
+4. verify with scripts and tests
+5. sync the wiki if code truth changed
+
+Typical chains:
+
+- backend route change -> `metaldocs-backend-api` -> verification -> `metaldocs-module-doc-sync`
+- designed screen -> `metaldocs-frontend` + `metaldocs-screen-implementation` + `metaldocs-tanstack-query` when needed -> verification
+- blocked screen or API work -> `runtime-contract-prereq` -> exit gate -> return to original task
 
 ## How wiki sync works now
 

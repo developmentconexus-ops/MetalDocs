@@ -26,6 +26,20 @@ For full module documentation, maturity promotion, deep module mapping, or rebui
 
 After implementation work touches an already documented module, use `metaldocs-module-doc-sync` at `.agents/skills/metaldocs-module-doc-sync/SKILL.md` to update module docs, tech-debt, backlog, route truth, artifacts, and sync logs from the concrete change context.
 
+## Core Skill Map
+
+Use the smallest skill set that matches the task boundary:
+
+- backend route / OpenAPI / codegen / handler work -> `metaldocs-backend-api`
+- frontend implementation under `frontend/apps/web/` -> `metaldocs-frontend`
+- frontend API wrappers / query hooks / generated frontend API types -> `metaldocs-tanstack-query`
+- designed screen from `frontend/apps/web/design-source/` -> `metaldocs-frontend` + `metaldocs-screen-implementation`
+- full module wiki build or maturity promotion -> `metaldocs-module-doc`
+- post-implementation wiki update for documented modules -> `metaldocs-module-doc-sync`
+- startup / auth / route / runtime-spec-generated-wrapper drift -> `runtime-contract-prereq`
+
+If a task crosses boundaries, compose the skills. Do not force one skill to absorb unrelated prerequisite work.
+
 ## MetalDocs AI Operating System
 
 Use the MetalDocs operating model for all non-trivial work.
@@ -54,6 +68,16 @@ Default mismatch rule:
 
 Critical contradiction stop rule:
 Stop when contradictions affect route ownership/prefix, plan or prerequisite status, startup instructions, module ownership, API contract expectations, or verification expectations.
+
+Default workflow order:
+1. Choose the task skill.
+2. Read the required wiki/architecture docs for that boundary.
+3. Pass the relevant gate before implementation.
+4. Implement only inside the current boundary.
+5. Verify with scripts/tests.
+6. Sync module wiki memory if code truth changed.
+
+Escalate to `runtime-contract-prereq` when startup truth, auth/session truth, target route truth, or runtime/spec/generated/frontend-wrapper alignment is not trustworthy enough to continue local feature work.
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
