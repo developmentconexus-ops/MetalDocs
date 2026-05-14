@@ -2,8 +2,8 @@ import { Icon } from '../../../components/ui/Icon';
 import styles from './InboxToolbar.module.css';
 
 type Props = {
-  view: string;
-  onViewChange: (v: string) => void;
+  view: 'stack' | 'timeline';
+  onViewChange: (v: 'stack' | 'timeline') => void;
 };
 
 const StackIcon = () => (
