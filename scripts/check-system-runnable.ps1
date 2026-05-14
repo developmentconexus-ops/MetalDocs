@@ -15,6 +15,18 @@ $meRoute = '/api/v1/auth/me'
 $loginIdentifier = 'admin'
 $loginPassword = 'AdminMetalDocs123!'
 
+function Resolve-TargetRoute {
+    param(
+        [string]$Route
+    )
+
+    switch ($Route) {
+        '/api/v1/approvals' { return '/api/v1/approval/inbox' }
+        '/api/v1/approvals/inbox' { return '/api/v1/approval/inbox' }
+        default { return $Route }
+    }
+}
+
 function Fail-Checkpoint {
     param(
         [string]$Name,
@@ -165,12 +177,23 @@ try {
     }
     Pass-Checkpoint -Name 'auth-me' -Message "GET $meRoute returned HTTP $([int]$meResponse.StatusCode)"
 
-    $targetResponse = Invoke-CheckedRequest -Client $client -Method Get -Route $TargetRoute
+    $resolvedTargetRoute = Resolve-TargetRoute -Route $TargetRoute
+    $targetResponse = Invoke-CheckedRequest -Client $client -Method Get -Route $resolvedTargetRoute
     if (-not $targetResponse.IsSuccessStatusCode) {
         $targetBody = $targetResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-        Fail-Checkpoint -Name 'target-route' -Message "GET $TargetRoute returned HTTP $([int]$targetResponse.StatusCode); body=$targetBody"
+        $routeLabel = if ($resolvedTargetRoute -eq $TargetRoute) {
+            $TargetRoute
+        } else {
+            "$TargetRoute normalized to $resolvedTargetRoute"
+        }
+        Fail-Checkpoint -Name 'target-route' -Message "GET $routeLabel returned HTTP $([int]$targetResponse.StatusCode); body=$targetBody"
     }
-    Pass-Checkpoint -Name 'target-route' -Message "GET $TargetRoute returned HTTP $([int]$targetResponse.StatusCode)"
+    $routeLabel = if ($resolvedTargetRoute -eq $TargetRoute) {
+        $TargetRoute
+    } else {
+        "$TargetRoute normalized to $resolvedTargetRoute"
+    }
+    Pass-Checkpoint -Name 'target-route' -Message "GET $routeLabel returned HTTP $([int]$targetResponse.StatusCode)"
 }
 catch {
     if ($_.Exception.Message -ne 'checkpoint failure') {
