@@ -21,6 +21,8 @@ Each phase produces an artifact under `design-source/<slug>/artifacts/`. Missing
 
 Load `metaldocs-frontend` first. It owns feature-sliced layout, OpenAPI codegen, CSS Modules + tokens, no `HashRouter`, and no legacy paths. If the screen wires real API calls, query hooks, query keys, invalidation, optimistic updates, polling, prefetching, or freshness policy, also load `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
 
+If the screen contains mock-era widgets, deferred backlog items, missing capability questions, legacy API wrappers, or any uncertainty about whether the design maps to real product behavior, run `metaldocs-screen-integration-audit` before this skill. Do not use this implementation workflow to decide whether unsupported features should be invented, deferred, or split into prerequisite work.
+
 ## Phase -1: Runnable Checkpoint
 
 Artifact: `design-source/<slug>/artifacts/phase-1-runnable.md`
@@ -96,7 +98,7 @@ Every UI element maps to (state/role/persona/data) → Keep/Cut/Defer. Show cut 
 1.3 component tree.
 1.4 status/enum SSOT (`features/<domain>/lib/<x>Meta.ts`).
 1.5 state design (server=TanStack via `metaldocs-tanstack-query`, persisted=lazy initializer, debounced=`useDebouncedValue`).
-1.6 backend contract (existing vs needed; needed→mock + `wiki/backlog/<screen>.md` row).
+1.6 backend contract from `metaldocs-screen-integration-audit` when real integration is involved. Implement only items classified as implementable or screen-local. Shared prerequisites, missing backend capabilities, and deferred items stay out of the screen PR.
 1.7 **tier classification.**
 1.8 user checkpoint.
 

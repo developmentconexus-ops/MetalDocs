@@ -14,6 +14,8 @@ For ANY work under `frontend/apps/web/`, use the `metaldocs-frontend` skill at `
 
 For designed screens under `frontend/apps/web/design-source/`, also use `metaldocs-screen-implementation` at `.agents/skills/metaldocs-screen-implementation/SKILL.md`.
 
+Before real screen finalization, use `metaldocs-screen-integration-audit` at `.agents/skills/metaldocs-screen-integration-audit/SKILL.md` when the screen/backlog may include mock-era widgets, missing backend capability, legacy API wrappers, deferred items, or uncertainty about what can be wired to real product behavior.
+
 ## Frontend API / TanStack Query
 
 For ANY work on MetalDocs frontend API calls, TanStack Query hooks, query keys, cache invalidation, optimistic updates, generated frontend API types, or server-state performance under `frontend/apps/web/src/`, use the `metaldocs-tanstack-query` skill at `.agents/skills/metaldocs-tanstack-query/SKILL.md`.
@@ -33,7 +35,7 @@ Use the smallest skill set that matches the task boundary:
 - backend route / OpenAPI / codegen / handler work -> `metaldocs-backend-api`
 - frontend implementation under `frontend/apps/web/` -> `metaldocs-frontend`
 - frontend API wrappers / query hooks / generated frontend API types -> `metaldocs-tanstack-query`
-- designed screen from `frontend/apps/web/design-source/` -> `metaldocs-frontend` + `metaldocs-screen-implementation`
+- designed screen from `frontend/apps/web/design-source/` -> `metaldocs-frontend` + `metaldocs-screen-integration-audit` when real capability mapping is needed + `metaldocs-screen-implementation`
 - full module wiki build or maturity promotion -> `metaldocs-module-doc`
 - post-implementation wiki update for documented modules -> `metaldocs-module-doc-sync`
 - startup / auth / route / runtime-spec-generated-wrapper drift -> `runtime-contract-prereq`

@@ -31,6 +31,8 @@ For frontend API calls, TanStack Query hooks, query keys, cache invalidation, op
 
 Designed screens land in `frontend/apps/web/design-source/<slug>/` (HTML + screenshot + NOTES.md). For any task that says "implement screen X" or references a `design-source/<slug>/` directory, ALSO use the **`metaldocs-screen-implementation`** skill (`.claude/skills/metaldocs-screen-implementation/SKILL.md`) on top of `metaldocs-frontend`. It drives a 6-phase workflow (Audit → Map → Pre-flight → Page assembly → Verify → Document) with hard gates that captures lessons from the Library screen rollout.
 
+Before real screen finalization, use **`metaldocs-screen-integration-audit`** (`.claude/skills/metaldocs-screen-integration-audit/SKILL.md`) when the screen/backlog may include mock-era widgets, missing backend capability, legacy API wrappers, deferred items, or uncertainty about what maps to real product behavior. It classifies what can be implemented now and what must become prerequisite or deferred work.
+
 ## Backend/API
 
 For ANY work on MetalDocs backend HTTP routes, OpenAPI, oapi-codegen, handler wiring, API contracts, route migrations, or generated frontend API types, use the **`metaldocs-backend-api`** skill (`.claude/skills/metaldocs-backend-api/SKILL.md`). It enforces the canonical backend/API structure defined in `wiki/architecture/backend-api-structure.md` and the behavior contracts in `wiki/architecture/api-contract.md` and `wiki/architecture/api-design-system.md`.
@@ -46,7 +48,7 @@ Workflow selection quick map:
 - backend/API boundary -> `metaldocs-backend-api`
 - frontend boundary -> `metaldocs-frontend`
 - frontend API/query boundary -> `metaldocs-tanstack-query`
-- designed screen boundary -> `metaldocs-frontend` + `metaldocs-screen-implementation`
+- designed screen boundary -> `metaldocs-frontend` + `metaldocs-screen-integration-audit` when real capability mapping is needed + `metaldocs-screen-implementation`
 - module wiki rebuild -> `metaldocs-module-doc`
 - module wiki sync after implementation -> `metaldocs-module-doc-sync`
 - runtime/auth/route/contract drift -> `runtime-contract-prereq`
