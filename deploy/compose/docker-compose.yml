@@ -11,7 +11,6 @@ services:
       - "${POSTGRES_HOST_PORT}:5432"
     volumes:
       - metaldocs_postgres_data:/var/lib/postgresql/data
-      - ../../migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
