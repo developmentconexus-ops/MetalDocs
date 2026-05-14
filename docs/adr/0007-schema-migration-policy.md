@@ -21,3 +21,9 @@ MetalDocs temporarily operates a dual-path migration model:
 - canonical baseline bootstrap for fresh local environments
 
 This preserves additive-first upgrade safety while reducing bootstrap cost for new local installs.
+
+## Operational note (curated baseline)
+
+Fresh environments use a curated current-state baseline plus product reference data and optional dev seeds. Historical migrations remain available for legacy replay/debugging until an explicit archive decision is approved.
+
+The canonical operational policy is `wiki/database/migration-policy.md`.
