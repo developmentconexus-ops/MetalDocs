@@ -140,7 +140,7 @@ func main() {
 	if deps.SQLDB != nil && !strings.EqualFold(strings.TrimSpace(os.Getenv("METALDOCS_SKIP_STARTUP_MIGRATIONS")), "true") {
 		migrationsDir := strings.TrimSpace(os.Getenv("METALDOCS_MIGRATIONS_DIR"))
 		if migrationsDir == "" {
-			migrationsDir = "migrations"
+			migrationsDir = "db/migrations"
 		}
 		if err := migrate.Apply(ctx, deps.SQLDB, migrationsDir, slog.Default()); err != nil {
 			log.Fatalf("apply startup migrations: %v", err)
