@@ -15,6 +15,7 @@
 - Use `runtime-contract-prereq` for the whole effort because DB bootstrap and startup truth are unreliable.
 - Use `superpowers:subagent-driven-development` if executing this plan with subagents.
 - Use `superpowers:verification-before-completion` before claiming the migration/bootstrap work is complete.
+- Use `skill-creator` before creating or updating `.claude/skills/metaldocs-database/SKILL.md` or `.agents/skills/metaldocs-database/SKILL.md`.
 - Do not continue feature work while the DB prerequisite remains failing.
 - Do not patch historical migrations just to get startup passing unless a task explicitly says to preserve the legacy replay path.
 - Do not create fake runtime data or mocked backend behavior.
@@ -1640,13 +1641,30 @@ Expected: commit succeeds.
 
 ## Phase 6: Governance and Skill Updates
 
-### Task 23: Add Canonical Database Skill
+### Task 23: Add Canonical Database Skill With `skill-creator`
 
 **Files:**
 - Create: `.claude/skills/metaldocs-database/SKILL.md`
 - Create: `.agents/skills/metaldocs-database/SKILL.md`
 
-- [ ] **Step 1: Create canonical Claude skill**
+- [ ] **Step 1: Invoke and follow `skill-creator`**
+
+Before writing either skill file, invoke the `skill-creator` skill and follow its workflow for creating/updating effective skills.
+
+Required `skill-creator` conclusions for this task:
+
+```text
+Skill name: metaldocs-database
+Skill purpose: guide MetalDocs database migration, bootstrap, curated baseline, reference data, dev seed, schema ownership, database dictionary, schema_migrations, extension, grants, triggers, functions, and runtime DB startup drift work.
+Canonical skill location: .claude/skills/metaldocs-database/SKILL.md
+Codex bridge location: .agents/skills/metaldocs-database/SKILL.md
+Resources: no extra references/assets/scripts in the skill folder for the first version; link to wiki/database and existing runbooks instead.
+Style: concise frontmatter and body; detailed rules live in wiki/database to avoid duplication.
+```
+
+If the skill creation helper scripts are available in the active environment, use them to initialize the skill folder. If they are not available for repo-local `.claude`/`.agents` skill paths, create the two `SKILL.md` files manually using the `skill-creator` anatomy and validation rules.
+
+- [ ] **Step 2: Create canonical Claude skill**
 
 Create `.claude/skills/metaldocs-database/SKILL.md`:
 
@@ -1703,7 +1721,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnabl
 ```
 ````
 
-- [ ] **Step 2: Create Codex bridge skill**
+- [ ] **Step 3: Create Codex bridge skill**
 
 Create `.agents/skills/metaldocs-database/SKILL.md`:
 
@@ -1722,7 +1740,30 @@ This bridge exists so Codex sessions can discover the canonical database workflo
 Stop if canonical guidance is missing or conflicts with `wiki/database/`.
 ```
 
-- [ ] **Step 3: Commit database skill**
+- [ ] **Step 4: Validate skill files**
+
+Run these checks:
+
+```powershell
+Test-Path .claude/skills/metaldocs-database/SKILL.md
+Test-Path .agents/skills/metaldocs-database/SKILL.md
+Select-String -Path .claude/skills/metaldocs-database/SKILL.md -Pattern "^name: metaldocs-database$"
+Select-String -Path .claude/skills/metaldocs-database/SKILL.md -Pattern "^description: Use for any MetalDocs database work"
+Select-String -Path .agents/skills/metaldocs-database/SKILL.md -Pattern "Read and follow `.claude/skills/metaldocs-database/SKILL.md`"
+```
+
+Expected: both files exist and all `Select-String` commands return one matching line.
+
+If the `skill-creator` validation script is available, also run:
+
+```powershell
+python C:\Users\leandro.theodoro.MN-NTB-LEANDROT\.codex\skills\.system\skill-creator\scripts\quick_validate.py .claude/skills/metaldocs-database
+python C:\Users\leandro.theodoro.MN-NTB-LEANDROT\.codex\skills\.system\skill-creator\scripts\quick_validate.py .agents/skills/metaldocs-database
+```
+
+Expected: validation passes. If those script paths do not exist, record that validation was limited to the explicit file/frontmatter checks above.
+
+- [ ] **Step 5: Commit database skill**
 
 Run:
 
