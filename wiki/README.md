@@ -1,12 +1,12 @@
 # MetalDocs Wiki
 
 > **Last verified:** 2026-05-11 (roadmap index added)
-> **Purpose:** Single source of truth for codebase knowledge. Read this first — drill into folders only after.
+> **Purpose:** Governed index for codebase knowledge. Read this first — drill into folders only after.
 
 ## How to use this wiki
 
 - **Humans:** Browse by folder.
-- **AI agents:** Read this index, then `Glob wiki/**/*.md` to discover. Each doc has `Last verified:` + `Key files:` block at the top - use those file:line anchors instead of re-grepping.
+- **AI agents:** Read this index, then `Glob wiki/**/*.md` to discover. Prefer docs with `Last verified:` and `Key files:` blocks when they exist, and fall back to direct code verification when they do not.
 - **Drift policy:** When changing code referenced by a doc, update the doc's `Last verified` stamp. Stale stamps = trust nothing in that doc until verified.
 
 ---
@@ -128,6 +128,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [references/environment-setup.md](references/environment-setup.md) - local dev: compose, migrations, seed (stub, Last verified: 2026-05-01)
 - [references/how-to-run-tests.md](references/how-to-run-tests.md) - Go tests, frontend vitest, e2e playwright (stub, Last verified: 2026-05-01)
 - [references/local-dev-startup.md](references/local-dev-startup.md) - **START HERE** - PS script, port, credentials, common mistakes
+- [references/ai-operating-system.md](references/ai-operating-system.md) - how to work inside the MetalDocs AI operating system: truth layers, gates, classifications, and stop rules.
 - [references/local-dev-credentials.md](references/local-dev-credentials.md) - admin login details, DB access
 - [references/oapi-codegen.md](references/oapi-codegen.md) - how to regenerate, vendor-mode `GOFLAGS=-mod=mod` requirement, add a new module, include-tags filter (Last verified: 2026-05-08)
 
@@ -140,7 +141,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 
 **Filename:** kebab-case, descriptive. ADRs prefix with 4-digit number.
 
-**File header (every doc):**
+**Preferred file header (for mature docs):**
 ```markdown
 # Title
 

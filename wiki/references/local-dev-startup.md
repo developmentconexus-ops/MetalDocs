@@ -1,6 +1,6 @@
 # Local Dev Startup
 
-**Last verified:** 2026-04-27
+**Last verified:** 2026-05-13
 
 ## TL;DR
 
@@ -12,7 +12,7 @@
 Frontend (separate terminal):
 ```bash
 cd frontend/apps/web && pnpm dev
-# → http://localhost:4174
+# → http://localhost:4173
 ```
 
 ---
@@ -31,20 +31,50 @@ PowerShell string assignment is literal — `<>` is safe.
 
 1. Loads all vars from `.env` (split on first `=` — safe for `<>`)
 2. Forces `APP_PORT=8081` (binary defaults to 8080 if this var is missing)
-3. Kills any existing process on `:8081`
-4. Builds `metaldocs-api.exe` if binary is missing
-5. Starts the binary
+3. Rebuilds on `-Build`, or auto-rebuilds when timestamp checks show a stale API or worker binary
+4. Replaces the current workspace API on `:8081` only when ownership is proven; otherwise fails loudly on an occupied port
+5. Starts the API after timestamp-based freshness checks
+6. Starts the worker too unless `-NoWorker` is passed
 
 Pass `-Build` to force rebuild:
 ```powershell
 .\scripts\start-api.ps1 -Build
 ```
 
+## Script-truth policy
+
+Local startup follows `script-truth` policy:
+
+- startup scripts are authoritative
+- ad hoc startup commands are not authoritative
+- stale binaries are not trusted
+- if startup evidence conflicts with the script or current source, trust the script and rerun from there
+
+If you see a route, auth, or startup result that does not match current code expectations, assume the first suspect is stale runtime truth until the canonical script rebuilds or proves freshness.
+
+## Runnable preflight before screen work
+
+Runnable preflight is required before screen work. Do not start a screen task just because the frontend renders.
+
+Run the API from the canonical script, then run the runnable preflight:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check-system-runnable.ps1 -TargetRoute /api/v1/templates
+```
+
+This checkpoint verifies:
+
+1. login succeeds from the current runtime
+2. session validation works after login
+3. the target route responds from the same runtime boundary
+
+If any checkpoint fails, classify it as a prerequisite first. Do not absorb startup, auth, or shared contract repair silently into a screen implementation task.
+
 ---
 
 ## docgen-v2 (token substitution service)
 
-Required for document approval to produce frozen DOCX artifacts. Without it, approval succeeds but no DOCX is written to MinIO.
+Required for document approval flows that fan out to DOCX/PDF generation. If `METALDOCS_FANOUT_URL` is unset, approval can complete locally with freeze skipped. If fanout is configured but docgen-v2 is unavailable, approval can fail during fanout.
 
 **Setup (first time):**
 ```powershell
@@ -107,7 +137,7 @@ Port: `5433` (host) → `5432` (container). DB: `metaldocs`. Schema split:
 
 ## Worker (PDF generation)
 
-Required for PDF generation after document approval. Polls `messaging_outbox` every 10s, calls docgen-v2 `/convert/pdf`, writes `final_pdf_s3_key` to DB.
+Required for PDF generation after document approval. Polls `messaging_outbox` using the configured worker interval, calls docgen-v2 `/convert/pdf`, and writes `final_pdf_s3_key` to DB.
 
 **Start (separate terminal, after API + docgen-v2 are up):**
 ```powershell
@@ -115,13 +145,13 @@ Required for PDF generation after document approval. Polls `messaging_outbox` ev
 .\scripts\start-worker.ps1 -Build # rebuild binary first
 ```
 
-**Verify running:** worker logs `MetalDocs Worker running (poll_interval_s=2 ...)` on start, then `worker_batch result=completed ...` every 2s.
+**Verify running:** startup logs `MetalDocs Worker running (poll_interval_s=...)` on boot. The exact value comes from `METALDOCS_WORKER_POLL_INTERVAL_SECONDS` in `.env`, and ongoing `worker_batch result=completed ...` logs follow that configured interval.
 
 **Env vars required (already in `.env`):**
 - `METALDOCS_DOCGEN_V2_URL=http://localhost:3001`
 - `METALDOCS_DOCGEN_V2_SERVICE_TOKEN=dev-local-service-token-32chars!!`
 
-**If PDF not generated after signoff:** check worker log for `event_type=docgen_v2_pdf result=published`. If missing, event may not have been dispatched — check `METALDOCS_FANOUT_URL` is set (required for pdfDispatchAdapter to be wired).
+**If PDF not generated after signoff:** check worker log for `event_type=docgen_v2_pdf result=published`. If missing, first confirm whether `METALDOCS_FANOUT_URL` is configured at all; when it is unset, freeze is skipped. If it is configured, inspect worker/docgen-v2 connectivity because fanout failures can block approval.
 
 ---
 
@@ -131,6 +161,6 @@ Required for PDF generation after document approval. Polls `messaging_outbox` ev
 |---|---|---|
 | Used bash to source .env | `pq: password authentication failed` | Use PS script |
 | Missing `APP_PORT` | API starts on :8080 not :8081 | Script sets it explicitly |
-| Old process on :8081 | `bind: only one usage...` | Script kills it automatically |
+| Occupied :8081 by another process | startup script fails before boot | Free the port or stop the conflicting process intentionally |
 | Wrong login body field | `AUTH_INVALID_CREDENTIALS` | Use `identifier`, not `username` |
 | Bootstrap skipped | Can't create admin | Truncate iam_user_roles + restart |
