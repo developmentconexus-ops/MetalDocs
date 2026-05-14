@@ -2,10 +2,19 @@
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  white-space: nowrap;
+}
+
+.bar::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--sp-1);
   padding: var(--sp-2) var(--sp-4);

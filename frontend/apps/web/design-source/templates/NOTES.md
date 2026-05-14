@@ -49,3 +49,24 @@ Todos · Publicados · Rascunhos · Arquivados (counts from API response)
 - Two backend/API gaps remain for design parity: real `updated_at` and author display name instead of raw `created_by`.
 - The feature still contains a legacy parallel API layer in `api/templates.ts`; keep Plan 12.1 on `templatesV2.ts` and only clean legacy paths if the touched screen flow still depends on them.
 - Frontend route wiring needs attention before trusting the screen boundary: `routes.tsx` currently declares duplicate `"templates"` entries.
+
+## Plan 12.1 implementation sync (2026-05-13)
+
+Implemented now (screen-local):
+- `templatesV2.listTemplates()` hardened for list envelope/meta tolerance on the real `/api/v1/templates` path
+- tab counts behavior preserved on fetched data with explicit per-status counting
+- card shell fallback values hardened for missing list fields
+- mobile tab clipping fixed via horizontal tab scrolling on narrow widths
+
+Verified unchanged:
+- `/templates` route ownership in frontend is already single-source in `features/templates/routes.tsx`
+- list -> wizard handoff remains `/templates/new`
+
+Still prerequisite:
+- true `updated_at` semantics from backend/API
+- author display name (instead of raw `created_by`)
+
+Still deferred:
+- card description text
+- bound profile pills
+- extra `em revisao` tab semantics beyond the current 4-tab behavior

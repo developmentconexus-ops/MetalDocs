@@ -92,6 +92,19 @@ async function apiJson<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const n = Number(value);
+    if (Number.isFinite(n)) {
+      return n;
+    }
+  }
+  return null;
+}
+
 export async function createTemplate(cmd: {
   key: string;
   name: string;
@@ -123,14 +136,24 @@ export async function listTemplates(params?: {
 
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const body = await apiFetch<{
-    data: { templates: TemplateDTO[] };
-    meta: { limit: number; offset: number };
+    data?: { templates?: unknown; items?: unknown };
+    meta?: { limit?: unknown; offset?: unknown };
   }>(`/api/v1/templates${suffix}`);
 
-  return {
-    templates: body.data.templates,
-    meta: body.meta,
-  };
+  const dataTemplates = body?.data?.templates;
+  const dataItems = body?.data?.items;
+  const templates = Array.isArray(dataTemplates)
+    ? (dataTemplates as TemplateDTO[])
+    : Array.isArray(dataItems)
+      ? (dataItems as TemplateDTO[])
+      : [];
+
+  const defaultLimit = params?.limit ?? 50;
+  const defaultOffset = params?.offset ?? 0;
+  const limit = toFiniteNumber(body?.meta?.limit) ?? defaultLimit;
+  const offset = toFiniteNumber(body?.meta?.offset) ?? defaultOffset;
+
+  return { templates, meta: { limit, offset } };
 }
 
 export async function getTemplate(id: string): Promise<{ template: TemplateDTO; latest_version: VersionDTO }> {
