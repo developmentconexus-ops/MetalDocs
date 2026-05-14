@@ -7,8 +7,8 @@
 
 - [ ] `TemplateDTO` missing `updated_at` field — `formatRelative` currently falls back to `created_at`. Add field in backend and update `TemplatesListPage.tsx:43`.
 - [ ] Resolve `created_by` user_id → display name. Currently shows raw UUID passed as `author` to `TemplateCard`. Requires a user lookup (batch or eager join in API response).
-- [ ] Card grid gap: design specifies 14px; token `var(--sp-6)` resolves to 24px (no 14px token exists). Minor delta accepted; snap to 16px token if one is introduced.
-- [ ] Mobile tab clipping at 375px: "Arquivados" tab may render off-screen on narrow viewports. `TabBar` has no horizontal scroll today — consider `overflow-x: auto` + `scrollbar-width: none` on `.bar`.
+- [x] Card grid gap aligned to tokenized 16px (`var(--sp-4)`) for list cards (pre-existing in code; re-verified in Plan 12.1 on 2026-05-13).
+- [x] Mobile tab clipping at 375px fixed via horizontal scroll support on `TabBar` (`overflow-x: auto` + hidden scrollbar) (2026-05-13).
 - [ ] `formatRelative` helper inlined in `TemplatesListPage.tsx:17` — promote to `lib/utils/formatRelative.ts` when a second caller appears.
 
 ## Integration Audit — 2026-05-13
@@ -59,3 +59,21 @@ Verification needed next:
 - rerun `scripts/check-system-runnable.ps1 -TargetRoute /api/v1/templates` before implementation if startup/auth drift reappears
 - inspect the real `GET /api/v1/templates` payload while implementing to confirm whether `meta.limit/offset` and list envelope still match `templatesV2.listTemplates()`
 - keep implementation on the `templatesV2.ts` path; treat legacy `api/templates.ts` as separate cleanup unless the touched screen path still depends on it
+
+## Plan 12.1 implementation update — 2026-05-13
+
+Completed in this PR (screen-local):
+- templates list path hardening on `templatesV2.listTemplates()` for envelope/meta tolerance
+- status tabs/counts behavior kept on real list data with deterministic status counting
+- card shell consistency hardened for empty/missing name and author values
+- mobile tab clipping fix in `TabBar.module.css`
+- list -> wizard handoff verified unchanged (`/templates/new` route wiring remains correct)
+
+Still prerequisite (not implemented in this PR):
+- backend/API `updated_at` semantics for true last-updated display
+- backend/API author display name instead of raw `created_by`
+
+Still deferred (not implemented in this PR):
+- card description text
+- bound profile pills
+- any `em revisao` tab semantics beyond the current 4-tab behavior

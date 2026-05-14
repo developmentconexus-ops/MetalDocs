@@ -13,6 +13,7 @@ export type TemplatesListPageProps = {
 };
 
 type TabKey = "all" | "published" | "draft" | "archived";
+type TemplateStatus = "published" | "draft" | "archived";
 
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -26,29 +27,49 @@ function formatRelative(iso: string): string {
   return `${years} ${years === 1 ? "ano" : "anos"} atrás`;
 }
 
+function isValidIsoDate(value: string): boolean {
+  return Number.isFinite(Date.parse(value));
+}
+
 export function TemplatesListPage(props: TemplatesListPageProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const { data, isLoading, isError, error } = useTemplatesQuery();
 
-  const templates = (data?.templates ?? []).map((dto) => ({
-    id: dto.id,
-    title: dto.name,
-    version: `v${dto.latest_version}`,
-    status: (dto.archived_at
+  const templates = (data?.templates ?? []).map((dto) => {
+    const status: TemplateStatus = dto.archived_at
       ? "archived"
       : dto.published_version_id
-      ? "published"
-      : "draft") as "published" | "draft" | "archived",
-    author: dto.created_by,
-    updated: formatRelative(dto.created_at),
-    latestVersion: dto.latest_version,
-  }));
+        ? "published"
+        : "draft";
+    const maybeUpdatedAt = (dto as { updated_at?: unknown }).updated_at;
+    const updatedAt = typeof maybeUpdatedAt === "string" && isValidIsoDate(maybeUpdatedAt)
+      ? maybeUpdatedAt
+      : dto.created_at;
+
+    return {
+      id: dto.id,
+      title: dto.name || "Sem nome",
+      version: `v${dto.latest_version}`,
+      status,
+      author: dto.created_by || "Usuario",
+      updated: formatRelative(updatedAt),
+      latestVersion: dto.latest_version,
+    };
+  });
+
+  const counts = templates.reduce(
+    (acc, tpl) => {
+      acc[tpl.status] += 1;
+      return acc;
+    },
+    { published: 0, draft: 0, archived: 0 },
+  );
 
   const tabs: TabBarItem[] = [
     { key: "all", label: "Todos", count: templates.length },
-    { key: "published", label: "Publicados", count: templates.filter((t) => t.status === "published").length },
-    { key: "draft", label: "Rascunhos", count: templates.filter((t) => t.status === "draft").length },
-    { key: "archived", label: "Arquivados", count: templates.filter((t) => t.status === "archived").length },
+    { key: "published", label: "Publicados", count: counts.published },
+    { key: "draft", label: "Rascunhos", count: counts.draft },
+    { key: "archived", label: "Arquivados", count: counts.archived },
   ];
 
   const filtered = activeTab === "all" ? templates : templates.filter((t) => t.status === activeTab);
