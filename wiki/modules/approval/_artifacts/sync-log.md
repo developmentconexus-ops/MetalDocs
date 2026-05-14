@@ -2,6 +2,21 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-14 - Plan 12.2 caixa-aprovacao screen reality-first sync
+
+- **Context:** commits `a0a90f7e..3d9572cb` (design/spec, approvals screen implementation, review fixes, backlog/design notes sync)
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** none
+- **Routes/API:** none (frontend now uses existing approval routes; no backend route/contract delta)
+- **Runtime flows:** none
+- **Persistence:** none
+- **Dependencies:** none
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=4 Minor=6; missing-ADR=10
+- **Tally gate:** PASS
+- **Patched files:** wiki/modules/approval.md; wiki/modules/approval/_artifacts/sync-log.md
 ## 2026-05-13 - Plan 10 approval column rename + v1 route canonicalization
 
 - **Context:** uncommitted Plan 10 implementation diff (document_id rename migration 0194, constraints validation 0195, route prefix sweep)
@@ -17,3 +32,4 @@
 - **Counts after:** Critical=2 Major=4 Minor=6; missing-ADR=10
 - **Tally gate:** PASS
 - **Patched files:** wiki/modules/approval.md; wiki/modules/approval-tech-debt.md; wiki/backlog/approval-refactor.md; wiki/modules/approval/_artifacts/*
+
