@@ -2,6 +2,8 @@
 
 Use this runbook only when a full trusted historical replay is required.
 
+Legacy replay streams local `migrations/*.sql` files through `psql`. Docker Postgres no longer auto-runs this directory through `/docker-entrypoint-initdb.d`.
+
 ## Commands
 
 ```powershell
