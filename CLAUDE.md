@@ -39,6 +39,12 @@ For ANY work on MetalDocs backend HTTP routes, OpenAPI, oapi-codegen, handler wi
 
 Do not change public backend routes, generated `api.gen.go` wiring, or OpenAPI contract shape from memory. Build the route truth table first, compare runtime/spec/codegen/wiki, then implement from the canonical module pattern.
 
+## Database
+
+For ANY work on MetalDocs database migrations, bootstrap, curated baseline, reference data, dev seeds, schema ownership, Postgres extensions, grants, triggers, functions, `schema_migrations`, or database dictionary/wiki pages, use the **`metaldocs-database`** skill (`.claude/skills/metaldocs-database/SKILL.md`).
+
+The database wiki under `wiki/database/` is the source of truth for schema ownership, dictionary entries, migration policy, reference data, and bootstrap rules. Do not duplicate those rules here.
+
 ## Mandatory Gates
 
 Canonical design: `docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md`.
@@ -52,6 +58,7 @@ Workflow selection quick map:
 - module wiki rebuild -> `metaldocs-module-doc`
 - module wiki sync after implementation -> `metaldocs-module-doc-sync`
 - runtime/auth/route/contract drift -> `runtime-contract-prereq`
+- database migrations / bootstrap / curated baseline / seeds / dictionary -> `metaldocs-database`
 
 Before screen work:
 1. Fresh build truth
