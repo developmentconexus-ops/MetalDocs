@@ -15,6 +15,8 @@ Always load these together:
 2. `.claude/skills/metaldocs-screen-implementation/SKILL.md`
 3. `.agents/skills/metaldocs-tanstack-query/SKILL.md` if the screen wires server state, queries, mutations, generated API types, polling, prefetching, or invalidation
 
+Run `.agents/skills/metaldocs-screen-integration-audit/SKILL.md` first when the screen has mock-era widgets, deferred backlog items, missing capability questions, legacy API wrappers, or uncertainty about whether the visual design maps to real product behavior.
+
 Honor the Iron Law from the canonical screen skill: no phase progression without evidence artifacts, no self-graded visual parity, and the user is the only visual approver.
 
 Stop if the canonical `.claude/skills/metaldocs-screen-implementation/SKILL.md` file is missing.

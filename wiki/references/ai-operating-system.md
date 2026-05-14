@@ -46,6 +46,7 @@ These are the core MetalDocs skills. Pick the smallest set that matches the task
 - `metaldocs-backend-api` - use for backend HTTP routes, OpenAPI, codegen, handler wiring, route migrations, and public API contract work.
 - `metaldocs-frontend` - use for frontend implementation under `frontend/apps/web/`.
 - `metaldocs-tanstack-query` - use when frontend work touches API wrappers, query hooks, generated frontend API types, cache invalidation, or server-state behavior.
+- `metaldocs-screen-integration-audit` - use before real screen finalization when a visual/backlog may include mock-era widgets, missing backend capability, legacy API wrappers, or deferred behavior.
 - `metaldocs-screen-implementation` - use on top of frontend workflow for designed screens under `frontend/apps/web/design-source/`.
 - `metaldocs-module-doc` - use for full module wiki creation, maturity promotion, or rebuilds.
 - `metaldocs-module-doc-sync` - use after implementation to sync affected module docs from a concrete change context.
@@ -58,7 +59,7 @@ If a task spans multiple boundaries, compose the skills rather than forcing one 
 - If the task changes public HTTP behavior, start with `metaldocs-backend-api`.
 - If the task changes frontend screens or components, start with `metaldocs-frontend`.
 - If the frontend task also touches API calls or query state, add `metaldocs-tanstack-query`.
-- If the task is a designed screen from `design-source/`, add `metaldocs-screen-implementation` and pass the Screen Gate first.
+- If the task is a designed screen from `design-source/`, add `metaldocs-screen-integration-audit` when real capability mapping is needed, then add `metaldocs-screen-implementation` and pass the Screen Gate.
 - If implementation exposed startup or contract drift, stop feature work and switch to `runtime-contract-prereq`.
 - If the code change touched an already documented module, finish with `metaldocs-module-doc-sync`.
 - If the module wiki is missing, stale beyond repair, or needs full structure, use `metaldocs-module-doc` instead of sync.
@@ -86,10 +87,11 @@ Use these as defaults.
 
 - Frontend screen change:
   1. Use `metaldocs-frontend`.
-  2. If the screen comes from `design-source/`, add `metaldocs-screen-implementation`.
-  3. Pass the Startup Gate and Screen Gate before page assembly.
-  4. If API/query state changes are involved, add `metaldocs-tanstack-query`.
-  5. Stop and classify if runtime or contract drift appears.
+  2. If the screen has mock-era widgets, missing capability questions, legacy wrappers, or deferred backlog items, run `metaldocs-screen-integration-audit`.
+  3. If the screen comes from `design-source/`, add `metaldocs-screen-implementation`.
+  4. Pass the Startup Gate and Screen Gate before page assembly.
+  5. If API/query state changes are involved, add `metaldocs-tanstack-query`.
+  6. Stop and classify if runtime or contract drift appears.
 
 - Runtime or contract drift:
   1. Stop the feature task.
@@ -125,7 +127,7 @@ The normal sequence is:
 Typical chains:
 
 - backend route change -> `metaldocs-backend-api` -> verification -> `metaldocs-module-doc-sync`
-- designed screen -> `metaldocs-frontend` + `metaldocs-screen-implementation` + `metaldocs-tanstack-query` when needed -> verification
+- designed screen -> `metaldocs-frontend` + `metaldocs-screen-integration-audit` when needed + `metaldocs-screen-implementation` + `metaldocs-tanstack-query` when needed -> verification
 - blocked screen or API work -> `runtime-contract-prereq` -> exit gate -> return to original task
 
 ## How wiki sync works now
