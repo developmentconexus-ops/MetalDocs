@@ -1,7 +1,7 @@
 param(
   [string]$ComposeFile = "deploy/compose/docker-compose.yml",
   [string]$EnvFile = ".env",
-  [string]$BaselineFile = "migrations_baseline/0001_baseline_2026_05.sql"
+  [switch]$WithDevSeed
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,8 +25,20 @@ if ([string]::IsNullOrWhiteSpace($env:POSTGRES_USER) -or [string]::IsNullOrWhite
   throw "POSTGRES_USER and POSTGRES_DB are required in $EnvFile for baseline bootstrap."
 }
 
-if (-not (Test-Path $BaselineFile)) {
-  throw "Baseline file not found: $BaselineFile"
+function Invoke-DbSqlFile {
+  param([string]$Path)
+
+  if (-not (Test-Path $Path)) {
+    throw "SQL file not found: $Path"
+  }
+
+  Write-Host "[dev-bootstrap-baseline] Applying $Path"
+  Get-Content -Raw $Path | docker compose -f $ComposeFile --env-file $EnvFile exec -T postgres `
+    psql -v ON_ERROR_STOP=1 -U $env:POSTGRES_USER -d $env:POSTGRES_DB | Out-Host
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "[dev-bootstrap-baseline] SQL apply failed: $Path"
+  }
 }
 
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-db-reset.ps1 -ComposeFile $ComposeFile -EnvFile $EnvFile | Out-Host
@@ -53,47 +65,17 @@ if (-not $ready) {
   throw "[dev-bootstrap-baseline] Postgres did not become ready in time."
 }
 
-$migrationLedgerQuery = @"
-SELECT CASE
-  WHEN to_regclass('public.schema_migrations') IS NULL THEN -1
-  ELSE (SELECT COUNT(*) FROM public.schema_migrations)
-END;
-"@
+Invoke-DbSqlFile -Path "db/prerequisites/0001_extensions.sql"
+Invoke-DbSqlFile -Path "db/baseline/0001_current_schema.sql"
+Invoke-DbSqlFile -Path "db/reference-data/0001_product_reference_data.sql"
 
-$guardAttempts = 90
-for ($attempt = 1; $attempt -le $guardAttempts; $attempt++) {
-  try {
-    $appliedRaw = docker compose -f $ComposeFile --env-file $EnvFile exec -T postgres `
-      psql -U $env:POSTGRES_USER -d $env:POSTGRES_DB -tAc $migrationLedgerQuery 2>&1
-  } catch {
-    $appliedRaw = $null
-    $global:LASTEXITCODE = 1
-  }
-
-  if ($LASTEXITCODE -eq 0) {
-    $appliedCount = -1
-    [void][int]::TryParse(($appliedRaw | Out-String).Trim(), [ref]$appliedCount)
-    if ($appliedCount -gt 0) {
-      Write-Host "[dev-bootstrap-baseline] Detected $appliedCount row(s) in public.schema_migrations."
-      Write-Host "[dev-bootstrap-baseline] Container bootstrap already initialized schema; skipping baseline apply."
-      Write-Host "[dev-bootstrap-baseline] Done."
-      return
-    }
-    if ($appliedCount -eq 0 -or $appliedCount -eq -1) {
-      break
-    }
-  }
-
-  Start-Sleep -Seconds 2
+if ($WithDevSeed) {
+  Invoke-DbSqlFile -Path "db/dev-seeds/0001_local_dev_seed.sql"
 }
 
-Write-Host "[dev-bootstrap-baseline] Applying baseline from $BaselineFile ..."
-Get-Content -Raw $BaselineFile | docker compose -f $ComposeFile --env-file $EnvFile exec -T postgres `
-  psql -v ON_ERROR_STOP=1 -U $env:POSTGRES_USER -d $env:POSTGRES_DB | Out-Host
-
-if ($LASTEXITCODE -ne 0) {
-  throw "[dev-bootstrap-baseline] Baseline apply failed."
+$tailMigrations = Get-ChildItem -Path "db/migrations" -Filter *.sql | Sort-Object Name
+foreach ($migration in $tailMigrations) {
+  Invoke-DbSqlFile -Path $migration.FullName
 }
 
-Write-Host "[dev-bootstrap-baseline] Baseline applied."
-Write-Host "[dev-bootstrap-baseline] Applying tail migrations (if any) remains manual in this rollout."
+Write-Host "[dev-bootstrap-baseline] Curated baseline bootstrap completed."
