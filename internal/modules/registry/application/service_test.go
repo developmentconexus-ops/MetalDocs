@@ -27,6 +27,7 @@ func TestCreate_AutoCode(t *testing.T) {
 		Title:           "Welding Procedure",
 		OwnerUserID:     "owner-1",
 		ActorUserID:     "actor-1",
+		VisibilityScope: "restricted",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -40,6 +41,12 @@ func TestCreate_AutoCode(t *testing.T) {
 	}
 	if len(logger.events) != 0 {
 		t.Fatalf("expected zero governance events, got %+v", logger.events)
+	}
+	if cd.Visibility.Scope != registrydomain.VisibilityScopeRestricted {
+		t.Fatalf("visibility scope = %q, want restricted", cd.Visibility.Scope)
+	}
+	if len(cd.Visibility.AreaCodes) != 1 || cd.Visibility.AreaCodes[0] != "quality" {
+		t.Fatalf("area grants = %+v, want [quality]", cd.Visibility.AreaCodes)
 	}
 }
 
@@ -57,6 +64,7 @@ func TestCreate_ManualCode(t *testing.T) {
 		ActorUserID:      "actor-1",
 		ManualCode:       stringPtr("PO-LEG-47"),
 		ManualCodeReason: stringPtr("Legacy migration from spreadsheet"),
+		VisibilityScope:  "company",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -70,6 +78,9 @@ func TestCreate_ManualCode(t *testing.T) {
 	}
 	if len(logger.events) != 1 || logger.events[0].EventType != "numbering.override" {
 		t.Fatalf("expected numbering.override event, got %+v", logger.events)
+	}
+	if cd.Visibility.Scope != registrydomain.VisibilityScopeCompany {
+		t.Fatalf("visibility scope = %q, want company", cd.Visibility.Scope)
 	}
 }
 
@@ -209,8 +220,9 @@ func TestCreate_AreaArchived(t *testing.T) {
 }
 
 type fakeControlledDocumentRepository struct {
-	codeExists bool
-	created    *registrydomain.ControlledDocument
+	codeExists      bool
+	created         *registrydomain.ControlledDocument
+	lastListFilter  registrydomain.CDFilter
 }
 
 func newFakeControlledDocumentRepository() *fakeControlledDocumentRepository {
@@ -233,8 +245,12 @@ func (f *fakeControlledDocumentRepository) CodeExists(_ context.Context, _, _, _
 	return f.codeExists, nil
 }
 
-func (f *fakeControlledDocumentRepository) List(_ context.Context, _ string, _ registrydomain.CDFilter) ([]registrydomain.ControlledDocument, error) {
+func (f *fakeControlledDocumentRepository) List(_ context.Context, _ string, filter registrydomain.CDFilter) ([]registrydomain.ControlledDocument, error) {
+	f.lastListFilter = filter
 	return nil, nil
+}
+func (f *fakeControlledDocumentRepository) CanRead(_ context.Context, _, _, _ string) (bool, error) {
+	return true, nil
 }
 
 func (f *fakeControlledDocumentRepository) Create(_ context.Context, doc *registrydomain.ControlledDocument) error {
@@ -431,5 +447,18 @@ func TestRegistryService_PreviewCode_ReturnsFormatted(t *testing.T) {
 	}
 	if code != "DC-RH-007" {
 		t.Fatalf("expected DC-RH-007, got %q", code)
+	}
+}
+
+func TestList_DoesNotInjectEmptyActorFilter(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+
+	_, err := svc.List(context.Background(), "tenant-a", registrydomain.CDFilter{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if repo.lastListFilter.ActorUserID != nil {
+		t.Fatalf("ActorUserID = %v, want nil", *repo.lastListFilter.ActorUserID)
 	}
 }

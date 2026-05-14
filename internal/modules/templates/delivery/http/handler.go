@@ -58,6 +58,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/v1/templates/{id}/approval-config", generated.UpsertTemplateApprovalConfigV2)
 
 	mux.HandleFunc("GET /api/v1/templates/{id}", generated.GetTemplateV2)
+	mux.HandleFunc("GET /api/v1/templates/system/blank", generated.GetSystemBlankTemplate)
 	mux.HandleFunc("GET /api/v1/templates/{id}/versions/{n}/docx-url", generated.GetTemplateDocxUrlV2)
 	mux.HandleFunc("GET /api/v1/templates/{id}/audit", generated.ListTemplateAuditV2)
 	mux.HandleFunc("GET /api/v1/templates/v2/placeholder-catalog", generated.ListTemplatePlaceholderCatalogV2)

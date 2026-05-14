@@ -5,9 +5,12 @@ import { toast } from 'sonner';
 import { resolveQueryError } from '../../../lib/api';
 import { useAuthStore } from '../../../store/auth.store';
 import { createControlledDocumentAtomic } from '../../registry/api/controlledDocuments';
+import type { components } from '../../../lib/api-types';
+import { usePreviewCodeQuery } from '../../registry/queries/usePreviewCodeQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useTemplatesByProfileQuery } from '../queries/useTemplatesByProfileQuery';
+import { useBlankTemplateQuery } from '../queries/useBlankTemplateQuery';
 import {
   INITIAL_STATE,
   canAdvance,
@@ -26,6 +29,29 @@ function parseStepParam(raw: string | null): WizardStep {
   const n = Number(raw);
   if (n === 1 || n === 2 || n === 3 || n === 4) return n;
   return 1;
+}
+
+export function buildVisibilityPayload(
+  state: WizardState,
+): components['schemas']['ControlledDocumentVisibility'] {
+  if (state.visibility === 'company') {
+    return { scope: 'company', areaCodes: [], userIds: [] };
+  }
+  if (state.visibility === 'area') {
+    return {
+      scope: 'restricted',
+      areaCodes: state.visibilityAreaCodes,
+      userIds: [],
+    };
+  }
+  if (state.visibility === 'people') {
+    return {
+      scope: 'restricted',
+      areaCodes: state.visibilityAreaCodes,
+      userIds: state.invitees.map((row) => row.id),
+    };
+  }
+  return { scope: 'company', areaCodes: [], userIds: [] };
 }
 
 function initialStateFromUrl(searchParams: URLSearchParams): WizardState {
@@ -64,10 +90,13 @@ export function NewDocumentWizardPage(): JSX.Element {
   const profilesQuery = useProfilesQuery();
   const areasQuery = useAreasQuery();
   const templatesQuery = useTemplatesByProfileQuery(state.profileCode);
+  const blankTemplateQuery = useBlankTemplateQuery();
+  const previewCodeQuery = usePreviewCodeQuery(state.profileCode, state.areaCode || null);
 
   const profiles = profilesQuery.data ?? [];
   const areas = areasQuery.data ?? [];
   const templates = templatesQuery.data?.templates ?? [];
+  const blankTemplate = blankTemplateQuery.data ?? null;
 
   // Derived selections
   const selectedProfile = useMemo(
@@ -82,6 +111,10 @@ export function NewDocumentWizardPage(): JSX.Element {
     () => templates.find((t) => t.id === state.templateID) ?? null,
     [templates, state.templateID],
   );
+  const blankTemplateSelected =
+    blankTemplate !== null &&
+    state.templateID === blankTemplate.templateId &&
+    state.templateVersionID === blankTemplate.templateVersionId;
 
   // Derived: URL pre-filled `?profile=X` but profile is not in the loaded list.
   // TanStack Query v5 keeps isSuccess=true after first successful fetch (background refetches
@@ -116,6 +149,7 @@ export function NewDocumentWizardPage(): JSX.Element {
       templateVersionID: string;
       ownerUserId: string;
       idempotencyKey: string;
+      visibility: components['schemas']['ControlledDocumentVisibility'];
     }) => {
       return createControlledDocumentAtomic(
         {
@@ -125,6 +159,7 @@ export function NewDocumentWizardPage(): JSX.Element {
           ownerUserId: input.ownerUserId,
           documentName: input.title,
           templateVersionId: input.templateVersionID,
+          visibility: input.visibility,
         },
         input.idempotencyKey,
       );
@@ -165,6 +200,7 @@ export function NewDocumentWizardPage(): JSX.Element {
       templateVersionID: state.templateVersionID,
       ownerUserId: currentUser.userId,
       idempotencyKey,
+      visibility: buildVisibilityPayload(state),
     });
   }
 
@@ -214,12 +250,14 @@ export function NewDocumentWizardPage(): JSX.Element {
           areaCode={state.areaCode}
           title={state.title}
           visibility={state.visibility}
+          visibilityAreaCodes={state.visibilityAreaCodes}
           invitees={state.invitees}
           external={state.external}
           onChangeProfile={() => dispatch({ type: 'goToStep', step: 1 })}
           onSetArea={(code) => dispatch({ type: 'setArea', code })}
           onSetTitle={(value) => dispatch({ type: 'setTitle', value })}
           onSetVisibility={(key) => dispatch({ type: 'setVisibility', key })}
+          onSetVisibilityAreas={(codes) => dispatch({ type: 'setVisibilityAreas', codes })}
           onAddInvitee={(invitee) => dispatch({ type: 'addInvitee', invitee })}
           onRemoveInvitee={(id) => dispatch({ type: 'removeInvitee', id })}
           onSetExternal={(patch) => dispatch({ type: 'setExternal', patch })}
@@ -241,6 +279,9 @@ export function NewDocumentWizardPage(): JSX.Element {
           onRetry={() => void templatesQuery.refetch()}
           selectedTemplateID={state.templateID}
           selectedVersionID={state.templateVersionID}
+          blankTemplateID={blankTemplate?.templateId ?? null}
+          blankTemplateVersionID={blankTemplate?.templateVersionId ?? null}
+          blankTemplateName={blankTemplate?.name ?? 'Em branco'}
           onSelect={(templateID, versionID) =>
             dispatch({ type: 'selectTemplate', templateID, templateVersionID: versionID })
           }
@@ -256,7 +297,12 @@ export function NewDocumentWizardPage(): JSX.Element {
           area={selectedArea}
           title={state.title}
           visibility={state.visibility}
+          visibilityAreaCodes={state.visibilityAreaCodes}
+          inviteeCount={state.invitees.length}
           template={selectedTemplate}
+          isBlankTemplateSelected={blankTemplateSelected}
+          blankTemplateName={blankTemplate?.name ?? 'Em branco'}
+          previewCode={previewCodeQuery.data?.code ?? null}
           authorDisplayName={currentUser?.displayName ?? ''}
           createdAt={new Date()}
           consent={state.consent}

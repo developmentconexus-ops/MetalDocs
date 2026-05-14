@@ -28,6 +28,7 @@ func TestMapErr(t *testing.T) {
 		{name: "iso segregation violation", err: domain.ErrISOSegregationViolation, wantStatus: http.StatusForbidden, wantCode: "iso_segregation_violation"},
 		{name: "forbidden role", err: domain.ErrForbiddenRole, wantStatus: http.StatusForbidden, wantCode: "forbidden_role"},
 		{name: "forbidden", err: domain.ErrForbidden, wantStatus: http.StatusForbidden, wantCode: "forbidden"},
+		{name: "system template immutable", err: domain.ErrSystemTemplateImmutable, wantStatus: http.StatusConflict, wantCode: "SYSTEM_TEMPLATE_IMMUTABLE"},
 		{name: "archived", err: domain.ErrArchived, wantStatus: http.StatusConflict, wantCode: "archived"},
 		{name: "invalid approval config", err: domain.ErrInvalidApprovalConfig, wantStatus: http.StatusBadRequest, wantCode: "invalid_approval_config"},
 		{name: "placeholder name invalid", err: domain.ErrPlaceholderNameInvalid, wantStatus: http.StatusUnprocessableEntity, wantCode: "placeholder_name_invalid"},

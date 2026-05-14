@@ -127,3 +127,8 @@ O smoke:
 - Adicionar/atualizar apenas o necessario para a feature em andamento.
 - Commitar `go.mod` e `go.sum` juntos quando houver mudanca de dependencia.
 - Dependencia critica nova exige ADR/RFC conforme `AGENTS.md`.
+
+## Baseline bootstrap (preferred for fresh local setups)
+Use `scripts/dev-bootstrap-baseline.ps1` for fresh local environments.
+
+Use `scripts/dev-migrate.ps1` only when full historical replay is required for recovery or migration debugging.

@@ -3,28 +3,46 @@
 BEGIN;
 
 ALTER TABLE documents
-    ADD COLUMN placeholder_schema_snapshot     JSONB,
-    ADD COLUMN placeholder_schema_hash         BYTEA,
-    ADD COLUMN composition_config_snapshot     JSONB,
-    ADD COLUMN composition_config_hash         BYTEA,
-    ADD COLUMN editable_zones_schema_snapshot  JSONB,
-    ADD COLUMN body_docx_snapshot_s3_key       TEXT,
-    ADD COLUMN body_docx_hash                  BYTEA,
-    ADD COLUMN values_frozen_at                TIMESTAMPTZ,
-    ADD COLUMN values_hash                     BYTEA,
-    ADD COLUMN final_docx_s3_key               TEXT,
-    ADD COLUMN content_hash                    BYTEA,
-    ADD COLUMN final_pdf_s3_key                TEXT,
-    ADD COLUMN pdf_hash                        BYTEA,
-    ADD COLUMN pdf_generated_at                TIMESTAMPTZ,
-    ADD COLUMN reconstruction_attempts         JSONB NOT NULL DEFAULT '[]'::jsonb,
-    ADD CONSTRAINT documents_placeholder_schema_hash_len CHECK (placeholder_schema_hash IS NULL OR octet_length(placeholder_schema_hash) = 32),
-    ADD CONSTRAINT documents_composition_config_hash_len CHECK (composition_config_hash IS NULL OR octet_length(composition_config_hash) = 32),
-    ADD CONSTRAINT documents_body_docx_hash_len CHECK (body_docx_hash IS NULL OR octet_length(body_docx_hash) = 32),
-    ADD CONSTRAINT documents_values_hash_len CHECK (values_hash IS NULL OR octet_length(values_hash) = 32),
-    ADD CONSTRAINT documents_content_hash_len CHECK (content_hash IS NULL OR octet_length(content_hash) = 32),
-    ADD CONSTRAINT documents_pdf_hash_len CHECK (pdf_hash IS NULL OR octet_length(pdf_hash) = 32),
-    ADD CONSTRAINT documents_reconstruction_attempts_is_array CHECK (jsonb_typeof(reconstruction_attempts) = 'array');
+    ADD COLUMN IF NOT EXISTS placeholder_schema_snapshot     JSONB,
+    ADD COLUMN IF NOT EXISTS placeholder_schema_hash         BYTEA,
+    ADD COLUMN IF NOT EXISTS composition_config_snapshot     JSONB,
+    ADD COLUMN IF NOT EXISTS composition_config_hash         BYTEA,
+    ADD COLUMN IF NOT EXISTS editable_zones_schema_snapshot  JSONB,
+    ADD COLUMN IF NOT EXISTS body_docx_snapshot_s3_key       TEXT,
+    ADD COLUMN IF NOT EXISTS body_docx_hash                  BYTEA,
+    ADD COLUMN IF NOT EXISTS values_frozen_at                TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS values_hash                     BYTEA,
+    ADD COLUMN IF NOT EXISTS final_docx_s3_key               TEXT,
+    ADD COLUMN IF NOT EXISTS content_hash                    BYTEA,
+    ADD COLUMN IF NOT EXISTS final_pdf_s3_key                TEXT,
+    ADD COLUMN IF NOT EXISTS pdf_hash                        BYTEA,
+    ADD COLUMN IF NOT EXISTS pdf_generated_at                TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS reconstruction_attempts         JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'documents_placeholder_schema_hash_len' AND conrelid = 'documents'::regclass) THEN
+        ALTER TABLE documents ADD CONSTRAINT documents_placeholder_schema_hash_len CHECK (placeholder_schema_hash IS NULL OR octet_length(placeholder_schema_hash) = 32);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'documents_composition_config_hash_len' AND conrelid = 'documents'::regclass) THEN
+        ALTER TABLE documents ADD CONSTRAINT documents_composition_config_hash_len CHECK (composition_config_hash IS NULL OR octet_length(composition_config_hash) = 32);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'documents_body_docx_hash_len' AND conrelid = 'documents'::regclass) THEN
+        ALTER TABLE documents ADD CONSTRAINT documents_body_docx_hash_len CHECK (body_docx_hash IS NULL OR octet_length(body_docx_hash) = 32);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'documents_values_hash_len' AND conrelid = 'documents'::regclass) THEN
+        ALTER TABLE documents ADD CONSTRAINT documents_values_hash_len CHECK (values_hash IS NULL OR octet_length(values_hash) = 32);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'documents_content_hash_len' AND conrelid = 'documents'::regclass) THEN
+        ALTER TABLE documents ADD CONSTRAINT documents_content_hash_len CHECK (content_hash IS NULL OR octet_length(content_hash) = 32);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'documents_pdf_hash_len' AND conrelid = 'documents'::regclass) THEN
+        ALTER TABLE documents ADD CONSTRAINT documents_pdf_hash_len CHECK (pdf_hash IS NULL OR octet_length(pdf_hash) = 32);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'documents_reconstruction_attempts_is_array' AND conrelid = 'documents'::regclass) THEN
+        ALTER TABLE documents ADD CONSTRAINT documents_reconstruction_attempts_is_array CHECK (jsonb_typeof(reconstruction_attempts) = 'array');
+    END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION enforce_snapshot_on_submit() RETURNS trigger AS $$
 BEGIN
@@ -48,7 +66,7 @@ CREATE TRIGGER enforce_snapshot_on_submit_trg
     BEFORE INSERT OR UPDATE ON documents
     FOR EACH ROW EXECUTE FUNCTION enforce_snapshot_on_submit();
 
-CREATE TABLE document_placeholder_values (
+CREATE TABLE IF NOT EXISTS document_placeholder_values (
     tenant_id        UUID        NOT NULL,
     revision_id      UUID        NOT NULL,
     placeholder_id   TEXT        NOT NULL,
@@ -65,7 +83,7 @@ CREATE TABLE document_placeholder_values (
     FOREIGN KEY (revision_id) REFERENCES documents(id) ON DELETE CASCADE
 );
 
-CREATE TABLE document_editable_zone_content (
+CREATE TABLE IF NOT EXISTS document_editable_zone_content (
     tenant_id     UUID  NOT NULL,
     revision_id   UUID  NOT NULL,
     zone_id       TEXT  NOT NULL,

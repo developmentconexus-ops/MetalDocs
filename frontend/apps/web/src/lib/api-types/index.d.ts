@@ -4339,6 +4339,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/templates/system/blank": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get system-owned blank template */
+        get: operations["getSystemBlankTemplate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/templates/{id}/versions/{n}": {
         parameters: {
             query?: never;
@@ -6421,6 +6438,13 @@ export interface components {
              */
             MDDM_NATIVE_EXPORT_ROLLOUT_PCT: number;
         };
+        SystemBlankTemplateResponse: {
+            /** Format: uuid */
+            templateId: string;
+            /** Format: uuid */
+            templateVersionId: string;
+            name: string;
+        };
         ControlledDocument: {
             /** Format: uuid */
             id: string;
@@ -6437,10 +6461,17 @@ export interface components {
             overrideTemplateVersionId?: string | null;
             /** @enum {string} */
             status: "active" | "obsolete" | "superseded";
+            visibility: components["schemas"]["ControlledDocumentVisibility"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        ControlledDocumentVisibility: {
+            /** @enum {string} */
+            scope: "company" | "restricted";
+            areaCodes: string[];
+            userIds: string[];
         };
         DocumentRef: {
             /** Format: uuid */
@@ -6454,6 +6485,7 @@ export interface components {
             title: string;
             ownerUserId: string;
             documentName: string;
+            visibility: components["schemas"]["ControlledDocumentVisibility"];
             /** Format: uuid */
             templateVersionId?: string;
             formData?: {
@@ -7297,6 +7329,33 @@ export interface operations {
                         version_id?: string;
                     };
                 };
+            };
+        };
+    };
+    getSystemBlankTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemBlankTemplateResponse"];
+                };
+            };
+            /** @description not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

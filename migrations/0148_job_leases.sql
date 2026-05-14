@@ -92,9 +92,19 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION metaldocs.acquire_lease(text, text, interval) OWNER TO metaldocs_admin;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_admin') THEN
+        ALTER FUNCTION metaldocs.acquire_lease(text, text, interval) OWNER TO metaldocs_admin;
+    END IF;
+END $$;
 REVOKE EXECUTE ON FUNCTION metaldocs.acquire_lease(text, text, interval) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION metaldocs.acquire_lease(text, text, interval) TO metaldocs_writer;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_writer') THEN
+        GRANT EXECUTE ON FUNCTION metaldocs.acquire_lease(text, text, interval) TO metaldocs_writer;
+    END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION metaldocs.heartbeat_lease(_job text, _leader text, _epoch bigint)
 RETURNS bool
@@ -115,9 +125,19 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION metaldocs.heartbeat_lease(text, text, bigint) OWNER TO metaldocs_admin;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_admin') THEN
+        ALTER FUNCTION metaldocs.heartbeat_lease(text, text, bigint) OWNER TO metaldocs_admin;
+    END IF;
+END $$;
 REVOKE EXECUTE ON FUNCTION metaldocs.heartbeat_lease(text, text, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION metaldocs.heartbeat_lease(text, text, bigint) TO metaldocs_writer;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_writer') THEN
+        GRANT EXECUTE ON FUNCTION metaldocs.heartbeat_lease(text, text, bigint) TO metaldocs_writer;
+    END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION metaldocs.release_lease(_job text, _leader text, _epoch bigint)
 RETURNS void
@@ -133,9 +153,19 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION metaldocs.release_lease(text, text, bigint) OWNER TO metaldocs_admin;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_admin') THEN
+        ALTER FUNCTION metaldocs.release_lease(text, text, bigint) OWNER TO metaldocs_admin;
+    END IF;
+END $$;
 REVOKE EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint) TO metaldocs_writer;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_writer') THEN
+        GRANT EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint) TO metaldocs_writer;
+    END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION metaldocs.assert_lease_epoch(_job text, _epoch bigint)
 RETURNS void
@@ -156,10 +186,25 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION metaldocs.assert_lease_epoch(text, bigint) OWNER TO metaldocs_admin;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_admin') THEN
+        ALTER FUNCTION metaldocs.assert_lease_epoch(text, bigint) OWNER TO metaldocs_admin;
+    END IF;
+END $$;
 REVOKE EXECUTE ON FUNCTION metaldocs.assert_lease_epoch(text, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION metaldocs.assert_lease_epoch(text, bigint) TO metaldocs_writer;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_writer') THEN
+        GRANT EXECUTE ON FUNCTION metaldocs.assert_lease_epoch(text, bigint) TO metaldocs_writer;
+    END IF;
+END $$;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON metaldocs.job_leases TO metaldocs_writer;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_writer') THEN
+        GRANT SELECT, INSERT, UPDATE, DELETE ON metaldocs.job_leases TO metaldocs_writer;
+    END IF;
+END $$;
 
 COMMIT;

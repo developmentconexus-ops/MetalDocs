@@ -8,6 +8,7 @@ import { VISIBILITY_KEYS, VISIBILITY_META, type VisibilityKey } from '../../../.
 import { CodePreviewBanner } from '../../CodePreviewBanner';
 import { WizardFooter } from '../../../../../shared/components/wizard/WizardFooter';
 import type { WizardExternalConfig, WizardInvitee } from '../../../../state/wizard.reducer';
+import { AreaVisibilitySubcontrols } from './AreaVisibilitySubcontrols';
 import { PeopleSubcontrols } from './PeopleSubcontrols';
 import { ExternalSubcontrols } from './ExternalSubcontrols';
 import styles from './StepAreaCodeVisibility.module.css';
@@ -22,12 +23,14 @@ export type StepAreaCodeVisibilityProps = {
   areaCode: string;
   title: string;
   visibility: VisibilityKey;
+  visibilityAreaCodes: string[];
   invitees: WizardInvitee[];
   external: WizardExternalConfig;
   onChangeProfile: () => void;
   onSetArea: (code: string) => void;
   onSetTitle: (value: string) => void;
   onSetVisibility: (key: VisibilityKey) => void;
+  onSetVisibilityAreas: (codes: string[]) => void;
   onAddInvitee: (invitee: WizardInvitee) => void;
   onRemoveInvitee: (id: string) => void;
   onSetExternal: (patch: Partial<WizardExternalConfig>) => void;
@@ -48,12 +51,14 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
     areaCode,
     title,
     visibility,
+    visibilityAreaCodes,
     invitees,
     external,
     onChangeProfile,
     onSetArea,
     onSetTitle,
     onSetVisibility,
+    onSetVisibilityAreas,
     onAddInvitee,
     onRemoveInvitee,
     onSetExternal,
@@ -137,18 +142,18 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
 
       <CodePreviewBanner profileCode={profile?.code ?? null} areaCode={areaCode} />
 
-      {/* TODO(novo-documento:visibility): captured in form state but NOT submitted —
-          controlled_documents has no visibility column today. See
-          wiki/backlog/novo-documento.md#visibility for the backend prereq. */}
       <div className={`kicker ${styles.visibilityKicker}`}>Visibilidade *</div>
       <div className={styles.visibilityGrid}>
         {VISIBILITY_KEYS.map((key) => {
           const meta = VISIBILITY_META[key];
           const selected = visibility === key;
+          const disabled = key === 'external';
           return (
             <SelectableCard
               key={key}
               selected={selected}
+              disabled={disabled}
+              title={disabled ? 'Em breve' : undefined}
               onSelect={() => onSetVisibility(key)}
             >
               <div className={styles.visibilityCardBody}>
@@ -165,6 +170,15 @@ export function StepAreaCodeVisibility(props: StepAreaCodeVisibilityProps): JSX.
           );
         })}
       </div>
+
+      {visibility === 'area' ? (
+        <AreaVisibilitySubcontrols
+          areas={areas}
+          documentAreaCode={areaCode}
+          selectedCodes={visibilityAreaCodes}
+          onSetAreaCodes={onSetVisibilityAreas}
+        />
+      ) : null}
 
       {visibility === 'people' ? (
         <PeopleSubcontrols

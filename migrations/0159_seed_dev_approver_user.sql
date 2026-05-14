@@ -8,6 +8,8 @@
 
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 INSERT INTO metaldocs.auth_identities (user_id, username, display_name, password_hash, password_algo)
 VALUES (
   'approver',
@@ -18,8 +20,8 @@ VALUES (
 )
 ON CONFLICT (user_id) DO NOTHING;
 
-INSERT INTO metaldocs.iam_users (user_id, display_name)
-VALUES ('approver', 'Approver Dev')
+INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id)
+VALUES ('approver', 'Approver Dev', 'ffffffff-ffff-ffff-ffff-ffffffffffff')
 ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO metaldocs.iam_user_roles (user_id, role_code)

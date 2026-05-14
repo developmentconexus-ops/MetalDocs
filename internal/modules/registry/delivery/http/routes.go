@@ -86,6 +86,9 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		TemplateVersionID:         templateVersionID,
 		DocumentName:              strings.TrimSpace(req.DocumentName),
 		FormData:                  formData,
+		VisibilityScope:           string(req.Visibility.Scope),
+		VisibilityAreaCodes:       req.Visibility.AreaCodes,
+		VisibilityUserIDs:         req.Visibility.UserIds,
 	})
 	if err != nil {
 		h.writeDomainError(w, err)
@@ -124,6 +127,8 @@ func missingAtomicCreateField(req registryapi.CreateAtomicRequest) string {
 		return "title"
 	case strings.TrimSpace(req.OwnerUserId) == "":
 		return "ownerUserId"
+	case strings.TrimSpace(string(req.Visibility.Scope)) == "":
+		return "visibility.scope"
 	default:
 		return ""
 	}
@@ -424,6 +429,11 @@ func controlledDocumentResponse(doc registrydomain.ControlledDocument) (registry
 		Status:                    registryapi.ControlledDocumentStatus(doc.Status),
 		CreatedAt:                 doc.CreatedAt,
 		UpdatedAt:                 doc.UpdatedAt,
+		Visibility: registryapi.ControlledDocumentVisibility{
+			Scope:     registryapi.ControlledDocumentVisibilityScope(doc.Visibility.Scope),
+			AreaCodes: doc.Visibility.AreaCodes,
+			UserIds:   doc.Visibility.UserIDs,
+		},
 	}, nil
 }
 
@@ -463,6 +473,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusBadRequest, "MANUAL_CODE_REASON_REQUIRED", "manual code reason is required")
 	case errors.Is(err, registrydomain.ErrOverrideReasonRequired):
 		httpresponse.WriteError(w, http.StatusBadRequest, "OVERRIDE_REASON_REQUIRED", "override reason is required")
+	case errors.Is(err, registrydomain.ErrVisibilityScopeInvalid):
+		httpresponse.WriteError(w, http.StatusBadRequest, "VISIBILITY_SCOPE_INVALID", "visibility scope is invalid")
 	case errors.Is(err, registrydomain.ErrOverrideTemplateDeleted):
 		httpresponse.WriteError(w, http.StatusConflict, "OVERRIDE_TEMPLATE_DELETED", "override template deleted")
 	case errors.Is(err, registrydomain.ErrOverrideNotPublished):

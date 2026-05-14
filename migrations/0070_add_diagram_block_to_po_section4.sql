@@ -24,4 +24,7 @@ SET definition_json = jsonb_set(
   )
 )
 WHERE template_key = 'po-mddm-canvas'
-  AND version = 1;
+  AND version = 1
+  AND definition_json IS NOT NULL
+  AND jsonb_typeof(definition_json) = 'object'
+  AND jsonb_typeof(definition_json #> '{children,3,children}') = 'array';

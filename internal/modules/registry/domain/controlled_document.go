@@ -26,6 +26,7 @@ type ControlledDocument struct {
 	Title                     string     `json:"title"`
 	OwnerUserID               string     `json:"ownerUserId"`
 	OverrideTemplateVersionID *string    `json:"overrideTemplateVersionId"`
+	Visibility                Visibility `json:"visibility"`
 	Status                    CDStatus   `json:"status"`
 	CreatedAt                 time.Time  `json:"createdAt"`
 	UpdatedAt                 time.Time  `json:"updatedAt"`

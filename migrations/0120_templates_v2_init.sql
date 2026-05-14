@@ -1,4 +1,4 @@
-CREATE TABLE templates_v2_template (
+CREATE TABLE IF NOT EXISTS templates_v2_template (
   id                    uuid PRIMARY KEY,
   tenant_id             text NOT NULL,
   doc_type_code         text NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE templates_v2_template (
   UNIQUE (tenant_id, key)
 );
 
-CREATE TABLE templates_v2_template_version (
+CREATE TABLE IF NOT EXISTS templates_v2_template_version (
   id                  uuid PRIMARY KEY,
   template_id         uuid NOT NULL REFERENCES templates_v2_template(id),
   version_number      int  NOT NULL,
@@ -40,17 +40,27 @@ CREATE TABLE templates_v2_template_version (
   UNIQUE (template_id, version_number)
 );
 
-ALTER TABLE templates_v2_template
-  ADD CONSTRAINT fk_templates_v2_published_version
-  FOREIGN KEY (published_version_id) REFERENCES templates_v2_template_version(id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_templates_v2_published_version'
+      AND conrelid = 'templates_v2_template'::regclass
+  ) THEN
+    ALTER TABLE templates_v2_template
+      ADD CONSTRAINT fk_templates_v2_published_version
+      FOREIGN KEY (published_version_id) REFERENCES templates_v2_template_version(id);
+  END IF;
+END $$;
 
-CREATE TABLE templates_v2_approval_config (
+CREATE TABLE IF NOT EXISTS templates_v2_approval_config (
   template_id     uuid PRIMARY KEY REFERENCES templates_v2_template(id),
   reviewer_role   text NULL,
   approver_role   text NOT NULL
 );
 
-CREATE TABLE templates_v2_audit_log (
+CREATE TABLE IF NOT EXISTS templates_v2_audit_log (
   id            bigserial PRIMARY KEY,
   tenant_id     text NOT NULL,
   template_id   uuid NOT NULL,
@@ -61,6 +71,6 @@ CREATE TABLE templates_v2_audit_log (
   occurred_at   timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_templates_v2_template_tenant_doctype ON templates_v2_template (tenant_id, doc_type_code);
-CREATE INDEX idx_templates_v2_version_template_status ON templates_v2_template_version (template_id, status);
-CREATE INDEX idx_templates_v2_audit_template_time ON templates_v2_audit_log (template_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_templates_v2_template_tenant_doctype ON templates_v2_template (tenant_id, doc_type_code);
+CREATE INDEX IF NOT EXISTS idx_templates_v2_version_template_status ON templates_v2_template_version (template_id, status);
+CREATE INDEX IF NOT EXISTS idx_templates_v2_audit_template_time ON templates_v2_audit_log (template_id, occurred_at DESC);

@@ -32,21 +32,36 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES
   ('reviewer',  'doc.submit', 'Submit document for approval')
 ON CONFLICT (role, capability) DO NOTHING;
 
--- 3. Dev-tenant seed: give the default admin user qms_admin in general area.
---    Revoke any conflicting active row first (trigger allows effective_to update).
-UPDATE public.user_process_areas
-   SET effective_to = now(),
-       revoked_by   = 'admin'
- WHERE user_id      = 'admin'
-   AND tenant_id    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-   AND area_code    = 'general'
-   AND role        != 'qms_admin'
-   AND effective_to IS NULL;
+-- 3. Dev-tenant seed: give default admin qms_admin in general area only when
+--    required records exist in the current environment.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM metaldocs.document_process_areas
+    WHERE tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+      AND code = 'general'
+  ) AND EXISTS (
+    SELECT 1
+    FROM metaldocs.iam_users
+    WHERE tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+      AND user_id = 'admin'
+  ) THEN
+    UPDATE public.user_process_areas
+       SET effective_to = now(),
+           revoked_by   = 'admin'
+     WHERE user_id      = 'admin'
+       AND tenant_id    = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+       AND area_code    = 'general'
+       AND role        != 'qms_admin'
+       AND effective_to IS NULL;
 
-INSERT INTO public.user_process_areas
-  (user_id, tenant_id, area_code, role, effective_from, granted_by)
-VALUES
-  ('admin', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'general', 'qms_admin', now(), 'admin')
-ON CONFLICT DO NOTHING;
+    INSERT INTO public.user_process_areas
+      (user_id, tenant_id, area_code, role, effective_from, granted_by)
+    VALUES
+      ('admin', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'general', 'qms_admin', now(), 'admin')
+    ON CONFLICT DO NOTHING;
+  END IF;
+END $$;
 
 COMMIT;

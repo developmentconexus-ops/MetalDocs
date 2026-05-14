@@ -1698,3 +1698,9 @@ Escopo:
 
 Aceite:
 - Lista priorizada com justificativa de impacto.
+
+## Task - Migration archive follow-up
+
+- classify `migrations/` into upgrade-critical vs historical-only
+- identify destructive or dev-reset files that should leave the primary operational path
+- move only after baseline bootstrap has been validated against runtime truth

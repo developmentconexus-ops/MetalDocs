@@ -7,26 +7,48 @@
 
 BEGIN;
 
-GRANT USAGE ON SCHEMA metaldocs TO metaldocs_app;
-GRANT USAGE ON SCHEMA metaldocs TO metaldocs_admin;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
+        GRANT USAGE ON SCHEMA metaldocs TO metaldocs_app;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_admin') THEN
+        GRANT USAGE ON SCHEMA metaldocs TO metaldocs_admin;
+    END IF;
+END $$;
 
 -- Job lease functions (background worker)
-GRANT SELECT, INSERT, UPDATE, DELETE
-    ON metaldocs.job_leases
-    TO metaldocs_app;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
+        GRANT SELECT, INSERT, UPDATE, DELETE
+            ON metaldocs.job_leases
+            TO metaldocs_app;
+    END IF;
+END $$;
 
 -- USAGE grant is needed for SECURITY DEFINER functions owned by metaldocs_admin
 -- to resolve schema objects in hardened environments where PUBLIC lacks schema USAGE.
 
-GRANT EXECUTE ON FUNCTION metaldocs.acquire_lease(text, text, interval)   TO metaldocs_app;
-GRANT EXECUTE ON FUNCTION metaldocs.heartbeat_lease(text, text, bigint)   TO metaldocs_app;
-GRANT EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint)     TO metaldocs_app;
-GRANT EXECUTE ON FUNCTION metaldocs.assert_lease_epoch(text, bigint)      TO metaldocs_app;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
+        GRANT EXECUTE ON FUNCTION metaldocs.acquire_lease(text, text, interval)   TO metaldocs_app;
+        GRANT EXECUTE ON FUNCTION metaldocs.heartbeat_lease(text, text, bigint)   TO metaldocs_app;
+        GRANT EXECUTE ON FUNCTION metaldocs.release_lease(text, text, bigint)     TO metaldocs_app;
+        GRANT EXECUTE ON FUNCTION metaldocs.assert_lease_epoch(text, bigint)      TO metaldocs_app;
+    END IF;
+END $$;
 
 -- Idempotency keys table (signoff replay store)
-GRANT SELECT, INSERT, UPDATE
-    ON metaldocs.idempotency_keys
-    TO metaldocs_app;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'metaldocs_app') THEN
+        GRANT SELECT, INSERT, UPDATE
+            ON metaldocs.idempotency_keys
+            TO metaldocs_app;
+    END IF;
+END $$;
 
 
 COMMIT;

@@ -155,6 +155,9 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 	if err != nil {
 		return nil, err
 	}
+	if template.SystemOwned {
+		return nil, domain.ErrSystemTemplateImmutable
+	}
 	if template.IsArchived() {
 		return nil, domain.ErrArchived
 	}

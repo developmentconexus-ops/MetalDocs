@@ -75,6 +75,24 @@ func (e ControlledDocumentStatus) Valid() bool {
 	}
 }
 
+// Defines values for ControlledDocumentVisibilityScope.
+const (
+	Company    ControlledDocumentVisibilityScope = "company"
+	Restricted ControlledDocumentVisibilityScope = "restricted"
+)
+
+// Valid indicates whether the value is a known member of the ControlledDocumentVisibilityScope enum.
+func (e ControlledDocumentVisibilityScope) Valid() bool {
+	switch e {
+	case Company:
+		return true
+	case Restricted:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DocumentTemplateFieldSlotNodeResponseFieldKind.
 const (
 	Scalar DocumentTemplateFieldSlotNodeResponseFieldKind = "scalar"
@@ -282,38 +300,50 @@ type AtomicCreateResponse struct {
 
 // ControlledDocument defines model for ControlledDocument.
 type ControlledDocument struct {
-	Code                      string                   `json:"code"`
-	CreatedAt                 time.Time                `json:"createdAt"`
-	DepartmentCode            *string                  `json:"departmentCode,omitempty"`
-	Id                        openapi_types.UUID       `json:"id"`
-	OverrideTemplateVersionId *openapi_types.UUID      `json:"overrideTemplateVersionId,omitempty"`
-	OwnerUserId               string                   `json:"ownerUserId"`
-	ProcessAreaCode           string                   `json:"processAreaCode"`
-	ProfileCode               string                   `json:"profileCode"`
-	SequenceNum               *int                     `json:"sequenceNum,omitempty"`
-	Status                    ControlledDocumentStatus `json:"status"`
-	TenantId                  openapi_types.UUID       `json:"tenantId"`
-	Title                     string                   `json:"title"`
-	UpdatedAt                 time.Time                `json:"updatedAt"`
+	Code                      string                       `json:"code"`
+	CreatedAt                 time.Time                    `json:"createdAt"`
+	DepartmentCode            *string                      `json:"departmentCode,omitempty"`
+	Id                        openapi_types.UUID           `json:"id"`
+	OverrideTemplateVersionId *openapi_types.UUID          `json:"overrideTemplateVersionId,omitempty"`
+	OwnerUserId               string                       `json:"ownerUserId"`
+	ProcessAreaCode           string                       `json:"processAreaCode"`
+	ProfileCode               string                       `json:"profileCode"`
+	SequenceNum               *int                         `json:"sequenceNum,omitempty"`
+	Status                    ControlledDocumentStatus     `json:"status"`
+	TenantId                  openapi_types.UUID           `json:"tenantId"`
+	Title                     string                       `json:"title"`
+	UpdatedAt                 time.Time                    `json:"updatedAt"`
+	Visibility                ControlledDocumentVisibility `json:"visibility"`
 }
 
 // ControlledDocumentStatus defines model for ControlledDocument.Status.
 type ControlledDocumentStatus string
 
+// ControlledDocumentVisibility defines model for ControlledDocumentVisibility.
+type ControlledDocumentVisibility struct {
+	AreaCodes []string                          `json:"areaCodes"`
+	Scope     ControlledDocumentVisibilityScope `json:"scope"`
+	UserIds   []string                          `json:"userIds"`
+}
+
+// ControlledDocumentVisibilityScope defines model for ControlledDocumentVisibility.Scope.
+type ControlledDocumentVisibilityScope string
+
 // CreateAtomicRequest defines model for CreateAtomicRequest.
 type CreateAtomicRequest struct {
-	DepartmentCode            *string                 `json:"departmentCode,omitempty"`
-	DocumentName              string                  `json:"documentName"`
-	FormData                  *map[string]interface{} `json:"formData,omitempty"`
-	ManualCode                *string                 `json:"manualCode,omitempty"`
-	ManualCodeReason          *string                 `json:"manualCodeReason,omitempty"`
-	OverrideTemplateReason    *string                 `json:"overrideTemplateReason,omitempty"`
-	OverrideTemplateVersionId *openapi_types.UUID     `json:"overrideTemplateVersionId,omitempty"`
-	OwnerUserId               string                  `json:"ownerUserId"`
-	ProcessAreaCode           string                  `json:"processAreaCode"`
-	ProfileCode               string                  `json:"profileCode"`
-	TemplateVersionId         *openapi_types.UUID     `json:"templateVersionId,omitempty"`
-	Title                     string                  `json:"title"`
+	DepartmentCode            *string                      `json:"departmentCode,omitempty"`
+	DocumentName              string                       `json:"documentName"`
+	FormData                  *map[string]interface{}      `json:"formData,omitempty"`
+	ManualCode                *string                      `json:"manualCode,omitempty"`
+	ManualCodeReason          *string                      `json:"manualCodeReason,omitempty"`
+	OverrideTemplateReason    *string                      `json:"overrideTemplateReason,omitempty"`
+	OverrideTemplateVersionId *openapi_types.UUID          `json:"overrideTemplateVersionId,omitempty"`
+	OwnerUserId               string                       `json:"ownerUserId"`
+	ProcessAreaCode           string                       `json:"processAreaCode"`
+	ProfileCode               string                       `json:"profileCode"`
+	TemplateVersionId         *openapi_types.UUID          `json:"templateVersionId,omitempty"`
+	Title                     string                       `json:"title"`
+	Visibility                ControlledDocumentVisibility `json:"visibility"`
 }
 
 // CreateRevisionRequest defines model for CreateRevisionRequest.
@@ -1890,53 +1920,54 @@ func (sh *strictHandler) SupersedeControlledDocument(w http.ResponseWriter, r *h
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"9cTOJs+6iwn3j/v/BQAA//8=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

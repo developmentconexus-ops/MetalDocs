@@ -33,6 +33,8 @@ func MapErr(err error) (httpStatus int, code string) {
 		return http.StatusForbidden, "forbidden_role"
 	case errors.Is(err, domain.ErrForbidden):
 		return http.StatusForbidden, "forbidden"
+	case errors.Is(err, domain.ErrSystemTemplateImmutable):
+		return http.StatusConflict, "SYSTEM_TEMPLATE_IMMUTABLE"
 	case errors.Is(err, domain.ErrArchived):
 		return http.StatusConflict, "archived"
 	case errors.Is(err, domain.ErrInvalidApprovalConfig):

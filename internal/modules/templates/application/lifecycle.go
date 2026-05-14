@@ -15,8 +15,12 @@ type SubmitForReviewCmd struct {
 }
 
 func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (*domain.TemplateVersion, error) {
-	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
+	if err != nil {
 		return nil, err
+	}
+	if template.SystemOwned {
+		return nil, domain.ErrSystemTemplateImmutable
 	}
 
 	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
@@ -92,8 +96,12 @@ type ReviewCmd struct {
 }
 
 func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVersion, error) {
-	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
+	if err != nil {
 		return nil, err
+	}
+	if template.SystemOwned {
+		return nil, domain.ErrSystemTemplateImmutable
 	}
 
 	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
@@ -179,6 +187,9 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
 		return nil, err
+	}
+	if template.SystemOwned {
+		return nil, domain.ErrSystemTemplateImmutable
 	}
 	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
@@ -320,6 +331,9 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	if err != nil {
 		return nil, err
 	}
+	if template.SystemOwned {
+		return nil, domain.ErrSystemTemplateImmutable
+	}
 	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
@@ -436,6 +450,9 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
 		return nil, err
+	}
+	if template.SystemOwned {
+		return nil, domain.ErrSystemTemplateImmutable
 	}
 	if template.IsArchived() {
 		return template, nil

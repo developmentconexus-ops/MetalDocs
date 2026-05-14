@@ -9,6 +9,11 @@ import (
 	"metaldocs/internal/modules/templates/application"
 )
 
+const (
+	systemBlankTemplateTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+	systemBlankTemplateID       = "00000000-0000-0000-0000-000000000101"
+)
+
 func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -63,6 +68,33 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 			"limit":  limit,
 			"offset": offset,
 		},
+	})
+}
+
+func (h *Handler) GetSystemBlankTemplate(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+		writeMappedErr(w, err)
+		return
+	}
+	tpl, err := h.svc.GetTemplate(r.Context(), systemBlankTemplateTenantID, systemBlankTemplateID)
+	if err != nil {
+		writeMappedErr(w, err)
+		return
+	}
+	ver, err := h.svc.GetVersion(r.Context(), systemBlankTemplateTenantID, tpl.ID, tpl.LatestVersion)
+	if err != nil {
+		writeMappedErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"templateId":        tpl.ID,
+		"templateVersionId": ver.ID,
+		"name":              tpl.Name,
 	})
 }
 

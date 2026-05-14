@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
-import { NewDocumentWizardPage } from './NewDocumentWizardPage';
+import { NewDocumentWizardPage, buildVisibilityPayload } from './NewDocumentWizardPage';
+import type { WizardState } from '../state/wizard.reducer';
 
 // ── Mock react-router-dom ─────────────────────────────────────────────────────
 
@@ -55,6 +56,16 @@ vi.mock('../queries/useTemplatesByProfileQuery', () => ({
   }),
 }));
 
+vi.mock('../queries/useBlankTemplateQuery', () => ({
+  useBlankTemplateQuery: () => ({
+    data: { templateId: 'blank-template', templateVersionId: 'blank-tv-1', name: 'Em branco' },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 // ── Mock wizard reducer — seed INITIAL_STATE with all required fields so
 //    clampStep(4, state) returns 4 and the page opens directly at StepConfirm.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,8 +79,10 @@ vi.mock('../state/wizard.reducer', async (importOriginal) => {
       profileCode: 'PRC',
       areaCode: 'TI',
       title: 'My Document',
-      templateID: 'tmpl-1',
-      templateVersionID: 'tv-1',
+      visibility: 'company',
+      visibilityAreaCodes: [],
+      templateID: 'blank-template',
+      templateVersionID: 'blank-tv-1',
     },
   };
 });
@@ -213,7 +226,8 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
       title: 'My Document',
       ownerUserId: 'user-1',
       documentName: 'My Document',
-      templateVersionId: 'tv-1',
+      templateVersionId: 'blank-tv-1',
+      visibility: { scope: 'company', areaCodes: [], userIds: [] },
     });
     expect(typeof idempotencyKey).toBe('string');
   });
@@ -283,5 +297,81 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
     expect(key1).toMatch(uuidV4Regex);
     expect(key2).toMatch(uuidV4Regex);
     expect(key1).not.toBe(key2);
+  });
+});
+
+describe('buildVisibilityPayload', () => {
+  it('returns company scope shape', () => {
+    const payload = buildVisibilityPayload({
+      ...({
+        step: 4,
+        profileCode: 'PRC',
+        areaCode: 'TI',
+        title: 'X',
+        visibility: 'company',
+        visibilityAreaCodes: ['TI'],
+        invitees: [{ id: 'u1', label: 'User 1' }],
+        external: { passwordRequired: false, watermark: false, expiresInDays: null },
+        templateID: 't1',
+        templateVersionID: 'tv1',
+        consent: true,
+        submitting: false,
+        error: null,
+      } satisfies WizardState),
+    });
+    expect(payload).toEqual({ scope: 'company', areaCodes: [], userIds: [] });
+  });
+
+  it('returns restricted scope with areas and users for people visibility', () => {
+    const payload = buildVisibilityPayload({
+      ...({
+        step: 4,
+        profileCode: 'PRC',
+        areaCode: 'TI',
+        title: 'X',
+        visibility: 'people',
+        visibilityAreaCodes: ['TI', 'QA'],
+        invitees: [
+          { id: 'u1', label: 'User 1' },
+          { id: 'u2', label: 'User 2' },
+        ],
+        external: { passwordRequired: false, watermark: false, expiresInDays: null },
+        templateID: 't1',
+        templateVersionID: 'tv1',
+        consent: true,
+        submitting: false,
+        error: null,
+      } satisfies WizardState),
+    });
+    expect(payload).toEqual({
+      scope: 'restricted',
+      areaCodes: ['TI', 'QA'],
+      userIds: ['u1', 'u2'],
+    });
+  });
+
+  it('returns restricted scope with additional selected areas for area visibility', () => {
+    const payload = buildVisibilityPayload({
+      ...({
+        step: 4,
+        profileCode: 'PRC',
+        areaCode: 'QA',
+        title: 'X',
+        visibility: 'area',
+        visibilityAreaCodes: ['QA', 'RH'],
+        invitees: [],
+        external: { passwordRequired: false, watermark: false, expiresInDays: null },
+        templateID: 't1',
+        templateVersionID: 'tv1',
+        consent: true,
+        submitting: false,
+        error: null,
+      } satisfies WizardState),
+    });
+    expect(payload).toEqual({
+      scope: 'restricted',
+      areaCodes: ['QA', 'RH'],
+      userIds: [],
+    });
   });
 });

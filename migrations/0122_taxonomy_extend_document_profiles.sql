@@ -13,9 +13,19 @@ ALTER TABLE metaldocs.document_profiles
   ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 
 -- Step 3: code format constraint
-ALTER TABLE metaldocs.document_profiles
-  ADD CONSTRAINT IF NOT EXISTS profile_code_format
-    CHECK (code ~ '^[a-z][a-z0-9_-]{1,63}$');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'profile_code_format'
+      AND conrelid = 'metaldocs.document_profiles'::regclass
+  ) THEN
+    ALTER TABLE metaldocs.document_profiles
+      ADD CONSTRAINT profile_code_format
+      CHECK (code ~ '^[a-z][a-z0-9_-]{1,63}$');
+  END IF;
+END $$;
 
 -- Step 4: tenant-scoped unique index (includes archived rows -- codes non-reusable)
 CREATE UNIQUE INDEX IF NOT EXISTS ux_document_profiles_tenant_code

@@ -21,13 +21,24 @@ ALTER TABLE documents
   ADD COLUMN IF NOT EXISTS locked_at              TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS content_hash_at_submit TEXT;
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_documents_v2_cd_revision
-  ON documents (controlled_document_id, revision_number)
-  WHERE controlled_document_id IS NOT NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'metaldocs'
+      AND table_name = 'documents'
+      AND column_name = 'controlled_document_id'
+  ) THEN
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_documents_v2_cd_revision
+      ON documents (controlled_document_id, revision_number)
+      WHERE controlled_document_id IS NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_documents_v2_cd_active
-  ON documents (controlled_document_id)
-  WHERE controlled_document_id IS NOT NULL
-    AND status IN ('draft','under_review','approved','rejected','scheduled');
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_documents_v2_cd_active
+      ON documents (controlled_document_id)
+      WHERE controlled_document_id IS NOT NULL
+        AND status IN ('draft','under_review','approved','rejected','scheduled');
+  END IF;
+END $$;
 
 COMMIT;

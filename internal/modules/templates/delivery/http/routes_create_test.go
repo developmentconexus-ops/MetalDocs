@@ -351,3 +351,39 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		t.Fatalf("expected error.code=key_conflict, got %q", out.Code)
 	}
 }
+
+func TestCreateNextVersion_SystemOwnedTemplateImmutable(t *testing.T) {
+	repo := newFakeRepo()
+	templateID := "00000000-0000-0000-0000-000000000101"
+	repo.templates[templateID] = &domain.Template{
+		ID:          templateID,
+		TenantID:    "tenant-a",
+		SystemOwned: true,
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:            "ver-1",
+		TemplateID:    templateID,
+		VersionNumber: 1,
+		Status:        domain.VersionStatusPublished,
+	}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "SYSTEM_TEMPLATE_IMMUTABLE" {
+		t.Fatalf("expected error.code=SYSTEM_TEMPLATE_IMMUTABLE, got %q", out.Code)
+	}
+}

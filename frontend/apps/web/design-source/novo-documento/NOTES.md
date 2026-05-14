@@ -13,7 +13,25 @@
 
 ## Purpose
 
-Operator creates a new controlled document. Wizard collects: profile → area + title + visibility → template → confirm. Submit triggers two-call sequence (create slot, then create draft document). User lands on the editor for the new draft.
+Operator creates a new controlled document. Wizard collects: profile → area + title + visibility → template → confirm. Submit calls the atomic registry create flow (`createControlledDocumentAtomic`) and then lands the user on the editor for the new draft.
+
+## Implementation Summary (2026-05-14)
+
+- `implemented and aligned`
+  - Step 1 profile selection loads from real taxonomy data.
+  - Step 2 area/title loads from real taxonomy data and Step 2 code preview uses the real preview endpoint.
+  - Step 3 template selection uses the real profile-filtered templates list and submits the published version ID.
+- `screen-local integration fix`
+  - Step 4 confirmation now mirrors the real preview code and template in the summary card.
+  - Local query-key wiring for disabled template/preview queries was normalized to canonical non-sentinel keys.
+- `shared contract prerequisite`
+  - Runtime smoke reached Step 4, but `POST /api/v1/controlled-documents` returned `500 INTERNAL_ERROR` with a valid atomic-create request, so end-to-end create remains blocked outside this screen PR.
+- `missing backend capability`
+  - Visibility persistence and both sharing subcontrols remain UI-only because no backend field/endpoints exist.
+  - Blank-template creation still needs backend support for `templateVersionId: null`.
+  - Profile counts still need an aggregate field on the profiles response.
+- `defer`
+  - Per-version template picker remains deferred until a template versions list surface exists.
 
 ## Personas
 - **Author** (`role=author`) — primary user. Has `registry.create` + `doc.create` + `doc.edit`.
@@ -31,7 +49,7 @@ User policy: **render every designed feature**, even features without backend su
 | Profile card "soon" / disabled badge | **DROP** — no model field, would mislead | — | — |
 | Step 2 — Area `<select>` (real list from `/api/v1/process-areas`) | Render + selectable | `processAreaCode` sent | — |
 | Step 2 — Title input | Render + required | `title` + `name` sent | — |
-| Step 2 — Code preview "POP-QUA-120" | Render `≈ POP-QUA-???` with tooltip "Código final atribuído ao confirmar" | Server assigns | — |
+| Step 2 — Code preview "POP-QUA-120" | Render live preview from `GET /api/v1/controlled-documents/preview-code`; fall back to `POP-QUA-???` while incomplete/loading | Read-only preview; server still assigns final code at create time | — |
 | Step 2 — Visibility radios (area / people / company / external) | Render + selectable, default "Toda empresa" | **NOT submitted** (no backend field today) | TODO — needs visibility model |
 | Step 2 — People-invite chips (when visibility=people) | Render + interactive | No-op | TODO — needs share model |
 | Step 2 — External: password / watermark / expiry | Render + interactive | No-op | TODO — needs share model |
@@ -41,7 +59,7 @@ User policy: **render every designed feature**, even features without backend su
 | Step 4 — Summary card (Perfil / Área / Código / Título / Visibilidade / Template) | Render derived from prior steps | Read-only | — |
 | Step 4 — Author + Created at | Render (`useAuthStore` user + `new Date()`) | Set server-side | — |
 | Step 4 — "Confirmo que entendi" checkbox | Render + required to enable submit | Frontend gate only | — |
-| Step 4 — "Criar documento" button | Render + primary | Two-call sequence: `POST /controlled-documents` → `POST /documents` | — |
+| Step 4 — "Criar documento" button | Render + primary | Atomic create: `POST /api/v1/controlled-documents` with `Idempotency-Key` | — |
 | Stepper header (4 dots / step labels) | Render — generic primitive `components/ui/Stepper.tsx` | URL `?step=N` | — |
 | Cancel / back buttons | Render | URL nav back | — |
 
@@ -69,21 +87,19 @@ Step deps:
 
 Single route `/documents-v2/new` with `?step=1..4` URL param. Internal step state via `useReducer`. Refresh-safe + back-button works. URL also accepts pre-fill query params (e.g. `?profile=POP`) for entry from profile detail screens later.
 
-`features/documents/components/LibrarySidebar.tsx:59` currently navigates to broken `/documents/new` — **fix to `/documents-v2/new`** in this PR.
+`features/documents/components/LibrarySidebar.tsx:59` now navigates to `/documents-v2/new`.
 
 ## Backend prereqs (for `wiki/backlog/novo-documento.md`)
 
 - **Visibility model.** Define enum + storage on `controlled_documents` (or `documents`). Design uses 4 options (area/people/company/external) — different from earlier 3-option (`public/area/restricted`) attempted in 0164. Decide before backlog can be cleared.
 - **Share controls** — invitee list + external password/watermark/expiry. Schema work + sharing module.
-- **Sequence preview endpoint** — `GET /api/v1/controlled-documents/next-code?profile=X&area=Y` (optional UX polish; placeholder works fine in v1).
 - **Template versions list** — `GET /api/v1/templates/:id/versions` returning `[{ID, VersionNum, IsPublished, CreatedAt, Label}]`.
-- **No-template POST path** — `POST /documents` with `template_version_id: null` allowed; wizard surfaces "Em branco" option.
-- **Slot rollback / atomic create** — if `POST /documents` fails after `POST /controlled-documents` succeeded, document the orphan-slot recovery path. Today: orphan stays + code consumed.
+- **No-template POST path** — `POST /api/v1/controlled-documents` with `templateVersionId: null` allowed; wizard surfaces "Em branco" option.
 - **Profile doc-count aggregate** — for Step 1 card badge. Low priority.
 
 ## Open questions log (Phase 0)
 
 - [Resolved 2026-05-06] Visibility default = "Toda empresa" (matches design pre-selection + standard QMS convention). Stored in form state, not submitted.
-- [Resolved 2026-05-06] Code preview = `≈ POP-QUA-???` with tooltip.
+- [Resolved 2026-05-06] Code preview fallback = `≈ POP-QUA-???` with tooltip when profile/area is incomplete.
 - [Resolved 2026-05-06] Profile "soon" badge dropped (no consistent model).
 - [Resolved 2026-05-06] Profile per-card count = `—` placeholder + TODO.

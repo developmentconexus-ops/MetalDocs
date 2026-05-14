@@ -2813,6 +2813,19 @@ paths:
                 properties:
                   id: { type: string, format: uuid }
                   version_id: { type: string, format: uuid }
+  /api/v1/templates/system/blank:
+    get:
+      summary: Get system-owned blank template
+      tags: [templates]
+      operationId: getSystemBlankTemplate
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemBlankTemplateResponse'
+        '404': { description: not_found }
   /api/v1/templates/{id}/versions/{n}:
     get:
       summary: Get template version metadata (docx-v2)
@@ -5758,9 +5771,16 @@ components:
             export path is active. 0 = shadow-only (Phase 1); 100 = all users (Phase 3).
 
     # ── Registry schemas ──────────────────────────────────────────────────────
+    SystemBlankTemplateResponse:
+      type: object
+      required: [templateId, templateVersionId, name]
+      properties:
+        templateId: { type: string, format: uuid }
+        templateVersionId: { type: string, format: uuid }
+        name: { type: string }
     ControlledDocument:
       type: object
-      required: [id, tenantId, profileCode, processAreaCode, code, title, ownerUserId, status, createdAt, updatedAt]
+      required: [id, tenantId, profileCode, processAreaCode, code, title, ownerUserId, status, visibility, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         tenantId: { type: string, format: uuid }
@@ -5773,8 +5793,22 @@ components:
         ownerUserId: { type: string }
         overrideTemplateVersionId: { type: string, format: uuid, nullable: true }
         status: { type: string, enum: [active, obsolete, superseded] }
+        visibility:
+          $ref: '#/components/schemas/ControlledDocumentVisibility'
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    ControlledDocumentVisibility:
+      type: object
+      required: [scope, areaCodes, userIds]
+      properties:
+        scope: { type: string, enum: [company, restricted] }
+        areaCodes:
+          type: array
+          items: { type: string }
+        userIds:
+          type: array
+          items: { type: string }
 
     DocumentRef:
       type: object
@@ -5785,7 +5819,7 @@ components:
 
     CreateAtomicRequest:
       type: object
-      required: [profileCode, processAreaCode, title, ownerUserId, documentName]
+      required: [profileCode, processAreaCode, title, ownerUserId, documentName, visibility]
       properties:
         profileCode: { type: string, minLength: 1 }
         processAreaCode: { type: string, minLength: 1 }
@@ -5793,6 +5827,8 @@ components:
         title: { type: string, minLength: 1 }
         ownerUserId: { type: string, minLength: 1 }
         documentName: { type: string, minLength: 1 }
+        visibility:
+          $ref: '#/components/schemas/ControlledDocumentVisibility'
         templateVersionId: { type: string, format: uuid }
         formData: { type: object, additionalProperties: true }
         manualCode: { type: string }
@@ -5862,5 +5898,3 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
-
-

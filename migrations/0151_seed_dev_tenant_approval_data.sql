@@ -39,14 +39,14 @@ VALUES ('reviewer', 'doc.submit', 'Submit document for approval')
 ON CONFLICT (role, capability) DO NOTHING;
 
 -- 3. Ensure dev IAM users exist.
-INSERT INTO metaldocs.iam_users (user_id, display_name) VALUES
-  ('reviewer-1',  'Reviewer One'),
-  ('admin-local', 'Administrator')
+INSERT INTO metaldocs.iam_users (user_id, display_name, tenant_id) VALUES
+  ('reviewer-1',  'Reviewer One', 'ffffffff-ffff-ffff-ffff-ffffffffffff'),
+  ('admin-local', 'Administrator', 'ffffffff-ffff-ffff-ffff-ffffffffffff')
 ON CONFLICT (user_id) DO NOTHING;
 
 -- 4. Set reviewer-1 as reviewer in quality area (idempotent insert).
 INSERT INTO public.user_process_areas (user_id, tenant_id, area_code, role, effective_from, granted_by)
-VALUES ('reviewer-1', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'quality', 'reviewer', now(), 'system')
+VALUES ('reviewer-1', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'quality', 'reviewer', now(), 'admin-local')
 ON CONFLICT DO NOTHING;
 
 -- 5. Set admin-local as qms_admin in quality area.
@@ -69,7 +69,7 @@ BEGIN
        AND effective_to IS NULL;
   ELSE
     INSERT INTO public.user_process_areas (user_id, tenant_id, area_code, role, effective_from, granted_by)
-    VALUES ('admin-local', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'quality', 'qms_admin', now(), 'system');
+    VALUES ('admin-local', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'quality', 'qms_admin', now(), 'admin-local');
   END IF;
 END $$;
 

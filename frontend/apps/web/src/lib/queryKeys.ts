@@ -50,6 +50,7 @@ export const QK = {
   },
   templates: {
     list: () => ['templates', 'list'] as const,
+    blank: () => ['templates', 'blank'] as const,
     byProfile: (profileCode: string) =>
       ['templates', 'by-profile', profileCode] as const,
   },

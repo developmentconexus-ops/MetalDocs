@@ -18,6 +18,8 @@ powershell -ExecutionPolicy Bypass -File scripts/dev-migrate.ps1 | Out-Host
 
 Write-Host ""
 Write-Host "[dev-local] Fast local development mode is ready."
+Write-Host "  0. Fresh install (preferred): powershell -ExecutionPolicy Bypass -File scripts/dev-bootstrap-baseline.ps1"
+Write-Host "     Legacy recovery: powershell -ExecutionPolicy Bypass -File scripts/dev-migrate.ps1"
 Write-Host "  1. Start docgen: powershell -ExecutionPolicy Bypass -File scripts/dev-docgen.ps1"
 Write-Host "  2. Start API: powershell -ExecutionPolicy Bypass -File scripts/dev-api.ps1"
 Write-Host "  3. Start web: cd frontend/apps/web; npm run dev"

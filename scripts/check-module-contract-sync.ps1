@@ -41,6 +41,20 @@ function New-ModuleConfig {
                 FrontendWrapperPatterns = @('/approval/inbox', '/documents/${documentId}/signoff', '/documents/${documentId}/cancel', '/approval/routes', 'listInbox', 'signoff', 'cancel', 'createRoute', 'listRoutes')
             }
         }
+        'registry' {
+            return @{
+                RuntimeFile = 'internal/modules/registry/delivery/http/handler.go'
+                RuntimePatterns = @('/api/v1/controlled-documents', 'generated.ListControlledDocuments', 'generated.GetControlledDocument')
+                OpenApiFile = 'api/openapi/v1/openapi.yaml'
+                OpenApiPatterns = @('/api/v1/controlled-documents:', '/api/v1/controlled-documents/{id}:', '/api/v1/controlled-documents/{id}/revisions:')
+                BackendFile = 'internal/modules/registry/api/api.gen.go'
+                BackendPatterns = @('ListControlledDocuments', 'AtomicCreateControlledDocument', 'GetControlledDocument')
+                FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
+                FrontendTypesPatterns = @('"/api/v1/controlled-documents":', '"/api/v1/controlled-documents/{id}":', '"/api/v1/controlled-documents/{id}/revisions":')
+                FrontendWrapperFile = 'frontend/apps/web/src/features/registry/api/controlledDocuments.ts'
+                FrontendWrapperPatterns = @('/api/v1/controlled-documents', 'fetchControlledDocuments', 'createControlledDocumentAtomic')
+            }
+        }
         default {
             $basePath = "/api/v1/$ModuleName"
             return @{
