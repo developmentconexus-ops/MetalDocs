@@ -40,3 +40,12 @@ Todos · Publicados · Rascunhos · Arquivados (counts from API response)
 - Add `description` column to templates table
 - Return template descriptions in list API response
 - Potentially return bound profiles association
+
+## Integration audit summary (2026-05-13)
+
+- Runtime/auth/target-route gate passes for `GET /api/v1/templates`.
+- Contract surfaces exist for templates runtime, OpenAPI, generated backend API, generated frontend types, and `api/templatesV2.ts`.
+- The list screen is partly real already: fetch, tabs, cards, empty/loading/error states, and wizard handoff are implementable now.
+- Two backend/API gaps remain for design parity: real `updated_at` and author display name instead of raw `created_by`.
+- The feature still contains a legacy parallel API layer in `api/templates.ts`; keep Plan 12.1 on `templatesV2.ts` and only clean legacy paths if the touched screen flow still depends on them.
+- Frontend route wiring needs attention before trusting the screen boundary: `routes.tsx` currently declares duplicate `"templates"` entries.
