@@ -1,11 +1,15 @@
 # Architecture: Data Model
 
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-05-15
 > **Status:** Stub. Expand with ERD + per-table schema notes when SQL stabilizes.
 > **Scope:** Postgres tables, key relationships, snapshot columns, hash columns.
-> **Out of scope:** Migration history (see `internal/platform/db/migrations/`).
+> **Out of scope:** Migration archaeology (see `docs/db-research/` and retained historical `migrations/` evidence).
 > **Key files:**
-> - `internal/platform/db/migrations/` — source of truth for schema
+> - `db/prerequisites/0001_extensions.sql` - required extensions before schema objects
+> - `db/baseline/0001_current_schema.sql` - curated current-state schema for fresh environments
+> - `db/reference-data/0001_product_reference_data.sql` - product reference data required at runtime
+> - `db/dev-seeds/0001_local_dev_seed.sql` - optional local-only developer accounts/data
+> - `db/migrations/` - post-baseline forward migrations
 > - `internal/modules/templates/infrastructure/repo/` — template tables
 > - `internal/modules/documents/repository/repository.go:37` — document tables; `CreateDocument` INSERT (accepts `requiredPlaceholders`; seeds `document_placeholder_values` atomically)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:11` — document_families SQL impl

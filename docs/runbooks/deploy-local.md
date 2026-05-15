@@ -23,7 +23,7 @@
       - `METALDOCS_ATTACHMENTS_SIGNING_SECRET`
       - `METALDOCS_MINIO_SECRET_KEY`
       - `METALDOCS_AUTH_SESSION_SECRET`
-      - `METALDOCS_BOOTSTRAP_ADMIN_PASSWORD`
+      - `METALDOCS_BOOTSTRAP_ADMIN_PASSWORD` only if `METALDOCS_BOOTSTRAP_ADMIN_ENABLED=true`
       - `METALDOCS_AUTH_TRUSTED_ORIGINS`
    - Para hardening basico, habilitar:
      - `METALDOCS_RATE_LIMIT_ENABLED=true`
@@ -43,10 +43,9 @@
    - `curl http://localhost:4000/`
 4. Validar UI:
    - abrir `http://localhost/`
-   - login inicial:
+   - login local seeded:
      - username: `admin`
-     - senha: valor de `METALDOCS_BOOTSTRAP_ADMIN_PASSWORD`
-   - trocar a senha no primeiro acesso
+     - senha: `AdminMetalDocs123!` when the database was bootstrapped with `db/dev-seeds`
 5. Validar storage:
    - abrir `http://localhost/api/v1/health/live`
    - confirmar bucket `metaldocs-attachments` no console do MinIO `http://localhost:9001/`

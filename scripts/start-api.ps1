@@ -11,7 +11,7 @@ $apiCriticalPaths = @(
     'apps/api/cmd/metaldocs-api',
     'internal/modules',
     'internal/platform',
-    'migrations',
+    'db',
     'scripts/start-api.ps1'
 )
 
@@ -19,7 +19,7 @@ $workerCriticalPaths = @(
     'apps/worker/cmd/metaldocs-worker',
     'internal/modules',
     'internal/platform',
-    'migrations',
+    'db',
     'scripts/start-api.ps1'
 )
 

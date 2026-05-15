@@ -1,72 +1,75 @@
 # Database Dictionary Index
 
+> **Last verified:** 2026-05-15
+> **Source:** `db/baseline/0001_current_schema.sql`
+
 | Table | Schema | Owner | Page |
 |---|---|---|---|
-| $(@{Schema=metaldocs; Table=audit_events}.Table) | $(@{Schema=metaldocs; Table=audit_events}.Schema) | TBD | wiki/database/tables/audit_events.md |
-| $(@{Schema=metaldocs; Table=auth_identities}.Table) | $(@{Schema=metaldocs; Table=auth_identities}.Schema) | TBD | wiki/database/tables/auth_identities.md |
-| $(@{Schema=metaldocs; Table=auth_sessions}.Table) | $(@{Schema=metaldocs; Table=auth_sessions}.Schema) | TBD | wiki/database/tables/auth_sessions.md |
-| $(@{Schema=metaldocs; Table=document_access_policies}.Table) | $(@{Schema=metaldocs; Table=document_access_policies}.Schema) | TBD | wiki/database/tables/document_access_policies.md |
-| $(@{Schema=metaldocs; Table=document_attachments}.Table) | $(@{Schema=metaldocs; Table=document_attachments}.Schema) | TBD | wiki/database/tables/document_attachments.md |
-| $(@{Schema=metaldocs; Table=document_collaboration_presence}.Table) | $(@{Schema=metaldocs; Table=document_collaboration_presence}.Schema) | TBD | wiki/database/tables/document_collaboration_presence.md |
-| $(@{Schema=metaldocs; Table=document_departments}.Table) | $(@{Schema=metaldocs; Table=document_departments}.Schema) | TBD | wiki/database/tables/document_departments.md |
-| $(@{Schema=metaldocs; Table=document_edit_locks}.Table) | $(@{Schema=metaldocs; Table=document_edit_locks}.Schema) | TBD | wiki/database/tables/document_edit_locks.md |
-| $(@{Schema=metaldocs; Table=document_families}.Table) | $(@{Schema=metaldocs; Table=document_families}.Schema) | TBD | wiki/database/tables/document_families.md |
-| $(@{Schema=metaldocs; Table=document_images}.Table) | $(@{Schema=metaldocs; Table=document_images}.Schema) | TBD | wiki/database/tables/document_images.md |
-| $(@{Schema=metaldocs; Table=document_process_areas}.Table) | $(@{Schema=metaldocs; Table=document_process_areas}.Schema) | TBD | wiki/database/tables/document_process_areas.md |
-| $(@{Schema=metaldocs; Table=document_profile_governance}.Table) | $(@{Schema=metaldocs; Table=document_profile_governance}.Schema) | TBD | wiki/database/tables/document_profile_governance.md |
-| $(@{Schema=metaldocs; Table=document_profile_schema_versions}.Table) | $(@{Schema=metaldocs; Table=document_profile_schema_versions}.Schema) | TBD | wiki/database/tables/document_profile_schema_versions.md |
-| $(@{Schema=metaldocs; Table=document_profile_template_defaults}.Table) | $(@{Schema=metaldocs; Table=document_profile_template_defaults}.Schema) | TBD | wiki/database/tables/document_profile_template_defaults.md |
-| $(@{Schema=metaldocs; Table=document_profiles}.Table) | $(@{Schema=metaldocs; Table=document_profiles}.Schema) | TBD | wiki/database/tables/document_profiles.md |
-| $(@{Schema=metaldocs; Table=document_sequences}.Table) | $(@{Schema=metaldocs; Table=document_sequences}.Schema) | TBD | wiki/database/tables/document_sequences.md |
-| $(@{Schema=metaldocs; Table=document_subjects}.Table) | $(@{Schema=metaldocs; Table=document_subjects}.Schema) | TBD | wiki/database/tables/document_subjects.md |
-| $(@{Schema=metaldocs; Table=document_template_assignments}.Table) | $(@{Schema=metaldocs; Table=document_template_assignments}.Schema) | TBD | wiki/database/tables/document_template_assignments.md |
-| $(@{Schema=metaldocs; Table=document_template_versions}.Table) | $(@{Schema=metaldocs; Table=document_template_versions}.Schema) | TBD | wiki/database/tables/document_template_versions.md |
-| $(@{Schema=metaldocs; Table=document_template_versions_mddm}.Table) | $(@{Schema=metaldocs; Table=document_template_versions_mddm}.Schema) | TBD | wiki/database/tables/document_template_versions_mddm.md |
-| $(@{Schema=metaldocs; Table=document_type_schema_versions}.Table) | $(@{Schema=metaldocs; Table=document_type_schema_versions}.Schema) | TBD | wiki/database/tables/document_type_schema_versions.md |
-| $(@{Schema=metaldocs; Table=document_types}.Table) | $(@{Schema=metaldocs; Table=document_types}.Schema) | TBD | wiki/database/tables/document_types.md |
-| $(@{Schema=metaldocs; Table=document_version_images}.Table) | $(@{Schema=metaldocs; Table=document_version_images}.Schema) | TBD | wiki/database/tables/document_version_images.md |
-| $(@{Schema=metaldocs; Table=document_versions}.Table) | $(@{Schema=metaldocs; Table=document_versions}.Schema) | TBD | wiki/database/tables/document_versions.md |
-| $(@{Schema=metaldocs; Table=document_versions_mddm}.Table) | $(@{Schema=metaldocs; Table=document_versions_mddm}.Schema) | TBD | wiki/database/tables/document_versions_mddm.md |
-| $(@{Schema=metaldocs; Table=documents}.Table) | $(@{Schema=metaldocs; Table=documents}.Schema) | TBD | wiki/database/tables/documents.md |
-| $(@{Schema=metaldocs; Table=iam_group_members}.Table) | $(@{Schema=metaldocs; Table=iam_group_members}.Schema) | TBD | wiki/database/tables/iam_group_members.md |
-| $(@{Schema=metaldocs; Table=iam_group_roles}.Table) | $(@{Schema=metaldocs; Table=iam_group_roles}.Schema) | TBD | wiki/database/tables/iam_group_roles.md |
-| $(@{Schema=metaldocs; Table=iam_groups}.Table) | $(@{Schema=metaldocs; Table=iam_groups}.Schema) | TBD | wiki/database/tables/iam_groups.md |
-| $(@{Schema=metaldocs; Table=iam_user_roles}.Table) | $(@{Schema=metaldocs; Table=iam_user_roles}.Schema) | TBD | wiki/database/tables/iam_user_roles.md |
-| $(@{Schema=metaldocs; Table=iam_users}.Table) | $(@{Schema=metaldocs; Table=iam_users}.Schema) | TBD | wiki/database/tables/iam_users.md |
-| $(@{Schema=metaldocs; Table=idempotency_keys}.Table) | $(@{Schema=metaldocs; Table=idempotency_keys}.Schema) | TBD | wiki/database/tables/idempotency_keys.md |
-| $(@{Schema=metaldocs; Table=job_leases}.Table) | $(@{Schema=metaldocs; Table=job_leases}.Schema) | TBD | wiki/database/tables/job_leases.md |
-| $(@{Schema=metaldocs; Table=mddm_shadow_diff_events}.Table) | $(@{Schema=metaldocs; Table=mddm_shadow_diff_events}.Schema) | TBD | wiki/database/tables/mddm_shadow_diff_events.md |
-| $(@{Schema=metaldocs; Table=notifications}.Table) | $(@{Schema=metaldocs; Table=notifications}.Schema) | TBD | wiki/database/tables/notifications.md |
-| $(@{Schema=metaldocs; Table=outbox_events}.Table) | $(@{Schema=metaldocs; Table=outbox_events}.Schema) | TBD | wiki/database/tables/outbox_events.md |
-| $(@{Schema=metaldocs; Table=pdf_dispatch_outbox}.Table) | $(@{Schema=metaldocs; Table=pdf_dispatch_outbox}.Schema) | TBD | wiki/database/tables/pdf_dispatch_outbox.md |
-| $(@{Schema=metaldocs; Table=role_capabilities}.Table) | $(@{Schema=metaldocs; Table=role_capabilities}.Schema) | TBD | wiki/database/tables/role_capabilities.md |
-| $(@{Schema=metaldocs; Table=template_audit_log}.Table) | $(@{Schema=metaldocs; Table=template_audit_log}.Schema) | TBD | wiki/database/tables/template_audit_log.md |
-| $(@{Schema=metaldocs; Table=template_drafts}.Table) | $(@{Schema=metaldocs; Table=template_drafts}.Schema) | TBD | wiki/database/tables/template_drafts.md |
-| $(@{Schema=metaldocs; Table=workflow_approvals}.Table) | $(@{Schema=metaldocs; Table=workflow_approvals}.Schema) | TBD | wiki/database/tables/workflow_approvals.md |
-| $(@{Schema=public; Table=approval_instances}.Table) | $(@{Schema=public; Table=approval_instances}.Schema) | TBD | wiki/database/tables/approval_instances.md |
-| $(@{Schema=public; Table=approval_route_stages}.Table) | $(@{Schema=public; Table=approval_route_stages}.Schema) | TBD | wiki/database/tables/approval_route_stages.md |
-| $(@{Schema=public; Table=approval_routes}.Table) | $(@{Schema=public; Table=approval_routes}.Schema) | TBD | wiki/database/tables/approval_routes.md |
-| $(@{Schema=public; Table=approval_signoffs}.Table) | $(@{Schema=public; Table=approval_signoffs}.Schema) | TBD | wiki/database/tables/approval_signoffs.md |
-| $(@{Schema=public; Table=approval_stage_instances}.Table) | $(@{Schema=public; Table=approval_stage_instances}.Schema) | TBD | wiki/database/tables/approval_stage_instances.md |
-| $(@{Schema=public; Table=autosave_pending_uploads}.Table) | $(@{Schema=public; Table=autosave_pending_uploads}.Schema) | TBD | wiki/database/tables/autosave_pending_uploads.md |
-| $(@{Schema=public; Table=cd_sequence_counters}.Table) | $(@{Schema=public; Table=cd_sequence_counters}.Schema) | TBD | wiki/database/tables/cd_sequence_counters.md |
-| $(@{Schema=public; Table=controlled_document_area_grants}.Table) | $(@{Schema=public; Table=controlled_document_area_grants}.Schema) | TBD | wiki/database/tables/controlled_document_area_grants.md |
-| $(@{Schema=public; Table=controlled_document_user_grants}.Table) | $(@{Schema=public; Table=controlled_document_user_grants}.Schema) | TBD | wiki/database/tables/controlled_document_user_grants.md |
-| $(@{Schema=public; Table=controlled_documents}.Table) | $(@{Schema=public; Table=controlled_documents}.Schema) | TBD | wiki/database/tables/controlled_documents.md |
-| $(@{Schema=public; Table=document_checkpoints}.Table) | $(@{Schema=public; Table=document_checkpoints}.Schema) | TBD | wiki/database/tables/document_checkpoints.md |
-| $(@{Schema=public; Table=document_comments}.Table) | $(@{Schema=public; Table=document_comments}.Schema) | TBD | wiki/database/tables/document_comments.md |
-| $(@{Schema=public; Table=document_exports}.Table) | $(@{Schema=public; Table=document_exports}.Schema) | TBD | wiki/database/tables/document_exports.md |
-| $(@{Schema=public; Table=document_placeholder_values}.Table) | $(@{Schema=public; Table=document_placeholder_values}.Schema) | TBD | wiki/database/tables/document_placeholder_values.md |
-| $(@{Schema=public; Table=document_revisions}.Table) | $(@{Schema=public; Table=document_revisions}.Schema) | TBD | wiki/database/tables/document_revisions.md |
-| $(@{Schema=public; Table=documents}.Table) | $(@{Schema=public; Table=documents}.Schema) | TBD | wiki/database/tables/documents.md |
-| $(@{Schema=public; Table=editor_sessions}.Table) | $(@{Schema=public; Table=editor_sessions}.Schema) | TBD | wiki/database/tables/editor_sessions.md |
-| $(@{Schema=public; Table=governance_events}.Table) | $(@{Schema=public; Table=governance_events}.Schema) | TBD | wiki/database/tables/governance_events.md |
-| $(@{Schema=public; Table=schema_migrations}.Table) | $(@{Schema=public; Table=schema_migrations}.Schema) | TBD | wiki/database/tables/schema_migrations.md |
-| $(@{Schema=public; Table=template_audit_log}.Table) | $(@{Schema=public; Table=template_audit_log}.Schema) | TBD | wiki/database/tables/template_audit_log.md |
-| $(@{Schema=public; Table=template_versions}.Table) | $(@{Schema=public; Table=template_versions}.Schema) | TBD | wiki/database/tables/template_versions.md |
-| $(@{Schema=public; Table=templates}.Table) | $(@{Schema=public; Table=templates}.Schema) | TBD | wiki/database/tables/templates.md |
-| $(@{Schema=public; Table=templates_v2_approval_config}.Table) | $(@{Schema=public; Table=templates_v2_approval_config}.Schema) | TBD | wiki/database/tables/templates_v2_approval_config.md |
-| $(@{Schema=public; Table=templates_v2_audit_log}.Table) | $(@{Schema=public; Table=templates_v2_audit_log}.Schema) | TBD | wiki/database/tables/templates_v2_audit_log.md |
-| $(@{Schema=public; Table=templates_v2_template}.Table) | $(@{Schema=public; Table=templates_v2_template}.Schema) | TBD | wiki/database/tables/templates_v2_template.md |
-| $(@{Schema=public; Table=templates_v2_template_version}.Table) | $(@{Schema=public; Table=templates_v2_template_version}.Schema) | TBD | wiki/database/tables/templates_v2_template_version.md |
-| $(@{Schema=public; Table=user_process_areas}.Table) | $(@{Schema=public; Table=user_process_areas}.Schema) | TBD | wiki/database/tables/user_process_areas.md |
+| `audit_events` | `metaldocs` | audit | `wiki/database/tables/audit_events.md` |
+| `auth_identities` | `metaldocs` | auth | `wiki/database/tables/auth_identities.md` |
+| `auth_sessions` | `metaldocs` | auth | `wiki/database/tables/auth_sessions.md` |
+| `document_access_policies` | `metaldocs` | documents | `wiki/database/tables/document_access_policies.md` |
+| `document_attachments` | `metaldocs` | documents | `wiki/database/tables/document_attachments.md` |
+| `document_collaboration_presence` | `metaldocs` | documents | `wiki/database/tables/document_collaboration_presence.md` |
+| `document_departments` | `metaldocs` | taxonomy | `wiki/database/tables/document_departments.md` |
+| `document_edit_locks` | `metaldocs` | documents | `wiki/database/tables/document_edit_locks.md` |
+| `document_families` | `metaldocs` | taxonomy | `wiki/database/tables/document_families.md` |
+| `document_images` | `metaldocs` | documents | `wiki/database/tables/document_images.md` |
+| `document_process_areas` | `metaldocs` | taxonomy | `wiki/database/tables/document_process_areas.md` |
+| `document_profile_governance` | `metaldocs` | taxonomy | `wiki/database/tables/document_profile_governance.md` |
+| `document_profile_schema_versions` | `metaldocs` | taxonomy | `wiki/database/tables/document_profile_schema_versions.md` |
+| `document_profile_template_defaults` | `metaldocs` | taxonomy | `wiki/database/tables/document_profile_template_defaults.md` |
+| `document_profiles` | `metaldocs` | taxonomy | `wiki/database/tables/document_profiles.md` |
+| `document_sequences` | `metaldocs` | unknown-owner | `wiki/database/tables/document_sequences.md` |
+| `document_subjects` | `metaldocs` | taxonomy | `wiki/database/tables/document_subjects.md` |
+| `document_template_assignments` | `metaldocs` | templates | `wiki/database/tables/document_template_assignments.md` |
+| `document_template_versions` | `metaldocs` | templates | `wiki/database/tables/document_template_versions.md` |
+| `document_template_versions_mddm` | `metaldocs` | templates | `wiki/database/tables/document_template_versions_mddm.md` |
+| `document_type_schema_versions` | `metaldocs` | taxonomy | `wiki/database/tables/document_type_schema_versions.md` |
+| `document_types` | `metaldocs` | taxonomy | `wiki/database/tables/document_types.md` |
+| `document_version_images` | `metaldocs` | documents | `wiki/database/tables/document_version_images.md` |
+| `document_versions` | `metaldocs` | documents | `wiki/database/tables/document_versions.md` |
+| `document_versions_mddm` | `metaldocs` | documents | `wiki/database/tables/document_versions_mddm.md` |
+| `documents` | `metaldocs` | documents | `wiki/database/tables/documents.md` |
+| `iam_group_members` | `metaldocs` | iam | `wiki/database/tables/iam_group_members.md` |
+| `iam_group_roles` | `metaldocs` | iam | `wiki/database/tables/iam_group_roles.md` |
+| `iam_groups` | `metaldocs` | iam | `wiki/database/tables/iam_groups.md` |
+| `iam_user_roles` | `metaldocs` | iam | `wiki/database/tables/iam_user_roles.md` |
+| `iam_users` | `metaldocs` | iam | `wiki/database/tables/iam_users.md` |
+| `idempotency_keys` | `metaldocs` | registry | `wiki/database/tables/idempotency_keys.md` |
+| `job_leases` | `metaldocs` | platform/workers | `wiki/database/tables/job_leases.md` |
+| `mddm_shadow_diff_events` | `metaldocs` | documents | `wiki/database/tables/mddm_shadow_diff_events.md` |
+| `notifications` | `metaldocs` | platform/workers | `wiki/database/tables/notifications.md` |
+| `outbox_events` | `metaldocs` | platform/workers | `wiki/database/tables/outbox_events.md` |
+| `pdf_dispatch_outbox` | `metaldocs` | platform/workers | `wiki/database/tables/pdf_dispatch_outbox.md` |
+| `role_capabilities` | `metaldocs` | iam | `wiki/database/tables/role_capabilities.md` |
+| `template_audit_log` | `metaldocs` | templates | `wiki/database/tables/template_audit_log.md` |
+| `template_drafts` | `metaldocs` | templates | `wiki/database/tables/template_drafts.md` |
+| `workflow_approvals` | `metaldocs` | approval | `wiki/database/tables/workflow_approvals.md` |
+| `approval_instances` | `public` | approval | `wiki/database/tables/approval_instances.md` |
+| `approval_route_stages` | `public` | approval | `wiki/database/tables/approval_route_stages.md` |
+| `approval_routes` | `public` | approval | `wiki/database/tables/approval_routes.md` |
+| `approval_signoffs` | `public` | approval | `wiki/database/tables/approval_signoffs.md` |
+| `approval_stage_instances` | `public` | approval | `wiki/database/tables/approval_stage_instances.md` |
+| `autosave_pending_uploads` | `public` | documents | `wiki/database/tables/autosave_pending_uploads.md` |
+| `cd_sequence_counters` | `public` | registry | `wiki/database/tables/cd_sequence_counters.md` |
+| `controlled_document_area_grants` | `public` | registry | `wiki/database/tables/controlled_document_area_grants.md` |
+| `controlled_document_user_grants` | `public` | registry | `wiki/database/tables/controlled_document_user_grants.md` |
+| `controlled_documents` | `public` | registry | `wiki/database/tables/controlled_documents.md` |
+| `document_checkpoints` | `public` | documents | `wiki/database/tables/document_checkpoints.md` |
+| `document_comments` | `public` | documents | `wiki/database/tables/document_comments.md` |
+| `document_exports` | `public` | documents | `wiki/database/tables/document_exports.md` |
+| `document_placeholder_values` | `public` | documents | `wiki/database/tables/document_placeholder_values.md` |
+| `document_revisions` | `public` | documents | `wiki/database/tables/document_revisions.md` |
+| `documents` | `public` | documents | `wiki/database/tables/documents.md` |
+| `editor_sessions` | `public` | documents | `wiki/database/tables/editor_sessions.md` |
+| `governance_events` | `public` | audit | `wiki/database/tables/governance_events.md` |
+| `schema_migrations` | `public` | platform/db tooling | `wiki/database/tables/schema_migrations.md` |
+| `template_audit_log` | `public` | templates | `wiki/database/tables/template_audit_log.md` |
+| `template_versions` | `public` | templates | `wiki/database/tables/template_versions.md` |
+| `templates` | `public` | templates | `wiki/database/tables/templates.md` |
+| `templates_v2_approval_config` | `public` | templates | `wiki/database/tables/templates_v2_approval_config.md` |
+| `templates_v2_audit_log` | `public` | templates | `wiki/database/tables/templates_v2_audit_log.md` |
+| `templates_v2_template` | `public` | templates | `wiki/database/tables/templates_v2_template.md` |
+| `templates_v2_template_version` | `public` | templates | `wiki/database/tables/templates_v2_template_version.md` |
+| `user_process_areas` | `public` | iam | `wiki/database/tables/user_process_areas.md` |
