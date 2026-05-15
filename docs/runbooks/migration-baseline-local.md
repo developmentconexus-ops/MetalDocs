@@ -8,5 +8,6 @@ This path uses the curated baseline plus optional local dev seed. It does not re
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-bootstrap-baseline.ps1 -WithDevSeed
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-db-bootstrap.ps1 -WithDevSeed
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -StartApi -TargetRoute /api/v1/controlled-documents
 ```

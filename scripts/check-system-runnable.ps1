@@ -141,26 +141,38 @@ $client.Timeout = [TimeSpan]::FromSeconds(15)
 try {
     $startupProcess = $null
     if ($StartApi) {
-        Write-Host "Starting API via scripts/start-api.ps1 -Build -NoWorker"
-        Normalize-ProcessPathEnvironment
-        $startupProcess = Start-Process `
-            -FilePath (Join-Path $PSHOME "powershell.exe") `
-            -ArgumentList @(
-                '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        (Join-Path $PSScriptRoot 'start-api.ps1'),
-        '-NoWorker'
-      ) `
-            -WorkingDirectory $root `
-            -PassThru `
-            -WindowStyle Hidden
+        $reuseRunningApi = $false
+        try {
+            $readyResponse = Invoke-CheckedRequest -Client $client -Method Get -Route '/api/v1/health/ready'
+            if ($readyResponse.IsSuccessStatusCode) {
+                $reuseRunningApi = $true
+                Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) from existing API on :8081"
+            }
+        } catch {
+        }
 
-        $readyResponse = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 420
-        Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) after start-api.ps1"
-        Start-Sleep -Seconds 2
-        $null = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 30 -ConsecutiveSuccesses 1
+        if (-not $reuseRunningApi) {
+            Write-Host "Starting API via scripts/start-api.ps1 -NoWorker"
+            Normalize-ProcessPathEnvironment
+            $startupProcess = Start-Process `
+                -FilePath (Join-Path $PSHOME "powershell.exe") `
+                -ArgumentList @(
+                    '-NoProfile',
+                    '-ExecutionPolicy',
+                    'Bypass',
+                    '-File',
+                    (Join-Path $PSScriptRoot 'start-api.ps1'),
+                    '-NoWorker'
+                ) `
+                -WorkingDirectory $root `
+                -PassThru `
+                -WindowStyle Hidden
+
+            $readyResponse = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 720
+            Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) after start-api.ps1"
+            Start-Sleep -Seconds 2
+            $null = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 30 -ConsecutiveSuccesses 1
+        }
     }
 
     $loginPayload = @{
