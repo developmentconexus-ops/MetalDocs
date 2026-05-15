@@ -327,7 +327,7 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 - Binary: single Go server (`apps/api/cmd/metaldocs-api`)
 - Process: `:8081` (see [wiki/references/local-dev-startup.md](references/local-dev-startup.md))
 - Migrations: applied at startup; files at repo-root `migrations/` (7 affect registry: 0124, 0126, 0127, 0128, 0167, 0182, 0183 â€” see `_artifacts/04-persistence.md` Â§6)
-- Startup hook: `Module.RunStartupMigrations` runs `BackfillLegacyDocuments` (`application/migration.go:13`)
+- Legacy registry maintenance is not part of normal API startup. Use `Module.RunLegacyMaintenance` only for intentional recovery on older databases.
 - Environment: module reads no env vars directly (`_artifacts/03-deps.md` Â§4)
 
 ---
@@ -460,4 +460,3 @@ Top 3 (by severity, then blast-radius):
 
 - 2026-05-11 â€” Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; Â§5.3 T-006 note updated; Â§6.2 sequence + tripwire note updated; Â§8.7 tenant-scoping paragraph added; Key files updated.
 - 2026-05-11 â€” initial Arc42 + C4 publish; supersedes 2026-05-07 stub.
-
