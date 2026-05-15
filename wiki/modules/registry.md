@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-12 (Plan 8) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-05-15 (DB foundation) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/registry/module.go:25` â€” module wiring (`New`, dependencies)
@@ -139,7 +139,7 @@ C4Container
 
 ### 5.2 Public surface (selected)
 
-Full list in `_artifacts/01-surface.md` (90 exported symbols). Anchors below:
+Full list in `_artifacts/01-surface.md` (89 exported symbols). Anchors below:
 
 | File | Symbol | Kind | Purpose |
 |---|---|---|---|
@@ -149,7 +149,7 @@ Full list in `_artifacts/01-surface.md` (90 exported symbols). Anchors below:
 | `application/service.go:279` | `PreviewCode` | method | Read-only next-code peek |
 | `application/service.go:293` | `Obsolete` / `Supersede` | method | Lifecycle transitions via `changeStatus` |
 | `application/service.go:330` | `CreateRevision` | method | New revision on existing CD |
-| `application/migration.go:13` | `BackfillLegacyDocuments` | func | Startup data-migration hook |
+| `application/migration.go:13` | `BackfillLegacyDocuments` | func | Recovery-only legacy data maintenance hook |
 | `domain/controlled_document.go:18` | `ControlledDocument` | struct | Domain entity |
 | `domain/controlled_document.go:13-15` | `CDStatusActive/Obsolete/Superseded` | const | Status enum |
 | `domain/controlled_document.go:48` | `AutoCode` | func | Format `{profile}-{area}-{NNN}` |
@@ -457,6 +457,8 @@ Top 3 (by severity, then blast-radius):
 - Tech debt: [registry-tech-debt](modules/registry-tech-debt.md)
 
 ## Changelog
+
+- 2026-05-15 - Database foundation sync: removed startup migration alias references (`RunStartupMigrations`), confirmed legacy maintenance is explicit recovery-only, and aligned startup notes with the current DB bootstrap workflow.
 
 - 2026-05-11 â€” Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; Â§5.3 T-006 note updated; Â§6.2 sequence + tripwire note updated; Â§8.7 tenant-scoping paragraph added; Key files updated.
 - 2026-05-11 â€” initial Arc42 + C4 publish; supersedes 2026-05-07 stub.
