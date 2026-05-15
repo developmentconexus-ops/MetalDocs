@@ -28,6 +28,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-migrate.ps1
 ## Verification
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-api.ps1 -Build -NoWorker
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/controlled-documents
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -StartApi -TargetRoute /api/v1/controlled-documents
 ```

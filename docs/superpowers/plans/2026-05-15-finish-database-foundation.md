@@ -297,7 +297,7 @@ Expected: commit succeeds.
 - Modify: `scripts/check-db-bootstrap.ps1`
 - Modify: `scripts/dev-local.ps1`
 
-- [ ] **Step 1: Prevent accidental self-compare**
+- [x] **Step 1: Prevent accidental self-compare**
 
 Modify `scripts/check-baseline-equivalence.ps1` params:
 
@@ -360,7 +360,7 @@ COMMIT;
 
 If this foreground start blocks in practice, replace the inner startup with `scripts/check-system-runnable.ps1 -StartApi -TargetRoute /api/v1/health/ready` and keep the process cleanup.
 
-- [ ] **Step 3: Fix local dev printed command**
+- [x] **Step 3: Fix local dev printed command**
 
 Modify `scripts/dev-local.ps1` output:
 
@@ -370,7 +370,7 @@ Write-Host "     Product schema only: powershell -ExecutionPolicy Bypass -File s
 Write-Host "     Historical recovery: powershell -ExecutionPolicy Bypass -File scripts/dev-migrate.ps1"
 ```
 
-- [ ] **Step 4: Parse touched PowerShell scripts**
+- [x] **Step 4: Parse touched PowerShell scripts**
 
 Run:
 
