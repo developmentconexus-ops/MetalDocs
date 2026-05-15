@@ -109,17 +109,9 @@ METALDOCS_DOCGEN_V2_SERVICE_TOKEN=<same value as DOCGEN_V2_SERVICE_TOKEN in .env
 | identifier | `admin` |
 | password | `AdminMetalDocs123!` |
 
-Bootstrap creates this user automatically on first start when no admin role exists in DB.
+The curated local bootstrap creates this user when `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed` runs. First-boot bootstrap admin is separate and opt-in.
 
-**To reset / re-bootstrap:**
-```sql
--- Run via: docker exec metaldocs-postgres psql -U metaldocs_app -d metaldocs -c "<query>"
-TRUNCATE metaldocs.auth_sessions CASCADE;
-TRUNCATE metaldocs.auth_identities CASCADE;
-TRUNCATE metaldocs.iam_user_roles CASCADE;
-TRUNCATE metaldocs.iam_users CASCADE;
-```
-Then restart API — bootstrap recreates `admin`.
+**To reset local credentials:** rerun `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed`. This rebuilds the curated local database and reapplies the local dev seed.
 
 ---
 
@@ -163,4 +155,4 @@ Required for PDF generation after document approval. Polls `messaging_outbox` us
 | Missing `APP_PORT` | API starts on :8080 not :8081 | Script sets it explicitly |
 | Occupied :8081 by another process | startup script fails before boot | Free the port or stop the conflicting process intentionally |
 | Wrong login body field | `AUTH_INVALID_CREDENTIALS` | Use `identifier`, not `username` |
-| Bootstrap skipped | Can't create admin | Truncate iam_user_roles + restart |
+| Dev seed skipped | Can't login as admin | Rerun `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed` |

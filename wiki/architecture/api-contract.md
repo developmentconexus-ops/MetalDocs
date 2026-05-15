@@ -2,7 +2,7 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-05-12
+> **Last verified:** 2026-05-15
 > **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, per-module migration status.
 > **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md §7`).
 > **Key files:**
@@ -28,7 +28,7 @@
 
 ## 1. Spec location
 
-`api/openapi/v1/openapi.yaml` is the **single source of truth** for all MetalDocs HTTP contracts. OpenAPI 3.0.3. Path prefix conventions: `/api/v1` (platform/auth) and `/api/v2` (business modules).
+`api/openapi/v1/openapi.yaml` is the **single source of truth** for all MetalDocs HTTP contracts. OpenAPI 3.0.3. Current public routes use the `/api/v1` prefix.
 
 New endpoints MUST be authored in the spec first. Handlers implement; spec governs.
 
@@ -76,7 +76,7 @@ generated := registryapi.ServerInterfaceWrapper{
         httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
     },
 }
-mux.HandleFunc("GET /api/v2/controlled-documents", generated.ListControlledDocuments)
+mux.HandleFunc("GET /api/v1/controlled-documents", generated.ListControlledDocuments)
 // …
 ```
 
@@ -134,33 +134,33 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 
 ---
 
-## 8. Legacy migration notes (superseded by Plan 8 baseline)
+## 8. Historical route migration notes (superseded)
 
 | Module | Path prefix | Codegen status | Handler migration |
 |--------|------------|----------------|------------------|
-| `registry` | `/api/v2/controlled-documents` | Full (`include-tags: registry`) | Complete (commits `aa867b6c`, `9fccd8e7`) |
-| `templates` | `/api/v2/templates` | Full (`include-tags: templates`) | Complete (commit `f7f9c58d`) |
-| `documents` | `/api/v2/documents` | Bootstrap only (`include-tags: documents`) | Deferred — see below |
-| `approval` | `/api/v2/approvals` | No spec coverage | Not started |
-| `taxonomy` | `/api/v2/taxonomy` | No spec coverage | Not started |
-| `iam` | `/api/v2/iam` | No spec coverage | Not started |
-| `platform` | `/api/v1/auth`, `/api/v1/feature-flags` | No spec coverage | Not started |
+| `registry` | `/api/v1/controlled-documents` | Full (`include-tags: registry`) | Complete and wrapper-mounted |
+| `templates` | `/api/v1/templates` | Full (`include-tags: templates`) | Complete for generated core routes |
+| `documents` | `/api/v1/documents` | Bootstrap only (`include-tags: documents`) | Deferred — see below |
+| `approval` | `/api/v1/approval` | No spec coverage | Raw/runtime routes remain |
+| `taxonomy` | `/api/v1/taxonomy` | No spec coverage | Raw/runtime routes remain |
+| `iam` | `/api/v1/iam` | No spec coverage | Raw/runtime routes remain |
+| `platform` | `/api/v1/auth`, `/api/v1/feature-flags` | No spec coverage | Raw/runtime routes remain |
 
 **Documents module note:** codegen bootstrap landed (commit `81e7ec23`) — `api.gen.go` is generated and up to date. Handler migration is blocked by spec-handler drift (missing spec ops for `renameDocument`, `duplicateDocument`, comments CRUD; orphaned spec ops with no handler). Details and migration template: `wiki/backlog/contract-first-followups.md`.
 
 ---
 
-## 9. Module migration status (Plan 8 baseline)
+## 9. Module contract status
 
 | Module | Path prefix | Contract status | Notes |
 |--------|------------|-----------------|-------|
-| `documents` | `/api/v2/documents` | `Partial` | Mixed aligned+raw surface; includes one path signature mismatch (`{version}` vs `{versionNum}`) |
-| `approval` | `/api/v2/approval`, `/api/v2/documents/* approval routes` | `Raw` | Runtime routes are mounted but not yet represented in OpenAPI/codegen |
-| `templates` | `/api/v2/templates`, `/api/v2/signed` | `Partial` | Core generated routes aligned; several runtime routes still spec-missing |
-| `registry` | `/api/v2/controlled-documents` | `Wrapper-only` | Fully mounted through `ServerInterfaceWrapper` and aligned with spec/codegen |
-| `taxonomy` | `/api/v2/taxonomy` | `Raw` | Runtime routes present; no OpenAPI coverage yet |
+| `documents` | `/api/v1/documents` | `Partial` | Mixed aligned+raw surface; includes one path signature mismatch (`{version}` vs `{versionNum}`) |
+| `approval` | `/api/v1/approval`, `/api/v1/documents/* approval routes` | `Raw` | Runtime routes are mounted but not yet represented in OpenAPI/codegen |
+| `templates` | `/api/v1/templates`, `/api/v1/signed` | `Partial` | Core generated routes aligned; several runtime routes still spec-missing |
+| `registry` | `/api/v1/controlled-documents` | `Wrapper-only` | Fully mounted through `ServerInterfaceWrapper` and aligned with spec/codegen |
+| `taxonomy` | `/api/v1/taxonomy` | `Raw` | Runtime routes present; no OpenAPI coverage yet |
 | `audit` | `/api/v1/audit` | `Partial` | Runtime path aligns with spec (`/audit/events` + `/api/v1` server prefix); operationId missing |
-| `iam` | `/api/v1/iam`, `/api/v2/iam` | `Partial` | v1 admin routes aligned; v2 area-membership routes are spec-missing |
+| `iam` | `/api/v1/iam` | `Partial` | v1 admin routes aligned; area-membership routes are spec-missing |
 | `auth/platform` | `/api/v1/auth` | `Partial` | Auth runtime routes align with spec paths, but operationIds are missing |
 
 ### Route truth tables
@@ -211,4 +211,3 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 - `wiki/backlog/contract-first-followups.md` - deferred handler migrations + documents spec/handler gap inventory
 - `wiki/references/oapi-codegen.md` - operational how-to (regenerate, vendor mode, add module)
 - `wiki/architecture/frontend-structure.md §7` - frontend API call patterns using generated types
-

@@ -1,6 +1,6 @@
 # Reference: Environment Setup
 
-> **Last verified:** 2026-05-01
+> **Last verified:** 2026-05-15
 > **Status:** Stub. See `references/local-dev-startup.md` for the canonical Windows path.
 > **Scope:** Local dev environment bootstrap, secrets, seed data.
 > **Out of scope:** Prod deployment (see `architecture/deployment.md`), credentials (see `references/local-dev-credentials.md`).
@@ -26,11 +26,8 @@ cd MetalDocs
 # bring up infra
 docker compose up -d
 
-# run DB migrations (verify exact command)
-# .\scripts\migrate.ps1 OR go run ./cmd/migrate up
-
-# seed admin user (verify exact command)
-# the admin user "admin" / "AdminMetalDocs123!" should exist by default
+# run curated DB bootstrap with local dev seed
+.\scripts\dev-bootstrap-baseline.ps1 -WithDevSeed
 
 # start API
 .\scripts\start-api.ps1 -Build
@@ -43,7 +40,7 @@ pnpm dev
 
 ## Seed data
 
-Admin user pre-seeded. No areas/profiles by default — bootstrap via UI (see [workflows/user-onboarding.md](../workflows/user-onboarding.md) Step 1).
+The local dev seed creates `admin` / `AdminMetalDocs123!`. Product reference data and local dev seed data stay separate.
 
 ## See also
 

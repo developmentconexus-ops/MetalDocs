@@ -1,46 +1,38 @@
-# $(@{Schema=public; Table=schema_migrations}.Schema).schema_migrations",
-",
+# public.schema_migrations
 
-
-TBD
+> **Source:** `db/baseline/0001_current_schema.sql`
+> **Schema:** `public`
+> **Owner:** platform/db tooling
 
 ## Purpose
-
-TBD
-
-## Row Lifecycle
-
-TBD
+Current curated-baseline table owned by `platform/db tooling`. See the owning module wiki and runtime repositories for business behavior.
 
 ## Columns
 
 | Column | Type | Nullable | Meaning |
 |---|---|---|---|
+| `version` | `text` | no | Baseline column. |
+| `applied_at` | `timestamp with time zone` | no | Baseline column. |
+| `description` | `text` | yes | Baseline column. |
 
-## Keys and Constraints
+## Baseline Definition
 
-| Name | Type | Definition | Reason |
-|---|---|---|---|
-
-## Indexes
-
-| Name | Definition | Reason |
-|---|---|---|
-
-## Triggers and Functions
-
-| Name | Purpose |
-|---|---|
+```sql
+CREATE TABLE public.schema_migrations (
+version text NOT NULL,
+    applied_at timestamp with time zone DEFAULT now() NOT NULL,
+    description text
+);
+```
 
 ## Runtime Usage
 
-| Reader/Writer | File | Behavior |
-|---|---|---|
+Use `rg -n "schema_migrations" internal apps` and the owning module wiki to verify readers/writers before changing this table.
 
 ## Seed or Reference Data
 
-TBD
+Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001_local_dev_seed.sql` before adding rows.
 
 ## Notes and Debt
 
-TBD
+Retained in `public` because current runtime/baseline truth still uses it. Do not move schemas without an approved migration plan.

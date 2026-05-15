@@ -14,6 +14,7 @@ MetalDocs fresh bootstrap uses:
 
 - Do not patch historical migrations to hide bootstrap drift.
 - Do not delete or move historical migrations without explicit archive approval.
+- Do not use historical migration replay as the normal fresh bootstrap path.
 - Post-baseline migrations must be forward-only and idempotent.
 - Every post-baseline migration must write one `public.schema_migrations` row.
 - Runtime and contract truth take precedence over migration archaeology when contradictions appear.

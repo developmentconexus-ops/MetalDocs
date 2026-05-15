@@ -46,6 +46,22 @@ function Pass-Checkpoint {
     Write-Host "PASS $Name - $Message"
 }
 
+function Normalize-ProcessPathEnvironment {
+    $vars = [System.Environment]::GetEnvironmentVariables('Process')
+    $pathKeys = @($vars.Keys | Where-Object { $_ -ieq 'Path' })
+    if ($pathKeys.Count -le 1) {
+        return
+    }
+
+    $pathValue = [string]$vars['Path']
+    if ([string]::IsNullOrWhiteSpace($pathValue)) {
+        $pathValue = [string]$vars['PATH']
+    }
+
+    [System.Environment]::SetEnvironmentVariable('PATH', $null, 'Process')
+    [System.Environment]::SetEnvironmentVariable('Path', $pathValue, 'Process')
+}
+
 function Invoke-CheckedRequest {
     param(
         [System.Net.Http.HttpClient]$Client,
@@ -105,13 +121,6 @@ function Wait-ForReady {
             $successCount = 0
         }
 
-        if ($StartupProcess -and $StartupProcess.HasExited) {
-            if ($lastStatusCode -ne $null) {
-                throw "start-api.ps1 exited before readiness succeeded; last response HTTP $lastStatusCode; body=$lastBody"
-            }
-            throw "start-api.ps1 exited before readiness succeeded"
-        }
-
         Start-Sleep -Seconds 1
     } while ((Get-Date) -lt $deadline)
 
@@ -133,8 +142,9 @@ try {
     $startupProcess = $null
     if ($StartApi) {
         Write-Host "Starting API via scripts/start-api.ps1 -Build -NoWorker"
+        Normalize-ProcessPathEnvironment
         $startupProcess = Start-Process `
-            -FilePath "powershell" `
+            -FilePath (Join-Path $PSHOME "powershell.exe") `
             -ArgumentList @(
                 '-NoProfile',
                 '-ExecutionPolicy',
@@ -144,11 +154,14 @@ try {
                 '-Build',
                 '-NoWorker'
             ) `
+            -WorkingDirectory $root `
             -PassThru `
             -WindowStyle Hidden
 
         $readyResponse = Wait-ForReady -Client $client -StartupProcess $startupProcess
         Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) after start-api.ps1"
+        Start-Sleep -Seconds 2
+        $null = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 30 -ConsecutiveSuccesses 1
     }
 
     $loginPayload = @{

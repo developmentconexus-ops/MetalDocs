@@ -1,46 +1,37 @@
-# $(@{Schema=metaldocs; Table=document_sequences}.Schema).document_sequences",
-",
+# metaldocs.document_sequences
 
-
-TBD
+> **Source:** `db/baseline/0001_current_schema.sql`
+> **Schema:** `metaldocs`
+> **Owner:** unknown-owner
 
 ## Purpose
-
-TBD
-
-## Row Lifecycle
-
-TBD
+Current curated-baseline table owned by `unknown-owner`. See the owning module wiki and runtime repositories for business behavior.
 
 ## Columns
 
 | Column | Type | Nullable | Meaning |
 |---|---|---|---|
+| `profile_code` | `text` | no | Baseline column. |
+| `next_value` | `integer` | no | Baseline column. |
 
-## Keys and Constraints
+## Baseline Definition
 
-| Name | Type | Definition | Reason |
-|---|---|---|---|
-
-## Indexes
-
-| Name | Definition | Reason |
-|---|---|---|
-
-## Triggers and Functions
-
-| Name | Purpose |
-|---|---|
+```sql
+CREATE TABLE metaldocs.document_sequences (
+profile_code text NOT NULL,
+    next_value integer NOT NULL,
+    CONSTRAINT document_sequences_next_value_check CHECK ((next_value > 0))
+);
+```
 
 ## Runtime Usage
 
-| Reader/Writer | File | Behavior |
-|---|---|---|
+Use `rg -n "document_sequences" internal apps` and the owning module wiki to verify readers/writers before changing this table.
 
 ## Seed or Reference Data
 
-TBD
+Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001_local_dev_seed.sql` before adding rows.
 
 ## Notes and Debt
 
-TBD
+Curated baseline table in the `metaldocs` schema.

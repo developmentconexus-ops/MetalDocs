@@ -25,13 +25,14 @@ Classify the task before editing:
 - local dev seed change
 - post-baseline forward migration
 - dictionary/wiki update
-- legacy replay/debugging
+- historical migration evidence/recovery
 
 ## Rules
 
 - Do not patch historical migrations to hide bootstrap drift.
 - Fresh local setup uses curated baseline artifacts, not Docker entrypoint migration replay.
 - Product schema, product reference data, and local dev seeds stay separated.
+- Local authenticated smoke tests use the optional dev seed account unless a first-boot bootstrap admin flow is intentionally configured.
 - New post-baseline migrations must write `public.schema_migrations`.
 - Required extensions are declared before use.
 - Every baseline table needs a wiki dictionary page or explicit exception.
@@ -46,5 +47,5 @@ Use the smallest applicable gate:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-bootstrap-baseline.ps1 -WithDevSeed
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-db-dictionary-coverage.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-api.ps1 -Build -NoWorker
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v2/controlled-documents
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/controlled-documents
 ```

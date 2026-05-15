@@ -1,8 +1,6 @@
 # Runbook: Migration Governance
 
-# Runbook: Migration Governance
-
-MetalDocs uses a curated current-state baseline for fresh environments and preserves historical migrations for legacy replay/debugging until archive approval.
+MetalDocs uses a curated current-state baseline for fresh environments and retains historical migrations as evidence/recovery material until archive approval.
 
 Canonical policy lives in `wiki/database/migration-policy.md`.
 
@@ -14,3 +12,4 @@ Canonical policy lives in `wiki/database/migration-policy.md`.
 4. Every post-baseline forward migration must record `public.schema_migrations`.
 5. Every baseline table must have a database dictionary page or explicit exception.
 6. Historical migration archive/deletion requires explicit review.
+7. Historical replay is not the normal local bootstrap or verification path.

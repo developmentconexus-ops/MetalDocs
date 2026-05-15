@@ -1,6 +1,6 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-05-03
+**Last verified:** 2026-05-15
 
 ## API login
 
@@ -9,15 +9,14 @@ Body field is `identifier` (not `username`).
 
 | identifier | password | IAM role | notes |
 |---|---|---|---|
-| `admin` | `AdminMetalDocs123!` | system_admin | bootstrapped on first start; use to author documents/templates |
-| `approver` | `ApproverMetalDocs123!` | approver | seeded by migration 0159; corrected to `approver` by migration 0170 (0166 had incorrectly set this to `system_admin`) — use to test SoD signoff flows |
-| `author-test` | `AuthorTest123!` | system_admin | smoke-test author: creates templates + docs + submits for approval |
+| `admin` | `AdminMetalDocs123!` | system_admin | local dev seed account; use to author documents/templates |
+| `approver` | `ApproverMetalDocs123!` | approver | local dev seed account for SoD signoff flows |
+| `author-test` | `AuthorTest123!` | author | smoke-test author: creates templates + docs + submits for approval |
 | `approver-test` | `ApproverMetalDocs456!@` | approver | smoke-test approver: signs off docs submitted by `author-test` (ISO seg test requires distinct userIds); password reset 2026-05-01; role renamed from `reviewer` by migration 0166 |
 
-> **Migration 0170:** Corrects the dev `approver` user back to role `approver`. Migration 0166's blanket `admin→system_admin` rename incorrectly caught this user. SoD (Segregation of Duties) requires `approver` and `admin-local` to be distinct roles.
+These accounts are created by `db/dev-seeds/0001_local_dev_seed.sql` when the curated bootstrap runs with `-WithDevSeed`.
 
-Bootstrap triggers when: API starts and `metaldocs.iam_user_roles` has no `system_admin` role.
-To re-bootstrap: truncate `metaldocs.auth_identities`, `metaldocs.iam_user_roles`, `metaldocs.iam_users` and restart API.
+First-boot bootstrap admin is separate and opt-in. Do not rely on it for the normal fresh local login path.
 
 ## API startup
 
@@ -51,7 +50,7 @@ docker exec metaldocs-postgres psql -U metaldocs_app -d metaldocs -c "<query>"
 
 User tables: `metaldocs.auth_identities`, `metaldocs.iam_users`, `metaldocs.iam_user_roles`
 Document tables: `public.documents`, `public.controlled_documents` (note: `public.documents_v2` was dropped by migration 0168)
-Template tables: `public.templates_template`, `public.templates_template_version`
+Template tables: `public.templates`, `public.template_versions`, `public.templates_v2_template`, `public.templates_v2_template_version`
 
 ## Process-area roles (approval authz)
 

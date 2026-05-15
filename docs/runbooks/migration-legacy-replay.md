@@ -1,8 +1,8 @@
-# Runbook: Legacy Migration Replay
+# Runbook: Historical Migration Replay
 
-Use this runbook only when a full trusted historical replay is required.
+Use this runbook only when a full trusted historical replay is required for recovery evidence or migration archaeology. It is not the supported fresh local bootstrap path.
 
-Legacy replay streams local `migrations/*.sql` files through `psql`. Docker Postgres no longer auto-runs this directory through `/docker-entrypoint-initdb.d`.
+Historical replay streams local `migrations/*.sql` files through `psql`. Docker Postgres no longer auto-runs this directory through `/docker-entrypoint-initdb.d`.
 
 ## Commands
 

@@ -32,7 +32,7 @@
 
 The 4-step wizard replaces the old `DocumentCreatePage` single-step flow. It creates the controlled-document slot and first draft revision in a **single atomic call**:
 
-`POST /api/v2/controlled-documents` (`Idempotency-Key` required) Ã¢â‚¬â€ inserts the CD row, increments the per-(profile, area) sequence counter, and clones the template into the first draft document revision, all within a single DB transaction. Returns the CD with server-resolved code (e.g. `DC-RH-001`) plus the new document ID.
+`POST /api/v1/controlled-documents` (`Idempotency-Key` required) Ã¢â‚¬â€ inserts the CD row, increments the per-(profile, area) sequence counter, and clones the template into the first draft document revision, all within a single DB transaction. Returns the CD with server-resolved code (e.g. `DC-RH-001`) plus the new document ID.
 
 All wizard form state lives in a single `useReducer(wizardReducer)` call inside `NewDocumentWizardPage`. Step is mirrored to `?step=1..4` in the URL (with `replace: true`) so the browser back button works.
 
@@ -42,10 +42,10 @@ All wizard form state lives in a single `useReducer(wizardReducer)` call inside 
 
 | Step | Component | Server call | Gate to advance |
 |------|-----------|-------------|-----------------|
-| 1 Ã¢â‚¬â€ Profile | `StepProfile` | `GET /api/v2/taxonomy/profiles` | `profileCode !== null` |
-| 2 Ã¢â‚¬â€ Area + Title + Visibility | `StepAreaCodeVisibility` | `GET /api/v2/taxonomy/areas` | `areaCode !== ''` and `title.trim() !== ''` |
-| 3 Ã¢â‚¬â€ Template | `StepTemplate` | `GET /api/v2/templates?profileCode=Ã¢â‚¬Â¦` | `templateVersionID !== null` |
-| 4 Ã¢â‚¬â€ Confirm + Create | `StepConfirm` | `POST /api/v2/controlled-documents` (atomic) | `consent && !submitting` |
+| 1 Ã¢â‚¬â€ Profile | `StepProfile` | `GET /api/v1/taxonomy/profiles` | `profileCode !== null` |
+| 2 Ã¢â‚¬â€ Area + Title + Visibility | `StepAreaCodeVisibility` | `GET /api/v1/taxonomy/areas` | `areaCode !== ''` and `title.trim() !== ''` |
+| 3 Ã¢â‚¬â€ Template | `StepTemplate` | `GET /api/v1/templates?profileCode=Ã¢â‚¬Â¦` | `templateVersionID !== null` |
+| 4 Ã¢â‚¬â€ Confirm + Create | `StepConfirm` | `POST /api/v1/controlled-documents` (atomic) | `consent && !submitting` |
 
 ---
 
@@ -108,7 +108,7 @@ const createMutation = useMutation({
   mutationFn: async (input) => {
     return createControlledDocumentAtomic(
       { profileCode, processAreaCode, title, ownerUserId, documentName, templateVersionId },
-      input.idempotencyKey,  // POST /api/v2/controlled-documents with Idempotency-Key header
+      input.idempotencyKey,  // POST /api/v1/controlled-documents with Idempotency-Key header
     );
   },
   onError: (err) => {
