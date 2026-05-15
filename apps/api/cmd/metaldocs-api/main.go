@@ -209,11 +209,6 @@ func main() {
 		AuditWriter: deps.AuditWriter,
 	})
 	registryModule.RegisterRoutes(mux)
-	if deps.SQLDB != nil {
-		if err := registryModule.RunStartupMigrations(context.Background(), deps.SQLDB, slog.Default()); err != nil {
-			log.Printf("registry startup migration failed: %v", err)
-		}
-	}
 	docRegistryDuplicator := registryControlledDocumentDuplicator{svc: registryModule.Service()}
 
 	var membershipService *iamapp.AreaMembershipService

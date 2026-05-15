@@ -52,8 +52,4 @@ func (m *Module) RunLegacyMaintenance(ctx context.Context, db *sql.DB, logger *s
 	return application.BackfillLegacyDocuments(ctx, db, logger)
 }
 
-func (m *Module) RunStartupMigrations(ctx context.Context, db *sql.DB, logger *slog.Logger) error {
-	return m.RunLegacyMaintenance(ctx, db, logger)
-}
-
 func (m *Module) Service() *application.RegistryService { return m.svc }
