@@ -116,13 +116,28 @@ function Get-ProcessEvidence {
         Process = $process
         ProcessName = $process.ProcessName
         Path = $path
+        CommandLine = $null
+    }
+}
+
+function Get-ProcessCommandLine {
+    param(
+        [int]$ProcessId
+    )
+
+    try {
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction Stop
+        return $proc.CommandLine
+    } catch {
+        return $null
     }
 }
 
 function Test-IsOwnedApiProcess {
     param(
         [hashtable]$ProcessEvidence,
-        [string]$ExpectedBinaryPath
+        [string]$ExpectedBinaryPath,
+        [string]$ExpectedLauncherPath
     )
 
     if (-not $ProcessEvidence) {
@@ -137,6 +152,13 @@ function Test-IsOwnedApiProcess {
                 return $true
             }
         } catch {
+        }
+    }
+
+    if ($ProcessEvidence.ProcessName -ieq 'powershell' -or $ProcessEvidence.ProcessName -ieq 'pwsh') {
+        $commandLine = Get-ProcessCommandLine -ProcessId $ProcessEvidence.Process.Id
+        if ($commandLine -and $commandLine -like "*$ExpectedLauncherPath*") {
+            return $true
         }
     }
 
@@ -203,7 +225,8 @@ $held = netstat -ano 2>$null | Select-String ":8081 " | ForEach-Object { ($_ -sp
 if ($held) {
     $heldId = [int]$held
     $heldProcess = Get-ProcessEvidence -ProcessId $heldId
-    if (Test-IsOwnedApiProcess -ProcessEvidence $heldProcess -ExpectedBinaryPath $binary) {
+    $launcherPath = (Join-Path $root 'scripts/start-api.ps1')
+    if (Test-IsOwnedApiProcess -ProcessEvidence $heldProcess -ExpectedBinaryPath $binary -ExpectedLauncherPath $launcherPath) {
         $heldDesc = if ($heldProcess.Path) {
             "$($heldProcess.ProcessName) ($($heldProcess.Path))"
         } else {

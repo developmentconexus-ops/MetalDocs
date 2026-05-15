@@ -36,7 +36,7 @@ func TestApply_IgnoresNonNumericBaselineMarker(t *testing.T) {
 	}
 }
 
-func TestApply_PreservesNumericHighWaterMark(t *testing.T) {
+func TestApply_SkipsOnlyAppliedVersions(t *testing.T) {
 	t.Parallel()
 
 	db, mock, err := sqlmock.New()
@@ -52,6 +52,7 @@ func TestApply_PreservesNumericHighWaterMark(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT version FROM public\.schema_migrations`).
 		WillReturnRows(sqlmock.NewRows([]string{"version"}).AddRow("0002"))
+	mock.ExpectExec("SELECT 1;").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("SELECT 3;").WillReturnResult(sqlmock.NewResult(0, 0))
 
 	if err := Apply(context.Background(), db, dir, slog.Default()); err != nil {

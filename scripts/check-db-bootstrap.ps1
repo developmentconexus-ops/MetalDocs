@@ -44,12 +44,14 @@ COMMIT;
 
   try {
     Get-Process -Name metaldocs-api -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    $fixtureApiOutLog = Join-Path $root "non_git/check-db-bootstrap-fixture-api.out.log"
+    $fixtureApiErrLog = Join-Path $root "non_git/check-db-bootstrap-fixture-api.err.log"
+    Remove-Item -Force $fixtureApiOutLog,$fixtureApiErrLog -ErrorAction SilentlyContinue
+
     $apiBinary = Join-Path $root "metaldocs-api.exe"
-    if (-not (Test-Path $apiBinary)) {
-      go build -o $apiBinary ./apps/api/cmd/metaldocs-api/...
-      if ($LASTEXITCODE -ne 0) {
-        throw "[check-db-bootstrap] failed to build metaldocs-api.exe for forward migration verification"
-      }
+    go build -o $apiBinary ./apps/api/cmd/metaldocs-api/...
+    if ($LASTEXITCODE -ne 0) {
+      throw "[check-db-bootstrap] failed to build metaldocs-api.exe for forward migration verification"
     }
 
     Get-Content ".env" | ForEach-Object {
@@ -58,9 +60,6 @@ COMMIT;
       [System.Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim(), 'Process')
     }
     [System.Environment]::SetEnvironmentVariable('APP_PORT', '18081', 'Process')
-    $fixtureApiOutLog = Join-Path $root "non_git/check-db-bootstrap-fixture-api.out.log"
-    $fixtureApiErrLog = Join-Path $root "non_git/check-db-bootstrap-fixture-api.err.log"
-    Remove-Item -Force $fixtureApiOutLog,$fixtureApiErrLog -ErrorAction SilentlyContinue
 
     $apiProcess = Start-Process `
       -FilePath $apiBinary `
@@ -103,6 +102,7 @@ COMMIT;
   if (($fixtureLedger | Out-String).Trim() -ne $fixtureVersion) {
     throw "[check-db-bootstrap] forward migration fixture ledger marker missing"
   }
+  docker exec metaldocs-postgres psql -U metaldocs_app -d metaldocs -tAc "DROP TABLE IF EXISTS metaldocs.forward_migration_fixture; DELETE FROM public.schema_migrations WHERE version = '$fixtureVersion';" | Out-Null
 }
 
 Write-Host "[check-db-bootstrap] Checking critical tables..."
