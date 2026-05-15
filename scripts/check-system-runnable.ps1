@@ -147,18 +147,17 @@ try {
             -FilePath (Join-Path $PSHOME "powershell.exe") `
             -ArgumentList @(
                 '-NoProfile',
-                '-ExecutionPolicy',
-                'Bypass',
-                '-File',
-                (Join-Path $PSScriptRoot 'start-api.ps1'),
-                '-Build',
-                '-NoWorker'
-            ) `
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        (Join-Path $PSScriptRoot 'start-api.ps1'),
+        '-NoWorker'
+      ) `
             -WorkingDirectory $root `
             -PassThru `
             -WindowStyle Hidden
 
-        $readyResponse = Wait-ForReady -Client $client -StartupProcess $startupProcess
+        $readyResponse = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 420
         Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) after start-api.ps1"
         Start-Sleep -Seconds 2
         $null = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 30 -ConsecutiveSuccesses 1

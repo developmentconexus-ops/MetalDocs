@@ -43,7 +43,7 @@ function Invoke-DbSqlFile {
 
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-db-reset.ps1 -ComposeFile $ComposeFile -EnvFile $EnvFile | Out-Host
 
-$maxAttempts = 60
+$maxAttempts = 180
 $ready = $false
 for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
   try {
