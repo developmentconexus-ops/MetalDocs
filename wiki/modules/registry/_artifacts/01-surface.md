@@ -1,37 +1,37 @@
-### 1. File tree
-- `module.go` — Module wiring for registry service, HTTP handler, startup migration hook (inferred from top-level types/functions).
+ï»¿### 1. File tree
+- `module.go` â€” Module wiring for registry service, HTTP handler, startup migration hook (inferred from top-level types/functions).
 
 `api/`
-- `api/gen.go` — `go:generate` entrypoint for oapi-codegen output (inferred from directive).
-- `api/cfg.yaml` — oapi-codegen configuration for `registry` tagged server/models generation.
-- `api/api.gen.go` — generated OpenAPI server/models for registry tag (generated file).
+- `api/gen.go` â€” `go:generate` entrypoint for oapi-codegen output (inferred from directive).
+- `api/cfg.yaml` â€” oapi-codegen configuration for `registry` tagged server/models generation.
+- `api/api.gen.go` â€” generated OpenAPI server/models for registry tag (generated file).
 
 `application/`
-- `application/service.go` — application service orchestration for controlled documents, sequence allocation, template checks, and revisions.
-- `application/migration.go` — startup backfill routine from legacy `documents` rows into `controlled_documents`.
-- `application/integration_test.go` — (undocumented)
-- `application/migration_integration_test.go` — (undocumented)
-- `application/service_test.go` — (undocumented)
-- `application/tenant_isolation_test.go` — (undocumented)
+- `application/service.go` â€” application service orchestration for controlled documents, sequence allocation, template checks, and revisions.
+- `application/migration.go` â€” startup backfill routine from legacy `documents` rows into `controlled_documents`.
+- `application/integration_test.go` â€” (undocumented)
+- `application/migration_integration_test.go` â€” (undocumented)
+- `application/service_test.go` â€” (undocumented)
+- `application/tenant_isolation_test.go` â€” (undocumented)
 
 `delivery/http/`
-- `delivery/http/handler.go` — HTTP handler wiring and route registration to generated OpenAPI wrapper.
-- `delivery/http/routes.go` — strict-server endpoint implementations and request/response mapping.
-- `delivery/http/routes_contract_test.go` — (undocumented)
+- `delivery/http/handler.go` â€” HTTP handler wiring and route registration to generated OpenAPI wrapper.
+- `delivery/http/routes.go` â€” strict-server endpoint implementations and request/response mapping.
+- `delivery/http/routes_contract_test.go` â€” (undocumented)
 
 `domain/`
-- `domain/controlled_document.go` — core controlled-document entity, statuses, and domain errors.
-- `domain/document_initializer.go` — document initialization port and DTOs for atomic create/revision flows.
-- `domain/port.go` — repository port and list filter contract.
-- `domain/resolution.go` — template resolution rules and related domain errors.
-- `domain/sequence.go` — sequence allocator and DB executor ports.
-- `domain/autocode_test.go` — (undocumented)
-- `domain/resolution_test.go` — (undocumented)
-- `domain/sequence_bench_test.go` — (undocumented)
-- `domain/sequence_test.go` — (undocumented)
+- `domain/controlled_document.go` â€” core controlled-document entity, statuses, and domain errors.
+- `domain/document_initializer.go` â€” document initialization port and DTOs for atomic create/revision flows.
+- `domain/port.go` â€” repository port and list filter contract.
+- `domain/resolution.go` â€” template resolution rules and related domain errors.
+- `domain/sequence.go` â€” sequence allocator and DB executor ports.
+- `domain/autocode_test.go` â€” (undocumented)
+- `domain/resolution_test.go` â€” (undocumented)
+- `domain/sequence_bench_test.go` â€” (undocumented)
+- `domain/sequence_test.go` â€” (undocumented)
 
 `infrastructure/`
-- `infrastructure/repository.go` — PostgreSQL adapters for repository, sequence allocation, template-state checks, and taxonomy readers.
+- `infrastructure/repository.go` â€” PostgreSQL adapters for repository, sequence allocation, template-state checks, and taxonomy readers.
 
 ### 2. Public surface
 | File:line | Kind | Name | Signature / receiver | Doc comment first line |
@@ -40,7 +40,6 @@
 | internal/modules/registry/module.go:20 | type | Dependencies | `struct` | (undocumented) |
 | internal/modules/registry/module.go:25 | func | New | `func New(deps Dependencies) *Module` | (undocumented) |
 | internal/modules/registry/module.go:37 | method | RegisterRoutes | `func (m *Module) RegisterRoutes(mux *http.ServeMux)` | (undocumented) |
-| internal/modules/registry/module.go:41 | method | RunStartupMigrations | `func (m *Module) RunStartupMigrations(ctx context.Context, db *sql.DB, logger *slog.Logger) error` | (undocumented) |
 | internal/modules/registry/module.go:45 | method | Service | `func (m *Module) Service() *application.RegistryService` | (undocumented) |
 | internal/modules/registry/application/service.go:16 | type | TemplateVersionChecker | `interface` | (undocumented) |
 | internal/modules/registry/application/service.go:20 | type | ProfileReader | `interface` | (undocumented) |
