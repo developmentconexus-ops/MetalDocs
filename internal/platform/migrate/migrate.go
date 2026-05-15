@@ -16,6 +16,7 @@ import (
 )
 
 var versionRE = regexp.MustCompile(`^(\d{4})_`)
+var numericVersionRE = regexp.MustCompile(`^\d{4}$`)
 
 // Apply runs every *.sql file in dir whose version (the leading 4-digit prefix)
 // is not present in public.schema_migrations. Files are applied in lexical
@@ -30,10 +31,14 @@ func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) error 
 		return fmt.Errorf("load schema_migrations: %w", err)
 	}
 	// High-water mark: only apply versions strictly greater than the max
-	// recorded version. Pre-ledger history (migrations applied before
+	// recorded numeric version. Pre-ledger history (migrations applied before
 	// schema_migrations existed) must not be re-run on startup.
+	// Non-numeric markers (for example baseline sentinels) are ignored here.
 	maxApplied := ""
 	for v := range applied {
+		if !numericVersionRE.MatchString(v) {
+			continue
+		}
 		if v > maxApplied {
 			maxApplied = v
 		}
