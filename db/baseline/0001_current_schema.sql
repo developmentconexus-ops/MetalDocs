@@ -5,6 +5,7 @@
 
 BEGIN;
 
+SET check_function_bodies = false;
 --
 -- PostgreSQL database dump
 --
@@ -187,7 +188,7 @@ DECLARE
   _now            TIMESTAMPTZ := pg_catalog.clock_timestamp();
   _correlation_id UUID        := pg_catalog.gen_random_uuid();
 BEGIN
-  -- -- Input validation (before any query) ----------------------------------
+  -- ── Input validation (before any query) ──────────────────────────────────
   IF _user_id !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid user_id: %', _user_id USING ERRCODE = '22023';
   END IF;
@@ -203,7 +204,7 @@ BEGIN
     RAISE EXCEPTION 'invalid granted_by: %', _granted_by USING ERRCODE = '22023';
   END IF;
 
-  -- -- Idempotency check ----------------------------------------------------
+  -- ── Idempotency check ────────────────────────────────────────────────────
   SELECT effective_from
     INTO _existing_from
     FROM public.user_process_areas
@@ -215,17 +216,17 @@ BEGIN
    LIMIT 1;
 
   IF FOUND THEN
-    -- Already active � return correlation id without side-effects.
+    -- Already active — return correlation id without side-effects.
     RETURN _correlation_id;
   END IF;
 
-  -- -- Insert membership row ------------------------------------------------
+  -- ── Insert membership row ────────────────────────────────────────────────
   INSERT INTO public.user_process_areas
     (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by, revoked_by)
   VALUES
     (_user_id, _tenant_id, _area_code, _role, _now, NULL, _granted_by, NULL);
 
-  -- -- Emit governance event ------------------------------------------------
+  -- ── Emit governance event ────────────────────────────────────────────────
   INSERT INTO metaldocs.governance_events
     (tenant_id, event_type, actor_user_id, resource_type, resource_id, payload_json)
   VALUES
@@ -322,7 +323,7 @@ DECLARE
   _rows_affected  INT;
   _now            TIMESTAMPTZ := pg_catalog.clock_timestamp();
 BEGIN
-  -- -- Input validation (before any query) ----------------------------------
+  -- ── Input validation (before any query) ──────────────────────────────────
   IF _user_id !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid user_id: %', _user_id USING ERRCODE = '22023';
   END IF;
@@ -337,7 +338,7 @@ BEGIN
     RAISE EXCEPTION 'invalid revoked_by: %', _revoked_by USING ERRCODE = '22023';
   END IF;
 
-  -- -- Soft-delete: set effective_to + revoked_by ---------------------------
+  -- ── Soft-delete: set effective_to + revoked_by ───────────────────────────
   UPDATE public.user_process_areas
      SET effective_to = _now,
          revoked_by   = _revoked_by
@@ -354,7 +355,7 @@ BEGIN
       USING ERRCODE = 'P0002';
   END IF;
 
-  -- -- Emit governance event ------------------------------------------------
+  -- ── Emit governance event ────────────────────────────────────────────────
   INSERT INTO metaldocs.governance_events
     (tenant_id, event_type, actor_user_id, resource_type, resource_id, payload_json)
   VALUES
@@ -489,7 +490,7 @@ BEGIN
       v_tenant_id     := NULL;
 
     ELSE
-      -- Unknown table � conservative pass-through.
+      -- Unknown table — conservative pass-through.
       RETURN NEW;
   END CASE;
 
@@ -578,7 +579,7 @@ DECLARE
   cancel_instance_id TEXT;
 BEGIN
   IF OLD.status IS DISTINCT FROM NEW.status THEN
-    -- Check cancel path: under_review?draft allowed if cancel GUC is set.
+    -- Check cancel path: under_review→draft allowed if cancel GUC is set.
     IF OLD.status = 'under_review' AND NEW.status = 'draft' THEN
       cancel_instance_id := current_setting('metaldocs.cancel_in_progress', true);
       IF cancel_instance_id IS NULL OR cancel_instance_id = '' THEN
@@ -598,7 +599,7 @@ BEGIN
       (OLD.status = 'scheduled'    AND NEW.status IN ('published','draft')) OR
       (OLD.status = 'published'    AND NEW.status IN ('superseded','obsolete')) OR
       (OLD.status = 'superseded'   AND NEW.status =  'obsolete')
-      -- Note: compat window (draft?finalized, finalized?archived) removed by 0142_disable_legacy_compat.sql
+      -- Note: compat window (draft→finalized, finalized→archived) removed by 0142_disable_legacy_compat.sql
     ) THEN
       RAISE EXCEPTION 'illegal status transition % -> %', OLD.status, NEW.status
         USING ERRCODE = 'check_violation';
@@ -4559,4 +4560,3 @@ ALTER TABLE ONLY public.user_process_areas
 
 
 COMMIT;
-
