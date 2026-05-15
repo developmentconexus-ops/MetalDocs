@@ -1,12 +1,17 @@
 param(
-  [string]$ReferenceDb = "metaldocs",
-  [string]$CandidateDb = "metaldocs"
+  [string]$ReferenceDb = "metaldocs_reference",
+  [string]$CandidateDb = "metaldocs",
+  [switch]$AllowSameDatabase
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+
+if ($ReferenceDb -eq $CandidateDb -and -not $AllowSameDatabase) {
+  throw "[check-baseline-equivalence] ReferenceDb and CandidateDb are both '$ReferenceDb'. Pass distinct DB names or -AllowSameDatabase for a smoke check."
+}
 
 $evidenceDir = "non_git/db/reference-schema"
 if (-not (Test-Path $evidenceDir)) {
