@@ -6,6 +6,12 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
+SELECT set_config(
+  'metaldocs.asserted_caps',
+  '[{"cap":"user.manage"},{"cap":"membership.manage"},{"cap":"document.create"},{"cap":"document.submit"},{"cap":"document.signoff"}]',
+  true
+);
+
 -- Local-only auth identities.
 INSERT INTO metaldocs.auth_identities (user_id, username, display_name, password_hash, password_algo)
 VALUES
@@ -31,33 +37,5 @@ VALUES
   ('author-test', 'system_admin', 'admin-local'),
   ('approver-test', 'approver', 'admin-local')
 ON CONFLICT (user_id, role_code) DO NOTHING;
-
--- Local process-area convenience memberships.
-INSERT INTO public.user_process_areas (user_id, tenant_id, area_code, role, effective_from, granted_by)
-VALUES
-  ('reviewer-1', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'quality', 'reviewer', now(), 'admin-local')
-ON CONFLICT DO NOTHING;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM public.user_process_areas
-    WHERE user_id = 'admin-local'
-      AND tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-      AND area_code = 'quality'
-      AND effective_to IS NULL
-  ) THEN
-    UPDATE public.user_process_areas
-    SET role = 'qms_admin'
-    WHERE user_id = 'admin-local'
-      AND tenant_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-      AND area_code = 'quality'
-      AND effective_to IS NULL;
-  ELSE
-    INSERT INTO public.user_process_areas (user_id, tenant_id, area_code, role, effective_from, granted_by)
-    VALUES ('admin-local', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'quality', 'qms_admin', now(), 'admin-local');
-  END IF;
-END $$;
 
 COMMIT;

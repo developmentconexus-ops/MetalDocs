@@ -78,6 +78,12 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'template.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
 -- System blank template required for controlled document creation defaults.
+SELECT set_config(
+  'metaldocs.asserted_caps',
+  '[{"cap":"template.create"},{"cap":"template.edit"},{"cap":"template.submit"},{"cap":"template.approve"},{"cap":"template.publish"}]',
+  true
+);
+
 INSERT INTO public.templates_v2_template (
   id, tenant_id, doc_type_code, key, name, description, areas, visibility,
   specific_areas, latest_version, published_version_id, created_by, system_owned, archived_at
@@ -88,11 +94,11 @@ INSERT INTO public.templates_v2_template (
   '__system_blank__',
   'Em branco',
   'System blank template for controlled document creation.',
-  '{}'::jsonb,
+  ARRAY[]::text[],
   'internal',
-  '{}'::jsonb,
+  ARRAY[]::text[],
   1,
-  '00000000-0000-0000-0000-000000000102'::uuid,
+  NULL,
   'system',
   true,
   NULL
@@ -123,5 +129,12 @@ INSERT INTO public.templates_v2_template_version (
   NULL,
   0
 ) ON CONFLICT (id) DO NOTHING;
+
+UPDATE public.templates_v2_template
+SET
+  system_owned = true,
+  latest_version = 1,
+  published_version_id = '00000000-0000-0000-0000-000000000102'::uuid
+WHERE id = '00000000-0000-0000-0000-000000000101'::uuid;
 
 COMMIT;
