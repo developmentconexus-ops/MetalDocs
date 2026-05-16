@@ -62,13 +62,13 @@ export const documentsRoutes: RouteObject[] = [
     ],
   },
   {
-    path: "documents-v2/new",
-    handle: { workspaceView: "documents-v2" },
+    path: "documents/new",
+    handle: { workspaceView: "document-editor" },
     lazy: () => import("./pages/NewDocumentWizardPage").then((m) => ({ Component: m.NewDocumentWizardPage })),
   },
   {
-    path: "documents-v2/:documentID",
-    handle: { workspaceView: "documents-v2" },
+    path: "documents/:documentID/edit",
+    handle: { workspaceView: "document-editor" },
     lazy: () => import("./pages/DocumentEditorRoutePage"),
   },
 ];

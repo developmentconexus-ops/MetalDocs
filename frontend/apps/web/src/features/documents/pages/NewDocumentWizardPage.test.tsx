@@ -252,7 +252,7 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
     expect(passedKey).toMatch(uuidV4Regex);
   });
 
-  it('navigates to /documents-v2/<document.id> on success', async () => {
+  it('navigates to /documents/<document.id>/edit on success', async () => {
     vi.mocked(cdApi.createControlledDocumentAtomic).mockResolvedValue(
       makeSuccessResponse('doc-xyz') as never,
     );
@@ -263,7 +263,7 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/documents-v2/doc-xyz');
+      expect(mockNavigate).toHaveBeenCalledWith('/documents/doc-xyz/edit');
     });
   });
 

@@ -110,7 +110,7 @@ area_code TEXT NOT NULL
 -- public.approval_instances (migrations/0135_approval_instances.sql:9)
 id UUID NOT NULL PRIMARY KEY
 tenant_id UUID NOT NULL
-document_v2_id UUID NOT NULL REFERENCES documents(id)
+document_id UUID NOT NULL REFERENCES documents(id)
 route_id UUID NOT NULL REFERENCES approval_routes(id)
 submitted_by TEXT NOT NULL
 ```
@@ -186,7 +186,7 @@ status TEXT NOT NULL
 | `document_exports_doc_hash_uidx` | `document_exports` | `(document_id, composite_hash)` | Yes | idempotent export insert (`0111:16`). |
 | `idx_document_comments_doc_lib` | `document_comments` | `(document_id, library_comment_id)` | Yes | unique library comment id per doc (`0118:16`). |
 | `approval_routes_tenant_profile_key` | `approval_routes` | `(tenant_id, profile_code)` | Yes | one route per tenant/profile (`0134:11`). |
-| `ux_approval_instances_active` | `approval_instances` | `(document_v2_id) WHERE status='in_progress'` | Yes | one in-progress instance per doc (`0135:33`). |
+| `ux_approval_instances_active` | `approval_instances` | `(document_id) WHERE status='in_progress'` | Yes | one in-progress instance per doc (`0135:33`). |
 | `ix_stage_instances_active` | `approval_stage_instances` | `(approval_instance_id, stage_order) WHERE status='active'` | No | active stage lookup (`0135:65`). |
 | `ix_signoffs_stage` | `approval_signoffs` | `(stage_instance_id)` | No | stage signoff lookup (`0135:100`). |
 | `ix_governance_events_tenant_type` | `governance_events` | `(tenant_id, event_type, created_at DESC)` | No | governance feed lookup (`0125:36`). |
@@ -198,7 +198,7 @@ status TEXT NOT NULL
 | `InsertInstance` (`postgres_approval_repository.go:32`) | No | (unclear: no `authz.Require` call in file) | INSERT | `approval_instances` |
 | `InsertSignoff` (`postgres_approval_repository.go:114`) | No | (unclear: no `authz.Require` call in file) | INSERT | `approval_signoffs` |
 | `UpdateInstanceStatus` (`postgres_approval_repository.go:469`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `approval_instances` |
-| `CreateDocumentTx` (`repository.go:73`) | No | (unclear: no `authz.Require` call in file) | INSERT/UPDATE | `documents` |
+| `CreateDocumentTx` (`repository.go:76`) | Yes | `document.create` before INSERT; `document.edit` before pointer/snapshot UPDATEs; area=`tenant` | INSERT/UPDATE | `documents` |
 | `UpdateDocumentName` (`repository.go:216`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `documents` |
 | `UpdateDocumentStatus` (`repository.go:428`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `documents` |
 | `MarkArchived` (`repository.go:1071`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `public.documents` |
@@ -206,7 +206,7 @@ status TEXT NOT NULL
 
 Tripwire rule evaluation facts:
 - `approval_instances` / `approval_signoffs` writes above have no `authz.Require` call in the scanned repository files; DB tripwire trigger exists in `0142b_role_capabilities_v2_enforce.sql:201-209`.
-- `documents` writes above have no `authz.Require` call in the scanned repository files.
+- `CreateDocumentTx` now asserts `document.create` and `document.edit` in order inside the caller-owned transaction; the remaining `documents` rows in this audit are pre-existing scanned findings outside this sync scope.
 - Reads were not audited per rule.
 
 ## 6. Migration History

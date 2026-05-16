@@ -1,6 +1,35 @@
+## 2026-05-15 - D4 hard-cutover wiki/docs sync
+
+- **Context:** Worker E wiki/docs lane cutover refresh for current route/API truth and approval linkage rename evidence.
+- **Mode:** lite patch
+- **Anchors moved:** route/API wording only
+- **Public surface:** `/documents/new`, `/documents/:documentID/edit`, `/documents/:documentId`
+- **Routes/API:** `/api/v1/documents/*` canonical in current-truth sections; stale `/api/v2/documents` removed from active docs wording
+- **Persistence:** approval linkage wording reflects `document_id` naming (0194 evidence preserved via docs)
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
+- **Tally gate:** pending
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`
 # Sync log — documents
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
+
+## 2026-05-15 - Novo Documento blank-template create tripwire repair
+
+- **Context:** uncommitted runtime repair for Documents v2 initialization inside Registry atomic create
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** `CreateDocumentTx` behavior updated; it asserts `document.create` before INSERT and `document.edit` before initial pointer/snapshot UPDATEs
+- **Routes/API:** none
+- **Runtime flows:** atomic CD+draft create note updated for Plan 5 tripwire behavior
+- **Persistence:** `documents` INSERT/UPDATE tripwire pairing updated for `CreateDocumentTx`
+- **Dependencies:** Registry remains caller/owner of atomic create; Documents v2 remains row-initialization port provider
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
+- **Tally gate:** PASS
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`
 
 ## 2026-05-11 · Plan 6a — close T-005
 

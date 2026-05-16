@@ -3,7 +3,7 @@ import { buildProfileAccordions } from "../features/documents/adapters/catalogSu
 import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../lib/types";
 import styles from "./DocumentWorkspaceShell.module.css";
 
-export type WorkspaceView = "operations" | "approvals" | "audit" | "library" | "my-docs" | "recent" | "create" | "content-builder" | "registry" | "notifications" | "admin" | "taxonomy-admin" | "templates" | "documents-v2" | "registry-v2" | "iam-memberships" | "approval-routes";
+export type WorkspaceView = "operations" | "approvals" | "audit" | "library" | "my-docs" | "recent" | "create" | "content-builder" | "registry" | "notifications" | "admin" | "taxonomy-admin" | "templates" | "document-editor" | "registry-v2" | "iam-memberships" | "approval-routes";
 
 type WorkspaceShellProps = {
   userDisplayName: string;
@@ -258,8 +258,8 @@ function activeTitle(activeView: WorkspaceView): string {
       return "Tipos Documentais";
     case "templates":
       return "Templates";
-    case "documents-v2":
-      return "Documents v2";
+    case "document-editor":
+      return "Editor de Documento";
     case "registry-v2":
       return "Documentos Controlados";
     case "iam-memberships":

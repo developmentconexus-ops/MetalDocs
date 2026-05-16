@@ -1,7 +1,7 @@
 # Editor — Deferred Backlog
 
 > **Last verified:** 2026-05-06
-> **Scope:** Deferred implementation items for the `/documents-v2/:documentID` editor screen. The right `EditorMetaSidebar` ships with mock data while backend endpoints are designed.
+> **Scope:** Deferred implementation items for the `/documents/:documentID/edit` editor screen. The right `EditorMetaSidebar` ships with mock data while backend endpoints are designed.
 > **Out of scope:** Bug fixes (see `bugs/`), shared editor primitive (`EditorChrome`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx:12` — TODO block for `MOCK_META`
@@ -15,10 +15,10 @@
 
 | Item | Priority | Depends on | Status |
 |---|---|---|---|
-| Metadados rows (Perfil, Área, Próx. revisão, Visibilidade) | High | Extend `GET /api/v2/documents/:id` response | Deferred |
-| Vigência atual (approval date) | High | Extend `GET /api/v2/documents/:id` response | Deferred |
-| Revisões timeline (full history list) | High | New endpoint `GET /api/v2/documents/:id/revisions` | Deferred |
-| Próximos aprovadores (signoff list) | Medium | New endpoint `GET /api/v2/documents/:id/signoffs` | Deferred |
+| Metadados rows (Perfil, Área, Próx. revisão, Visibilidade) | High | Extend `GET /api/v1/documents/:id` response | Deferred |
+| Vigência atual (approval date) | High | Extend `GET /api/v1/documents/:id` response | Deferred |
+| Revisões timeline (full history list) | High | New endpoint `GET /api/v1/documents/:id/revisions` | Deferred |
+| Próximos aprovadores (signoff list) | Medium | New endpoint `GET /api/v1/documents/:id/signoffs` | Deferred |
 
 ---
 
@@ -31,7 +31,7 @@
 **What it should do:** Show real metadata for the document being edited. Drives compliance visibility (who can see it, when next review is due, which profile/area governs it).
 
 **Backend work needed:**
-- Extend `GET /api/v2/documents/:id` response payload with:
+- Extend `GET /api/v1/documents/:id` response payload with:
   - `ProfileName` — denormalized profile display name (already have `ProfileCode`)
   - `AreaName` — denormalized area name (already have `AreaCode` via profile join)
   - `ApprovedAt` — timestamp the current revision was approved (for "Vigência atual" row)
@@ -57,7 +57,7 @@
 **What it should do:** Show full revision history of the document with subtitles (label or commit-style summary) and timestamps. Active entry = `CurrentRevisionID`.
 
 **Backend work needed:**
-- New endpoint: `GET /api/v2/documents/:id/revisions`
+- New endpoint: `GET /api/v1/documents/:id/revisions`
 - Returns: `[{ ID, VersionNum, Label?, CreatedAt, CreatedBy, IsCurrent }]` ordered by `VersionNum desc`.
 - `Label` = optional rev-message (could come from `Checkpoint.Label` if revisions tie 1:1 to checkpoints, or a separate `revision_label` column).
 - Pagination not needed — typical doc has <50 revisions.
@@ -85,8 +85,8 @@
 - Endpoint exists for approval module but not surfaced via doc API:
   - Likely already returnable: signoff records with `ActorID`, `Role`, `Status`, sequence order.
 - Either:
-  - (a) Add `Signoffs` array to `GET /api/v2/documents/:id` response (preferred — one fewer round trip), or
-  - (b) Standalone `GET /api/v2/documents/:id/signoffs` returning the sequence.
+  - (a) Add `Signoffs` array to `GET /api/v1/documents/:id` response (preferred — one fewer round trip), or
+  - (b) Standalone `GET /api/v1/documents/:id/signoffs` returning the sequence.
 - Need actor display names — backend should denormalize `ActorName`.
 
 **Frontend work:**

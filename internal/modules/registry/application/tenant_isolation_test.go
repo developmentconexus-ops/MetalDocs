@@ -8,7 +8,7 @@ func TestTenantIsolation_CrossTenantFK_DocumentProfile(t *testing.T) {
 	t.Skip("requires live DB")
 }
 
-func TestTenantIsolation_CrossTenantFK_DocumentsV2Trigger(t *testing.T) {
+func TestTenantIsolation_CrossTenantFK_DocumentsTrigger(t *testing.T) {
 	t.Skip("requires live DB")
 }
 

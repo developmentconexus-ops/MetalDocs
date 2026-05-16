@@ -163,7 +163,7 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 - [ ] Profile: `DC`. Area: `RH`. Title: `Descrição de Cargo — Analista Fiscal`.
 - [ ] Confirm.
 - [ ] **Expected:** new CD with code `DC-RH-001` (or next in sequence).
-- [ ] **E12 regression:** navigate to `/documents-v2/new` immediately after page load (before auth fully resolves) → proceed to Step 4 and click "Criar documento" before `currentUser` resolves → toast should fire with **"Aguardando autenticação. Tente novamente em alguns segundos."** and no POST fired. (`NewDocumentWizardPage.tsx:154`; `RegistryCreateDialog` was deleted by feat/cd-atomic-create)
+- [ ] **E12 regression:** navigate to `/documents/new` immediately after page load (before auth fully resolves) → proceed to Step 4 and click "Criar documento" before `currentUser` resolves → toast should fire with **"Aguardando autenticação. Tente novamente em alguns segundos."** and no POST fired. (`NewDocumentWizardPage.tsx:154`; `RegistryCreateDialog` was deleted by feat/cd-atomic-create)
 
 ### C2. Generate working version
 

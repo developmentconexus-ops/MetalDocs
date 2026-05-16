@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-15 (DB foundation) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-05-15 (Novo Documento atomic create runtime repair) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/registry/module.go:25` â€” module wiring (`New`, dependencies)
@@ -166,7 +166,7 @@ All routes registered via `Handler.RegisterRoutes` (`delivery/http/handler.go:67
 
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
-| POST | `/api/v1/controlled-documents` | `atomicCreateControlledDocument` | `routes.go:43` | `registry.create` (tier-1 only) |
+| POST | `/api/v1/controlled-documents` | `atomicCreateControlledDocument` | `routes.go:43` | `registry.create` (tier-1 + in-tx `authz.Require`; sets `metaldocs.tenant_id`/`actor_id` before sequence/CD writes) |
 | POST | `/api/v1/controlled-documents/{id}/revisions` | `createControlledDocumentRevision` | `routes.go:148` | `registry.create` (tier-1) |
 | GET | `/api/v1/controlled-documents/preview-code` | `previewControlledDocumentCode` | `routes.go:127` | (read; resolver mapping outside module) |
 | GET | `/api/v1/controlled-documents` | `listControlledDocuments` | `routes.go:23` | (read) |
@@ -216,6 +216,8 @@ sequenceDiagram
     S->>Repo: TaxonomyProfileReader.GetByCode
     S->>Repo: TaxonomyAreaReader.GetByCode
     S->>S: BeginTx
+    S->>S: setAuthzGUC(tenant_id, actor_id)
+    S->>S: authz.Require(registry.create, tenant)
     S->>Seq: NextAndIncrement(tx)
     S->>Repo: CreateTx (controlled_documents)
     S->>Init: CloneTemplate(tx, ...)
@@ -234,7 +236,7 @@ State transitions:
 
 | Entity | From | To | Trigger | Capability |
 |---|---|---|---|---|
-| `controlled_documents` (new row) | (none) | `active` | `CreateTx` | `registry.create` (tier-1 IAM middleware) |
+| `controlled_documents` (new row) | (none) | `active` | `CreateTx` | `registry.create` (tier-1 IAM middleware + in-tx `authz.Require`) |
 | `documents` (new row) | (none) | `draft` | `CreateDocumentTx` (in same tx) | same |
 | `cd_sequence_counters.next_seq` | N | N+1 | `NextAndIncrement` | same |
 | `governance_events` | (none) | event row (post-commit) | `govLogger.Log` | same |
@@ -459,6 +461,7 @@ Top 3 (by severity, then blast-radius):
 ## Changelog
 
 - 2026-05-15 - Database foundation sync: removed startup migration alias references (`RunStartupMigrations`), confirmed legacy maintenance is explicit recovery-only, and aligned startup notes with the current DB bootstrap workflow.
+- 2026-05-15 - Runtime repair: atomic create now primes `metaldocs.tenant_id`/`metaldocs.actor_id` and asserts `registry.create` inside the caller-owned transaction before sequence/CD writes, restoring Plan 5 tripwire pairing for `/api/v1/controlled-documents`.
 
 - 2026-05-11 â€” Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; Â§5.3 T-006 note updated; Â§6.2 sequence + tripwire note updated; Â§8.7 tenant-scoping paragraph added; Key files updated.
 - 2026-05-11 â€” initial Arc42 + C4 publish; supersedes 2026-05-07 stub.

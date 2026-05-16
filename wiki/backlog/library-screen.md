@@ -79,7 +79,7 @@
 **What it should do:** Count of documents currently awaiting the **current user's** approval signature. Distinct from `under_review` (system-wide) — this is the user's personal action queue size.
 
 **Backend work needed:**
-- Extend `GET /api/v2/documents/stats` response schema:
+- Extend `GET /api/v1/documents/stats` response schema:
   ```json
   {
     "pendingMyApproval": 3,
@@ -103,7 +103,7 @@
 **What it should do:** Count of documents frozen (status `frozen` + `published`) this calendar month, plus month-over-month delta.
 
 **Backend work needed:**
-- Extend `GET /api/v2/documents/stats`:
+- Extend `GET /api/v1/documents/stats`:
   ```json
   {
     "frozenThisMonth": 47,
@@ -128,7 +128,7 @@
 **What it should do:** Count of documents whose next scheduled review date falls within the next 60 days, plus the months covered.
 
 **Backend work needed:**
-- Option A: New query param on list endpoint: `GET /api/v2/documents?nextReviewWithin=60d&pageSize=0` → response `total`.
+- Option A: New query param on list endpoint: `GET /api/v1/documents?nextReviewWithin=60d&pageSize=0` → response `total`.
 - Option B: Extend stats endpoint with `upcomingReview60d: number, upcomingReviewMonths: string[]`.
 - Option B is cleaner (single stats call, no phantom list fetch).
 
@@ -146,7 +146,7 @@
 
 **What it should do:** Open a sidebar/panel with advanced filter options: date range, area multi-select, profile, author, revision range.
 
-**Depends on:** Design spec for the filter panel + backend support for each filter param in `GET /api/v2/documents`. Most params already exist (`areaCode`, `status`, `q`). Need: `authorID`, `profileCode`, `createdAfter`, `createdBefore`, `revisionMin`, `revisionMax`.
+**Depends on:** Design spec for the filter panel + backend support for each filter param in `GET /api/v1/documents`. Most params already exist (`areaCode`, `status`, `q`). Need: `authorID`, `profileCode`, `createdAfter`, `createdBefore`, `revisionMin`, `revisionMax`.
 
 ---
 
@@ -156,7 +156,7 @@
 
 **Current state:** "Exportar" button is `disabled aria-disabled="true"`.
 
-**What it should do:** Export current filtered list as CSV or XLSX. Probably a background job (`POST /api/v2/documents/export`) that returns a download URL.
+**What it should do:** Export current filtered list as CSV or XLSX. Probably a background job (`POST /api/v1/documents/export`) that returns a download URL.
 
 **Depends on:** Backend export job endpoint. No spec yet.
 

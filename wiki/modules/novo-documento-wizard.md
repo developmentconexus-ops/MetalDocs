@@ -1,7 +1,7 @@
 # Novo-Documento Wizard
 
-> **Last verified:** 2026-05-13
-> **Scope:** 4-step document-creation wizard at `/documents-v2/new` Ã¢â‚¬â€ state machine, step components, new primitives (`DocPaperPreview`, `WizardFooter`), sub-controls, and helpers (`resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile`).
+> **Last verified:** 2026-05-15 (blank-template create runtime smoke)
+> **Scope:** 4-step document-creation wizard at `/documents/new` Ã¢â‚¬â€ state machine, step components, new primitives (`DocPaperPreview`, `WizardFooter`), sub-controls, and helpers (`resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile`).
 
 > **Maturity:** L2
 > **Key files:**
@@ -33,6 +33,8 @@
 The 4-step wizard replaces the old `DocumentCreatePage` single-step flow. It creates the controlled-document slot and first draft revision in a **single atomic call**:
 
 `POST /api/v1/controlled-documents` (`Idempotency-Key` required) Ã¢â‚¬â€ inserts the CD row, increments the per-(profile, area) sequence counter, and clones the template into the first draft document revision, all within a single DB transaction. Returns the CD with server-resolved code (e.g. `DC-RH-001`) plus the new document ID.
+
+The blank-template path is a real runtime path, not fake frontend data: the wizard resolves `GET /api/v1/templates/system/blank`, uses the returned `templateId` and `templateVersionId`, and submits that version ID through the same Registry-owned atomic create endpoint.
 
 All wizard form state lives in a single `useReducer(wizardReducer)` call inside `NewDocumentWizardPage`. Step is mirrored to `?step=1..4` in the URL (with `replace: true`) so the browser back button works.
 
@@ -244,10 +246,10 @@ See `wiki/backlog/novo-documento.md` for all deferred items. Short list (closed 
 
 - `visibility` Ã¢â‚¬â€ selected value not submitted (no backend column)
 - `template-versions` Ã¢â‚¬â€ no version picker
-- `blank-template` Ã¢â‚¬â€ disabled (backend requires valid `templateVersionId`)
 - `profile-counts` Ã¢â‚¬â€ no document count per profile card
 
 Closed by feat/cd-atomic-create: `sequence-preview` (preview endpoint shipped), `slot-rollback` (atomic create eliminates orphan slots). See ADR 0011.
+Closed by Novo Documento blank-template repair: `blank-template` (system blank endpoint supplies a valid `templateVersionId`; StepTemplate keeps the card selectable even when no profile templates exist).
 
 ---
 

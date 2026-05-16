@@ -2,6 +2,22 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-15 - Novo Documento atomic create runtime repair
+
+- **Context:** uncommitted runtime repair for `POST /api/v1/controlled-documents`
+- **Mode:** lite patch
+- **Anchors moved:** `Last verified` stamp only
+- **Public surface:** `RegistryService.Create` now primes `metaldocs.tenant_id` and `metaldocs.actor_id`, then asserts `registry.create` inside the caller transaction before sequence allocation and CD insert
+- **Routes/API:** no path/schema change; route truth remains `POST /api/v1/controlled-documents`
+- **Runtime flows:** atomic create flow updated to include in-tx authz GUC + `registry.create`
+- **Persistence:** `cd_sequence_counters` and `controlled_documents` writes now documented as protected by in-tx capability assertion
+- **Dependencies:** Documents v2 dependency clarified as `document.create` plus `document.edit` during `CreateDocumentTx`
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=6 Minor=4; missing-ADR=9
+- **Tally gate:** PASS
+- **Patched files:** `wiki/modules/registry.md`; `wiki/modules/registry/_artifacts/02-flow-atomic-create.md`; `wiki/modules/registry/_artifacts/sync-log.md`
+
 ## 2026-05-15 - DB foundation startup and migration policy sync
 
 - **Context:** git range `b940d0d66fe44fa7fd6877d222d89e1bfae1eccd..cf123c5a` (DB foundation implementation and verification hardening)

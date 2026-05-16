@@ -2,6 +2,19 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-15 - D4 hard-cutover debt/backlog closure sync (0194)
+
+- **Context:** Worker E wiki/docs lane closeout for approval linkage rename debt row and refactor backlog row.
+- **Mode:** lite patch
+- **Anchors moved:** debt + backlog status wording
+- **Public surface:** unchanged
+- **Routes/API:** unchanged runtime; docs keep `/api/v1/documents/*` references
+- **Persistence:** T-008 marked closed; `approval_instances` linkage naming synchronized to `document_id` with migration 0194 evidence
+- **T-NNN touched:** T-008 -> closed (2026-05-15)
+- **R-NNN touched:** R-008 -> merged (migration 0194)
+- **Counts after:** Critical=2 Major=4 Minor=6; missing-ADR=10
+- **Tally gate:** pending
+- **Patched files:** `wiki/modules/approval.md`; `wiki/modules/approval-tech-debt.md`; `wiki/backlog/approval-refactor.md`; `wiki/modules/approval/_artifacts/sync-log.md`
 ## 2026-05-14 - Plan 12.2 caixa-aprovacao screen reality-first sync
 
 - **Context:** commits `a0a90f7e..3d9572cb` (design/spec, approvals screen implementation, review fixes, backlog/design notes sync)

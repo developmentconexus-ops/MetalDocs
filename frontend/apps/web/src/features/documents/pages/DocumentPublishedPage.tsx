@@ -118,7 +118,7 @@ export function DocumentPublishedPage() {
   const connectorSide = stageCount > 1 ? `${(100 / (2 * stageCount)).toFixed(2)}%` : '50%';
 
   // Handlers
-  const handleView = () => navigate(`/documents-v2/${documentId}`);
+  const handleView = () => navigate(`/documents/${documentId}/edit`);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href)

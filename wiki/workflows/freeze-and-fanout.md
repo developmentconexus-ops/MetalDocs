@@ -128,7 +128,7 @@ This is a **raw JSON array** — NOT wrapped as `{"placeholders": [...]}`. `pars
 | 16 | docgen-v2 | Converts DOCX→PDF, uploads to `tenants/{id}/revisions/{id}/final.pdf`, returns `OutputKey` + `ContentHash` |
 | 17 | `PDFJobRunner.Handle` (cont.) | Calls `WritePDF` — stamps `final_pdf_s3_key` and `pdf_content_hash` on document row |
 
-After step 17, `GET /api/v2/documents/{id}/view` returns `{"pdf_status":"ready","signed_url":"..."}`. Before step 17 completes the same endpoint returns `{"pdf_status":"pending"}` (or `"failed"` if the outbox row is in `failed` state). The frontend polls this endpoint every 3 s via `useDocumentPdfStatus`. See `modules/documents.md` — PDF Status Polling section.
+After step 17, `GET /api/v1/documents/{id}/view` returns `{"pdf_status":"ready","signed_url":"..."}`. Before step 17 completes the same endpoint returns `{"pdf_status":"pending"}` (or `"failed"` if the outbox row is in `failed` state). The frontend polls this endpoint every 3 s via `useDocumentPdfStatus`. See `modules/documents.md` — PDF Status Polling section.
 
 ### S3 key pattern
 

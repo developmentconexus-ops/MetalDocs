@@ -11,7 +11,7 @@
 > - `frontend/apps/web/src/features/templates/TemplatesListPage.tsx` — Templates list
 > - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — eigenpal author (renamed from `TemplateAuthorPage` 2026-05-10)
 > - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — Documentos Controlados list
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx` — 4-step novo-documento wizard at `/documents-v2/new` (profile → area/title/visibility → template → confirm + create)
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx` — 4-step novo-documento wizard at `/documents/new` (profile → area/title/visibility → template → confirm + create)
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx` — eigenpal fill-in editor
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada de Aprovação
 
