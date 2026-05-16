@@ -66,12 +66,12 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-007`
 - **Linked ADR:** missing-ADR
 
-### T-008 · `approval_instances.document_v2_id` column retains `_v2` suffix post-cutover
-- **Severity:** minor
-- **Surface:** `migrations/0135_approval_instances.sql:12`; `internal/modules/documents/approval/repository/postgres_approval_repository.go:36-37`
-- **Observation:** Cutover from `documents_v2` → `documents` is complete (`migrations/0167`); the column on `approval_instances` still uses the migration-era name `document_v2_id`. UNIQUE constraint `(document_v2_id, idempotency_key)` carries the legacy name forward.
-- **Evidence:** persistence map §1.
-- **Linked backlog row:** `backlog/approval-refactor.md#R-008`
+### T-008 · `approval_instances.document_v2_id` column retains `_v2` suffix post-cutover — CLOSED 2026-05-15 (0194)
+- **Severity:** minor (closed)
+- **Surface (resolved):** `migrations/0194_*` migration evidence; `internal/modules/documents/approval/repository/postgres_approval_repository.go` now reads `document_id`.
+- **Observation (original):** Cutover from `documents_v2` → `documents` completed, but `approval_instances` still used legacy `document_v2_id`.
+- **Evidence:** migration `0194` + repository surface aligned to `document_id`; persistence map sync updated.
+- **Linked backlog row:** `backlog/approval-refactor.md#R-008` (merged 2026-05-15 with 0194 evidence)
 - **Linked ADR:** missing-ADR
 
 ### T-009 · `NOT VALID` FKs on tenant-scoped iam_users joins

@@ -60,7 +60,7 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 16 }}>Documentos Controlados</h2>
-        <button type="button" onClick={() => navigate('/documents-v2/new')} style={{ marginLeft: "auto", padding: "6px 14px" }}>
+        <button type="button" onClick={() => navigate('/documents/new')} style={{ marginLeft: "auto", padding: "6px 14px" }}>
           + Novo
         </button>
       </div>

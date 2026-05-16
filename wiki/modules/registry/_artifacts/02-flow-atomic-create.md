@@ -26,7 +26,7 @@ Note: live OpenAPI spec is under `api/openapi/v1/partials/registry.yaml` even th
    → calls: `internal/modules/registry/delivery/http/routes.go:61` `h.svc.Create(...)`
 7. `internal/modules/registry/application/service.go:104` `RegistryService.Create` — validates profile/area, selects code path, coordinates atomic create.
    → calls: `internal/modules/registry/infrastructure/repository.go:303` `TaxonomyProfileReader.GetByCode`; `internal/modules/registry/infrastructure/repository.go:343` `TaxonomyAreaReader.GetByCode`
-8. `internal/modules/registry/application/service.go:153` transaction start for auto-code path.
+8. `internal/modules/registry/application/service.go:153` transaction start for auto-code path; `setAuthzGUC` primes `metaldocs.tenant_id`/`metaldocs.actor_id`, then `authz.Require(registry.create, tenant)` appends the asserted cap before guarded writes.
    → calls: `internal/modules/registry/application/service.go:153` `s.db.BeginTx(...)`
 9. `internal/modules/registry/application/service.go:164` sequence allocation.
    → calls: `internal/modules/registry/infrastructure/repository.go:239` `PostgresSequenceAllocator.NextAndIncrement(...)`
@@ -49,9 +49,9 @@ Note: live OpenAPI spec is under `api/openapi/v1/partials/registry.yaml` even th
 | Entity | From | To | Trigger | Capability required |
 |---|---|---|---|---|
 | `metaldocs.idempotency_keys` | no completed row for `(tenant, actor, route, key)` | completed replay row inserted/updated | `RecordReplay` after 2xx (`internal/platform/idempotency/middleware.go:67`, `postgres_store.go:67`) | `CapRegistryCreate` resolved at `apps/api/cmd/metaldocs-api/permissions.go:186-187`, enforced via IAM middleware (`main.go:173-174`, `:386`) |
-| `cd_sequence_counters.next_seq` | `N` (or missing row) | `N+1` (and row ensured) | `NextAndIncrement` (`repository.go:214`, `:251`) | same |
-| `controlled_documents` | no row | new active row | `CreateTx` (`repository.go:146`) | same |
-| `documents` | no row | new draft row + pointer/snapshot updates | `CreateDocumentTx` (`documents/repository/repository.go:101`, `:135`, `:145`) | same |
+| `cd_sequence_counters.next_seq` | `N` (or missing row) | `N+1` (and row ensured) | `NextAndIncrement` (`repository.go:214`, `:251`) | `registry.create` asserted in tx |
+| `controlled_documents` | no row | new active row | `CreateTx` (`repository.go:146`) | `registry.create` asserted in tx |
+| `documents` | no row | new draft row + pointer/snapshot updates | `CreateDocumentTx` (`documents/repository/repository.go:101`, `:135`, `:145`) | `document.create` for INSERT; `document.edit` before guarded document UPDATEs |
 | `editor_sessions` | none | active session inserted | `CreateDocumentTx` (`:112`, `:128`) | same |
 | `document_revisions` | none | initial revision inserted (template passthrough key) | `CreateDocumentTx` (`:120`) | same |
 | `document_placeholder_values` | missing required rows | seeded placeholder rows (idempotent insert) | `CreateDocumentTx` (`:165`) | same |
@@ -80,7 +80,7 @@ Note: live OpenAPI spec is under `api/openapi/v1/partials/registry.yaml` even th
 | `internal/modules/taxonomy/application/governance_logger.go:25` | INSERT | `governance_events` | same |
 | `internal/platform/idempotency/postgres_store.go:69` | INSERT ... ON CONFLICT DO UPDATE | `metaldocs.idempotency_keys` | same |
 
-**Tripwire pairing audit:** N/A in the registry path — no `authz.Require(...)` call. Access control is via IAM middleware + permission resolver (`apps/api/cmd/metaldocs-api/main.go:173-174`, `:386`, `permissions.go:186-187`). Capability `CapRegistryCreate` (seeded `registry.create` in `migrations/0165_role_capabilities_reseed.sql`).
+**Tripwire pairing audit:** active for atomic create. HTTP tier-1 still resolves `registry.create` via IAM middleware + permission resolver (`apps/api/cmd/metaldocs-api/main.go:173-174`, `:386`, `permissions.go:186-187`). `RegistryService.Create` now sets authz GUCs and calls `authz.Require(registry.create, tenant)` before `cd_sequence_counters` and `controlled_documents` writes. Documents-side `CreateDocumentTx` asserts `document.create` for the INSERT and `document.edit` before guarded `documents` UPDATEs.
 
 ### 5. Response shape
 

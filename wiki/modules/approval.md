@@ -406,7 +406,7 @@ Two layers on signoff:
 - HTTP: `Idempotency-Key` header â†’ `PostgresSignoffIdempStore.CheckReplay` / `RecordReplay` (`infrastructure/postgres_signoff_idemp_store.go:25,42`); store backed by `metaldocs.idempotency_keys` (24h `expires_at`).
 - Repository: `INSERT â€¦ ON CONFLICT (approval_instance_id, actor_user_id) DO NOTHING` + `LoadSignoffByActor` field-compare (`postgres_approval_repository.go:127-173`) â€” replay returns prior `Signoff`; differing stage/decision/content_hash returns `ErrActorAlreadySigned`.
 
-Submit derives a deterministic key (`application/idempotency.go:25`) stored on `approval_instances.idempotency_key` with UNIQUE `(document_v2_id, idempotency_key)`.
+Submit derives a deterministic key (`application/idempotency.go:25`) stored on `approval_instances.idempotency_key` with UNIQUE `(document_id, idempotency_key)`.
 
 ### 8.4 Pagination
 
@@ -466,7 +466,7 @@ Pointer-only. Body lives in `wiki/modules/approval-tech-debt.md`. Severity rubri
 
 - Critical: 2 (T-001 closed Plan 7; T-002 remaining)
 - Major: 4 (T-003 closed Plan 7; T-004/T-005/T-006 remaining)
-- Minor: 6
+- Minor: 6 (includes closed rows in tally accounting; T-008 closed via migration 0194)
 
 Top 3 (by severity, then by blast-radius):
 1. Signoff & cancel doc-scoped routes absent from OpenAPI â€” frontend hand-rolls types; future migration to codegen blocked â€” see tech-debt Â§T-002.

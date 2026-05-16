@@ -8,7 +8,7 @@
 
 ### `DocumentResponse` missing area_code, profile_code, created_at
 
-`GET /api/v2/documents/:id` currently returns: `id`, `code`, `name`, `status`, `created_by`, `current_revision_id`, `revision_version`, `form_data`.
+`GET /api/v1/documents/:id` currently returns: `id`, `code`, `name`, `status`, `created_by`, `current_revision_id`, `revision_version`, `form_data`.
 
 Missing fields needed by this screen:
 - `area_code` — to show area label in breadcrumb, DocCardMini header, and facts grid "Área"
@@ -25,7 +25,7 @@ Backend fix: add these three fields to the `getDocumentByID` handler SELECT. The
 
 `created_by` returns the username (e.g. `admin-local`), not the user's display name. The owner banner should show the full display name (e.g. "Administrator").
 
-Backend fix: add `created_by_display_name` (denormalized snapshot at publish time) to `GET /api/v2/documents/:id` response.
+Backend fix: add `created_by_display_name` (denormalized snapshot at publish time) to `GET /api/v1/documents/:id` response.
 
 **Frontend interim:** If `created_by === currentUser.username`, substitute `currentUser.displayName`. Does not cover documents created by other users.
 
@@ -35,7 +35,7 @@ Backend fix: add `created_by_display_name` (denormalized snapshot at publish tim
 
 "Iniciar revisão" calls `POST /api/v2/controlled-documents/:cdId/revisions`. The page only has the document `id`, not `controlled_document_id`. Currently RBAC gate is role-only (admin/editor/qms_admin/area_admin). Full author-ownership gate needs this field.
 
-Backend fix: expose `controlled_document_id` in `GET /api/v2/documents/:id` response.
+Backend fix: expose `controlled_document_id` in `GET /api/v1/documents/:id` response.
 
 **Frontend impact:** Replace role-only gate with `user.userId === doc.controlled_document_owner_id || hasRole(['admin', 'qms_admin'])`.
 
@@ -57,7 +57,7 @@ Mutation fn to add to `features/documents/api/` or new `controlledDocumentsApi.t
 
 ### VersionTimeline — revision list endpoint
 
-No `GET /api/v2/documents/:id/revisions` list endpoint exists. Only single-revision URL (`/revisions/:rid/url`). 
+No `GET /api/v1/documents/:id/revisions` list endpoint exists. Only single-revision URL (`/revisions/:rid/url`). 
 
 Backend: implement list endpoint returning `[{ revision_id, version_num, created_by, created_at, summary? }]`.
 
@@ -73,7 +73,7 @@ No related-documents relationship model in the backend. Needs design + backend w
 
 ### CommentsCard — display-side architecture
 
-Editor comments (`GET /api/v2/documents/:id/comments`, content is ProseMirror JSON `unknown[]`) exist but are scoped to the document editor. The published page needs a separate "discussion" model or a read-only ProseMirror renderer.
+Editor comments (`GET /api/v1/documents/:id/comments`, content is ProseMirror JSON `unknown[]`) exist but are scoped to the document editor. The published page needs a separate "discussion" model or a read-only ProseMirror renderer.
 
 Decide:
 1. Reuse editor comments with `extractPlainText` util for display
@@ -84,7 +84,7 @@ Decide:
 
 ---
 
-### PDF download — `GET /api/v2/documents/:id/pdf`
+### PDF download — `GET /api/v1/documents/:id/pdf`
 
 No PDF generation endpoint. "Baixar PDF" button is `aria-disabled` pending this.
 
@@ -98,7 +98,7 @@ Requires fanout/read-tracking API. No endpoint today. "Cobertura" KPI shows `—
 
 ### AuditCard / ISO seal — values_hash
 
-`GET /api/v2/documents/:id` does not return `values_hash`. AuditCard + ISOSeal cut from this screen pending backend field addition.
+`GET /api/v1/documents/:id` does not return `values_hash`. AuditCard + ISOSeal cut from this screen pending backend field addition.
 
 ---
 

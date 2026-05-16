@@ -15,7 +15,7 @@
 | R-005 | Convert inbox list+count to single tx (or single window-function query) | T-005 | S | major | — | — | open | — |
 | R-006 | Audit cancel & cutover service paths for `authz.Require` pairing | T-006 | S | major | — | — | open | — |
 | R-007 | Consolidate `infra/signature/` and `infrastructure/` packages | T-007 | XS | minor | — | — | open | — |
-| R-008 | Rename `approval_instances.document_v2_id` → `document_id` (migration) | T-008 | S | minor | — | — | open | — |
+| R-008 | Rename `approval_instances.document_v2_id` → `document_id` (migration) | T-008 | S | minor | — | — | merged | migration 0194 |
 | R-009 | Validate `NOT VALID` FKs on `submitted_by` and `actor_user_id` | T-009 | XS | minor | — | — | open | — |
 | R-010 | Add Go doc comments to exported approval symbols | T-010 | M | minor | — | — | open | — |
 | R-011 | Remove `WithMembershipContext` in favor of `setAuthzGUC` | T-011 | XS | minor | — | — | open | — |
@@ -25,4 +25,4 @@
 
 - R-001 + R-002 are both `M` and depend on a shared envelope/spec decision — sequence them: R-002 first (lock the schema), then R-001 (server emits matching shape).
 - R-006 is gated by extending `tally_check.sh` audit to non-test service files — keep diff small, no new lint dependencies.
-- R-008 requires a migration plus repository column rename — coordinate with documents module to avoid double-migration.
+- R-008 completed in migration 0194; repository column surface is now `document_id`.

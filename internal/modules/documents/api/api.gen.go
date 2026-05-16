@@ -388,8 +388,8 @@ type DocumentTemplateTableSlotNodeResponseFieldKind string
 // DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
 type DocumentTemplateTableSlotNodeResponseType string
 
-// ListDocumentsV2Params defines parameters for ListDocumentsV2.
-type ListDocumentsV2Params struct {
+// ListDocumentsParams defines parameters for ListDocuments.
+type ListDocumentsParams struct {
 	Page     *int `form:"page,omitempty" json:"page,omitempty"`
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 
@@ -401,42 +401,42 @@ type ListDocumentsV2Params struct {
 	IncludeArchived *bool   `form:"includeArchived,omitempty" json:"includeArchived,omitempty"`
 }
 
-// DocumentStatsV2Params defines parameters for DocumentStatsV2.
-type DocumentStatsV2Params struct {
+// DocumentStatsParams defines parameters for DocumentStats.
+type DocumentStatsParams struct {
 	Status      *string `form:"status,omitempty" json:"status,omitempty"`
 	AreaCode    *string `form:"areaCode,omitempty" json:"areaCode,omitempty"`
 	ProfileCode *string `form:"profileCode,omitempty" json:"profileCode,omitempty"`
 }
 
-// RenameDocumentV2JSONBody defines parameters for RenameDocumentV2.
-type RenameDocumentV2JSONBody struct {
+// RenameDocumentJSONBody defines parameters for RenameDocument.
+type RenameDocumentJSONBody struct {
 	Name string `json:"name"`
 }
 
-// CommitDocumentAutosaveV2JSONBody defines parameters for CommitDocumentAutosaveV2.
-type CommitDocumentAutosaveV2JSONBody struct {
+// CommitDocumentAutosaveJSONBody defines parameters for CommitDocumentAutosave.
+type CommitDocumentAutosaveJSONBody struct {
 	FormDataSnapshot *map[string]interface{} `json:"form_data_snapshot,omitempty"`
 	PendingUploadId  openapi_types.UUID      `json:"pending_upload_id"`
 	SessionId        openapi_types.UUID      `json:"session_id"`
 }
 
-// PresignDocumentAutosaveV2JSONBody defines parameters for PresignDocumentAutosaveV2.
-type PresignDocumentAutosaveV2JSONBody struct {
+// PresignDocumentAutosaveJSONBody defines parameters for PresignDocumentAutosave.
+type PresignDocumentAutosaveJSONBody struct {
 	BaseRevisionId openapi_types.UUID `json:"base_revision_id"`
 	ContentHash    string             `json:"content_hash"`
 	SessionId      openapi_types.UUID `json:"session_id"`
 }
 
-// CreateDocumentCheckpointV2JSONBody defines parameters for CreateDocumentCheckpointV2.
-type CreateDocumentCheckpointV2JSONBody struct {
+// CreateDocumentCheckpointJSONBody defines parameters for CreateDocumentCheckpoint.
+type CreateDocumentCheckpointJSONBody struct {
 	Label *string `json:"label,omitempty"`
 }
 
-// CreateDocumentCommentV2JSONBody defines parameters for CreateDocumentCommentV2.
-type CreateDocumentCommentV2JSONBody = map[string]interface{}
+// CreateDocumentCommentJSONBody defines parameters for CreateDocumentComment.
+type CreateDocumentCommentJSONBody = map[string]interface{}
 
-// UpdateDocumentCommentV2JSONBody defines parameters for UpdateDocumentCommentV2.
-type UpdateDocumentCommentV2JSONBody = map[string]interface{}
+// UpdateDocumentCommentJSONBody defines parameters for UpdateDocumentComment.
+type UpdateDocumentCommentJSONBody = map[string]interface{}
 
 // ExportDocumentPDFJSONBody defines parameters for ExportDocumentPDF.
 type ExportDocumentPDFJSONBody struct {
@@ -447,43 +447,43 @@ type ExportDocumentPDFJSONBody struct {
 // ExportDocumentPDFJSONBodyPaperSize defines parameters for ExportDocumentPDF.
 type ExportDocumentPDFJSONBodyPaperSize string
 
-// FinalizeDocumentV2Params defines parameters for FinalizeDocumentV2.
-type FinalizeDocumentV2Params struct {
+// FinalizeDocumentParams defines parameters for FinalizeDocument.
+type FinalizeDocumentParams struct {
 	IdempotencyKey openapi_types.UUID `json:"Idempotency-Key"`
 }
 
-// PutDocumentPlaceholderValueV2JSONBody defines parameters for PutDocumentPlaceholderValueV2.
-type PutDocumentPlaceholderValueV2JSONBody = map[string]interface{}
+// PutDocumentPlaceholderValueJSONBody defines parameters for PutDocumentPlaceholderValue.
+type PutDocumentPlaceholderValueJSONBody = map[string]interface{}
 
-// ReconstructDocumentV2JSONBody defines parameters for ReconstructDocumentV2.
-type ReconstructDocumentV2JSONBody = map[string]interface{}
+// ReconstructDocumentJSONBody defines parameters for ReconstructDocument.
+type ReconstructDocumentJSONBody = map[string]interface{}
 
-// RenameDocumentV2JSONRequestBody defines body for RenameDocumentV2 for application/json ContentType.
-type RenameDocumentV2JSONRequestBody RenameDocumentV2JSONBody
+// RenameDocumentJSONRequestBody defines body for RenameDocument for application/json ContentType.
+type RenameDocumentJSONRequestBody RenameDocumentJSONBody
 
-// CommitDocumentAutosaveV2JSONRequestBody defines body for CommitDocumentAutosaveV2 for application/json ContentType.
-type CommitDocumentAutosaveV2JSONRequestBody CommitDocumentAutosaveV2JSONBody
+// CommitDocumentAutosaveJSONRequestBody defines body for CommitDocumentAutosave for application/json ContentType.
+type CommitDocumentAutosaveJSONRequestBody CommitDocumentAutosaveJSONBody
 
-// PresignDocumentAutosaveV2JSONRequestBody defines body for PresignDocumentAutosaveV2 for application/json ContentType.
-type PresignDocumentAutosaveV2JSONRequestBody PresignDocumentAutosaveV2JSONBody
+// PresignDocumentAutosaveJSONRequestBody defines body for PresignDocumentAutosave for application/json ContentType.
+type PresignDocumentAutosaveJSONRequestBody PresignDocumentAutosaveJSONBody
 
-// CreateDocumentCheckpointV2JSONRequestBody defines body for CreateDocumentCheckpointV2 for application/json ContentType.
-type CreateDocumentCheckpointV2JSONRequestBody CreateDocumentCheckpointV2JSONBody
+// CreateDocumentCheckpointJSONRequestBody defines body for CreateDocumentCheckpoint for application/json ContentType.
+type CreateDocumentCheckpointJSONRequestBody CreateDocumentCheckpointJSONBody
 
-// CreateDocumentCommentV2JSONRequestBody defines body for CreateDocumentCommentV2 for application/json ContentType.
-type CreateDocumentCommentV2JSONRequestBody = CreateDocumentCommentV2JSONBody
+// CreateDocumentCommentJSONRequestBody defines body for CreateDocumentComment for application/json ContentType.
+type CreateDocumentCommentJSONRequestBody = CreateDocumentCommentJSONBody
 
-// UpdateDocumentCommentV2JSONRequestBody defines body for UpdateDocumentCommentV2 for application/json ContentType.
-type UpdateDocumentCommentV2JSONRequestBody = UpdateDocumentCommentV2JSONBody
+// UpdateDocumentCommentJSONRequestBody defines body for UpdateDocumentComment for application/json ContentType.
+type UpdateDocumentCommentJSONRequestBody = UpdateDocumentCommentJSONBody
 
 // ExportDocumentPDFJSONRequestBody defines body for ExportDocumentPDF for application/json ContentType.
 type ExportDocumentPDFJSONRequestBody ExportDocumentPDFJSONBody
 
-// PutDocumentPlaceholderValueV2JSONRequestBody defines body for PutDocumentPlaceholderValueV2 for application/json ContentType.
-type PutDocumentPlaceholderValueV2JSONRequestBody = PutDocumentPlaceholderValueV2JSONBody
+// PutDocumentPlaceholderValueJSONRequestBody defines body for PutDocumentPlaceholderValue for application/json ContentType.
+type PutDocumentPlaceholderValueJSONRequestBody = PutDocumentPlaceholderValueJSONBody
 
-// ReconstructDocumentV2JSONRequestBody defines body for ReconstructDocumentV2 for application/json ContentType.
-type ReconstructDocumentV2JSONRequestBody = ReconstructDocumentV2JSONBody
+// ReconstructDocumentJSONRequestBody defines body for ReconstructDocument for application/json ContentType.
+type ReconstructDocumentJSONRequestBody = ReconstructDocumentJSONBody
 
 // AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
 func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
@@ -728,49 +728,49 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 type ServerInterface interface {
 	// List documents for tenant
 	// (GET /api/v1/documents)
-	ListDocumentsV2(w http.ResponseWriter, r *http.Request, params ListDocumentsV2Params)
+	ListDocuments(w http.ResponseWriter, r *http.Request, params ListDocumentsParams)
 	// Documents stats by status and area
 	// (GET /api/v1/documents/stats)
-	DocumentStatsV2(w http.ResponseWriter, r *http.Request, params DocumentStatsV2Params)
+	DocumentStats(w http.ResponseWriter, r *http.Request, params DocumentStatsParams)
 
 	// (GET /api/v1/documents/{id})
-	GetDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	GetDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PATCH /api/v1/documents/{id})
-	RenameDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	RenameDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/archive)
-	ArchiveDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ArchiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/autosave/commit)
-	CommitDocumentAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	CommitDocumentAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/autosave/presign)
-	PresignDocumentAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	PresignDocumentAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/documents/{id}/checkpoints)
-	ListDocumentCheckpointsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ListDocumentCheckpoints(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/checkpoints)
-	CreateDocumentCheckpointV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	CreateDocumentCheckpoint(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 	// Forward-only restore - clones the checkpoint rev into a new head revision
 	// (POST /api/v1/documents/{id}/checkpoints/{version}/restore)
-	RestoreDocumentCheckpointV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, version int)
+	RestoreDocumentCheckpoint(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, version int)
 
 	// (GET /api/v1/documents/{id}/comments)
-	ListDocumentCommentsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ListDocumentComments(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/comments)
-	CreateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	CreateDocumentComment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (DELETE /api/v1/documents/{id}/comments/{libraryID})
-	DeleteDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
+	DeleteDocumentComment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
 
 	// (PATCH /api/v1/documents/{id}/comments/{libraryID})
-	UpdateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
+	UpdateDocumentComment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int)
 
 	// (POST /api/v1/documents/{id}/duplicate)
-	DuplicateDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	DuplicateDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/documents/{id}/export/docx-url)
 	GetDocumentDocxURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -779,40 +779,40 @@ type ServerInterface interface {
 	ExportDocumentPDF(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/documents/{id}/fill-in-schema)
-	GetDocumentFillInSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	GetDocumentFillInSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/finalize)
-	FinalizeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params FinalizeDocumentV2Params)
+	FinalizeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params FinalizeDocumentParams)
 
 	// (GET /api/v1/documents/{id}/placeholder-options/{pid})
-	GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
+	GetDocumentPlaceholderOptions(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
 
 	// (GET /api/v1/documents/{id}/placeholders)
-	ListDocumentPlaceholderValuesV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ListDocumentPlaceholderValues(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v1/documents/{id}/placeholders/{pid})
-	PutDocumentPlaceholderValueV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
+	PutDocumentPlaceholderValue(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string)
 
 	// (POST /api/v1/documents/{id}/reconstruct)
-	ReconstructDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ReconstructDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/documents/{id}/revisions/{rid}/url)
-	GetDocumentRevisionUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, rid openapi_types.UUID)
+	GetDocumentRevisionUrl(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, rid openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/session/acquire)
-	AcquireDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	AcquireDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/session/force-release)
-	ForceReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ForceReleaseDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/session/heartbeat)
-	HeartbeatDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	HeartbeatDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/session/release)
-	ReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ReleaseDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/documents/{id}/view)
-	ViewDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ViewDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -824,14 +824,14 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// ListDocumentsV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListDocumentsV2(w http.ResponseWriter, r *http.Request) {
+// ListDocuments operation middleware
+func (siw *ServerInterfaceWrapper) ListDocuments(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params ListDocumentsV2Params
+	var params ListDocumentsParams
 
 	// ------------- Optional query parameter "page" -------------
 
@@ -925,7 +925,7 @@ func (siw *ServerInterfaceWrapper) ListDocumentsV2(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListDocumentsV2(w, r, params)
+		siw.Handler.ListDocuments(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -935,14 +935,14 @@ func (siw *ServerInterfaceWrapper) ListDocumentsV2(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// DocumentStatsV2 operation middleware
-func (siw *ServerInterfaceWrapper) DocumentStatsV2(w http.ResponseWriter, r *http.Request) {
+// DocumentStats operation middleware
+func (siw *ServerInterfaceWrapper) DocumentStats(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params DocumentStatsV2Params
+	var params DocumentStatsParams
 
 	// ------------- Optional query parameter "status" -------------
 
@@ -984,7 +984,7 @@ func (siw *ServerInterfaceWrapper) DocumentStatsV2(w http.ResponseWriter, r *htt
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DocumentStatsV2(w, r, params)
+		siw.Handler.DocumentStats(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -994,8 +994,8 @@ func (siw *ServerInterfaceWrapper) DocumentStatsV2(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// GetDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetDocumentV2(w http.ResponseWriter, r *http.Request) {
+// GetDocument operation middleware
+func (siw *ServerInterfaceWrapper) GetDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1010,7 +1010,7 @@ func (siw *ServerInterfaceWrapper) GetDocumentV2(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDocumentV2(w, r, id)
+		siw.Handler.GetDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1020,8 +1020,8 @@ func (siw *ServerInterfaceWrapper) GetDocumentV2(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
-// RenameDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) RenameDocumentV2(w http.ResponseWriter, r *http.Request) {
+// RenameDocument operation middleware
+func (siw *ServerInterfaceWrapper) RenameDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1036,7 +1036,7 @@ func (siw *ServerInterfaceWrapper) RenameDocumentV2(w http.ResponseWriter, r *ht
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RenameDocumentV2(w, r, id)
+		siw.Handler.RenameDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1046,8 +1046,8 @@ func (siw *ServerInterfaceWrapper) RenameDocumentV2(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
-// ArchiveDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) ArchiveDocumentV2(w http.ResponseWriter, r *http.Request) {
+// ArchiveDocument operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1062,7 +1062,7 @@ func (siw *ServerInterfaceWrapper) ArchiveDocumentV2(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ArchiveDocumentV2(w, r, id)
+		siw.Handler.ArchiveDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1072,8 +1072,8 @@ func (siw *ServerInterfaceWrapper) ArchiveDocumentV2(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// CommitDocumentAutosaveV2 operation middleware
-func (siw *ServerInterfaceWrapper) CommitDocumentAutosaveV2(w http.ResponseWriter, r *http.Request) {
+// CommitDocumentAutosave operation middleware
+func (siw *ServerInterfaceWrapper) CommitDocumentAutosave(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1088,7 +1088,7 @@ func (siw *ServerInterfaceWrapper) CommitDocumentAutosaveV2(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CommitDocumentAutosaveV2(w, r, id)
+		siw.Handler.CommitDocumentAutosave(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1098,8 +1098,8 @@ func (siw *ServerInterfaceWrapper) CommitDocumentAutosaveV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// PresignDocumentAutosaveV2 operation middleware
-func (siw *ServerInterfaceWrapper) PresignDocumentAutosaveV2(w http.ResponseWriter, r *http.Request) {
+// PresignDocumentAutosave operation middleware
+func (siw *ServerInterfaceWrapper) PresignDocumentAutosave(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1114,7 +1114,7 @@ func (siw *ServerInterfaceWrapper) PresignDocumentAutosaveV2(w http.ResponseWrit
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PresignDocumentAutosaveV2(w, r, id)
+		siw.Handler.PresignDocumentAutosave(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1124,8 +1124,8 @@ func (siw *ServerInterfaceWrapper) PresignDocumentAutosaveV2(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
-// ListDocumentCheckpointsV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListDocumentCheckpointsV2(w http.ResponseWriter, r *http.Request) {
+// ListDocumentCheckpoints operation middleware
+func (siw *ServerInterfaceWrapper) ListDocumentCheckpoints(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1140,7 +1140,7 @@ func (siw *ServerInterfaceWrapper) ListDocumentCheckpointsV2(w http.ResponseWrit
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListDocumentCheckpointsV2(w, r, id)
+		siw.Handler.ListDocumentCheckpoints(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1150,8 +1150,8 @@ func (siw *ServerInterfaceWrapper) ListDocumentCheckpointsV2(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
-// CreateDocumentCheckpointV2 operation middleware
-func (siw *ServerInterfaceWrapper) CreateDocumentCheckpointV2(w http.ResponseWriter, r *http.Request) {
+// CreateDocumentCheckpoint operation middleware
+func (siw *ServerInterfaceWrapper) CreateDocumentCheckpoint(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1166,7 +1166,7 @@ func (siw *ServerInterfaceWrapper) CreateDocumentCheckpointV2(w http.ResponseWri
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateDocumentCheckpointV2(w, r, id)
+		siw.Handler.CreateDocumentCheckpoint(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1176,8 +1176,8 @@ func (siw *ServerInterfaceWrapper) CreateDocumentCheckpointV2(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
-// RestoreDocumentCheckpointV2 operation middleware
-func (siw *ServerInterfaceWrapper) RestoreDocumentCheckpointV2(w http.ResponseWriter, r *http.Request) {
+// RestoreDocumentCheckpoint operation middleware
+func (siw *ServerInterfaceWrapper) RestoreDocumentCheckpoint(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1201,7 +1201,7 @@ func (siw *ServerInterfaceWrapper) RestoreDocumentCheckpointV2(w http.ResponseWr
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RestoreDocumentCheckpointV2(w, r, id, version)
+		siw.Handler.RestoreDocumentCheckpoint(w, r, id, version)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1211,8 +1211,8 @@ func (siw *ServerInterfaceWrapper) RestoreDocumentCheckpointV2(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
-// ListDocumentCommentsV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListDocumentCommentsV2(w http.ResponseWriter, r *http.Request) {
+// ListDocumentComments operation middleware
+func (siw *ServerInterfaceWrapper) ListDocumentComments(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1227,7 +1227,7 @@ func (siw *ServerInterfaceWrapper) ListDocumentCommentsV2(w http.ResponseWriter,
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListDocumentCommentsV2(w, r, id)
+		siw.Handler.ListDocumentComments(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1237,8 +1237,8 @@ func (siw *ServerInterfaceWrapper) ListDocumentCommentsV2(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// CreateDocumentCommentV2 operation middleware
-func (siw *ServerInterfaceWrapper) CreateDocumentCommentV2(w http.ResponseWriter, r *http.Request) {
+// CreateDocumentComment operation middleware
+func (siw *ServerInterfaceWrapper) CreateDocumentComment(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1253,7 +1253,7 @@ func (siw *ServerInterfaceWrapper) CreateDocumentCommentV2(w http.ResponseWriter
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateDocumentCommentV2(w, r, id)
+		siw.Handler.CreateDocumentComment(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1263,43 +1263,8 @@ func (siw *ServerInterfaceWrapper) CreateDocumentCommentV2(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// DeleteDocumentCommentV2 operation middleware
-func (siw *ServerInterfaceWrapper) DeleteDocumentCommentV2(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	// ------------- Path parameter "libraryID" -------------
-	var libraryID int
-
-	err = runtime.BindStyledParameterWithOptions("simple", "libraryID", r.PathValue("libraryID"), &libraryID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryID", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteDocumentCommentV2(w, r, id, libraryID)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// UpdateDocumentCommentV2 operation middleware
-func (siw *ServerInterfaceWrapper) UpdateDocumentCommentV2(w http.ResponseWriter, r *http.Request) {
+// DeleteDocumentComment operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDocumentComment(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1323,7 +1288,7 @@ func (siw *ServerInterfaceWrapper) UpdateDocumentCommentV2(w http.ResponseWriter
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateDocumentCommentV2(w, r, id, libraryID)
+		siw.Handler.DeleteDocumentComment(w, r, id, libraryID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1333,8 +1298,43 @@ func (siw *ServerInterfaceWrapper) UpdateDocumentCommentV2(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// DuplicateDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) DuplicateDocumentV2(w http.ResponseWriter, r *http.Request) {
+// UpdateDocumentComment operation middleware
+func (siw *ServerInterfaceWrapper) UpdateDocumentComment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "libraryID" -------------
+	var libraryID int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "libraryID", r.PathValue("libraryID"), &libraryID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateDocumentComment(w, r, id, libraryID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DuplicateDocument operation middleware
+func (siw *ServerInterfaceWrapper) DuplicateDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1349,7 +1349,7 @@ func (siw *ServerInterfaceWrapper) DuplicateDocumentV2(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DuplicateDocumentV2(w, r, id)
+		siw.Handler.DuplicateDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1411,8 +1411,8 @@ func (siw *ServerInterfaceWrapper) ExportDocumentPDF(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// GetDocumentFillInSchemaV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetDocumentFillInSchemaV2(w http.ResponseWriter, r *http.Request) {
+// GetDocumentFillInSchema operation middleware
+func (siw *ServerInterfaceWrapper) GetDocumentFillInSchema(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1427,7 +1427,7 @@ func (siw *ServerInterfaceWrapper) GetDocumentFillInSchemaV2(w http.ResponseWrit
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDocumentFillInSchemaV2(w, r, id)
+		siw.Handler.GetDocumentFillInSchema(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1437,8 +1437,8 @@ func (siw *ServerInterfaceWrapper) GetDocumentFillInSchemaV2(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
-// FinalizeDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) FinalizeDocumentV2(w http.ResponseWriter, r *http.Request) {
+// FinalizeDocument operation middleware
+func (siw *ServerInterfaceWrapper) FinalizeDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1453,7 +1453,7 @@ func (siw *ServerInterfaceWrapper) FinalizeDocumentV2(w http.ResponseWriter, r *
 	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params FinalizeDocumentV2Params
+	var params FinalizeDocumentParams
 
 	headers := r.Header
 
@@ -1481,7 +1481,7 @@ func (siw *ServerInterfaceWrapper) FinalizeDocumentV2(w http.ResponseWriter, r *
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.FinalizeDocumentV2(w, r, id, params)
+		siw.Handler.FinalizeDocument(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1491,8 +1491,8 @@ func (siw *ServerInterfaceWrapper) FinalizeDocumentV2(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
-// GetDocumentPlaceholderOptionsV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, r *http.Request) {
+// GetDocumentPlaceholderOptions operation middleware
+func (siw *ServerInterfaceWrapper) GetDocumentPlaceholderOptions(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1516,7 +1516,7 @@ func (siw *ServerInterfaceWrapper) GetDocumentPlaceholderOptionsV2(w http.Respon
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDocumentPlaceholderOptionsV2(w, r, id, pid)
+		siw.Handler.GetDocumentPlaceholderOptions(w, r, id, pid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1526,8 +1526,8 @@ func (siw *ServerInterfaceWrapper) GetDocumentPlaceholderOptionsV2(w http.Respon
 	handler.ServeHTTP(w, r)
 }
 
-// ListDocumentPlaceholderValuesV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListDocumentPlaceholderValuesV2(w http.ResponseWriter, r *http.Request) {
+// ListDocumentPlaceholderValues operation middleware
+func (siw *ServerInterfaceWrapper) ListDocumentPlaceholderValues(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1542,7 +1542,7 @@ func (siw *ServerInterfaceWrapper) ListDocumentPlaceholderValuesV2(w http.Respon
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListDocumentPlaceholderValuesV2(w, r, id)
+		siw.Handler.ListDocumentPlaceholderValues(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1552,8 +1552,8 @@ func (siw *ServerInterfaceWrapper) ListDocumentPlaceholderValuesV2(w http.Respon
 	handler.ServeHTTP(w, r)
 }
 
-// PutDocumentPlaceholderValueV2 operation middleware
-func (siw *ServerInterfaceWrapper) PutDocumentPlaceholderValueV2(w http.ResponseWriter, r *http.Request) {
+// PutDocumentPlaceholderValue operation middleware
+func (siw *ServerInterfaceWrapper) PutDocumentPlaceholderValue(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1577,7 +1577,7 @@ func (siw *ServerInterfaceWrapper) PutDocumentPlaceholderValueV2(w http.Response
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutDocumentPlaceholderValueV2(w, r, id, pid)
+		siw.Handler.PutDocumentPlaceholderValue(w, r, id, pid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1587,8 +1587,8 @@ func (siw *ServerInterfaceWrapper) PutDocumentPlaceholderValueV2(w http.Response
 	handler.ServeHTTP(w, r)
 }
 
-// ReconstructDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) ReconstructDocumentV2(w http.ResponseWriter, r *http.Request) {
+// ReconstructDocument operation middleware
+func (siw *ServerInterfaceWrapper) ReconstructDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1603,7 +1603,7 @@ func (siw *ServerInterfaceWrapper) ReconstructDocumentV2(w http.ResponseWriter, 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReconstructDocumentV2(w, r, id)
+		siw.Handler.ReconstructDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1613,8 +1613,8 @@ func (siw *ServerInterfaceWrapper) ReconstructDocumentV2(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// GetDocumentRevisionUrlV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetDocumentRevisionUrlV2(w http.ResponseWriter, r *http.Request) {
+// GetDocumentRevisionUrl operation middleware
+func (siw *ServerInterfaceWrapper) GetDocumentRevisionUrl(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1638,7 +1638,7 @@ func (siw *ServerInterfaceWrapper) GetDocumentRevisionUrlV2(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDocumentRevisionUrlV2(w, r, id, rid)
+		siw.Handler.GetDocumentRevisionUrl(w, r, id, rid)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1648,8 +1648,8 @@ func (siw *ServerInterfaceWrapper) GetDocumentRevisionUrlV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// AcquireDocumentSessionV2 operation middleware
-func (siw *ServerInterfaceWrapper) AcquireDocumentSessionV2(w http.ResponseWriter, r *http.Request) {
+// AcquireDocumentSession operation middleware
+func (siw *ServerInterfaceWrapper) AcquireDocumentSession(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1664,7 +1664,7 @@ func (siw *ServerInterfaceWrapper) AcquireDocumentSessionV2(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AcquireDocumentSessionV2(w, r, id)
+		siw.Handler.AcquireDocumentSession(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1674,8 +1674,8 @@ func (siw *ServerInterfaceWrapper) AcquireDocumentSessionV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// ForceReleaseDocumentSessionV2 operation middleware
-func (siw *ServerInterfaceWrapper) ForceReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request) {
+// ForceReleaseDocumentSession operation middleware
+func (siw *ServerInterfaceWrapper) ForceReleaseDocumentSession(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1690,7 +1690,7 @@ func (siw *ServerInterfaceWrapper) ForceReleaseDocumentSessionV2(w http.Response
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ForceReleaseDocumentSessionV2(w, r, id)
+		siw.Handler.ForceReleaseDocumentSession(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1700,8 +1700,8 @@ func (siw *ServerInterfaceWrapper) ForceReleaseDocumentSessionV2(w http.Response
 	handler.ServeHTTP(w, r)
 }
 
-// HeartbeatDocumentSessionV2 operation middleware
-func (siw *ServerInterfaceWrapper) HeartbeatDocumentSessionV2(w http.ResponseWriter, r *http.Request) {
+// HeartbeatDocumentSession operation middleware
+func (siw *ServerInterfaceWrapper) HeartbeatDocumentSession(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1716,7 +1716,7 @@ func (siw *ServerInterfaceWrapper) HeartbeatDocumentSessionV2(w http.ResponseWri
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.HeartbeatDocumentSessionV2(w, r, id)
+		siw.Handler.HeartbeatDocumentSession(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1726,8 +1726,8 @@ func (siw *ServerInterfaceWrapper) HeartbeatDocumentSessionV2(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
-// ReleaseDocumentSessionV2 operation middleware
-func (siw *ServerInterfaceWrapper) ReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request) {
+// ReleaseDocumentSession operation middleware
+func (siw *ServerInterfaceWrapper) ReleaseDocumentSession(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1742,7 +1742,7 @@ func (siw *ServerInterfaceWrapper) ReleaseDocumentSessionV2(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReleaseDocumentSessionV2(w, r, id)
+		siw.Handler.ReleaseDocumentSession(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1752,8 +1752,8 @@ func (siw *ServerInterfaceWrapper) ReleaseDocumentSessionV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// ViewDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) ViewDocumentV2(w http.ResponseWriter, r *http.Request) {
+// ViewDocument operation middleware
+func (siw *ServerInterfaceWrapper) ViewDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -1768,7 +1768,7 @@ func (siw *ServerInterfaceWrapper) ViewDocumentV2(w http.ResponseWriter, r *http
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ViewDocumentV2(w, r, id)
+		siw.Handler.ViewDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1898,50 +1898,50 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents", wrapper.ListDocumentsV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/stats", wrapper.DocumentStatsV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}", wrapper.GetDocumentV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/documents/{id}", wrapper.RenameDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/archive", wrapper.ArchiveDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/autosave/commit", wrapper.CommitDocumentAutosaveV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/autosave/presign", wrapper.PresignDocumentAutosaveV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints", wrapper.ListDocumentCheckpointsV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints", wrapper.CreateDocumentCheckpointV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints/{version}/restore", wrapper.RestoreDocumentCheckpointV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/comments", wrapper.ListDocumentCommentsV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/comments", wrapper.CreateDocumentCommentV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/documents/{id}/comments/{libraryID}", wrapper.DeleteDocumentCommentV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/documents/{id}/comments/{libraryID}", wrapper.UpdateDocumentCommentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/duplicate", wrapper.DuplicateDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents", wrapper.ListDocuments)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/stats", wrapper.DocumentStats)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}", wrapper.GetDocument)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/documents/{id}", wrapper.RenameDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/archive", wrapper.ArchiveDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/autosave/commit", wrapper.CommitDocumentAutosave)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/autosave/presign", wrapper.PresignDocumentAutosave)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints", wrapper.ListDocumentCheckpoints)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints", wrapper.CreateDocumentCheckpoint)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/checkpoints/{version}/restore", wrapper.RestoreDocumentCheckpoint)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/comments", wrapper.ListDocumentComments)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/comments", wrapper.CreateDocumentComment)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/documents/{id}/comments/{libraryID}", wrapper.DeleteDocumentComment)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/documents/{id}/comments/{libraryID}", wrapper.UpdateDocumentComment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/duplicate", wrapper.DuplicateDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/export/docx-url", wrapper.GetDocumentDocxURL)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/export/pdf", wrapper.ExportDocumentPDF)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/fill-in-schema", wrapper.GetDocumentFillInSchemaV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/finalize", wrapper.FinalizeDocumentV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/placeholder-options/{pid}", wrapper.GetDocumentPlaceholderOptionsV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/placeholders", wrapper.ListDocumentPlaceholderValuesV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/documents/{id}/placeholders/{pid}", wrapper.PutDocumentPlaceholderValueV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/reconstruct", wrapper.ReconstructDocumentV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/revisions/{rid}/url", wrapper.GetDocumentRevisionUrlV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/acquire", wrapper.AcquireDocumentSessionV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/force-release", wrapper.ForceReleaseDocumentSessionV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/heartbeat", wrapper.HeartbeatDocumentSessionV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/release", wrapper.ReleaseDocumentSessionV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/view", wrapper.ViewDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/fill-in-schema", wrapper.GetDocumentFillInSchema)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/finalize", wrapper.FinalizeDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/placeholder-options/{pid}", wrapper.GetDocumentPlaceholderOptions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/placeholders", wrapper.ListDocumentPlaceholderValues)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/documents/{id}/placeholders/{pid}", wrapper.PutDocumentPlaceholderValue)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/reconstruct", wrapper.ReconstructDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/revisions/{rid}/url", wrapper.GetDocumentRevisionUrl)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/acquire", wrapper.AcquireDocumentSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/force-release", wrapper.ForceReleaseDocumentSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/heartbeat", wrapper.HeartbeatDocumentSession)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/session/release", wrapper.ReleaseDocumentSession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/view", wrapper.ViewDocument)
 
 	return m
 }
 
-type ListDocumentsV2RequestObject struct {
-	Params ListDocumentsV2Params
+type ListDocumentsRequestObject struct {
+	Params ListDocumentsParams
 }
 
-type ListDocumentsV2ResponseObject interface {
-	VisitListDocumentsV2Response(w http.ResponseWriter) error
+type ListDocumentsResponseObject interface {
+	VisitListDocumentsResponse(w http.ResponseWriter) error
 }
 
-type ListDocumentsV2200JSONResponse DocumentListResponse
+type ListDocuments200JSONResponse DocumentListResponse
 
-func (response ListDocumentsV2200JSONResponse) VisitListDocumentsV2Response(w http.ResponseWriter) error {
+func (response ListDocuments200JSONResponse) VisitListDocumentsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1953,9 +1953,9 @@ func (response ListDocumentsV2200JSONResponse) VisitListDocumentsV2Response(w ht
 	return err
 }
 
-type ListDocumentsV2400JSONResponse ApiErrorEnvelope
+type ListDocuments400JSONResponse ApiErrorEnvelope
 
-func (response ListDocumentsV2400JSONResponse) VisitListDocumentsV2Response(w http.ResponseWriter) error {
+func (response ListDocuments400JSONResponse) VisitListDocumentsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1967,9 +1967,9 @@ func (response ListDocumentsV2400JSONResponse) VisitListDocumentsV2Response(w ht
 	return err
 }
 
-type ListDocumentsV2401JSONResponse ApiErrorEnvelope
+type ListDocuments401JSONResponse ApiErrorEnvelope
 
-func (response ListDocumentsV2401JSONResponse) VisitListDocumentsV2Response(w http.ResponseWriter) error {
+func (response ListDocuments401JSONResponse) VisitListDocumentsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1981,9 +1981,9 @@ func (response ListDocumentsV2401JSONResponse) VisitListDocumentsV2Response(w ht
 	return err
 }
 
-type ListDocumentsV2403JSONResponse ApiErrorEnvelope
+type ListDocuments403JSONResponse ApiErrorEnvelope
 
-func (response ListDocumentsV2403JSONResponse) VisitListDocumentsV2Response(w http.ResponseWriter) error {
+func (response ListDocuments403JSONResponse) VisitListDocumentsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1995,17 +1995,17 @@ func (response ListDocumentsV2403JSONResponse) VisitListDocumentsV2Response(w ht
 	return err
 }
 
-type DocumentStatsV2RequestObject struct {
-	Params DocumentStatsV2Params
+type DocumentStatsRequestObject struct {
+	Params DocumentStatsParams
 }
 
-type DocumentStatsV2ResponseObject interface {
-	VisitDocumentStatsV2Response(w http.ResponseWriter) error
+type DocumentStatsResponseObject interface {
+	VisitDocumentStatsResponse(w http.ResponseWriter) error
 }
 
-type DocumentStatsV2200JSONResponse DocumentStatsResponse
+type DocumentStats200JSONResponse DocumentStatsResponse
 
-func (response DocumentStatsV2200JSONResponse) VisitDocumentStatsV2Response(w http.ResponseWriter) error {
+func (response DocumentStats200JSONResponse) VisitDocumentStatsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2017,9 +2017,9 @@ func (response DocumentStatsV2200JSONResponse) VisitDocumentStatsV2Response(w ht
 	return err
 }
 
-type DocumentStatsV2400JSONResponse ApiErrorEnvelope
+type DocumentStats400JSONResponse ApiErrorEnvelope
 
-func (response DocumentStatsV2400JSONResponse) VisitDocumentStatsV2Response(w http.ResponseWriter) error {
+func (response DocumentStats400JSONResponse) VisitDocumentStatsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2031,9 +2031,9 @@ func (response DocumentStatsV2400JSONResponse) VisitDocumentStatsV2Response(w ht
 	return err
 }
 
-type DocumentStatsV2401JSONResponse ApiErrorEnvelope
+type DocumentStats401JSONResponse ApiErrorEnvelope
 
-func (response DocumentStatsV2401JSONResponse) VisitDocumentStatsV2Response(w http.ResponseWriter) error {
+func (response DocumentStats401JSONResponse) VisitDocumentStatsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2045,9 +2045,9 @@ func (response DocumentStatsV2401JSONResponse) VisitDocumentStatsV2Response(w ht
 	return err
 }
 
-type DocumentStatsV2403JSONResponse ApiErrorEnvelope
+type DocumentStats403JSONResponse ApiErrorEnvelope
 
-func (response DocumentStatsV2403JSONResponse) VisitDocumentStatsV2Response(w http.ResponseWriter) error {
+func (response DocumentStats403JSONResponse) VisitDocumentStatsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2059,79 +2059,79 @@ func (response DocumentStatsV2403JSONResponse) VisitDocumentStatsV2Response(w ht
 	return err
 }
 
-type GetDocumentV2RequestObject struct {
+type GetDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type GetDocumentV2ResponseObject interface {
-	VisitGetDocumentV2Response(w http.ResponseWriter) error
+type GetDocumentResponseObject interface {
+	VisitGetDocumentResponse(w http.ResponseWriter) error
 }
 
-type GetDocumentV2200Response struct {
+type GetDocument200Response struct {
 }
 
-func (response GetDocumentV2200Response) VisitGetDocumentV2Response(w http.ResponseWriter) error {
+func (response GetDocument200Response) VisitGetDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type GetDocumentV2404Response struct {
+type GetDocument404Response struct {
 }
 
-func (response GetDocumentV2404Response) VisitGetDocumentV2Response(w http.ResponseWriter) error {
+func (response GetDocument404Response) VisitGetDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(404)
 	return nil
 }
 
-type RenameDocumentV2RequestObject struct {
+type RenameDocumentRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *RenameDocumentV2JSONRequestBody
+	Body *RenameDocumentJSONRequestBody
 }
 
-type RenameDocumentV2ResponseObject interface {
-	VisitRenameDocumentV2Response(w http.ResponseWriter) error
+type RenameDocumentResponseObject interface {
+	VisitRenameDocumentResponse(w http.ResponseWriter) error
 }
 
-type RenameDocumentV2200Response struct {
+type RenameDocument200Response struct {
 }
 
-func (response RenameDocumentV2200Response) VisitRenameDocumentV2Response(w http.ResponseWriter) error {
+func (response RenameDocument200Response) VisitRenameDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ArchiveDocumentV2RequestObject struct {
+type ArchiveDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ArchiveDocumentV2ResponseObject interface {
-	VisitArchiveDocumentV2Response(w http.ResponseWriter) error
+type ArchiveDocumentResponseObject interface {
+	VisitArchiveDocumentResponse(w http.ResponseWriter) error
 }
 
-type ArchiveDocumentV2200Response struct {
+type ArchiveDocument200Response struct {
 }
 
-func (response ArchiveDocumentV2200Response) VisitArchiveDocumentV2Response(w http.ResponseWriter) error {
+func (response ArchiveDocument200Response) VisitArchiveDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type CommitDocumentAutosaveV2RequestObject struct {
+type CommitDocumentAutosaveRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *CommitDocumentAutosaveV2JSONRequestBody
+	Body *CommitDocumentAutosaveJSONRequestBody
 }
 
-type CommitDocumentAutosaveV2ResponseObject interface {
-	VisitCommitDocumentAutosaveV2Response(w http.ResponseWriter) error
+type CommitDocumentAutosaveResponseObject interface {
+	VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error
 }
 
-type CommitDocumentAutosaveV2200JSONResponse struct {
+type CommitDocumentAutosave200JSONResponse struct {
 	IdempotentReplay *bool              `json:"idempotent_replay,omitempty"`
 	RevisionId       openapi_types.UUID `json:"revision_id"`
 	RevisionNum      int                `json:"revision_num"`
 }
 
-func (response CommitDocumentAutosaveV2200JSONResponse) VisitCommitDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response CommitDocumentAutosave200JSONResponse) VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2143,114 +2143,114 @@ func (response CommitDocumentAutosaveV2200JSONResponse) VisitCommitDocumentAutos
 	return err
 }
 
-type CommitDocumentAutosaveV2403Response struct {
+type CommitDocumentAutosave403Response struct {
 }
 
-func (response CommitDocumentAutosaveV2403Response) VisitCommitDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response CommitDocumentAutosave403Response) VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(403)
 	return nil
 }
 
-type CommitDocumentAutosaveV2404Response struct {
+type CommitDocumentAutosave404Response struct {
 }
 
-func (response CommitDocumentAutosaveV2404Response) VisitCommitDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response CommitDocumentAutosave404Response) VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(404)
 	return nil
 }
 
-type CommitDocumentAutosaveV2409Response struct {
+type CommitDocumentAutosave409Response struct {
 }
 
-func (response CommitDocumentAutosaveV2409Response) VisitCommitDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response CommitDocumentAutosave409Response) VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(409)
 	return nil
 }
 
-type CommitDocumentAutosaveV2410Response struct {
+type CommitDocumentAutosave410Response struct {
 }
 
-func (response CommitDocumentAutosaveV2410Response) VisitCommitDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response CommitDocumentAutosave410Response) VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(410)
 	return nil
 }
 
-type CommitDocumentAutosaveV2422Response struct {
+type CommitDocumentAutosave422Response struct {
 }
 
-func (response CommitDocumentAutosaveV2422Response) VisitCommitDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response CommitDocumentAutosave422Response) VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(422)
 	return nil
 }
 
-type PresignDocumentAutosaveV2RequestObject struct {
+type PresignDocumentAutosaveRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *PresignDocumentAutosaveV2JSONRequestBody
+	Body *PresignDocumentAutosaveJSONRequestBody
 }
 
-type PresignDocumentAutosaveV2ResponseObject interface {
-	VisitPresignDocumentAutosaveV2Response(w http.ResponseWriter) error
+type PresignDocumentAutosaveResponseObject interface {
+	VisitPresignDocumentAutosaveResponse(w http.ResponseWriter) error
 }
 
-type PresignDocumentAutosaveV2200Response struct {
+type PresignDocumentAutosave200Response struct {
 }
 
-func (response PresignDocumentAutosaveV2200Response) VisitPresignDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response PresignDocumentAutosave200Response) VisitPresignDocumentAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type PresignDocumentAutosaveV2409Response struct {
+type PresignDocumentAutosave409Response struct {
 }
 
-func (response PresignDocumentAutosaveV2409Response) VisitPresignDocumentAutosaveV2Response(w http.ResponseWriter) error {
+func (response PresignDocumentAutosave409Response) VisitPresignDocumentAutosaveResponse(w http.ResponseWriter) error {
 	w.WriteHeader(409)
 	return nil
 }
 
-type ListDocumentCheckpointsV2RequestObject struct {
+type ListDocumentCheckpointsRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ListDocumentCheckpointsV2ResponseObject interface {
-	VisitListDocumentCheckpointsV2Response(w http.ResponseWriter) error
+type ListDocumentCheckpointsResponseObject interface {
+	VisitListDocumentCheckpointsResponse(w http.ResponseWriter) error
 }
 
-type ListDocumentCheckpointsV2200Response struct {
+type ListDocumentCheckpoints200Response struct {
 }
 
-func (response ListDocumentCheckpointsV2200Response) VisitListDocumentCheckpointsV2Response(w http.ResponseWriter) error {
+func (response ListDocumentCheckpoints200Response) VisitListDocumentCheckpointsResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type CreateDocumentCheckpointV2RequestObject struct {
+type CreateDocumentCheckpointRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *CreateDocumentCheckpointV2JSONRequestBody
+	Body *CreateDocumentCheckpointJSONRequestBody
 }
 
-type CreateDocumentCheckpointV2ResponseObject interface {
-	VisitCreateDocumentCheckpointV2Response(w http.ResponseWriter) error
+type CreateDocumentCheckpointResponseObject interface {
+	VisitCreateDocumentCheckpointResponse(w http.ResponseWriter) error
 }
 
-type CreateDocumentCheckpointV2201Response struct {
+type CreateDocumentCheckpoint201Response struct {
 }
 
-func (response CreateDocumentCheckpointV2201Response) VisitCreateDocumentCheckpointV2Response(w http.ResponseWriter) error {
+func (response CreateDocumentCheckpoint201Response) VisitCreateDocumentCheckpointResponse(w http.ResponseWriter) error {
 	w.WriteHeader(201)
 	return nil
 }
 
-type RestoreDocumentCheckpointV2RequestObject struct {
+type RestoreDocumentCheckpointRequestObject struct {
 	Id      openapi_types.UUID `json:"id"`
 	Version int                `json:"version"`
 }
 
-type RestoreDocumentCheckpointV2ResponseObject interface {
-	VisitRestoreDocumentCheckpointV2Response(w http.ResponseWriter) error
+type RestoreDocumentCheckpointResponseObject interface {
+	VisitRestoreDocumentCheckpointResponse(w http.ResponseWriter) error
 }
 
-type RestoreDocumentCheckpointV2200JSONResponse struct {
+type RestoreDocumentCheckpoint200JSONResponse struct {
 	// Idempotent true when ON CONFLICT (document_id, content_hash) fired - current head already matches
 	Idempotent                 bool               `json:"idempotent"`
 	NewRevisionId              openapi_types.UUID `json:"new_revision_id"`
@@ -2258,7 +2258,7 @@ type RestoreDocumentCheckpointV2200JSONResponse struct {
 	SourceCheckpointVersionNum *int               `json:"source_checkpoint_version_num,omitempty"`
 }
 
-func (response RestoreDocumentCheckpointV2200JSONResponse) VisitRestoreDocumentCheckpointV2Response(w http.ResponseWriter) error {
+func (response RestoreDocumentCheckpoint200JSONResponse) VisitRestoreDocumentCheckpointResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2270,102 +2270,102 @@ func (response RestoreDocumentCheckpointV2200JSONResponse) VisitRestoreDocumentC
 	return err
 }
 
-type RestoreDocumentCheckpointV2403Response struct {
+type RestoreDocumentCheckpoint403Response struct {
 }
 
-func (response RestoreDocumentCheckpointV2403Response) VisitRestoreDocumentCheckpointV2Response(w http.ResponseWriter) error {
+func (response RestoreDocumentCheckpoint403Response) VisitRestoreDocumentCheckpointResponse(w http.ResponseWriter) error {
 	w.WriteHeader(403)
 	return nil
 }
 
-type RestoreDocumentCheckpointV2404Response struct {
+type RestoreDocumentCheckpoint404Response struct {
 }
 
-func (response RestoreDocumentCheckpointV2404Response) VisitRestoreDocumentCheckpointV2Response(w http.ResponseWriter) error {
+func (response RestoreDocumentCheckpoint404Response) VisitRestoreDocumentCheckpointResponse(w http.ResponseWriter) error {
 	w.WriteHeader(404)
 	return nil
 }
 
-type ListDocumentCommentsV2RequestObject struct {
+type ListDocumentCommentsRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ListDocumentCommentsV2ResponseObject interface {
-	VisitListDocumentCommentsV2Response(w http.ResponseWriter) error
+type ListDocumentCommentsResponseObject interface {
+	VisitListDocumentCommentsResponse(w http.ResponseWriter) error
 }
 
-type ListDocumentCommentsV2200Response struct {
+type ListDocumentComments200Response struct {
 }
 
-func (response ListDocumentCommentsV2200Response) VisitListDocumentCommentsV2Response(w http.ResponseWriter) error {
+func (response ListDocumentComments200Response) VisitListDocumentCommentsResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type CreateDocumentCommentV2RequestObject struct {
+type CreateDocumentCommentRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *CreateDocumentCommentV2JSONRequestBody
+	Body *CreateDocumentCommentJSONRequestBody
 }
 
-type CreateDocumentCommentV2ResponseObject interface {
-	VisitCreateDocumentCommentV2Response(w http.ResponseWriter) error
+type CreateDocumentCommentResponseObject interface {
+	VisitCreateDocumentCommentResponse(w http.ResponseWriter) error
 }
 
-type CreateDocumentCommentV2201Response struct {
+type CreateDocumentComment201Response struct {
 }
 
-func (response CreateDocumentCommentV2201Response) VisitCreateDocumentCommentV2Response(w http.ResponseWriter) error {
+func (response CreateDocumentComment201Response) VisitCreateDocumentCommentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(201)
 	return nil
 }
 
-type DeleteDocumentCommentV2RequestObject struct {
+type DeleteDocumentCommentRequestObject struct {
 	Id        openapi_types.UUID `json:"id"`
 	LibraryID int                `json:"libraryID"`
 }
 
-type DeleteDocumentCommentV2ResponseObject interface {
-	VisitDeleteDocumentCommentV2Response(w http.ResponseWriter) error
+type DeleteDocumentCommentResponseObject interface {
+	VisitDeleteDocumentCommentResponse(w http.ResponseWriter) error
 }
 
-type DeleteDocumentCommentV2204Response struct {
+type DeleteDocumentComment204Response struct {
 }
 
-func (response DeleteDocumentCommentV2204Response) VisitDeleteDocumentCommentV2Response(w http.ResponseWriter) error {
+func (response DeleteDocumentComment204Response) VisitDeleteDocumentCommentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type UpdateDocumentCommentV2RequestObject struct {
+type UpdateDocumentCommentRequestObject struct {
 	Id        openapi_types.UUID `json:"id"`
 	LibraryID int                `json:"libraryID"`
-	Body      *UpdateDocumentCommentV2JSONRequestBody
+	Body      *UpdateDocumentCommentJSONRequestBody
 }
 
-type UpdateDocumentCommentV2ResponseObject interface {
-	VisitUpdateDocumentCommentV2Response(w http.ResponseWriter) error
+type UpdateDocumentCommentResponseObject interface {
+	VisitUpdateDocumentCommentResponse(w http.ResponseWriter) error
 }
 
-type UpdateDocumentCommentV2200Response struct {
+type UpdateDocumentComment200Response struct {
 }
 
-func (response UpdateDocumentCommentV2200Response) VisitUpdateDocumentCommentV2Response(w http.ResponseWriter) error {
+func (response UpdateDocumentComment200Response) VisitUpdateDocumentCommentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type DuplicateDocumentV2RequestObject struct {
+type DuplicateDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type DuplicateDocumentV2ResponseObject interface {
-	VisitDuplicateDocumentV2Response(w http.ResponseWriter) error
+type DuplicateDocumentResponseObject interface {
+	VisitDuplicateDocumentResponse(w http.ResponseWriter) error
 }
 
-type DuplicateDocumentV2201Response struct {
+type DuplicateDocument201Response struct {
 }
 
-func (response DuplicateDocumentV2201Response) VisitDuplicateDocumentV2Response(w http.ResponseWriter) error {
+func (response DuplicateDocument201Response) VisitDuplicateDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(201)
 	return nil
 }
@@ -2457,232 +2457,232 @@ func (response ExportDocumentPDF502Response) VisitExportDocumentPDFResponse(w ht
 	return nil
 }
 
-type GetDocumentFillInSchemaV2RequestObject struct {
+type GetDocumentFillInSchemaRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type GetDocumentFillInSchemaV2ResponseObject interface {
-	VisitGetDocumentFillInSchemaV2Response(w http.ResponseWriter) error
+type GetDocumentFillInSchemaResponseObject interface {
+	VisitGetDocumentFillInSchemaResponse(w http.ResponseWriter) error
 }
 
-type GetDocumentFillInSchemaV2200Response struct {
+type GetDocumentFillInSchema200Response struct {
 }
 
-func (response GetDocumentFillInSchemaV2200Response) VisitGetDocumentFillInSchemaV2Response(w http.ResponseWriter) error {
+func (response GetDocumentFillInSchema200Response) VisitGetDocumentFillInSchemaResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type FinalizeDocumentV2RequestObject struct {
+type FinalizeDocumentRequestObject struct {
 	Id     openapi_types.UUID `json:"id"`
-	Params FinalizeDocumentV2Params
+	Params FinalizeDocumentParams
 }
 
-type FinalizeDocumentV2ResponseObject interface {
-	VisitFinalizeDocumentV2Response(w http.ResponseWriter) error
+type FinalizeDocumentResponseObject interface {
+	VisitFinalizeDocumentResponse(w http.ResponseWriter) error
 }
 
-type FinalizeDocumentV2200Response struct {
+type FinalizeDocument200Response struct {
 }
 
-func (response FinalizeDocumentV2200Response) VisitFinalizeDocumentV2Response(w http.ResponseWriter) error {
+func (response FinalizeDocument200Response) VisitFinalizeDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type FinalizeDocumentV2409Response struct {
+type FinalizeDocument409Response struct {
 }
 
-func (response FinalizeDocumentV2409Response) VisitFinalizeDocumentV2Response(w http.ResponseWriter) error {
+func (response FinalizeDocument409Response) VisitFinalizeDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(409)
 	return nil
 }
 
-type GetDocumentPlaceholderOptionsV2RequestObject struct {
+type GetDocumentPlaceholderOptionsRequestObject struct {
 	Id  openapi_types.UUID `json:"id"`
 	Pid string             `json:"pid"`
 }
 
-type GetDocumentPlaceholderOptionsV2ResponseObject interface {
-	VisitGetDocumentPlaceholderOptionsV2Response(w http.ResponseWriter) error
+type GetDocumentPlaceholderOptionsResponseObject interface {
+	VisitGetDocumentPlaceholderOptionsResponse(w http.ResponseWriter) error
 }
 
-type GetDocumentPlaceholderOptionsV2200Response struct {
+type GetDocumentPlaceholderOptions200Response struct {
 }
 
-func (response GetDocumentPlaceholderOptionsV2200Response) VisitGetDocumentPlaceholderOptionsV2Response(w http.ResponseWriter) error {
+func (response GetDocumentPlaceholderOptions200Response) VisitGetDocumentPlaceholderOptionsResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ListDocumentPlaceholderValuesV2RequestObject struct {
+type ListDocumentPlaceholderValuesRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ListDocumentPlaceholderValuesV2ResponseObject interface {
-	VisitListDocumentPlaceholderValuesV2Response(w http.ResponseWriter) error
+type ListDocumentPlaceholderValuesResponseObject interface {
+	VisitListDocumentPlaceholderValuesResponse(w http.ResponseWriter) error
 }
 
-type ListDocumentPlaceholderValuesV2200Response struct {
+type ListDocumentPlaceholderValues200Response struct {
 }
 
-func (response ListDocumentPlaceholderValuesV2200Response) VisitListDocumentPlaceholderValuesV2Response(w http.ResponseWriter) error {
+func (response ListDocumentPlaceholderValues200Response) VisitListDocumentPlaceholderValuesResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type PutDocumentPlaceholderValueV2RequestObject struct {
+type PutDocumentPlaceholderValueRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Pid  string             `json:"pid"`
-	Body *PutDocumentPlaceholderValueV2JSONRequestBody
+	Body *PutDocumentPlaceholderValueJSONRequestBody
 }
 
-type PutDocumentPlaceholderValueV2ResponseObject interface {
-	VisitPutDocumentPlaceholderValueV2Response(w http.ResponseWriter) error
+type PutDocumentPlaceholderValueResponseObject interface {
+	VisitPutDocumentPlaceholderValueResponse(w http.ResponseWriter) error
 }
 
-type PutDocumentPlaceholderValueV2200Response struct {
+type PutDocumentPlaceholderValue200Response struct {
 }
 
-func (response PutDocumentPlaceholderValueV2200Response) VisitPutDocumentPlaceholderValueV2Response(w http.ResponseWriter) error {
+func (response PutDocumentPlaceholderValue200Response) VisitPutDocumentPlaceholderValueResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ReconstructDocumentV2RequestObject struct {
+type ReconstructDocumentRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *ReconstructDocumentV2JSONRequestBody
+	Body *ReconstructDocumentJSONRequestBody
 }
 
-type ReconstructDocumentV2ResponseObject interface {
-	VisitReconstructDocumentV2Response(w http.ResponseWriter) error
+type ReconstructDocumentResponseObject interface {
+	VisitReconstructDocumentResponse(w http.ResponseWriter) error
 }
 
-type ReconstructDocumentV2200Response struct {
+type ReconstructDocument200Response struct {
 }
 
-func (response ReconstructDocumentV2200Response) VisitReconstructDocumentV2Response(w http.ResponseWriter) error {
+func (response ReconstructDocument200Response) VisitReconstructDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type GetDocumentRevisionUrlV2RequestObject struct {
+type GetDocumentRevisionUrlRequestObject struct {
 	Id  openapi_types.UUID `json:"id"`
 	Rid openapi_types.UUID `json:"rid"`
 }
 
-type GetDocumentRevisionUrlV2ResponseObject interface {
-	VisitGetDocumentRevisionUrlV2Response(w http.ResponseWriter) error
+type GetDocumentRevisionUrlResponseObject interface {
+	VisitGetDocumentRevisionUrlResponse(w http.ResponseWriter) error
 }
 
-type GetDocumentRevisionUrlV2302Response struct {
+type GetDocumentRevisionUrl302Response struct {
 }
 
-func (response GetDocumentRevisionUrlV2302Response) VisitGetDocumentRevisionUrlV2Response(w http.ResponseWriter) error {
+func (response GetDocumentRevisionUrl302Response) VisitGetDocumentRevisionUrlResponse(w http.ResponseWriter) error {
 	w.WriteHeader(302)
 	return nil
 }
 
-type AcquireDocumentSessionV2RequestObject struct {
+type AcquireDocumentSessionRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type AcquireDocumentSessionV2ResponseObject interface {
-	VisitAcquireDocumentSessionV2Response(w http.ResponseWriter) error
+type AcquireDocumentSessionResponseObject interface {
+	VisitAcquireDocumentSessionResponse(w http.ResponseWriter) error
 }
 
-type AcquireDocumentSessionV2200Response struct {
+type AcquireDocumentSession200Response struct {
 }
 
-func (response AcquireDocumentSessionV2200Response) VisitAcquireDocumentSessionV2Response(w http.ResponseWriter) error {
+func (response AcquireDocumentSession200Response) VisitAcquireDocumentSessionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type AcquireDocumentSessionV2201Response struct {
+type AcquireDocumentSession201Response struct {
 }
 
-func (response AcquireDocumentSessionV2201Response) VisitAcquireDocumentSessionV2Response(w http.ResponseWriter) error {
+func (response AcquireDocumentSession201Response) VisitAcquireDocumentSessionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(201)
 	return nil
 }
 
-type ForceReleaseDocumentSessionV2RequestObject struct {
+type ForceReleaseDocumentSessionRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ForceReleaseDocumentSessionV2ResponseObject interface {
-	VisitForceReleaseDocumentSessionV2Response(w http.ResponseWriter) error
+type ForceReleaseDocumentSessionResponseObject interface {
+	VisitForceReleaseDocumentSessionResponse(w http.ResponseWriter) error
 }
 
-type ForceReleaseDocumentSessionV2200Response struct {
+type ForceReleaseDocumentSession200Response struct {
 }
 
-func (response ForceReleaseDocumentSessionV2200Response) VisitForceReleaseDocumentSessionV2Response(w http.ResponseWriter) error {
+func (response ForceReleaseDocumentSession200Response) VisitForceReleaseDocumentSessionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ForceReleaseDocumentSessionV2403Response struct {
+type ForceReleaseDocumentSession403Response struct {
 }
 
-func (response ForceReleaseDocumentSessionV2403Response) VisitForceReleaseDocumentSessionV2Response(w http.ResponseWriter) error {
+func (response ForceReleaseDocumentSession403Response) VisitForceReleaseDocumentSessionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(403)
 	return nil
 }
 
-type HeartbeatDocumentSessionV2RequestObject struct {
+type HeartbeatDocumentSessionRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type HeartbeatDocumentSessionV2ResponseObject interface {
-	VisitHeartbeatDocumentSessionV2Response(w http.ResponseWriter) error
+type HeartbeatDocumentSessionResponseObject interface {
+	VisitHeartbeatDocumentSessionResponse(w http.ResponseWriter) error
 }
 
-type HeartbeatDocumentSessionV2200Response struct {
+type HeartbeatDocumentSession200Response struct {
 }
 
-func (response HeartbeatDocumentSessionV2200Response) VisitHeartbeatDocumentSessionV2Response(w http.ResponseWriter) error {
+func (response HeartbeatDocumentSession200Response) VisitHeartbeatDocumentSessionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type HeartbeatDocumentSessionV2409Response struct {
+type HeartbeatDocumentSession409Response struct {
 }
 
-func (response HeartbeatDocumentSessionV2409Response) VisitHeartbeatDocumentSessionV2Response(w http.ResponseWriter) error {
+func (response HeartbeatDocumentSession409Response) VisitHeartbeatDocumentSessionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(409)
 	return nil
 }
 
-type ReleaseDocumentSessionV2RequestObject struct {
+type ReleaseDocumentSessionRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ReleaseDocumentSessionV2ResponseObject interface {
-	VisitReleaseDocumentSessionV2Response(w http.ResponseWriter) error
+type ReleaseDocumentSessionResponseObject interface {
+	VisitReleaseDocumentSessionResponse(w http.ResponseWriter) error
 }
 
-type ReleaseDocumentSessionV2200Response struct {
+type ReleaseDocumentSession200Response struct {
 }
 
-func (response ReleaseDocumentSessionV2200Response) VisitReleaseDocumentSessionV2Response(w http.ResponseWriter) error {
+func (response ReleaseDocumentSession200Response) VisitReleaseDocumentSessionResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ViewDocumentV2RequestObject struct {
+type ViewDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ViewDocumentV2ResponseObject interface {
-	VisitViewDocumentV2Response(w http.ResponseWriter) error
+type ViewDocumentResponseObject interface {
+	VisitViewDocumentResponse(w http.ResponseWriter) error
 }
 
-type ViewDocumentV2200Response struct {
+type ViewDocument200Response struct {
 }
 
-func (response ViewDocumentV2200Response) VisitViewDocumentV2Response(w http.ResponseWriter) error {
+func (response ViewDocument200Response) VisitViewDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
@@ -2691,49 +2691,49 @@ func (response ViewDocumentV2200Response) VisitViewDocumentV2Response(w http.Res
 type StrictServerInterface interface {
 	// List documents for tenant
 	// (GET /api/v1/documents)
-	ListDocumentsV2(ctx context.Context, request ListDocumentsV2RequestObject) (ListDocumentsV2ResponseObject, error)
+	ListDocuments(ctx context.Context, request ListDocumentsRequestObject) (ListDocumentsResponseObject, error)
 	// Documents stats by status and area
 	// (GET /api/v1/documents/stats)
-	DocumentStatsV2(ctx context.Context, request DocumentStatsV2RequestObject) (DocumentStatsV2ResponseObject, error)
+	DocumentStats(ctx context.Context, request DocumentStatsRequestObject) (DocumentStatsResponseObject, error)
 
 	// (GET /api/v1/documents/{id})
-	GetDocumentV2(ctx context.Context, request GetDocumentV2RequestObject) (GetDocumentV2ResponseObject, error)
+	GetDocument(ctx context.Context, request GetDocumentRequestObject) (GetDocumentResponseObject, error)
 
 	// (PATCH /api/v1/documents/{id})
-	RenameDocumentV2(ctx context.Context, request RenameDocumentV2RequestObject) (RenameDocumentV2ResponseObject, error)
+	RenameDocument(ctx context.Context, request RenameDocumentRequestObject) (RenameDocumentResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/archive)
-	ArchiveDocumentV2(ctx context.Context, request ArchiveDocumentV2RequestObject) (ArchiveDocumentV2ResponseObject, error)
+	ArchiveDocument(ctx context.Context, request ArchiveDocumentRequestObject) (ArchiveDocumentResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/autosave/commit)
-	CommitDocumentAutosaveV2(ctx context.Context, request CommitDocumentAutosaveV2RequestObject) (CommitDocumentAutosaveV2ResponseObject, error)
+	CommitDocumentAutosave(ctx context.Context, request CommitDocumentAutosaveRequestObject) (CommitDocumentAutosaveResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/autosave/presign)
-	PresignDocumentAutosaveV2(ctx context.Context, request PresignDocumentAutosaveV2RequestObject) (PresignDocumentAutosaveV2ResponseObject, error)
+	PresignDocumentAutosave(ctx context.Context, request PresignDocumentAutosaveRequestObject) (PresignDocumentAutosaveResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/checkpoints)
-	ListDocumentCheckpointsV2(ctx context.Context, request ListDocumentCheckpointsV2RequestObject) (ListDocumentCheckpointsV2ResponseObject, error)
+	ListDocumentCheckpoints(ctx context.Context, request ListDocumentCheckpointsRequestObject) (ListDocumentCheckpointsResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/checkpoints)
-	CreateDocumentCheckpointV2(ctx context.Context, request CreateDocumentCheckpointV2RequestObject) (CreateDocumentCheckpointV2ResponseObject, error)
+	CreateDocumentCheckpoint(ctx context.Context, request CreateDocumentCheckpointRequestObject) (CreateDocumentCheckpointResponseObject, error)
 	// Forward-only restore - clones the checkpoint rev into a new head revision
 	// (POST /api/v1/documents/{id}/checkpoints/{version}/restore)
-	RestoreDocumentCheckpointV2(ctx context.Context, request RestoreDocumentCheckpointV2RequestObject) (RestoreDocumentCheckpointV2ResponseObject, error)
+	RestoreDocumentCheckpoint(ctx context.Context, request RestoreDocumentCheckpointRequestObject) (RestoreDocumentCheckpointResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/comments)
-	ListDocumentCommentsV2(ctx context.Context, request ListDocumentCommentsV2RequestObject) (ListDocumentCommentsV2ResponseObject, error)
+	ListDocumentComments(ctx context.Context, request ListDocumentCommentsRequestObject) (ListDocumentCommentsResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/comments)
-	CreateDocumentCommentV2(ctx context.Context, request CreateDocumentCommentV2RequestObject) (CreateDocumentCommentV2ResponseObject, error)
+	CreateDocumentComment(ctx context.Context, request CreateDocumentCommentRequestObject) (CreateDocumentCommentResponseObject, error)
 
 	// (DELETE /api/v1/documents/{id}/comments/{libraryID})
-	DeleteDocumentCommentV2(ctx context.Context, request DeleteDocumentCommentV2RequestObject) (DeleteDocumentCommentV2ResponseObject, error)
+	DeleteDocumentComment(ctx context.Context, request DeleteDocumentCommentRequestObject) (DeleteDocumentCommentResponseObject, error)
 
 	// (PATCH /api/v1/documents/{id}/comments/{libraryID})
-	UpdateDocumentCommentV2(ctx context.Context, request UpdateDocumentCommentV2RequestObject) (UpdateDocumentCommentV2ResponseObject, error)
+	UpdateDocumentComment(ctx context.Context, request UpdateDocumentCommentRequestObject) (UpdateDocumentCommentResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/duplicate)
-	DuplicateDocumentV2(ctx context.Context, request DuplicateDocumentV2RequestObject) (DuplicateDocumentV2ResponseObject, error)
+	DuplicateDocument(ctx context.Context, request DuplicateDocumentRequestObject) (DuplicateDocumentResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/export/docx-url)
 	GetDocumentDocxURL(ctx context.Context, request GetDocumentDocxURLRequestObject) (GetDocumentDocxURLResponseObject, error)
@@ -2742,40 +2742,40 @@ type StrictServerInterface interface {
 	ExportDocumentPDF(ctx context.Context, request ExportDocumentPDFRequestObject) (ExportDocumentPDFResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/fill-in-schema)
-	GetDocumentFillInSchemaV2(ctx context.Context, request GetDocumentFillInSchemaV2RequestObject) (GetDocumentFillInSchemaV2ResponseObject, error)
+	GetDocumentFillInSchema(ctx context.Context, request GetDocumentFillInSchemaRequestObject) (GetDocumentFillInSchemaResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/finalize)
-	FinalizeDocumentV2(ctx context.Context, request FinalizeDocumentV2RequestObject) (FinalizeDocumentV2ResponseObject, error)
+	FinalizeDocument(ctx context.Context, request FinalizeDocumentRequestObject) (FinalizeDocumentResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/placeholder-options/{pid})
-	GetDocumentPlaceholderOptionsV2(ctx context.Context, request GetDocumentPlaceholderOptionsV2RequestObject) (GetDocumentPlaceholderOptionsV2ResponseObject, error)
+	GetDocumentPlaceholderOptions(ctx context.Context, request GetDocumentPlaceholderOptionsRequestObject) (GetDocumentPlaceholderOptionsResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/placeholders)
-	ListDocumentPlaceholderValuesV2(ctx context.Context, request ListDocumentPlaceholderValuesV2RequestObject) (ListDocumentPlaceholderValuesV2ResponseObject, error)
+	ListDocumentPlaceholderValues(ctx context.Context, request ListDocumentPlaceholderValuesRequestObject) (ListDocumentPlaceholderValuesResponseObject, error)
 
 	// (PUT /api/v1/documents/{id}/placeholders/{pid})
-	PutDocumentPlaceholderValueV2(ctx context.Context, request PutDocumentPlaceholderValueV2RequestObject) (PutDocumentPlaceholderValueV2ResponseObject, error)
+	PutDocumentPlaceholderValue(ctx context.Context, request PutDocumentPlaceholderValueRequestObject) (PutDocumentPlaceholderValueResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/reconstruct)
-	ReconstructDocumentV2(ctx context.Context, request ReconstructDocumentV2RequestObject) (ReconstructDocumentV2ResponseObject, error)
+	ReconstructDocument(ctx context.Context, request ReconstructDocumentRequestObject) (ReconstructDocumentResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/revisions/{rid}/url)
-	GetDocumentRevisionUrlV2(ctx context.Context, request GetDocumentRevisionUrlV2RequestObject) (GetDocumentRevisionUrlV2ResponseObject, error)
+	GetDocumentRevisionUrl(ctx context.Context, request GetDocumentRevisionUrlRequestObject) (GetDocumentRevisionUrlResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/session/acquire)
-	AcquireDocumentSessionV2(ctx context.Context, request AcquireDocumentSessionV2RequestObject) (AcquireDocumentSessionV2ResponseObject, error)
+	AcquireDocumentSession(ctx context.Context, request AcquireDocumentSessionRequestObject) (AcquireDocumentSessionResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/session/force-release)
-	ForceReleaseDocumentSessionV2(ctx context.Context, request ForceReleaseDocumentSessionV2RequestObject) (ForceReleaseDocumentSessionV2ResponseObject, error)
+	ForceReleaseDocumentSession(ctx context.Context, request ForceReleaseDocumentSessionRequestObject) (ForceReleaseDocumentSessionResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/session/heartbeat)
-	HeartbeatDocumentSessionV2(ctx context.Context, request HeartbeatDocumentSessionV2RequestObject) (HeartbeatDocumentSessionV2ResponseObject, error)
+	HeartbeatDocumentSession(ctx context.Context, request HeartbeatDocumentSessionRequestObject) (HeartbeatDocumentSessionResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/session/release)
-	ReleaseDocumentSessionV2(ctx context.Context, request ReleaseDocumentSessionV2RequestObject) (ReleaseDocumentSessionV2ResponseObject, error)
+	ReleaseDocumentSession(ctx context.Context, request ReleaseDocumentSessionRequestObject) (ReleaseDocumentSessionResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/view)
-	ViewDocumentV2(ctx context.Context, request ViewDocumentV2RequestObject) (ViewDocumentV2ResponseObject, error)
+	ViewDocument(ctx context.Context, request ViewDocumentRequestObject) (ViewDocumentResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2807,25 +2807,25 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
-// ListDocumentsV2 operation middleware
-func (sh *strictHandler) ListDocumentsV2(w http.ResponseWriter, r *http.Request, params ListDocumentsV2Params) {
-	var request ListDocumentsV2RequestObject
+// ListDocuments operation middleware
+func (sh *strictHandler) ListDocuments(w http.ResponseWriter, r *http.Request, params ListDocumentsParams) {
+	var request ListDocumentsRequestObject
 
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListDocumentsV2(ctx, request.(ListDocumentsV2RequestObject))
+		return sh.ssi.ListDocuments(ctx, request.(ListDocumentsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListDocumentsV2")
+		handler = middleware(handler, "ListDocuments")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListDocumentsV2ResponseObject); ok {
-		if err := validResponse.VisitListDocumentsV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListDocumentsResponseObject); ok {
+		if err := validResponse.VisitListDocumentsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2833,25 +2833,25 @@ func (sh *strictHandler) ListDocumentsV2(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// DocumentStatsV2 operation middleware
-func (sh *strictHandler) DocumentStatsV2(w http.ResponseWriter, r *http.Request, params DocumentStatsV2Params) {
-	var request DocumentStatsV2RequestObject
+// DocumentStats operation middleware
+func (sh *strictHandler) DocumentStats(w http.ResponseWriter, r *http.Request, params DocumentStatsParams) {
+	var request DocumentStatsRequestObject
 
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DocumentStatsV2(ctx, request.(DocumentStatsV2RequestObject))
+		return sh.ssi.DocumentStats(ctx, request.(DocumentStatsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DocumentStatsV2")
+		handler = middleware(handler, "DocumentStats")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DocumentStatsV2ResponseObject); ok {
-		if err := validResponse.VisitDocumentStatsV2Response(w); err != nil {
+	} else if validResponse, ok := response.(DocumentStatsResponseObject); ok {
+		if err := validResponse.VisitDocumentStatsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2859,25 +2859,25 @@ func (sh *strictHandler) DocumentStatsV2(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// GetDocumentV2 operation middleware
-func (sh *strictHandler) GetDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request GetDocumentV2RequestObject
+// GetDocument operation middleware
+func (sh *strictHandler) GetDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDocumentV2(ctx, request.(GetDocumentV2RequestObject))
+		return sh.ssi.GetDocument(ctx, request.(GetDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDocumentV2")
+		handler = middleware(handler, "GetDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitGetDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetDocumentResponseObject); ok {
+		if err := validResponse.VisitGetDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2885,13 +2885,13 @@ func (sh *strictHandler) GetDocumentV2(w http.ResponseWriter, r *http.Request, i
 	}
 }
 
-// RenameDocumentV2 operation middleware
-func (sh *strictHandler) RenameDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request RenameDocumentV2RequestObject
+// RenameDocument operation middleware
+func (sh *strictHandler) RenameDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request RenameDocumentRequestObject
 
 	request.Id = id
 
-	var body RenameDocumentV2JSONRequestBody
+	var body RenameDocumentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -2899,18 +2899,18 @@ func (sh *strictHandler) RenameDocumentV2(w http.ResponseWriter, r *http.Request
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RenameDocumentV2(ctx, request.(RenameDocumentV2RequestObject))
+		return sh.ssi.RenameDocument(ctx, request.(RenameDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RenameDocumentV2")
+		handler = middleware(handler, "RenameDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RenameDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitRenameDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(RenameDocumentResponseObject); ok {
+		if err := validResponse.VisitRenameDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2918,25 +2918,25 @@ func (sh *strictHandler) RenameDocumentV2(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// ArchiveDocumentV2 operation middleware
-func (sh *strictHandler) ArchiveDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ArchiveDocumentV2RequestObject
+// ArchiveDocument operation middleware
+func (sh *strictHandler) ArchiveDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ArchiveDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ArchiveDocumentV2(ctx, request.(ArchiveDocumentV2RequestObject))
+		return sh.ssi.ArchiveDocument(ctx, request.(ArchiveDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ArchiveDocumentV2")
+		handler = middleware(handler, "ArchiveDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ArchiveDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitArchiveDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ArchiveDocumentResponseObject); ok {
+		if err := validResponse.VisitArchiveDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2944,13 +2944,13 @@ func (sh *strictHandler) ArchiveDocumentV2(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// CommitDocumentAutosaveV2 operation middleware
-func (sh *strictHandler) CommitDocumentAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request CommitDocumentAutosaveV2RequestObject
+// CommitDocumentAutosave operation middleware
+func (sh *strictHandler) CommitDocumentAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CommitDocumentAutosaveRequestObject
 
 	request.Id = id
 
-	var body CommitDocumentAutosaveV2JSONRequestBody
+	var body CommitDocumentAutosaveJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -2958,18 +2958,18 @@ func (sh *strictHandler) CommitDocumentAutosaveV2(w http.ResponseWriter, r *http
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CommitDocumentAutosaveV2(ctx, request.(CommitDocumentAutosaveV2RequestObject))
+		return sh.ssi.CommitDocumentAutosave(ctx, request.(CommitDocumentAutosaveRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CommitDocumentAutosaveV2")
+		handler = middleware(handler, "CommitDocumentAutosave")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CommitDocumentAutosaveV2ResponseObject); ok {
-		if err := validResponse.VisitCommitDocumentAutosaveV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CommitDocumentAutosaveResponseObject); ok {
+		if err := validResponse.VisitCommitDocumentAutosaveResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2977,13 +2977,13 @@ func (sh *strictHandler) CommitDocumentAutosaveV2(w http.ResponseWriter, r *http
 	}
 }
 
-// PresignDocumentAutosaveV2 operation middleware
-func (sh *strictHandler) PresignDocumentAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request PresignDocumentAutosaveV2RequestObject
+// PresignDocumentAutosave operation middleware
+func (sh *strictHandler) PresignDocumentAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request PresignDocumentAutosaveRequestObject
 
 	request.Id = id
 
-	var body PresignDocumentAutosaveV2JSONRequestBody
+	var body PresignDocumentAutosaveJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -2991,18 +2991,18 @@ func (sh *strictHandler) PresignDocumentAutosaveV2(w http.ResponseWriter, r *htt
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PresignDocumentAutosaveV2(ctx, request.(PresignDocumentAutosaveV2RequestObject))
+		return sh.ssi.PresignDocumentAutosave(ctx, request.(PresignDocumentAutosaveRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PresignDocumentAutosaveV2")
+		handler = middleware(handler, "PresignDocumentAutosave")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PresignDocumentAutosaveV2ResponseObject); ok {
-		if err := validResponse.VisitPresignDocumentAutosaveV2Response(w); err != nil {
+	} else if validResponse, ok := response.(PresignDocumentAutosaveResponseObject); ok {
+		if err := validResponse.VisitPresignDocumentAutosaveResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3010,25 +3010,25 @@ func (sh *strictHandler) PresignDocumentAutosaveV2(w http.ResponseWriter, r *htt
 	}
 }
 
-// ListDocumentCheckpointsV2 operation middleware
-func (sh *strictHandler) ListDocumentCheckpointsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ListDocumentCheckpointsV2RequestObject
+// ListDocumentCheckpoints operation middleware
+func (sh *strictHandler) ListDocumentCheckpoints(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListDocumentCheckpointsRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListDocumentCheckpointsV2(ctx, request.(ListDocumentCheckpointsV2RequestObject))
+		return sh.ssi.ListDocumentCheckpoints(ctx, request.(ListDocumentCheckpointsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListDocumentCheckpointsV2")
+		handler = middleware(handler, "ListDocumentCheckpoints")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListDocumentCheckpointsV2ResponseObject); ok {
-		if err := validResponse.VisitListDocumentCheckpointsV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListDocumentCheckpointsResponseObject); ok {
+		if err := validResponse.VisitListDocumentCheckpointsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3036,13 +3036,13 @@ func (sh *strictHandler) ListDocumentCheckpointsV2(w http.ResponseWriter, r *htt
 	}
 }
 
-// CreateDocumentCheckpointV2 operation middleware
-func (sh *strictHandler) CreateDocumentCheckpointV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request CreateDocumentCheckpointV2RequestObject
+// CreateDocumentCheckpoint operation middleware
+func (sh *strictHandler) CreateDocumentCheckpoint(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreateDocumentCheckpointRequestObject
 
 	request.Id = id
 
-	var body CreateDocumentCheckpointV2JSONRequestBody
+	var body CreateDocumentCheckpointJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		if !errors.Is(err, io.EOF) {
 			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
@@ -3053,18 +3053,18 @@ func (sh *strictHandler) CreateDocumentCheckpointV2(w http.ResponseWriter, r *ht
 	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateDocumentCheckpointV2(ctx, request.(CreateDocumentCheckpointV2RequestObject))
+		return sh.ssi.CreateDocumentCheckpoint(ctx, request.(CreateDocumentCheckpointRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateDocumentCheckpointV2")
+		handler = middleware(handler, "CreateDocumentCheckpoint")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateDocumentCheckpointV2ResponseObject); ok {
-		if err := validResponse.VisitCreateDocumentCheckpointV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CreateDocumentCheckpointResponseObject); ok {
+		if err := validResponse.VisitCreateDocumentCheckpointResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3072,26 +3072,26 @@ func (sh *strictHandler) CreateDocumentCheckpointV2(w http.ResponseWriter, r *ht
 	}
 }
 
-// RestoreDocumentCheckpointV2 operation middleware
-func (sh *strictHandler) RestoreDocumentCheckpointV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, version int) {
-	var request RestoreDocumentCheckpointV2RequestObject
+// RestoreDocumentCheckpoint operation middleware
+func (sh *strictHandler) RestoreDocumentCheckpoint(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, version int) {
+	var request RestoreDocumentCheckpointRequestObject
 
 	request.Id = id
 	request.Version = version
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RestoreDocumentCheckpointV2(ctx, request.(RestoreDocumentCheckpointV2RequestObject))
+		return sh.ssi.RestoreDocumentCheckpoint(ctx, request.(RestoreDocumentCheckpointRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RestoreDocumentCheckpointV2")
+		handler = middleware(handler, "RestoreDocumentCheckpoint")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RestoreDocumentCheckpointV2ResponseObject); ok {
-		if err := validResponse.VisitRestoreDocumentCheckpointV2Response(w); err != nil {
+	} else if validResponse, ok := response.(RestoreDocumentCheckpointResponseObject); ok {
+		if err := validResponse.VisitRestoreDocumentCheckpointResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3099,25 +3099,25 @@ func (sh *strictHandler) RestoreDocumentCheckpointV2(w http.ResponseWriter, r *h
 	}
 }
 
-// ListDocumentCommentsV2 operation middleware
-func (sh *strictHandler) ListDocumentCommentsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ListDocumentCommentsV2RequestObject
+// ListDocumentComments operation middleware
+func (sh *strictHandler) ListDocumentComments(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListDocumentCommentsRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListDocumentCommentsV2(ctx, request.(ListDocumentCommentsV2RequestObject))
+		return sh.ssi.ListDocumentComments(ctx, request.(ListDocumentCommentsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListDocumentCommentsV2")
+		handler = middleware(handler, "ListDocumentComments")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListDocumentCommentsV2ResponseObject); ok {
-		if err := validResponse.VisitListDocumentCommentsV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListDocumentCommentsResponseObject); ok {
+		if err := validResponse.VisitListDocumentCommentsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3125,13 +3125,13 @@ func (sh *strictHandler) ListDocumentCommentsV2(w http.ResponseWriter, r *http.R
 	}
 }
 
-// CreateDocumentCommentV2 operation middleware
-func (sh *strictHandler) CreateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request CreateDocumentCommentV2RequestObject
+// CreateDocumentComment operation middleware
+func (sh *strictHandler) CreateDocumentComment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreateDocumentCommentRequestObject
 
 	request.Id = id
 
-	var body CreateDocumentCommentV2JSONRequestBody
+	var body CreateDocumentCommentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3139,18 +3139,18 @@ func (sh *strictHandler) CreateDocumentCommentV2(w http.ResponseWriter, r *http.
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateDocumentCommentV2(ctx, request.(CreateDocumentCommentV2RequestObject))
+		return sh.ssi.CreateDocumentComment(ctx, request.(CreateDocumentCommentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateDocumentCommentV2")
+		handler = middleware(handler, "CreateDocumentComment")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateDocumentCommentV2ResponseObject); ok {
-		if err := validResponse.VisitCreateDocumentCommentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CreateDocumentCommentResponseObject); ok {
+		if err := validResponse.VisitCreateDocumentCommentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3158,26 +3158,26 @@ func (sh *strictHandler) CreateDocumentCommentV2(w http.ResponseWriter, r *http.
 	}
 }
 
-// DeleteDocumentCommentV2 operation middleware
-func (sh *strictHandler) DeleteDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int) {
-	var request DeleteDocumentCommentV2RequestObject
+// DeleteDocumentComment operation middleware
+func (sh *strictHandler) DeleteDocumentComment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int) {
+	var request DeleteDocumentCommentRequestObject
 
 	request.Id = id
 	request.LibraryID = libraryID
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteDocumentCommentV2(ctx, request.(DeleteDocumentCommentV2RequestObject))
+		return sh.ssi.DeleteDocumentComment(ctx, request.(DeleteDocumentCommentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteDocumentCommentV2")
+		handler = middleware(handler, "DeleteDocumentComment")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteDocumentCommentV2ResponseObject); ok {
-		if err := validResponse.VisitDeleteDocumentCommentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(DeleteDocumentCommentResponseObject); ok {
+		if err := validResponse.VisitDeleteDocumentCommentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3185,14 +3185,14 @@ func (sh *strictHandler) DeleteDocumentCommentV2(w http.ResponseWriter, r *http.
 	}
 }
 
-// UpdateDocumentCommentV2 operation middleware
-func (sh *strictHandler) UpdateDocumentCommentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int) {
-	var request UpdateDocumentCommentV2RequestObject
+// UpdateDocumentComment operation middleware
+func (sh *strictHandler) UpdateDocumentComment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, libraryID int) {
+	var request UpdateDocumentCommentRequestObject
 
 	request.Id = id
 	request.LibraryID = libraryID
 
-	var body UpdateDocumentCommentV2JSONRequestBody
+	var body UpdateDocumentCommentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3200,18 +3200,18 @@ func (sh *strictHandler) UpdateDocumentCommentV2(w http.ResponseWriter, r *http.
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateDocumentCommentV2(ctx, request.(UpdateDocumentCommentV2RequestObject))
+		return sh.ssi.UpdateDocumentComment(ctx, request.(UpdateDocumentCommentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateDocumentCommentV2")
+		handler = middleware(handler, "UpdateDocumentComment")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateDocumentCommentV2ResponseObject); ok {
-		if err := validResponse.VisitUpdateDocumentCommentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(UpdateDocumentCommentResponseObject); ok {
+		if err := validResponse.VisitUpdateDocumentCommentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3219,25 +3219,25 @@ func (sh *strictHandler) UpdateDocumentCommentV2(w http.ResponseWriter, r *http.
 	}
 }
 
-// DuplicateDocumentV2 operation middleware
-func (sh *strictHandler) DuplicateDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request DuplicateDocumentV2RequestObject
+// DuplicateDocument operation middleware
+func (sh *strictHandler) DuplicateDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DuplicateDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DuplicateDocumentV2(ctx, request.(DuplicateDocumentV2RequestObject))
+		return sh.ssi.DuplicateDocument(ctx, request.(DuplicateDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DuplicateDocumentV2")
+		handler = middleware(handler, "DuplicateDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DuplicateDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitDuplicateDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(DuplicateDocumentResponseObject); ok {
+		if err := validResponse.VisitDuplicateDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3307,25 +3307,25 @@ func (sh *strictHandler) ExportDocumentPDF(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// GetDocumentFillInSchemaV2 operation middleware
-func (sh *strictHandler) GetDocumentFillInSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request GetDocumentFillInSchemaV2RequestObject
+// GetDocumentFillInSchema operation middleware
+func (sh *strictHandler) GetDocumentFillInSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetDocumentFillInSchemaRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDocumentFillInSchemaV2(ctx, request.(GetDocumentFillInSchemaV2RequestObject))
+		return sh.ssi.GetDocumentFillInSchema(ctx, request.(GetDocumentFillInSchemaRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDocumentFillInSchemaV2")
+		handler = middleware(handler, "GetDocumentFillInSchema")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDocumentFillInSchemaV2ResponseObject); ok {
-		if err := validResponse.VisitGetDocumentFillInSchemaV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetDocumentFillInSchemaResponseObject); ok {
+		if err := validResponse.VisitGetDocumentFillInSchemaResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3333,26 +3333,26 @@ func (sh *strictHandler) GetDocumentFillInSchemaV2(w http.ResponseWriter, r *htt
 	}
 }
 
-// FinalizeDocumentV2 operation middleware
-func (sh *strictHandler) FinalizeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params FinalizeDocumentV2Params) {
-	var request FinalizeDocumentV2RequestObject
+// FinalizeDocument operation middleware
+func (sh *strictHandler) FinalizeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params FinalizeDocumentParams) {
+	var request FinalizeDocumentRequestObject
 
 	request.Id = id
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.FinalizeDocumentV2(ctx, request.(FinalizeDocumentV2RequestObject))
+		return sh.ssi.FinalizeDocument(ctx, request.(FinalizeDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "FinalizeDocumentV2")
+		handler = middleware(handler, "FinalizeDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(FinalizeDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitFinalizeDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(FinalizeDocumentResponseObject); ok {
+		if err := validResponse.VisitFinalizeDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3360,26 +3360,26 @@ func (sh *strictHandler) FinalizeDocumentV2(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// GetDocumentPlaceholderOptionsV2 operation middleware
-func (sh *strictHandler) GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string) {
-	var request GetDocumentPlaceholderOptionsV2RequestObject
+// GetDocumentPlaceholderOptions operation middleware
+func (sh *strictHandler) GetDocumentPlaceholderOptions(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string) {
+	var request GetDocumentPlaceholderOptionsRequestObject
 
 	request.Id = id
 	request.Pid = pid
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDocumentPlaceholderOptionsV2(ctx, request.(GetDocumentPlaceholderOptionsV2RequestObject))
+		return sh.ssi.GetDocumentPlaceholderOptions(ctx, request.(GetDocumentPlaceholderOptionsRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDocumentPlaceholderOptionsV2")
+		handler = middleware(handler, "GetDocumentPlaceholderOptions")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDocumentPlaceholderOptionsV2ResponseObject); ok {
-		if err := validResponse.VisitGetDocumentPlaceholderOptionsV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetDocumentPlaceholderOptionsResponseObject); ok {
+		if err := validResponse.VisitGetDocumentPlaceholderOptionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3387,25 +3387,25 @@ func (sh *strictHandler) GetDocumentPlaceholderOptionsV2(w http.ResponseWriter, 
 	}
 }
 
-// ListDocumentPlaceholderValuesV2 operation middleware
-func (sh *strictHandler) ListDocumentPlaceholderValuesV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ListDocumentPlaceholderValuesV2RequestObject
+// ListDocumentPlaceholderValues operation middleware
+func (sh *strictHandler) ListDocumentPlaceholderValues(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListDocumentPlaceholderValuesRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListDocumentPlaceholderValuesV2(ctx, request.(ListDocumentPlaceholderValuesV2RequestObject))
+		return sh.ssi.ListDocumentPlaceholderValues(ctx, request.(ListDocumentPlaceholderValuesRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListDocumentPlaceholderValuesV2")
+		handler = middleware(handler, "ListDocumentPlaceholderValues")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListDocumentPlaceholderValuesV2ResponseObject); ok {
-		if err := validResponse.VisitListDocumentPlaceholderValuesV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListDocumentPlaceholderValuesResponseObject); ok {
+		if err := validResponse.VisitListDocumentPlaceholderValuesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3413,14 +3413,14 @@ func (sh *strictHandler) ListDocumentPlaceholderValuesV2(w http.ResponseWriter, 
 	}
 }
 
-// PutDocumentPlaceholderValueV2 operation middleware
-func (sh *strictHandler) PutDocumentPlaceholderValueV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string) {
-	var request PutDocumentPlaceholderValueV2RequestObject
+// PutDocumentPlaceholderValue operation middleware
+func (sh *strictHandler) PutDocumentPlaceholderValue(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, pid string) {
+	var request PutDocumentPlaceholderValueRequestObject
 
 	request.Id = id
 	request.Pid = pid
 
-	var body PutDocumentPlaceholderValueV2JSONRequestBody
+	var body PutDocumentPlaceholderValueJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3428,18 +3428,18 @@ func (sh *strictHandler) PutDocumentPlaceholderValueV2(w http.ResponseWriter, r 
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PutDocumentPlaceholderValueV2(ctx, request.(PutDocumentPlaceholderValueV2RequestObject))
+		return sh.ssi.PutDocumentPlaceholderValue(ctx, request.(PutDocumentPlaceholderValueRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PutDocumentPlaceholderValueV2")
+		handler = middleware(handler, "PutDocumentPlaceholderValue")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PutDocumentPlaceholderValueV2ResponseObject); ok {
-		if err := validResponse.VisitPutDocumentPlaceholderValueV2Response(w); err != nil {
+	} else if validResponse, ok := response.(PutDocumentPlaceholderValueResponseObject); ok {
+		if err := validResponse.VisitPutDocumentPlaceholderValueResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3447,13 +3447,13 @@ func (sh *strictHandler) PutDocumentPlaceholderValueV2(w http.ResponseWriter, r 
 	}
 }
 
-// ReconstructDocumentV2 operation middleware
-func (sh *strictHandler) ReconstructDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ReconstructDocumentV2RequestObject
+// ReconstructDocument operation middleware
+func (sh *strictHandler) ReconstructDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ReconstructDocumentRequestObject
 
 	request.Id = id
 
-	var body ReconstructDocumentV2JSONRequestBody
+	var body ReconstructDocumentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -3461,18 +3461,18 @@ func (sh *strictHandler) ReconstructDocumentV2(w http.ResponseWriter, r *http.Re
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ReconstructDocumentV2(ctx, request.(ReconstructDocumentV2RequestObject))
+		return sh.ssi.ReconstructDocument(ctx, request.(ReconstructDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ReconstructDocumentV2")
+		handler = middleware(handler, "ReconstructDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ReconstructDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitReconstructDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ReconstructDocumentResponseObject); ok {
+		if err := validResponse.VisitReconstructDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3480,26 +3480,26 @@ func (sh *strictHandler) ReconstructDocumentV2(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// GetDocumentRevisionUrlV2 operation middleware
-func (sh *strictHandler) GetDocumentRevisionUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, rid openapi_types.UUID) {
-	var request GetDocumentRevisionUrlV2RequestObject
+// GetDocumentRevisionUrl operation middleware
+func (sh *strictHandler) GetDocumentRevisionUrl(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, rid openapi_types.UUID) {
+	var request GetDocumentRevisionUrlRequestObject
 
 	request.Id = id
 	request.Rid = rid
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetDocumentRevisionUrlV2(ctx, request.(GetDocumentRevisionUrlV2RequestObject))
+		return sh.ssi.GetDocumentRevisionUrl(ctx, request.(GetDocumentRevisionUrlRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetDocumentRevisionUrlV2")
+		handler = middleware(handler, "GetDocumentRevisionUrl")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetDocumentRevisionUrlV2ResponseObject); ok {
-		if err := validResponse.VisitGetDocumentRevisionUrlV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetDocumentRevisionUrlResponseObject); ok {
+		if err := validResponse.VisitGetDocumentRevisionUrlResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3507,25 +3507,25 @@ func (sh *strictHandler) GetDocumentRevisionUrlV2(w http.ResponseWriter, r *http
 	}
 }
 
-// AcquireDocumentSessionV2 operation middleware
-func (sh *strictHandler) AcquireDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request AcquireDocumentSessionV2RequestObject
+// AcquireDocumentSession operation middleware
+func (sh *strictHandler) AcquireDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request AcquireDocumentSessionRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.AcquireDocumentSessionV2(ctx, request.(AcquireDocumentSessionV2RequestObject))
+		return sh.ssi.AcquireDocumentSession(ctx, request.(AcquireDocumentSessionRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "AcquireDocumentSessionV2")
+		handler = middleware(handler, "AcquireDocumentSession")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(AcquireDocumentSessionV2ResponseObject); ok {
-		if err := validResponse.VisitAcquireDocumentSessionV2Response(w); err != nil {
+	} else if validResponse, ok := response.(AcquireDocumentSessionResponseObject); ok {
+		if err := validResponse.VisitAcquireDocumentSessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3533,25 +3533,25 @@ func (sh *strictHandler) AcquireDocumentSessionV2(w http.ResponseWriter, r *http
 	}
 }
 
-// ForceReleaseDocumentSessionV2 operation middleware
-func (sh *strictHandler) ForceReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ForceReleaseDocumentSessionV2RequestObject
+// ForceReleaseDocumentSession operation middleware
+func (sh *strictHandler) ForceReleaseDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ForceReleaseDocumentSessionRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ForceReleaseDocumentSessionV2(ctx, request.(ForceReleaseDocumentSessionV2RequestObject))
+		return sh.ssi.ForceReleaseDocumentSession(ctx, request.(ForceReleaseDocumentSessionRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ForceReleaseDocumentSessionV2")
+		handler = middleware(handler, "ForceReleaseDocumentSession")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ForceReleaseDocumentSessionV2ResponseObject); ok {
-		if err := validResponse.VisitForceReleaseDocumentSessionV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ForceReleaseDocumentSessionResponseObject); ok {
+		if err := validResponse.VisitForceReleaseDocumentSessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3559,25 +3559,25 @@ func (sh *strictHandler) ForceReleaseDocumentSessionV2(w http.ResponseWriter, r 
 	}
 }
 
-// HeartbeatDocumentSessionV2 operation middleware
-func (sh *strictHandler) HeartbeatDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request HeartbeatDocumentSessionV2RequestObject
+// HeartbeatDocumentSession operation middleware
+func (sh *strictHandler) HeartbeatDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request HeartbeatDocumentSessionRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.HeartbeatDocumentSessionV2(ctx, request.(HeartbeatDocumentSessionV2RequestObject))
+		return sh.ssi.HeartbeatDocumentSession(ctx, request.(HeartbeatDocumentSessionRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "HeartbeatDocumentSessionV2")
+		handler = middleware(handler, "HeartbeatDocumentSession")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(HeartbeatDocumentSessionV2ResponseObject); ok {
-		if err := validResponse.VisitHeartbeatDocumentSessionV2Response(w); err != nil {
+	} else if validResponse, ok := response.(HeartbeatDocumentSessionResponseObject); ok {
+		if err := validResponse.VisitHeartbeatDocumentSessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3585,25 +3585,25 @@ func (sh *strictHandler) HeartbeatDocumentSessionV2(w http.ResponseWriter, r *ht
 	}
 }
 
-// ReleaseDocumentSessionV2 operation middleware
-func (sh *strictHandler) ReleaseDocumentSessionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ReleaseDocumentSessionV2RequestObject
+// ReleaseDocumentSession operation middleware
+func (sh *strictHandler) ReleaseDocumentSession(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ReleaseDocumentSessionRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ReleaseDocumentSessionV2(ctx, request.(ReleaseDocumentSessionV2RequestObject))
+		return sh.ssi.ReleaseDocumentSession(ctx, request.(ReleaseDocumentSessionRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ReleaseDocumentSessionV2")
+		handler = middleware(handler, "ReleaseDocumentSession")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ReleaseDocumentSessionV2ResponseObject); ok {
-		if err := validResponse.VisitReleaseDocumentSessionV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ReleaseDocumentSessionResponseObject); ok {
+		if err := validResponse.VisitReleaseDocumentSessionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3611,25 +3611,25 @@ func (sh *strictHandler) ReleaseDocumentSessionV2(w http.ResponseWriter, r *http
 	}
 }
 
-// ViewDocumentV2 operation middleware
-func (sh *strictHandler) ViewDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ViewDocumentV2RequestObject
+// ViewDocument operation middleware
+func (sh *strictHandler) ViewDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ViewDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ViewDocumentV2(ctx, request.(ViewDocumentV2RequestObject))
+		return sh.ssi.ViewDocument(ctx, request.(ViewDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ViewDocumentV2")
+		handler = middleware(handler, "ViewDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ViewDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitViewDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ViewDocumentResponseObject); ok {
+		if err := validResponse.VisitViewDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3642,66 +3642,66 @@ func (sh *strictHandler) ViewDocumentV2(w http.ResponseWriter, r *http.Request, 
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

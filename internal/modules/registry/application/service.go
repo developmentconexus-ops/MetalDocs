@@ -168,6 +168,12 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 				}
 			}()
 			createTx = tx
+			if err := setAuthzGUC(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
+				return nil, fmt.Errorf("registry: set authz context: %w", err)
+			}
+			if err := authz.Require(ctx, createTx, string(iamdomain.CapRegistryCreate), "tenant"); err != nil {
+				return nil, fmt.Errorf("registry: authz check sequence allocation: %w", err)
+			}
 
 			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
@@ -290,6 +296,16 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 	}
 
 	return &CreateResult{ControlledDocument: doc, DocumentRef: docRef}, nil
+}
+
+func setAuthzGUC(ctx context.Context, tx *sql.Tx, tenantID, actorID string) error {
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", actorID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // PreviewCode returns the next auto-allocated CD code for (profile, area)

@@ -6,7 +6,7 @@ export function Component() {
 
   return (
     <RegistryListPage
-      onOpenDocumentEditor={(docId) => navigate(`/documents-v2/${docId}`)}
+      onOpenDocumentEditor={(docId) => navigate(`/documents/${docId}/edit`)}
     />
   );
 }

@@ -1,7 +1,7 @@
 # Backlog: Novo-Documento Wizard
 
 > **Last verified:** 2026-05-14 (Plan 12.3 integration audit + screen-local sync)
-> **Scope:** Deferred items for the 4-step wizard at `/documents-v2/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
+> **Scope:** Deferred items for the 4-step wizard at `/documents/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
 > **Out of scope:** Library screen deferrals (`backlog/library-screen.md`), editor deferrals (`backlog/editor.md`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:146` — `handleCreate` — single-call atomic submit via `createControlledDocumentAtomic`
@@ -51,7 +51,7 @@ Verification needed next:
 - `cd frontend/apps/web`
 - `pnpm.cmd tsc --noEmit -p tsconfig.build.json`
 - `pnpm test`
-- Runtime smoke for `/documents-v2/new`
+- Runtime smoke for `/documents/new`
 - Screenshot capture for Step 1 through Step 4
 
 ---
