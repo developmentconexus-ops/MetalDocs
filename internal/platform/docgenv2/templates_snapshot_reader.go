@@ -9,27 +9,27 @@ import (
 	"metaldocs/internal/modules/documents/domain"
 )
 
-var _ application.SnapshotTemplateReader = (*TemplatesV2SnapshotReader)(nil)
+var _ application.SnapshotTemplateReader = (*TemplatesSnapshotReader)(nil)
 
-type TemplatesV2SnapshotReader struct {
+type TemplatesSnapshotReader struct {
 	db *sql.DB
 }
 
-func NewTemplatesV2SnapshotReader(db *sql.DB) *TemplatesV2SnapshotReader {
-	return &TemplatesV2SnapshotReader{db: db}
+func NewTemplatesSnapshotReader(db *sql.DB) *TemplatesSnapshotReader {
+	return &TemplatesSnapshotReader{db: db}
 }
 
-func (r *TemplatesV2SnapshotReader) LoadForSnapshot(ctx context.Context, tenantID, templateVersionID string) (domain.TemplateSnapshot, error) {
+func (r *TemplatesSnapshotReader) LoadForSnapshot(ctx context.Context, tenantID, templateVersionID string) (domain.TemplateSnapshot, error) {
 	if r.db == nil {
-		return domain.TemplateSnapshot{}, errors.New("templates_v2 snapshot reader: db is nil")
+		return domain.TemplateSnapshot{}, errors.New("templates snapshot reader: db is nil")
 	}
 
 	var phJSON, docxKey string
 	err := r.db.QueryRowContext(ctx, `
 		SELECT COALESCE(tv.placeholder_schema::text, '{}'),
 		       COALESCE(tv.docx_storage_key, '')
-		  FROM templates_v2_template_version tv
-		  JOIN templates_v2_template tpl ON tpl.id = tv.template_id
+		  FROM templates_template_version tv
+		  JOIN templates_template tpl ON tpl.id = tv.template_id
 		 WHERE tv.id = $1::uuid
 		   AND tpl.tenant_id = $2
 		   AND tv.status = 'published'`,

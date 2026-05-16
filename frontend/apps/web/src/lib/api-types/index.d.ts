@@ -1031,7 +1031,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * [DEPRECATED] Template DOCX rendering removed — use content builder
+         * [DEPRECATED] Template DOCX rendering removed â€” use content builder
          * @deprecated
          */
         get: {
@@ -2979,7 +2979,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * [DEPRECATED] Template DOCX rendering removed — use content builder
+         * [DEPRECATED] Template DOCX rendering removed â€” use content builder
          * @deprecated
          */
         get: {
@@ -4264,12 +4264,12 @@ export interface paths {
             cookie?: never;
         };
         /** List active area memberships for the current tenant */
-        get: operations["listAreaMembershipsV2"];
+        get: operations["listAreaMemberships"];
         put?: never;
         /** Grant or replace an active area membership */
-        post: operations["grantAreaMembershipV2"];
+        post: operations["grantAreaMembership"];
         /** Revoke an active area membership */
-        delete: operations["revokeAreaMembershipV2"];
+        delete: operations["revokeAreaMembership"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4328,11 +4328,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List templates for tenant (docx-v2) */
-        get: operations["listTemplatesV2"];
+        /** List templates for tenant (docx) */
+        get: operations["listTemplates"];
         put?: never;
-        /** Create template (docx-v2) */
-        post: operations["createTemplateV2"];
+        /** Create template (docx) */
+        post: operations["createTemplate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4363,8 +4363,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get template version metadata (docx-v2) */
-        get: operations["getTemplateVersionV2"];
+        /** Get template version metadata (docx) */
+        get: operations["getTemplateVersion"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4383,7 +4383,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Presign PUT URL for draft .docx upload */
-        post: operations["presignTemplateDocxUploadUrlV2"];
+        post: operations["presignTemplateDocxUploadUrl"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4400,7 +4400,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Presign PUT URL for draft schema.json upload */
-        post: operations["presignTemplateSchemaUploadUrlV2"];
+        post: operations["presignTemplateSchemaUploadUrl"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4415,7 +4415,7 @@ export interface paths {
             cookie?: never;
         };
         /** Redirect to presigned GET URL for a stored object */
-        get: operations["redirectSignedUrlV2"];
+        get: operations["redirectSignedUrl"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4433,7 +4433,7 @@ export interface paths {
         };
         get?: never;
         /** Save draft (CAS via expected_lock_version) */
-        put: operations["saveTemplateDraftV2"];
+        put: operations["saveTemplateDraft"];
         post?: never;
         delete?: never;
         options?: never;
@@ -4451,7 +4451,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Publish draft (delegates to docgen-v2 /validate/template) */
-        post: operations["publishTemplateVersionV2"];
+        post: operations["publishTemplateVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4467,7 +4467,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["createTemplateVersionV2"];
+        post: operations["createTemplateVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4482,7 +4482,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["updateTemplateSchemaV2"];
+        put: operations["updateTemplateSchema"];
         post?: never;
         delete?: never;
         options?: never;
@@ -4499,7 +4499,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["presignTemplateAutosaveV2"];
+        post: operations["presignTemplateAutosave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4515,7 +4515,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["commitTemplateAutosaveV2"];
+        post: operations["commitTemplateAutosave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4531,7 +4531,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["submitTemplateVersionV2"];
+        post: operations["submitTemplateVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4547,7 +4547,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["reviewTemplateVersionV2"];
+        post: operations["reviewTemplateVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4563,7 +4563,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["approveTemplateVersionV2"];
+        post: operations["approveTemplateVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4579,7 +4579,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["archiveTemplateV2"];
+        post: operations["archiveTemplate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4594,7 +4594,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["upsertTemplateApprovalConfigV2"];
+        put: operations["upsertTemplateApprovalConfig"];
         post?: never;
         delete?: never;
         options?: never;
@@ -4609,7 +4609,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getTemplateV2"];
+        get: operations["getTemplate"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4625,7 +4625,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getTemplateDocxUrlV2"];
+        get: operations["getTemplateDocxUrl"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4641,7 +4641,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listTemplateAuditV2"];
+        get: operations["listTemplateAudit"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4650,14 +4650,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/templates/v2/placeholder-catalog": {
+    "/api/v1/templates/placeholder-catalog": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listTemplatePlaceholderCatalogV2"];
+        get: operations["listTemplatePlaceholderCatalog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4673,9 +4673,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listTaxonomyProfilesV2"];
+        get: operations["listTaxonomyProfiles"];
         put?: never;
-        post: operations["createTaxonomyProfileV2"];
+        post: operations["createTaxonomyProfile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4689,13 +4689,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getTaxonomyProfileV2"];
+        get: operations["getTaxonomyProfile"];
         put?: never;
         post?: never;
-        delete: operations["archiveTaxonomyProfileV2"];
+        delete: operations["archiveTaxonomyProfile"];
         options?: never;
         head?: never;
-        patch: operations["updateTaxonomyProfileV2"];
+        patch: operations["updateTaxonomyProfile"];
         trace?: never;
     };
     "/api/v1/taxonomy/profiles/{code}/default-template": {
@@ -4706,7 +4706,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["setTaxonomyProfileDefaultTemplateV2"];
+        put: operations["setTaxonomyProfileDefaultTemplate"];
         post?: never;
         delete?: never;
         options?: never;
@@ -4721,9 +4721,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listTaxonomyAreasV2"];
+        get: operations["listTaxonomyAreas"];
         put?: never;
-        post: operations["createTaxonomyAreaV2"];
+        post: operations["createTaxonomyArea"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4737,10 +4737,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getTaxonomyAreaV2"];
-        put: operations["updateTaxonomyAreaV2"];
+        get: operations["getTaxonomyArea"];
+        put: operations["updateTaxonomyArea"];
         post?: never;
-        delete: operations["archiveTaxonomyAreaV2"];
+        delete: operations["archiveTaxonomyArea"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4753,9 +4753,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listTaxonomyFamiliesV2"];
+        get: operations["listTaxonomyFamilies"];
         put?: never;
-        post: operations["createTaxonomyFamilyV2"];
+        post: operations["createTaxonomyFamily"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4769,13 +4769,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getTaxonomyFamilyV2"];
+        get: operations["getTaxonomyFamily"];
         put?: never;
         post?: never;
-        delete: operations["deactivateTaxonomyFamilyV2"];
+        delete: operations["deactivateTaxonomyFamily"];
         options?: never;
         head?: never;
-        patch: operations["updateTaxonomyFamilyV2"];
+        patch: operations["updateTaxonomyFamily"];
         trace?: never;
     };
     "/api/v1/controlled-documents": {
@@ -4906,7 +4906,7 @@ export interface paths {
             cookie?: never;
         };
         /** List documents for tenant */
-        get: operations["listDocumentsV2"];
+        get: operations["listDocuments"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4922,13 +4922,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getDocumentV2"];
+        get: operations["getDocument"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["renameDocumentV2"];
+        patch: operations["renameDocument"];
         trace?: never;
     };
     "/api/v1/documents/{id}/finalize": {
@@ -4940,7 +4940,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["finalizeDocumentV2"];
+        post: operations["finalizeDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4956,7 +4956,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["archiveDocumentV2"];
+        post: operations["archiveDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4972,7 +4972,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["duplicateDocumentV2"];
+        post: operations["duplicateDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4987,7 +4987,7 @@ export interface paths {
             cookie?: never;
         };
         /** Documents stats by status and area */
-        get: operations["documentStatsV2"];
+        get: operations["documentStats"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5005,7 +5005,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["acquireDocumentSessionV2"];
+        post: operations["acquireDocumentSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5021,7 +5021,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["heartbeatDocumentSessionV2"];
+        post: operations["heartbeatDocumentSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5037,7 +5037,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["releaseDocumentSessionV2"];
+        post: operations["releaseDocumentSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5053,7 +5053,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["forceReleaseDocumentSessionV2"];
+        post: operations["forceReleaseDocumentSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5069,7 +5069,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["presignDocumentAutosaveV2"];
+        post: operations["presignDocumentAutosave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5085,7 +5085,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["commitDocumentAutosaveV2"];
+        post: operations["commitDocumentAutosave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5099,9 +5099,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listDocumentCheckpointsV2"];
+        get: operations["listDocumentCheckpoints"];
         put?: never;
-        post: operations["createDocumentCheckpointV2"];
+        post: operations["createDocumentCheckpoint"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5118,7 +5118,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Forward-only restore - clones the checkpoint rev into a new head revision */
-        post: operations["restoreDocumentCheckpointV2"];
+        post: operations["restoreDocumentCheckpoint"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5132,7 +5132,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getDocumentRevisionUrlV2"];
+        get: operations["getDocumentRevisionUrl"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5148,9 +5148,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listDocumentCommentsV2"];
+        get: operations["listDocumentComments"];
         put?: never;
-        post: operations["createDocumentCommentV2"];
+        post: operations["createDocumentComment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5167,10 +5167,10 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete: operations["deleteDocumentCommentV2"];
+        delete: operations["deleteDocumentComment"];
         options?: never;
         head?: never;
-        patch: operations["updateDocumentCommentV2"];
+        patch: operations["updateDocumentComment"];
         trace?: never;
     };
     "/api/v1/documents/{id}/export/pdf": {
@@ -5212,7 +5212,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getDocumentFillInSchemaV2"];
+        get: operations["getDocumentFillInSchema"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5228,7 +5228,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listDocumentPlaceholderValuesV2"];
+        get: operations["listDocumentPlaceholderValues"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5245,7 +5245,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["putDocumentPlaceholderValueV2"];
+        put: operations["putDocumentPlaceholderValue"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5260,7 +5260,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["viewDocumentV2"];
+        get: operations["viewDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5278,7 +5278,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["reconstructDocumentV2"];
+        post: operations["reconstructDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5292,7 +5292,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getDocumentPlaceholderOptionsV2"];
+        get: operations["getDocumentPlaceholderOptions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5310,7 +5310,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["submitDocumentForApprovalV2"];
+        post: operations["submitDocumentForApproval"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5326,7 +5326,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["recordApprovalStageSignoffV2"];
+        post: operations["recordApprovalStageSignoff"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5342,7 +5342,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["publishDocumentV2"];
+        post: operations["publishDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5358,7 +5358,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["scheduleDocumentPublishV2"];
+        post: operations["scheduleDocumentPublish"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5374,7 +5374,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["supersedeDocumentV2"];
+        post: operations["supersedeDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5390,7 +5390,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["obsoleteDocumentV2"];
+        post: operations["obsoleteDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5406,7 +5406,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["cancelApprovalInstanceV2"];
+        post: operations["cancelApprovalInstance"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5420,7 +5420,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getApprovalInstanceV2"];
+        get: operations["getApprovalInstance"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5436,7 +5436,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getApprovalInstanceByDocumentV2"];
+        get: operations["getApprovalInstanceByDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5452,7 +5452,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listApprovalInboxV2"];
+        get: operations["listApprovalInbox"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5470,7 +5470,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["recordDocumentSignoffV2"];
+        post: operations["recordDocumentSignoff"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5486,7 +5486,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["cancelDocumentApprovalV2"];
+        post: operations["cancelDocumentApproval"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5500,9 +5500,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["listApprovalRoutesV2"];
+        get: operations["listApprovalRoutes"];
         put?: never;
-        post: operations["createApprovalRouteV2"];
+        post: operations["createApprovalRoute"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5517,9 +5517,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put: operations["updateApprovalRouteV2"];
+        put: operations["updateApprovalRoute"];
         post?: never;
-        delete: operations["deactivateApprovalRouteV2"];
+        delete: operations["deactivateApprovalRoute"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6395,7 +6395,7 @@ export interface components {
             trace_id: string;
         };
         /**
-         * @description Frozen renderer inputs captured at DRAFT→RELEASED transition.
+         * @description Frozen renderer inputs captured at DRAFTâ†’RELEASED transition.
          *     Guarantees a released document always re-renders with the engine
          *     that approved it.
          */
@@ -6433,7 +6433,7 @@ export interface components {
         /** @description Server-controlled feature flag values exposed to the frontend. */
         FeatureFlagsResponse: {
             /**
-             * @description Percentage (0–100) of users for whom the new client-side MDDM DOCX export path is active. 0 = shadow-only (Phase 1); 100 = all users (Phase 3).
+             * @description Percentage (0â€“100) of users for whom the new client-side MDDM DOCX export path is active. 0 = shadow-only (Phase 1); 100 = all users (Phase 3).
              * @default 0
              */
             MDDM_NATIVE_EXPORT_ROLLOUT_PCT: number;
@@ -7113,7 +7113,7 @@ export interface operations {
             };
         };
     };
-    listAreaMembershipsV2: {
+    listAreaMemberships: {
         parameters: {
             query?: never;
             header?: never;
@@ -7131,7 +7131,7 @@ export interface operations {
             };
         };
     };
-    grantAreaMembershipV2: {
+    grantAreaMembership: {
         parameters: {
             query?: never;
             header?: never;
@@ -7158,7 +7158,7 @@ export interface operations {
             };
         };
     };
-    revokeAreaMembershipV2: {
+    revokeAreaMembership: {
         parameters: {
             query?: never;
             header?: never;
@@ -7259,7 +7259,7 @@ export interface operations {
             };
         };
     };
-    listTemplatesV2: {
+    listTemplates: {
         parameters: {
             query?: never;
             header?: never;
@@ -7295,7 +7295,7 @@ export interface operations {
             };
         };
     };
-    createTemplateV2: {
+    createTemplate: {
         parameters: {
             query?: never;
             header: {
@@ -7359,7 +7359,7 @@ export interface operations {
             };
         };
     };
-    getTemplateVersionV2: {
+    getTemplateVersion: {
         parameters: {
             query?: never;
             header?: never;
@@ -7387,7 +7387,7 @@ export interface operations {
             };
         };
     };
-    presignTemplateDocxUploadUrlV2: {
+    presignTemplateDocxUploadUrl: {
         parameters: {
             query?: never;
             header?: never;
@@ -7413,7 +7413,7 @@ export interface operations {
             };
         };
     };
-    presignTemplateSchemaUploadUrlV2: {
+    presignTemplateSchemaUploadUrl: {
         parameters: {
             query?: never;
             header?: never;
@@ -7439,7 +7439,7 @@ export interface operations {
             };
         };
     };
-    redirectSignedUrlV2: {
+    redirectSignedUrl: {
         parameters: {
             query: {
                 key: string;
@@ -7459,7 +7459,7 @@ export interface operations {
             };
         };
     };
-    saveTemplateDraftV2: {
+    saveTemplateDraft: {
         parameters: {
             query?: never;
             header?: never;
@@ -7504,7 +7504,7 @@ export interface operations {
             };
         };
     };
-    publishTemplateVersionV2: {
+    publishTemplateVersion: {
         parameters: {
             query?: never;
             header: {
@@ -7554,7 +7554,7 @@ export interface operations {
             };
         };
     };
-    createTemplateVersionV2: {
+    createTemplateVersion: {
         parameters: {
             query?: never;
             header?: never;
@@ -7574,28 +7574,7 @@ export interface operations {
             };
         };
     };
-    updateTemplateSchemaV2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                n: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description ok */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    presignTemplateAutosaveV2: {
+    updateTemplateSchema: {
         parameters: {
             query?: never;
             header?: never;
@@ -7616,7 +7595,7 @@ export interface operations {
             };
         };
     };
-    commitTemplateAutosaveV2: {
+    presignTemplateAutosave: {
         parameters: {
             query?: never;
             header?: never;
@@ -7637,7 +7616,28 @@ export interface operations {
             };
         };
     };
-    submitTemplateVersionV2: {
+    commitTemplateAutosave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                n: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    submitTemplateVersion: {
         parameters: {
             query?: never;
             header: {
@@ -7660,7 +7660,7 @@ export interface operations {
             };
         };
     };
-    reviewTemplateVersionV2: {
+    reviewTemplateVersion: {
         parameters: {
             query?: never;
             header: {
@@ -7683,7 +7683,7 @@ export interface operations {
             };
         };
     };
-    approveTemplateVersionV2: {
+    approveTemplateVersion: {
         parameters: {
             query?: never;
             header: {
@@ -7706,7 +7706,7 @@ export interface operations {
             };
         };
     };
-    archiveTemplateV2: {
+    archiveTemplate: {
         parameters: {
             query?: never;
             header?: never;
@@ -7726,7 +7726,7 @@ export interface operations {
             };
         };
     };
-    upsertTemplateApprovalConfigV2: {
+    upsertTemplateApprovalConfig: {
         parameters: {
             query?: never;
             header?: never;
@@ -7746,7 +7746,7 @@ export interface operations {
             };
         };
     };
-    getTemplateV2: {
+    getTemplate: {
         parameters: {
             query?: never;
             header?: never;
@@ -7766,7 +7766,7 @@ export interface operations {
             };
         };
     };
-    getTemplateDocxUrlV2: {
+    getTemplateDocxUrl: {
         parameters: {
             query?: never;
             header?: never;
@@ -7787,7 +7787,7 @@ export interface operations {
             };
         };
     };
-    listTemplateAuditV2: {
+    listTemplateAudit: {
         parameters: {
             query?: never;
             header?: never;
@@ -7807,7 +7807,7 @@ export interface operations {
             };
         };
     };
-    listTemplatePlaceholderCatalogV2: {
+    listTemplatePlaceholderCatalog: {
         parameters: {
             query?: never;
             header?: never;
@@ -7825,7 +7825,7 @@ export interface operations {
             };
         };
     };
-    listTaxonomyProfilesV2: {
+    listTaxonomyProfiles: {
         parameters: {
             query?: never;
             header?: never;
@@ -7845,7 +7845,7 @@ export interface operations {
             };
         };
     };
-    createTaxonomyProfileV2: {
+    createTaxonomyProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -7865,7 +7865,7 @@ export interface operations {
             };
         };
     };
-    getTaxonomyProfileV2: {
+    getTaxonomyProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -7887,7 +7887,7 @@ export interface operations {
             };
         };
     };
-    archiveTaxonomyProfileV2: {
+    archiveTaxonomyProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -7907,7 +7907,7 @@ export interface operations {
             };
         };
     };
-    updateTaxonomyProfileV2: {
+    updateTaxonomyProfile: {
         parameters: {
             query?: never;
             header?: never;
@@ -7929,7 +7929,7 @@ export interface operations {
             };
         };
     };
-    setTaxonomyProfileDefaultTemplateV2: {
+    setTaxonomyProfileDefaultTemplate: {
         parameters: {
             query?: never;
             header?: never;
@@ -7949,7 +7949,7 @@ export interface operations {
             };
         };
     };
-    listTaxonomyAreasV2: {
+    listTaxonomyAreas: {
         parameters: {
             query?: never;
             header?: never;
@@ -7969,7 +7969,7 @@ export interface operations {
             };
         };
     };
-    createTaxonomyAreaV2: {
+    createTaxonomyArea: {
         parameters: {
             query?: never;
             header?: never;
@@ -7989,7 +7989,7 @@ export interface operations {
             };
         };
     };
-    getTaxonomyAreaV2: {
+    getTaxonomyArea: {
         parameters: {
             query?: never;
             header?: never;
@@ -8011,7 +8011,7 @@ export interface operations {
             };
         };
     };
-    updateTaxonomyAreaV2: {
+    updateTaxonomyArea: {
         parameters: {
             query?: never;
             header?: never;
@@ -8033,7 +8033,7 @@ export interface operations {
             };
         };
     };
-    archiveTaxonomyAreaV2: {
+    archiveTaxonomyArea: {
         parameters: {
             query?: never;
             header?: never;
@@ -8053,7 +8053,7 @@ export interface operations {
             };
         };
     };
-    listTaxonomyFamiliesV2: {
+    listTaxonomyFamilies: {
         parameters: {
             query?: {
                 includeInactive?: boolean;
@@ -8075,7 +8075,7 @@ export interface operations {
             };
         };
     };
-    createTaxonomyFamilyV2: {
+    createTaxonomyFamily: {
         parameters: {
             query?: never;
             header?: never;
@@ -8095,7 +8095,7 @@ export interface operations {
             };
         };
     };
-    getTaxonomyFamilyV2: {
+    getTaxonomyFamily: {
         parameters: {
             query?: never;
             header?: never;
@@ -8117,7 +8117,7 @@ export interface operations {
             };
         };
     };
-    deactivateTaxonomyFamilyV2: {
+    deactivateTaxonomyFamily: {
         parameters: {
             query?: never;
             header?: never;
@@ -8137,7 +8137,7 @@ export interface operations {
             };
         };
     };
-    updateTaxonomyFamilyV2: {
+    updateTaxonomyFamily: {
         parameters: {
             query?: never;
             header?: never;
@@ -8512,7 +8512,7 @@ export interface operations {
             };
         };
     };
-    listDocumentsV2: {
+    listDocuments: {
         parameters: {
             query?: {
                 page?: number;
@@ -8568,7 +8568,7 @@ export interface operations {
             };
         };
     };
-    getDocumentV2: {
+    getDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -8595,7 +8595,7 @@ export interface operations {
             };
         };
     };
-    renameDocumentV2: {
+    renameDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -8621,7 +8621,7 @@ export interface operations {
             };
         };
     };
-    finalizeDocumentV2: {
+    finalizeDocument: {
         parameters: {
             query?: never;
             header: {
@@ -8650,7 +8650,7 @@ export interface operations {
             };
         };
     };
-    archiveDocumentV2: {
+    archiveDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -8670,7 +8670,7 @@ export interface operations {
             };
         };
     };
-    duplicateDocumentV2: {
+    duplicateDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -8690,7 +8690,7 @@ export interface operations {
             };
         };
     };
-    documentStatsV2: {
+    documentStats: {
         parameters: {
             query?: {
                 status?: string;
@@ -8741,7 +8741,7 @@ export interface operations {
             };
         };
     };
-    acquireDocumentSessionV2: {
+    acquireDocumentSession: {
         parameters: {
             query?: never;
             header?: never;
@@ -8768,7 +8768,7 @@ export interface operations {
             };
         };
     };
-    heartbeatDocumentSessionV2: {
+    heartbeatDocumentSession: {
         parameters: {
             query?: never;
             header?: never;
@@ -8795,7 +8795,7 @@ export interface operations {
             };
         };
     };
-    releaseDocumentSessionV2: {
+    releaseDocumentSession: {
         parameters: {
             query?: never;
             header?: never;
@@ -8815,7 +8815,7 @@ export interface operations {
             };
         };
     };
-    forceReleaseDocumentSessionV2: {
+    forceReleaseDocumentSession: {
         parameters: {
             query?: never;
             header?: never;
@@ -8842,7 +8842,7 @@ export interface operations {
             };
         };
     };
-    presignDocumentAutosaveV2: {
+    presignDocumentAutosave: {
         parameters: {
             query?: never;
             header?: never;
@@ -8879,7 +8879,7 @@ export interface operations {
             };
         };
     };
-    commitDocumentAutosaveV2: {
+    commitDocumentAutosave: {
         parameters: {
             query?: never;
             header?: never;
@@ -8951,7 +8951,7 @@ export interface operations {
             };
         };
     };
-    listDocumentCheckpointsV2: {
+    listDocumentCheckpoints: {
         parameters: {
             query?: never;
             header?: never;
@@ -8971,7 +8971,7 @@ export interface operations {
             };
         };
     };
-    createDocumentCheckpointV2: {
+    createDocumentCheckpoint: {
         parameters: {
             query?: never;
             header?: never;
@@ -8997,7 +8997,7 @@ export interface operations {
             };
         };
     };
-    restoreDocumentCheckpointV2: {
+    restoreDocumentCheckpoint: {
         parameters: {
             query?: never;
             header?: never;
@@ -9041,7 +9041,7 @@ export interface operations {
             };
         };
     };
-    getDocumentRevisionUrlV2: {
+    getDocumentRevisionUrl: {
         parameters: {
             query?: never;
             header?: never;
@@ -9062,7 +9062,7 @@ export interface operations {
             };
         };
     };
-    listDocumentCommentsV2: {
+    listDocumentComments: {
         parameters: {
             query?: never;
             header?: never;
@@ -9082,7 +9082,7 @@ export interface operations {
             };
         };
     };
-    createDocumentCommentV2: {
+    createDocumentComment: {
         parameters: {
             query?: never;
             header?: never;
@@ -9106,7 +9106,7 @@ export interface operations {
             };
         };
     };
-    deleteDocumentCommentV2: {
+    deleteDocumentComment: {
         parameters: {
             query?: never;
             header?: never;
@@ -9127,7 +9127,7 @@ export interface operations {
             };
         };
     };
-    updateDocumentCommentV2: {
+    updateDocumentComment: {
         parameters: {
             query?: never;
             header?: never;
@@ -9251,7 +9251,7 @@ export interface operations {
             };
         };
     };
-    getDocumentFillInSchemaV2: {
+    getDocumentFillInSchema: {
         parameters: {
             query?: never;
             header?: never;
@@ -9271,7 +9271,7 @@ export interface operations {
             };
         };
     };
-    listDocumentPlaceholderValuesV2: {
+    listDocumentPlaceholderValues: {
         parameters: {
             query?: never;
             header?: never;
@@ -9291,7 +9291,7 @@ export interface operations {
             };
         };
     };
-    putDocumentPlaceholderValueV2: {
+    putDocumentPlaceholderValue: {
         parameters: {
             query?: never;
             header?: never;
@@ -9316,7 +9316,7 @@ export interface operations {
             };
         };
     };
-    viewDocumentV2: {
+    viewDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -9336,7 +9336,7 @@ export interface operations {
             };
         };
     };
-    reconstructDocumentV2: {
+    reconstructDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -9360,7 +9360,7 @@ export interface operations {
             };
         };
     };
-    getDocumentPlaceholderOptionsV2: {
+    getDocumentPlaceholderOptions: {
         parameters: {
             query?: never;
             header?: never;
@@ -9381,7 +9381,7 @@ export interface operations {
             };
         };
     };
-    submitDocumentForApprovalV2: {
+    submitDocumentForApproval: {
         parameters: {
             query?: never;
             header?: never;
@@ -9401,7 +9401,7 @@ export interface operations {
             };
         };
     };
-    recordApprovalStageSignoffV2: {
+    recordApprovalStageSignoff: {
         parameters: {
             query?: never;
             header?: never;
@@ -9422,7 +9422,7 @@ export interface operations {
             };
         };
     };
-    publishDocumentV2: {
+    publishDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -9442,7 +9442,7 @@ export interface operations {
             };
         };
     };
-    scheduleDocumentPublishV2: {
+    scheduleDocumentPublish: {
         parameters: {
             query?: never;
             header?: never;
@@ -9462,7 +9462,7 @@ export interface operations {
             };
         };
     };
-    supersedeDocumentV2: {
+    supersedeDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -9482,7 +9482,7 @@ export interface operations {
             };
         };
     };
-    obsoleteDocumentV2: {
+    obsoleteDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -9502,7 +9502,7 @@ export interface operations {
             };
         };
     };
-    cancelApprovalInstanceV2: {
+    cancelApprovalInstance: {
         parameters: {
             query?: never;
             header?: never;
@@ -9522,7 +9522,7 @@ export interface operations {
             };
         };
     };
-    getApprovalInstanceV2: {
+    getApprovalInstance: {
         parameters: {
             query?: never;
             header?: never;
@@ -9542,7 +9542,7 @@ export interface operations {
             };
         };
     };
-    getApprovalInstanceByDocumentV2: {
+    getApprovalInstanceByDocument: {
         parameters: {
             query?: never;
             header?: never;
@@ -9562,7 +9562,7 @@ export interface operations {
             };
         };
     };
-    listApprovalInboxV2: {
+    listApprovalInbox: {
         parameters: {
             query?: never;
             header?: never;
@@ -9580,7 +9580,7 @@ export interface operations {
             };
         };
     };
-    recordDocumentSignoffV2: {
+    recordDocumentSignoff: {
         parameters: {
             query?: never;
             header?: never;
@@ -9600,7 +9600,7 @@ export interface operations {
             };
         };
     };
-    cancelDocumentApprovalV2: {
+    cancelDocumentApproval: {
         parameters: {
             query?: never;
             header?: never;
@@ -9620,7 +9620,7 @@ export interface operations {
             };
         };
     };
-    listApprovalRoutesV2: {
+    listApprovalRoutes: {
         parameters: {
             query?: never;
             header?: never;
@@ -9638,7 +9638,7 @@ export interface operations {
             };
         };
     };
-    createApprovalRouteV2: {
+    createApprovalRoute: {
         parameters: {
             query?: never;
             header?: never;
@@ -9656,7 +9656,7 @@ export interface operations {
             };
         };
     };
-    updateApprovalRouteV2: {
+    updateApprovalRoute: {
         parameters: {
             query?: never;
             header?: never;
@@ -9676,7 +9676,7 @@ export interface operations {
             };
         };
     };
-    deactivateApprovalRouteV2: {
+    deactivateApprovalRoute: {
         parameters: {
             query?: never;
             header?: never;

@@ -55,3 +55,10 @@ All tagged `TODO(novo-template-wizard:permissions-api)`.
 - `artifacts/parity-diff.md` (subagent)
 - `artifacts/phase4-behavior.md`
 - `artifacts/phase4-review.md`
+
+## Plan 12.4 update (2026-05-15)
+
+Final runtime truth supersedes the earlier mocked permissions UI:
+- **Keep:** read-only public visibility, matching the current `CreateTemplateV2` behavior.
+- **Remove from active UI:** role cards, area cards, and company user count mocks.
+- **Defer:** roles API, area counts, company user count, and create-body visibility fields remain backlog prerequisites.

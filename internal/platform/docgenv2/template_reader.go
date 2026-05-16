@@ -10,6 +10,8 @@ import (
 	"github.com/minio/minio-go/v7"
 )
 
+const systemTemplateTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+
 type TemplateReader struct {
 	db     *sql.DB
 	client *minio.Client
@@ -29,9 +31,9 @@ func (t *TemplateReader) GetPublishedVersion(ctx context.Context, tenantID, temp
 		FROM template_versions tv
 		JOIN templates tpl ON tpl.id = tv.template_id
 		WHERE tv.id = $1
-		  AND tpl.tenant_id = $2
+		  AND (tpl.tenant_id = $2 OR tpl.tenant_id = $3)
 		  AND tv.status = 'published'`,
-		templateVersionID, tenantID,
+		templateVersionID, tenantID, systemTemplateTenantID,
 	).Scan(&docxKey, &schemaKey); err != nil {
 		return "", "", "", err
 	}

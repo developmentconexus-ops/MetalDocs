@@ -523,52 +523,52 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 type ServerInterface interface {
 
 	// (GET /api/v1/approval/inbox)
-	ListApprovalInboxV2(w http.ResponseWriter, r *http.Request)
+	ListApprovalInbox(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/approval/instances/{instance_id})
-	GetApprovalInstanceV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
+	GetApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 
 	// (POST /api/v1/approval/instances/{instance_id}/cancel)
-	CancelApprovalInstanceV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
+	CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 
 	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
-	RecordApprovalStageSignoffV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID)
+	RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID)
 
 	// (GET /api/v1/approval/routes)
-	ListApprovalRoutesV2(w http.ResponseWriter, r *http.Request)
+	ListApprovalRoutes(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/v1/approval/routes)
-	CreateApprovalRouteV2(w http.ResponseWriter, r *http.Request)
+	CreateApprovalRoute(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/v1/approval/routes/{id})
-	DeactivateApprovalRouteV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v1/approval/routes/{id})
-	UpdateApprovalRouteV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/documents/{id}/approval-instance)
-	GetApprovalInstanceByDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/cancel)
-	CancelDocumentApprovalV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/obsolete)
-	ObsoleteDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/publish)
-	PublishDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/schedule-publish)
-	ScheduleDocumentPublishV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/signoff)
-	RecordDocumentSignoffV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/submit)
-	SubmitDocumentForApprovalV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/supersede)
-	SupersedeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -580,11 +580,11 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// ListApprovalInboxV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListApprovalInboxV2(w http.ResponseWriter, r *http.Request) {
+// ListApprovalInbox operation middleware
+func (siw *ServerInterfaceWrapper) ListApprovalInbox(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListApprovalInboxV2(w, r)
+		siw.Handler.ListApprovalInbox(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -594,8 +594,8 @@ func (siw *ServerInterfaceWrapper) ListApprovalInboxV2(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// GetApprovalInstanceV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetApprovalInstanceV2(w http.ResponseWriter, r *http.Request) {
+// GetApprovalInstance operation middleware
+func (siw *ServerInterfaceWrapper) GetApprovalInstance(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -610,7 +610,7 @@ func (siw *ServerInterfaceWrapper) GetApprovalInstanceV2(w http.ResponseWriter, 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApprovalInstanceV2(w, r, instanceId)
+		siw.Handler.GetApprovalInstance(w, r, instanceId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -620,8 +620,8 @@ func (siw *ServerInterfaceWrapper) GetApprovalInstanceV2(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// CancelApprovalInstanceV2 operation middleware
-func (siw *ServerInterfaceWrapper) CancelApprovalInstanceV2(w http.ResponseWriter, r *http.Request) {
+// CancelApprovalInstance operation middleware
+func (siw *ServerInterfaceWrapper) CancelApprovalInstance(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -636,7 +636,7 @@ func (siw *ServerInterfaceWrapper) CancelApprovalInstanceV2(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CancelApprovalInstanceV2(w, r, instanceId)
+		siw.Handler.CancelApprovalInstance(w, r, instanceId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -646,8 +646,8 @@ func (siw *ServerInterfaceWrapper) CancelApprovalInstanceV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// RecordApprovalStageSignoffV2 operation middleware
-func (siw *ServerInterfaceWrapper) RecordApprovalStageSignoffV2(w http.ResponseWriter, r *http.Request) {
+// RecordApprovalStageSignoff operation middleware
+func (siw *ServerInterfaceWrapper) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -671,7 +671,7 @@ func (siw *ServerInterfaceWrapper) RecordApprovalStageSignoffV2(w http.ResponseW
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RecordApprovalStageSignoffV2(w, r, instanceId, stageId)
+		siw.Handler.RecordApprovalStageSignoff(w, r, instanceId, stageId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -681,11 +681,11 @@ func (siw *ServerInterfaceWrapper) RecordApprovalStageSignoffV2(w http.ResponseW
 	handler.ServeHTTP(w, r)
 }
 
-// ListApprovalRoutesV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListApprovalRoutesV2(w http.ResponseWriter, r *http.Request) {
+// ListApprovalRoutes operation middleware
+func (siw *ServerInterfaceWrapper) ListApprovalRoutes(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListApprovalRoutesV2(w, r)
+		siw.Handler.ListApprovalRoutes(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -695,11 +695,11 @@ func (siw *ServerInterfaceWrapper) ListApprovalRoutesV2(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// CreateApprovalRouteV2 operation middleware
-func (siw *ServerInterfaceWrapper) CreateApprovalRouteV2(w http.ResponseWriter, r *http.Request) {
+// CreateApprovalRoute operation middleware
+func (siw *ServerInterfaceWrapper) CreateApprovalRoute(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateApprovalRouteV2(w, r)
+		siw.Handler.CreateApprovalRoute(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -709,8 +709,8 @@ func (siw *ServerInterfaceWrapper) CreateApprovalRouteV2(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// DeactivateApprovalRouteV2 operation middleware
-func (siw *ServerInterfaceWrapper) DeactivateApprovalRouteV2(w http.ResponseWriter, r *http.Request) {
+// DeactivateApprovalRoute operation middleware
+func (siw *ServerInterfaceWrapper) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -725,7 +725,7 @@ func (siw *ServerInterfaceWrapper) DeactivateApprovalRouteV2(w http.ResponseWrit
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeactivateApprovalRouteV2(w, r, id)
+		siw.Handler.DeactivateApprovalRoute(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -735,8 +735,8 @@ func (siw *ServerInterfaceWrapper) DeactivateApprovalRouteV2(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateApprovalRouteV2 operation middleware
-func (siw *ServerInterfaceWrapper) UpdateApprovalRouteV2(w http.ResponseWriter, r *http.Request) {
+// UpdateApprovalRoute operation middleware
+func (siw *ServerInterfaceWrapper) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -751,7 +751,7 @@ func (siw *ServerInterfaceWrapper) UpdateApprovalRouteV2(w http.ResponseWriter, 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateApprovalRouteV2(w, r, id)
+		siw.Handler.UpdateApprovalRoute(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -761,8 +761,8 @@ func (siw *ServerInterfaceWrapper) UpdateApprovalRouteV2(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// GetApprovalInstanceByDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetApprovalInstanceByDocumentV2(w http.ResponseWriter, r *http.Request) {
+// GetApprovalInstanceByDocument operation middleware
+func (siw *ServerInterfaceWrapper) GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -777,7 +777,7 @@ func (siw *ServerInterfaceWrapper) GetApprovalInstanceByDocumentV2(w http.Respon
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetApprovalInstanceByDocumentV2(w, r, id)
+		siw.Handler.GetApprovalInstanceByDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -787,8 +787,8 @@ func (siw *ServerInterfaceWrapper) GetApprovalInstanceByDocumentV2(w http.Respon
 	handler.ServeHTTP(w, r)
 }
 
-// CancelDocumentApprovalV2 operation middleware
-func (siw *ServerInterfaceWrapper) CancelDocumentApprovalV2(w http.ResponseWriter, r *http.Request) {
+// CancelDocumentApproval operation middleware
+func (siw *ServerInterfaceWrapper) CancelDocumentApproval(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -803,7 +803,7 @@ func (siw *ServerInterfaceWrapper) CancelDocumentApprovalV2(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CancelDocumentApprovalV2(w, r, id)
+		siw.Handler.CancelDocumentApproval(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -813,8 +813,8 @@ func (siw *ServerInterfaceWrapper) CancelDocumentApprovalV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// ObsoleteDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) ObsoleteDocumentV2(w http.ResponseWriter, r *http.Request) {
+// ObsoleteDocument operation middleware
+func (siw *ServerInterfaceWrapper) ObsoleteDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -829,7 +829,7 @@ func (siw *ServerInterfaceWrapper) ObsoleteDocumentV2(w http.ResponseWriter, r *
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ObsoleteDocumentV2(w, r, id)
+		siw.Handler.ObsoleteDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -839,8 +839,8 @@ func (siw *ServerInterfaceWrapper) ObsoleteDocumentV2(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
-// PublishDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) PublishDocumentV2(w http.ResponseWriter, r *http.Request) {
+// PublishDocument operation middleware
+func (siw *ServerInterfaceWrapper) PublishDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -855,7 +855,7 @@ func (siw *ServerInterfaceWrapper) PublishDocumentV2(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PublishDocumentV2(w, r, id)
+		siw.Handler.PublishDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -865,8 +865,8 @@ func (siw *ServerInterfaceWrapper) PublishDocumentV2(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// ScheduleDocumentPublishV2 operation middleware
-func (siw *ServerInterfaceWrapper) ScheduleDocumentPublishV2(w http.ResponseWriter, r *http.Request) {
+// ScheduleDocumentPublish operation middleware
+func (siw *ServerInterfaceWrapper) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -881,7 +881,7 @@ func (siw *ServerInterfaceWrapper) ScheduleDocumentPublishV2(w http.ResponseWrit
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ScheduleDocumentPublishV2(w, r, id)
+		siw.Handler.ScheduleDocumentPublish(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -891,8 +891,8 @@ func (siw *ServerInterfaceWrapper) ScheduleDocumentPublishV2(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
-// RecordDocumentSignoffV2 operation middleware
-func (siw *ServerInterfaceWrapper) RecordDocumentSignoffV2(w http.ResponseWriter, r *http.Request) {
+// RecordDocumentSignoff operation middleware
+func (siw *ServerInterfaceWrapper) RecordDocumentSignoff(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -907,7 +907,7 @@ func (siw *ServerInterfaceWrapper) RecordDocumentSignoffV2(w http.ResponseWriter
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RecordDocumentSignoffV2(w, r, id)
+		siw.Handler.RecordDocumentSignoff(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -917,8 +917,8 @@ func (siw *ServerInterfaceWrapper) RecordDocumentSignoffV2(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// SubmitDocumentForApprovalV2 operation middleware
-func (siw *ServerInterfaceWrapper) SubmitDocumentForApprovalV2(w http.ResponseWriter, r *http.Request) {
+// SubmitDocumentForApproval operation middleware
+func (siw *ServerInterfaceWrapper) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -933,7 +933,7 @@ func (siw *ServerInterfaceWrapper) SubmitDocumentForApprovalV2(w http.ResponseWr
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SubmitDocumentForApprovalV2(w, r, id)
+		siw.Handler.SubmitDocumentForApproval(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -943,8 +943,8 @@ func (siw *ServerInterfaceWrapper) SubmitDocumentForApprovalV2(w http.ResponseWr
 	handler.ServeHTTP(w, r)
 }
 
-// SupersedeDocumentV2 operation middleware
-func (siw *ServerInterfaceWrapper) SupersedeDocumentV2(w http.ResponseWriter, r *http.Request) {
+// SupersedeDocument operation middleware
+func (siw *ServerInterfaceWrapper) SupersedeDocument(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -959,7 +959,7 @@ func (siw *ServerInterfaceWrapper) SupersedeDocumentV2(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SupersedeDocumentV2(w, r, id)
+		siw.Handler.SupersedeDocument(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1089,276 +1089,276 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/inbox", wrapper.ListApprovalInboxV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}", wrapper.GetApprovalInstanceV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/cancel", wrapper.CancelApprovalInstanceV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoffV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.ListApprovalRoutesV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.CreateApprovalRouteV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.DeactivateApprovalRouteV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.UpdateApprovalRouteV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/cancel", wrapper.CancelDocumentApprovalV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/obsolete", wrapper.ObsoleteDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/publish", wrapper.PublishDocumentV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublishV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/signoff", wrapper.RecordDocumentSignoffV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/submit", wrapper.SubmitDocumentForApprovalV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/supersede", wrapper.SupersedeDocumentV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/inbox", wrapper.ListApprovalInbox)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}", wrapper.GetApprovalInstance)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/cancel", wrapper.CancelApprovalInstance)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoff)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.ListApprovalRoutes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.CreateApprovalRoute)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.DeactivateApprovalRoute)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.UpdateApprovalRoute)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/cancel", wrapper.CancelDocumentApproval)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/obsolete", wrapper.ObsoleteDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/publish", wrapper.PublishDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublish)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/signoff", wrapper.RecordDocumentSignoff)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/submit", wrapper.SubmitDocumentForApproval)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/supersede", wrapper.SupersedeDocument)
 
 	return m
 }
 
-type ListApprovalInboxV2RequestObject struct {
+type ListApprovalInboxRequestObject struct {
 }
 
-type ListApprovalInboxV2ResponseObject interface {
-	VisitListApprovalInboxV2Response(w http.ResponseWriter) error
+type ListApprovalInboxResponseObject interface {
+	VisitListApprovalInboxResponse(w http.ResponseWriter) error
 }
 
-type ListApprovalInboxV2200Response struct {
+type ListApprovalInbox200Response struct {
 }
 
-func (response ListApprovalInboxV2200Response) VisitListApprovalInboxV2Response(w http.ResponseWriter) error {
+func (response ListApprovalInbox200Response) VisitListApprovalInboxResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type GetApprovalInstanceV2RequestObject struct {
+type GetApprovalInstanceRequestObject struct {
 	InstanceId openapi_types.UUID `json:"instance_id"`
 }
 
-type GetApprovalInstanceV2ResponseObject interface {
-	VisitGetApprovalInstanceV2Response(w http.ResponseWriter) error
+type GetApprovalInstanceResponseObject interface {
+	VisitGetApprovalInstanceResponse(w http.ResponseWriter) error
 }
 
-type GetApprovalInstanceV2200Response struct {
+type GetApprovalInstance200Response struct {
 }
 
-func (response GetApprovalInstanceV2200Response) VisitGetApprovalInstanceV2Response(w http.ResponseWriter) error {
+func (response GetApprovalInstance200Response) VisitGetApprovalInstanceResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type CancelApprovalInstanceV2RequestObject struct {
+type CancelApprovalInstanceRequestObject struct {
 	InstanceId openapi_types.UUID `json:"instance_id"`
 }
 
-type CancelApprovalInstanceV2ResponseObject interface {
-	VisitCancelApprovalInstanceV2Response(w http.ResponseWriter) error
+type CancelApprovalInstanceResponseObject interface {
+	VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error
 }
 
-type CancelApprovalInstanceV2200Response struct {
+type CancelApprovalInstance200Response struct {
 }
 
-func (response CancelApprovalInstanceV2200Response) VisitCancelApprovalInstanceV2Response(w http.ResponseWriter) error {
+func (response CancelApprovalInstance200Response) VisitCancelApprovalInstanceResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type RecordApprovalStageSignoffV2RequestObject struct {
+type RecordApprovalStageSignoffRequestObject struct {
 	InstanceId openapi_types.UUID `json:"instance_id"`
 	StageId    openapi_types.UUID `json:"stage_id"`
 }
 
-type RecordApprovalStageSignoffV2ResponseObject interface {
-	VisitRecordApprovalStageSignoffV2Response(w http.ResponseWriter) error
+type RecordApprovalStageSignoffResponseObject interface {
+	VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error
 }
 
-type RecordApprovalStageSignoffV2200Response struct {
+type RecordApprovalStageSignoff200Response struct {
 }
 
-func (response RecordApprovalStageSignoffV2200Response) VisitRecordApprovalStageSignoffV2Response(w http.ResponseWriter) error {
+func (response RecordApprovalStageSignoff200Response) VisitRecordApprovalStageSignoffResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ListApprovalRoutesV2RequestObject struct {
+type ListApprovalRoutesRequestObject struct {
 }
 
-type ListApprovalRoutesV2ResponseObject interface {
-	VisitListApprovalRoutesV2Response(w http.ResponseWriter) error
+type ListApprovalRoutesResponseObject interface {
+	VisitListApprovalRoutesResponse(w http.ResponseWriter) error
 }
 
-type ListApprovalRoutesV2200Response struct {
+type ListApprovalRoutes200Response struct {
 }
 
-func (response ListApprovalRoutesV2200Response) VisitListApprovalRoutesV2Response(w http.ResponseWriter) error {
+func (response ListApprovalRoutes200Response) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type CreateApprovalRouteV2RequestObject struct {
+type CreateApprovalRouteRequestObject struct {
 }
 
-type CreateApprovalRouteV2ResponseObject interface {
-	VisitCreateApprovalRouteV2Response(w http.ResponseWriter) error
+type CreateApprovalRouteResponseObject interface {
+	VisitCreateApprovalRouteResponse(w http.ResponseWriter) error
 }
 
-type CreateApprovalRouteV2200Response struct {
+type CreateApprovalRoute200Response struct {
 }
 
-func (response CreateApprovalRouteV2200Response) VisitCreateApprovalRouteV2Response(w http.ResponseWriter) error {
+func (response CreateApprovalRoute200Response) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type DeactivateApprovalRouteV2RequestObject struct {
+type DeactivateApprovalRouteRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type DeactivateApprovalRouteV2ResponseObject interface {
-	VisitDeactivateApprovalRouteV2Response(w http.ResponseWriter) error
+type DeactivateApprovalRouteResponseObject interface {
+	VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error
 }
 
-type DeactivateApprovalRouteV2200Response struct {
+type DeactivateApprovalRoute200Response struct {
 }
 
-func (response DeactivateApprovalRouteV2200Response) VisitDeactivateApprovalRouteV2Response(w http.ResponseWriter) error {
+func (response DeactivateApprovalRoute200Response) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type UpdateApprovalRouteV2RequestObject struct {
+type UpdateApprovalRouteRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type UpdateApprovalRouteV2ResponseObject interface {
-	VisitUpdateApprovalRouteV2Response(w http.ResponseWriter) error
+type UpdateApprovalRouteResponseObject interface {
+	VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error
 }
 
-type UpdateApprovalRouteV2200Response struct {
+type UpdateApprovalRoute200Response struct {
 }
 
-func (response UpdateApprovalRouteV2200Response) VisitUpdateApprovalRouteV2Response(w http.ResponseWriter) error {
+func (response UpdateApprovalRoute200Response) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type GetApprovalInstanceByDocumentV2RequestObject struct {
+type GetApprovalInstanceByDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type GetApprovalInstanceByDocumentV2ResponseObject interface {
-	VisitGetApprovalInstanceByDocumentV2Response(w http.ResponseWriter) error
+type GetApprovalInstanceByDocumentResponseObject interface {
+	VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error
 }
 
-type GetApprovalInstanceByDocumentV2200Response struct {
+type GetApprovalInstanceByDocument200Response struct {
 }
 
-func (response GetApprovalInstanceByDocumentV2200Response) VisitGetApprovalInstanceByDocumentV2Response(w http.ResponseWriter) error {
+func (response GetApprovalInstanceByDocument200Response) VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type CancelDocumentApprovalV2RequestObject struct {
+type CancelDocumentApprovalRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type CancelDocumentApprovalV2ResponseObject interface {
-	VisitCancelDocumentApprovalV2Response(w http.ResponseWriter) error
+type CancelDocumentApprovalResponseObject interface {
+	VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error
 }
 
-type CancelDocumentApprovalV2200Response struct {
+type CancelDocumentApproval200Response struct {
 }
 
-func (response CancelDocumentApprovalV2200Response) VisitCancelDocumentApprovalV2Response(w http.ResponseWriter) error {
+func (response CancelDocumentApproval200Response) VisitCancelDocumentApprovalResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ObsoleteDocumentV2RequestObject struct {
+type ObsoleteDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ObsoleteDocumentV2ResponseObject interface {
-	VisitObsoleteDocumentV2Response(w http.ResponseWriter) error
+type ObsoleteDocumentResponseObject interface {
+	VisitObsoleteDocumentResponse(w http.ResponseWriter) error
 }
 
-type ObsoleteDocumentV2200Response struct {
+type ObsoleteDocument200Response struct {
 }
 
-func (response ObsoleteDocumentV2200Response) VisitObsoleteDocumentV2Response(w http.ResponseWriter) error {
+func (response ObsoleteDocument200Response) VisitObsoleteDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type PublishDocumentV2RequestObject struct {
+type PublishDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type PublishDocumentV2ResponseObject interface {
-	VisitPublishDocumentV2Response(w http.ResponseWriter) error
+type PublishDocumentResponseObject interface {
+	VisitPublishDocumentResponse(w http.ResponseWriter) error
 }
 
-type PublishDocumentV2200Response struct {
+type PublishDocument200Response struct {
 }
 
-func (response PublishDocumentV2200Response) VisitPublishDocumentV2Response(w http.ResponseWriter) error {
+func (response PublishDocument200Response) VisitPublishDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type ScheduleDocumentPublishV2RequestObject struct {
+type ScheduleDocumentPublishRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type ScheduleDocumentPublishV2ResponseObject interface {
-	VisitScheduleDocumentPublishV2Response(w http.ResponseWriter) error
+type ScheduleDocumentPublishResponseObject interface {
+	VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error
 }
 
-type ScheduleDocumentPublishV2200Response struct {
+type ScheduleDocumentPublish200Response struct {
 }
 
-func (response ScheduleDocumentPublishV2200Response) VisitScheduleDocumentPublishV2Response(w http.ResponseWriter) error {
+func (response ScheduleDocumentPublish200Response) VisitScheduleDocumentPublishResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type RecordDocumentSignoffV2RequestObject struct {
+type RecordDocumentSignoffRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type RecordDocumentSignoffV2ResponseObject interface {
-	VisitRecordDocumentSignoffV2Response(w http.ResponseWriter) error
+type RecordDocumentSignoffResponseObject interface {
+	VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error
 }
 
-type RecordDocumentSignoffV2200Response struct {
+type RecordDocumentSignoff200Response struct {
 }
 
-func (response RecordDocumentSignoffV2200Response) VisitRecordDocumentSignoffV2Response(w http.ResponseWriter) error {
+func (response RecordDocumentSignoff200Response) VisitRecordDocumentSignoffResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type SubmitDocumentForApprovalV2RequestObject struct {
+type SubmitDocumentForApprovalRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type SubmitDocumentForApprovalV2ResponseObject interface {
-	VisitSubmitDocumentForApprovalV2Response(w http.ResponseWriter) error
+type SubmitDocumentForApprovalResponseObject interface {
+	VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error
 }
 
-type SubmitDocumentForApprovalV2200Response struct {
+type SubmitDocumentForApproval200Response struct {
 }
 
-func (response SubmitDocumentForApprovalV2200Response) VisitSubmitDocumentForApprovalV2Response(w http.ResponseWriter) error {
+func (response SubmitDocumentForApproval200Response) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
 
-type SupersedeDocumentV2RequestObject struct {
+type SupersedeDocumentRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type SupersedeDocumentV2ResponseObject interface {
-	VisitSupersedeDocumentV2Response(w http.ResponseWriter) error
+type SupersedeDocumentResponseObject interface {
+	VisitSupersedeDocumentResponse(w http.ResponseWriter) error
 }
 
-type SupersedeDocumentV2200Response struct {
+type SupersedeDocument200Response struct {
 }
 
-func (response SupersedeDocumentV2200Response) VisitSupersedeDocumentV2Response(w http.ResponseWriter) error {
+func (response SupersedeDocument200Response) VisitSupersedeDocumentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
@@ -1367,52 +1367,52 @@ func (response SupersedeDocumentV2200Response) VisitSupersedeDocumentV2Response(
 type StrictServerInterface interface {
 
 	// (GET /api/v1/approval/inbox)
-	ListApprovalInboxV2(ctx context.Context, request ListApprovalInboxV2RequestObject) (ListApprovalInboxV2ResponseObject, error)
+	ListApprovalInbox(ctx context.Context, request ListApprovalInboxRequestObject) (ListApprovalInboxResponseObject, error)
 
 	// (GET /api/v1/approval/instances/{instance_id})
-	GetApprovalInstanceV2(ctx context.Context, request GetApprovalInstanceV2RequestObject) (GetApprovalInstanceV2ResponseObject, error)
+	GetApprovalInstance(ctx context.Context, request GetApprovalInstanceRequestObject) (GetApprovalInstanceResponseObject, error)
 
 	// (POST /api/v1/approval/instances/{instance_id}/cancel)
-	CancelApprovalInstanceV2(ctx context.Context, request CancelApprovalInstanceV2RequestObject) (CancelApprovalInstanceV2ResponseObject, error)
+	CancelApprovalInstance(ctx context.Context, request CancelApprovalInstanceRequestObject) (CancelApprovalInstanceResponseObject, error)
 
 	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
-	RecordApprovalStageSignoffV2(ctx context.Context, request RecordApprovalStageSignoffV2RequestObject) (RecordApprovalStageSignoffV2ResponseObject, error)
+	RecordApprovalStageSignoff(ctx context.Context, request RecordApprovalStageSignoffRequestObject) (RecordApprovalStageSignoffResponseObject, error)
 
 	// (GET /api/v1/approval/routes)
-	ListApprovalRoutesV2(ctx context.Context, request ListApprovalRoutesV2RequestObject) (ListApprovalRoutesV2ResponseObject, error)
+	ListApprovalRoutes(ctx context.Context, request ListApprovalRoutesRequestObject) (ListApprovalRoutesResponseObject, error)
 
 	// (POST /api/v1/approval/routes)
-	CreateApprovalRouteV2(ctx context.Context, request CreateApprovalRouteV2RequestObject) (CreateApprovalRouteV2ResponseObject, error)
+	CreateApprovalRoute(ctx context.Context, request CreateApprovalRouteRequestObject) (CreateApprovalRouteResponseObject, error)
 
 	// (DELETE /api/v1/approval/routes/{id})
-	DeactivateApprovalRouteV2(ctx context.Context, request DeactivateApprovalRouteV2RequestObject) (DeactivateApprovalRouteV2ResponseObject, error)
+	DeactivateApprovalRoute(ctx context.Context, request DeactivateApprovalRouteRequestObject) (DeactivateApprovalRouteResponseObject, error)
 
 	// (PUT /api/v1/approval/routes/{id})
-	UpdateApprovalRouteV2(ctx context.Context, request UpdateApprovalRouteV2RequestObject) (UpdateApprovalRouteV2ResponseObject, error)
+	UpdateApprovalRoute(ctx context.Context, request UpdateApprovalRouteRequestObject) (UpdateApprovalRouteResponseObject, error)
 
 	// (GET /api/v1/documents/{id}/approval-instance)
-	GetApprovalInstanceByDocumentV2(ctx context.Context, request GetApprovalInstanceByDocumentV2RequestObject) (GetApprovalInstanceByDocumentV2ResponseObject, error)
+	GetApprovalInstanceByDocument(ctx context.Context, request GetApprovalInstanceByDocumentRequestObject) (GetApprovalInstanceByDocumentResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/cancel)
-	CancelDocumentApprovalV2(ctx context.Context, request CancelDocumentApprovalV2RequestObject) (CancelDocumentApprovalV2ResponseObject, error)
+	CancelDocumentApproval(ctx context.Context, request CancelDocumentApprovalRequestObject) (CancelDocumentApprovalResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/obsolete)
-	ObsoleteDocumentV2(ctx context.Context, request ObsoleteDocumentV2RequestObject) (ObsoleteDocumentV2ResponseObject, error)
+	ObsoleteDocument(ctx context.Context, request ObsoleteDocumentRequestObject) (ObsoleteDocumentResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/publish)
-	PublishDocumentV2(ctx context.Context, request PublishDocumentV2RequestObject) (PublishDocumentV2ResponseObject, error)
+	PublishDocument(ctx context.Context, request PublishDocumentRequestObject) (PublishDocumentResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/schedule-publish)
-	ScheduleDocumentPublishV2(ctx context.Context, request ScheduleDocumentPublishV2RequestObject) (ScheduleDocumentPublishV2ResponseObject, error)
+	ScheduleDocumentPublish(ctx context.Context, request ScheduleDocumentPublishRequestObject) (ScheduleDocumentPublishResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/signoff)
-	RecordDocumentSignoffV2(ctx context.Context, request RecordDocumentSignoffV2RequestObject) (RecordDocumentSignoffV2ResponseObject, error)
+	RecordDocumentSignoff(ctx context.Context, request RecordDocumentSignoffRequestObject) (RecordDocumentSignoffResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/submit)
-	SubmitDocumentForApprovalV2(ctx context.Context, request SubmitDocumentForApprovalV2RequestObject) (SubmitDocumentForApprovalV2ResponseObject, error)
+	SubmitDocumentForApproval(ctx context.Context, request SubmitDocumentForApprovalRequestObject) (SubmitDocumentForApprovalResponseObject, error)
 
 	// (POST /api/v1/documents/{id}/supersede)
-	SupersedeDocumentV2(ctx context.Context, request SupersedeDocumentV2RequestObject) (SupersedeDocumentV2ResponseObject, error)
+	SupersedeDocument(ctx context.Context, request SupersedeDocumentRequestObject) (SupersedeDocumentResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1444,23 +1444,23 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
-// ListApprovalInboxV2 operation middleware
-func (sh *strictHandler) ListApprovalInboxV2(w http.ResponseWriter, r *http.Request) {
-	var request ListApprovalInboxV2RequestObject
+// ListApprovalInbox operation middleware
+func (sh *strictHandler) ListApprovalInbox(w http.ResponseWriter, r *http.Request) {
+	var request ListApprovalInboxRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListApprovalInboxV2(ctx, request.(ListApprovalInboxV2RequestObject))
+		return sh.ssi.ListApprovalInbox(ctx, request.(ListApprovalInboxRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListApprovalInboxV2")
+		handler = middleware(handler, "ListApprovalInbox")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListApprovalInboxV2ResponseObject); ok {
-		if err := validResponse.VisitListApprovalInboxV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListApprovalInboxResponseObject); ok {
+		if err := validResponse.VisitListApprovalInboxResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1468,25 +1468,25 @@ func (sh *strictHandler) ListApprovalInboxV2(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// GetApprovalInstanceV2 operation middleware
-func (sh *strictHandler) GetApprovalInstanceV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID) {
-	var request GetApprovalInstanceV2RequestObject
+// GetApprovalInstance operation middleware
+func (sh *strictHandler) GetApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID) {
+	var request GetApprovalInstanceRequestObject
 
 	request.InstanceId = instanceId
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetApprovalInstanceV2(ctx, request.(GetApprovalInstanceV2RequestObject))
+		return sh.ssi.GetApprovalInstance(ctx, request.(GetApprovalInstanceRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetApprovalInstanceV2")
+		handler = middleware(handler, "GetApprovalInstance")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetApprovalInstanceV2ResponseObject); ok {
-		if err := validResponse.VisitGetApprovalInstanceV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetApprovalInstanceResponseObject); ok {
+		if err := validResponse.VisitGetApprovalInstanceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1494,25 +1494,25 @@ func (sh *strictHandler) GetApprovalInstanceV2(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// CancelApprovalInstanceV2 operation middleware
-func (sh *strictHandler) CancelApprovalInstanceV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID) {
-	var request CancelApprovalInstanceV2RequestObject
+// CancelApprovalInstance operation middleware
+func (sh *strictHandler) CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID) {
+	var request CancelApprovalInstanceRequestObject
 
 	request.InstanceId = instanceId
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CancelApprovalInstanceV2(ctx, request.(CancelApprovalInstanceV2RequestObject))
+		return sh.ssi.CancelApprovalInstance(ctx, request.(CancelApprovalInstanceRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CancelApprovalInstanceV2")
+		handler = middleware(handler, "CancelApprovalInstance")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CancelApprovalInstanceV2ResponseObject); ok {
-		if err := validResponse.VisitCancelApprovalInstanceV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CancelApprovalInstanceResponseObject); ok {
+		if err := validResponse.VisitCancelApprovalInstanceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1520,26 +1520,26 @@ func (sh *strictHandler) CancelApprovalInstanceV2(w http.ResponseWriter, r *http
 	}
 }
 
-// RecordApprovalStageSignoffV2 operation middleware
-func (sh *strictHandler) RecordApprovalStageSignoffV2(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID) {
-	var request RecordApprovalStageSignoffV2RequestObject
+// RecordApprovalStageSignoff operation middleware
+func (sh *strictHandler) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID) {
+	var request RecordApprovalStageSignoffRequestObject
 
 	request.InstanceId = instanceId
 	request.StageId = stageId
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RecordApprovalStageSignoffV2(ctx, request.(RecordApprovalStageSignoffV2RequestObject))
+		return sh.ssi.RecordApprovalStageSignoff(ctx, request.(RecordApprovalStageSignoffRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RecordApprovalStageSignoffV2")
+		handler = middleware(handler, "RecordApprovalStageSignoff")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RecordApprovalStageSignoffV2ResponseObject); ok {
-		if err := validResponse.VisitRecordApprovalStageSignoffV2Response(w); err != nil {
+	} else if validResponse, ok := response.(RecordApprovalStageSignoffResponseObject); ok {
+		if err := validResponse.VisitRecordApprovalStageSignoffResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1547,23 +1547,23 @@ func (sh *strictHandler) RecordApprovalStageSignoffV2(w http.ResponseWriter, r *
 	}
 }
 
-// ListApprovalRoutesV2 operation middleware
-func (sh *strictHandler) ListApprovalRoutesV2(w http.ResponseWriter, r *http.Request) {
-	var request ListApprovalRoutesV2RequestObject
+// ListApprovalRoutes operation middleware
+func (sh *strictHandler) ListApprovalRoutes(w http.ResponseWriter, r *http.Request) {
+	var request ListApprovalRoutesRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListApprovalRoutesV2(ctx, request.(ListApprovalRoutesV2RequestObject))
+		return sh.ssi.ListApprovalRoutes(ctx, request.(ListApprovalRoutesRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListApprovalRoutesV2")
+		handler = middleware(handler, "ListApprovalRoutes")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListApprovalRoutesV2ResponseObject); ok {
-		if err := validResponse.VisitListApprovalRoutesV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListApprovalRoutesResponseObject); ok {
+		if err := validResponse.VisitListApprovalRoutesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1571,23 +1571,23 @@ func (sh *strictHandler) ListApprovalRoutesV2(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// CreateApprovalRouteV2 operation middleware
-func (sh *strictHandler) CreateApprovalRouteV2(w http.ResponseWriter, r *http.Request) {
-	var request CreateApprovalRouteV2RequestObject
+// CreateApprovalRoute operation middleware
+func (sh *strictHandler) CreateApprovalRoute(w http.ResponseWriter, r *http.Request) {
+	var request CreateApprovalRouteRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateApprovalRouteV2(ctx, request.(CreateApprovalRouteV2RequestObject))
+		return sh.ssi.CreateApprovalRoute(ctx, request.(CreateApprovalRouteRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateApprovalRouteV2")
+		handler = middleware(handler, "CreateApprovalRoute")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateApprovalRouteV2ResponseObject); ok {
-		if err := validResponse.VisitCreateApprovalRouteV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CreateApprovalRouteResponseObject); ok {
+		if err := validResponse.VisitCreateApprovalRouteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1595,25 +1595,25 @@ func (sh *strictHandler) CreateApprovalRouteV2(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// DeactivateApprovalRouteV2 operation middleware
-func (sh *strictHandler) DeactivateApprovalRouteV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request DeactivateApprovalRouteV2RequestObject
+// DeactivateApprovalRoute operation middleware
+func (sh *strictHandler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DeactivateApprovalRouteRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeactivateApprovalRouteV2(ctx, request.(DeactivateApprovalRouteV2RequestObject))
+		return sh.ssi.DeactivateApprovalRoute(ctx, request.(DeactivateApprovalRouteRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeactivateApprovalRouteV2")
+		handler = middleware(handler, "DeactivateApprovalRoute")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeactivateApprovalRouteV2ResponseObject); ok {
-		if err := validResponse.VisitDeactivateApprovalRouteV2Response(w); err != nil {
+	} else if validResponse, ok := response.(DeactivateApprovalRouteResponseObject); ok {
+		if err := validResponse.VisitDeactivateApprovalRouteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1621,25 +1621,25 @@ func (sh *strictHandler) DeactivateApprovalRouteV2(w http.ResponseWriter, r *htt
 	}
 }
 
-// UpdateApprovalRouteV2 operation middleware
-func (sh *strictHandler) UpdateApprovalRouteV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request UpdateApprovalRouteV2RequestObject
+// UpdateApprovalRoute operation middleware
+func (sh *strictHandler) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateApprovalRouteRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateApprovalRouteV2(ctx, request.(UpdateApprovalRouteV2RequestObject))
+		return sh.ssi.UpdateApprovalRoute(ctx, request.(UpdateApprovalRouteRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateApprovalRouteV2")
+		handler = middleware(handler, "UpdateApprovalRoute")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateApprovalRouteV2ResponseObject); ok {
-		if err := validResponse.VisitUpdateApprovalRouteV2Response(w); err != nil {
+	} else if validResponse, ok := response.(UpdateApprovalRouteResponseObject); ok {
+		if err := validResponse.VisitUpdateApprovalRouteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1647,25 +1647,25 @@ func (sh *strictHandler) UpdateApprovalRouteV2(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// GetApprovalInstanceByDocumentV2 operation middleware
-func (sh *strictHandler) GetApprovalInstanceByDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request GetApprovalInstanceByDocumentV2RequestObject
+// GetApprovalInstanceByDocument operation middleware
+func (sh *strictHandler) GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetApprovalInstanceByDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetApprovalInstanceByDocumentV2(ctx, request.(GetApprovalInstanceByDocumentV2RequestObject))
+		return sh.ssi.GetApprovalInstanceByDocument(ctx, request.(GetApprovalInstanceByDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetApprovalInstanceByDocumentV2")
+		handler = middleware(handler, "GetApprovalInstanceByDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetApprovalInstanceByDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitGetApprovalInstanceByDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetApprovalInstanceByDocumentResponseObject); ok {
+		if err := validResponse.VisitGetApprovalInstanceByDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1673,25 +1673,25 @@ func (sh *strictHandler) GetApprovalInstanceByDocumentV2(w http.ResponseWriter, 
 	}
 }
 
-// CancelDocumentApprovalV2 operation middleware
-func (sh *strictHandler) CancelDocumentApprovalV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request CancelDocumentApprovalV2RequestObject
+// CancelDocumentApproval operation middleware
+func (sh *strictHandler) CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CancelDocumentApprovalRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CancelDocumentApprovalV2(ctx, request.(CancelDocumentApprovalV2RequestObject))
+		return sh.ssi.CancelDocumentApproval(ctx, request.(CancelDocumentApprovalRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CancelDocumentApprovalV2")
+		handler = middleware(handler, "CancelDocumentApproval")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CancelDocumentApprovalV2ResponseObject); ok {
-		if err := validResponse.VisitCancelDocumentApprovalV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CancelDocumentApprovalResponseObject); ok {
+		if err := validResponse.VisitCancelDocumentApprovalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1699,25 +1699,25 @@ func (sh *strictHandler) CancelDocumentApprovalV2(w http.ResponseWriter, r *http
 	}
 }
 
-// ObsoleteDocumentV2 operation middleware
-func (sh *strictHandler) ObsoleteDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ObsoleteDocumentV2RequestObject
+// ObsoleteDocument operation middleware
+func (sh *strictHandler) ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ObsoleteDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ObsoleteDocumentV2(ctx, request.(ObsoleteDocumentV2RequestObject))
+		return sh.ssi.ObsoleteDocument(ctx, request.(ObsoleteDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ObsoleteDocumentV2")
+		handler = middleware(handler, "ObsoleteDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ObsoleteDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitObsoleteDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ObsoleteDocumentResponseObject); ok {
+		if err := validResponse.VisitObsoleteDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1725,25 +1725,25 @@ func (sh *strictHandler) ObsoleteDocumentV2(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// PublishDocumentV2 operation middleware
-func (sh *strictHandler) PublishDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request PublishDocumentV2RequestObject
+// PublishDocument operation middleware
+func (sh *strictHandler) PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request PublishDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PublishDocumentV2(ctx, request.(PublishDocumentV2RequestObject))
+		return sh.ssi.PublishDocument(ctx, request.(PublishDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PublishDocumentV2")
+		handler = middleware(handler, "PublishDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PublishDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitPublishDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(PublishDocumentResponseObject); ok {
+		if err := validResponse.VisitPublishDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1751,25 +1751,25 @@ func (sh *strictHandler) PublishDocumentV2(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// ScheduleDocumentPublishV2 operation middleware
-func (sh *strictHandler) ScheduleDocumentPublishV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ScheduleDocumentPublishV2RequestObject
+// ScheduleDocumentPublish operation middleware
+func (sh *strictHandler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ScheduleDocumentPublishRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ScheduleDocumentPublishV2(ctx, request.(ScheduleDocumentPublishV2RequestObject))
+		return sh.ssi.ScheduleDocumentPublish(ctx, request.(ScheduleDocumentPublishRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ScheduleDocumentPublishV2")
+		handler = middleware(handler, "ScheduleDocumentPublish")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ScheduleDocumentPublishV2ResponseObject); ok {
-		if err := validResponse.VisitScheduleDocumentPublishV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ScheduleDocumentPublishResponseObject); ok {
+		if err := validResponse.VisitScheduleDocumentPublishResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1777,25 +1777,25 @@ func (sh *strictHandler) ScheduleDocumentPublishV2(w http.ResponseWriter, r *htt
 	}
 }
 
-// RecordDocumentSignoffV2 operation middleware
-func (sh *strictHandler) RecordDocumentSignoffV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request RecordDocumentSignoffV2RequestObject
+// RecordDocumentSignoff operation middleware
+func (sh *strictHandler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request RecordDocumentSignoffRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RecordDocumentSignoffV2(ctx, request.(RecordDocumentSignoffV2RequestObject))
+		return sh.ssi.RecordDocumentSignoff(ctx, request.(RecordDocumentSignoffRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RecordDocumentSignoffV2")
+		handler = middleware(handler, "RecordDocumentSignoff")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RecordDocumentSignoffV2ResponseObject); ok {
-		if err := validResponse.VisitRecordDocumentSignoffV2Response(w); err != nil {
+	} else if validResponse, ok := response.(RecordDocumentSignoffResponseObject); ok {
+		if err := validResponse.VisitRecordDocumentSignoffResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1803,25 +1803,25 @@ func (sh *strictHandler) RecordDocumentSignoffV2(w http.ResponseWriter, r *http.
 	}
 }
 
-// SubmitDocumentForApprovalV2 operation middleware
-func (sh *strictHandler) SubmitDocumentForApprovalV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request SubmitDocumentForApprovalV2RequestObject
+// SubmitDocumentForApproval operation middleware
+func (sh *strictHandler) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request SubmitDocumentForApprovalRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.SubmitDocumentForApprovalV2(ctx, request.(SubmitDocumentForApprovalV2RequestObject))
+		return sh.ssi.SubmitDocumentForApproval(ctx, request.(SubmitDocumentForApprovalRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "SubmitDocumentForApprovalV2")
+		handler = middleware(handler, "SubmitDocumentForApproval")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(SubmitDocumentForApprovalV2ResponseObject); ok {
-		if err := validResponse.VisitSubmitDocumentForApprovalV2Response(w); err != nil {
+	} else if validResponse, ok := response.(SubmitDocumentForApprovalResponseObject); ok {
+		if err := validResponse.VisitSubmitDocumentForApprovalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1829,25 +1829,25 @@ func (sh *strictHandler) SubmitDocumentForApprovalV2(w http.ResponseWriter, r *h
 	}
 }
 
-// SupersedeDocumentV2 operation middleware
-func (sh *strictHandler) SupersedeDocumentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request SupersedeDocumentV2RequestObject
+// SupersedeDocument operation middleware
+func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request SupersedeDocumentRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.SupersedeDocumentV2(ctx, request.(SupersedeDocumentV2RequestObject))
+		return sh.ssi.SupersedeDocument(ctx, request.(SupersedeDocumentRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "SupersedeDocumentV2")
+		handler = middleware(handler, "SupersedeDocument")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(SupersedeDocumentV2ResponseObject); ok {
-		if err := validResponse.VisitSupersedeDocumentV2Response(w); err != nil {
+	} else if validResponse, ok := response.(SupersedeDocumentResponseObject); ok {
+		if err := validResponse.VisitSupersedeDocumentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1860,38 +1860,38 @@ func (sh *strictHandler) SupersedeDocumentV2(w http.ResponseWriter, r *http.Requ
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

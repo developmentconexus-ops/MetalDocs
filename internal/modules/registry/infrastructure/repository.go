@@ -551,8 +551,8 @@ func (c *PostgresTemplateVersionChecker) GetTemplateVersionState(ctx context.Con
 	var profileCode sql.NullString
 	err := c.db.QueryRowContext(ctx, `
 		SELECT v.status, t.profile_code
-		FROM templates_v2_template_version v
-		JOIN templates_v2_template t ON t.id = v.template_id
+		FROM templates_template_version v
+		JOIN templates_template t ON t.id = v.template_id
 		WHERE v.id = $1`, templateVersionID,
 	).Scan(&status, &profileCode)
 	if errors.Is(err, sql.ErrNoRows) {

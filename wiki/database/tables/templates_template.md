@@ -1,4 +1,4 @@
-# public.templates_v2_template
+# public.templates_template
 
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `public`
@@ -30,7 +30,7 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 ## Baseline Definition
 
 ```sql
-CREATE TABLE public.templates_v2_template (
+CREATE TABLE public.templates_template (
 id uuid NOT NULL,
     tenant_id text NOT NULL,
     doc_type_code text NOT NULL,
@@ -51,7 +51,7 @@ id uuid NOT NULL,
 
 ## Runtime Usage
 
-Use `rg -n "templates_v2_template" internal apps` and the owning module wiki to verify readers/writers before changing this table.
+Use `rg -n "templates_template" internal apps` and the owning module wiki to verify readers/writers before changing this table.
 
 ## Seed or Reference Data
 

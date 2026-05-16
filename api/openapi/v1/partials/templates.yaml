@@ -14,9 +14,9 @@ paths:
         '404': { description: not_found }
   /api/v1/templates:
     get:
-      summary: List templates for tenant (docx-v2)
+      summary: List templates for tenant (docx)
       tags: [templates]
-      operationId: listTemplatesV2
+      operationId: listTemplates
       responses:
         '200':
           description: ok
@@ -36,9 +36,9 @@ paths:
                     updated_at: { type: string, format: date-time }
         '403': { description: forbidden }
     post:
-      summary: Create template (docx-v2)
+      summary: Create template (docx)
       tags: [templates]
-      operationId: createTemplateV2
+      operationId: createTemplate
       requestBody:
         required: true
         content:
@@ -62,7 +62,7 @@ paths:
                   version_id: { type: string, format: uuid }
   /api/v1/templates/{id}/versions/{n}:
     get:
-      summary: Get template version metadata (docx-v2)
+      summary: Get template version metadata (docx)
       tags: [templates]
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }

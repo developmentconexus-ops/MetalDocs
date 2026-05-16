@@ -10,7 +10,7 @@ import (
 func TestPlaceholderCatalog_Returns7Entries(t *testing.T) {
 	repo := newFakeRepo()
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
-	req := httptest.NewRequest("GET", "/api/v1/templates/v2/placeholder-catalog", nil)
+	req := httptest.NewRequest("GET", "/api/v1/templates/placeholder-catalog", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

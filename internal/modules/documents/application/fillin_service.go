@@ -242,7 +242,7 @@ func (r *TemplateVersionSchemaReader) LoadFillInSchema(ctx context.Context, tena
 	var pRaw []byte
 	err := r.db.QueryRowContext(ctx, `
 		SELECT tv.placeholder_schema
-		  FROM templates_v2_template_version tv
+		  FROM templates_template_version tv
 		  JOIN documents d ON d.template_version_id = tv.id
 		 WHERE d.id = $1::uuid AND d.tenant_id = $2::uuid`,
 		docID, tenantID,

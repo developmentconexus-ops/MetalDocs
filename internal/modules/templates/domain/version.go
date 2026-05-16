@@ -67,8 +67,8 @@ func (v *TemplateVersion) CanTransition(next VersionStatus, hasReviewer bool) er
 }
 
 var (
-	ErrInvalidStateTransition = errors.New("templates_v2: invalid_state_transition")
-	ErrContentHashMismatch    = errors.New("templates_v2: content_hash_mismatch")
-	ErrStaleBase              = errors.New("templates_v2: stale_base")
-	ErrStaleLockVersion       = errors.New("templates_v2: stale_lock_version")
+	ErrInvalidStateTransition = errors.New("templates: invalid_state_transition")
+	ErrContentHashMismatch    = errors.New("templates: content_hash_mismatch")
+	ErrStaleBase              = errors.New("templates: stale_base")
+	ErrStaleLockVersion       = errors.New("templates: stale_lock_version")
 )

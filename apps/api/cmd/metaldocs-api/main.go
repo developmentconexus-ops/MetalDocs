@@ -32,9 +32,9 @@ import (
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	jobscheduler "metaldocs/internal/modules/jobs/scheduler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
-	tv2app "metaldocs/internal/modules/templates/application"
-	tv2http "metaldocs/internal/modules/templates/delivery/http"
-	tv2repo "metaldocs/internal/modules/templates/repository"
+	templatesapp "metaldocs/internal/modules/templates/application"
+	templateshttp "metaldocs/internal/modules/templates/delivery/http"
+	templatesrepo "metaldocs/internal/modules/templates/repository"
 
 	"metaldocs/apps/api/internal/wiring"
 	auditapp "metaldocs/internal/modules/audit/application"
@@ -260,7 +260,7 @@ func main() {
 		}
 	}
 
-	docSnapshotReader := docgenv2.NewTemplatesV2SnapshotReader(deps.SQLDB)
+	docSnapshotReader := docgenv2.NewTemplatesSnapshotReader(deps.SQLDB)
 	docSnapshotWriter := docrepo.NewSnapshotRepository(deps.SQLDB)
 	docDeps := documents.Dependencies{
 		DB:      deps.SQLDB,
@@ -268,10 +268,10 @@ func main() {
 		Presign: docPresigner,
 		TplRead: docgenv2.NewFanoutTemplateReader(
 			docgenv2.NewTemplateReader(deps.SQLDB, deps.MinioClient, deps.MinioBucket),
-			docgenv2.NewTemplatesV2TemplateReader(deps.SQLDB),
+			docgenv2.NewTemplatesTemplateReader(deps.SQLDB),
 		),
 		FormVal:            formval.NewGojsonschema(),
-		Audit:              newDocumentsV2AuditAdapter(deps.AuditWriter),
+		Audit:              newDocumentsAuditAdapter(deps.AuditWriter),
 		ExportPresign:      docPresigner,
 		RegistryReader:     cdRepo,
 		RegistryDuplicator: docRegistryDuplicator,
@@ -323,13 +323,13 @@ func main() {
 	// needs RegistryDuplicator), hence the post-construction setter.
 	registryModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
-	tv2Presigner := objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
-	tv2Svc := tv2app.New(tv2repo.New(deps.SQLDB).WithAudit(deps.AuditWriter), tv2Presigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
-	tv2AuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
+	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
+	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
+	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
 	}
-	tv2http.New(tv2Svc, tv2AuthzFn).Register(mux)
+	templateshttp.New(templatesSvc, templatesAuthzFn).Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
@@ -474,15 +474,15 @@ type realUUIDGen struct{}
 
 func (realUUIDGen) New() string { return uuid.NewString() }
 
-type documentsV2AuditAdapter struct {
+type documentsAuditAdapter struct {
 	writer auditdomain.Writer
 }
 
-func newDocumentsV2AuditAdapter(writer auditdomain.Writer) *documentsV2AuditAdapter {
-	return &documentsV2AuditAdapter{writer: writer}
+func newDocumentsAuditAdapter(writer auditdomain.Writer) *documentsAuditAdapter {
+	return &documentsAuditAdapter{writer: writer}
 }
 
-func (a *documentsV2AuditAdapter) WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error {
+func (a *documentsAuditAdapter) WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error {
 	if a == nil || a.writer == nil {
 		return nil
 	}
@@ -507,7 +507,7 @@ func (a *documentsV2AuditAdapter) WriteTx(ctx context.Context, tx *sql.Tx, tenan
 	})
 }
 
-func (a *documentsV2AuditAdapter) Write(ctx context.Context, tenantID, actorID, action, docID string, meta any) {
+func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, action, docID string, meta any) {
 	if a == nil || a.writer == nil {
 		return
 	}
@@ -532,7 +532,7 @@ func (a *documentsV2AuditAdapter) Write(ctx context.Context, tenantID, actorID, 
 		TraceID:      "trace-local",
 		TenantID:     tenantID,
 	}); err != nil {
-		log.Printf("documents_v2 audit write failed: %v", err)
+		log.Printf("documents audit write failed: %v", err)
 	}
 }
 
@@ -563,7 +563,7 @@ func (a cdRegistryAdapter) GetControlledDocument(ctx context.Context, tenantID, 
 	return resolvers.ControlledDocumentInfo{DocCode: cd.Code}, nil
 }
 
-// profileDefaultsAdapter bridges taxonomy ProfileRepository → documents_v2 ProfileDefaultTemplateReader.
+// profileDefaultsAdapter bridges taxonomy ProfileRepository → documents module ProfileDefaultTemplateReader.
 type profileDefaultsAdapter struct {
 	profileRepo interface {
 		GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)

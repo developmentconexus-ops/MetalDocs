@@ -478,12 +478,12 @@ BEGIN
       -- document_families has no tenant_id column.
       v_tenant_id     := NULL;
 
-    WHEN TG_TABLE_NAME = 'templates_v2_template' THEN
+    WHEN TG_TABLE_NAME = 'templates_template' THEN
       v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit',
                                 'template.approve', 'template.publish'];
       v_tenant_id     := NEW.tenant_id;
 
-    WHEN TG_TABLE_NAME = 'templates_v2_template_version' THEN
+    WHEN TG_TABLE_NAME = 'templates_template_version' THEN
       v_required_caps := ARRAY['template.create', 'template.edit', 'template.submit',
                                 'template.approve', 'template.publish'];
       -- template_version has no tenant_id column.
@@ -2256,10 +2256,10 @@ CREATE TABLE public.templates (
 
 
 --
--- Name: templates_v2_approval_config; Type: TABLE; Schema: public; Owner: -
+-- Name: templates_approval_config; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.templates_v2_approval_config (
+CREATE TABLE public.templates_approval_config (
     template_id uuid NOT NULL,
     reviewer_role text,
     approver_role text NOT NULL
@@ -2267,10 +2267,10 @@ CREATE TABLE public.templates_v2_approval_config (
 
 
 --
--- Name: templates_v2_audit_log; Type: TABLE; Schema: public; Owner: -
+-- Name: templates_audit_log; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.templates_v2_audit_log (
+CREATE TABLE public.templates_audit_log (
     id bigint NOT NULL,
     tenant_id text NOT NULL,
     template_id uuid NOT NULL,
@@ -2283,10 +2283,10 @@ CREATE TABLE public.templates_v2_audit_log (
 
 
 --
--- Name: templates_v2_audit_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: templates_audit_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-CREATE SEQUENCE public.templates_v2_audit_log_id_seq
+CREATE SEQUENCE public.templates_audit_log_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -2295,17 +2295,17 @@ CREATE SEQUENCE public.templates_v2_audit_log_id_seq
 
 
 --
--- Name: templates_v2_audit_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: templates_audit_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
-ALTER SEQUENCE public.templates_v2_audit_log_id_seq OWNED BY public.templates_v2_audit_log.id;
+ALTER SEQUENCE public.templates_audit_log_id_seq OWNED BY public.templates_audit_log.id;
 
 
 --
--- Name: templates_v2_template; Type: TABLE; Schema: public; Owner: -
+-- Name: templates_template; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.templates_v2_template (
+CREATE TABLE public.templates_template (
     id uuid NOT NULL,
     tenant_id text NOT NULL,
     doc_type_code text NOT NULL,
@@ -2325,10 +2325,10 @@ CREATE TABLE public.templates_v2_template (
 
 
 --
--- Name: templates_v2_template_version; Type: TABLE; Schema: public; Owner: -
+-- Name: templates_template_version; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.templates_v2_template_version (
+CREATE TABLE public.templates_template_version (
     id uuid NOT NULL,
     template_id uuid NOT NULL,
     version_number integer NOT NULL,
@@ -2381,10 +2381,10 @@ ALTER TABLE ONLY public.document_revisions ALTER COLUMN revision_num SET DEFAULT
 
 
 --
--- Name: templates_v2_audit_log id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: templates_audit_log id; Type: DEFAULT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_audit_log ALTER COLUMN id SET DEFAULT nextval('public.templates_v2_audit_log_id_seq'::regclass);
+ALTER TABLE ONLY public.templates_audit_log ALTER COLUMN id SET DEFAULT nextval('public.templates_audit_log_id_seq'::regclass);
 
 
 --
@@ -3092,51 +3092,51 @@ ALTER TABLE ONLY public.templates
 
 
 --
--- Name: templates_v2_approval_config templates_v2_approval_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: templates_approval_config templates_approval_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_approval_config
-    ADD CONSTRAINT templates_v2_approval_config_pkey PRIMARY KEY (template_id);
-
-
---
--- Name: templates_v2_audit_log templates_v2_audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates_v2_audit_log
-    ADD CONSTRAINT templates_v2_audit_log_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.templates_approval_config
+    ADD CONSTRAINT templates_approval_config_pkey PRIMARY KEY (template_id);
 
 
 --
--- Name: templates_v2_template templates_v2_template_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: templates_audit_log templates_audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_template
-    ADD CONSTRAINT templates_v2_template_pkey PRIMARY KEY (id);
-
-
---
--- Name: templates_v2_template templates_v2_template_tenant_id_key_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.templates_v2_template
-    ADD CONSTRAINT templates_v2_template_tenant_id_key_key UNIQUE (tenant_id, key);
+ALTER TABLE ONLY public.templates_audit_log
+    ADD CONSTRAINT templates_audit_log_pkey PRIMARY KEY (id);
 
 
 --
--- Name: templates_v2_template_version templates_v2_template_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: templates_template templates_template_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_template_version
-    ADD CONSTRAINT templates_v2_template_version_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.templates_template
+    ADD CONSTRAINT templates_template_pkey PRIMARY KEY (id);
 
 
 --
--- Name: templates_v2_template_version templates_v2_template_version_template_id_version_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: templates_template templates_template_tenant_id_key_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_template_version
-    ADD CONSTRAINT templates_v2_template_version_template_id_version_number_key UNIQUE (template_id, version_number);
+ALTER TABLE ONLY public.templates_template
+    ADD CONSTRAINT templates_template_tenant_id_key_key UNIQUE (tenant_id, key);
+
+
+--
+-- Name: templates_template_version templates_template_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.templates_template_version
+    ADD CONSTRAINT templates_template_version_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: templates_template_version templates_template_version_template_id_version_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.templates_template_version
+    ADD CONSTRAINT templates_template_version_template_id_version_number_key UNIQUE (template_id, version_number);
 
 
 --
@@ -3638,24 +3638,24 @@ CREATE INDEX idx_templates_tenant ON public.templates USING btree (tenant_id);
 
 
 --
--- Name: idx_templates_v2_audit_template_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_templates_audit_template_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_templates_v2_audit_template_time ON public.templates_v2_audit_log USING btree (template_id, occurred_at DESC);
-
-
---
--- Name: idx_templates_v2_template_tenant_doctype; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_templates_v2_template_tenant_doctype ON public.templates_v2_template USING btree (tenant_id, doc_type_code);
+CREATE INDEX idx_templates_audit_template_time ON public.templates_audit_log USING btree (template_id, occurred_at DESC);
 
 
 --
--- Name: idx_templates_v2_version_template_status; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_templates_template_tenant_doctype; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_templates_v2_version_template_status ON public.templates_v2_template_version USING btree (template_id, status);
+CREATE INDEX idx_templates_template_tenant_doctype ON public.templates_template USING btree (tenant_id, doc_type_code);
+
+
+--
+-- Name: idx_templates_version_template_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_templates_version_template_status ON public.templates_template_version USING btree (template_id, status);
 
 
 --
@@ -3757,17 +3757,17 @@ CREATE UNIQUE INDEX ux_approval_instances_active_document_id ON public.approval_
 
 
 --
--- Name: ux_documents_v2_cd_active; Type: INDEX; Schema: public; Owner: -
+-- Name: ux_documents_cd_active; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX ux_documents_v2_cd_active ON public.documents USING btree (controlled_document_id) WHERE ((controlled_document_id IS NOT NULL) AND (status = ANY (ARRAY['draft'::text, 'under_review'::text, 'approved'::text, 'rejected'::text, 'scheduled'::text])));
+CREATE UNIQUE INDEX ux_documents_cd_active ON public.documents USING btree (controlled_document_id) WHERE ((controlled_document_id IS NOT NULL) AND (status = ANY (ARRAY['draft'::text, 'under_review'::text, 'approved'::text, 'rejected'::text, 'scheduled'::text])));
 
 
 --
--- Name: ux_documents_v2_cd_revision; Type: INDEX; Schema: public; Owner: -
+-- Name: ux_documents_cd_revision; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX ux_documents_v2_cd_revision ON public.documents USING btree (controlled_document_id, revision_number) WHERE (controlled_document_id IS NOT NULL);
+CREATE UNIQUE INDEX ux_documents_cd_revision ON public.documents USING btree (controlled_document_id, revision_number) WHERE (controlled_document_id IS NOT NULL);
 
 
 --
@@ -3785,10 +3785,10 @@ CREATE UNIQUE INDEX ux_governance_events_caps_bump_spec_version ON public.govern
 
 
 --
--- Name: ux_templates_v2_system_blank; Type: INDEX; Schema: public; Owner: -
+-- Name: ux_templates_system_blank; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX ux_templates_v2_system_blank ON public.templates_v2_template USING btree (tenant_id, key) WHERE ((system_owned = true) AND (key = '__system_blank__'::text));
+CREATE UNIQUE INDEX ux_templates_system_blank ON public.templates_template USING btree (tenant_id, key) WHERE ((system_owned = true) AND (key = '__system_blank__'::text));
 
 
 --
@@ -3890,17 +3890,17 @@ CREATE TRIGGER trg_controlled_documents_code_immutable BEFORE UPDATE ON public.c
 
 
 --
--- Name: documents trg_documents_v2_legal_transition; Type: TRIGGER; Schema: public; Owner: -
+-- Name: documents trg_documents_legal_transition; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_documents_v2_legal_transition BEFORE UPDATE ON public.documents FOR EACH ROW EXECUTE FUNCTION public.enforce_document_transition();
+CREATE TRIGGER trg_documents_legal_transition BEFORE UPDATE ON public.documents FOR EACH ROW EXECUTE FUNCTION public.enforce_document_transition();
 
 
 --
--- Name: documents trg_documents_v2_revision_version_monotonic; Type: TRIGGER; Schema: public; Owner: -
+-- Name: documents trg_documents_revision_version_monotonic; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_documents_v2_revision_version_monotonic BEFORE UPDATE ON public.documents FOR EACH ROW EXECUTE FUNCTION public.enforce_revision_version_monotonic();
+CREATE TRIGGER trg_documents_revision_version_monotonic BEFORE UPDATE ON public.documents FOR EACH ROW EXECUTE FUNCTION public.enforce_revision_version_monotonic();
 
 
 --
@@ -3925,17 +3925,17 @@ CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR UPDATE ON public.docume
 
 
 --
--- Name: templates_v2_template trg_require_cap_asserted; Type: TRIGGER; Schema: public; Owner: -
+-- Name: templates_template trg_require_cap_asserted; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON public.templates_v2_template FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON public.templates_template FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
 
 
 --
--- Name: templates_v2_template_version trg_require_cap_asserted; Type: TRIGGER; Schema: public; Owner: -
+-- Name: templates_template_version trg_require_cap_asserted; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON public.templates_v2_template_version FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
+CREATE TRIGGER trg_require_cap_asserted BEFORE INSERT OR DELETE OR UPDATE ON public.templates_template_version FOR EACH ROW EXECUTE FUNCTION public.enforce_capability_asserted();
 
 
 --
@@ -4053,7 +4053,7 @@ ALTER TABLE ONLY metaldocs.document_profile_schema_versions
 --
 
 ALTER TABLE ONLY metaldocs.document_profiles
-    ADD CONSTRAINT document_profiles_default_template_version_id_fkey FOREIGN KEY (default_template_version_id) REFERENCES public.templates_v2_template_version(id);
+    ADD CONSTRAINT document_profiles_default_template_version_id_fkey FOREIGN KEY (default_template_version_id) REFERENCES public.templates_template_version(id);
 
 
 --
@@ -4373,7 +4373,7 @@ ALTER TABLE ONLY public.controlled_document_user_grants
 --
 
 ALTER TABLE ONLY public.controlled_documents
-    ADD CONSTRAINT controlled_documents_override_template_version_id_fkey FOREIGN KEY (override_template_version_id) REFERENCES public.templates_v2_template_version(id);
+    ADD CONSTRAINT controlled_documents_override_template_version_id_fkey FOREIGN KEY (override_template_version_id) REFERENCES public.templates_template_version(id);
 
 
 --
@@ -4497,11 +4497,11 @@ ALTER TABLE ONLY public.templates
 
 
 --
--- Name: templates_v2_template fk_templates_v2_published_version; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: templates_template fk_templates_published_version; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_template
-    ADD CONSTRAINT fk_templates_v2_published_version FOREIGN KEY (published_version_id) REFERENCES public.templates_v2_template_version(id);
+ALTER TABLE ONLY public.templates_template
+    ADD CONSTRAINT fk_templates_published_version FOREIGN KEY (published_version_id) REFERENCES public.templates_template_version(id);
 
 
 --
@@ -4513,19 +4513,19 @@ ALTER TABLE ONLY public.template_versions
 
 
 --
--- Name: templates_v2_approval_config templates_v2_approval_config_template_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: templates_approval_config templates_approval_config_template_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_approval_config
-    ADD CONSTRAINT templates_v2_approval_config_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.templates_v2_template(id);
+ALTER TABLE ONLY public.templates_approval_config
+    ADD CONSTRAINT templates_approval_config_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.templates_template(id);
 
 
 --
--- Name: templates_v2_template_version templates_v2_template_version_template_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: templates_template_version templates_template_version_template_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.templates_v2_template_version
-    ADD CONSTRAINT templates_v2_template_version_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.templates_v2_template(id);
+ALTER TABLE ONLY public.templates_template_version
+    ADD CONSTRAINT templates_template_version_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.templates_template(id);
 
 
 --

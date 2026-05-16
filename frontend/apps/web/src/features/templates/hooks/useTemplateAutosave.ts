@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { presignAutosave, commitAutosave } from '../api/templatesV2';
+import { presignAutosave, commitAutosave } from '../api/templates';
 
 const DEBOUNCE_MS = 15_000;
 

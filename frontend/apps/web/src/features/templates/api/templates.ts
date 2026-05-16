@@ -1,280 +1,378 @@
-import { request, requestBlob, requestRaw } from "../../../lib/api/client";
+export type VersionStatus = 'draft' | 'in_review' | 'approved' | 'published' | 'obsolete';
 
-// ---------------------------------------------------------------------------
-// DTOs
-// ---------------------------------------------------------------------------
+import { apiFetch } from '../../../lib/api/client';
+import type { Placeholder, CompositionConfig } from '../placeholder-types';
+export type { Placeholder, CompositionConfig };
 
-export interface TemplateDraftDTO {
-  templateKey: string;
-  profileCode: string;
+export interface TemplateSchemas {
+  placeholders: Placeholder[];
+  composition: CompositionConfig | null;
+}
+
+export interface TemplateDTO {
+  id: string;
+  tenant_id: string;
+  doc_type_code: string | null;
+  key: string;
   name: string;
-  status: string; // "draft"
-  lockVersion: number;
-  hasStrippedFields: boolean;
-  blocks: unknown; // JSON
-  theme?: unknown;
-  meta?: unknown;
-  updatedAt: string;
+  description: string | null | undefined;
+  areas: string[];
+  visibility: string;
+  specific_areas: string[];
+  latest_version: number;
+  published_version_id: string | null;
+  created_by: string;
+  created_at: string;
+  archived_at: string | null;
 }
 
-export interface TemplateVersionDTO {
-  templateKey: string;
-  version: number;
-  profileCode: string;
+export interface VersionDTO {
+  id: string;
+  template_id: string;
+  version_number: number;
+  status: VersionStatus;
+  docx_storage_key: string | null;
+  content_hash: string | null;
+  metadata_schema: Record<string, unknown> | null;
+  placeholder_schema: Record<string, unknown> | null;
+  author_id: string;
+  pending_reviewer_role: string | null;
+  pending_approver_role: string | null;
+  reviewer_id: string | null;
+  approver_id: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  approved_at: string | null;
+  published_at: string | null;
+  obsoleted_at: string | null;
+  created_at: string;
+}
+
+export type TemplateListRow = {
+  id: string;
+  key: string;
   name: string;
-  status: string; // "published" | "deprecated"
+  description?: string;
+  latest_version: number;
+  latest_version_id?: string;
+  published_version_id?: string | null;
+  updated_at?: string;
+  doc_type_code?: string | null;
+  visibility: string;
+  archived_at: string | null;
+};
+
+export interface PublishError {
+  valid: false;
+  parse_errors: Array<{ type: string; element?: string; ident?: string }>;
+  missing_tokens: string[];
+  orphan_tokens: string[];
 }
 
-export interface TemplateListItemDTO {
-  templateKey: string;
-  version: number;
-  profileCode: string;
-  name: string;
-  status: string;
+export interface PublishSuccess {
+  published_version_id: string;
+  next_draft_id: string;
+  next_draft_version_num: number;
 }
 
-export interface PublishErrorDTO {
-  blockId: string;
-  blockType: string;
-  field: string;
-  reason: string;
-}
-
-export interface StrippedFieldDTO {
-  blockId: string;
-  blockType: string;
-  field: string;
-  reason: string;
-}
-
-export interface ImportResultDTO {
-  templateKey: string;
-  hasStrippedFields: boolean;
-  strippedFields: StrippedFieldDTO[];
-}
-
-// ---------------------------------------------------------------------------
-// Typed error helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Thrown when the server returns 409 (optimistic-lock conflict).
- * Callers can use `instanceof TemplateLockConflictError` to handle it.
- */
-export class TemplateLockConflictError extends Error {
-  readonly status = 409;
-  constructor(message = "Lock conflict — the template was modified by someone else") {
-    super(message);
-    this.name = "TemplateLockConflictError";
-  }
-}
-
-/**
- * Thrown when the server returns 422 (publish validation failed).
- * `errors` contains the field-level issues returned by the server.
- */
-export class TemplatePublishValidationError extends Error {
-  readonly status = 422;
-  readonly errors: PublishErrorDTO[];
-  constructor(errors: PublishErrorDTO[], message = "Template has validation errors that prevent publishing") {
-    super(message);
-    this.name = "TemplatePublishValidationError";
-    this.errors = errors;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function encodeKey(key: string): string {
-  return encodeURIComponent(key);
-}
-
-/**
- * Internal fetch wrapper for endpoints that can return 409 or 422 with
- * structured error bodies that need special error types.
- */
-async function requestWithStructuredErrors<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await requestRaw(path, init, [409, 422]);
-  if (!response.ok) {
-    const body = await response.json().catch(() => null) as Record<string, unknown> | null;
-
-    if (response.status === 409) {
-      const message = (body as { error?: { message?: string } } | null)?.error?.message;
-      throw new TemplateLockConflictError(message ?? undefined);
+async function apiJson<T>(res: Response): Promise<T> {
+  if (!res.ok) {
+    try {
+      const body = (await res.json()) as { error?: { code?: string; message?: string } };
+      const message = body?.error?.message;
+      throw new Error(message || `HTTP ${res.status}`);
+    } catch (err) {
+      if (err instanceof Error) {
+        throw err;
+      }
+      throw new Error(`HTTP ${res.status}`);
     }
+  }
 
-    if (response.status === 422) {
-      const errors = (body as { errors?: PublishErrorDTO[] } | null)?.errors ?? [];
-      const message = (body as { error?: { message?: string } } | null)?.error?.message;
-      throw new TemplatePublishValidationError(errors, message ?? undefined);
+  return (await res.json()) as T;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const n = Number(value);
+    if (Number.isFinite(n)) {
+      return n;
     }
+  }
+  return null;
+}
 
-    // Fall back to generic error for all other non-ok statuses
-    const message = (body as { error?: { message?: string } } | null)?.error?.message;
-    const error = new Error(message ?? `HTTP ${response.status}`);
-    (error as Error & { status?: number }).status = response.status;
-    throw error;
+export async function createTemplate(cmd: {
+  key: string;
+  name: string;
+  description?: string;
+  doc_type_code?: string;
+  idempotencyKey: string;
+}): Promise<{ template: TemplateDTO; version: VersionDTO }> {
+  const body = await apiFetch<{
+    data?: { template?: TemplateDTO; version?: VersionDTO };
+  }>('/api/v1/templates', {
+    method: 'POST',
+    idempotencyKey: cmd.idempotencyKey,
+    body: JSON.stringify({
+      key: cmd.key,
+      name: cmd.name,
+      ...(cmd.description ? { description: cmd.description } : {}),
+      ...(cmd.doc_type_code ? { doc_type_code: cmd.doc_type_code } : {}),
+    }),
+  });
+  const template = body.data?.template;
+  const version = body.data?.version;
+  if (!template || !version) {
+    throw new Error('Resposta de criação de template não trouxe os dados esperados.');
+  }
+  return { template, version };
+}
+
+export async function listTemplates(params?: {
+  limit?: number;
+  offset?: number;
+  doc_type?: string;
+  area?: string[];
+}): Promise<{ templates: TemplateDTO[]; meta: { limit: number; offset: number } }> {
+  const qs = new URLSearchParams();
+  if (params?.limit !== undefined) qs.set('limit', String(params.limit));
+  if (params?.offset !== undefined) qs.set('offset', String(params.offset));
+  if (params?.doc_type) qs.set('doc_type', params.doc_type);
+  for (const area of params?.area ?? []) {
+    qs.append('area', area);
   }
 
-  if (response.status === 204) {
-    return undefined as T;
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const body = await apiFetch<{
+    data?: { templates?: unknown; items?: unknown };
+    meta?: { limit?: unknown; offset?: unknown };
+  }>(`/api/v1/templates${suffix}`);
+
+  const dataTemplates = body?.data?.templates;
+  const dataItems = body?.data?.items;
+  const templates = Array.isArray(dataTemplates)
+    ? (dataTemplates as TemplateDTO[])
+    : Array.isArray(dataItems)
+      ? (dataItems as TemplateDTO[])
+      : [];
+
+  const defaultLimit = params?.limit ?? 50;
+  const defaultOffset = params?.offset ?? 0;
+  const limit = toFiniteNumber(body?.meta?.limit) ?? defaultLimit;
+  const offset = toFiniteNumber(body?.meta?.offset) ?? defaultOffset;
+
+  return { templates, meta: { limit, offset } };
+}
+
+export async function getTemplate(id: string): Promise<{ template: TemplateDTO; latest_version: VersionDTO }> {
+  const res = await fetch(`/api/v1/templates/${id}`);
+  const body = await apiJson<{ data: { template: TemplateDTO; latest_version: VersionDTO } }>(res);
+  return body.data;
+}
+
+export async function getVersion(templateId: string, n: number): Promise<VersionDTO> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${n}`);
+  const body = await apiJson<{ data: { version: VersionDTO } }>(res);
+  return body.data.version;
+}
+
+export async function presignAutosave(
+  templateId: string,
+  versionNum: number,
+): Promise<{ upload_url: string; storage_key: string; expires_at: string }> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/presign`, {
+    method: 'POST',
+  });
+  const body = await apiJson<{
+    data: { upload_url: string; storage_key: string; expires_at: string };
+  }>(res);
+  return body.data;
+}
+
+export async function commitAutosave(
+  templateId: string,
+  versionNum: number,
+  expectedContentHash: string,
+): Promise<VersionDTO> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/autosave/commit`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ expected_content_hash: expectedContentHash }),
+  });
+  const body = await apiJson<{ data: { version: VersionDTO } }>(res);
+  return body.data.version;
+}
+
+export async function presignDocxUpload(
+  templateId: string,
+  versionNum: number,
+): Promise<{ url: string; storage_key: string }> {
+  const r = await presignAutosave(templateId, versionNum);
+  return { url: r.upload_url, storage_key: r.storage_key };
+}
+
+export async function presignSchemaUpload(
+  templateId: string,
+  versionNum: number,
+): Promise<{ url: string; storage_key: string }> {
+  const r = await presignAutosave(templateId, versionNum);
+  return { url: r.upload_url, storage_key: r.storage_key };
+}
+
+export async function saveDraft(
+  templateId: string,
+  versionNum: number,
+  body: {
+    expected_lock_version: number;
+    docx_storage_key: string;
+    schema_storage_key: string;
+    docx_content_hash: string;
+    schema_content_hash: string;
+  },
+): Promise<void> {
+  await commitAutosave(templateId, versionNum, body.docx_content_hash || body.schema_content_hash);
+}
+
+export async function publishVersion(
+  templateId: string,
+  versionNum: number,
+  docxKey: string,
+  schemaKey: string,
+): Promise<PublishSuccess | PublishError> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/publish`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ docx_key: docxKey, schema_key: schemaKey }),
+  });
+  if (res.status === 422) {
+    return (await res.json()) as PublishError;
   }
-
-  return (await response.json()) as T;
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return (await res.json()) as PublishSuccess;
 }
 
-// ---------------------------------------------------------------------------
-// API functions — 13 endpoints
-// ---------------------------------------------------------------------------
-
-/**
- * GET /templates?profileCode=<code>
- * List all templates for a given profile.
- */
-export async function listTemplates(profileCode: string): Promise<TemplateListItemDTO[]> {
-  const body = await request<{ items: TemplateListItemDTO[] }>(`/templates?profileCode=${encodeURIComponent(profileCode)}`);
-  return body.items ?? [];
+export async function getDocxURL(templateId: string, versionNum: number): Promise<string> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/docx-url`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
+  }
+  const body = (await res.json()) as { data: { url: string } };
+  return body.data.url;
 }
 
-/**
- * POST /templates
- * Create a new draft template.
- */
-export function createTemplate(profileCode: string, name: string): Promise<TemplateDraftDTO> {
-  return request<TemplateDraftDTO>("/templates", {
-    method: "POST",
-    body: JSON.stringify({ profileCode, name }),
+export async function submitForReview(templateId: string, versionNum: number): Promise<VersionDTO> {
+  const data = await apiFetch<{ data: { version: VersionDTO } }>(
+    `/api/v1/templates/${templateId}/versions/${versionNum}/submit`,
+    { method: 'POST' },
+  );
+  return data.data.version;
+}
+
+export async function reviewVersion(
+  templateId: string,
+  versionNum: number,
+  accept: boolean,
+  reason?: string,
+): Promise<VersionDTO> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/review`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ accept, reason: reason || '' }),
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as { data: { version: VersionDTO } };
+  return data.data.version;
 }
 
-/**
- * GET /templates/:key
- * Retrieve a template (draft or latest published version).
- */
-export function getTemplate(key: string): Promise<TemplateDraftDTO | TemplateVersionDTO> {
-  return request<TemplateDraftDTO | TemplateVersionDTO>(`/templates/${encodeKey(key)}`);
-}
-
-/**
- * PUT /templates/:key/draft
- * Save draft content. May throw TemplateLockConflictError on 409.
- */
-export function saveDraft(
-  key: string,
-  payload: { blocks: unknown; theme?: unknown; meta?: unknown; lockVersion: number },
-): Promise<TemplateDraftDTO> {
-  return requestWithStructuredErrors<TemplateDraftDTO>(`/templates/${encodeKey(key)}/draft`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
+export async function approveVersion(
+  templateId: string,
+  versionNum: number,
+  accept: boolean,
+  reason?: string,
+): Promise<VersionDTO> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ accept, reason: reason || '' }),
   });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as { data: { version: VersionDTO } };
+  return data.data.version;
 }
 
-/**
- * POST /templates/:key/publish
- * Publish the current draft. May throw TemplateLockConflictError (409) or
- * TemplatePublishValidationError (422).
- */
-export function publishTemplate(key: string, lockVersion: number): Promise<TemplateVersionDTO> {
-  return requestWithStructuredErrors<TemplateVersionDTO>(`/templates/${encodeKey(key)}/publish`, {
-    method: "POST",
-    body: JSON.stringify({ lockVersion }),
+// Wire-format types (backend snake_case)
+interface WirePlaceholder { id: string; name?: string; label: string; type: string; required: boolean; options?: string[]; regex?: string; min_number?: number; max_number?: number; min_date?: string; max_date?: string; max_length?: number; resolver_key?: string; visible_if?: { placeholder_id: string; op: string; value?: unknown }; }
+
+function placeholderFromWire(w: WirePlaceholder): Placeholder {
+  return {
+    id: w.id,
+    ...(w.name != null ? { name: w.name } : {}),
+    label: w.label,
+    type: w.type as Placeholder['type'],
+    ...(w.required ? { required: true } : {}),
+    ...(w.options ? { options: w.options } : {}),
+    ...(w.regex != null ? { regex: w.regex } : {}),
+    ...(w.min_number != null ? { minNumber: w.min_number } : {}),
+    ...(w.max_number != null ? { maxNumber: w.max_number } : {}),
+    ...(w.min_date != null ? { minDate: w.min_date } : {}),
+    ...(w.max_date != null ? { maxDate: w.max_date } : {}),
+    ...(w.max_length != null ? { maxLength: w.max_length } : {}),
+    ...(w.resolver_key != null ? { resolverKey: w.resolver_key } : {}),
+    ...(w.visible_if ? { visibleIf: { placeholderID: w.visible_if.placeholder_id, operator: w.visible_if.op as NonNullable<Placeholder['visibleIf']>['operator'], value: w.visible_if.value as string | undefined } } : {}),
+  };
+}
+
+function placeholderToWire(p: Placeholder): WirePlaceholder {
+  return {
+    id: p.id,
+    ...(p.name != null ? { name: p.name } : {}),
+    label: p.label,
+    type: p.type,
+    required: p.required ?? false,
+    ...(p.options ? { options: p.options } : {}),
+    ...(p.regex != null ? { regex: p.regex } : {}),
+    ...(p.minNumber != null ? { min_number: p.minNumber } : {}),
+    ...(p.maxNumber != null ? { max_number: p.maxNumber } : {}),
+    ...(p.minDate != null ? { min_date: p.minDate } : {}),
+    ...(p.maxDate != null ? { max_date: p.maxDate } : {}),
+    ...(p.maxLength != null ? { max_length: p.maxLength } : {}),
+    ...(p.resolverKey != null ? { resolver_key: p.resolverKey } : {}),
+    ...(p.visibleIf ? { visible_if: { placeholder_id: p.visibleIf.placeholderID, op: p.visibleIf.operator, value: p.visibleIf.value } } : {}),
+  };
+}
+
+export async function getTemplateSchemas(templateId: string, versionNum: number): Promise<TemplateSchemas> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}`);
+  const body = await apiJson<{ data: { version: VersionDTO & { placeholder_schema: WirePlaceholder[] | null } } }>(res);
+  const v = body.data.version;
+  return {
+    placeholders: Array.isArray(v.placeholder_schema) ? v.placeholder_schema.map(placeholderFromWire) : [],
+    composition: null,
+  };
+}
+
+export async function putTemplateSchemas(templateId: string, versionNum: number, schemas: TemplateSchemas): Promise<void> {
+  const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/schema`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      metadata_schema: {},
+      placeholder_schema: schemas.placeholders.map(placeholderToWire),
+      expected_content_hash: '',
+    }),
   });
-}
-
-/**
- * POST /templates/:key/edit
- * Create a new draft from a published version so it can be edited.
- */
-export function editPublished(key: string): Promise<TemplateDraftDTO> {
-  return request<TemplateDraftDTO>(`/templates/${encodeKey(key)}/edit`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
-
-/**
- * POST /templates/:key/deprecate
- * Deprecate a specific published version.
- */
-export function deprecateTemplate(key: string, version: number): Promise<void> {
-  return request<void>(`/templates/${encodeKey(key)}/deprecate`, {
-    method: "POST",
-    body: JSON.stringify({ version }),
-  });
-}
-
-/**
- * POST /templates/:key/clone
- * Clone an existing template under a new name.
- */
-export function cloneTemplate(key: string, newName: string): Promise<TemplateDraftDTO> {
-  return request<TemplateDraftDTO>(`/templates/${encodeKey(key)}/clone`, {
-    method: "POST",
-    body: JSON.stringify({ newName }),
-  });
-}
-
-/**
- * DELETE /templates/:key/draft
- * Permanently delete a draft (no published version exists).
- */
-export function deleteDraft(key: string): Promise<void> {
-  return request<void>(`/templates/${encodeKey(key)}`, {
-    method: "DELETE",
-  });
-}
-
-/**
- * POST /templates/:key/discard
- * Discard an in-progress draft, reverting to the last published version.
- */
-export function discardDraft(key: string): Promise<void> {
-  return request<void>(`/templates/${encodeKey(key)}/discard-draft`, {
-    method: "POST",
-  });
-}
-
-/**
- * POST /templates/:key/acknowledge-stripped
- * Acknowledge that the user has reviewed stripped fields after import.
- * May throw TemplateLockConflictError on 409.
- */
-export function acknowledgeStripped(key: string, lockVersion: number): Promise<TemplateDraftDTO> {
-  return requestWithStructuredErrors<TemplateDraftDTO>(`/templates/${encodeKey(key)}/acknowledge-stripped`, {
-    method: "POST",
-    body: JSON.stringify({ lockVersion }),
-  });
-}
-
-/**
- * GET /templates/:key/export?version=<n>
- * Download a template snapshot as a binary blob (JSON file download).
- */
-export function exportTemplate(key: string, version: number): Promise<Blob> {
-  return requestBlob(`/templates/${encodeKey(key)}/export?version=${encodeURIComponent(String(version))}`);
-}
-
-/**
- * POST /templates/:key/preview-docx
- * Render a .docx preview from the current draft's blocks.
- * Returns a Blob for browser download.
- */
-export function previewTemplateDocx(key: string): Promise<Blob> {
-  return requestBlob(`/templates/${encodeKey(key)}/preview-docx`, { method: "POST" });
-}
-
-/**
- * POST /templates/import?profileCode=<code>
- * Import a template from an uploaded file (multipart/form-data).
- */
-export function importTemplate(profileCode: string, file: File): Promise<ImportResultDTO> {
-  return request<ImportResultDTO>(`/templates/import?profileCode=${encodeURIComponent(profileCode)}`, {
-    method: "POST",
-    body: file,
-    headers: {
-      "Content-Type": file.type || "application/json",
-    },
-  });
+  await apiJson<unknown>(res);
 }
