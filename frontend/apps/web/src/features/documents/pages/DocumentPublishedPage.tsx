@@ -14,9 +14,9 @@ import styles from './DocumentPublishedPage.module.css';
 // TODO(backlog): Replace with real revision list from GET /api/v1/documents/:id/revisions
 // See wiki/backlog/documento-publicado.md
 const PLACEHOLDER_VERSIONS = [
-  { v: 'v2.3', when: '18 mar 2025', author: 'A. Tavares', current: false,
+  { v: 'rev. 2.3', when: '18 mar 2025', author: 'A. Tavares', current: false,
     summary: 'Ajustes de redação após feedback de Engenharia.' },
-  { v: 'v2.4', when: '02 jul 2025', author: 'R. Souza', current: false,
+  { v: 'rev. 2.4', when: '02 jul 2025', author: 'R. Souza', current: false,
     summary: 'Revisão geral pós-auditoria interna. Novas etiquetas padronizadas para todas as plantas.' },
   { v: 'v3.0', when: '14 nov 2025', author: 'R. Souza', current: false,
     summary: 'Reestruturação completa do procedimento. Inclusão de seção para fontes energéticas múltiplas.' },

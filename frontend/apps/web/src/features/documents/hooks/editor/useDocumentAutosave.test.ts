@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDocumentAutosave, type AutosaveArgs } from './useDocumentAutosave';
-import * as api from '../../api/documentsV2';
+import * as api from '../../api/documents';
 import * as idb from './useIndexedDBRestore';
 
-vi.mock('../../api/documentsV2');
+vi.mock('../../api/documents');
 vi.mock('./useIndexedDBRestore', () => ({
   putPending: vi.fn().mockResolvedValue(undefined),
   deletePending: vi.fn().mockResolvedValue(undefined),

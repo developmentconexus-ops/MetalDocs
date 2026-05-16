@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listCheckpoints, createCheckpoint, restoreCheckpoint, type Checkpoint } from '../api/documentsV2';
+import { listCheckpoints, createCheckpoint, restoreCheckpoint, type Checkpoint } from '../api/documents';
 
 export type CheckpointsPanelProps = {
   documentID: string;

@@ -64,7 +64,7 @@ The CD itself doesn't have an approval state — its document revisions do. The 
 
 **Response:** `201 Created` with the CD object (including the server-resolved `code` field). Replay of the same `Idempotency-Key` returns the stored 201 response from `metaldocs.idempotency_keys`.
 
-**Legacy deleted:** `RegistryCreateDialog` and `DocumentCreatePage` were removed. The wizard at `/documents-v2/new` now calls this endpoint directly.
+**Legacy deleted:** `RegistryCreateDialog` and `DocumentCreatePage` were removed. The wizard at `/documents/new` now calls this endpoint directly.
 
 ## Preview Endpoint
 

@@ -1,5 +1,21 @@
 # Sync log - approval
 
+## 2026-05-16 - controlled-document review route polish
+
+- **Context:** uncommitted diff: approval inbox navigation target changed from `/controlled-documents/{controlled_document_id}` to `/controlled-documents/{controlled_document_id}`.
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** none
+- **Routes/API:** frontend navigation spec/backlog references updated; approval HTTP API unchanged
+- **Runtime flows:** review/open-document UI path now targets canonical controlled-document route
+- **Persistence:** none
+- **Dependencies:** none
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=4 Minor=6; missing-ADR=10
+- **Tally gate:** PASS preflight
+- **Patched files:** `wiki/backlog/caixa-aprovacao.md`; `wiki/modules/approval/_artifacts/sync-log.md`
+
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
 ## 2026-05-15 - D4 hard-cutover debt/backlog closure sync (0194)

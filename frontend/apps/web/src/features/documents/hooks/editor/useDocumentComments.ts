@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Comment } from '@metaldocs/editor-ui';
 import { toast } from 'sonner';
-import { createComment, deleteComment, listComments, patchComment, type CommentRow } from '../../api/documentsV2';
+import { createComment, deleteComment, listComments, patchComment, type CommentRow } from '../../api/documents';
 
 function toInitials(author: string): string {
   return author

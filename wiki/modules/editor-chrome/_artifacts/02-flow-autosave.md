@@ -7,7 +7,7 @@
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| Hook (state owner) | `useDocumentAutosave` | `frontend/apps/web/src/features/documents/hooks/v2/useDocumentAutosave.ts:22` |
+| Hook (state owner) | `useDocumentAutosave` | `frontend/apps/web/src/features/documents/hooks/editor/useDocumentAutosave.ts:22` |
 | Local hook status type | `AutosaveStatus` (NAME COLLISION with component) | `useDocumentAutosave.ts:5` |
 | Adapter | inline `autosaveState` ternary | `DocumentEditorPage.tsx:184-188` (and `TemplateEditorPage.tsx:217-221`) |
 | Component | `AutosaveStatus` | `parts/AutosaveStatus.tsx:28` |

@@ -37,7 +37,7 @@ Composer: main agent (Opus 4.7). Date: 2026-05-10. Re-read of `wiki/modules/audi
    - `internal/modules/audit/application/service.go:18` — `ListEvents` declared at line 18. ✓
    - `migrations/0005_grant_workflow_audit_privileges.sql:2` — INSERT grant on line 2. ✓
    - Plus: `apps/api/cmd/metaldocs-api/main.go:193` (`auditHandler.RegisterRoutes(mux)`) confirmed by Phase 2 artifact §2c.
-   - Plus: `apps/api/cmd/metaldocs-api/main.go:445-479` (`documentsV2AuditAdapter`) confirmed by Phase 3 §2c.
+   - Plus: `apps/api/cmd/metaldocs-api/main.go:477-492` (`documentsAuditAdapter`) confirmed by Phase 3 §2c.
 
 6. **Backlog ↔ debt linkage.** R-001..R-012 each carry a `T-NNN` debt_id matching the register's T-001..T-012. One-to-one. Verified by tally_check.sh (PASS).
 

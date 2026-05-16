@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { finalizeDocument, listDocuments } from '../api/documentsV2';
+import { finalizeDocument, listDocuments } from '../api/documents';
 import { ApiError } from '../../../lib/api';
 
-describe('documentsV2 with apiFetch', () => {
+describe('documents with apiFetch', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('listDocuments returns array on 200', async () => {

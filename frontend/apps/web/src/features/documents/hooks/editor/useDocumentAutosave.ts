@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { presignAutosave, commitAutosave } from '../../api/documentsV2';
+import { presignAutosave, commitAutosave } from '../../api/documents';
 import { deletePending, putPending, getAllPending } from './useIndexedDBRestore';
 
 export type AutosaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'stale' | 'session_lost' | 'error';
