@@ -49,14 +49,14 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 	}
 
 	snapshotSvc := application.NewSnapshotService(
-		docgenv2.NewTemplatesV2SnapshotReader(db),
+		docgenv2.NewTemplatesSnapshotReader(db),
 		docrepo.NewSnapshotRepository(db),
 	)
 	svc := application.NewServiceWithSnapshot(
 		docrepo.New(db),
 		nil,
 		nil,
-		docgenv2.NewTemplatesV2TemplateReader(db),
+		docgenv2.NewTemplatesTemplateReader(db),
 		fakeFormVal{valid: true},
 		&noopAudit{},
 		&fakeRegistryReader{cd: cd},
@@ -125,7 +125,7 @@ func seedCreateDocumentSnapshotRows(t *testing.T, ctx context.Context, db *sql.D
 	t.Helper()
 
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO templates_v2_template (
+		INSERT INTO templates_template (
 			id, tenant_id, doc_type_code, key, name, visibility, latest_version, published_version_id, created_by
 		) VALUES (
 			$1::uuid, $2, 'po', 'snapshot-integration-template', 'Snapshot Integration Template',
@@ -133,11 +133,11 @@ func seedCreateDocumentSnapshotRows(t *testing.T, ctx context.Context, db *sql.D
 		)`,
 		templateID, tenantID, actorID,
 	); err != nil {
-		t.Fatalf("seed templates_v2_template: %v", err)
+		t.Fatalf("seed templates_template: %v", err)
 	}
 
 	if _, err := db.ExecContext(ctx, `
-		INSERT INTO templates_v2_template_version (
+		INSERT INTO templates_template_version (
 			id, template_id, version_number, status, docx_storage_key, content_hash,
 			metadata_schema, placeholder_schema, author_id, published_at
 		) VALUES (
@@ -146,11 +146,11 @@ func seedCreateDocumentSnapshotRows(t *testing.T, ctx context.Context, db *sql.D
 		)`,
 		templateVersionID, templateID, actorID,
 	); err != nil {
-		t.Fatalf("seed templates_v2_template_version: %v", err)
+		t.Fatalf("seed templates_template_version: %v", err)
 	}
 
 	if _, err := db.ExecContext(ctx, `
-		UPDATE templates_v2_template
+		UPDATE templates_template
 		   SET published_version_id = $1::uuid
 		 WHERE id = $2::uuid`,
 		templateVersionID, templateID,

@@ -32,8 +32,8 @@ Notes:
 | `internal/modules/documents/http` | `fillin_handler.go:17` | `templatesdomain.PHType`, `templatesdomain.Placeholder` | HTTP handler maps placeholder types to API response |
 | `internal/modules/documents/http` | `placeholder_options_handler.go:8` | `templatesdomain.PHSelect`, `templatesdomain.Placeholder` | Options handler filters select-type placeholders |
 | `internal/platform/objectstore` | `templates_presigner.go:13` | `domain.ErrUploadMissing` | Presigner adapter implements `application.Presigner`; uses domain error sentinel |
-| `internal/platform/docgenv2` | `templates_reader.go` (no Go import; raw SQL only) | — | `TemplatesV2TemplateReader` reads directly from `templates_template_version` table; no Go import of templates packages |
-| `internal/platform/docgenv2` | `templates_snapshot_reader.go` (no Go import; raw SQL only) | — | `TemplatesV2SnapshotReader` reads directly from DB tables; no Go import of templates packages |
+| `internal/platform/docgenv2` | `templates_reader.go` (no Go import; raw SQL only) | — | `TemplatesTemplateReader` reads directly from `templates_template_version` table; no Go import of templates packages |
+| `internal/platform/docgenv2` | `templates_snapshot_reader.go` (no Go import; raw SQL only) | — | `TemplatesSnapshotReader` reads directly from DB tables; no Go import of templates packages |
 | `apps/api/cmd/metaldocs-api` | `main.go:34–36` | `tv2app.New`, `tv2repo.New`, `tv2http.New` | DI composition root; constructs and registers all templates layers |
 | `tests/docx_v2` | `scaffold_smoke_test.go:8` | `domain.Placeholder` (unclear: exact symbol) | Smoke test scaffolds placeholder domain objects |
 
@@ -45,7 +45,7 @@ Total external importers (non-self): 14 entries across 5 packages. None exceed 5
 
 | Site | File:line | What is wired |
 |---|---|---|
-| `apps/api/cmd/metaldocs-api/main.go` | `327` | `objectstore.NewTemplatesV2Presigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)` — constructs presigner adapter |
+| `apps/api/cmd/metaldocs-api/main.go` | `327` | `objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)` — constructs presigner adapter |
 | `apps/api/cmd/metaldocs-api/main.go` | `328` | `tv2app.New(tv2repo.New(deps.SQLDB), tv2Presigner, realClock{}, realUUIDGen{})` — constructs repository and service; `resolvers` arg is omitted (nil) |
 | `apps/api/cmd/metaldocs-api/main.go` | `329` | `tv2http.New(tv2Svc, nil).Register(mux)` — constructs handler with nil authz func (bypassed); registers all routes on the global mux |
 
@@ -64,7 +64,7 @@ The only runtime-configurable value surfaces at construction time via `main.go`:
 
 | Name | Read at (file:line) | Required? | Default |
 |---|---|---|---|
-| `deps.MinioClient` | `main.go:327` (passed to `NewTemplatesV2Presigner`) | Yes | — (set by DI deps loader) |
+| `deps.MinioClient` | `main.go:327` (passed to `NewTemplatesPresigner`) | Yes | — (set by DI deps loader) |
 | `deps.MinioBucket` | `main.go:327` | Yes | — (set by DI deps loader) |
 | Max object size | `main.go:327` literal `25*1024*1024` | n/a | 25 MiB hard-coded at wiring site |
 

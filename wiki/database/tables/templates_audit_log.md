@@ -1,4 +1,4 @@
-# public.templates_v2_audit_log
+# public.templates_audit_log
 
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `public`
@@ -23,7 +23,7 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 ## Baseline Definition
 
 ```sql
-CREATE TABLE public.templates_v2_audit_log (
+CREATE TABLE public.templates_audit_log (
 id bigint NOT NULL,
     tenant_id text NOT NULL,
     template_id uuid NOT NULL,
@@ -37,7 +37,7 @@ id bigint NOT NULL,
 
 ## Runtime Usage
 
-Use `rg -n "templates_v2_audit_log" internal apps` and the owning module wiki to verify readers/writers before changing this table.
+Use `rg -n "templates_audit_log" internal apps` and the owning module wiki to verify readers/writers before changing this table.
 
 ## Seed or Reference Data
 

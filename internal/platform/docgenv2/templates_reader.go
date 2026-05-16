@@ -6,29 +6,29 @@ import (
 	"errors"
 )
 
-// TemplatesV2TemplateReader implements documents_v2/application.TemplateReader
-// for templates authored via the templates_v2 module. Schema is stored in the
+// TemplatesTemplateReader implements documents/application.TemplateReader
+// for templates authored via the templates module. Schema is stored in the
 // database (not S3), so schemaKey is always "" and schemaJSON is always "".
-type TemplatesV2TemplateReader struct {
+type TemplatesTemplateReader struct {
 	db *sql.DB
 }
 
-func NewTemplatesV2TemplateReader(db *sql.DB) *TemplatesV2TemplateReader {
-	return &TemplatesV2TemplateReader{db: db}
+func NewTemplatesTemplateReader(db *sql.DB) *TemplatesTemplateReader {
+	return &TemplatesTemplateReader{db: db}
 }
 
-func (r *TemplatesV2TemplateReader) GetPublishedVersion(ctx context.Context, tenantID, templateVersionID string) (docxKey, schemaKey, schemaJSON string, err error) {
+func (r *TemplatesTemplateReader) GetPublishedVersion(ctx context.Context, tenantID, templateVersionID string) (docxKey, schemaKey, schemaJSON string, err error) {
 	if r.db == nil {
-		return "", "", "", errors.New("templates_v2 template reader: db is nil")
+		return "", "", "", errors.New("templates template reader: db is nil")
 	}
 	err = r.db.QueryRowContext(ctx, `
 		SELECT tv.docx_storage_key
-		FROM templates_v2_template_version tv
-		JOIN templates_v2_template tpl ON tpl.id = tv.template_id
+		FROM templates_template_version tv
+		JOIN templates_template tpl ON tpl.id = tv.template_id
 		WHERE tv.id = $1
-		  AND tpl.tenant_id = $2
+		  AND (tpl.tenant_id = $2 OR tpl.tenant_id = $3)
 		  AND tv.status = 'published'`,
-		templateVersionID, tenantID,
+		templateVersionID, tenantID, systemTemplateTenantID,
 	).Scan(&docxKey)
 	if err != nil {
 		return "", "", "", err
@@ -40,10 +40,10 @@ func (r *TemplatesV2TemplateReader) GetPublishedVersion(ctx context.Context, ten
 // it falls back to the secondary reader.
 type FanoutTemplateReader struct {
 	primary   *TemplateReader
-	secondary *TemplatesV2TemplateReader
+	secondary *TemplatesTemplateReader
 }
 
-func NewFanoutTemplateReader(primary *TemplateReader, secondary *TemplatesV2TemplateReader) *FanoutTemplateReader {
+func NewFanoutTemplateReader(primary *TemplateReader, secondary *TemplatesTemplateReader) *FanoutTemplateReader {
 	return &FanoutTemplateReader{primary: primary, secondary: secondary}
 }
 

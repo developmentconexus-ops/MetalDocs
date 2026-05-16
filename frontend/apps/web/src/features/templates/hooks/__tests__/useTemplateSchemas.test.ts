@@ -1,9 +1,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTemplateSchemas } from '../useTemplateSchemas';
-import * as api from '../../api/templatesV2';
+import * as api from '../../api/templates';
 
-vi.mock('../../api/templatesV2');
+vi.mock('../../api/templates');
 
 const schemas = {
   placeholders: [{ id: 'p1', label: 'Title', type: 'text' as const }],

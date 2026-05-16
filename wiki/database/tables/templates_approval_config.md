@@ -1,4 +1,4 @@
-# public.templates_v2_approval_config
+# public.templates_approval_config
 
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `public`
@@ -18,7 +18,7 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 ## Baseline Definition
 
 ```sql
-CREATE TABLE public.templates_v2_approval_config (
+CREATE TABLE public.templates_approval_config (
 template_id uuid NOT NULL,
     reviewer_role text,
     approver_role text NOT NULL
@@ -27,7 +27,7 @@ template_id uuid NOT NULL,
 
 ## Runtime Usage
 
-Use `rg -n "templates_v2_approval_config" internal apps` and the owning module wiki to verify readers/writers before changing this table.
+Use `rg -n "templates_approval_config" internal apps` and the owning module wiki to verify readers/writers before changing this table.
 
 ## Seed or Reference Data
 

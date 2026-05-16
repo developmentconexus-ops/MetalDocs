@@ -13,18 +13,18 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
-// TemplatesV2Presigner implements templates_v2/application.Presigner.
-type TemplatesV2Presigner struct {
+// TemplatesPresigner implements templates/application.Presigner.
+type TemplatesPresigner struct {
 	client       *minio.Client
 	bucket       string
 	maxSizeBytes int64
 }
 
-func NewTemplatesV2Presigner(client *minio.Client, bucket string, maxSizeBytes int64) *TemplatesV2Presigner {
-	return &TemplatesV2Presigner{client: client, bucket: bucket, maxSizeBytes: maxSizeBytes}
+func NewTemplatesPresigner(client *minio.Client, bucket string, maxSizeBytes int64) *TemplatesPresigner {
+	return &TemplatesPresigner{client: client, bucket: bucket, maxSizeBytes: maxSizeBytes}
 }
 
-func (p *TemplatesV2Presigner) PresignPUT(ctx context.Context, key string, expires time.Duration) (string, error) {
+func (p *TemplatesPresigner) PresignPUT(ctx context.Context, key string, expires time.Duration) (string, error) {
 	u, err := p.client.PresignedPutObject(ctx, p.bucket, key, expires)
 	if err != nil {
 		return "", err
@@ -32,7 +32,7 @@ func (p *TemplatesV2Presigner) PresignPUT(ctx context.Context, key string, expir
 	return u.String(), nil
 }
 
-func (p *TemplatesV2Presigner) PresignGET(ctx context.Context, key string, expires time.Duration) (string, error) {
+func (p *TemplatesPresigner) PresignGET(ctx context.Context, key string, expires time.Duration) (string, error) {
 	u, err := p.client.PresignedGetObject(ctx, p.bucket, key, expires, nil)
 	if err != nil {
 		return "", err
@@ -40,7 +40,7 @@ func (p *TemplatesV2Presigner) PresignGET(ctx context.Context, key string, expir
 	return u.String(), nil
 }
 
-func (p *TemplatesV2Presigner) HeadContentHash(ctx context.Context, key string) (string, error) {
+func (p *TemplatesPresigner) HeadContentHash(ctx context.Context, key string) (string, error) {
 	obj, err := p.client.GetObject(ctx, p.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		if isNoSuchKeyErr(err) {
@@ -75,7 +75,7 @@ func (p *TemplatesV2Presigner) HeadContentHash(ctx context.Context, key string) 
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func (p *TemplatesV2Presigner) Delete(ctx context.Context, key string) error {
+func (p *TemplatesPresigner) Delete(ctx context.Context, key string) error {
 	err := p.client.RemoveObject(ctx, p.bucket, key, minio.RemoveObjectOptions{})
 	if isNoSuchKeyErr(err) {
 		return nil

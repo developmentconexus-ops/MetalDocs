@@ -1,25 +1,25 @@
-# templates - Flow Trace: GET /api/v1/templates (ListTemplatesV2)
+# templates - Flow Trace: GET /api/v1/templates (ListTemplates)
 <!-- Read-only trace. Facts only. -->
 Generated: 2026-05-10
 
 ## Header
 - Operation: `GET /api/v1/templates`
-- API op name: `ListTemplatesV2`
+- API op name: `ListTemplates`
 - Module: `internal/modules/templates`
 - Primary path: Route -> `delivery/http` handler -> `application.Service.ListTemplates` -> `repository.Repository.ListTemplates` -> SQL `templates_template`
 
 ## Flow
 
 ### 1) ROUTE REGISTRATION
-- Generated oapi-codegen mount exists: `m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates", wrapper.ListTemplatesV2)` at `internal/modules/templates/api/api.gen.go:954`.
-- Generated wrapper dispatch calls module handler interface method: `siw.Handler.ListTemplatesV2(w, r)` at `internal/modules/templates/api/api.gen.go:631-634`.
-- Module route registration mounts generated wrapper endpoint directly: `mux.HandleFunc("GET /api/v1/templates", generated.ListTemplatesV2)` at `internal/modules/templates/delivery/http/handler.go:40`.
+- Generated oapi-codegen mount exists: `m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/templates", wrapper.ListTemplates)` at `internal/modules/templates/api/api.gen.go:954`.
+- Generated wrapper dispatch calls module handler interface method: `siw.Handler.ListTemplates(w, r)` at `internal/modules/templates/api/api.gen.go:631-634`.
+- Module route registration mounts generated wrapper endpoint directly: `mux.HandleFunc("GET /api/v1/templates", generated.ListTemplates)` at `internal/modules/templates/delivery/http/handler.go:40`.
 - In module wiring, `generated` is a `templatesapi.ServerInterfaceWrapper{Handler: h, ...}` at `internal/modules/templates/delivery/http/handler.go:32-37`.
-- Strict-server codegen wiring exists (`StrictServerInterface`, `NewStrictHandler`, `strictHandler.ListTemplatesV2`) at `internal/modules/templates/api/api.gen.go:1193-1199`, `1228-1240`, `1276-1291`.
+- Strict-server codegen wiring exists (`StrictServerInterface`, `NewStrictHandler`, `strictHandler.ListTemplates`) at `internal/modules/templates/api/api.gen.go:1193-1199`, `1228-1240`, `1276-1291`.
 - Runtime use of `NewStrictHandler(...)` for templates route mounting is UNVERIFIED from inspected wiring; module register path uses `ServerInterfaceWrapper` (`internal/modules/templates/delivery/http/handler.go:31-40`).
 
 ### 2) HANDLER
-- Generated module handler entrypoint: `func (h *Handler) ListTemplatesV2(w http.ResponseWriter, r *http.Request)` delegates to `h.listTemplates(w, r)` at `internal/modules/templates/delivery/http/routes_generated.go:15-17`.
+- Generated module handler entrypoint: `func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request)` delegates to `h.listTemplates(w, r)` at `internal/modules/templates/delivery/http/routes_generated.go:15-17`.
 - Concrete handler signature: `func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request)` at `internal/modules/templates/delivery/http/routes_query.go:12`.
 - Query parse and validation:
 - `limit` parsed by `readQueryInt(q.Get("limit"), 50)` and returns `400 invalid_limit` when parse fails (`routes_query.go:20-24`, `214-223`).
@@ -91,7 +91,7 @@ Generated: 2026-05-10
 | Stage | Confirmed behavior | Evidence |
 |---|---|---|
 | Route mount | GET `/api/v1/templates` mounted to generated wrapper method | `internal/modules/templates/delivery/http/handler.go:40`; `internal/modules/templates/api/api.gen.go:954` |
-| Dispatch | Wrapper calls `Handler.ListTemplatesV2`; handler delegates to `listTemplates` | `internal/modules/templates/api/api.gen.go:631-634`; `internal/modules/templates/delivery/http/routes_generated.go:15-17` |
+| Dispatch | Wrapper calls `Handler.ListTemplates`; handler delegates to `listTemplates` | `internal/modules/templates/api/api.gen.go:631-634`; `internal/modules/templates/delivery/http/routes_generated.go:15-17` |
 | Authz | `h.authz(..., "template.view")` called, but nil wiring installs no-op | `internal/modules/templates/delivery/http/routes_query.go:14`; `internal/modules/templates/delivery/http/handler.go:24-27`; `apps/api/cmd/metaldocs-api/main.go:329` |
 | Tenant scope | Header `X-Tenant-ID` else `tenant.DevTenantID`; SQL has `tenant_id = $1` | `internal/modules/templates/delivery/http/handler.go:84-89`; `internal/modules/templates/repository/postgres.go:94` |
 | Service | List is pass-through to repo | `internal/modules/templates/application/queries.go:28-30` |

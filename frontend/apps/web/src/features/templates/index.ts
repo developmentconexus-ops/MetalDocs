@@ -1,2 +1,2 @@
-export type { TemplateDTO } from './api/templatesV2';
-export { listTemplates } from './api/templatesV2';
+export type { TemplateDTO } from './api/templates';
+export { listTemplates } from './api/templates';

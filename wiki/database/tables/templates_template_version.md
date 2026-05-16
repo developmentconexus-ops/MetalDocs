@@ -1,4 +1,4 @@
-# public.templates_v2_template_version
+# public.templates_template_version
 
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `public`
@@ -35,7 +35,7 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 ## Baseline Definition
 
 ```sql
-CREATE TABLE public.templates_v2_template_version (
+CREATE TABLE public.templates_template_version (
 id uuid NOT NULL,
     template_id uuid NOT NULL,
     version_number integer NOT NULL,
@@ -61,7 +61,7 @@ id uuid NOT NULL,
 
 ## Runtime Usage
 
-Use `rg -n "templates_v2_template_version" internal apps` and the owning module wiki to verify readers/writers before changing this table.
+Use `rg -n "templates_template_version" internal apps` and the owning module wiki to verify readers/writers before changing this table.
 
 ## Seed or Reference Data
 

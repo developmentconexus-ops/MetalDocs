@@ -184,8 +184,8 @@ Source: `_artifacts/01-surface.md` Â§1a + Â§1b. **All routes still mount und
 | Method | Path | OperationID | Handler | Authz cap (intended) |
 |---|---|---|---|---|
 | GET | `/api/v1/signed` | `RedirectSignedUrlV2` | `generated.RedirectSignedUrlV2` | (none) |
-| GET | `/api/v1/templates` | `ListTemplatesV2` | `generated.ListTemplatesV2` | `template.view` |
-| POST | `/api/v1/templates` | `CreateTemplateV2` | `generated.CreateTemplateV2` | `template.create` |
+| GET | `/api/v1/templates` | `ListTemplates` | `generated.ListTemplates` | `template.view` |
+| POST | `/api/v1/templates` | `CreateTemplate` | `generated.CreateTemplate` | `template.create` |
 | GET | `/api/v1/templates/{id}` | â€” (hand-rolled) | `Handler.getTemplate` | `template.view` |
 | GET | `/api/v1/templates/{id}/versions/{n}` | `GetTemplateVersionV2` | `generated.GetTemplateVersionV2` | `template.view` |
 | POST | `/api/v1/templates/{id}/versions` | â€” (hand-rolled) | `Handler.createNextVersion` | `template.edit` |
@@ -212,8 +212,8 @@ Hand-rolled rows (12 of 20) are absent from the OpenAPI spec â†’ spec/handl
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/signed` | `internal/modules/templates/delivery/http/handler.go:39` | `generated.RedirectSignedUrlV2` | `/api/v1/signed` | `redirectSignedUrlV2` | `RedirectSignedUrlV2` | Aligned | Wrapper-mounted |
-| GET | `/api/v1/templates` | `internal/modules/templates/delivery/http/handler.go:40` | `generated.ListTemplatesV2` | `/api/v1/templates` | `listTemplatesV2` | `ListTemplatesV2` | Aligned | Wrapper-mounted |
-| POST | `/api/v1/templates` | `internal/modules/templates/delivery/http/handler.go:41` | `generated.CreateTemplateV2` | `/api/v1/templates` | `createTemplateV2` | `CreateTemplateV2` | Aligned | Wrapper-mounted |
+| GET | `/api/v1/templates` | `internal/modules/templates/delivery/http/handler.go:40` | `generated.ListTemplates` | `/api/v1/templates` | `listTemplates` | `ListTemplates` | Aligned | Wrapper-mounted |
+| POST | `/api/v1/templates` | `internal/modules/templates/delivery/http/handler.go:41` | `generated.CreateTemplate` | `/api/v1/templates` | `createTemplate` | `CreateTemplate` | Aligned | Wrapper-mounted |
 | GET | `/api/v1/templates/{id}/versions/{n}` | `internal/modules/templates/delivery/http/handler.go:42` | `generated.GetTemplateVersionV2` | `/api/v1/templates/{id}/versions/{n}` | `getTemplateVersionV2` | `GetTemplateVersionV2` | Aligned | Wrapper-mounted |
 | POST | `/api/v1/templates/{id}/versions/{n}/docx-upload-url` | `internal/modules/templates/delivery/http/handler.go:43` | `generated.PresignTemplateDocxUploadUrlV2` | `/api/v1/templates/{id}/versions/{n}/docx-upload-url` | `presignTemplateDocxUploadUrlV2` | `PresignTemplateDocxUploadUrlV2` | Aligned | Wrapper-mounted |
 | POST | `/api/v1/templates/{id}/versions/{n}/schema-upload-url` | `internal/modules/templates/delivery/http/handler.go:44` | `generated.PresignTemplateSchemaUploadUrlV2` | `/api/v1/templates/{id}/versions/{n}/schema-upload-url` | `presignTemplateSchemaUploadUrlV2` | `PresignTemplateSchemaUploadUrlV2` | Aligned | Wrapper-mounted |
