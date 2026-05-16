@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExportMenu } from '../components/ExportMenu';
 
-vi.mock('../api/exportsV2', () => ({
+vi.mock('../api/exports', () => ({
   exportPDF: vi.fn(),
   getDocxSignedURL: vi.fn(),
 }));
@@ -16,7 +16,7 @@ beforeEach(() => {
 
 describe('ExportMenu', () => {
   it('PDF happy path — status done with cached=false', async () => {
-    const { exportPDF } = await import('../api/exportsV2');
+    const { exportPDF } = await import('../api/exports');
     vi.mocked(exportPDF).mockResolvedValueOnce({
       storage_key: 'k',
       signed_url: 'https://example.com/file.pdf',
@@ -36,7 +36,7 @@ describe('ExportMenu', () => {
   });
 
   it('PDF cache hit — displays Cached', async () => {
-    const { exportPDF } = await import('../api/exportsV2');
+    const { exportPDF } = await import('../api/exports');
     vi.mocked(exportPDF).mockResolvedValueOnce({
       storage_key: 'k',
       signed_url: 'https://example.com/file.pdf',
@@ -54,7 +54,7 @@ describe('ExportMenu', () => {
   });
 
   it('429 — shows rate limited message with retry seconds', async () => {
-    const { exportPDF } = await import('../api/exportsV2');
+    const { exportPDF } = await import('../api/exports');
     vi.mocked(exportPDF).mockRejectedValueOnce(
       Object.assign(new Error('http_429'), { status: 429, body: { retry_after_seconds: 15 } }),
     );
@@ -67,7 +67,7 @@ describe('ExportMenu', () => {
   });
 
   it('502 — shows unavailable error message', async () => {
-    const { exportPDF } = await import('../api/exportsV2');
+    const { exportPDF } = await import('../api/exports');
     vi.mocked(exportPDF).mockRejectedValueOnce(
       Object.assign(new Error('http_502'), { status: 502 }),
     );

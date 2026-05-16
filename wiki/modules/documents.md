@@ -501,12 +501,12 @@ Top 3 (by severity, then blast radius):
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`
 - Upstream template publisher: [`wiki/modules/templates.md`](templates.md) â€” publishes the `template_version` rows (with `placeholder_schema`) that documents instantiates from; `documents` snapshots `placeholder_schema` at create time (Â§8.7 of that doc)
 - Frontend counterpart: `frontend/apps/web/src/features/documents/` â€” Library, Wizard, Editor, Published view (see `wiki/architecture/frontend-structure.md`)
-- Predecessor stub: `wiki/modules/documents-v2.md` â€” DEPRECATED, retired by R-100
+- Predecessor stub: `retired documents module stub` â€” DEPRECATED, retired by R-100
 - Backlog: `wiki/backlog/documents-refactor.md`, `wiki/backlog/contract-first-followups.md`
 - Tech debt: `wiki/modules/documents-tech-debt.md`
 - Iam cross-refs: `wiki/modules/iam-tech-debt.md` T-001 (namespaces), T-006 (RFC 9457), T-009 (`ErrCapabilityDenied`)
 - Auth cross-ref: [`wiki/modules/auth.md Â§8.8`](auth.md) â€” `authdomain.CurrentUserFromContext` is the IN-edge this module reads after middleware injection; Â§8.1 of auth.md covers the middleware that sets the context value
-- See also: [`modules/audit.md`](audit.md) â€” documents emits audit events via `documentsV2AuditAdapter` (`main.go:445-479`); T-005 (rename outside tx) and T-007 (latent consumer port) are the open gaps in the consumer-side register
+- See also: [`modules/audit.md`](audit.md) â€” documents emits audit events via `documentsAuditAdapter` (`main.go:477-492`); T-005 (rename outside tx) and T-007 (latent consumer port) are the open gaps in the consumer-side register
 - See also: [`modules/registry.md`](registry.md) â€” registry owns the CD identity (`controlled_documents`); documents exposes the `CreateDocumentTx` port that registry calls inside the atomic create transaction (ADR 0011)
 - See also: [`modules/taxonomy.md`](taxonomy.md) â€” documents reads `process_areas.name` live at document-create time for the `area_name_snapshot` column (`repository.go:94-101`); taxonomy Â§8.9 documents this cross-module data contract
 

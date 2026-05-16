@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getDocument } from '../api/documentsV2';
+import { getDocument } from '../api/documents';
 import { QK } from '../../../lib/queryKeys';
 
 export function useDocumentDetailQuery(id: string) {

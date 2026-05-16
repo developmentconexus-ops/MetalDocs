@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { exportPDF, getDocxSignedURL, type ExportPDFResult } from '../api/exportsV2';
+import { exportPDF, getDocxSignedURL, type ExportPDFResult } from '../api/exports';
 
 type Status =
   | { kind: 'idle' }

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { getApprovalInstance } from '../api/documentsV2';
+import { getApprovalInstance } from '../api/documents';
 import { QK } from '../../../lib/queryKeys';
 
 export function useApprovalInstanceQuery(documentId: string) {

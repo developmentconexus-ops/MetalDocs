@@ -53,7 +53,7 @@ export function InboxPage() {
   }
 
   function openDocument(item: InboxItem) {
-    navigate(`/registry-v2/${item.controlled_document_id}`);
+    navigate(`/controlled-documents/${item.controlled_document_id}`);
   }
 
   async function openDecisionFlow(item: InboxItem, initialDecision: 'approve' | 'reject') {

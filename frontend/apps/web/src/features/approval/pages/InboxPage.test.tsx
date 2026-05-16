@@ -215,7 +215,7 @@ describe('InboxPage', () => {
     renderPage();
     fireEvent.click(screen.getByText('Abrir documento'));
 
-    expect(navigateMock).toHaveBeenCalledWith('/registry-v2/cd-123');
+    expect(navigateMock).toHaveBeenCalledWith('/controlled-documents/cd-123');
   });
 
   it('approve action opens signoff flow only when active-document context is complete', async () => {

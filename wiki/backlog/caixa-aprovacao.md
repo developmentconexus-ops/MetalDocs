@@ -18,7 +18,7 @@ Preflight evidence:
   - validated persisted view state (`stack | timeline`)
   - honest empty-state behavior (no mock fallback)
   - `InboxStack`, card, and timeline rendering from real `InboxItem` fields
-  - `Abrir documento` and timeline `Revisar` actions navigate to `/registry-v2/{controlled_document_id}`
+  - `Abrir documento` and timeline `Revisar` actions navigate to `/controlled-documents/{controlled_document_id}`
   - `Aprovar e assinar` and `Devolver` open real signoff flow after active-document context lookup
   - action icon parity (`eye`)
 - `implemented but legacy-wired`

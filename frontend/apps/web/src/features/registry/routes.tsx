@@ -12,13 +12,13 @@ export const registryRoutes: RouteObject[] = [
     lazy: () => import("./pages/RegistryExplorerPage"),
   },
   {
-    path: "registry-v2",
-    handle: { workspaceView: "registry-v2" },
-    lazy: () => import("./pages/RegistryV2Page"),
+    path: "controlled-documents",
+    handle: { workspaceView: "controlled-documents" },
+    lazy: () => import("./pages/ControlledDocumentsPage"),
   },
   {
-    path: "registry-v2/:controlledDocumentId",
-    handle: { workspaceView: "registry-v2" },
-    lazy: () => import("./pages/RegistryV2Page"),
+    path: "controlled-documents/:controlledDocumentId",
+    handle: { workspaceView: "controlled-documents" },
+    lazy: () => import("./pages/ControlledDocumentsPage"),
   },
 ];

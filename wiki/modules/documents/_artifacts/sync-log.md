@@ -1,5 +1,21 @@
 ## 2026-05-15 - D4 hard-cutover wiki/docs sync
 
+## 2026-05-16 - documents frontend V2 naming polish
+
+- **Context:** uncommitted diff: documents frontend API wrappers renamed editor hooks folder renamed the editor hook folder to `hooks/editor`.
+- **Mode:** lite patch
+- **Anchors moved:** `features/documents/hooks/editor/*`
+- **Public surface:** frontend-only import/file naming changed; document HTTP API unchanged
+- **Routes/API:** no backend route/schema change
+- **Runtime flows:** editor/autosave/comments/pdf hooks keep existing behavior under canonical path names
+- **Persistence:** IndexedDB DB name changed from `metaldocs_docs`
+- **Dependencies:** audit adapter reference corrected to `documentsAuditAdapter`
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
+- **Tally gate:** PASS preflight
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
+
 - **Context:** Worker E wiki/docs lane cutover refresh for current route/API truth and approval linkage rename evidence.
 - **Mode:** lite patch
 - **Anchors moved:** route/API wording only
@@ -36,7 +52,7 @@
 - **Context:** Plan 6a (commit 0e106ed9) · wrap RenameDocument UPDATE + audit.Write in single transaction
 - **Anchors moved:** 0
 - **Symbols renamed:** 0
-- **T-NNN closed:** T-005 · evidence: Service.RenameDocument uses BeginTx when s.db != nil; UpdateDocumentNameTx added to Repository interface + postgres impl; WriteTx added to Audit interface; documentsV2AuditAdapter.WriteTx wired
+- **T-NNN closed:** T-005 · evidence: Service.RenameDocument uses BeginTx when s.db != nil; UpdateDocumentNameTx added to Repository interface + postgres impl; WriteTx added to Audit interface; documentsAuditAdapter.WriteTx wired
 - **R-NNN updated:** R-005 → merged · commit 0e106ed9
 - **§11 counts after:** Critical=1 Major=5 Minor=4 (unchanged)
 - **Tally gate:** PASS (pre-existing WARNs T-007/T-010 have no backlog row — latent by design)

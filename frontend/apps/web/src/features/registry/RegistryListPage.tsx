@@ -18,7 +18,7 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
   const [profileFilter, setProfileFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  const pathMatch = /^\/registry-v2\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(location.pathname);
+  const pathMatch = /^\/controlled-documents\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(location.pathname);
   const detailId = pathMatch ? pathMatch[1] : null;
 
   async function load() {
@@ -48,7 +48,7 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
       <RegistryDetailPage
         id={detailId}
         onBack={() => {
-          navigate('/registry-v2');
+          navigate('/controlled-documents');
           void load();
         }}
         onOpenDocumentEditor={onOpenDocumentEditor}
@@ -109,7 +109,7 @@ export function RegistryListPage({ onOpenDocumentEditor }: Props = {}) {
             {docs.map((doc) => (
               <tr
                 key={doc.id}
-                onClick={() => navigate(`/registry-v2/${doc.id}`)}
+                onClick={() => navigate(`/controlled-documents/${doc.id}`)}
                 style={{ borderBottom: "1px solid #f0f0f0", cursor: "pointer" }}
                 onMouseOver={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "#f7f7f7"; }}
                 onMouseOut={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = ""; }}

@@ -61,7 +61,7 @@ async function triggerEditorChange() {
   await act(async () => { await Promise.resolve(); vi.advanceTimersByTime(400); });
 }
 
-// SKIP 2026-05-10 - convergence test predates the v2/ dir dissolve (commit b1e7ae00)
+// SKIP 2026-05-10 - convergence test predates the versioned directory dissolve (commit b1e7ae00)
 // and never had its mock paths or render assumptions refreshed for the
 // `TemplateAuthorPage -> TemplateEditorPage` rebuild. Pre-existing fail on main
 // (4/5) -> still red after the rename + path fix because fake-timer + multi-effect

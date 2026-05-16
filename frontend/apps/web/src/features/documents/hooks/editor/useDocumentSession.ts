@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { acquireSession, heartbeatSession, releaseSession, type AcquireResult } from '../../api/documentsV2';
+import { acquireSession, heartbeatSession, releaseSession, type AcquireResult } from '../../api/documents';
 
 export type SessionState =
   | { phase: 'idle' }

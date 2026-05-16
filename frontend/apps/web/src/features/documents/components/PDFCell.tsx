@@ -1,4 +1,4 @@
-import type { PDFStatus } from '../hooks/v2/useDocumentPdfStatus';
+import type { PDFStatus } from '../hooks/editor/useDocumentPdfStatus';
 
 type Props = { status: PDFStatus; url?: string; onRetry: () => void };
 

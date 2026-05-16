@@ -2,9 +2,9 @@ import React, { type PropsWithChildren } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDocumentSession } from '../useDocumentSession';
-import * as api from '../../../api/documentsV2';
+import * as api from '../../../api/documents';
 
-vi.mock('../../../api/documentsV2');
+vi.mock('../../../api/documents');
 
 const WRITER_ONE = {
   mode: 'writer' as const,

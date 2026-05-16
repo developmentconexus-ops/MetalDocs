@@ -1,6 +1,6 @@
 import { openDB, type IDBPDatabase } from 'idb';
 
-const DB_NAME = 'metaldocs_docs_v2';
+const DB_NAME = 'metaldocs_docs';
 const STORE = 'pending_autosaves';
 
 interface PendingBlob {

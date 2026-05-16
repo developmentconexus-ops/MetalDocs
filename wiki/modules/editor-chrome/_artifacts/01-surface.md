@@ -179,7 +179,7 @@ If eigenpal changes any of these attribute values, the override silently no-ops.
 
 - Slot API uses `ReactNode` (untyped slot contents — no constraint on what consumers pass). No discriminated union on slot identity.
 - `editorChromeStyles` re-export is the SOLE mechanism by which consumers obtain the shared button/text class names. Type is `typeof styles` (inferred CSS-module record); the consuming pages can typo a class name and get `undefined` at runtime (only flagged if `noUncheckedIndexedAccess` is on — verify in Phase 6.75).
-- `AutosaveState` (`'idle' | 'saving' | 'saved' | 'error'`) is a 4-state enum exported from this module. The Documents feature has a parallel local type `AutosaveStatus` in `features/documents/hooks/v2/useDocumentAutosave.ts:5` with a 7-state superset (`'idle' | 'dirty' | 'saving' | 'saved' | 'stale' | 'session_lost' | 'error'`). The page-level code maps the larger enum to this 4-state enum (see `DocumentEditorPage.tsx:184` and `TemplateEditorPage.tsx:217` — `autosaveState: AutosaveState = ...`).
+- `AutosaveState` (`'idle' | 'saving' | 'saved' | 'error'`) is a 4-state enum exported from this module. The Documents feature has a parallel local type `AutosaveStatus` in `features/documents/hooks/editor/useDocumentAutosave.ts:5` with a 7-state superset (`'idle' | 'dirty' | 'saving' | 'saved' | 'stale' | 'session_lost' | 'error'`). The page-level code maps the larger enum to this 4-state enum (see `DocumentEditorPage.tsx:184` and `TemplateEditorPage.tsx:217` — `autosaveState: AutosaveState = ...`).
 
 ## Summary
 

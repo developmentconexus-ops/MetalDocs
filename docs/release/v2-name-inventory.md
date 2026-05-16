@@ -1,11 +1,11 @@
 # Release V2 Name Inventory
 
-- Generated: 2026-05-16 10:48:38 -03:00
+- Generated: 2026-05-16 11:14:28 -03:00
 - Scope: api, apps, db, docs, frontend/apps/web/src, internal, migrations, wiki
 - Match regex: (?i)\bV2\b|_v2\b|/v2/|api/v2|templatesV2|templates_v2|documents_v2|docgenv2|docgen-v2|docgen_v2
-- Total hits: 5134
+- Total hits: 5082
 - Allowed hits: 49
-- Unexpected hits: 5085
+- Unexpected hits: 5033
 - Allowlist rules: github.com/oapi-codegen/oapi-codegen/v2, oapi-codegen v2, openapi-typescript v7, MDDM/v2
 
 ## Unexpected Hits

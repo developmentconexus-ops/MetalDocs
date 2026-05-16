@@ -19,9 +19,9 @@ Total external runtime deps: 2 (`@eigenpal/docx-js-editor`, `@metaldocs/shared-t
 | Consumer | Imports | Notes |
 |---|---|---|
 | `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:2` | `MetalDocsEditor`, `MetalDocsEditorRef`, `Comment` | **Sole runtime mount of `MetalDocsEditor`** |
-| `frontend/apps/web/src/features/documents/hooks/v2/useDocumentComments.ts:2` | `type { Comment }` | Type-only |
-| `frontend/apps/web/src/features/documents/hooks/v2/__tests__/useDocumentComments.add.test.tsx:1` | `type { Comment }` | Type-only |
-| `frontend/apps/web/src/features/documents/hooks/v2/__tests__/useDocumentComments.orphan.test.tsx:1` | `type { Comment }` | Type-only |
+| `frontend/apps/web/src/features/documents/hooks/editor/useDocumentComments.ts:2` | `type { Comment }` | Type-only |
+| `frontend/apps/web/src/features/documents/hooks/editor/__tests__/useDocumentComments.add.test.tsx:1` | `type { Comment }` | Type-only |
+| `frontend/apps/web/src/features/documents/hooks/editor/__tests__/useDocumentComments.orphan.test.tsx:1` | `type { Comment }` | Type-only |
 | `frontend/apps/web/src/features/documents/__tests__/DocumentEditorPage.test.tsx:36` | `MetalDocsEditor` (vi.mock target) | Mock for tests |
 | `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.test.tsx:7` | `MetalDocsEditor` (vi.mock target) | Mock for tests |
 | `frontend/apps/web/vite.config.ts:36` | alias `@metaldocs/editor-ui` → `packages/editor-ui/src/index.ts` | Build wiring |
