@@ -84,6 +84,7 @@ type CreateResult struct {
 }
 
 var ErrTemplateArtifactMissing = errors.New("template artifact missing")
+var errTemplateArtifactInvariantUnconfigured = errors.New("registry: template artifact invariant not configured")
 
 func NewRegistryService(
 	db *sql.DB,
@@ -98,7 +99,7 @@ func NewRegistryService(
 	if govLogger == nil {
 		panic("registry: governance logger must not be nil")
 	}
-	return &RegistryService{
+	svc := &RegistryService{
 		db:        db,
 		docs:      docs,
 		seq:       seq,
@@ -106,9 +107,12 @@ func NewRegistryService(
 		profiles:  profiles,
 		areas:     areas,
 		govLogger: govLogger,
-		docInit:   docInit,
 		now:       time.Now,
 	}
+	if docInit != nil {
+		svc.WithDocumentInitializer(docInit)
+	}
+	return svc
 }
 
 // WithDocumentInitializer wires the DocumentInitializer adapter post-construction.
@@ -117,13 +121,20 @@ func NewRegistryService(
 // RegistryDuplicator), then the documents module is built, then the
 // initializer adapter is injected back here.
 func (s *RegistryService) WithDocumentInitializer(d registrydomain.DocumentInitializer) *RegistryService {
+	if d == nil {
+		panic("registry: document initializer must not be nil")
+	}
+	resolver, ok := d.(templateArtifactResolver)
+	if !ok {
+		panic("registry: document initializer must implement template artifact resolver")
+	}
+	checker, ok := d.(TemplateArtifactChecker)
+	if !ok {
+		panic("registry: document initializer must implement template artifact checker")
+	}
 	s.docInit = d
-	if resolver, ok := d.(templateArtifactResolver); ok {
-		s.templateArtifactResolver = resolver
-	}
-	if checker, ok := d.(TemplateArtifactChecker); ok {
-		s.templateArtifactChecker = checker
-	}
+	s.templateArtifactResolver = resolver
+	s.templateArtifactChecker = checker
 	return s
 }
 
@@ -332,7 +343,7 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 
 func (s *RegistryService) ensureTemplateArtifact(ctx context.Context, cmd CreateControlledDocumentCmd) error {
 	if s.templateArtifactResolver == nil || s.templateArtifactChecker == nil {
-		return nil
+		return errTemplateArtifactInvariantUnconfigured
 	}
 	storageKey, err := s.templateArtifactResolver.ResolveTemplateStorageKey(ctx, cmd.TenantID, cmd.ProfileCode, cmd.TemplateVersionID)
 	if err != nil {
