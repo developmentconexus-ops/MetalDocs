@@ -15,8 +15,6 @@ func MapErr(err error) (httpStatus int, code string) {
 		return http.StatusNotFound, "not_found"
 	case errors.Is(err, domain.ErrKeyConflict):
 		return http.StatusConflict, "key_conflict"
-	case errors.Is(err, domain.ErrInvalidVisibility):
-		return http.StatusBadRequest, "invalid_visibility"
 	case errors.Is(err, domain.ErrInvalidStateTransition):
 		return http.StatusConflict, "invalid_state_transition"
 	case errors.Is(err, domain.ErrStaleBase):

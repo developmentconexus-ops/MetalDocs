@@ -45,7 +45,6 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 
 	templates, err := h.svc.ListTemplates(r.Context(), application.ListFilter{
 		TenantID:    tenantID,
-		AreaAny:     readCSVQuery(q["area"]),
 		DocTypeCode: docTypeCode,
 		Limit:       limit,
 		Offset:      offset,
@@ -244,23 +243,6 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 			"offset": offset,
 		},
 	})
-}
-
-func readCSVQuery(values []string) []string {
-	if len(values) == 0 {
-		return nil
-	}
-
-	out := make([]string, 0, len(values))
-	for _, raw := range values {
-		for _, part := range strings.Split(raw, ",") {
-			v := strings.TrimSpace(part)
-			if v != "" {
-				out = append(out, v)
-			}
-		}
-	}
-	return out
 }
 
 func readQueryInt(raw string, fallback int) (int, bool) {

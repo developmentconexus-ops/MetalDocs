@@ -1,6 +1,6 @@
 # Current Agent Handoff
 
-> **Last verified:** 2026-05-16
+> **Last verified:** 2026-05-17
 > **Scope:** Recovery context for a fresh or reinstalled Codex session.
 > **Out of scope:** Full implementation details for each screen. Follow the linked plan/spec/backlog files for that.
 
@@ -29,7 +29,7 @@ The user-reported Plan 12 status is:
 | Plan 12.1 | `templates` list | done |
 | Plan 12.2 | `caixa-aprovacao` | done |
 | Plan 12.3 | `novo-documento` | done |
-| Plan 12.4 | `novo-template-wizard` | functionally working, but see recovered review checkpoint below |
+| Plan 12.4 | `novo-template-wizard` | closed in current workspace; see 2026-05-17 closure checkpoint below |
 | Plan 12.5 | `template-editor` | next target |
 | Plan 12.6 | `documento-publicado` | remaining |
 | Plan 12.7 | `library` / biblioteca | remaining |
@@ -80,7 +80,7 @@ Recovered summary:
 - The user chose a split sequence: finish the template wizard professionally first, then handle broader release cleanup separately.
 - The session wrote and committed `docs/superpowers/specs/2026-05-16-template-wizard-stabilization-design.md`.
 
-Recovered review blockers to verify before declaring Plan 12.4 closed:
+Recovered review blockers that were verified/resolved before declaring Plan 12.4 closed:
 
 | Finding | Action from recovered design |
 |---|---|
@@ -95,6 +95,16 @@ Recovered review blockers to verify before declaring Plan 12.4 closed:
 The committed design spec is the authoritative recovery artifact:
 
 - `docs/superpowers/specs/2026-05-16-template-wizard-stabilization-design.md`
+
+2026-05-17 closure checkpoint:
+
+- `/templates/new` is a four-step wizard: Perfil, Identidade, Estrutura, Confirmação.
+- The old template-use permissions/disponibilidade step was removed by product decision. Template governance stays IAM capability-based (`template.*`); template selection for document creation is driven by document type/profile and lifecycle/publication state, not creator-scoped template visibility.
+- Template create/list runtime behavior and OpenAPI/generated DTOs no longer expose or filter by `visibility`, `areas`, or `specific_areas`. Existing database columns remain inert compatibility fields pending a coordinated baseline/migration cleanup.
+- DOCX wizard import is implemented: the selected `.docx` is held until submit, template/version is created, bytes are uploaded via autosave presign, SHA-256 is committed through autosave commit, then Eigenpal opens `/templates/{id}/versions/{n}` with the imported document rendered.
+- Browser validation created both blank and imported-DOCX templates. Blank opened Eigenpal with a blank draft; imported DOCX rendered fixture text `Hello {doc_code}` and did not show `No document loaded`.
+- Fresh gates after closure: frontend template typecheck passed; targeted template Vitest passed (2 files / 5 tests); backend templates `go test ./internal/modules/templates/... -count=1` passed with workspace-local Go cache; backend `go generate ./internal/modules/templates/api/...` passed; editor-ui typecheck passed; editor-ui Vitest passed (5 files / 13 tests); `git diff --check` passed with only CRLF warnings; templates wiki tally passed with severity count 4/6/4.
+- Known caveats: Redocly lint remains blocked by npm `ECOMPROMISED Lock compromised`; the broad frontend suite still has unrelated existing failures; final browser reconnect failed because the browser runtime could not write kernel assets, but prior runtime validation evidence exists in `.codex-run/template-e2e-result.json`.
 
 ## Plan 12.5 next target
 
@@ -136,8 +146,7 @@ The user stated they are changing references from `documents_v2` to `documents` 
 
 1. Read `AGENTS.md`, `CLAUDE.md`, `wiki/README.md`, `wiki/references/ai-operating-system.md`, and this file.
 2. Run `git status --short` and identify current branch.
-3. Inspect whether `docs/superpowers/specs/2026-05-16-template-wizard-stabilization-design.md` has been implemented after commit `7b79f48b`.
-4. If not implemented, ask the user whether to complete that stabilization before Plan 12.5 or keep it as a separate tracked follow-up.
-5. If proceeding to Plan 12.5, create or read the Plan 12.5 execution plan and start with `metaldocs-screen-integration-audit`.
+3. Treat Plan 12.4 as closed unless fresh verification contradicts the 2026-05-17 closure checkpoint.
+4. If proceeding to Plan 12.5, create or read the Plan 12.5 execution plan and start with `metaldocs-screen-integration-audit`.
+5. Use implementation subagents only after the screen integration audit classifies the work into independent, non-overlapping implementation slices.
 6. After implementation changes, run the relevant verification gates and sync wiki memory with `metaldocs-module-doc-sync` for touched documented modules.
-

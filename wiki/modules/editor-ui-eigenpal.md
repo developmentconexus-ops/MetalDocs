@@ -2,7 +2,7 @@
 
 > Living architecture doc. Replaces the prior integration stub. Shape: Arc42 (12 sections) + C4 (Context + Container) Mermaid diagrams + ADR links.
 >
-> **Last verified:** 2026-05-11 | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
+> **Last verified:** 2026-05-17 | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
 
 ---
 
@@ -15,6 +15,7 @@
 - **Wrap a single eigenpal version pin** â€” drives plugin compatibility and CSS overrides. Source: ADR 0001.
 - **Provide a 3-value `EditorMode`** â€” `template-draft` / `document-edit` / `readonly` â€” that maps onto eigenpal's 2-value `editing`/`viewing`. Source: 2026-05-06 plugin-registration refactor (no ADR â€” see T-007).
 - **Gate `templatePlugin` to `template-draft`** â€” so document-edit and readonly do not render meaningless sidebar chips. Source: `MetalDocsEditor.tsx:49-59` comments + `concepts/placeholders.md` (writer mode never substitutes).
+- **Seed editable blank mounts with an Eigenpal empty document** - when no DOCX buffer exists, `template-draft` / `document-edit` pass `createEmptyDocument()` through the adapter so consumers see a blank page, not Eigenpal's "No document loaded" fallback. Source: `MetalDocsEditor.tsx:53-56`.
 - **Surface DOCX bytes via debounced autosave** â€” 1500ms debounce + concurrent-save guard, hand bytes to the parent. Source: `MetalDocsEditor.tsx:30-47`.
 - **Re-export the eigenpal `Comment` type** â€” so `documents` module consumes one type-source. Source: `index.ts:3`.
 
@@ -24,7 +25,8 @@
 |---|---|---|
 | 1 | Seam isolation â€” no `@eigenpal/docx-js-editor` import outside `packages/editor-ui/` | Repo-wide grep. Violation resolved 2026-05-11 (commit `60fa5473`) â€” `TemplateEditorPage` migrated to `MetalDocsEditor`; target now met |
 | 2 | Tokens stay literal in writer mode â€” no client-side `applyVariables` call | Source grep `applyVariables` in `MetalDocsEditor.tsx` returns 0; freeze pipeline owns substitution. See `concepts/placeholders.md` |
-| 3 | No save races â€” only one save in flight per editor instance | `inFlightRef` guard at `MetalDocsEditor.tsx:35`; covered by `MetalDocsEditor.mount.test.tsx` |
+| 3 | Blank authoring starts as a real editable page | `MetalDocsEditor.mount.test.tsx` asserts editable no-buffer mounts receive `createEmptyDocument()`; Navegador validation on `Blank Eigenpal 1779023863221` showed toolbar + empty page and no "No document loaded" |
+| 4 | No save races â€” only one save in flight per editor instance | `inFlightRef` guard at `MetalDocsEditor.tsx:35`; covered by `MetalDocsEditor.mount.test.tsx` |
 
 ### 1.3 Stakeholders
 
@@ -83,7 +85,7 @@ Inbound:
 - Type-only imports of `Comment` from `useDocumentComments` and its tests.
 
 Outbound:
-- `@eigenpal/docx-js-editor` (`DocxEditor`, `PluginHost`, `templatePlugin`, type exports).
+- `@eigenpal/docx-js-editor` (`DocxEditor`, `PluginHost`, `templatePlugin`, type exports) and `@eigenpal/docx-js-editor/core` (`createEmptyDocument` for editable blank mounts).
 - `@metaldocs/shared-tokens` (`diffTokensVsSchema`, `classifyBlacklist`) â€” fuels `computeSidebarModel`.
 
 ---
@@ -92,6 +94,7 @@ Outbound:
 
 - **Wrap, do not patch.** No `pnpm patch` files, no `node_modules` hacks. Refresh path is artifact-level â€” replace the tarball in `vendor/eigenpal/` + reinstall. Driver: ADR 0001.
 - **Three modes, one prop.** A single `mode` prop drives plugin gating, autosave on/off, eigenpal `mode` mapping. Avoids per-consumer conditionals. Driver: 2026-05-06 refactor (rule has no ADR â€” T-007).
+- **Blank document default belongs in the adapter.** Consumers pass `documentBuffer` when persisted DOCX exists; otherwise the wrapper seeds editable modes with `createEmptyDocument()` and leaves readonly empty mounts unseeded. This prevents every screen from learning Eigenpal's blank-document API and avoids writing storage rows before the first user edit.
 - **Plugins composed at mount time, not on mode change.** The plugin list is rebuilt on every render; eigenpal's `PluginHost` accepts the new array. No `useMemo` â€” list is tiny and identity-stable when inputs are stable. Driver: simplicity over micro-optimization.
 - **Autosave is parent's problem.** The wrapper produces bytes + a single in-flight guard. The parent owns retry, conflict (409/etag), and status surfacing (via `EditorChrome` `right` slot). Driver: keep wrapper free of network/API concerns.
 - **`applyVariables` deferred.** Writer never substitutes. Future "preview mode" gets its own two-buffer design. Driver: ADR 0008.
@@ -151,6 +154,7 @@ None. Adapter has no HTTP surface. The C4 Container diagram above replaces the (
 | `template-draft` | `editing` | included | yes |
 | `document-edit` | `editing` | skipped | yes |
 | `readonly` | `viewing` | skipped | no (early-return at `MetalDocsEditor.tsx:31`) |
+Editable modes also receive an Eigenpal `document={createEmptyDocument()}` seed when `documentBuffer` is absent. Persisted DOCX buffers take precedence and readonly empty mounts stay empty.
 
 ---
 
@@ -203,10 +207,11 @@ sequenceDiagram
     participant Wrap as MetalDocsEditor
     participant PH as PluginHost
     participant Eig as DocxEditor
-    Parent->>Wrap: <MetalDocsEditor mode={m} sidebarModel? externalPlugins?/>
+    Parent->>Wrap: <MetalDocsEditor mode={m} documentBuffer? sidebarModel? externalPlugins?/>
+    Wrap->>Wrap: if editing and no documentBuffer: blankDocument = createEmptyDocument()
     Wrap->>Wrap: plugins = [...(m==='template-draft'?[templatePlugin]:[]), ...sidebarBridge?, ...external?]
     Wrap->>PH: <PluginHost plugins={plugins}>
-    PH->>Eig: <DocxEditor mode={libMode} ... />
+    PH->>Eig: <DocxEditor mode={libMode} documentBuffer? document? ... />
     Eig-->>Parent: editor mounted
 ```
 
@@ -298,6 +303,7 @@ The adapter's central job is to be the only file that imports `@eigenpal/docx-js
 | Seam isolation | `grep -r "@eigenpal/docx-js-editor" frontend/apps/web/src` outside type-only positions | Returns zero results â€” target met (T-002 resolved 2026-05-11) |
 | Tokens stay literal | Author types `{doc_code}`, autosaves, refreshes page | Stored DOCX still contains the literal string `{doc_code}` â€” no substitution in the buffer |
 | Single in-flight save | Burst of 10 keystrokes within 1s | Exactly one `save()` invocation after debounce; no overlapping `cb(buf)` calls |
+| Blank editable mount | New blank template has no `docx_storage_key`; `TemplateEditorPage` mounts `MetalDocsEditor` with no `documentBuffer` | Eigenpal receives `createEmptyDocument()` and renders a blank page with toolbar; no "No document loaded" fallback |
 | Readonly is non-mutating | Mount `mode='readonly'`, fire `onChange` programmatically | `handleChange` early-returns at line 31; no `onAutoSave` invocation |
 
 ---
@@ -347,6 +353,8 @@ Top 3 (by severity, then by blast-radius):
 - Tech debt: `wiki/modules/editor-ui-eigenpal-tech-debt.md`
 
 ## Changelog (this doc)
+
+- 2026-05-17 - Blank-template authoring fix: `MetalDocsEditor` now seeds editable no-buffer mounts with `createEmptyDocument()`, keeping Eigenpal's blank-document contract inside the adapter. Updated requirements, strategy, mode mapping, plugin-registration flow, quality requirements, and dependency facts. Verified with editor-ui tests, editor-ui typecheck, frontend typecheck, and Navegador on a fresh blank template (`a93b9271-470c-4178-b557-a914733de92e`).
 
 - 2026-05-11 â€” Plan 11: T-002 closed â€” `TemplateEditorPage` migrated to `MetalDocsEditor` (commit `60fa5473`); T-003 closed â€” `templatePlugin.wiring.test.tsx` rewritten to 5 correct assertions gated on `template-draft` mode (commit `ce6d809a`). `onChange` prop added to `MetalDocsEditorProps` (commit `cae6da02`). Â§1.2 goal-1 updated; C4 context diagram updated; Â§3.2 IN-edges updated; Â§5.2 surface table extended; Â§8.7 ACL note updated; Â§10 seam-isolation row updated; Â§11 counts + Top 3 recomputed. Consumer anchor `TemplateEditorPage.tsx:334` added.
 - 2026-05-11 â€” Sync pass (Plan 3): bumped Last verified; Â§2 vendor note updated (T-001 resolved â€” tarball restored); Â§11 Top 3 list updated to reflect T-001 closure (T-002 now #1, T-003 #2, T-004 #3).

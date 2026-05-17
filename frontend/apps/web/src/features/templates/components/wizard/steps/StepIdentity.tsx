@@ -34,10 +34,10 @@ export function StepIdentity({
 }: StepIdentityProps): JSX.Element {
   const kicker =
     scopeType === 'generic'
-      ? 'Etapa 2 de 5 · Template genérico'
+      ? 'Etapa 2 de 4 · Template genérico'
       : selectedProfile
-        ? `Etapa 2 de 5 · Perfil ${selectedProfile.code} - ${selectedProfile.name}`
-        : 'Etapa 2 de 5';
+        ? `Etapa 2 de 4 · Perfil ${selectedProfile.code} - ${selectedProfile.name}`
+        : 'Etapa 2 de 4';
 
   // TODO(novo-template-wizard:next-code-preview): replace the slug key preview
   // with a server sequence only when the next-code endpoint ships.
@@ -151,8 +151,8 @@ export function StepIdentity({
       <WizardFooter
         stepLabel={
           advanceDisabled
-            ? 'Etapa 2 de 5 · Informe o nome para continuar'
-            : 'Etapa 2 de 5 · Pronto para avançar'
+            ? 'Etapa 2 de 4 · Informe o nome para continuar'
+            : 'Etapa 2 de 4 · Pronto para avançar'
         }
         showBack
         onBack={onBack}

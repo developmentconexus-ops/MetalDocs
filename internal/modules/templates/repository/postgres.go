@@ -43,12 +43,12 @@ INSERT INTO templates_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
 	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8,
-	$9, $10, $11, $12, $13, $14, $15
+	$1, $2, $3, $4, $5, $6, '{}'::text[], 'public',
+	'{}'::text[], $7, $8, $9, $10, $11, $12
 )`
 	_, err := r.db.ExecContext(ctx, q,
-		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description, t.Areas, string(t.Visibility),
-		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
+		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
+		t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -63,7 +63,7 @@ INSERT INTO templates_template (
 func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
+	id::text, tenant_id, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_template
 WHERE id = $1 AND tenant_id = $2`
@@ -81,7 +81,7 @@ WHERE id = $1 AND tenant_id = $2`
 func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
+	id::text, tenant_id, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_template
 WHERE tenant_id = $1 AND key = $2`
@@ -99,31 +99,22 @@ WHERE tenant_id = $1 AND key = $2`
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
+	id::text, tenant_id, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_template
 WHERE tenant_id = $1
   AND system_owned = false
   AND ($2::text IS NULL OR doc_type_code = $2)
-  AND (cardinality($3::text[]) = 0 OR areas && $3::text[])
-  AND (
-    visibility = 'public'
-    OR (visibility = 'internal' AND NOT $6::boolean)
-    OR (visibility = 'specific' AND cardinality($7::text[]) > 0 AND specific_areas && $7::text[])
-  )
 ORDER BY created_at DESC
-LIMIT $4 OFFSET $5`
+LIMIT $3 OFFSET $4`
 
 	rows, err := r.db.QueryContext(
 		ctx,
 		q,
 		f.TenantID,
 		f.DocTypeCode,
-		normalizedTextArray(f.AreaAny),
 		f.Limit,
 		f.Offset,
-		f.IsExternalViewer,
-		normalizedTextArray(f.ActorAreas),
 	)
 	if err != nil {
 		return nil, err
@@ -149,18 +140,15 @@ SET
 	key = $4,
 	name = $5,
 	description = $6,
-	areas = $7,
-	visibility = $8,
-	specific_areas = $9,
-	latest_version = $10,
-	published_version_id = $11,
-	system_owned = $12,
-	archived_at = $13
+	latest_version = $7,
+	published_version_id = $8,
+	system_owned = $9,
+	archived_at = $10
 WHERE id = $1 AND tenant_id = $2`
 
 	res, err := r.db.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
-		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
+		t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
 	)
 	if err != nil {
 		return err
@@ -312,12 +300,12 @@ INSERT INTO templates_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
 	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8,
-	$9, $10, $11, $12, $13, $14, $15
+	$1, $2, $3, $4, $5, $6, '{}'::text[], 'public',
+	'{}'::text[], $7, $8, $9, $10, $11, $12
 )`
 	_, err := tx.ExecContext(ctx, q,
-		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description, t.Areas, string(t.Visibility),
-		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
+		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
+		t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -337,17 +325,14 @@ SET
 	key = $4,
 	name = $5,
 	description = $6,
-	areas = $7,
-	visibility = $8,
-	specific_areas = $9,
-	latest_version = $10,
-	published_version_id = $11,
-	system_owned = $12,
-	archived_at = $13
+	latest_version = $7,
+	published_version_id = $8,
+	system_owned = $9,
+	archived_at = $10
 WHERE id = $1 AND tenant_id = $2`
 	res, err := tx.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
-		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
+		t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
 	)
 	if err != nil {
 		return err
@@ -401,6 +386,19 @@ WHERE id = $1`
 }
 
 func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return updateVersionDraftCAS(ctx, r.db, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+}
+
+func (r *Repository) UpdateVersionDraftCASTx(ctx context.Context, tx *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return updateVersionDraftCAS(ctx, tx, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+}
+
+type draftCASExecutor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func updateVersionDraftCAS(ctx context.Context, db draftCASExecutor, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	const q = `
 UPDATE templates_template_version
 SET
@@ -409,7 +407,7 @@ SET
 	lock_version = lock_version + 1
 WHERE id = $1
   AND lock_version = $2`
-	res, err := r.db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+	res, err := db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 	if err != nil {
 		return err
 	}
@@ -419,7 +417,7 @@ WHERE id = $1
 	}
 
 	var exists bool
-	if err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM templates_template_version WHERE id = $1)", versionID).Scan(&exists); err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM templates_template_version WHERE id = $1)", versionID).Scan(&exists); err != nil {
 		return err
 	}
 	if !exists {

@@ -1,5 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { DocxEditor, PluginHost, templatePlugin, type DocxEditorRef, type EditorPlugin } from '@eigenpal/docx-js-editor';
+import { createEmptyDocument } from '@eigenpal/docx-js-editor/core';
 import '@eigenpal/docx-js-editor/styles.css';
 import type { MetalDocsEditorProps, MetalDocsEditorRef } from './types';
 import { buildSidebarModelPlugin } from './plugins/sidebarModelBridge';
@@ -49,6 +50,10 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
     };
 
     const libMode = props.mode === 'readonly' ? 'viewing' : 'editing';
+    const blankDocument = useMemo(
+      () => (!props.documentBuffer && props.mode !== 'readonly' ? createEmptyDocument() : undefined),
+      [props.documentBuffer, props.mode],
+    );
     // templatePlugin renders the `template-annotation-chip` items into the
     // unified sidebar (used for variable authoring in template-draft mode).
     // Document editing renders fully-substituted output — skip the plugin so
@@ -65,6 +70,7 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
         <DocxEditor
           ref={inner}
           documentBuffer={props.documentBuffer}
+          document={blankDocument}
           mode={libMode}
           author={props.author}
           documentName={props.documentName}

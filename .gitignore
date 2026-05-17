@@ -46,6 +46,7 @@ coverage_phase5.out
 .claude/worktrees/
 .claude/launch.json
 .codex/
+.codex-run/
 .codex-gocache/
 .gomodcache/
 worker.err.log
@@ -77,6 +78,7 @@ worker-*.out.log
 frontend/apps/web/vite-*.log
 frontend/apps/web/vite-*.err.log
 frontend/apps/web/vite-*.out.log
+frontend/apps/web/tmp-*.docx
 
 # Codex runtime dirs
 .codex-appdata/

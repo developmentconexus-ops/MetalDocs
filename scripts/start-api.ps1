@@ -275,4 +275,18 @@ if (-not $NoWorker) {
 }
 
 Write-Host "Starting MetalDocs API on :8081 after timestamp-based binary checks"
-& $binary
+try {
+    & $binary
+} catch {
+    $message = $_.Exception.Message
+    if ($message -notmatch 'Acesso negado' -and $message -notmatch 'Access is denied') {
+        throw
+    }
+
+    Write-Host "Launching metaldocs-api.exe was denied by the local Windows environment; falling back to go run for the API process"
+    $env:GOFLAGS = "-mod=mod"
+    go run ./apps/api/cmd/metaldocs-api/...
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}

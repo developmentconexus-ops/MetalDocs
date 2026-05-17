@@ -2,13 +2,13 @@
 
 > Companion to `wiki/modules/templates.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates-refactor.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-17 (wizard DOCX import + permission simplification)
 
 ## Items
 
 ### T-001 · Authz wired `nil` — every mutation bypasses capability assertion — CLOSED 2026-05-11 (Plan 5)
 - **Severity:** critical (closed)
-- **Surface (resolved):** `internal/modules/templates/application/service.go:22` — `WithDB(db *sql.DB) *Service` builder added; `apps/api/cmd/metaldocs-api/main.go` wires `tv2Svc.WithDB(deps.SQLDB)` + real `capabilityService` `AuthzFunc`. `application/create.go:84` (`CreateTemplate`), `application/lifecycle.go:54` (`SubmitForReview`), `:125`/`:148` (`Review`), `:226` (`Approve`), `:345` (`PublishTemplateVersion`), `:406` (`ArchiveTemplate`) — all six mutation paths call `authz.Require` with the appropriate capability when `s.db != nil`. Migration `0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version`.
+- **Surface (resolved):** `internal/modules/templates/application/service.go:22` — `WithDB(db *sql.DB) *Service` builder added; `apps/api/cmd/metaldocs-api/main.go` wires `tv2Svc.WithDB(deps.SQLDB)` + real `capabilityService` `AuthzFunc`. `application/create.go`, `application/lifecycle.go`, and `application/autosave.go` now call `authz.Require` with the appropriate capability when `s.db != nil`; the 2026-05-17 repair added `template.edit` assertions around `SaveTemplateDraft` and `CommitAutosave` so DOCX import/autosave commits satisfy the templates table tripwire. Migration `0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version`.
 - **Observation (original):** `New(svc, authz)` accepted an `AuthzFunc` argument, then if `authz == nil` substituted a no-op callback. The composition root passed `nil`. None of the seven repo mutations was wrapped in `internal/platform/authz.Require`. No `metaldocs.asserted_caps` GUC tripwire was installed on `templates_*` tables.
 - **Evidence:** `_artifacts/02-flow-update-schema.md`, `_artifacts/02-flow-publish.md`, `_artifacts/04-persistence.md` §5 (7 tripwire violations), `_artifacts/03-deps.md` §3.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-001`
@@ -48,13 +48,13 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-005` (merged Plan 7 2026-05-11, commit `bbe3933b`)
 - **Linked ADR:** `wiki/architecture/api-design-system.md`
 
-### T-006 · OpenAPI / handler drift — 12 of 20 routes hand-rolled, not in spec
-- **Severity:** major
-- **Surface:** `internal/modules/templates/api/api.gen.go:954-961` (8 generated routes) vs `internal/modules/templates/delivery/http/handler.go:39-61` (20 routes registered).
-- **Observation:** Twelve routes — `POST .../versions`, `PUT .../schema`, `POST .../{submit,review,approve}`, `POST .../autosave/{presign,commit}`, `POST .../archive`, `PUT .../approval-config`, `GET .../docx-url`, `GET .../audit`, `GET v2/placeholder-catalog` — are mounted by `Handler.Register` but absent from the OpenAPI spec consumed by oapi-codegen. Generated typed surfaces (`*RequestObject`, `*ResponseObject`) cover only 8 routes. Downstream tooling (frontend codegen, contract tests) sees half the surface. Same drift class as `documents` T-002.
-- **Evidence:** `_artifacts/01-surface.md` §1a + §1b, `_artifacts/05-industry.md` IP-005.
-- **Linked backlog row:** `backlog/templates-refactor.md#R-006`
-- **Linked ADR:** `wiki/decisions/0012-contract-first-api.md` (decision exists; module deviation is the debt)
+### T-006 · OpenAPI / handler drift — 12 of 20 routes hand-rolled, not in spec — CLOSED 2026-05-16 (Plan 12.4)
+- **Severity:** major (closed)
+- **Surface (resolved):** `api/openapi/v1/openapi.yaml` and `api/openapi/v1/partials/templates.yaml` include the mounted template route set, including `/api/v1/templates/placeholder-catalog`; `internal/modules/templates/api/api.gen.go` and `frontend/apps/web/src/lib/api-types/index.d.ts` were regenerated. `Handler.Register` mounts generated wrapper methods for the template routes and delegates some generated methods to existing internal handler bodies.
+- **Observation (original):** Twelve routes were mounted by `Handler.Register` but absent from the OpenAPI spec consumed by oapi-codegen.
+- **Evidence:** Plan 12.4 diff; `scripts/check-module-contract-sync.ps1 -Module templates` PASS; `go generate ./internal/modules/templates/api/...`; `pnpm gen:api`.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-006` (closed for route/spec/generated coverage; strict-server cleanup can be tracked separately if desired)
+- **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`
 
 ### T-007 · Multi-step publish + obsolete + audit not transactional
 - **Severity:** major
@@ -72,18 +72,19 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-008`
 - **Linked ADR:** missing-ADR
 
-### T-009 · No `Idempotency-Key` support on POST routes
+### T-009 · Idempotency replay coverage incomplete on generated POST routes
 - **Severity:** major
-- **Surface:** `internal/modules/templates/delivery/http/handler.go` (no header parsing); `internal/modules/templates/application/create.go:30` (`CreateTemplate`); `internal/modules/templates/application/lifecycle.go:265` (`PublishTemplateVersion`).
-- **Observation:** No route reads `Idempotency-Key`. Replays of `POST /api/v1/templates`, `POST /publish`, `POST /submit`, `POST /approve` either succeed twice (creating duplicate audit rows / duplicate template rows when `(tenant_id, key)` differs) or fail with `ErrInvalidStateTransition` after the first transition lands. `internal/platform/idempotency/` exists from Plan 2 but is not consumed here. Network retries by clients (mobile, browser refresh on slow API) produce inconsistent observable state.
-- **Evidence:** `_artifacts/05-industry.md` IP-002.
+- **Surface:** generated mutation wrappers under `internal/modules/templates/delivery/http/routes_generated.go` and `h.idempotent(...)` coverage; application mutations in `internal/modules/templates/application/create.go` and `internal/modules/templates/application/lifecycle.go`.
+- **Observation:** Plan 12.4 requires `Idempotency-Key` in the OpenAPI contract for `POST /api/v1/templates`, routes the wizard create path through the generated typed wrapper, and verifies HTTP 201 create with the header present. Replay semantics still need a focused audit across generated POST mutations (`/templates`, `/publish`, `/submit`, `/review`, `/approve`) to prove same-key retries return the first result and do not duplicate audit/state changes.
+- **Evidence:** `_artifacts/05-industry.md` IP-002; Plan 12.4 runtime smoke for `POST /api/v1/templates`; generated API contract requiring `Idempotency-Key` on create.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-009`
 - **Linked ADR:** missing-ADR
 
-### T-010 · Optimistic locking field carried but never enforced on autosave
-- **Severity:** major
-- **Surface:** `internal/modules/templates/application/autosave.go` (`SaveTemplateDraftCmd.ExpectedLockVersion` field) → `internal/modules/templates/repository/postgres.go:236` (`UpdateVersion`).
-- **Observation:** Command struct has `ExpectedLockVersion int64`, set by HTTP handler from request body. Service does not compare it against the row's current lock_version before `UpdateVersion`. Repo's UPDATE statement does not include `WHERE lock_version = $X`. Two concurrent autosaves on the same draft from different editors produce last-write-wins silently. No `412 Precondition Failed` ever returns. Eigenpal autosave fires on every keystroke flush; multi-tab editing data loss is observable.
+### T-010 · Optimistic locking field carried but never enforced on autosave — PARTIALLY CLOSED 2026-05-17
+- **Severity:** major → **partially resolved**
+- **Surface (resolved):** `internal/modules/templates/application/autosave.go` (`SaveTemplateDraft`) now calls `UpdateVersionDraftCAS` / `UpdateVersionDraftCASTx`; `internal/modules/templates/repository/postgres.go` enforces `WHERE id = $1 AND lock_version = $2` and returns `ErrStaleLockVersion` when the row exists but the version changed.
+- **Surface (residual):** legacy `/autosave/commit` carries only `expected_content_hash`, not `expected_lock_version`; it is hash-gated and tripwire-protected, but not multi-tab lock-version protected. The 2026-05-17 wizard DOCX import intentionally uses this legacy presign/commit path after template create because it is the existing Eigenpal-compatible import contract.
+- **Observation:** The generated `SaveTemplateDraft` path now enforces the lock field, closing the original unverified-field gap for that route. Eigenpal's current import/autosave wrapper still uses `/autosave/presign` + `/autosave/commit`, so a lock-version follow-up remains if the legacy commit route stays active.
 - **Evidence:** `_artifacts/02-flow-update-schema.md`.
 - **Linked backlog row:** `backlog/templates-refactor.md#R-010`
 - **Linked ADR:** missing-ADR

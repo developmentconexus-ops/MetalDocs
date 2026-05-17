@@ -322,7 +322,7 @@ Const blocks and identifiers:
   - AuditCreated, AuditSaved, AuditSubmitted, AuditReviewed, AuditApproved, AuditRejected,
     AuditPublished, AuditObsoleted, AuditArchived, AuditRestored, AuditApprovalConfigUpdated
 - internal/modules/templates/domain/template.go:10
-  - VisibilityPublic, VisibilityInternal, VisibilitySpecific
+  - no exported template-use visibility enum remains in the runtime domain; legacy DB compatibility values are repository-local constants only
 - internal/modules/templates/domain/schemas.go:12
   - PHText, PHDate, PHNumber, PHSelect, PHUser, PHPicture, PHComputed
 - internal/modules/templates/domain/version.go:10

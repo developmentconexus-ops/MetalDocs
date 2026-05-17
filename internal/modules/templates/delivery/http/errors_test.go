@@ -19,7 +19,6 @@ func TestMapErr(t *testing.T) {
 	}{
 		{name: "not found", err: domain.ErrNotFound, wantStatus: http.StatusNotFound, wantCode: "not_found"},
 		{name: "key conflict", err: domain.ErrKeyConflict, wantStatus: http.StatusConflict, wantCode: "key_conflict"},
-		{name: "invalid visibility", err: domain.ErrInvalidVisibility, wantStatus: http.StatusBadRequest, wantCode: "invalid_visibility"},
 		{name: "invalid state transition", err: domain.ErrInvalidStateTransition, wantStatus: http.StatusConflict, wantCode: "invalid_state_transition"},
 		{name: "stale base", err: domain.ErrStaleBase, wantStatus: http.StatusConflict, wantCode: "stale_base"},
 		{name: "stale lock version", err: domain.ErrStaleLockVersion, wantStatus: http.StatusPreconditionFailed, wantCode: "stale_lock_version"},

@@ -140,6 +140,10 @@ func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, ex
 	return nil
 }
 
+func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return r.UpdateVersionDraftCAS(context.Background(), versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+}
+
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.Status == domain.VersionStatusPublished && v.ID != keepVersionID {
@@ -278,10 +282,8 @@ func TestCreateTemplate_Happy(t *testing.T) {
 
 	var out struct {
 		Data struct {
-			Template struct {
-				ID string `json:"id"`
-			} `json:"template"`
-			Version struct {
+			Template map[string]any `json:"template"`
+			Version  struct {
 				VersionNumber int `json:"version_number"`
 			} `json:"version"`
 		} `json:"data"`
@@ -289,8 +291,17 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode body: %v", err)
 	}
-	if out.Data.Template.ID == "" {
+	if out.Data.Template["id"] == "" {
 		t.Fatal("expected template.id to be present")
+	}
+	if _, ok := out.Data.Template["visibility"]; ok {
+		t.Fatal("expected template response to omit visibility")
+	}
+	if _, ok := out.Data.Template["areas"]; ok {
+		t.Fatal("expected template response to omit areas")
+	}
+	if _, ok := out.Data.Template["specific_areas"]; ok {
+		t.Fatal("expected template response to omit specific_areas")
 	}
 	if out.Data.Version.VersionNumber != 1 {
 		t.Fatalf("expected version.version_number=1, got %d", out.Data.Version.VersionNumber)
@@ -301,7 +312,7 @@ func TestCreateTemplate_RejectUnknownField(t *testing.T) {
 	repo := newFakeRepo()
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewBufferString(`{"key":"contract-default","name":"Contract Template","visibility":"weird"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates", bytes.NewBufferString(`{"key":"contract-default","name":"Contract Template","visibility":"public"}`))
 	withHeaders(req)
 	rr := httptest.NewRecorder()
 

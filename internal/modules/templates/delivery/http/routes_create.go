@@ -22,15 +22,12 @@ func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		DocTypeCode   string            `json:"doc_type_code"`
-		Key           string            `json:"key"`
-		Name          string            `json:"name"`
-		Description   string            `json:"description"`
-		Areas         []string          `json:"areas"`
-		Visibility    domain.Visibility `json:"visibility"`
-		SpecificAreas []string          `json:"specific_areas"`
-		ApproverRole  string            `json:"approver_role"`
-		ReviewerRole  *string           `json:"reviewer_role"`
+		DocTypeCode  string  `json:"doc_type_code"`
+		Key          string  `json:"key"`
+		Name         string  `json:"name"`
+		Description  string  `json:"description"`
+		ApproverRole string  `json:"approver_role"`
+		ReviewerRole *string `json:"reviewer_role"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
@@ -38,17 +35,14 @@ func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res, err := h.svc.CreateTemplate(r.Context(), application.CreateTemplateCmd{
-		TenantID:      tenantID,
-		ActorUserID:   actorID,
-		DocTypeCode:   req.DocTypeCode,
-		Key:           req.Key,
-		Name:          req.Name,
-		Description:   req.Description,
-		Areas:         req.Areas,
-		Visibility:    req.Visibility,
-		SpecificAreas: req.SpecificAreas,
-		ApproverRole:  req.ApproverRole,
-		ReviewerRole:  req.ReviewerRole,
+		TenantID:     tenantID,
+		ActorUserID:  actorID,
+		DocTypeCode:  req.DocTypeCode,
+		Key:          req.Key,
+		Name:         req.Name,
+		Description:  req.Description,
+		ApproverRole: req.ApproverRole,
+		ReviewerRole: req.ReviewerRole,
 	})
 	if err != nil {
 		writeMappedErr(w, err)
@@ -106,9 +100,6 @@ func toTemplateResponse(t *domain.Template) map[string]any {
 		"key":                  t.Key,
 		"name":                 t.Name,
 		"description":          t.Description,
-		"areas":                t.Areas,
-		"visibility":           t.Visibility,
-		"specific_areas":       t.SpecificAreas,
 		"latest_version":       t.LatestVersion,
 		"published_version_id": t.PublishedVersionID,
 		"created_by":           t.CreatedBy,

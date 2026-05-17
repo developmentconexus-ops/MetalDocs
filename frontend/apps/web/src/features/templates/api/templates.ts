@@ -1,51 +1,62 @@
-export type VersionStatus = 'draft' | 'in_review' | 'approved' | 'published' | 'obsolete';
-
 import { apiFetch } from '../../../lib/api/client';
+import type { components, paths } from '../../../lib/api-types';
 import type { Placeholder, CompositionConfig } from '../placeholder-types';
 export type { Placeholder, CompositionConfig };
+
+type CreateTemplateRequest =
+  paths['/api/v1/templates']['post']['requestBody']['content']['application/json'];
+type CreateTemplateResponse =
+  paths['/api/v1/templates']['post']['responses'][201]['content']['application/json'];
+type GeneratedTemplateDTO = components['schemas']['TemplateDTO'];
+type GeneratedVersionDTO = components['schemas']['VersionDTO'];
+
+export type TemplateDTO = Omit<
+  GeneratedTemplateDTO,
+  | 'archived_at'
+  | 'description'
+  | 'doc_type_code'
+  | 'published_version_id'
+> & {
+  archived_at: string | null;
+  description: string | null | undefined;
+  doc_type_code: string | null;
+  published_version_id: string | null;
+};
+export type VersionDTO = Omit<
+  GeneratedVersionDTO,
+  | 'approved_at'
+  | 'approver_id'
+  | 'content_hash'
+  | 'docx_storage_key'
+  | 'metadata_schema'
+  | 'obsoleted_at'
+  | 'pending_approver_role'
+  | 'pending_reviewer_role'
+  | 'placeholder_schema'
+  | 'published_at'
+  | 'reviewed_at'
+  | 'reviewer_id'
+  | 'submitted_at'
+> & {
+  approved_at: string | null;
+  approver_id: string | null;
+  content_hash: string | null;
+  docx_storage_key: string | null;
+  metadata_schema: Record<string, unknown> | null;
+  obsoleted_at: string | null;
+  pending_approver_role: string | null;
+  pending_reviewer_role: string | null;
+  placeholder_schema: Record<string, unknown> | null;
+  published_at: string | null;
+  reviewed_at: string | null;
+  reviewer_id: string | null;
+  submitted_at: string | null;
+};
+export type VersionStatus = VersionDTO['status'];
 
 export interface TemplateSchemas {
   placeholders: Placeholder[];
   composition: CompositionConfig | null;
-}
-
-export interface TemplateDTO {
-  id: string;
-  tenant_id: string;
-  doc_type_code: string | null;
-  key: string;
-  name: string;
-  description: string | null | undefined;
-  areas: string[];
-  visibility: string;
-  specific_areas: string[];
-  latest_version: number;
-  published_version_id: string | null;
-  created_by: string;
-  created_at: string;
-  archived_at: string | null;
-}
-
-export interface VersionDTO {
-  id: string;
-  template_id: string;
-  version_number: number;
-  status: VersionStatus;
-  docx_storage_key: string | null;
-  content_hash: string | null;
-  metadata_schema: Record<string, unknown> | null;
-  placeholder_schema: Record<string, unknown> | null;
-  author_id: string;
-  pending_reviewer_role: string | null;
-  pending_approver_role: string | null;
-  reviewer_id: string | null;
-  approver_id: string | null;
-  submitted_at: string | null;
-  reviewed_at: string | null;
-  approved_at: string | null;
-  published_at: string | null;
-  obsoleted_at: string | null;
-  created_at: string;
 }
 
 export type TemplateListRow = {
@@ -58,7 +69,6 @@ export type TemplateListRow = {
   published_version_id?: string | null;
   updated_at?: string;
   doc_type_code?: string | null;
-  visibility: string;
   archived_at: string | null;
 };
 
@@ -112,20 +122,19 @@ export async function createTemplate(cmd: {
   doc_type_code?: string;
   idempotencyKey: string;
 }): Promise<{ template: TemplateDTO; version: VersionDTO }> {
-  const body = await apiFetch<{
-    data?: { template?: TemplateDTO; version?: VersionDTO };
-  }>('/api/v1/templates', {
+  const payload: CreateTemplateRequest = {
+    key: cmd.key,
+    name: cmd.name,
+    ...(cmd.description ? { description: cmd.description } : {}),
+    ...(cmd.doc_type_code ? { doc_type_code: cmd.doc_type_code } : {}),
+  };
+  const body = await apiFetch<CreateTemplateResponse>('/api/v1/templates', {
     method: 'POST',
     idempotencyKey: cmd.idempotencyKey,
-    body: JSON.stringify({
-      key: cmd.key,
-      name: cmd.name,
-      ...(cmd.description ? { description: cmd.description } : {}),
-      ...(cmd.doc_type_code ? { doc_type_code: cmd.doc_type_code } : {}),
-    }),
+    body: JSON.stringify(payload),
   });
-  const template = body.data?.template;
-  const version = body.data?.version;
+  const template = body.data.template as TemplateDTO;
+  const version = body.data.version as VersionDTO;
   if (!template || !version) {
     throw new Error('Resposta de criação de template não trouxe os dados esperados.');
   }
@@ -136,15 +145,11 @@ export async function listTemplates(params?: {
   limit?: number;
   offset?: number;
   doc_type?: string;
-  area?: string[];
 }): Promise<{ templates: TemplateDTO[]; meta: { limit: number; offset: number } }> {
   const qs = new URLSearchParams();
   if (params?.limit !== undefined) qs.set('limit', String(params.limit));
   if (params?.offset !== undefined) qs.set('offset', String(params.offset));
   if (params?.doc_type) qs.set('doc_type', params.doc_type);
-  for (const area of params?.area ?? []) {
-    qs.append('area', area);
-  }
 
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const body = await apiFetch<{
@@ -205,6 +210,30 @@ export async function commitAutosave(
   });
   const body = await apiJson<{ data: { version: VersionDTO } }>(res);
   return body.data.version;
+}
+
+async function sha256Hex(buf: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function importTemplateDocx(
+  templateId: string,
+  versionNum: number,
+  file: File,
+): Promise<VersionDTO> {
+  const buf = await file.arrayBuffer();
+  const { upload_url } = await presignAutosave(templateId, versionNum);
+  const upload = await fetch(upload_url, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    body: buf,
+  });
+  if (!upload.ok) {
+    throw new Error(`Falha ao enviar DOCX: HTTP ${upload.status}`);
+  }
+  const hash = await sha256Hex(buf);
+  return commitAutosave(templateId, versionNum, hash);
 }
 
 export async function presignDocxUpload(
