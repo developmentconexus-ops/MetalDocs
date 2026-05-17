@@ -41,6 +41,20 @@ function New-ModuleConfig {
                 FrontendWrapperPatterns = @('/approval/inbox', '/documents/${documentId}/signoff', '/documents/${documentId}/cancel', '/approval/routes', 'listInbox', 'signoff', 'cancel', 'createRoute', 'listRoutes')
             }
         }
+        'documents' {
+            return @{
+                RuntimeFile = 'internal/modules/documents/delivery/http/handler.go'
+                RuntimePatterns = @('/api/v1/documents', 'h.listDocuments', 'h.getDocument')
+                OpenApiFile = 'api/openapi/v1/openapi.yaml'
+                OpenApiPatterns = @('/api/v1/documents:', '/api/v1/documents/{id}:', '/api/v1/documents/{id}/finalize:')
+                BackendFile = 'internal/modules/documents/api/api.gen.go'
+                BackendPatterns = @('ListDocuments', 'GetDocument', 'FinalizeDocument')
+                FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
+                FrontendTypesPatterns = @('"/api/v1/documents":', '"/api/v1/documents/{id}":', '"/api/v1/documents/{id}/finalize":')
+                FrontendWrapperFile = 'frontend/apps/web/src/features/documents/api/documents.ts'
+                FrontendWrapperPatterns = @('/api/v1/documents', 'listDocuments', 'getDocument', 'finalizeDocument')
+            }
+        }
         'registry' {
             return @{
                 RuntimeFile = 'internal/modules/registry/delivery/http/handler.go'
