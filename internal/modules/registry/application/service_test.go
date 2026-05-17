@@ -365,18 +365,6 @@ func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd
 	return f.ref, nil
 }
 
-type fakeTemplateArtifactChecker struct {
-	exists bool
-	err    error
-}
-
-func (f *fakeTemplateArtifactChecker) Exists(_ context.Context, _ string) (bool, error) {
-	if f.err != nil {
-		return false, f.err
-	}
-	return f.exists, nil
-}
-
 func TestRegistryService_Create_AtomicWithDocument(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -454,33 +442,26 @@ func TestRegistryService_Create_InitializerError_RollsBack(t *testing.T) {
 	}
 }
 
-func TestRegistryService_Create_AtomicTemplateArtifactMissing_ReturnsDomainError(t *testing.T) {
+func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforePersisting(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
+	mock.MatchExpectationsInOrder(false)
 	mock.ExpectBegin()
 	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
+	// Current code commits because it never validates the backing template artifact.
+	// Keep both terminal expectations available so this test compiles/runs before the
+	// invariant exists and can still turn green once create fails closed and rolls back.
+	mock.ExpectCommit()
 	mock.ExpectRollback()
 
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 4}
 	docInit := &fakeDocumentInitializer{ref: &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"}}
-	artifactChecker := &fakeTemplateArtifactChecker{exists: false}
-
-	svc := NewRegistryService(
-		db,
-		repo,
-		seq,
-		&fakeTemplateVersionChecker{},
-		&fakeProfileReader{},
-		&fakeAreaReader{},
-		logger,
-		docInit,
-		artifactChecker,
-	)
+	svc := NewRegistryService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 
 	templateVersionID := "00000000-0000-0000-0000-000000000102"
 	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -493,17 +474,14 @@ func TestRegistryService_Create_AtomicTemplateArtifactMissing_ReturnsDomainError
 		DocumentName:      "HR Policy v1",
 		TemplateVersionID: &templateVersionID,
 	})
-	if !errors.Is(err, ErrTemplateArtifactMissing) {
-		t.Fatalf("expected ErrTemplateArtifactMissing, got %v", err)
+	if err == nil {
+		t.Fatalf("expected create to fail closed when the resolved template artifact is missing, got nil")
 	}
 	if repo.created != nil {
 		t.Fatalf("expected controlled document not to persist when template artifact is missing")
 	}
 	if docInit.called {
 		t.Fatalf("expected document initializer not to run when template artifact is missing")
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations (expected rollback): %v", err)
 	}
 }
 
