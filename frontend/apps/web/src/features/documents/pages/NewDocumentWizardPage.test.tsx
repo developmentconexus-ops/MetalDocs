@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { NewDocumentWizardPage, buildVisibilityPayload } from './NewDocumentWizardPage';
+import { ApiError } from '../../../lib/api/problem';
 import type { WizardState } from '../state/wizard.reducer';
 
 // ── Mock react-router-dom ─────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ vi.mock('../../../store/auth.store', () => ({
 
 // ── Mock server-state queries ─────────────────────────────────────────────────
 
-vi.mock('../queries/useProfilesQuery', () => ({
+vi.mock('../../taxonomy/queries/useProfilesQuery', () => ({
   useProfilesQuery: () => ({
     data: [{ code: 'PRC', name: 'Procedimento', familyCode: 'FAM' }],
     isLoading: false,
@@ -59,6 +60,16 @@ vi.mock('../queries/useTemplatesByProfileQuery', () => ({
 vi.mock('../queries/useBlankTemplateQuery', () => ({
   useBlankTemplateQuery: () => ({
     data: { templateId: 'blank-template', templateVersionId: 'blank-tv-1', name: 'Em branco' },
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock('../../registry/queries/usePreviewCodeQuery', () => ({
+  usePreviewCodeQuery: () => ({
+    data: { code: 'PRC-TI-001' },
     isLoading: false,
     isError: false,
     error: null,
@@ -112,11 +123,13 @@ vi.mock('../components/wizard/steps/StepConfirm', () => ({
     submitDisabled,
     onConsent,
     consent,
+    error,
   }: {
     onSubmit: () => void;
     submitDisabled: boolean;
     onConsent: (v: boolean) => void;
     consent: boolean;
+    error?: string | null;
   }) => (
     <div data-testid="step-confirm">
       <button type="button" onClick={() => onConsent(!consent)}>
@@ -125,6 +138,7 @@ vi.mock('../components/wizard/steps/StepConfirm', () => ({
       <button type="button" data-disabled={String(submitDisabled)} onClick={onSubmit}>
         Criar documento
       </button>
+      {error ? <div role="alert">{error}</div> : null}
     </div>
   ),
 }));
@@ -157,6 +171,10 @@ function renderWizard() {
       <NewDocumentWizardPage />
     </QueryClientProvider>,
   );
+}
+
+function renderWizardAtConfirmationStep() {
+  return renderWizard();
 }
 
 beforeEach(() => {
@@ -297,6 +315,22 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
     expect(key1).toMatch(uuidV4Regex);
     expect(key2).toMatch(uuidV4Regex);
     expect(key1).not.toBe(key2);
+  });
+
+  it('stays on the wizard and shows a shared error when the template artifact is missing', async () => {
+    vi.mocked(cdApi.createControlledDocumentAtomic).mockRejectedValue(
+      new ApiError('template.artifact_missing', 409, 'artifact missing'),
+    );
+
+    renderWizardAtConfirmationStep();
+
+    fireEvent.click(screen.getByRole('button', { name: /criar documento/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/template base não está disponível/i)).toBeInTheDocument();
+    });
+
+    expect(mockNavigate).not.toHaveBeenCalledWith(expect.stringMatching(/^\/documents\/.+\/edit$/));
   });
 });
 
