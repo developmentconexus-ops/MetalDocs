@@ -481,6 +481,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusConflict, "OVERRIDE_TEMPLATE_NOT_PUBLISHED", "override template is not published")
 	case errors.Is(err, registrydomain.ErrTemplateProfileMismatch):
 		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, "template_invalid", "template version does not match the document profile"))
+	case errors.Is(err, application.ErrTemplateArtifactMissing):
+		httpresponse.WriteError(w, http.StatusConflict, "template.artifact_missing", "template artifact missing")
 	case errors.Is(err, registrydomain.ErrProfileHasNoDefaultTemplate):
 		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_NO_DEFAULT_TEMPLATE", "profile has no default template")
 	case errors.Is(err, registrydomain.ErrDefaultObsolete):

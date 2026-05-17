@@ -50,7 +50,7 @@ type fakeRepo struct {
 	renameDocID    string
 	renameTenantID string
 
-	lastOpts           application.ListOptions
+	lastOpts            application.ListOptions
 	listPaginatedReturn []*domain.Document
 	listPaginatedErr    error
 	countReturn         int64
@@ -243,6 +243,8 @@ type fakePresigner struct {
 	adoptErr    error
 	deleteCalls int
 	deleteErr   error
+	exists      bool
+	existsErr   error
 }
 
 func (f *fakePresigner) PresignRevisionPUT(_ context.Context, _, _, _ string) (string, string, error) {
@@ -267,6 +269,13 @@ func (f *fakePresigner) DeleteObject(_ context.Context, _ string) error {
 
 func (f *fakePresigner) PresignObjectGET(_ context.Context, storageKey string) (string, error) {
 	return "https://example/get/" + storageKey, nil
+}
+
+func (f *fakePresigner) Exists(_ context.Context, _ string) (bool, error) {
+	if f.existsErr != nil {
+		return false, f.existsErr
+	}
+	return f.exists, nil
 }
 
 type fakeDocgen struct {

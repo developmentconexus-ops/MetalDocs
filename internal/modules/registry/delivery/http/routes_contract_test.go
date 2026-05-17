@@ -293,6 +293,26 @@ func TestWriteDomainError_TemplateMismatchIs422(t *testing.T) {
 	}
 }
 
+func TestWriteDomainError_TemplateArtifactMissingIs409(t *testing.T) {
+	handler := &Handler{}
+	rec := httptest.NewRecorder()
+
+	handler.writeDomainError(rec, application.ErrTemplateArtifactMissing)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusConflict, rec.Body.String())
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if body.Code != "template.artifact_missing" {
+		t.Fatalf("code = %q, want %q", body.Code, "template.artifact_missing")
+	}
+}
+
 func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
 	handler := &Handler{svc: &spyRegistryService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{

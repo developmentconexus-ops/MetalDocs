@@ -69,6 +69,7 @@ type Presigner interface {
 	AdoptTempObject(ctx context.Context, tmpKey, finalKey string) error
 	DeleteObject(ctx context.Context, key string) error
 	HashObject(ctx context.Context, key string) (string, error)
+	Exists(ctx context.Context, storageKey string) (bool, error)
 }
 
 type TemplateReader interface {
@@ -400,45 +401,10 @@ type cloneIntoTxInput struct {
 //
 // All repo calls thread the tx via CreateDocumentTx.
 func (s *Service) cloneIntoTx(ctx context.Context, tx *sql.Tx, in cloneIntoTxInput) (docID string, contentHash string, err error) {
-	if s.profileTemplates == nil {
-		return "", "", errProfileTemplateReaderNotConfigured
-	}
-
-	// Resolve template version: same logic as CreateDocument's resolution
-	// block, but with explicit override hint instead of reading it off the CD.
-	defaultTemplateID, defaultTemplateStatus, err := s.profileTemplates.GetDefaultTemplateVersionID(ctx, in.TenantID, in.ProfileCode)
+	resolvedTemplateVersionID, err := s.resolveTemplateVersionID(ctx, in.TenantID, in.ProfileCode, in.OverrideTemplateVersionID)
 	if err != nil {
 		return "", "", err
 	}
-
-	var overrideTemplate *registrydomain.TemplateVersionCandidate
-	if in.OverrideTemplateVersionID != nil && *in.OverrideTemplateVersionID != "" {
-		overrideStatus := "published"
-		overrideTemplate = &registrydomain.TemplateVersionCandidate{
-			ID:          *in.OverrideTemplateVersionID,
-			ProfileCode: in.ProfileCode,
-			Status:      &overrideStatus,
-		}
-	}
-
-	var defaultTemplate *registrydomain.TemplateVersionCandidate
-	if defaultTemplateID != nil {
-		defaultTemplate = &registrydomain.TemplateVersionCandidate{
-			ID:          *defaultTemplateID,
-			ProfileCode: in.ProfileCode,
-			Status:      defaultTemplateStatus,
-		}
-	}
-
-	resolution, err := registrydomain.Resolve(registrydomain.TemplateResolutionInput{
-		ProfileCode:      in.ProfileCode,
-		OverrideTemplate: overrideTemplate,
-		DefaultTemplate:  defaultTemplate,
-	})
-	if err != nil {
-		return "", "", err
-	}
-	resolvedTemplateVersionID := resolution.TemplateVersionID
 
 	docxKey, _, _, err := s.tpl.GetPublishedVersion(ctx, in.TenantID, resolvedTemplateVersionID)
 	if err != nil {
@@ -486,6 +452,65 @@ func (s *Service) cloneIntoTx(ctx context.Context, tx *sql.Tx, in cloneIntoTxInp
 		return "", "", err
 	}
 	return docID, contentHash, nil
+}
+
+func (s *Service) resolveTemplateVersionID(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error) {
+	if s.profileTemplates == nil {
+		return "", errProfileTemplateReaderNotConfigured
+	}
+
+	defaultTemplateID, defaultTemplateStatus, err := s.profileTemplates.GetDefaultTemplateVersionID(ctx, tenantID, profileCode)
+	if err != nil {
+		return "", err
+	}
+
+	var overrideTemplate *registrydomain.TemplateVersionCandidate
+	if templateVersionID != nil && strings.TrimSpace(*templateVersionID) != "" {
+		overrideStatus := "published"
+		overrideTemplate = &registrydomain.TemplateVersionCandidate{
+			ID:          strings.TrimSpace(*templateVersionID),
+			ProfileCode: profileCode,
+			Status:      &overrideStatus,
+		}
+	}
+
+	var defaultTemplate *registrydomain.TemplateVersionCandidate
+	if defaultTemplateID != nil {
+		defaultTemplate = &registrydomain.TemplateVersionCandidate{
+			ID:          *defaultTemplateID,
+			ProfileCode: profileCode,
+			Status:      defaultTemplateStatus,
+		}
+	}
+
+	resolution, err := registrydomain.Resolve(registrydomain.TemplateResolutionInput{
+		ProfileCode:      profileCode,
+		OverrideTemplate: overrideTemplate,
+		DefaultTemplate:  defaultTemplate,
+	})
+	if err != nil {
+		return "", err
+	}
+	return resolution.TemplateVersionID, nil
+}
+
+func (s *Service) resolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error) {
+	resolvedTemplateVersionID, err := s.resolveTemplateVersionID(ctx, tenantID, profileCode, templateVersionID)
+	if err != nil {
+		return "", err
+	}
+	docxKey, _, _, err := s.tpl.GetPublishedVersion(ctx, tenantID, resolvedTemplateVersionID)
+	if err != nil {
+		return "", fmt.Errorf("template lookup: %w", err)
+	}
+	return docxKey, nil
+}
+
+func (s *Service) templateArtifactExists(ctx context.Context, storageKey string) (bool, error) {
+	if s.presigner == nil {
+		return false, errors.New("document presigner not configured")
+	}
+	return s.presigner.Exists(ctx, storageKey)
 }
 
 func (s *Service) GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error) {

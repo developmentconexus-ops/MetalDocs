@@ -22,6 +22,14 @@ type TemplateVersionChecker interface {
 	GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error)
 }
 
+type TemplateArtifactChecker interface {
+	Exists(ctx context.Context, storageKey string) (bool, error)
+}
+
+type templateArtifactResolver interface {
+	ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
+}
+
 type ProfileReader interface {
 	GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)
 }
@@ -34,15 +42,17 @@ type ControlledDocument = registrydomain.ControlledDocument
 type CDFilter = registrydomain.CDFilter
 
 type RegistryService struct {
-	db        *sql.DB
-	docs      registrydomain.ControlledDocumentRepository
-	seq       registrydomain.SequenceAllocator
-	tplCheck  TemplateVersionChecker
-	profiles  ProfileReader
-	areas     AreaReader
-	govLogger taxonomydomain.GovernanceLogger
-	docInit   registrydomain.DocumentInitializer
-	now       func() time.Time
+	db                       *sql.DB
+	docs                     registrydomain.ControlledDocumentRepository
+	seq                      registrydomain.SequenceAllocator
+	tplCheck                 TemplateVersionChecker
+	profiles                 ProfileReader
+	areas                    AreaReader
+	govLogger                taxonomydomain.GovernanceLogger
+	docInit                  registrydomain.DocumentInitializer
+	templateArtifactResolver templateArtifactResolver
+	templateArtifactChecker  TemplateArtifactChecker
+	now                      func() time.Time
 }
 
 type CreateControlledDocumentCmd struct {
@@ -72,6 +82,8 @@ type CreateResult struct {
 	ControlledDocument *registrydomain.ControlledDocument
 	DocumentRef        *registrydomain.DocumentRef
 }
+
+var ErrTemplateArtifactMissing = errors.New("template artifact missing")
 
 func NewRegistryService(
 	db *sql.DB,
@@ -106,6 +118,22 @@ func NewRegistryService(
 // initializer adapter is injected back here.
 func (s *RegistryService) WithDocumentInitializer(d registrydomain.DocumentInitializer) *RegistryService {
 	s.docInit = d
+	if resolver, ok := d.(templateArtifactResolver); ok {
+		s.templateArtifactResolver = resolver
+	}
+	if checker, ok := d.(TemplateArtifactChecker); ok {
+		s.templateArtifactChecker = checker
+	}
+	return s
+}
+
+func (s *RegistryService) withTemplateArtifactResolver(resolver templateArtifactResolver) *RegistryService {
+	s.templateArtifactResolver = resolver
+	return s
+}
+
+func (s *RegistryService) withTemplateArtifactChecker(checker TemplateArtifactChecker) *RegistryService {
+	s.templateArtifactChecker = checker
 	return s
 }
 
@@ -124,6 +152,10 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 	}
 	if !area.IsActive() {
 		return nil, taxonomydomain.ErrAreaArchived
+	}
+
+	if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
+		return nil, err
 	}
 
 	var (
@@ -296,6 +328,27 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 	}
 
 	return &CreateResult{ControlledDocument: doc, DocumentRef: docRef}, nil
+}
+
+func (s *RegistryService) ensureTemplateArtifact(ctx context.Context, cmd CreateControlledDocumentCmd) error {
+	if s.templateArtifactResolver == nil || s.templateArtifactChecker == nil {
+		return nil
+	}
+	storageKey, err := s.templateArtifactResolver.ResolveTemplateStorageKey(ctx, cmd.TenantID, cmd.ProfileCode, cmd.TemplateVersionID)
+	if err != nil {
+		return fmt.Errorf("resolve template artifact: %w", err)
+	}
+	if strings.TrimSpace(storageKey) == "" {
+		return ErrTemplateArtifactMissing
+	}
+	exists, err := s.templateArtifactChecker.Exists(ctx, storageKey)
+	if err != nil {
+		return fmt.Errorf("check template artifact: %w", err)
+	}
+	if !exists {
+		return ErrTemplateArtifactMissing
+	}
+	return nil
 }
 
 func setAuthzGUC(ctx context.Context, tx *sql.Tx, tenantID, actorID string) error {

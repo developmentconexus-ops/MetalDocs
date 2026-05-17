@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 
 	registrydomain "metaldocs/internal/modules/registry/domain"
 )
@@ -17,6 +18,20 @@ type CDDocumentInitializer struct {
 
 func NewCDDocumentInitializer(svc *Service) *CDDocumentInitializer {
 	return &CDDocumentInitializer{svc: svc}
+}
+
+func (i *CDDocumentInitializer) ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error) {
+	if i == nil || i.svc == nil {
+		return "", errors.New("documents service not configured")
+	}
+	return i.svc.resolveTemplateStorageKey(ctx, tenantID, profileCode, templateVersionID)
+}
+
+func (i *CDDocumentInitializer) Exists(ctx context.Context, storageKey string) (bool, error) {
+	if i == nil || i.svc == nil {
+		return false, errors.New("documents service not configured")
+	}
+	return i.svc.templateArtifactExists(ctx, storageKey)
 }
 
 // CloneTemplate threads the caller's tx into Service.cloneIntoTx so the

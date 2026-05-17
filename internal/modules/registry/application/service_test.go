@@ -365,6 +365,36 @@ func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd
 	return f.ref, nil
 }
 
+type fakeTemplateArtifactResolver struct {
+	storageKey string
+	err        error
+	called     bool
+}
+
+func (f *fakeTemplateArtifactResolver) ResolveTemplateStorageKey(_ context.Context, _, _ string, _ *string) (string, error) {
+	f.called = true
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.storageKey, nil
+}
+
+type fakeTemplateArtifactChecker struct {
+	exists        bool
+	err           error
+	called        bool
+	gotStorageKey string
+}
+
+func (f *fakeTemplateArtifactChecker) Exists(_ context.Context, storageKey string) (bool, error) {
+	f.called = true
+	f.gotStorageKey = storageKey
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.exists, nil
+}
+
 func TestRegistryService_Create_AtomicWithDocument(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -448,20 +478,16 @@ func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforeP
 		t.Fatalf("sqlmock.New: %v", err)
 	}
 	t.Cleanup(func() { db.Close() })
-	mock.MatchExpectationsInOrder(false)
-	mock.ExpectBegin()
-	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
-	// Current code commits because it never validates the backing template artifact.
-	// Keep both terminal expectations available so this test compiles/runs before the
-	// invariant exists and can still turn green once create fails closed and rolls back.
-	mock.ExpectCommit()
-	mock.ExpectRollback()
+	resolver := &fakeTemplateArtifactResolver{storageKey: "system/templates/blank.docx"}
+	checker := &fakeTemplateArtifactChecker{exists: false}
 
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 4}
 	docInit := &fakeDocumentInitializer{ref: &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"}}
 	svc := NewRegistryService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
+	svc.withTemplateArtifactResolver(resolver)
+	svc.withTemplateArtifactChecker(checker)
 
 	templateVersionID := "00000000-0000-0000-0000-000000000102"
 	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -474,14 +500,29 @@ func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforeP
 		DocumentName:      "HR Policy v1",
 		TemplateVersionID: &templateVersionID,
 	})
-	if err == nil {
-		t.Fatalf("expected create to fail closed when the resolved template artifact is missing, got nil")
+	if !errors.Is(err, ErrTemplateArtifactMissing) {
+		t.Fatalf("expected ErrTemplateArtifactMissing, got %v", err)
+	}
+	if !resolver.called {
+		t.Fatalf("expected template artifact resolver to be called")
+	}
+	if !checker.called {
+		t.Fatalf("expected template artifact checker to be called")
+	}
+	if checker.gotStorageKey != "system/templates/blank.docx" {
+		t.Fatalf("storage key = %q, want system/templates/blank.docx", checker.gotStorageKey)
 	}
 	if repo.created != nil {
 		t.Fatalf("expected controlled document not to persist when template artifact is missing")
 	}
+	if seq.next != 4 {
+		t.Fatalf("expected sequence allocation to remain unused, got next=%d", seq.next)
+	}
 	if docInit.called {
 		t.Fatalf("expected document initializer not to run when template artifact is missing")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
 	}
 }
 
