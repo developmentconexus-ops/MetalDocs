@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ func TestCreate_AutoCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 1}
-	svc := NewRegistryService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, nil)
+	svc := NewRegistryService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 	svc.now = func() time.Time { return time.Date(2026, 4, 21, 10, 0, 0, 0, time.UTC) }
 
 	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -54,7 +55,7 @@ func TestCreate_AutoCode(t *testing.T) {
 func TestCreate_ManualCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
-	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, nil)
+	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 
 	res, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",
@@ -86,7 +87,7 @@ func TestCreate_ManualCode(t *testing.T) {
 }
 
 func TestCreate_ManualCode_MissingReason(t *testing.T) {
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
 		ProfileCode:     "po",
@@ -102,7 +103,7 @@ func TestCreate_ManualCode_MissingReason(t *testing.T) {
 }
 
 func TestCreate_ManualCode_ShortReason(t *testing.T) {
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",
 		ProfileCode:      "po",
@@ -121,7 +122,7 @@ func TestCreate_ManualCode_ShortReason(t *testing.T) {
 func TestCreate_DuplicateCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	repo.codeExists = true
-	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:         "tenant-a",
@@ -144,7 +145,7 @@ func TestCreate_OverrideTemplate_GovernanceEvent(t *testing.T) {
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, nil)
+	svc := NewRegistryService(nil, repo, &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, logger, newInvariantReadyDocumentInitializer())
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -168,7 +169,7 @@ func TestCreate_OverrideTemplate_MissingReason(t *testing.T) {
 	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
 		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "po"},
 	}}
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:                  "tenant-a",
@@ -187,7 +188,7 @@ func TestCreate_OverrideTemplate_MissingReason(t *testing.T) {
 func TestCreate_ProfileArchived(t *testing.T) {
 	archivedAt := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
 	profiles := &fakeProfileReader{item: &taxonomydomain.DocumentProfile{Code: "po", TenantID: "tenant-a", ArchivedAt: &archivedAt}}
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, profiles, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, profiles, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
@@ -205,7 +206,7 @@ func TestCreate_ProfileArchived(t *testing.T) {
 func TestCreate_AreaArchived(t *testing.T) {
 	archivedAt := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
 	areas := &fakeAreaReader{item: &taxonomydomain.ProcessArea{Code: "quality", TenantID: "tenant-a", ArchivedAt: &archivedAt}}
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, areas, &fakeGovernanceLogger{}, nil)
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, areas, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
 
 	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:        "tenant-a",
@@ -347,12 +348,20 @@ func (f *fakeGovernanceLogger) Log(_ context.Context, e taxonomydomain.Governanc
 
 func stringPtr(v string) *string { return &v }
 
+func newInvariantReadyDocumentInitializer() *fakeDocumentInitializer {
+	return &fakeDocumentInitializer{exists: true}
+}
+
 type fakeDocumentInitializer struct {
 	called bool
 	ref    *registrydomain.DocumentRef
 	err    error
 	gotReq registrydomain.CloneTemplateRequest
 	gotCD  *registrydomain.ControlledDocument
+
+	storageKey string
+	exists     bool
+	existsErr  error
 }
 
 func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd *registrydomain.ControlledDocument, req registrydomain.CloneTemplateRequest) (*registrydomain.DocumentRef, error) {
@@ -363,6 +372,26 @@ func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd
 		return nil, f.err
 	}
 	return f.ref, nil
+}
+
+func (f *fakeDocumentInitializer) ResolveTemplateStorageKey(_ context.Context, _, _ string, _ *string) (string, error) {
+	if f.storageKey == "" {
+		return "system/templates/blank.docx", nil
+	}
+	return f.storageKey, nil
+}
+
+func (f *fakeDocumentInitializer) Exists(_ context.Context, _ string) (bool, error) {
+	if f.existsErr != nil {
+		return false, f.existsErr
+	}
+	return f.exists, nil
+}
+
+type legacyDocumentInitializer struct{}
+
+func (legacyDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, _ *registrydomain.ControlledDocument, _ registrydomain.CloneTemplateRequest) (*registrydomain.DocumentRef, error) {
+	return &registrydomain.DocumentRef{ID: "doc-legacy", ContentHash: "hash-legacy"}, nil
 }
 
 type fakeTemplateArtifactResolver struct {
@@ -408,7 +437,10 @@ func TestRegistryService_Create_AtomicWithDocument(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 3}
-	docInit := &fakeDocumentInitializer{ref: &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"}}
+	docInit := &fakeDocumentInitializer{
+		ref:    &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"},
+		exists: true,
+	}
 
 	svc := NewRegistryService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 
@@ -452,7 +484,7 @@ func TestRegistryService_Create_InitializerError_RollsBack(t *testing.T) {
 	mock.ExpectRollback()
 
 	repo := newFakeControlledDocumentRepository()
-	docInit := &fakeDocumentInitializer{err: errors.New("clone failed")}
+	docInit := &fakeDocumentInitializer{err: errors.New("clone failed"), exists: true}
 	svc := NewRegistryService(db, repo, &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
 	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
@@ -484,7 +516,7 @@ func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforeP
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 4}
-	docInit := &fakeDocumentInitializer{ref: &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"}}
+	docInit := &fakeDocumentInitializer{ref: &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"}, exists: true}
 	svc := NewRegistryService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 	svc.withTemplateArtifactResolver(resolver)
 	svc.withTemplateArtifactChecker(checker)
@@ -524,6 +556,48 @@ func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforeP
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sqlmock expectations: %v", err)
 	}
+}
+
+func TestRegistryService_Create_TemplateArtifactInvariantUnconfigured_FailsClosed(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	seq := &fakeSequenceAllocator{next: 5}
+	svc := NewRegistryService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+
+	templateVersionID := "00000000-0000-0000-0000-000000000102"
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:          "tenant-a",
+		ProfileCode:       "dc",
+		ProcessAreaCode:   "rh",
+		Title:             "HR Policy",
+		OwnerUserID:       "owner-1",
+		ActorUserID:       "actor-1",
+		DocumentName:      "HR Policy v1",
+		TemplateVersionID: &templateVersionID,
+	})
+	if err == nil {
+		t.Fatalf("expected invariant configuration error, got nil")
+	}
+	if !strings.Contains(err.Error(), "template artifact invariant") {
+		t.Fatalf("expected template artifact invariant error, got %v", err)
+	}
+	if repo.created != nil {
+		t.Fatalf("expected controlled document not to persist when invariant is unconfigured")
+	}
+	if seq.next != 5 {
+		t.Fatalf("expected sequence allocation to remain unused, got next=%d", seq.next)
+	}
+}
+
+func TestRegistryService_WithDocumentInitializer_PanicsWithoutArtifactSeams(t *testing.T) {
+	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+
+	defer func() {
+		if recover() == nil {
+			t.Fatalf("expected panic when document initializer lacks artifact seams")
+		}
+	}()
+
+	svc.WithDocumentInitializer(legacyDocumentInitializer{})
 }
 
 func TestRegistryService_PreviewCode_ReturnsFormatted(t *testing.T) {
