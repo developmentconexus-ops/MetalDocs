@@ -3,8 +3,11 @@ package application
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
 )
 
@@ -105,16 +108,7 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 	if version.Status != domain.VersionStatusDraft {
 		return domain.ErrInvalidStateTransition
 	}
-	if err := s.repo.UpdateVersionDraftCAS(
-		ctx,
-		version.ID,
-		cmd.ExpectedLockVersion,
-		cmd.DocxStorageKey,
-		cmd.DocxContentHash,
-	); err != nil {
-		return err
-	}
-	return s.repo.AppendAudit(ctx, &domain.AuditEvent{
+	audit := &domain.AuditEvent{
 		TenantID:   cmd.TenantID,
 		TemplateID: cmd.TemplateID,
 		VersionID:  &version.ID,
@@ -127,7 +121,31 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 			"expected_lock":       cmd.ExpectedLockVersion,
 		},
 		OccurredAt: s.clock.Now(),
-	})
+	}
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("templates save draft: begin tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return fmt.Errorf("templates save draft: set authz context: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return fmt.Errorf("templates save draft: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionDraftCASTx(ctx, tx, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
+			return err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	if err := s.repo.UpdateVersionDraftCAS(ctx, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
+		return err
+	}
+	return s.repo.AppendAudit(ctx, audit)
 }
 
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*domain.TemplateVersion, error) {
@@ -156,10 +174,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 	}
 
 	version.ContentHash = actualHash
-	if err := s.repo.UpdateVersion(ctx, version); err != nil {
-		return nil, err
-	}
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
+	audit := &domain.AuditEvent{
 		TenantID:   cmd.TenantID,
 		TemplateID: cmd.TemplateID,
 		VersionID:  &version.ID,
@@ -167,7 +182,34 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		Action:     domain.AuditSaved,
 		Details:    map[string]any{"content_hash": actualHash},
 		OccurredAt: s.clock.Now(),
-	}); err != nil {
+	}
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("templates commit autosave: begin tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates commit autosave: set authz context: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return nil, fmt.Errorf("templates commit autosave: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionTx(ctx, tx, version); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return version, nil
+	}
+	if err := s.repo.UpdateVersion(ctx, version); err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
 		return nil, err
 	}
 

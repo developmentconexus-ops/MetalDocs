@@ -5,45 +5,30 @@ import {
   templateWizardReducer,
   selectMaxReachableStep,
   initialTemplateWizardState,
+  slugifyTemplateName,
   type TemplateWizardStep,
   type ScopeType,
-  type PermissionsMode,
 } from '../state/templateWizard.reducer';
-import { createTemplate } from '../api/templatesV2';
+import { createTemplate, importTemplateDocx } from '../api/templates';
 import { WizardShell } from '../../shared/components/wizard/WizardShell';
 import type { StepperStep } from '../../../components/ui/Stepper';
 import { StepScope } from '../components/wizard/steps/StepScope';
 import { StepIdentity } from '../components/wizard/steps/StepIdentity';
 import { StepStructure } from '../components/wizard/steps/StepStructure';
-import { StepPermissions } from '../components/wizard/steps/StepPermissions';
 import { StepConfirmation } from '../components/wizard/steps/StepConfirmation';
 
-/** Converts a display name into a stable URL-safe key (max 64 chars). */
-function slugifyName(name: string): string {
-  // Combining diacritical marks U+0300–U+036F (written via RegExp to avoid
-  // encoding-sensitive literal unicode in source).
-  const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
-  return name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(COMBINING, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64);
-}
-
+const EMPTY_SLUG_ERROR = 'Informe um nome com letras ou números para gerar o identificador técnico.';
 
 const TPL_STEPS: StepperStep[] = [
   { id: '1', label: 'Perfil' },
   { id: '2', label: 'Identidade' },
   { id: '3', label: 'Estrutura' },
-  { id: '4', label: 'Permissões' },
-  { id: '5', label: 'Confirmação' },
+  { id: '4', label: 'Confirmação' },
 ];
 
 function parseStepParam(raw: string | null): TemplateWizardStep {
   const n = Number(raw);
-  if (n === 1 || n === 2 || n === 3 || n === 4 || n === 5) return n;
+  if (n === 1 || n === 2 || n === 3 || n === 4) return n;
   return 1;
 }
 
@@ -52,25 +37,24 @@ export function TemplateWizardPage(): JSX.Element {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [state, dispatch] = useReducer(
-    templateWizardReducer,
-    undefined,
-    () => {
-      // Initial state has no scope chosen. Clamp deep-links beyond Step 1
-      // to Step 1 — avoids a one-frame paint of placeholder content before
-      // the defensive effect runs.
-      const parsed = parseStepParam(searchParams.get('step'));
-      const safeStep = initialTemplateWizardState.scopeType === null ? 1 : parsed;
-      return { ...initialTemplateWizardState, step: safeStep };
-    },
-  );
+  const [state, dispatch] = useReducer(templateWizardReducer, undefined, () => {
+    // Initial state has no scope chosen. Clamp deep-links beyond Step 1
+    // to Step 1 - avoids a one-frame paint of placeholder content before
+    // the defensive effect runs.
+    const parsed = parseStepParam(searchParams.get('step'));
+    const safeStep = initialTemplateWizardState.scopeType === null ? 1 : parsed;
+    return { ...initialTemplateWizardState, step: safeStep };
+  });
   const goToStep = useCallback((step: TemplateWizardStep) => {
     dispatch({ type: 'GO_TO_STEP', step });
   }, []);
+  const templateKey = useMemo(() => slugifyTemplateName(state.name.trim()), [state.name]);
+  const hasValidTemplateKey = templateKey.length > 0;
+  const keyError = state.name.trim().length > 0 && !hasValidTemplateKey ? EMPTY_SLUG_ERROR : null;
   const maxReachableStep = selectMaxReachableStep(state);
-  const advanceDisabled = maxReachableStep <= state.step;
+  const advanceDisabled = maxReachableStep <= state.step || (state.step === 2 && !hasValidTemplateKey);
 
-  // Sync state.step → URL ?step=N
+  // Sync state.step -> URL ?step=N
   useEffect(() => {
     setSearchParams(
       (prev) => {
@@ -106,14 +90,33 @@ export function TemplateWizardPage(): JSX.Element {
   }
 
   async function handleSubmit() {
+    if (!hasValidTemplateKey) {
+      setSubmitError(EMPTY_SLUG_ERROR);
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
     try {
       const { template, version } = await createTemplate({
-        key: slugifyName(state.name),
+        key: templateKey,
         name: state.name,
         description: state.description.trim() || undefined,
+        doc_type_code: state.scopeType === 'profile' ? state.profileCode ?? undefined : undefined,
+        idempotencyKey: crypto.randomUUID(),
       });
+      if (state.startingPoint === 'docx') {
+        try {
+          if (!state.selectedDocxFile) {
+            throw new Error('Selecione um arquivo .docx antes de criar o template.');
+          }
+          await importTemplateDocx(template.id, version.version_number, state.selectedDocxFile);
+        } catch {
+          setSubmitError('Template criado, mas a importação do DOCX falhou. Tente novamente antes de abrir o editor.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
       navigate(`/templates/${template.id}/versions/${version.version_number}`);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Erro ao criar template.');
@@ -163,16 +166,16 @@ export function TemplateWizardPage(): JSX.Element {
         <StepIdentity
           scopeType={state.scopeType}
           selectedProfile={selectedProfile}
+          templateKey={templateKey}
           name={state.name}
           description={state.description}
           onChangeName={(value) => dispatch({ type: 'SET_NAME', value })}
-          onChangeDescription={(value) =>
-            dispatch({ type: 'SET_DESCRIPTION', value })
-          }
+          onChangeDescription={(value) => dispatch({ type: 'SET_DESCRIPTION', value })}
           onAdvance={() => goToStep(3)}
           onBack={() => goToStep(1)}
           onChangeScope={() => goToStep(1)}
           advanceDisabled={advanceDisabled}
+          keyError={keyError}
         />
       )}
       {state.step === 3 && state.scopeType !== null && (
@@ -180,34 +183,14 @@ export function TemplateWizardPage(): JSX.Element {
           startingPoint={state.startingPoint}
           selectedDocxName={state.selectedDocxName}
           selectedDocxSize={state.selectedDocxSize}
-          onSelectStartingPoint={(value) =>
-            dispatch({ type: 'SET_STARTING_POINT', value })
-          }
-          onSelectDocx={(name, size) =>
-            dispatch({ type: 'SET_SELECTED_DOCX', name, size })
-          }
-          onClearDocx={() => dispatch({ type: 'CLEAR_SELECTED_DOCX' })}
+          onSelectStartingPoint={(value) => dispatch({ type: 'SET_STARTING_POINT', value })}
+          onSelectDocxFile={(file) => dispatch({ type: 'SET_SELECTED_DOCX', file })}
           onAdvance={() => goToStep(4)}
           onBack={() => goToStep(2)}
           advanceDisabled={advanceDisabled}
         />
       )}
       {state.step === 4 && state.scopeType !== null && (
-        <StepPermissions
-          permissionsMode={state.permissionsMode}
-          selectedRoleIds={state.selectedRoleIds}
-          selectedAreaIds={state.selectedAreaIds}
-          onSetMode={(mode: PermissionsMode) =>
-            dispatch({ type: 'SET_PERMISSIONS_MODE', mode })
-          }
-          onToggleRole={(id) => dispatch({ type: 'TOGGLE_ROLE_ID', id })}
-          onToggleArea={(id) => dispatch({ type: 'TOGGLE_AREA_ID', id })}
-          onAdvance={() => goToStep(5)}
-          onBack={() => goToStep(3)}
-          advanceDisabled={advanceDisabled}
-        />
-      )}
-      {state.step === 5 && state.scopeType !== null && (
         <StepConfirmation
           name={state.name}
           selectedProfile={
@@ -220,12 +203,10 @@ export function TemplateWizardPage(): JSX.Element {
               : null
           }
           profileCode={state.profileCode}
+          templateKey={templateKey}
           startingPoint={state.startingPoint}
           selectedDocxName={state.selectedDocxName}
-          permissionsMode={state.permissionsMode}
-          selectedRoleIds={state.selectedRoleIds}
-          selectedAreaIds={state.selectedAreaIds}
-          onBack={() => goToStep(4)}
+          onBack={() => goToStep(3)}
           onSubmit={() => void handleSubmit()}
           isSubmitting={isSubmitting}
           submitError={submitError}

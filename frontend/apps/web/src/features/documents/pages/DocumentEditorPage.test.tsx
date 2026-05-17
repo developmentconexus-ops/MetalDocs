@@ -54,7 +54,7 @@ vi.mock('./ExportMenuButton', () => ({
 }));
 
 // Default mock — polls return pending. Individual tests override via mockReturnValue.
-vi.mock('../hooks/v2/useDocumentPdfStatus', () => ({
+vi.mock('../hooks/editor/useDocumentPdfStatus', () => ({
   useDocumentPdfStatus: vi.fn(() => ({
     status: 'pending' as string,
     url: undefined as string | undefined,
@@ -69,7 +69,7 @@ vi.mock('./PDFCell', () => ({
   },
 }));
 
-vi.mock('../api/documentsV2', () => ({
+vi.mock('../api/documents', () => ({
   getDocument: vi.fn(),
   finalizeDocument: vi.fn().mockResolvedValue(undefined),
   renameDocument: vi.fn().mockResolvedValue(undefined),
@@ -78,8 +78,8 @@ vi.mock('../api/documentsV2', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-import * as api from '../api/documentsV2';
-import * as pdfHook from '../hooks/v2/useDocumentPdfStatus';
+import * as api from '../api/documents';
+import * as pdfHook from '../hooks/editor/useDocumentPdfStatus';
 import { toast } from 'sonner';
 
 function makeDoc(status: string, overrides: Record<string, unknown> = {}) {

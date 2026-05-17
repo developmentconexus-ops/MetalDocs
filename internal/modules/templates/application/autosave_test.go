@@ -3,8 +3,11 @@ package application_test
 import (
 	"context"
 	"errors"
+	"regexp"
 	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
@@ -127,6 +130,46 @@ func TestCommitAutosave_Happy(t *testing.T) {
 	}
 }
 
+func TestCommitAutosave_WithDBSetsTemplateEditAuthz(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{
+		ID:       "tpl-1",
+		TenantID: "11111111-1111-1111-1111-111111111111",
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  7,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/7.docx",
+	}
+	svc := application.New(repo, &fakePresigner{HeadResult: "hash_abc"}, fakeClock{}, &fakeUUID{}).WithDB(db)
+
+	mock.ExpectBegin()
+	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
+	mock.ExpectCommit()
+
+	_, err = svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+		TenantID:            "11111111-1111-1111-1111-111111111111",
+		ActorUserID:         "user-a",
+		TemplateID:          "tpl-1",
+		VersionNumber:       7,
+		ExpectedContentHash: "hash_abc",
+	})
+	if err != nil {
+		t.Fatalf("CommitAutosave returned error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
 func TestCommitAutosave_HashMismatch(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{
@@ -219,4 +262,75 @@ func TestSaveTemplateDraft_StaleLockVersion(t *testing.T) {
 	if !errors.Is(err, domain.ErrStaleLockVersion) {
 		t.Fatalf("expected ErrStaleLockVersion, got %v", err)
 	}
+}
+
+func TestSaveTemplateDraft_WithDBSetsTemplateEditAuthz(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{
+		ID:       "tpl-1",
+		TenantID: "11111111-1111-1111-1111-111111111111",
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+	}
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+
+	mock.ExpectBegin()
+	expectTemplateEditAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
+	mock.ExpectCommit()
+
+	err = svc.SaveTemplateDraft(context.Background(), application.SaveTemplateDraftCmd{
+		TenantID:            "11111111-1111-1111-1111-111111111111",
+		ActorUserID:         "user-a",
+		TemplateID:          "tpl-1",
+		VersionNumber:       1,
+		ExpectedLockVersion: 0,
+		DocxStorageKey:      "templates/tpl-1/versions/1.docx",
+		SchemaStorageKey:    "templates/tpl-1/versions/1.schema.json",
+		DocxContentHash:     "hash_new",
+		SchemaContentHash:   "schema_hash",
+	})
+	if err != nil {
+		t.Fatalf("SaveTemplateDraft returned error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func expectTemplateEditAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.tenant_id', $1, true)")).
+		WithArgs(tenantID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.actor_id', $1, true)")).
+		WithArgs(actorID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(actorID))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1 FROM metaldocs.iam_user_roles
+   WHERE user_id   = $1
+     AND tenant_id = $2::uuid
+     AND role_code = 'system_admin'
+)`)).
+		WithArgs(actorID, tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
+		WithArgs(`[{"area":"tenant","cap":"template.edit"}]`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 }

@@ -27,7 +27,7 @@ const MOCK_REVISIONS = [
   { id: 'v5', title: 'v5', subtitle: 'Você · em edição', aside: 'agora', active: true },
   { id: 'v4', title: 'v4', subtitle: 'Anexos LGPD', aside: '15/04/2026' },
   { id: 'v3', title: 'v3', subtitle: 'Integração SAP', aside: '03/11/2025' },
-  { id: 'v2', title: 'v2', subtitle: 'Estágio', aside: '22/05/2024' },
+  { id: 'rev-2', title: 'rev. 2', subtitle: 'Estágio', aside: '22/05/2024' },
   { id: 'v1', title: 'v1', subtitle: 'Versão inicial', aside: '08/01/2024' },
 ];
 

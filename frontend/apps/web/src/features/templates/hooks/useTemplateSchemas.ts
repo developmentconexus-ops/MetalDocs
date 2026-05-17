@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getTemplateSchemas, putTemplateSchemas, type TemplateSchemas } from '../api/templatesV2';
+import { getTemplateSchemas, putTemplateSchemas, type TemplateSchemas } from '../api/templates';
 
 interface UseTemplateSchemasResult {
   schemas: TemplateSchemas | null;

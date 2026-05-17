@@ -12,7 +12,7 @@
 > - `migrations/0004_init_audit_events.sql:1` â€” `metaldocs.audit_events` table
 > - `migrations/0005_grant_workflow_audit_privileges.sql:2` â€” INSERT grant to `metaldocs_app`
 > - `apps/api/cmd/metaldocs-api/main.go:193` â€” route registration site
-> - `apps/api/cmd/metaldocs-api/main.go:445-479` â€” `documentsV2AuditAdapter`
+> - `apps/api/cmd/metaldocs-api/main.go:477-492` â€” `documentsAuditAdapter`
 
 ---
 
@@ -66,7 +66,7 @@ C4Context
     System_Boundary(b1, "MetalDocs") {
         System(audit, "audit", "Append-only event sink + read query")
         System_Ext(iam, "iam", "Calls Record on role/user mutations")
-        System_Ext(documents, "documents", "Calls Record via documentsV2AuditAdapter")
+        System_Ext(documents, "documents", "Calls Record via documentsAuditAdapter")
         System_Ext(export, "documents/export", "Calls Record on PDF/DOCX exports")
         System_Ext(auth, "auth", "Should call Record (T-002 in auth â€” gap)")
     }

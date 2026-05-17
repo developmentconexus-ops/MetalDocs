@@ -1,4 +1,4 @@
-import { useDocumentPdfStatus } from '../documents/hooks/v2/useDocumentPdfStatus';
+import { useDocumentPdfStatus } from '../documents/hooks/editor/useDocumentPdfStatus';
 import { PDFCell } from '../documents/components/PDFCell';
 
 export function PublishedDownloadCell({ documentId }: { documentId: string }) {

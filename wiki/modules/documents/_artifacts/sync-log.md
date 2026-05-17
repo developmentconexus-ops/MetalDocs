@@ -1,13 +1,58 @@
+## 2026-05-15 - D4 hard-cutover wiki/docs sync
+
+## 2026-05-16 - documents frontend V2 naming polish
+
+- **Context:** uncommitted diff: documents frontend API wrappers renamed editor hooks folder renamed the editor hook folder to `hooks/editor`.
+- **Mode:** lite patch
+- **Anchors moved:** `features/documents/hooks/editor/*`
+- **Public surface:** frontend-only import/file naming changed; document HTTP API unchanged
+- **Routes/API:** no backend route/schema change
+- **Runtime flows:** editor/autosave/comments/pdf hooks keep existing behavior under canonical path names
+- **Persistence:** IndexedDB DB name changed from `metaldocs_docs`
+- **Dependencies:** audit adapter reference corrected to `documentsAuditAdapter`
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
+- **Tally gate:** PASS preflight
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
+
+- **Context:** Worker E wiki/docs lane cutover refresh for current route/API truth and approval linkage rename evidence.
+- **Mode:** lite patch
+- **Anchors moved:** route/API wording only
+- **Public surface:** `/documents/new`, `/documents/:documentID/edit`, `/documents/:documentId`
+- **Routes/API:** `/api/v1/documents/*` canonical in current-truth sections; stale `/api/v2/documents` removed from active docs wording
+- **Persistence:** approval linkage wording reflects `document_id` naming (0194 evidence preserved via docs)
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
+- **Tally gate:** pending
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`
 # Sync log — documents
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
+
+## 2026-05-15 - Novo Documento blank-template create tripwire repair
+
+- **Context:** uncommitted runtime repair for Documents v2 initialization inside Registry atomic create
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** `CreateDocumentTx` behavior updated; it asserts `document.create` before INSERT and `document.edit` before initial pointer/snapshot UPDATEs
+- **Routes/API:** none
+- **Runtime flows:** atomic CD+draft create note updated for Plan 5 tripwire behavior
+- **Persistence:** `documents` INSERT/UPDATE tripwire pairing updated for `CreateDocumentTx`
+- **Dependencies:** Registry remains caller/owner of atomic create; Documents v2 remains row-initialization port provider
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
+- **Tally gate:** PASS
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`
 
 ## 2026-05-11 · Plan 6a — close T-005
 
 - **Context:** Plan 6a (commit 0e106ed9) · wrap RenameDocument UPDATE + audit.Write in single transaction
 - **Anchors moved:** 0
 - **Symbols renamed:** 0
-- **T-NNN closed:** T-005 · evidence: Service.RenameDocument uses BeginTx when s.db != nil; UpdateDocumentNameTx added to Repository interface + postgres impl; WriteTx added to Audit interface; documentsV2AuditAdapter.WriteTx wired
+- **T-NNN closed:** T-005 · evidence: Service.RenameDocument uses BeginTx when s.db != nil; UpdateDocumentNameTx added to Repository interface + postgres impl; WriteTx added to Audit interface; documentsAuditAdapter.WriteTx wired
 - **R-NNN updated:** R-005 → merged · commit 0e106ed9
 - **§11 counts after:** Critical=1 Major=5 Minor=4 (unchanged)
 - **Tally gate:** PASS (pre-existing WARNs T-007/T-010 have no backlog row — latent by design)

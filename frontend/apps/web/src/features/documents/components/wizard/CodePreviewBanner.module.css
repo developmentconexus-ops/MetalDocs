@@ -1,4 +1,4 @@
-/* Step 2 dashed brand-pale callout. Mirrors selected-wizard-v2.jsx line 76:
+/* Step 2 dashed brand-pale callout. Mirrors novo-documento design reference line 76:
    { padding: 16, background: 'var(--brand-pale)',
      border: '1px dashed var(--brand-soft)',
      borderRadius: 'var(--r-3)', marginBottom: 22 }.
@@ -11,7 +11,7 @@
   margin-bottom: var(--sp-5);
 }
 
-/* Generated code mono text. Mirrors selected-wizard-v2.jsx line 78:
+/* Generated code mono text. Mirrors novo-documento design reference line 78:
    { fontSize: 26, fontWeight: 600, color: 'var(--brand)',
      letterSpacing: '0.02em' }.
    TODO(novo-documento): wizard uses ad-hoc 13/12.5/11/10/9px sizes plus 26px

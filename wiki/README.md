@@ -1,6 +1,6 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-11 (roadmap index added)
+> **Last verified:** 2026-05-16 (current agent handoff added)
 > **Purpose:** Governed index for codebase knowledge. Read this first — drill into folders only after.
 
 ## How to use this wiki
@@ -123,6 +123,7 @@ Snapshot columns (`placeholder_schema_snapshot`, etc.) are populated at document
 - [decisions/0012-contract-first-api.md](decisions/0012-contract-first-api.md) - adopt spec-as-source-of-truth via oapi-codegen; root cause of `documents.name` empty-name bug; migration scope; residual risks for non-migrated modules (2026-05-08)
 
 ### References
+- [references/current-agent-handoff.md](references/current-agent-handoff.md) - **START HERE after Codex reinstall** - current Plan 12 status, next-session recovery context, and inaccessible thread summary.
 - [references/eigenpal-spike.md](references/eigenpal-spike.md) - pointer to spike repo + key findings (T1-T8)
 - [references/eigenpal-controlled-package.md](references/eigenpal-controlled-package.md) - current vendored EigenPal package contract for MetalDocs
 - [references/environment-setup.md](references/environment-setup.md) - local dev: compose, migrations, seed (stub, Last verified: 2026-05-01)

@@ -3,7 +3,7 @@ import { buildProfileAccordions } from "../features/documents/adapters/catalogSu
 import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../lib/types";
 import styles from "./DocumentWorkspaceShell.module.css";
 
-export type WorkspaceView = "operations" | "approvals" | "audit" | "library" | "my-docs" | "recent" | "create" | "content-builder" | "registry" | "notifications" | "admin" | "taxonomy-admin" | "templates" | "documents-v2" | "registry-v2" | "iam-memberships" | "approval-routes";
+export type WorkspaceView = "operations" | "approvals" | "audit" | "library" | "my-docs" | "recent" | "create" | "content-builder" | "registry" | "notifications" | "admin" | "taxonomy-admin" | "templates" | "document-editor" | "controlled-documents" | "iam-memberships" | "approval-routes";
 
 type WorkspaceShellProps = {
   userDisplayName: string;
@@ -147,7 +147,7 @@ function sections(props: WorkspaceShellProps): NavSection[] {
           ),
         },
         {
-          key: "registry-v2" as WorkspaceView,
+          key: "controlled-documents" as WorkspaceView,
           label: "Docs Controlados",
           icon: (
             <svg viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4">
@@ -212,7 +212,7 @@ function sections(props: WorkspaceShellProps): NavSection[] {
   }
 
   tail.push({
-    label: "Templates v2",
+    label: "Templates",
     items: [
       {
         key: "templates",
@@ -258,9 +258,9 @@ function activeTitle(activeView: WorkspaceView): string {
       return "Tipos Documentais";
     case "templates":
       return "Templates";
-    case "documents-v2":
-      return "Documents v2";
-    case "registry-v2":
+    case "document-editor":
+      return "Editor de Documento";
+    case "controlled-documents":
       return "Documentos Controlados";
     case "iam-memberships":
       return "Memberships de Area";

@@ -24,7 +24,7 @@ None.
 
 ### Browser-side storage (informational only)
 
-The consumer hook `useDocumentAutosave` (`features/documents/hooks/v2/useDocumentAutosave.ts`) uses IndexedDB for pending-save crash recovery via `useIndexedDBRestore`. That storage is owned by the `documents` feature, not by editor-chrome. The chrome only renders the visual indicator of the hook's state via `AutosaveStatus`.
+The consumer hook `useDocumentAutosave` (`features/documents/hooks/editor/useDocumentAutosave.ts`) uses IndexedDB for pending-save crash recovery via `useIndexedDBRestore`. That storage is owned by the `documents` feature, not by editor-chrome. The chrome only renders the visual indicator of the hook's state via `AutosaveStatus`.
 
 The `DocumentEditorPage` reads/writes `localStorage` key `editor-sidebar-open` (`DocumentEditorPage.tsx:181, 264`) for sidebar open/closed state; this is page state, not chrome state.
 

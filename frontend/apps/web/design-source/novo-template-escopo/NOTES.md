@@ -41,3 +41,25 @@ All other Step 1 elements backed by real data/state.
 
 ## Open backlog
 See `wiki/backlog/novo-template-wizard.md` (created at Phase 5).
+
+## Plan 12.4 integration summary (2026-05-15)
+
+This directory is the canonical worksheet for the requested `novo-template-wizard` screen. The repo does not contain `design-source/novo-template-wizard/`; the committed wizard artifacts are split as `design-source/novo-template-*`.
+
+**Implement now:**
+- Keep profile and generic template creation.
+- Pass `doc_type_code` when a profile-scoped template is selected.
+- Use the shared API client + idempotency key for the active create path.
+- Replace fake `TPL-*` code previews with the actual slug key currently submitted by the wizard.
+- Keep blank-start editor handoff.
+
+**Cut/defer for this PR:**
+- Disable `.docx` import in the wizard until there is a real mid-flow upload or post-create handoff contract.
+- Replace mocked Step 4 role/area/user-count permissions with an honest read-only public-visibility state.
+- Preserve next-code, key UX, template counts, CHK enabled flag, placeholder extraction, permissions APIs, and visibility create-body support in `wiki/backlog/novo-template-wizard.md`.
+
+**Final code truth:**
+- Runtime smoke created a profile-scoped template using `doc_type_code = qa_seed`, `Idempotency-Key`, and the real `POST /api/v1/templates` route.
+- The flow now redirects to `/templates/{id}/versions/1` after HTTP 201.
+- A create-path backend prerequisite was fixed in `templates`: the transaction now sets tenant/actor authz GUCs before `authz.Require`.
+- Screenshots and `smoke-report.json` live in `artifacts/screenshots/plan-12-4/`.

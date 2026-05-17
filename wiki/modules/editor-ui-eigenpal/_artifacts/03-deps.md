@@ -7,7 +7,8 @@
 | Source | Target | Purpose |
 |---|---|---|
 | `MetalDocsEditor.tsx:2` | `@eigenpal/docx-js-editor` — `DocxEditor`, `PluginHost`, `templatePlugin`, `DocxEditorRef`, `EditorPlugin` | Editor surface |
-| `MetalDocsEditor.tsx:3` | `@eigenpal/docx-js-editor/styles.css` | Eigenpal stylesheet (consumed once at adapter level) |
+| `MetalDocsEditor.tsx:3` | `@eigenpal/docx-js-editor/core` - `createEmptyDocument` | Seeds editable no-buffer mounts with an Eigenpal blank document |
+| `MetalDocsEditor.tsx:4` | `@eigenpal/docx-js-editor/styles.css` | Eigenpal stylesheet (consumed once at adapter level) |
 | `sidebarModelBridge.ts:1` | `@eigenpal/docx-js-editor` — `EditorPlugin`, `ReactSidebarItem` | Plugin type |
 | `OutlinePlugin.tsx:2` | `@eigenpal/docx-js-editor` — `EditorPlugin`, `PluginPanelProps` | Plugin type |
 | `mergefieldPlugin.ts:1` | `@metaldocs/shared-tokens` — `diffTokensVsSchema`, `classifyBlacklist`, `ParseError`, `Token` | Token diff math |
@@ -18,10 +19,11 @@ Total external runtime deps: 2 (`@eigenpal/docx-js-editor`, `@metaldocs/shared-t
 
 | Consumer | Imports | Notes |
 |---|---|---|
-| `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:2` | `MetalDocsEditor`, `MetalDocsEditorRef`, `Comment` | **Sole runtime mount of `MetalDocsEditor`** |
-| `frontend/apps/web/src/features/documents/hooks/v2/useDocumentComments.ts:2` | `type { Comment }` | Type-only |
-| `frontend/apps/web/src/features/documents/hooks/v2/__tests__/useDocumentComments.add.test.tsx:1` | `type { Comment }` | Type-only |
-| `frontend/apps/web/src/features/documents/hooks/v2/__tests__/useDocumentComments.orphan.test.tsx:1` | `type { Comment }` | Type-only |
+| `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:2` | `MetalDocsEditor`, `MetalDocsEditorRef`, `Comment` | Runtime mount |
+| `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:3` | `MetalDocsEditor`, `MetalDocsEditorRef` | Runtime mount; blank-template editor relies on adapter empty-document seed |
+| `frontend/apps/web/src/features/documents/hooks/editor/useDocumentComments.ts:2` | `type { Comment }` | Type-only |
+| `frontend/apps/web/src/features/documents/hooks/editor/__tests__/useDocumentComments.add.test.tsx:1` | `type { Comment }` | Type-only |
+| `frontend/apps/web/src/features/documents/hooks/editor/__tests__/useDocumentComments.orphan.test.tsx:1` | `type { Comment }` | Type-only |
 | `frontend/apps/web/src/features/documents/__tests__/DocumentEditorPage.test.tsx:36` | `MetalDocsEditor` (vi.mock target) | Mock for tests |
 | `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.test.tsx:7` | `MetalDocsEditor` (vi.mock target) | Mock for tests |
 | `frontend/apps/web/vite.config.ts:36` | alias `@metaldocs/editor-ui` → `packages/editor-ui/src/index.ts` | Build wiring |
@@ -31,12 +33,11 @@ Total external runtime deps: 2 (`@eigenpal/docx-js-editor`, `@metaldocs/shared-t
 
 | Consumer | Imports | Drift severity |
 |---|---|---|
-| `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:1` | `@eigenpal/docx-js-editor/styles.css` | — |
-| `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:4` | `DocxEditor`, `DocxEditorRef` from `@eigenpal/docx-js-editor/react` | **Major** — wraps adapter, not via `MetalDocsEditor` |
-| `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx:5` | `createEmptyDocument` from `@eigenpal/docx-js-editor/core` | Same; subpath import |
-| `frontend/apps/web/src/editor-adapters/eigenpal-template-mode.ts:1` | `BlockContent, Paragraph, Table` from `@eigenpal/docx-js-editor/core` | Type-only; outside adapter package |
+| `frontend/apps/web/src/editor-adapters/eigenpal-template-mode.ts:1` | `BlockContent`, `Paragraph`, `Table` from `@eigenpal/docx-js-editor/core` | Type-only adapter spike; not a runtime editor mount |
+| `frontend/apps/web/src/editor-adapters/__spike__/eigenpal-placeholder-spike.test.ts:7` | `createEmptyDocument`, `DocumentAgent`, `parseDocx`, `serializeDocx` from `@eigenpal/docx-js-editor/core` | Test/spike only |
+| `frontend/apps/web/src/features/templates/__tests__/template-author-page-convergence.test.tsx` | eigenpal mocks | Test-only |
 
-The wiki claim that `TemplateEditorPage` is a `MetalDocsEditor` consumer is **stale**.
+Template runtime pages consume `@metaldocs/editor-ui`; no production page mounts eigenpal directly.
 
 ## docgen-v2 OUT-edge
 
@@ -44,10 +45,10 @@ The wiki claim that `TemplateEditorPage` is a `MetalDocsEditor` consumer is **st
 
 ## Build wiring
 
-- `packages/editor-ui/package.json:29` — `@eigenpal/docx-js-editor: file:../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (path missing on `main`)
+- `packages/editor-ui/package.json:29` — `@eigenpal/docx-js-editor: file:../../vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` (path present after Plan 3 restoration)
 - `packages/editor-ui/package.json:5` — `main: ./src/index.ts` (no compile step shipped; consumers compile source via path alias)
 - TS path alias + Vite alias resolve `@metaldocs/editor-ui` to source directly.
 
-## Sonnet-subagent dispatch skipped — rationale
+## 2026-05-17 sync note
 
-Per Phase 0 skip note, this artifact was produced by main agent grep during context loading. IN-edge scan is small (1 page + 6 type-only consumers + 2 mocks); no whole-repo trace required. Recorded here for gate `(c)` coverage.
+Blank editable mount behavior adds a new adapter OUT-edge to `@eigenpal/docx-js-editor/core` for `createEmptyDocument`. Affected consumers are both runtime `MetalDocsEditor` mounts; no API, DB, or backend dependency changed.

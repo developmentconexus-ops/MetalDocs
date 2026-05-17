@@ -38,3 +38,11 @@ See `artifacts/phase0-audit.md`. Headline:
 ## Leakage probe
 
 Required — `<label>` + `<input type="checkbox">` rendered.
+
+## Plan 12.4 update (2026-05-15)
+
+Final runtime truth supersedes the earlier mocked submit:
+- **Keep:** checkbox gate and draft preview.
+- **Use real backend submit:** `POST /api/v1/templates` now runs through the shared API client with an idempotency key.
+- **Use honest preview:** fake `TPL-*` sequence was replaced by the slug key actually submitted as `key`.
+- **Redirect:** HTTP 201 opens `/templates/{id}/versions/1`.

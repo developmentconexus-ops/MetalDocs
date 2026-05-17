@@ -2,7 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TemplateEditorPage } from '../pages/TemplateEditorPage';
-import type { TemplateSchemas } from '../api/templatesV2';
+import type { TemplateSchemas } from '../api/templates';
 
 let detectedVariables: string[] = [];
 const saveSchemas = vi.fn();
@@ -61,10 +61,10 @@ async function triggerEditorChange() {
   await act(async () => { await Promise.resolve(); vi.advanceTimersByTime(400); });
 }
 
-// SKIP 2026-05-10 — convergence test predates the v2/ dir dissolve (commit b1e7ae00)
+// SKIP 2026-05-10 - convergence test predates the versioned directory dissolve (commit b1e7ae00)
 // and never had its mock paths or render assumptions refreshed for the
-// `TemplateAuthorPage → TemplateEditorPage` rebuild. Pre-existing fail on main
-// (4/5) → still red after the rename + path fix because fake-timer + multi-effect
+// `TemplateAuthorPage -> TemplateEditorPage` rebuild. Pre-existing fail on main
+// (4/5) -> still red after the rename + path fix because fake-timer + multi-effect
 // timing assumptions need a rewrite. Tracked in
 // `wiki/backlog/template-editor.md#convergence-test-rewrite`.
 describe.skip('TemplateEditorPage placeholder catalog', () => {

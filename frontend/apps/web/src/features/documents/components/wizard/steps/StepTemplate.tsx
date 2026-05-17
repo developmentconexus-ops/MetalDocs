@@ -68,12 +68,13 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
             </button>
           </div>
         </div>
-      ) : templates.length === 0 ? (
-        <div className="card">
-          <div className="caption">Nenhum template publicado para este perfil.</div>
-        </div>
       ) : (
         <div className={styles.templateStack}>
+          {templates.length === 0 ? (
+            <div className="card">
+              <div className="caption">Nenhum template publicado para este perfil.</div>
+            </div>
+          ) : null}
           {/* TODO(novo-documento:template-versions): only published version is
               selectable; older versions rendered disabled with "Em breve" tooltip.
               GET /api/v1/templates/:id/versions endpoint not yet shipped.

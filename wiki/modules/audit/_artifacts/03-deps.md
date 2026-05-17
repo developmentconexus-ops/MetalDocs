@@ -76,7 +76,7 @@ func (h *AdminHandler) WithAuditReader(reader auditdomain.Reader) *AdminHandler
 `.ListEvents(` call sites:
 - `admin_handler.go:128` — `events, err := h.auditReader.ListEvents(r.Context(), auditdomain.ListEventsQuery{Limit: 25})` — error-checked
 
-### 2c. `apps/api/cmd/metaldocs-api` — main / documentsV2AuditAdapter
+### 2c. `apps/api/cmd/metaldocs-api` — main / documentsAuditAdapter
 
 **File:** `apps/api/cmd/metaldocs-api/main.go`
 
@@ -86,10 +86,10 @@ func (h *AdminHandler) WithAuditReader(reader auditdomain.Reader) *AdminHandler
 | 38 | `auditapp` | `auditapp.NewService(deps.AuditReader)` | constructs `*application.Service` |
 | 39 | `auditdelivery` | `auditdelivery.NewHandler(auditService)` | constructs `*delivery/http.Handler` |
 
-`documentsV2AuditAdapter` (`main.go:445-479`) wraps `auditdomain.Writer` behind `documents/application.Audit` interface:
+`documentsAuditAdapter` (`main.go:477-492`) wraps `auditdomain.Writer` behind `documents/application.Audit` interface:
 ```go
-type documentsV2AuditAdapter struct { writer auditdomain.Writer }
-func (a *documentsV2AuditAdapter) Write(ctx, tenantID, actorID, action, docID string, meta any)
+type documentsAuditAdapter struct { writer auditdomain.Writer }
+func (a *documentsAuditAdapter) Write(ctx, tenantID, actorID, action, docID string, meta any)
 ```
 `.Record(` call in adapter (`main.go:467`):
 ```go
@@ -154,7 +154,7 @@ All `Action:` / action-string literals passed through the audit path, by consume
 | `admin_handler.go:398` via `recordAudit` | `"iam.user.roles.replaced"` | `"user"` | yes |
 | `admin_handler.go:417` via `recordAudit` | `"auth.user.password_reset"` | `"user"` | yes |
 
-### Consumer: `internal/modules/documents/application/service.go` (via `documentsV2AuditAdapter`)
+### Consumer: `internal/modules/documents/application/service.go` (via `documentsAuditAdapter`)
 
 | Call site (service.go) | Action string | ResourceType | Fire-and-forget? |
 |---|---|---|---|
@@ -170,7 +170,7 @@ All `Action:` / action-string literals passed through the audit path, by consume
 | `service.go:757` | `"document.finalized"` | `"document"` | yes |
 | `service.go:765` | `"document.archived"` | `"document"` | yes |
 
-### Consumer: `internal/modules/documents/application/export_service.go` (via `documentsV2AuditAdapter`)
+### Consumer: `internal/modules/documents/application/export_service.go` (via `documentsAuditAdapter`)
 
 | Call site (export_service.go) | Action string | ResourceType | Fire-and-forget? |
 |---|---|---|---|

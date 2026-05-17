@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import * as React from 'react';
 import type { ReactNode } from 'react';
 import { MetalDocsEditor } from '../src/MetalDocsEditor';
 
@@ -22,7 +23,7 @@ vi.mock('@eigenpal/docx-js-editor', () => ({
       {children}
     </div>
   ),
-  DocxEditor: () => <div data-testid="docx-editor-mock" />,
+  DocxEditor: React.forwardRef((_props, _ref) => <div data-testid="docx-editor-mock" />),
 }));
 
 describe('template plugin wiring', () => {

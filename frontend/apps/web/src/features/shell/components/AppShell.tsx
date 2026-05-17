@@ -12,7 +12,7 @@ export function AppShell() {
     (m) => (m.handle as RouteHandle | undefined)?.sectionPanel === true,
   );
   const hideToolbar = matches.some(
-    (m) => (m.handle as RouteHandle | undefined)?.workspaceView === 'documents-v2',
+    (m) => (m.handle as RouteHandle | undefined)?.workspaceView === 'document-editor',
   );
 
   return (

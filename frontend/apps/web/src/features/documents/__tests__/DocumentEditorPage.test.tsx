@@ -8,7 +8,7 @@ const queueSpy = vi.fn();
 const flushSpy = vi.fn();
 const saveBuffer = new Uint8Array([1, 2, 3, 4]).buffer;
 
-vi.mock('../api/documentsV2', () => ({
+vi.mock('../api/documents', () => ({
   getDocument: vi.fn(),
   signedRevisionURL: vi.fn(),
   finalizeDocument: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock('@metaldocs/editor-ui', () => ({
 describe('DocumentEditorPage', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    const api = await import('../api/documentsV2');
+    const api = await import('../api/documents');
     vi.mocked(api.getDocument).mockResolvedValue({
       ID: 'doc-1',
       Name: 'Quarterly Report',

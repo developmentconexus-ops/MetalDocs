@@ -14,7 +14,7 @@
 
 ## Indirect persistence touch
 
-The adapter emits `ArrayBuffer` (DOCX bytes) to the parent's `onAutoSave` callback. The parent (`DocumentEditorPage`) is responsible for uploading via `templatesV2`/`documents` backend modules, which own their own tables. Persistence concerns belong in those module docs:
+The adapter emits `ArrayBuffer` (DOCX bytes) to the parent's `onAutoSave` callback. The parent (`DocumentEditorPage`) is responsible for uploading via `templates`/`documents` backend modules, which own their own tables. Persistence concerns belong in those module docs:
 
 - `wiki/modules/documents.md` — `public.documents`, snapshot columns, finalize tripwire.
 - `wiki/modules/templates.md` — `public.template_versions`, DOCX storage in MinIO.

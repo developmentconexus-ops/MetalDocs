@@ -5,14 +5,6 @@ import (
 	"time"
 )
 
-type Visibility string
-
-const (
-	VisibilityPublic   Visibility = "public"
-	VisibilityInternal Visibility = "internal"
-	VisibilitySpecific Visibility = "specific"
-)
-
 type Template struct {
 	ID                 string
 	TenantID           string
@@ -20,9 +12,6 @@ type Template struct {
 	Key                string
 	Name               string
 	Description        string
-	Areas              []string
-	Visibility         Visibility
-	SpecificAreas      []string
 	LatestVersion      int
 	PublishedVersionID *string
 	CreatedBy          string
@@ -34,9 +23,8 @@ type Template struct {
 func (t *Template) IsArchived() bool { return t.ArchivedAt != nil }
 
 var (
-	ErrNotFound                = errors.New("templates_v2: not_found")
-	ErrKeyConflict             = errors.New("templates_v2: key_conflict")
-	ErrInvalidVisibility       = errors.New("templates_v2: invalid_visibility")
-	ErrArchived                = errors.New("templates_v2: archived")
-	ErrSystemTemplateImmutable = errors.New("templates_v2: system_template_immutable")
+	ErrNotFound                = errors.New("templates: not_found")
+	ErrKeyConflict             = errors.New("templates: key_conflict")
+	ErrArchived                = errors.New("templates: archived")
+	ErrSystemTemplateImmutable = errors.New("templates: system_template_immutable")
 )

@@ -68,8 +68,8 @@
 | `template_audit_log` | `public` | templates | `wiki/database/tables/template_audit_log.md` |
 | `template_versions` | `public` | templates | `wiki/database/tables/template_versions.md` |
 | `templates` | `public` | templates | `wiki/database/tables/templates.md` |
-| `templates_v2_approval_config` | `public` | templates | `wiki/database/tables/templates_v2_approval_config.md` |
-| `templates_v2_audit_log` | `public` | templates | `wiki/database/tables/templates_v2_audit_log.md` |
-| `templates_v2_template` | `public` | templates | `wiki/database/tables/templates_v2_template.md` |
-| `templates_v2_template_version` | `public` | templates | `wiki/database/tables/templates_v2_template_version.md` |
+| `templates_approval_config` | `public` | templates | `wiki/database/tables/templates_approval_config.md` |
+| `templates_audit_log` | `public` | templates | `wiki/database/tables/templates_audit_log.md` |
+| `templates_template` | `public` | templates | `wiki/database/tables/templates_template.md` |
+| `templates_template_version` | `public` | templates | `wiki/database/tables/templates_template_version.md` |
 | `user_process_areas` | `public` | iam | `wiki/database/tables/user_process_areas.md` |

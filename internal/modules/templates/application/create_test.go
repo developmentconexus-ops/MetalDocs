@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
@@ -16,17 +19,14 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	cmd := application.CreateTemplateCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "user-a",
-		DocTypeCode:   "CONTRACT",
-		Key:           "contract-default",
-		Name:          "Contract Template",
-		Description:   "Default contract",
-		Areas:         []string{"legal"},
-		Visibility:    domain.VisibilityPublic,
-		SpecificAreas: nil,
-		ApproverRole:  "approver",
-		ReviewerRole:  strPtr("reviewer"),
+		TenantID:     "tenant-a",
+		ActorUserID:  "user-a",
+		DocTypeCode:  "CONTRACT",
+		Key:          "contract-default",
+		Name:         "Contract Template",
+		Description:  "Default contract",
+		ApproverRole: "approver",
+		ReviewerRole: strPtr("reviewer"),
 	}
 
 	got, err := svc.CreateTemplate(context.Background(), cmd)
@@ -91,7 +91,6 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		DocTypeCode:  "CONTRACT",
 		Key:          "contract-default",
 		Name:         "Contract Template",
-		Visibility:   domain.VisibilityPublic,
 		ApproverRole: "approver",
 	})
 	if !errors.Is(err, domain.ErrKeyConflict) {
@@ -99,62 +98,33 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	}
 }
 
-func TestCreateTemplate_InvalidVisibility(t *testing.T) {
-	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
 
-	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:     "tenant-a",
+	repo := newFakeRepo()
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+
+	mock.ExpectBegin()
+	expectTemplateCreateAuthz(mock, "user-a", "11111111-1111-1111-1111-111111111111")
+	mock.ExpectCommit()
+
+	_, err = svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
+		TenantID:     "11111111-1111-1111-1111-111111111111",
 		ActorUserID:  "user-a",
 		DocTypeCode:  "CONTRACT",
 		Key:          "contract-default",
 		Name:         "Contract Template",
-		Visibility:   domain.Visibility("weird"),
 		ApproverRole: "approver",
-	})
-	if !errors.Is(err, domain.ErrInvalidVisibility) {
-		t.Fatalf("expected ErrInvalidVisibility, got %v", err)
-	}
-}
-
-func TestCreateTemplate_SpecificNoAreas(t *testing.T) {
-	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
-
-	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "user-a",
-		DocTypeCode:   "CONTRACT",
-		Key:           "contract-default",
-		Name:          "Contract Template",
-		Visibility:    domain.VisibilitySpecific,
-		SpecificAreas: nil,
-		ApproverRole:  "approver",
-	})
-	if !errors.Is(err, domain.ErrInvalidVisibility) {
-		t.Fatalf("expected ErrInvalidVisibility, got %v", err)
-	}
-}
-
-func TestCreateTemplate_NonSpecificWithAreas(t *testing.T) {
-	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
-
-	got, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "user-a",
-		DocTypeCode:   "CONTRACT",
-		Key:           "contract-default",
-		Name:          "Contract Template",
-		Visibility:    domain.VisibilityPublic,
-		SpecificAreas: []string{"restricted"},
-		ApproverRole:  "approver",
 	})
 	if err != nil {
 		t.Fatalf("CreateTemplate returned error: %v", err)
 	}
-	if len(got.Template.SpecificAreas) != 0 {
-		t.Fatalf("expected empty SpecificAreas, got %v", got.Template.SpecificAreas)
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
 	}
 }
 
@@ -264,4 +234,31 @@ func TestCreateNextVersion_Archived(t *testing.T) {
 
 func strPtr(v string) *string {
 	return &v
+}
+
+func expectTemplateCreateAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.tenant_id', $1, true)")).
+		WithArgs(tenantID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.actor_id', $1, true)")).
+		WithArgs(actorID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(actorID))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1 FROM metaldocs.iam_user_roles
+   WHERE user_id   = $1
+     AND tenant_id = $2::uuid
+     AND role_code = 'system_admin'
+)`)).
+		WithArgs(actorID, tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
+		WithArgs(`[{"area":"tenant","cap":"template.create"}]`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 }

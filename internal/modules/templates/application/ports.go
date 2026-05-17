@@ -24,6 +24,7 @@ type Repository interface {
 	UpdateVersion(ctx context.Context, v *domain.TemplateVersion) error
 	UpdateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error
 	UpdateVersionDraftCAS(ctx context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error
+	UpdateVersionDraftCASTx(ctx context.Context, tx *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error
 	ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error
 	ObsoletePreviousPublishedTx(ctx context.Context, tx *sql.Tx, templateID, keepVersionID string) error
 
@@ -48,12 +49,9 @@ type UUIDGen interface{ New() string }
 type ResolverRegistryReader interface{ Known() map[string]int }
 
 type ListFilter struct {
-	TenantID         string
-	AreaAny          []string
-	ActorAreas       []string
-	IsExternalViewer bool
-	DocTypeCode      *string
-	Status           *domain.VersionStatus
-	Limit            int
-	Offset           int
+	TenantID    string
+	DocTypeCode *string
+	Status      *domain.VersionStatus
+	Limit       int
+	Offset      int
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { DocumentFamily, DocumentProfile, CreateProfileRequest, UpdateProfileRequest } from "./types";
 import { createProfile, updateProfile, setDefaultTemplate, fetchFamilies } from './api/taxonomy';
-import { listTemplates, type TemplateListRow } from "../templates/api/templatesV2";
+import { listTemplates, type TemplateListRow } from "../templates/api/templates";
 
 type Props = {
   mode: "create" | "edit";

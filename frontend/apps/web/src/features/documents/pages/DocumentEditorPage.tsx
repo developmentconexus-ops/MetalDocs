@@ -3,13 +3,13 @@ import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import type { Comment } from '@metaldocs/editor-ui';
 import { toast } from 'sonner';
 import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
-import { useDocumentSession } from '../hooks/v2/useDocumentSession';
-import { useDocumentAutosave } from '../hooks/v2/useDocumentAutosave';
-import { useDocumentComments } from '../hooks/v2/useDocumentComments';
-import { getDocument, finalizeDocument, renameDocument, signedRevisionURL } from '../api/documentsV2';
-import { useDocumentPdfStatus } from '../hooks/v2/useDocumentPdfStatus';
+import { useDocumentSession } from '../hooks/editor/useDocumentSession';
+import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
+import { useDocumentComments } from '../hooks/editor/useDocumentComments';
+import { getDocument, finalizeDocument, renameDocument, signedRevisionURL } from '../api/documents';
+import { useDocumentPdfStatus } from '../hooks/editor/useDocumentPdfStatus';
 import { PDFCell } from '../components/PDFCell';
-import type { DocumentResponse } from '../api/documentsV2';
+import type { DocumentResponse } from '../api/documents';
 import { EditorMetaSidebar } from '../components/EditorMetaSidebar';
 import {
   EditorChrome,

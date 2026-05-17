@@ -15,7 +15,7 @@ Runtime and contract evidence verified on 2026-05-14:
 - Screen route exists at `/approvals`.
 - Inbox API exists at `GET /api/v1/approval/inbox`.
 - Approval module contract surfaces are present in runtime, OpenAPI, generated backend code, generated frontend types, and the current feature wrapper.
-- Registry detail remains the real review entrypoint at `/registry-v2/:controlledDocumentId`.
+- Registry detail remains the real review entrypoint at `/controlled-documents/:controlledDocumentId`.
 - Registry exposes `GET /api/v1/controlled-documents/{id}/active-document`, which provides the active document and approval context needed by the existing signoff flow.
 - Live inbox sample may legitimately return `items: []` and `total: 0`; therefore fake fallback data is not allowed.
 
@@ -167,7 +167,7 @@ Keep the filter button disabled and explicitly deferred. The API supports `area_
 
 Wire to the real review entrypoint:
 
-- `/registry-v2/{controlled_document_id}`
+- `/controlled-documents/{controlled_document_id}`
 
 ### Aprovar e assinar
 
@@ -187,7 +187,7 @@ This is screen-local because the backend mutation surface and the dialog already
 
 Use the same real review entrypoint as the rest of the screen:
 
-- navigate to `/registry-v2/{controlled_document_id}`
+- navigate to `/controlled-documents/{controlled_document_id}`
 
 This is preferred over bouncing back to the `Foco` card because it is simpler, consistent, and uses the established approval review path already documented in the repo.
 
@@ -228,7 +228,7 @@ This PR must not:
 
 ### Document open
 
-- route directly to `/registry-v2/{controlled_document_id}`
+- route directly to `/controlled-documents/{controlled_document_id}`
 
 ## Error handling
 
@@ -243,7 +243,7 @@ Write tests before implementation for each behavior change:
 
 - empty inbox renders honest empty state and not mock fallback content
 - invalid persisted `view` falls back safely
-- `Abrir documento` navigates to `/registry-v2/{controlled_document_id}`
+- `Abrir documento` navigates to `/controlled-documents/{controlled_document_id}`
 - timeline row and `Revisar →` navigate to the same route
 - signoff/reject entry handles missing active-document context honestly
 

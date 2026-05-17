@@ -13,6 +13,10 @@
   margin-bottom: var(--sp-5);
 }
 
+.radioGroupReset {
+  display: contents;
+}
+
 @media (max-width: 640px) {
   .startingPointGrid {
     grid-template-columns: 1fr;
@@ -37,6 +41,15 @@
 
 .startingPointCard:hover {
   border-color: var(--brand-soft);
+}
+
+.startingPointCard.disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.startingPointCard.disabled:hover {
+  border-color: var(--border);
 }
 
 .startingPointCard.selected {
@@ -96,6 +109,16 @@
   font-weight: 600;
   /* design-exact: 14px glyph */
   font-size: 14px;
+}
+
+.soonBadge {
+  margin-left: auto;
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-1);
+  background: var(--surface-3);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
 }
 
 .cardDesc {

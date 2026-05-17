@@ -9,7 +9,7 @@
 
 - `wiki/README.md` — index, last verified 2026-05-10.
 - `wiki/modules/documents.md` — existing module doc (Last verified 2026-05-09). Already substantial; this run upgrades to Arc42 + C4 + tech-debt + backlog deliverables.
-- `wiki/modules/documents-v2.md` — DEPRECATED stub (`renamed to documents` post-migration 0167/0168). **Decision:** retire after this run; wiki-curator removes/redirects in Phase 7. The current `documents.md` already supersedes it.
+- `retired documents module stub` — DEPRECATED stub (`renamed to documents` post-migration 0167/0168). **Decision:** retire after this run; wiki-curator removes/redirects in Phase 7. The current `documents.md` already supersedes it.
 - `wiki/decisions/0001-eigenpal-adoption.md` — DOCX editor choice.
 - `wiki/decisions/0007-two-tier-authz.md` — tier-1 / tier-2 split; documents wired via `NewCapabilityChecker` adapter (J2 amendment).
 - `wiki/decisions/0011-cd-atomic-create.md` — atomic CD+document create; `CreateDocumentTx` port crosses registry→documents boundary; `POST /api/v1/documents` deleted.
