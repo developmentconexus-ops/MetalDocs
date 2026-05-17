@@ -6445,6 +6445,72 @@ export interface components {
             templateVersionId: string;
             name: string;
         };
+        TemplateDTO: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            doc_type_code?: string | null;
+            key: string;
+            name: string;
+            description?: string | null;
+            latest_version: number;
+            /** Format: uuid */
+            published_version_id?: string | null;
+            created_by: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            archived_at?: string | null;
+        };
+        VersionDTO: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            template_id: string;
+            version_number: number;
+            /** @enum {string} */
+            status: "draft" | "in_review" | "approved" | "published" | "obsolete";
+            docx_storage_key?: string | null;
+            content_hash?: string | null;
+            metadata_schema?: {
+                [key: string]: unknown;
+            } | null;
+            placeholder_schema?: {
+                [key: string]: unknown;
+            } | null;
+            author_id: string;
+            pending_reviewer_role?: string | null;
+            pending_approver_role?: string | null;
+            reviewer_id?: string | null;
+            approver_id?: string | null;
+            /** Format: date-time */
+            submitted_at?: string | null;
+            /** Format: date-time */
+            reviewed_at?: string | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** Format: date-time */
+            obsoleted_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        CreateTemplateResponse: {
+            data: {
+                template: components["schemas"]["TemplateDTO"];
+                version: components["schemas"]["VersionDTO"];
+            };
+        };
+        PlaceholderCatalogEntry: {
+            key: string;
+            label: string;
+            description: string;
+        };
+        PlaceholderCatalogResponse: {
+            items: components["schemas"]["PlaceholderCatalogEntry"][];
+        };
         ControlledDocument: {
             /** Format: uuid */
             id: string;
@@ -7322,12 +7388,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        version_id?: string;
-                    };
+                    "application/json": components["schemas"]["CreateTemplateResponse"];
                 };
             };
         };
@@ -7821,7 +7882,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PlaceholderCatalogResponse"];
+                };
             };
         };
     };

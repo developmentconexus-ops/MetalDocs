@@ -8,7 +8,6 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
-	"metaldocs/internal/modules/templates/domain"
 )
 
 var _ templatesapi.ServerInterface = (*Handler)(nil)
@@ -54,7 +53,6 @@ func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templ
 		Name:         strings.TrimSpace(req.Name),
 		Description:  description,
 		DocTypeCode:  docTypeCode,
-		Visibility:   domain.VisibilityPublic,
 		ApproverRole: "approver",
 	})
 	if err != nil {

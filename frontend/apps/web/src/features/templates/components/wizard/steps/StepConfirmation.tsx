@@ -10,6 +10,7 @@ export type StepConfirmationProps = {
   profileCode: string | null;
   templateKey: string;
   startingPoint: 'docx' | 'blank' | null;
+  selectedDocxName?: string | null;
   onBack: () => void;
   onSubmit: () => void;
   isSubmitting?: boolean;
@@ -25,6 +26,7 @@ export function StepConfirmation({
   profileCode,
   templateKey,
   startingPoint,
+  selectedDocxName = null,
   onBack,
   onSubmit,
   isSubmitting = false,
@@ -36,8 +38,14 @@ export function StepConfirmation({
   const keyValue = templateKey || 'identificador-pendente';
   const perfilValue = profileCode ? `${profileCode} - ${selectedProfile?.name ?? ''}` : 'Genérico';
   const familiaValue = selectedProfile?.family ?? '-';
-  const origemValue = startingPoint === 'blank' ? 'Em branco' : 'Não definido';
-  const permissoesValue = 'Toda a empresa';
+  const origemValue =
+    startingPoint === 'blank'
+      ? 'Em branco'
+      : startingPoint === 'docx'
+        ? selectedDocxName
+          ? `Importado de .docx (${selectedDocxName})`
+          : 'Importado de .docx'
+        : 'Não definido';
   const autorValue = user?.displayName ?? '-';
 
   function handleSubmit() {
@@ -46,7 +54,7 @@ export function StepConfirmation({
 
   return (
     <div className="card">
-      <div className="kicker">Etapa 5 de 5</div>
+      <div className="kicker">Etapa 4 de 4</div>
       <h2 className={`h2 ${styles.stepTitle}`}>Revise e confirme a criação</h2>
       <p className={`caption ${styles.intro}`}>
         O template será criado como rascunho. Você pode editar a estrutura no editor visual antes de submeter para revisão.
@@ -87,10 +95,6 @@ export function StepConfirmation({
               <span className={styles.metaValue}>{origemValue}</span>
             </div>
             <div className={styles.metaRow}>
-              <span className={styles.metaLabel}>Visibilidade</span>
-              <span className={styles.metaValue}>{permissoesValue}</span>
-            </div>
-            <div className={styles.metaRow}>
               <span className={styles.metaLabel}>Autor</span>
               <span className={styles.metaValue}>{autorValue}</span>
             </div>
@@ -104,7 +108,7 @@ export function StepConfirmation({
           <li>O template receberá o identificador técnico acima.</li>
           <li>Uma versão 1.0 em rascunho será criada automaticamente.</li>
           <li>O editor será aberto para montar a estrutura.</li>
-          <li>O template será criado com visibilidade pública nesta versão.</li>
+          <li>A disponibilidade do template será governada pelo perfil documental e pelas permissões de criação existentes.</li>
         </ol>
       </div>
 
@@ -128,10 +132,10 @@ export function StepConfirmation({
       <WizardFooter
         stepLabel={
           isSubmitting
-            ? 'Etapa 5 de 5 - Criando template...'
+            ? 'Etapa 4 de 4 - Criando template...'
             : confirmed
-              ? 'Etapa 5 de 5 - Tudo pronto para criar'
-              : 'Etapa 5 de 5 - Confirme para continuar'
+              ? 'Etapa 4 de 4 - Tudo pronto para criar'
+              : 'Etapa 4 de 4 - Confirme para continuar'
         }
         showBack
         onBack={onBack}

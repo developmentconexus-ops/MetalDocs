@@ -105,3 +105,43 @@
 - All three items share a single TanStack Query refetch invalidation key per document. When backend ships any of these, plumb the query key consistently with existing `useDocumentSession` patterns.
 - Sidebar visibility persists via `localStorage` key `editor-sidebar-open`. No backend dependency.
 - The `templatePlugin` mode gating in `MetalDocsEditor` (skipped for `document-edit`/`readonly`) is intentional — keeps eigenpal sidebar empty so the canvas centers when there are no comments. If a future feature needs template-style annotations in the document editor, lift the gate back and use CSS to hide the chip class instead.
+
+## Integration Audit (2026-05-17)
+
+Scope: Documents Editor review comments, revision sidebar, clean release semantics, and Plan 12 baseline for Template Editor parity.
+
+Required gates:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents` -> PASS
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module documents` -> FAIL (`[MISSING] feature API wrapper presence - frontend/apps/web/src/features/documents/api/documentsV2.ts`)
+
+Gate decision:
+
+- Classification: `runtime-contract-prereq` (script result: `shared contract prerequisite`)
+- Stop status: implementation blocked until contract gate is repaired and rerun as PASS
+
+Route truth evidence snapshot:
+
+- OpenAPI comments paths: `api/openapi/v1/openapi.yaml:3723` and `api/openapi/v1/openapi.yaml:3741`
+- Generated backend surface: `internal/modules/documents/api/api.gen.go`
+- Runtime route wiring: `internal/modules/documents/delivery/http/handler.go:120` and `internal/modules/documents/delivery/http/handler.go:155`
+- Active frontend wrapper currently in use: `frontend/apps/web/src/features/documents/api/documents.ts`
+
+| Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
+|---|---|---|---|---|---|
+| Documents module contract gate | `scripts/check-module-contract-sync.ps1 -Module documents` | Gate expects wrapper `frontend/apps/web/src/features/documents/api/documentsV2.ts` | Screen uses `frontend/apps/web/src/features/documents/api/documents.ts` | runtime-contract-prereq | Stop screen implementation and repair/align module contract gate expectations first |
+| Inline document comments load | `DocumentEditorPage`, `useDocumentComments`, OpenAPI comments paths | GET comments route exists in runtime + OpenAPI + generated backend | Wrapper exists in `documents.ts` | blocked by prerequisite gate | Re-audit after gate repair |
+| Add/reply/resolve/delete comments | document comments API + Eigenpal callbacks | POST/PATCH/DELETE comment routes exist | Page-level behavior still needs full lifecycle audit | blocked by prerequisite gate | Re-audit after gate repair |
+| Reviewer adds comments during review | approved lifecycle spec | Not verified yet under current gate failure | Not verified yet under current gate failure | blocked by prerequisite gate | Re-audit after gate repair; if readonly commenting unsupported, classify `Eigenpal adapter prerequisite` |
+| Unresolved comments block approval | approved lifecycle spec | No server-side enforcement verified in this run | No enforcement verified in this run | backend/API prerequisite (pending) | Keep as prerequisite candidate; confirm after gate repair |
+| Template parity baseline | lifecycle spec + template backlog | Template comments capability still unknown in this run | No fake comments UI allowed | defer/prerequisite (pending) | Keep deferred until backend/database/API capability is proven |
+
+### Prerequisite to unblock Task 1
+
+- Fix the documents module contract-sync failure (wrapper truth drift between expected `documentsV2.ts` and actual `documents.ts`), then rerun:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module documents`
+
+### Next step after prerequisite passes
+
+- Resume this audit and classify every visible comment/revision/sidebar/action item to completion before any code implementation.

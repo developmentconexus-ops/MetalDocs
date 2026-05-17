@@ -1,12 +1,11 @@
-export interface PlaceholderCatalogEntry {
-  key: string;
-  label: string;
-  description: string;
-}
+import { apiFetch } from '../../../lib/api/client';
+import type { components, paths } from '../../../lib/api-types';
+
+export type PlaceholderCatalogEntry = components['schemas']['PlaceholderCatalogEntry'];
+type PlaceholderCatalogResponse =
+  paths['/api/v1/templates/placeholder-catalog']['get']['responses'][200]['content']['application/json'];
 
 export async function fetchPlaceholderCatalog(): Promise<PlaceholderCatalogEntry[]> {
-  const r = await fetch('/api/v1/templates/placeholder-catalog');
-  if (!r.ok) throw new Error(`http_${r.status}`);
-  const body = await r.json() as { items: PlaceholderCatalogEntry[] };
-  return body.items ?? [];
+  const body = await apiFetch<PlaceholderCatalogResponse>('/api/v1/templates/placeholder-catalog', {});
+  return body.items;
 }

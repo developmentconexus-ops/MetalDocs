@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/editor-ui-eigenpal-tech-debt.md`.
 
-**Last verified:** 2026-05-11
+**Last verified:** 2026-05-17
 
 ## Rows
 
@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|---|---|---|
 | R-001 | Restore vendored eigenpal tarball or pin to published @eigenpal package | T-001 | M | Critical | — | — | closed 2026-05-11 | Plan 3 |
 | R-002 | Migrate `TemplateEditorPage` to consume `MetalDocsEditor` instead of `DocxEditor` directly | T-002 | M | Major | R-001 | — | open | — |
-| R-003 | Rewrite `templatePlugin.wiring.test.tsx` against the current `template-draft` gate | T-003 | S | Major | — | — | open | — |
+| R-003 | Rewrite `templatePlugin.wiring.test.tsx` against the current `template-draft` gate | T-003 | S | Major | - | - | closed 2026-05-11 | Plan 11 |
 | R-004 | Delete `createOutlinePlugin` export (or re-register if outline panel is brought back) | T-004 | XS | Minor | — | — | open | — |
 | R-005 | Rename `plugins/mergefieldPlugin.ts` to `sidebarModel.ts`; drop the `Plugin` suffix | T-005 | XS | Minor | — | — | open | — |
 | R-006 | Wire `onLockLost` through to a real eigenpal lock-loss event, or remove the prop | T-006 | XS | Minor | — | — | open | — |

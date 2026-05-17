@@ -217,3 +217,14 @@ Mock strategy: all three "needed" fields/endpoints use hardcoded MOCK consts ins
 - [x] `wiki/modules/editor-ui-eigenpal.md` updated for `templatePlugin` mode gating + three-value `EditorMode` type + cross-links to backlog/editor.md and editor-chrome.md
 - [x] `wiki-curator` dispatched (2026-05-06)
 - [ ] PR references worksheet
+
+## 2026-05-17 Addendum - Review Comments Lifecycle
+
+The original 2026-05-06 worksheet predates the approved review-comments lifecycle. Comments are now active review feedback: they survive rejection back to draft and stay out of clean released/PDF output. See `docs/superpowers/specs/2026-05-17-editor-review-comments-lifecycle-design.md` and `wiki/backlog/editor.md` Integration Audit (2026-05-17).
+
+Current gate status for Plan 12 Task 1:
+
+- `scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents` -> PASS
+- `scripts/check-module-contract-sync.ps1 -Module documents` -> FAIL (`shared contract prerequisite`)
+
+Per stop rules, implementation is blocked until the documents contract gate is repaired and rerun as PASS.

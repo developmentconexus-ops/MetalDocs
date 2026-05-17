@@ -27,6 +27,8 @@ All four tables are created in a single migration: `migrations/0120_templates_in
 | `created_at` | timestamptz | NOT NULL DEFAULT now() |
 | `archived_at` | timestamptz | NULL |
 
+2026-05-17 note: `areas`, `visibility`, and `specific_areas` are inert compatibility columns after the template wizard permission simplification. Runtime/API create and list paths no longer expose or filter by these fields; repository inserts preserve `'public'` and empty arrays only to satisfy the existing schema/baseline until a coordinated migration removes or defaults them.
+
 ### `templates_template_version`
 
 | Column | Type | Constraints |

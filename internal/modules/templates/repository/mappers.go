@@ -14,25 +14,15 @@ type rowScanner interface {
 func scanTemplate(row rowScanner) (*domain.Template, error) {
 	var (
 		t                  domain.Template
-		visibility         string
-		areasJSON          []byte
-		specificAreasJSON  []byte
 		publishedVersionID sql.NullString
 		archivedAt         sql.NullTime
 	)
 	if err := row.Scan(
-		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description, &areasJSON, &visibility, &specificAreasJSON,
+		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description,
 		&t.LatestVersion, &publishedVersionID, &t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &archivedAt,
 	); err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(areasJSON, &t.Areas); err != nil {
-		t.Areas = []string{}
-	}
-	if err := json.Unmarshal(specificAreasJSON, &t.SpecificAreas); err != nil {
-		t.SpecificAreas = []string{}
-	}
-	t.Visibility = domain.Visibility(visibility)
 	if publishedVersionID.Valid {
 		t.PublishedVersionID = &publishedVersionID.String
 	}
@@ -120,11 +110,4 @@ func marshalAuditDetails(details map[string]any) ([]byte, error) {
 
 func unmarshalAuditDetails(raw []byte, details *map[string]any) error {
 	return json.Unmarshal(raw, details)
-}
-
-func normalizedTextArray(values []string) []string {
-	if values == nil {
-		return []string{}
-	}
-	return values
 }

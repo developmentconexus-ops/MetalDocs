@@ -3,7 +3,6 @@ package application_test
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 
 	"metaldocs/internal/modules/templates/application"
@@ -88,7 +87,7 @@ func TestListTemplates_Happy(t *testing.T) {
 	}
 }
 
-func TestListTemplates_VisibilityFieldsPassThrough(t *testing.T) {
+func TestListTemplates_SelectionFilterPassThrough(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
@@ -96,25 +95,25 @@ func TestListTemplates_VisibilityFieldsPassThrough(t *testing.T) {
 	status := domain.VersionStatusDraft
 	docType := "CONTRACT"
 	filter := application.ListFilter{
-		TenantID:         "tenant-a",
-		AreaAny:          []string{"core"},
-		DocTypeCode:      &docType,
-		Status:           &status,
-		Limit:            10,
-		Offset:           2,
-		ActorAreas:       []string{"legal", "ops"},
-		IsExternalViewer: true,
+		TenantID:    "tenant-a",
+		DocTypeCode: &docType,
+		Status:      &status,
+		Limit:       10,
+		Offset:      2,
 	}
 
 	_, err := svc.ListTemplates(context.Background(), filter)
 	if err != nil {
 		t.Fatalf("ListTemplates returned error: %v", err)
 	}
-	if !reflect.DeepEqual(repo.receivedFilter.ActorAreas, filter.ActorAreas) {
-		t.Fatalf("expected ActorAreas %v, got %v", filter.ActorAreas, repo.receivedFilter.ActorAreas)
+	if repo.receivedFilter.TenantID != filter.TenantID {
+		t.Fatalf("expected TenantID %q, got %q", filter.TenantID, repo.receivedFilter.TenantID)
 	}
-	if repo.receivedFilter.IsExternalViewer != filter.IsExternalViewer {
-		t.Fatalf("expected IsExternalViewer %v, got %v", filter.IsExternalViewer, repo.receivedFilter.IsExternalViewer)
+	if repo.receivedFilter.DocTypeCode == nil || *repo.receivedFilter.DocTypeCode != docType {
+		t.Fatalf("expected DocTypeCode %q, got %v", docType, repo.receivedFilter.DocTypeCode)
+	}
+	if repo.receivedFilter.Limit != filter.Limit || repo.receivedFilter.Offset != filter.Offset {
+		t.Fatalf("expected limit/offset %d/%d, got %d/%d", filter.Limit, filter.Offset, repo.receivedFilter.Limit, repo.receivedFilter.Offset)
 	}
 }
 

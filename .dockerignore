@@ -2,10 +2,16 @@
 # Applies to all images built from the repo root (api, worker, web).
 
 .git
+.git/**
 .gitignore
 
 # Node.js — each image runs its own npm ci inside the container
 **/node_modules
+**/node_modules/**
+
+# Go deps are downloaded inside builder images.
+vendor
+vendor/**
 
 # Frontend build output (Vite/Next) — not needed in context
 frontend/**/dist
@@ -15,6 +21,22 @@ frontend/**/.turbo
 # Go test / coverage artifacts
 **/*_test.go.tmp
 **/coverage.out
+metaldocs-api.exe
+metaldocs-worker.exe
+.tmp-go
+
+# Local dev/run artifacts.
+.codex-run
+.codex-run/**
+non_git
+non_git/**
+tmp
+tmp/**
+temp
+temp/**
+logs
+logs/**
+*.log
 
 # Local dev env files
 .env.local

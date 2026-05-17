@@ -19,17 +19,14 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	cmd := application.CreateTemplateCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "user-a",
-		DocTypeCode:   "CONTRACT",
-		Key:           "contract-default",
-		Name:          "Contract Template",
-		Description:   "Default contract",
-		Areas:         []string{"legal"},
-		Visibility:    domain.VisibilityPublic,
-		SpecificAreas: nil,
-		ApproverRole:  "approver",
-		ReviewerRole:  strPtr("reviewer"),
+		TenantID:     "tenant-a",
+		ActorUserID:  "user-a",
+		DocTypeCode:  "CONTRACT",
+		Key:          "contract-default",
+		Name:         "Contract Template",
+		Description:  "Default contract",
+		ApproverRole: "approver",
+		ReviewerRole: strPtr("reviewer"),
 	}
 
 	got, err := svc.CreateTemplate(context.Background(), cmd)
@@ -94,70 +91,10 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 		DocTypeCode:  "CONTRACT",
 		Key:          "contract-default",
 		Name:         "Contract Template",
-		Visibility:   domain.VisibilityPublic,
 		ApproverRole: "approver",
 	})
 	if !errors.Is(err, domain.ErrKeyConflict) {
 		t.Fatalf("expected ErrKeyConflict, got %v", err)
-	}
-}
-
-func TestCreateTemplate_InvalidVisibility(t *testing.T) {
-	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
-
-	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:     "tenant-a",
-		ActorUserID:  "user-a",
-		DocTypeCode:  "CONTRACT",
-		Key:          "contract-default",
-		Name:         "Contract Template",
-		Visibility:   domain.Visibility("weird"),
-		ApproverRole: "approver",
-	})
-	if !errors.Is(err, domain.ErrInvalidVisibility) {
-		t.Fatalf("expected ErrInvalidVisibility, got %v", err)
-	}
-}
-
-func TestCreateTemplate_SpecificNoAreas(t *testing.T) {
-	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
-
-	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "user-a",
-		DocTypeCode:   "CONTRACT",
-		Key:           "contract-default",
-		Name:          "Contract Template",
-		Visibility:    domain.VisibilitySpecific,
-		SpecificAreas: nil,
-		ApproverRole:  "approver",
-	})
-	if !errors.Is(err, domain.ErrInvalidVisibility) {
-		t.Fatalf("expected ErrInvalidVisibility, got %v", err)
-	}
-}
-
-func TestCreateTemplate_NonSpecificWithAreas(t *testing.T) {
-	repo := newFakeRepo()
-	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
-
-	got, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
-		TenantID:      "tenant-a",
-		ActorUserID:   "user-a",
-		DocTypeCode:   "CONTRACT",
-		Key:           "contract-default",
-		Name:          "Contract Template",
-		Visibility:    domain.VisibilityPublic,
-		SpecificAreas: []string{"restricted"},
-		ApproverRole:  "approver",
-	})
-	if err != nil {
-		t.Fatalf("CreateTemplate returned error: %v", err)
-	}
-	if len(got.Template.SpecificAreas) != 0 {
-		t.Fatalf("expected empty SpecificAreas, got %v", got.Template.SpecificAreas)
 	}
 }
 
@@ -181,7 +118,6 @@ func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
 		DocTypeCode:  "CONTRACT",
 		Key:          "contract-default",
 		Name:         "Contract Template",
-		Visibility:   domain.VisibilityPublic,
 		ApproverRole: "approver",
 	})
 	if err != nil {
