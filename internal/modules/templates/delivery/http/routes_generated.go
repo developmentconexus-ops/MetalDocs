@@ -8,16 +8,15 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	templatesapi "metaldocs/internal/modules/templates/api"
 	"metaldocs/internal/modules/templates/application"
-	"metaldocs/internal/modules/templates/domain"
 )
 
 var _ templatesapi.ServerInterface = (*Handler)(nil)
 
-func (h *Handler) ListTemplatesV2(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request) {
 	h.listTemplates(w, r)
 }
 
-func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateV2Params) {
+func (h *Handler) CreateTemplate(w http.ResponseWriter, r *http.Request, _ templatesapi.CreateTemplateParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
@@ -29,12 +28,12 @@ func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request, _ tem
 		return
 	}
 
-	var req templatesapi.CreateTemplateV2JSONRequestBody
+	var req templatesapi.CreateTemplateJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
 		return
 	}
-	if field := missingCreateTemplateV2Field(req); field != "" {
+	if field := missingCreateTemplateField(req); field != "" {
 		writeErr(w, http.StatusBadRequest, "invalid_body", "field "+field+" is required")
 		return
 	}
@@ -54,7 +53,6 @@ func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request, _ tem
 		Name:         strings.TrimSpace(req.Name),
 		Description:  description,
 		DocTypeCode:  docTypeCode,
-		Visibility:   domain.VisibilityPublic,
 		ApproverRole: "approver",
 	})
 	if err != nil {
@@ -72,7 +70,7 @@ func (h *Handler) CreateTemplateV2(w http.ResponseWriter, r *http.Request, _ tem
 	})
 }
 
-func missingCreateTemplateV2Field(req templatesapi.CreateTemplateV2JSONRequestBody) string {
+func missingCreateTemplateField(req templatesapi.CreateTemplateJSONRequestBody) string {
 	switch {
 	case strings.TrimSpace(req.Key) == "":
 		return "key"
@@ -83,17 +81,17 @@ func missingCreateTemplateV2Field(req templatesapi.CreateTemplateV2JSONRequestBo
 	}
 }
 
-func (h *Handler) GetTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int) {
+func (h *Handler) GetTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int) {
 	r.SetPathValue("id", id)
 	r.SetPathValue("n", intString(n))
 	h.getVersion(w, r)
 }
 
-func (h *Handler) PresignTemplateDocxUploadUrlV2(w http.ResponseWriter, r *http.Request, id string, n int) {
+func (h *Handler) PresignTemplateDocxUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
 	h.presignTemplateUpload(w, r, id, n, "")
 }
 
-func (h *Handler) PresignTemplateSchemaUploadUrlV2(w http.ResponseWriter, r *http.Request, id string, n int) {
+func (h *Handler) PresignTemplateSchemaUploadUrl(w http.ResponseWriter, r *http.Request, id string, n int) {
 	h.presignTemplateUpload(w, r, id, n, "templates/"+id+"/versions/"+intString(n)+".schema.json")
 }
 
@@ -126,7 +124,7 @@ func (h *Handler) presignTemplateUpload(w http.ResponseWriter, r *http.Request, 
 	})
 }
 
-func (h *Handler) RedirectSignedUrlV2(w http.ResponseWriter, r *http.Request, params templatesapi.RedirectSignedUrlV2Params) {
+func (h *Handler) RedirectSignedUrl(w http.ResponseWriter, r *http.Request, params templatesapi.RedirectSignedUrlParams) {
 	key := strings.TrimSpace(params.Key)
 	if key == "" {
 		writeErr(w, http.StatusBadRequest, "invalid_request", "key query parameter is required")
@@ -140,7 +138,7 @@ func (h *Handler) RedirectSignedUrlV2(w http.ResponseWriter, r *http.Request, pa
 	http.Redirect(w, r, url, http.StatusFound)
 }
 
-func (h *Handler) SaveTemplateDraftV2(w http.ResponseWriter, r *http.Request, id string, n int) {
+func (h *Handler) SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id string, n int) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
@@ -152,12 +150,12 @@ func (h *Handler) SaveTemplateDraftV2(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	var req templatesapi.SaveTemplateDraftV2JSONRequestBody
+	var req templatesapi.SaveTemplateDraftJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
 		return
 	}
-	if field := missingSaveTemplateDraftV2Field(req); field != "" {
+	if field := missingSaveTemplateDraftField(req); field != "" {
 		writeErr(w, http.StatusBadRequest, "invalid_body", "field "+field+" is required")
 		return
 	}
@@ -180,7 +178,7 @@ func (h *Handler) SaveTemplateDraftV2(w http.ResponseWriter, r *http.Request, id
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func missingSaveTemplateDraftV2Field(req templatesapi.SaveTemplateDraftV2JSONRequestBody) string {
+func missingSaveTemplateDraftField(req templatesapi.SaveTemplateDraftJSONRequestBody) string {
 	switch {
 	case strings.TrimSpace(req.DocxStorageKey) == "":
 		return "docx_storage_key"
@@ -195,7 +193,7 @@ func missingSaveTemplateDraftV2Field(req templatesapi.SaveTemplateDraftV2JSONReq
 	}
 }
 
-func (h *Handler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionV2Params) {
+func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, _ templatesapi.PublishTemplateVersionParams) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
@@ -207,12 +205,12 @@ func (h *Handler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var req templatesapi.PublishTemplateVersionV2JSONRequestBody
+	var req templatesapi.PublishTemplateVersionJSONRequestBody
 	if err := readStrictJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
 		return
 	}
-	if field := missingPublishTemplateVersionV2Field(req); field != "" {
+	if field := missingPublishTemplateVersionField(req); field != "" {
 		writeErr(w, http.StatusBadRequest, "invalid_body", "field "+field+" is required")
 		return
 	}
@@ -237,7 +235,7 @@ func (h *Handler) PublishTemplateVersionV2(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func missingPublishTemplateVersionV2Field(req templatesapi.PublishTemplateVersionV2JSONRequestBody) string {
+func missingPublishTemplateVersionField(req templatesapi.PublishTemplateVersionJSONRequestBody) string {
 	switch {
 	case strings.TrimSpace(req.DocxKey) == "":
 		return "docx_key"
@@ -252,54 +250,54 @@ func intString(v int) string {
 	return strconv.Itoa(v)
 }
 
-func (h *Handler) CreateTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) CreateTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.createNextVersion(w, r)
 }
 
-func (h *Handler) UpdateTemplateSchemaV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (h *Handler) UpdateTemplateSchema(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.updateSchemas(w, r)
 }
 
-func (h *Handler) PresignTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (h *Handler) PresignTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.presignAutosave(w, r)
 }
 
-func (h *Handler) CommitTemplateAutosaveV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (h *Handler) CommitTemplateAutosave(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.commitAutosave(w, r)
 }
 
-func (h *Handler) SubmitTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.SubmitTemplateVersionV2Params) {
+func (h *Handler) SubmitTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.SubmitTemplateVersionParams) {
 	h.submitForReview(w, r)
 }
 
-func (h *Handler) ReviewTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ReviewTemplateVersionV2Params) {
+func (h *Handler) ReviewTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ReviewTemplateVersionParams) {
 	h.review(w, r)
 }
 
-func (h *Handler) ApproveTemplateVersionV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ApproveTemplateVersionV2Params) {
+func (h *Handler) ApproveTemplateVersion(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int, _ templatesapi.ApproveTemplateVersionParams) {
 	h.approve(w, r)
 }
 
-func (h *Handler) ArchiveTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) ArchiveTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.archiveTemplate(w, r)
 }
 
-func (h *Handler) UpsertTemplateApprovalConfigV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) UpsertTemplateApprovalConfig(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.upsertApprovalConfig(w, r)
 }
 
-func (h *Handler) GetTemplateV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.getTemplate(w, r)
 }
 
-func (h *Handler) GetTemplateDocxUrlV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
+func (h *Handler) GetTemplateDocxUrl(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, n int) {
 	h.getDocxURL(w, r)
 }
 
-func (h *Handler) ListTemplateAuditV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) ListTemplateAudit(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	h.listAudit(w, r)
 }
 
-func (h *Handler) ListTemplatePlaceholderCatalogV2(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListTemplatePlaceholderCatalog(w http.ResponseWriter, r *http.Request) {
 	h.listPlaceholderCatalog(w, r)
 }

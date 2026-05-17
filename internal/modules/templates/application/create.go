@@ -11,17 +11,14 @@ import (
 )
 
 type CreateTemplateCmd struct {
-	TenantID      string
-	ActorUserID   string
-	DocTypeCode   string
-	Key           string
-	Name          string
-	Description   string
-	Areas         []string
-	Visibility    domain.Visibility
-	SpecificAreas []string
-	ApproverRole  string
-	ReviewerRole  *string
+	TenantID     string
+	ActorUserID  string
+	DocTypeCode  string
+	Key          string
+	Name         string
+	Description  string
+	ApproverRole string
+	ReviewerRole *string
 }
 
 type CreateTemplateResult struct {
@@ -30,16 +27,6 @@ type CreateTemplateResult struct {
 }
 
 func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*CreateTemplateResult, error) {
-	if !isValidVisibility(cmd.Visibility) {
-		return nil, domain.ErrInvalidVisibility
-	}
-	if cmd.Visibility == domain.VisibilitySpecific && len(cmd.SpecificAreas) == 0 {
-		return nil, fmt.Errorf("%w: specific_visibility_requires_areas", domain.ErrInvalidVisibility)
-	}
-	if cmd.Visibility != domain.VisibilitySpecific && len(cmd.SpecificAreas) > 0 {
-		cmd.SpecificAreas = nil
-	}
-
 	if _, err := s.repo.GetTemplateByKey(ctx, cmd.TenantID, cmd.Key); !errors.Is(err, domain.ErrNotFound) {
 		return nil, domain.ErrKeyConflict
 	}
@@ -51,9 +38,6 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		Key:                cmd.Key,
 		Name:               cmd.Name,
 		Description:        cmd.Description,
-		Areas:              append([]string{}, cmd.Areas...),
-		Visibility:         cmd.Visibility,
-		SpecificAreas:      append([]string{}, cmd.SpecificAreas...),
 		LatestVersion:      1,
 		PublishedVersionID: nil,
 		CreatedBy:          cmd.ActorUserID,
@@ -81,6 +65,9 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 			return nil, fmt.Errorf("templates create: begin tx: %w", err)
 		}
 		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates create: set authz context: %w", err)
+		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateCreate), "tenant"); err != nil {
 			return nil, fmt.Errorf("templates create: authz: %w", err)
 		}
@@ -215,10 +202,6 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 	}
 
 	return version, nil
-}
-
-func isValidVisibility(v domain.Visibility) bool {
-	return v == domain.VisibilityPublic || v == domain.VisibilityInternal || v == domain.VisibilitySpecific
 }
 
 func cloneMetadataSchema(s domain.MetadataSchema) domain.MetadataSchema {

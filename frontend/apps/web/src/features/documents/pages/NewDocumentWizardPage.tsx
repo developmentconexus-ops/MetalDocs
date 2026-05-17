@@ -125,7 +125,7 @@ export function NewDocumentWizardPage(): JSX.Element {
     selectedProfile === null;
 
   function goCancel() {
-    navigate('/documents-v2');
+    navigate('/documents');
   }
 
   function goBack() {
@@ -169,7 +169,7 @@ export function NewDocumentWizardPage(): JSX.Element {
     },
     onSuccess: (result) => {
       dispatch({ type: 'submitSuccess' });
-      navigate(`/documents-v2/${result.document.id}`);
+      navigate(`/documents/${result.document.id}/edit`);
     },
     onError: (err) => {
       const message = resolveQueryError(err, 'Falha ao criar o documento.');

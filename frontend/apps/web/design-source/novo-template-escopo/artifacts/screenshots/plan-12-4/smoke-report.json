@@ -1,0 +1,37 @@
+{
+  "baseURL": "http://127.0.0.1:4173",
+  "screenshots": [
+    "C:\\Users\\leandro.theodoro.MN-NTB-LEANDROT\\Documents\\MetalDocs\\frontend\\apps\\web\\design-source\\novo-template-escopo\\artifacts\\screenshots\\plan-12-4\\01-step1-scope.png",
+    "C:\\Users\\leandro.theodoro.MN-NTB-LEANDROT\\Documents\\MetalDocs\\frontend\\apps\\web\\design-source\\novo-template-escopo\\artifacts\\screenshots\\plan-12-4\\02-step1-profile-selected.png",
+    "C:\\Users\\leandro.theodoro.MN-NTB-LEANDROT\\Documents\\MetalDocs\\frontend\\apps\\web\\design-source\\novo-template-escopo\\artifacts\\screenshots\\plan-12-4\\03-step2-identity.png",
+    "C:\\Users\\leandro.theodoro.MN-NTB-LEANDROT\\Documents\\MetalDocs\\frontend\\apps\\web\\design-source\\novo-template-escopo\\artifacts\\screenshots\\plan-12-4\\04-step3-structure.png",
+    "C:\\Users\\leandro.theodoro.MN-NTB-LEANDROT\\Documents\\MetalDocs\\frontend\\apps\\web\\design-source\\novo-template-escopo\\artifacts\\screenshots\\plan-12-4\\05-step4-visibility.png",
+    "C:\\Users\\leandro.theodoro.MN-NTB-LEANDROT\\Documents\\MetalDocs\\frontend\\apps\\web\\design-source\\novo-template-escopo\\artifacts\\screenshots\\plan-12-4\\06-step5-confirmation.png",
+    "C:\\Users\\leandro.theodoro.MN-NTB-LEANDROT\\Documents\\MetalDocs\\frontend\\apps\\web\\design-source\\novo-template-escopo\\artifacts\\screenshots\\plan-12-4\\07-editor-after-create.png"
+  ],
+  "profile": {
+    "code": "qa_seed",
+    "name": "QA Seed",
+    "familyCode": "procedure"
+  },
+  "createRequest": {
+    "url": "http://127.0.0.1:4173/api/v1/templates",
+    "method": "POST",
+    "headers": {
+      "sec-ch-ua-platform": "\"Windows\"",
+      "referer": "http://127.0.0.1:4173/templates/new?step=5",
+      "idempotency-key": "e74b616a-dae4-4a3b-a08e-f35354446f39",
+      "sec-ch-ua": "\"Not:A-Brand\";v=\"99\", \"HeadlessChrome\";v=\"145\", \"Chromium\";v=\"145\"",
+      "content-type": "application/json",
+      "sec-ch-ua-mobile": "?0",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36"
+    },
+    "postData": "{\"key\":\"plan-12-4-smoke-1778870780304\",\"name\":\"Plan 12 4 Smoke 1778870780304\",\"description\":\"Smoke runtime real create path for Plan 12.4.\",\"doc_type_code\":\"qa_seed\"}"
+  },
+  "createResponse": {
+    "url": "http://127.0.0.1:4173/api/v1/templates",
+    "status": 201,
+    "body": "{\"data\":{\"template\":{\"archived_at\":null,\"areas\":[],\"created_at\":\"2026-05-15T18:46:27Z\",\"created_by\":\"admin\",\"description\":\"Smoke runtime real create path for Plan 12.4.\",\"doc_type_code\":\"qa_seed\",\"id\":\"b54ce946-466d-41f6-a051-af1a47c705e7\",\"key\":\"plan-12-4-smoke-1778870780304\",\"latest_version\":1,\"name\":\"Plan 12 4 Smoke 1778870780304\",\"published_version_id\":null,\"specific_areas\":[],\"tenant_id\":\"ffffffff-ffff-ffff-ffff-ffffffffffff\",\"visibility\":\"public\"},\"version\":{\"approved_at\":null,\"approver_id\":null,\"author_id\":\"admin\",\"content_hash\":\"\",\"created_at\":\"2026-05-15T18:46:27Z\",\"docx_storage_key\":\"templates/b54ce946-466d-41f6-a051-af1a47c705e7/versions/1.docx\",\"id\":\"6db686f4-fcb0-499a-be5b-add30b3759df\",\"metadata_schema\":{\"doc_code_pattern\":\"\",\"retention_days\":0,\"distribution_default\":null,\"required_metadata\":null},\"obsoleted_at\":null,\"pending_approver_role\":\"approver\",\"pending_reviewer_role\":null,\"placeholder_schema\":[],\"published_at\":null,\"reviewed_at\":null,\"reviewer_id\":null,\"status\":\"draft\",\"submitted_at\":null,\"template_id\":\"b54ce946-466d-41f6-a051-af1a47c705e7\",\"version_number\":1}},\"id\":\"b54ce946-466d-41f6-a051-af1a47c705e7\",\"version_id\":\"6db686f4-fcb0-499a-be5b-add30b3759df\"}\n"
+  },
+  "finalURL": "http://127.0.0.1:4173/templates/b54ce946-466d-41f6-a051-af1a47c705e7/versions/1"
+}

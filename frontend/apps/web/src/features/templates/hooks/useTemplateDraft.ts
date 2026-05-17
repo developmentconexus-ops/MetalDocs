@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getVersion, getTemplate, getDocxURL, type VersionDTO, type TemplateDTO } from '../api/templatesV2';
+import { getVersion, getTemplate, getDocxURL, type VersionDTO, type TemplateDTO } from '../api/templates';
 
 type DraftState = {
   loading: boolean;

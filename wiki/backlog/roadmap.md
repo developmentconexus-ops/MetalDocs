@@ -121,7 +121,7 @@ Status: implemented as a dedicated audit T-004 follow-up after Plan 9R. Added `a
 
 - **Goal:** No predecessor wiki docs. No `_v2` suffixes in code/columns/URLs. Production = v1. Dead surfaces deleted or wired.
 - **Touches:**
-  - Wiki: retire `wiki/modules/templates.md` (templates R-100), `wiki/modules/documents-v2.md` stub (documents R-100).
+  - Wiki: retire `wiki/modules/templates.md` (templates R-100), `retired documents module stub` stub (documents R-100).
   - Rename: `internal/modules/templates/` → `internal/modules/templates/` + URL `/api/v2/templates/*` → `/api/v1/templates/*` (templates R-101). Mirror for `/api/v2/documents`, `/api/v2/controlled-documents`, `/api/v2/taxonomy`, `/api/v2/approval` doc-scoped → all `/api/v1/*`. Frontend `lib/api/` updated.
   - Column rename: `approval_instances.document_v2_id` → `document_id` (approval T-008). Drop `templates_template_version.editable_zones` (templates T-012). Drop `profile_sequence_counters` legacy (registry R-100).
   - Naming: `internal/modules/documents/approval/infra/signature/` → `infrastructure/signature/` (approval T-007). `packages/editor-ui/src/plugins/mergefieldPlugin.ts` rename (editor-ui-eigenpal T-005).

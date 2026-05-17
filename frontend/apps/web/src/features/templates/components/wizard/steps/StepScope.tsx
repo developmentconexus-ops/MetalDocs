@@ -62,7 +62,7 @@ export function StepScope({
 
   return (
     <div className="card">
-      <div className="kicker">Etapa 1 de 5</div>
+      <div className="kicker">Etapa 1 de 4</div>
       <h2 className="h2">Escopo do template</h2>
       <p className="caption">
         Templates genéricos aparecem para todos os perfis. Templates de perfil só aparecem ao criar documentos daquele perfil.
@@ -181,10 +181,10 @@ export function StepScope({
 }
 
 function stepLabel(scopeType: ScopeType | null, selectedCode: string | null): string {
-  if (scopeType === null) return 'Etapa 1 de 5 · Selecione o escopo para continuar';
-  if (scopeType === 'generic') return 'Etapa 1 de 5 · Pronto para avançar';
-  if (selectedCode === null) return 'Etapa 1 de 5 · Selecione um perfil para continuar';
-  return 'Etapa 1 de 5 · Pronto para avançar';
+  if (scopeType === null) return 'Etapa 1 de 4 · Selecione o escopo para continuar';
+  if (scopeType === 'generic') return 'Etapa 1 de 4 · Pronto para avançar';
+  if (selectedCode === null) return 'Etapa 1 de 4 · Selecione um perfil para continuar';
+  return 'Etapa 1 de 4 · Pronto para avançar';
 }
 
 export default StepScope;

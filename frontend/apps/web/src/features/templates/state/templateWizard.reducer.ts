@@ -1,7 +1,6 @@
-export type TemplateWizardStep = 1 | 2 | 3 | 4 | 5;
+export type TemplateWizardStep = 1 | 2 | 3 | 4;
 export type ScopeType = 'generic' | 'profile';
 export type StartingPoint = 'docx' | 'blank';
-export type PermissionsMode = 'roles' | 'areas' | 'all';
 
 export type TemplateWizardState = {
   step: TemplateWizardStep;
@@ -9,19 +8,14 @@ export type TemplateWizardState = {
   scopeType: ScopeType | null;
   /** only meaningful when scopeType === 'profile' */
   profileCode: string | null;
-  /** Step 2 — Identidade */
+  /** Step 2 - Identidade */
   name: string;
   description: string;
-  /** Step 3 — Estrutura */
+  /** Step 3 - Estrutura */
   startingPoint: StartingPoint | null;
-  /** mocked at Step 3 — real upload deferred to post-create editor handoff
-   *  (backlog: step3-docx-upload, step3-editor-handoff). */
+  selectedDocxFile: File | null;
   selectedDocxName: string | null;
   selectedDocxSize: number | null;
-  /** Step 4 — Permissões */
-  permissionsMode: PermissionsMode;
-  selectedRoleIds: string[];
-  selectedAreaIds: string[];
 };
 
 export const initialTemplateWizardState: TemplateWizardState = {
@@ -31,12 +25,21 @@ export const initialTemplateWizardState: TemplateWizardState = {
   name: '',
   description: '',
   startingPoint: null,
+  selectedDocxFile: null,
   selectedDocxName: null,
   selectedDocxSize: null,
-  permissionsMode: 'all',
-  selectedRoleIds: [],
-  selectedAreaIds: [],
 };
+
+export function slugifyTemplateName(name: string): string {
+  const combining = new RegExp('[\\u0300-\\u036f]', 'g');
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(combining, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+}
 
 export type TemplateWizardAction =
   | { type: 'SET_SCOPE_TYPE'; scopeType: ScopeType }
@@ -44,11 +47,8 @@ export type TemplateWizardAction =
   | { type: 'SET_NAME'; value: string }
   | { type: 'SET_DESCRIPTION'; value: string }
   | { type: 'SET_STARTING_POINT'; value: StartingPoint }
-  | { type: 'SET_SELECTED_DOCX'; name: string; size: number }
+  | { type: 'SET_SELECTED_DOCX'; file: File }
   | { type: 'CLEAR_SELECTED_DOCX' }
-  | { type: 'SET_PERMISSIONS_MODE'; mode: PermissionsMode }
-  | { type: 'TOGGLE_ROLE_ID'; id: string }
-  | { type: 'TOGGLE_AREA_ID'; id: string }
   | { type: 'GO_TO_STEP'; step: TemplateWizardStep };
 
 export function templateWizardReducer(
@@ -82,29 +82,24 @@ function reduceCore(
       return {
         ...state,
         startingPoint: action.value,
-        // clear docx selection when switching to blank
+        selectedDocxFile: action.value === 'blank' ? null : state.selectedDocxFile,
         selectedDocxName: action.value === 'blank' ? null : state.selectedDocxName,
         selectedDocxSize: action.value === 'blank' ? null : state.selectedDocxSize,
       };
     case 'SET_SELECTED_DOCX':
-      return { ...state, selectedDocxName: action.name, selectedDocxSize: action.size };
-    case 'CLEAR_SELECTED_DOCX':
-      return { ...state, selectedDocxName: null, selectedDocxSize: null };
-    case 'SET_PERMISSIONS_MODE':
-      return { ...state, permissionsMode: action.mode };
-    case 'TOGGLE_ROLE_ID':
       return {
         ...state,
-        selectedRoleIds: state.selectedRoleIds.includes(action.id)
-          ? state.selectedRoleIds.filter((id) => id !== action.id)
-          : [...state.selectedRoleIds, action.id],
+        startingPoint: 'docx',
+        selectedDocxFile: action.file,
+        selectedDocxName: action.file.name,
+        selectedDocxSize: action.file.size,
       };
-    case 'TOGGLE_AREA_ID':
+    case 'CLEAR_SELECTED_DOCX':
       return {
         ...state,
-        selectedAreaIds: state.selectedAreaIds.includes(action.id)
-          ? state.selectedAreaIds.filter((id) => id !== action.id)
-          : [...state.selectedAreaIds, action.id],
+        selectedDocxFile: null,
+        selectedDocxName: null,
+        selectedDocxSize: null,
       };
     case 'GO_TO_STEP':
       return { ...state, step: action.step };
@@ -119,10 +114,8 @@ export function selectMaxReachableStep(
   if (state.scopeType === null) return 1;
   if (state.scopeType === 'profile' && state.profileCode === null) return 1;
   if (state.name.trim().length < 3) return 2;
+  if (slugifyTemplateName(state.name.trim()).length === 0) return 2;
   if (state.startingPoint === null) return 3;
-  if (state.startingPoint === 'docx' && state.selectedDocxName === null)
-    return 3;
-  if (state.permissionsMode === 'roles' && state.selectedRoleIds.length === 0)
-    return 4;
-  return 5;
+  if (state.startingPoint === 'docx' && state.selectedDocxFile === null) return 3;
+  return 4;
 }

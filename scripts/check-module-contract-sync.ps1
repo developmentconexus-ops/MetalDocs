@@ -16,14 +16,14 @@ function New-ModuleConfig {
         'templates' {
             return @{
                 RuntimeFile = 'internal/modules/templates/delivery/http/handler.go'
-                RuntimePatterns = @('/api/v1/templates', 'generated.ListTemplatesV2', 'generated.GetTemplateV2')
+                RuntimePatterns = @('/api/v1/templates', 'generated.ListTemplates', 'generated.GetTemplate')
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
-                OpenApiPatterns = @('/api/v1/templates:', '/api/v1/templates/{id}/versions/{n}/submit:', '/api/v1/templates/v2/placeholder-catalog:')
+                OpenApiPatterns = @('/api/v1/templates:', '/api/v1/templates/{id}/versions/{n}/submit:', '/api/v1/templates/placeholder-catalog:')
                 BackendFile = 'internal/modules/templates/api/api.gen.go'
-                BackendPatterns = @('ListTemplatesV2', 'CreateTemplateV2', 'GetTemplateV2', 'SubmitTemplateVersionV2')
+                BackendPatterns = @('ListTemplates', 'CreateTemplate', 'GetTemplate', 'SubmitTemplateVersion')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
-                FrontendTypesPatterns = @('"/api/v1/templates":', '"/api/v1/templates/{id}/versions/{n}/submit":', '"/api/v1/templates/v2/placeholder-catalog":')
-                FrontendWrapperFile = 'frontend/apps/web/src/features/templates/api/templatesV2.ts'
+                FrontendTypesPatterns = @('"/api/v1/templates":', '"/api/v1/templates/{id}/versions/{n}/submit":', '"/api/v1/templates/placeholder-catalog":')
+                FrontendWrapperFile = 'frontend/apps/web/src/features/templates/api/templates.ts'
                 FrontendWrapperPatterns = @('/api/v1/templates', 'submitForReview', 'approveVersion', 'putTemplateSchemas')
             }
         }
@@ -34,7 +34,7 @@ function New-ModuleConfig {
                 OpenApiFile = 'api/openapi/v1/openapi.yaml'
                 OpenApiPatterns = @('/api/v1/approval/inbox:', '/api/v1/documents/{id}/signoff:', '/api/v1/documents/{id}/cancel:', '/api/v1/approval/routes:')
                 BackendFile = 'internal/modules/documents/approval/api/api.gen.go'
-                BackendPatterns = @('ListApprovalInboxV2', 'ListApprovalRoutesV2', 'CreateApprovalRouteV2')
+                BackendPatterns = @('ListApprovalInbox', 'ListApprovalRoutes', 'CreateApprovalRoute')
                 FrontendTypesFile = 'frontend/apps/web/src/lib/api-types/index.d.ts'
                 FrontendTypesPatterns = @('"/api/v1/approval/inbox":', '"/api/v1/documents/{id}/signoff":', '"/api/v1/documents/{id}/cancel":', '"/api/v1/approval/routes":')
                 FrontendWrapperFile = 'frontend/apps/web/src/features/approval/api/approvalApi.ts'

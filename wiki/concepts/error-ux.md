@@ -102,7 +102,7 @@ const message = resolveQueryError(err, fallback);
 
 Re-exported from `lib/api/index.ts`. Used in `NewDocumentWizardPage` (`onError`) and `StepAreaCodeVisibility` (inline areas error). See `modules/novo-documento-wizard.md` for the wizard usage.
 
-Additional callsite: `TemplateEditorPage` (`frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx`) uses a local `resolveError(err, fallback)` helper that funnels `ApiError → resolveErrorMessage(code, message)` for both `submitForReview` and `importDocx` errors. `submitForReview` specifically routes through `apiFetch` (wired at `frontend/apps/web/src/features/templates/api/templatesV2.ts:240`) which throws `ApiError` on non-ok responses. Error codes relevant to review submission (e.g. `authz.capability_denied`, future `template.review_gap`) would resolve via the shared `errorMessages` map. See `wiki/backlog/template-editor.md#submitForReview-error-codes` for deferred error-code coverage.
+Additional callsite: `TemplateEditorPage` (`frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx`) uses a local `resolveError(err, fallback)` helper that funnels `ApiError → resolveErrorMessage(code, message)` for both `submitForReview` and `importDocx` errors. `submitForReview` specifically routes through `apiFetch` (wired at `frontend/apps/web/src/features/templates/api/templates.ts`) which throws `ApiError` on non-ok responses. Error codes relevant to review submission (e.g. `authz.capability_denied`, future `template.review_gap`) would resolve via the shared `errorMessages` map. See `wiki/backlog/template-editor.md#submitForReview-error-codes` for deferred error-code coverage.
 
 ---
 

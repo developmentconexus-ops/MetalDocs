@@ -131,6 +131,10 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 		return "", "", "", fmt.Errorf("insert revision: %w", err)
 	}
 
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return "", "", "", fmt.Errorf("initialize document pointers: authz check: %w", err)
+	}
+
 	if _, err := tx.ExecContext(ctx,
 		`UPDATE editor_sessions SET last_acknowledged_revision_id = $1 WHERE id = $2`,
 		revID, sessionID,

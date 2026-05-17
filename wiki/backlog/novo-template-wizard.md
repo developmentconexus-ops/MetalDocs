@@ -1,8 +1,93 @@
 # Backlog: Novo Template Wizard
 
 > Created: 2026-05-09
-> Feature: `/templates/new` (5-step wizard)
+> Feature: `/templates/new` (4-step wizard)
 > Worksheet: `frontend/apps/web/design-source/novo-template-escopo/IMPLEMENTATION.md`
+
+---
+
+## Integration Audit - Plan 12.4 (2026-05-15)
+
+**Scope:** one-screen finalization for the Template Creation Wizard at `/templates/new`.
+
+**Design-source reality:** the requested `frontend/apps/web/design-source/novo-template-wizard/` directory does not exist. The committed Plan 12 artifacts are split across `frontend/apps/web/design-source/novo-template-*`, with the canonical worksheet at `frontend/apps/web/design-source/novo-template-escopo/IMPLEMENTATION.md`.
+
+**Pre-code gates:**
+- `scripts/check-system-runnable.ps1 -TargetRoute /api/v1/templates` - PASS (`auth/login`, `auth/me`, and `GET /api/v1/templates` returned HTTP 200).
+- `scripts/check-module-contract-sync.ps1 -Module templates` - PASS (runtime owner, OpenAPI, backend generated package, frontend generated types, and feature wrapper present; manual drift review still required).
+
+| Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
+|---|---|---|---|---|---|
+| Wizard route `/templates/new` | routes + design | Route is frontend-only; primary API route is `POST /api/v1/templates` / `GET /api/v1/templates` | Route exists in `features/templates/routes.tsx` | implemented and aligned | keep |
+| Step 1 profile scope | design + code | `GET /api/v1/taxonomy/profiles` exists as raw taxonomy route | `useProfilesQuery` uses taxonomy API + TanStack Query | implemented and aligned | keep |
+| Profile-specific template creation | design + OpenAPI | `POST /api/v1/templates` accepts `doc_type_code?` | Wizard selected a profile but submit did not send `doc_type_code` | screen-local integration fix | include: pass selected profile code on create |
+| Generic template creation | design + OpenAPI | Omitting `doc_type_code` creates generic/public template | Wizard supports `scopeType === "generic"` | implemented and aligned | keep |
+| Template create API wrapper | frontend structure | `POST /api/v1/templates` is idempotency-wrapped and surfaced through shared client helpers | `createTemplate` used raw `fetch` on the wizard submit path | implemented but legacy-wired | include: switch this active create path to `apiFetch` + `Idempotency-Key` |
+| Step 2 name + description | design + OpenAPI | `name` and `description?` exist in create body | Reducer and Step 2 are wired | implemented and aligned | keep |
+| Step 2/5 `TPL-{PROFILE}-XXX` code preview | design + backlog | No next-code endpoint; backend create uses `key` from request | UI showed fake `TPL-*` values | screen-local integration fix | include: show the actual slug key preview instead of fake sequence |
+| `key` UX | backlog | Backend requires `key`; server-side key generation does not exist | Wizard auto-slugs from name | defer | preserve blocker; do not expand product UX beyond honest slug preview |
+| Step 3 blank start | design + runtime | Create endpoint creates a draft version; editor route exists | Wizard can redirect to editor after create | implemented and aligned | keep |
+| Step 3 DOCX import | design + backlog | Presigned upload requires created template/version; no mid-wizard upload or handoff contract | UI accepted a local file name only | missing backend capability | defer; include local cut by disabling DOCX import in this screen |
+| Step 3 placeholder extraction | design + backlog | No non-destructive extract-tokens endpoint | Cut from implementation | missing backend capability | defer |
+| Step 4 public visibility | runtime + backlog | `CreateTemplate` hardcodes `VisibilityPublic` and `ApproverRole: "approver"` | Wizard exposed role/area/all choices that are ignored by backend | screen-local integration fix | include: replace mocked chooser with honest read-only current visibility |
+| Step 4 roles mode | design + backlog | No personnel role endpoint or create-body roles field | Mock role cards and user counts existed | missing backend capability | defer; remove fake active UI |
+| Step 4 areas mode | design + backlog | Taxonomy areas exist, but create body has no visibility/areas fields and no user-count aggregate | Mock area cards and counts existed | missing backend capability | defer; remove fake active UI |
+| Step 4 company user count | design + backlog | No company-wide active-user-count endpoint | Mock `340` existed | missing backend capability | defer; remove fake count |
+| Step 5 create + redirect | code + runtime | Runtime returns created template/version and editor route is `/templates/{id}/versions/{n}` | Submit calls create and redirects | implemented and aligned | keep after wrapper/profile-code fixes |
+| Template count per profile card | backlog | No aggregate endpoint | UI shows `-` placeholder with TODO | missing backend capability | defer |
+| CHK disabled state | backlog | Taxonomy profile API has no `enabled` flag | Hardcoded disabled `CHK` | defer | preserve TODO, do not broaden taxonomy/API |
+
+**Ready for implementation:**
+- Pass `doc_type_code` for profile-scoped templates.
+- Use the shared API client and an idempotency key on the active `createTemplate` submit path.
+- Replace fake `TPL-*` sequence previews with the actual slug key already submitted today.
+- Disable unsupported DOCX import and replace mocked Step 4 permissions with an honest current public-visibility state.
+
+**Prerequisites / backend capabilities preserved:**
+- `next-code-preview`
+- `key-generation` UX decision
+- `step3-docx-upload`
+- `step3-placeholder-extract`
+- `step3-editor-handoff` richer import handoff
+- `permissions-roles-api`
+- `permissions-area-counts`
+- `permissions-user-count`
+- `template-create-visibility-api`
+- `template-counts`
+- `chk-disabled`
+
+**Verification needed next:**
+- `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
+- `cd frontend/apps/web; pnpm test`
+- Runtime smoke for `/templates/new` including profile-scoped create payload, blank-start flow, disabled DOCX import, and read-only permissions step.
+- Screenshots for PR evidence.
+
+**Implementation result (2026-05-15):**
+- Implemented screen-local fixes only: `doc_type_code` submit wiring, shared `apiFetch` create wrapper with `Idempotency-Key`, honest slug-key preview, disabled DOCX import, read-only public visibility, and create-to-editor redirect.
+- Runtime prerequisite discovered during smoke: `POST /api/v1/templates` reached `Service.CreateTemplate`, but the transaction lacked `metaldocs.tenant_id` / `metaldocs.actor_id` GUCs before `authz.Require`, returning HTTP 500. Fixed inside the templates create path with transaction-local authz context setup and a regression test.
+- Post-repair gates passed: `scripts/check-system-runnable.ps1 -TargetRoute /api/v1/templates` and `scripts/check-module-contract-sync.ps1 -Module templates`.
+- Runtime smoke passed: profile `qa_seed`, payload included `doc_type_code: "qa_seed"` and `Idempotency-Key`, backend returned HTTP 201, and the wizard redirected to `/templates/{id}/versions/1`.
+- Evidence captured under `frontend/apps/web/design-source/novo-template-escopo/artifacts/screenshots/plan-12-4/`.
+
+**Plan 12.4 recovery checkpoint (2026-05-16):**
+- `POST /api/v1/templates` contract now returns `data.template` and `data.version`; bundled and partial OpenAPI, backend generated API, and frontend generated API types were regenerated from that shape.
+- Active wizard create wiring uses generated frontend request/response types, shared `apiFetch`, and `Idempotency-Key`; placeholder catalog now uses the canonical `/api/v1/templates/placeholder-catalog` path through `apiFetch`.
+- Step reachability now rejects punctuation-only names whose slug would be empty; regression coverage lives in `templateWizard.reducer.test.ts`.
+- Runtime smoke used `doc_type_code: "POP"` because the local taxonomy profiles endpoint returned an empty `items: []`; the HTTP 201 response preserved `TemplateDocTypeCode: "POP"` and redirected to `/templates/{id}/versions/1`.
+- Windows local startup gained a `go run` fallback in `scripts/start-api.ps1` when the repo-local built `.exe` is denied by the OS; `check-system-runnable.ps1 -TargetRoute /api/v1/templates` passed with the fallback process.
+- Redocly lint was attempted but blocked before linting by npm `ECOMPROMISED Lock compromised` while resolving `@redocly/cli@2.30.6`; treat this as a tooling/supply-chain blocker, not an OpenAPI lint result.
+
+**Rename consistency checkpoint (2026-05-15):**
+- Searched the active touched wizard path for `documents_v2` references after implementation.
+- No `documents_v2` references were found in `frontend/apps/web/src/features/templates`, `wiki/backlog/novo-template-wizard.md`, or the concrete `frontend/apps/web/design-source/novo-template-*` artifacts touched for this screen.
+- No out-of-scope rename sweep was performed.
+
+**DOCX import + permission simplification checkpoint (2026-05-17):**
+- Wizard runtime is now four steps: Perfil, Identidade, Estrutura, Confirmação. The former template-use permissions/disponibilidade step was removed from the active product path.
+- Template availability for document creation is intentionally not creator-scoped. Valid choices are governed by document type/profile, lifecycle/publication state, and IAM role/capability gates (`template.*`), not per-template `visibility`, `areas`, or `specific_areas`.
+- Step 3 DOCX import is now implemented in the create flow: the wizard keeps the selected `File`, creates the template/version on submit, uploads through `/autosave/presign`, commits through `/autosave/commit`, then opens Eigenpal on `/templates/{id}/versions/{n}`.
+- Runtime/browser validation created a blank template and an imported-DOCX template. The imported Eigenpal editor rendered the fixture text `Hello {doc_code}` and did not show `No document loaded`.
+- OpenAPI/backend/frontend response DTOs no longer expose template-use `visibility`, `areas`, or `specific_areas`; the database columns remain as inert compatibility fields pending coordinated baseline cleanup.
 
 ---
 
@@ -53,6 +138,9 @@
 ---
 
 ### step3-docx-upload
+**Status: RESOLVED 2026-05-17.**
+The wizard now performs the real import after create: selected `.docx` bytes are uploaded via the autosave presign URL, SHA-256 is computed client-side, and `/autosave/commit` stores `docx_storage_key` plus `content_hash` on the draft version before redirecting to Eigenpal.
+
 **Context:** Step 3 lets user pick `.docx` as starting point. Real upload requires presigned URL flow — but template `id`+`n` only exist after Step 5 create.
 **Blocked by:** Wizard ordering — `POST /api/v2/templates` runs at Step 5. Upload flow `POST /api/v2/templates/{id}/{n}/docx-upload-url` then PUT then `PUT /draft` happens **after** create.
 **File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepStructure.tsx`
@@ -71,6 +159,9 @@
 ---
 
 ### step3-editor-handoff
+**Status: RESOLVED 2026-05-17.**
+Blank starts redirect directly to `/templates/{id}/versions/{n}` and Eigenpal opens a blank draft. DOCX starts first commit the uploaded file and then redirect to the same editor route, where Eigenpal renders the imported document.
+
 **Context:** After Step 5 create, user expects to land in editor (esp. for `'blank'` start, where there's no real docx to import).
 **Blocked by:** No editor flow defined for templates wizard handoff. Today, `/templates/new` Step 5 just calls create and (presumably) redirects to list.
 **File:** `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (Step 5 submit handler — not yet implemented).
@@ -80,6 +171,9 @@
 ---
 
 ### permissions-roles-api
+**Status: REMOVED 2026-05-17.**
+The active template wizard no longer has a template-use permissions step. Role/capability governance remains in IAM; per-template role visibility for document creation is intentionally out of product scope.
+
 **Context:** Step 4 (Permissões) "Por funções" mode shows personnel role cards (QUA-INSP, QUA-ANA, etc.) with user counts. All mocked.
 **Blocked by:** No personnel/roles endpoint. Taxonomy API exposes document-type profiles (POP, IT, etc.) — not user roles.
 **File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.tsx` (`MOCK_ROLES` constant)
@@ -89,6 +183,9 @@
 ---
 
 ### permissions-area-counts
+**Status: REMOVED 2026-05-17.**
+The active template wizard no longer asks the template author to restrict template use by area. Document type/profile and IAM govern who can create documents from available published templates.
+
 **Context:** Step 4 "Por área" mode shows area cards with user count per area (28, 89, 34…). Counts are mocked.
 **Blocked by:** No user-count-per-area aggregate endpoint.
 **File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.tsx` (`MOCK_AREAS` constant)
@@ -98,6 +195,9 @@
 ---
 
 ### permissions-user-count
+**Status: REMOVED 2026-05-17.**
+The former company-wide audience count belonged to the removed template-use permissions step and is no longer part of the wizard contract.
+
 **Context:** Step 4 "Todos" mode shows "~340 usuários ativos". Mocked constant.
 **Blocked by:** No company-wide active user count endpoint.
 **File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepPermissions.tsx` (`COMPANY_USER_COUNT` constant)
@@ -113,12 +213,15 @@
 ---
 
 ### template-create-visibility-api
+**Status: REMOVED 2026-05-17.**
+The product decision is to avoid per-template creation/use visibility because it conflicts with document-type permission semantics. OpenAPI, generated backend code, domain create command, frontend create wrapper, and wizard state no longer expose `visibility`, `areas`, or `specific_areas` as author-controlled template-use gates.
+
 **Context:** `POST /api/v2/templates` generated handler (`routes_generated.go`) only accepts `key`, `name`, `description?`, `doc_type_code?`. It hardcodes `Visibility: VisibilityPublic` and `ApproverRole: "approver"`. The wizard collects permissions (Step 4: by area / by role / all-company) and structure origin (Step 3: blank / docx) — none of those are forwarded to the create API.
-**Blocked by:** Backend API contract. The generated OpenAPI spec (`api.gen.go` `CreateTemplateV2JSONBody`) does not expose `visibility`, `areas`, `specific_areas`, or `approver_role` in the create body.
+**Blocked by:** Backend API contract. The generated OpenAPI spec (`api.gen.go` `CreateTemplateJSONBody`) does not expose `visibility`, `areas`, `specific_areas`, or `approver_role` in the create body.
 **Files:**
-- Backend: `internal/modules/templates/api/api.gen.go` (`CreateTemplateV2JSONBody`)
-- Backend: `internal/modules/templates/delivery/http/routes_generated.go` (`CreateTemplateV2`)
-- Frontend: `frontend/apps/web/src/features/templates/api/templatesV2.ts` (`createTemplate`)
+- Backend: `internal/modules/templates/api/api.gen.go` (`CreateTemplateJSONBody`)
+- Backend: `internal/modules/templates/delivery/http/routes_generated.go` (`CreateTemplate`)
+- Frontend: `frontend/apps/web/src/features/templates/api/templates.ts` (`createTemplate`)
 - Frontend: `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx` (`handleSubmit`)
 **Resolution:**
 1. Backend team expands OpenAPI spec to include `visibility`, `areas`, `specific_areas` (and optionally `approver_role`) in the create body — regenerate `api.gen.go`.
@@ -128,11 +231,17 @@
 
 ---
 
-## Steps not yet implemented
+## Active wizard steps
+
+Current runtime has four steps. Historical rows below for the old 5-step implementation are superseded by the 2026-05-17 checkpoint: Step 3 supports blank + DOCX import handoff, Step 4 is Confirmação, and the former `Permissões` step was removed.
 
 | Step | Name | Status |
 |---|---|---|
 | 2 | Identidade | **Done** (2026-05-09) |
+| 3 | Estrutura | **Done** (2026-05-17) - blank start and real DOCX import handoff to Eigenpal |
+| 4 | Confirmação | **Done** (2026-05-17) - create, optional DOCX import, redirect to editor |
+
+Superseded historical rows below describe the removed 5-step implementation and are retained only as migration context.
 | 3 | Estrutura | **Done** (2026-05-09) — mocked DOCX flow; real upload + placeholder extract deferred (see backlog items above) |
 | 4 | Permissões | **Done** (2026-05-09) — mocked roles/areas/counts; real API deferred (see backlog items above) |
 | 5 | Confirmação | **Done** (2026-05-10) — submit wired to API; redirects to editor on success. Visibility/permissions deferred: `template-create-visibility-api` |

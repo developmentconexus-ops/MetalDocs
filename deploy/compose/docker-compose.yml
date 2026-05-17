@@ -42,11 +42,26 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://127.0.0.1:4173,http://localhost:4173,http://127.0.0.1,http://localhost"
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - metaldocs_minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: metaldocs-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    restart: "no"
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - |
+        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do sleep 2; done;
+        mc mb -p local/${METALDOCS_MINIO_BUCKET} || true
 
   gotenberg:
     image: gotenberg/gotenberg:8
@@ -76,6 +91,8 @@ services:
     depends_on:
       minio:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
       gotenberg:
         condition: service_healthy
     healthcheck:
@@ -91,6 +108,8 @@ services:
     image: ${API_IMAGE}
     container_name: metaldocs-api
     restart: unless-stopped
+    ports:
+      - "${APP_PORT}:8081"
     depends_on:
       postgres:
         condition: service_healthy
@@ -126,7 +145,9 @@ services:
       METALDOCS_STORAGE_PROVIDER: ${METALDOCS_STORAGE_PROVIDER}
       METALDOCS_ATTACHMENTS_SIGNING_SECRET: ${METALDOCS_ATTACHMENTS_SIGNING_SECRET}
       METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS: ${METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS}
-      METALDOCS_MINIO_ENDPOINT: minio:9000
+      # Presigned DOCX URLs are consumed by the host browser, so the API must sign
+      # with a host-resolvable endpoint instead of Docker-only DNS (`minio:9000`).
+      METALDOCS_MINIO_ENDPOINT: host.docker.internal:9000
       METALDOCS_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       METALDOCS_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       METALDOCS_MINIO_BUCKET: ${METALDOCS_MINIO_BUCKET}
@@ -140,7 +161,7 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGSSLMODE: disable
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/api/v1/health/live >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/api/v1/health/live >/dev/null || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20

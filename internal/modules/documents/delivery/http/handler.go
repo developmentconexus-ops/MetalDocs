@@ -482,13 +482,13 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.Finalize(r.Context(), tenantID, docID, actorID); err != nil {
-		log.Printf("documents_v2 finalize audit-only error: %v", err)
+		log.Printf("documents finalize audit-only error: %v", err)
 	}
 	respBody := map[string]string{"instanceId": result.InstanceID}
 	if idempStore != nil {
 		body, _ := json.Marshal(respBody)
 		if err := idempStore.RecordReplay(r.Context(), tenantID, actorID, idempotencyKey, payloadHash, http.StatusCreated, body); err != nil {
-			log.Printf("documents_v2 finalize idempotency record error: %v", err)
+			log.Printf("documents finalize idempotency record error: %v", err)
 		}
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, respBody)

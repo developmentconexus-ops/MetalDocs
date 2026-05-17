@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { type VersionDTO, approveVersion, reviewVersion } from './api/templatesV2';
+import { type VersionDTO, approveVersion, reviewVersion } from './api/templates';
 
 type Props = {
   version: VersionDTO;

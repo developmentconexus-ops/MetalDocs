@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
 	"testing"
 	"time"
 
@@ -220,9 +221,9 @@ func TestCreate_AreaArchived(t *testing.T) {
 }
 
 type fakeControlledDocumentRepository struct {
-	codeExists      bool
-	created         *registrydomain.ControlledDocument
-	lastListFilter  registrydomain.CDFilter
+	codeExists     bool
+	created        *registrydomain.ControlledDocument
+	lastListFilter registrydomain.CDFilter
 }
 
 func newFakeControlledDocumentRepository() *fakeControlledDocumentRepository {
@@ -371,6 +372,7 @@ func TestRegistryService_Create_AtomicWithDocument(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	mock.ExpectBegin()
+	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectCommit()
 
 	repo := newFakeControlledDocumentRepository()
@@ -416,6 +418,7 @@ func TestRegistryService_Create_InitializerError_RollsBack(t *testing.T) {
 	}
 	t.Cleanup(func() { db.Close() })
 	mock.ExpectBegin()
+	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
 	mock.ExpectRollback()
 
 	repo := newFakeControlledDocumentRepository()
@@ -461,4 +464,31 @@ func TestList_DoesNotInjectEmptyActorFilter(t *testing.T) {
 	if repo.lastListFilter.ActorUserID != nil {
 		t.Fatalf("ActorUserID = %v, want nil", *repo.lastListFilter.ActorUserID)
 	}
+}
+
+func expectRegistryCreateAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.tenant_id', $1, true)")).
+		WithArgs(tenantID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.actor_id', $1, true)")).
+		WithArgs(actorID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(actorID))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1 FROM metaldocs.iam_user_roles
+   WHERE user_id   = $1
+     AND tenant_id = $2::uuid
+     AND role_code = 'system_admin'
+)`)).
+		WithArgs(actorID, tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(nil))
+	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 }

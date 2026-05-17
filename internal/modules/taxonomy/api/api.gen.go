@@ -323,8 +323,8 @@ type ProcessAreaItem struct {
 	Name        string `json:"name"`
 }
 
-// ListTaxonomyFamiliesV2Params defines parameters for ListTaxonomyFamiliesV2.
-type ListTaxonomyFamiliesV2Params struct {
+// ListTaxonomyFamiliesParams defines parameters for ListTaxonomyFamilies.
+type ListTaxonomyFamiliesParams struct {
 	IncludeInactive *bool `form:"includeInactive,omitempty" json:"includeInactive,omitempty"`
 }
 
@@ -571,52 +571,52 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 type ServerInterface interface {
 
 	// (GET /api/v1/taxonomy/areas)
-	ListTaxonomyAreasV2(w http.ResponseWriter, r *http.Request)
+	ListTaxonomyAreas(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/v1/taxonomy/areas)
-	CreateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request)
+	CreateTaxonomyArea(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/v1/taxonomy/areas/{code})
-	ArchiveTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string)
+	ArchiveTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
 
 	// (GET /api/v1/taxonomy/areas/{code})
-	GetTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string)
+	GetTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
 
 	// (PUT /api/v1/taxonomy/areas/{code})
-	UpdateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string)
+	UpdateTaxonomyArea(w http.ResponseWriter, r *http.Request, code string)
 
 	// (GET /api/v1/taxonomy/families)
-	ListTaxonomyFamiliesV2(w http.ResponseWriter, r *http.Request, params ListTaxonomyFamiliesV2Params)
+	ListTaxonomyFamilies(w http.ResponseWriter, r *http.Request, params ListTaxonomyFamiliesParams)
 
 	// (POST /api/v1/taxonomy/families)
-	CreateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request)
+	CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/v1/taxonomy/families/{code})
-	DeactivateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string)
+	DeactivateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
 
 	// (GET /api/v1/taxonomy/families/{code})
-	GetTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string)
+	GetTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
 
 	// (PATCH /api/v1/taxonomy/families/{code})
-	UpdateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string)
+	UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string)
 
 	// (GET /api/v1/taxonomy/profiles)
-	ListTaxonomyProfilesV2(w http.ResponseWriter, r *http.Request)
+	ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/v1/taxonomy/profiles)
-	CreateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request)
+	CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/v1/taxonomy/profiles/{code})
-	ArchiveTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string)
+	ArchiveTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
 
 	// (GET /api/v1/taxonomy/profiles/{code})
-	GetTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string)
+	GetTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
 
 	// (PATCH /api/v1/taxonomy/profiles/{code})
-	UpdateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string)
+	UpdateTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string)
 
 	// (PUT /api/v1/taxonomy/profiles/{code}/default-template)
-	SetTaxonomyProfileDefaultTemplateV2(w http.ResponseWriter, r *http.Request, code string)
+	SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter, r *http.Request, code string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -628,11 +628,11 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
-// ListTaxonomyAreasV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListTaxonomyAreasV2(w http.ResponseWriter, r *http.Request) {
+// ListTaxonomyAreas operation middleware
+func (siw *ServerInterfaceWrapper) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTaxonomyAreasV2(w, r)
+		siw.Handler.ListTaxonomyAreas(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -642,11 +642,11 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyAreasV2(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// CreateTaxonomyAreaV2 operation middleware
-func (siw *ServerInterfaceWrapper) CreateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request) {
+// CreateTaxonomyArea operation middleware
+func (siw *ServerInterfaceWrapper) CreateTaxonomyArea(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateTaxonomyAreaV2(w, r)
+		siw.Handler.CreateTaxonomyArea(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -656,8 +656,8 @@ func (siw *ServerInterfaceWrapper) CreateTaxonomyAreaV2(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// ArchiveTaxonomyAreaV2 operation middleware
-func (siw *ServerInterfaceWrapper) ArchiveTaxonomyAreaV2(w http.ResponseWriter, r *http.Request) {
+// ArchiveTaxonomyArea operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveTaxonomyArea(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -672,7 +672,7 @@ func (siw *ServerInterfaceWrapper) ArchiveTaxonomyAreaV2(w http.ResponseWriter, 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ArchiveTaxonomyAreaV2(w, r, code)
+		siw.Handler.ArchiveTaxonomyArea(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -682,8 +682,8 @@ func (siw *ServerInterfaceWrapper) ArchiveTaxonomyAreaV2(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
-// GetTaxonomyAreaV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetTaxonomyAreaV2(w http.ResponseWriter, r *http.Request) {
+// GetTaxonomyArea operation middleware
+func (siw *ServerInterfaceWrapper) GetTaxonomyArea(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -698,7 +698,7 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyAreaV2(w http.ResponseWriter, r *h
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetTaxonomyAreaV2(w, r, code)
+		siw.Handler.GetTaxonomyArea(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -708,8 +708,8 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyAreaV2(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateTaxonomyAreaV2 operation middleware
-func (siw *ServerInterfaceWrapper) UpdateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request) {
+// UpdateTaxonomyArea operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTaxonomyArea(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -724,7 +724,7 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyAreaV2(w http.ResponseWriter, r
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateTaxonomyAreaV2(w, r, code)
+		siw.Handler.UpdateTaxonomyArea(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -734,14 +734,14 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyAreaV2(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// ListTaxonomyFamiliesV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListTaxonomyFamiliesV2(w http.ResponseWriter, r *http.Request) {
+// ListTaxonomyFamilies operation middleware
+func (siw *ServerInterfaceWrapper) ListTaxonomyFamilies(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params ListTaxonomyFamiliesV2Params
+	var params ListTaxonomyFamiliesParams
 
 	// ------------- Optional query parameter "includeInactive" -------------
 
@@ -757,7 +757,7 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyFamiliesV2(w http.ResponseWriter,
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTaxonomyFamiliesV2(w, r, params)
+		siw.Handler.ListTaxonomyFamilies(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -767,11 +767,11 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyFamiliesV2(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// CreateTaxonomyFamilyV2 operation middleware
-func (siw *ServerInterfaceWrapper) CreateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request) {
+// CreateTaxonomyFamily operation middleware
+func (siw *ServerInterfaceWrapper) CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateTaxonomyFamilyV2(w, r)
+		siw.Handler.CreateTaxonomyFamily(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -781,8 +781,8 @@ func (siw *ServerInterfaceWrapper) CreateTaxonomyFamilyV2(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// DeactivateTaxonomyFamilyV2 operation middleware
-func (siw *ServerInterfaceWrapper) DeactivateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request) {
+// DeactivateTaxonomyFamily operation middleware
+func (siw *ServerInterfaceWrapper) DeactivateTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -797,7 +797,7 @@ func (siw *ServerInterfaceWrapper) DeactivateTaxonomyFamilyV2(w http.ResponseWri
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeactivateTaxonomyFamilyV2(w, r, code)
+		siw.Handler.DeactivateTaxonomyFamily(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -807,8 +807,8 @@ func (siw *ServerInterfaceWrapper) DeactivateTaxonomyFamilyV2(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
-// GetTaxonomyFamilyV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request) {
+// GetTaxonomyFamily operation middleware
+func (siw *ServerInterfaceWrapper) GetTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -823,7 +823,7 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyFamilyV2(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetTaxonomyFamilyV2(w, r, code)
+		siw.Handler.GetTaxonomyFamily(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -833,8 +833,8 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyFamilyV2(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateTaxonomyFamilyV2 operation middleware
-func (siw *ServerInterfaceWrapper) UpdateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request) {
+// UpdateTaxonomyFamily operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -849,7 +849,7 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyFamilyV2(w http.ResponseWriter,
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateTaxonomyFamilyV2(w, r, code)
+		siw.Handler.UpdateTaxonomyFamily(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -859,11 +859,11 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyFamilyV2(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// ListTaxonomyProfilesV2 operation middleware
-func (siw *ServerInterfaceWrapper) ListTaxonomyProfilesV2(w http.ResponseWriter, r *http.Request) {
+// ListTaxonomyProfiles operation middleware
+func (siw *ServerInterfaceWrapper) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTaxonomyProfilesV2(w, r)
+		siw.Handler.ListTaxonomyProfiles(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -873,11 +873,11 @@ func (siw *ServerInterfaceWrapper) ListTaxonomyProfilesV2(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
-// CreateTaxonomyProfileV2 operation middleware
-func (siw *ServerInterfaceWrapper) CreateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request) {
+// CreateTaxonomyProfile operation middleware
+func (siw *ServerInterfaceWrapper) CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateTaxonomyProfileV2(w, r)
+		siw.Handler.CreateTaxonomyProfile(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -887,8 +887,8 @@ func (siw *ServerInterfaceWrapper) CreateTaxonomyProfileV2(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// ArchiveTaxonomyProfileV2 operation middleware
-func (siw *ServerInterfaceWrapper) ArchiveTaxonomyProfileV2(w http.ResponseWriter, r *http.Request) {
+// ArchiveTaxonomyProfile operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -903,7 +903,7 @@ func (siw *ServerInterfaceWrapper) ArchiveTaxonomyProfileV2(w http.ResponseWrite
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ArchiveTaxonomyProfileV2(w, r, code)
+		siw.Handler.ArchiveTaxonomyProfile(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -913,8 +913,8 @@ func (siw *ServerInterfaceWrapper) ArchiveTaxonomyProfileV2(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
-// GetTaxonomyProfileV2 operation middleware
-func (siw *ServerInterfaceWrapper) GetTaxonomyProfileV2(w http.ResponseWriter, r *http.Request) {
+// GetTaxonomyProfile operation middleware
+func (siw *ServerInterfaceWrapper) GetTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -929,7 +929,7 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyProfileV2(w http.ResponseWriter, r
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetTaxonomyProfileV2(w, r, code)
+		siw.Handler.GetTaxonomyProfile(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -939,8 +939,8 @@ func (siw *ServerInterfaceWrapper) GetTaxonomyProfileV2(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// UpdateTaxonomyProfileV2 operation middleware
-func (siw *ServerInterfaceWrapper) UpdateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request) {
+// UpdateTaxonomyProfile operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -955,7 +955,7 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyProfileV2(w http.ResponseWriter
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateTaxonomyProfileV2(w, r, code)
+		siw.Handler.UpdateTaxonomyProfile(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -965,8 +965,8 @@ func (siw *ServerInterfaceWrapper) UpdateTaxonomyProfileV2(w http.ResponseWriter
 	handler.ServeHTTP(w, r)
 }
 
-// SetTaxonomyProfileDefaultTemplateV2 operation middleware
-func (siw *ServerInterfaceWrapper) SetTaxonomyProfileDefaultTemplateV2(w http.ResponseWriter, r *http.Request) {
+// SetTaxonomyProfileDefaultTemplate operation middleware
+func (siw *ServerInterfaceWrapper) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	_ = err
@@ -981,7 +981,7 @@ func (siw *ServerInterfaceWrapper) SetTaxonomyProfileDefaultTemplateV2(w http.Re
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SetTaxonomyProfileDefaultTemplateV2(w, r, code)
+		siw.Handler.SetTaxonomyProfileDefaultTemplate(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1111,36 +1111,36 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.ListTaxonomyAreasV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.CreateTaxonomyAreaV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.ArchiveTaxonomyAreaV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.GetTaxonomyAreaV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.UpdateTaxonomyAreaV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.ListTaxonomyFamiliesV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.CreateTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.DeactivateTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.GetTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.UpdateTaxonomyFamilyV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.ListTaxonomyProfilesV2)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.CreateTaxonomyProfileV2)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.ArchiveTaxonomyProfileV2)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.GetTaxonomyProfileV2)
-	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.UpdateTaxonomyProfileV2)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}/default-template", wrapper.SetTaxonomyProfileDefaultTemplateV2)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.ListTaxonomyAreas)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/areas", wrapper.CreateTaxonomyArea)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.ArchiveTaxonomyArea)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.GetTaxonomyArea)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/areas/{code}", wrapper.UpdateTaxonomyArea)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.ListTaxonomyFamilies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/families", wrapper.CreateTaxonomyFamily)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.DeactivateTaxonomyFamily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.GetTaxonomyFamily)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/families/{code}", wrapper.UpdateTaxonomyFamily)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.ListTaxonomyProfiles)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/taxonomy/profiles", wrapper.CreateTaxonomyProfile)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.ArchiveTaxonomyProfile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.GetTaxonomyProfile)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}", wrapper.UpdateTaxonomyProfile)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/taxonomy/profiles/{code}/default-template", wrapper.SetTaxonomyProfileDefaultTemplate)
 
 	return m
 }
 
-type ListTaxonomyAreasV2RequestObject struct {
+type ListTaxonomyAreasRequestObject struct {
 }
 
-type ListTaxonomyAreasV2ResponseObject interface {
-	VisitListTaxonomyAreasV2Response(w http.ResponseWriter) error
+type ListTaxonomyAreasResponseObject interface {
+	VisitListTaxonomyAreasResponse(w http.ResponseWriter) error
 }
 
-type ListTaxonomyAreasV2200JSONResponse ListProcessAreasResponse
+type ListTaxonomyAreas200JSONResponse ListProcessAreasResponse
 
-func (response ListTaxonomyAreasV2200JSONResponse) VisitListTaxonomyAreasV2Response(w http.ResponseWriter) error {
+func (response ListTaxonomyAreas200JSONResponse) VisitListTaxonomyAreasResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1152,16 +1152,16 @@ func (response ListTaxonomyAreasV2200JSONResponse) VisitListTaxonomyAreasV2Respo
 	return err
 }
 
-type CreateTaxonomyAreaV2RequestObject struct {
+type CreateTaxonomyAreaRequestObject struct {
 }
 
-type CreateTaxonomyAreaV2ResponseObject interface {
-	VisitCreateTaxonomyAreaV2Response(w http.ResponseWriter) error
+type CreateTaxonomyAreaResponseObject interface {
+	VisitCreateTaxonomyAreaResponse(w http.ResponseWriter) error
 }
 
-type CreateTaxonomyAreaV2201JSONResponse ProcessAreaItem
+type CreateTaxonomyArea201JSONResponse ProcessAreaItem
 
-func (response CreateTaxonomyAreaV2201JSONResponse) VisitCreateTaxonomyAreaV2Response(w http.ResponseWriter) error {
+func (response CreateTaxonomyArea201JSONResponse) VisitCreateTaxonomyAreaResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1173,33 +1173,33 @@ func (response CreateTaxonomyAreaV2201JSONResponse) VisitCreateTaxonomyAreaV2Res
 	return err
 }
 
-type ArchiveTaxonomyAreaV2RequestObject struct {
+type ArchiveTaxonomyAreaRequestObject struct {
 	Code string `json:"code"`
 }
 
-type ArchiveTaxonomyAreaV2ResponseObject interface {
-	VisitArchiveTaxonomyAreaV2Response(w http.ResponseWriter) error
+type ArchiveTaxonomyAreaResponseObject interface {
+	VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error
 }
 
-type ArchiveTaxonomyAreaV2204Response struct {
+type ArchiveTaxonomyArea204Response struct {
 }
 
-func (response ArchiveTaxonomyAreaV2204Response) VisitArchiveTaxonomyAreaV2Response(w http.ResponseWriter) error {
+func (response ArchiveTaxonomyArea204Response) VisitArchiveTaxonomyAreaResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type GetTaxonomyAreaV2RequestObject struct {
+type GetTaxonomyAreaRequestObject struct {
 	Code string `json:"code"`
 }
 
-type GetTaxonomyAreaV2ResponseObject interface {
-	VisitGetTaxonomyAreaV2Response(w http.ResponseWriter) error
+type GetTaxonomyAreaResponseObject interface {
+	VisitGetTaxonomyAreaResponse(w http.ResponseWriter) error
 }
 
-type GetTaxonomyAreaV2200JSONResponse ProcessAreaItem
+type GetTaxonomyArea200JSONResponse ProcessAreaItem
 
-func (response GetTaxonomyAreaV2200JSONResponse) VisitGetTaxonomyAreaV2Response(w http.ResponseWriter) error {
+func (response GetTaxonomyArea200JSONResponse) VisitGetTaxonomyAreaResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1211,17 +1211,17 @@ func (response GetTaxonomyAreaV2200JSONResponse) VisitGetTaxonomyAreaV2Response(
 	return err
 }
 
-type UpdateTaxonomyAreaV2RequestObject struct {
+type UpdateTaxonomyAreaRequestObject struct {
 	Code string `json:"code"`
 }
 
-type UpdateTaxonomyAreaV2ResponseObject interface {
-	VisitUpdateTaxonomyAreaV2Response(w http.ResponseWriter) error
+type UpdateTaxonomyAreaResponseObject interface {
+	VisitUpdateTaxonomyAreaResponse(w http.ResponseWriter) error
 }
 
-type UpdateTaxonomyAreaV2200JSONResponse ProcessAreaItem
+type UpdateTaxonomyArea200JSONResponse ProcessAreaItem
 
-func (response UpdateTaxonomyAreaV2200JSONResponse) VisitUpdateTaxonomyAreaV2Response(w http.ResponseWriter) error {
+func (response UpdateTaxonomyArea200JSONResponse) VisitUpdateTaxonomyAreaResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1233,17 +1233,17 @@ func (response UpdateTaxonomyAreaV2200JSONResponse) VisitUpdateTaxonomyAreaV2Res
 	return err
 }
 
-type ListTaxonomyFamiliesV2RequestObject struct {
-	Params ListTaxonomyFamiliesV2Params
+type ListTaxonomyFamiliesRequestObject struct {
+	Params ListTaxonomyFamiliesParams
 }
 
-type ListTaxonomyFamiliesV2ResponseObject interface {
-	VisitListTaxonomyFamiliesV2Response(w http.ResponseWriter) error
+type ListTaxonomyFamiliesResponseObject interface {
+	VisitListTaxonomyFamiliesResponse(w http.ResponseWriter) error
 }
 
-type ListTaxonomyFamiliesV2200JSONResponse ListDocumentFamiliesResponse
+type ListTaxonomyFamilies200JSONResponse ListDocumentFamiliesResponse
 
-func (response ListTaxonomyFamiliesV2200JSONResponse) VisitListTaxonomyFamiliesV2Response(w http.ResponseWriter) error {
+func (response ListTaxonomyFamilies200JSONResponse) VisitListTaxonomyFamiliesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1255,16 +1255,16 @@ func (response ListTaxonomyFamiliesV2200JSONResponse) VisitListTaxonomyFamiliesV
 	return err
 }
 
-type CreateTaxonomyFamilyV2RequestObject struct {
+type CreateTaxonomyFamilyRequestObject struct {
 }
 
-type CreateTaxonomyFamilyV2ResponseObject interface {
-	VisitCreateTaxonomyFamilyV2Response(w http.ResponseWriter) error
+type CreateTaxonomyFamilyResponseObject interface {
+	VisitCreateTaxonomyFamilyResponse(w http.ResponseWriter) error
 }
 
-type CreateTaxonomyFamilyV2201JSONResponse DocumentFamilyItem
+type CreateTaxonomyFamily201JSONResponse DocumentFamilyItem
 
-func (response CreateTaxonomyFamilyV2201JSONResponse) VisitCreateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+func (response CreateTaxonomyFamily201JSONResponse) VisitCreateTaxonomyFamilyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1276,33 +1276,33 @@ func (response CreateTaxonomyFamilyV2201JSONResponse) VisitCreateTaxonomyFamilyV
 	return err
 }
 
-type DeactivateTaxonomyFamilyV2RequestObject struct {
+type DeactivateTaxonomyFamilyRequestObject struct {
 	Code string `json:"code"`
 }
 
-type DeactivateTaxonomyFamilyV2ResponseObject interface {
-	VisitDeactivateTaxonomyFamilyV2Response(w http.ResponseWriter) error
+type DeactivateTaxonomyFamilyResponseObject interface {
+	VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error
 }
 
-type DeactivateTaxonomyFamilyV2204Response struct {
+type DeactivateTaxonomyFamily204Response struct {
 }
 
-func (response DeactivateTaxonomyFamilyV2204Response) VisitDeactivateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+func (response DeactivateTaxonomyFamily204Response) VisitDeactivateTaxonomyFamilyResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type GetTaxonomyFamilyV2RequestObject struct {
+type GetTaxonomyFamilyRequestObject struct {
 	Code string `json:"code"`
 }
 
-type GetTaxonomyFamilyV2ResponseObject interface {
-	VisitGetTaxonomyFamilyV2Response(w http.ResponseWriter) error
+type GetTaxonomyFamilyResponseObject interface {
+	VisitGetTaxonomyFamilyResponse(w http.ResponseWriter) error
 }
 
-type GetTaxonomyFamilyV2200JSONResponse DocumentFamilyItem
+type GetTaxonomyFamily200JSONResponse DocumentFamilyItem
 
-func (response GetTaxonomyFamilyV2200JSONResponse) VisitGetTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+func (response GetTaxonomyFamily200JSONResponse) VisitGetTaxonomyFamilyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1314,17 +1314,17 @@ func (response GetTaxonomyFamilyV2200JSONResponse) VisitGetTaxonomyFamilyV2Respo
 	return err
 }
 
-type UpdateTaxonomyFamilyV2RequestObject struct {
+type UpdateTaxonomyFamilyRequestObject struct {
 	Code string `json:"code"`
 }
 
-type UpdateTaxonomyFamilyV2ResponseObject interface {
-	VisitUpdateTaxonomyFamilyV2Response(w http.ResponseWriter) error
+type UpdateTaxonomyFamilyResponseObject interface {
+	VisitUpdateTaxonomyFamilyResponse(w http.ResponseWriter) error
 }
 
-type UpdateTaxonomyFamilyV2200JSONResponse DocumentFamilyItem
+type UpdateTaxonomyFamily200JSONResponse DocumentFamilyItem
 
-func (response UpdateTaxonomyFamilyV2200JSONResponse) VisitUpdateTaxonomyFamilyV2Response(w http.ResponseWriter) error {
+func (response UpdateTaxonomyFamily200JSONResponse) VisitUpdateTaxonomyFamilyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1336,16 +1336,16 @@ func (response UpdateTaxonomyFamilyV2200JSONResponse) VisitUpdateTaxonomyFamilyV
 	return err
 }
 
-type ListTaxonomyProfilesV2RequestObject struct {
+type ListTaxonomyProfilesRequestObject struct {
 }
 
-type ListTaxonomyProfilesV2ResponseObject interface {
-	VisitListTaxonomyProfilesV2Response(w http.ResponseWriter) error
+type ListTaxonomyProfilesResponseObject interface {
+	VisitListTaxonomyProfilesResponse(w http.ResponseWriter) error
 }
 
-type ListTaxonomyProfilesV2200JSONResponse ListDocumentProfilesResponse
+type ListTaxonomyProfiles200JSONResponse ListDocumentProfilesResponse
 
-func (response ListTaxonomyProfilesV2200JSONResponse) VisitListTaxonomyProfilesV2Response(w http.ResponseWriter) error {
+func (response ListTaxonomyProfiles200JSONResponse) VisitListTaxonomyProfilesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1357,16 +1357,16 @@ func (response ListTaxonomyProfilesV2200JSONResponse) VisitListTaxonomyProfilesV
 	return err
 }
 
-type CreateTaxonomyProfileV2RequestObject struct {
+type CreateTaxonomyProfileRequestObject struct {
 }
 
-type CreateTaxonomyProfileV2ResponseObject interface {
-	VisitCreateTaxonomyProfileV2Response(w http.ResponseWriter) error
+type CreateTaxonomyProfileResponseObject interface {
+	VisitCreateTaxonomyProfileResponse(w http.ResponseWriter) error
 }
 
-type CreateTaxonomyProfileV2201JSONResponse DocumentProfileItem
+type CreateTaxonomyProfile201JSONResponse DocumentProfileItem
 
-func (response CreateTaxonomyProfileV2201JSONResponse) VisitCreateTaxonomyProfileV2Response(w http.ResponseWriter) error {
+func (response CreateTaxonomyProfile201JSONResponse) VisitCreateTaxonomyProfileResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1378,33 +1378,33 @@ func (response CreateTaxonomyProfileV2201JSONResponse) VisitCreateTaxonomyProfil
 	return err
 }
 
-type ArchiveTaxonomyProfileV2RequestObject struct {
+type ArchiveTaxonomyProfileRequestObject struct {
 	Code string `json:"code"`
 }
 
-type ArchiveTaxonomyProfileV2ResponseObject interface {
-	VisitArchiveTaxonomyProfileV2Response(w http.ResponseWriter) error
+type ArchiveTaxonomyProfileResponseObject interface {
+	VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error
 }
 
-type ArchiveTaxonomyProfileV2204Response struct {
+type ArchiveTaxonomyProfile204Response struct {
 }
 
-func (response ArchiveTaxonomyProfileV2204Response) VisitArchiveTaxonomyProfileV2Response(w http.ResponseWriter) error {
+func (response ArchiveTaxonomyProfile204Response) VisitArchiveTaxonomyProfileResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
 }
 
-type GetTaxonomyProfileV2RequestObject struct {
+type GetTaxonomyProfileRequestObject struct {
 	Code string `json:"code"`
 }
 
-type GetTaxonomyProfileV2ResponseObject interface {
-	VisitGetTaxonomyProfileV2Response(w http.ResponseWriter) error
+type GetTaxonomyProfileResponseObject interface {
+	VisitGetTaxonomyProfileResponse(w http.ResponseWriter) error
 }
 
-type GetTaxonomyProfileV2200JSONResponse DocumentProfileItem
+type GetTaxonomyProfile200JSONResponse DocumentProfileItem
 
-func (response GetTaxonomyProfileV2200JSONResponse) VisitGetTaxonomyProfileV2Response(w http.ResponseWriter) error {
+func (response GetTaxonomyProfile200JSONResponse) VisitGetTaxonomyProfileResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1416,17 +1416,17 @@ func (response GetTaxonomyProfileV2200JSONResponse) VisitGetTaxonomyProfileV2Res
 	return err
 }
 
-type UpdateTaxonomyProfileV2RequestObject struct {
+type UpdateTaxonomyProfileRequestObject struct {
 	Code string `json:"code"`
 }
 
-type UpdateTaxonomyProfileV2ResponseObject interface {
-	VisitUpdateTaxonomyProfileV2Response(w http.ResponseWriter) error
+type UpdateTaxonomyProfileResponseObject interface {
+	VisitUpdateTaxonomyProfileResponse(w http.ResponseWriter) error
 }
 
-type UpdateTaxonomyProfileV2200JSONResponse DocumentProfileItem
+type UpdateTaxonomyProfile200JSONResponse DocumentProfileItem
 
-func (response UpdateTaxonomyProfileV2200JSONResponse) VisitUpdateTaxonomyProfileV2Response(w http.ResponseWriter) error {
+func (response UpdateTaxonomyProfile200JSONResponse) VisitUpdateTaxonomyProfileResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1438,18 +1438,18 @@ func (response UpdateTaxonomyProfileV2200JSONResponse) VisitUpdateTaxonomyProfil
 	return err
 }
 
-type SetTaxonomyProfileDefaultTemplateV2RequestObject struct {
+type SetTaxonomyProfileDefaultTemplateRequestObject struct {
 	Code string `json:"code"`
 }
 
-type SetTaxonomyProfileDefaultTemplateV2ResponseObject interface {
-	VisitSetTaxonomyProfileDefaultTemplateV2Response(w http.ResponseWriter) error
+type SetTaxonomyProfileDefaultTemplateResponseObject interface {
+	VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error
 }
 
-type SetTaxonomyProfileDefaultTemplateV2200Response struct {
+type SetTaxonomyProfileDefaultTemplate200Response struct {
 }
 
-func (response SetTaxonomyProfileDefaultTemplateV2200Response) VisitSetTaxonomyProfileDefaultTemplateV2Response(w http.ResponseWriter) error {
+func (response SetTaxonomyProfileDefaultTemplate200Response) VisitSetTaxonomyProfileDefaultTemplateResponse(w http.ResponseWriter) error {
 	w.WriteHeader(200)
 	return nil
 }
@@ -1458,52 +1458,52 @@ func (response SetTaxonomyProfileDefaultTemplateV2200Response) VisitSetTaxonomyP
 type StrictServerInterface interface {
 
 	// (GET /api/v1/taxonomy/areas)
-	ListTaxonomyAreasV2(ctx context.Context, request ListTaxonomyAreasV2RequestObject) (ListTaxonomyAreasV2ResponseObject, error)
+	ListTaxonomyAreas(ctx context.Context, request ListTaxonomyAreasRequestObject) (ListTaxonomyAreasResponseObject, error)
 
 	// (POST /api/v1/taxonomy/areas)
-	CreateTaxonomyAreaV2(ctx context.Context, request CreateTaxonomyAreaV2RequestObject) (CreateTaxonomyAreaV2ResponseObject, error)
+	CreateTaxonomyArea(ctx context.Context, request CreateTaxonomyAreaRequestObject) (CreateTaxonomyAreaResponseObject, error)
 
 	// (DELETE /api/v1/taxonomy/areas/{code})
-	ArchiveTaxonomyAreaV2(ctx context.Context, request ArchiveTaxonomyAreaV2RequestObject) (ArchiveTaxonomyAreaV2ResponseObject, error)
+	ArchiveTaxonomyArea(ctx context.Context, request ArchiveTaxonomyAreaRequestObject) (ArchiveTaxonomyAreaResponseObject, error)
 
 	// (GET /api/v1/taxonomy/areas/{code})
-	GetTaxonomyAreaV2(ctx context.Context, request GetTaxonomyAreaV2RequestObject) (GetTaxonomyAreaV2ResponseObject, error)
+	GetTaxonomyArea(ctx context.Context, request GetTaxonomyAreaRequestObject) (GetTaxonomyAreaResponseObject, error)
 
 	// (PUT /api/v1/taxonomy/areas/{code})
-	UpdateTaxonomyAreaV2(ctx context.Context, request UpdateTaxonomyAreaV2RequestObject) (UpdateTaxonomyAreaV2ResponseObject, error)
+	UpdateTaxonomyArea(ctx context.Context, request UpdateTaxonomyAreaRequestObject) (UpdateTaxonomyAreaResponseObject, error)
 
 	// (GET /api/v1/taxonomy/families)
-	ListTaxonomyFamiliesV2(ctx context.Context, request ListTaxonomyFamiliesV2RequestObject) (ListTaxonomyFamiliesV2ResponseObject, error)
+	ListTaxonomyFamilies(ctx context.Context, request ListTaxonomyFamiliesRequestObject) (ListTaxonomyFamiliesResponseObject, error)
 
 	// (POST /api/v1/taxonomy/families)
-	CreateTaxonomyFamilyV2(ctx context.Context, request CreateTaxonomyFamilyV2RequestObject) (CreateTaxonomyFamilyV2ResponseObject, error)
+	CreateTaxonomyFamily(ctx context.Context, request CreateTaxonomyFamilyRequestObject) (CreateTaxonomyFamilyResponseObject, error)
 
 	// (DELETE /api/v1/taxonomy/families/{code})
-	DeactivateTaxonomyFamilyV2(ctx context.Context, request DeactivateTaxonomyFamilyV2RequestObject) (DeactivateTaxonomyFamilyV2ResponseObject, error)
+	DeactivateTaxonomyFamily(ctx context.Context, request DeactivateTaxonomyFamilyRequestObject) (DeactivateTaxonomyFamilyResponseObject, error)
 
 	// (GET /api/v1/taxonomy/families/{code})
-	GetTaxonomyFamilyV2(ctx context.Context, request GetTaxonomyFamilyV2RequestObject) (GetTaxonomyFamilyV2ResponseObject, error)
+	GetTaxonomyFamily(ctx context.Context, request GetTaxonomyFamilyRequestObject) (GetTaxonomyFamilyResponseObject, error)
 
 	// (PATCH /api/v1/taxonomy/families/{code})
-	UpdateTaxonomyFamilyV2(ctx context.Context, request UpdateTaxonomyFamilyV2RequestObject) (UpdateTaxonomyFamilyV2ResponseObject, error)
+	UpdateTaxonomyFamily(ctx context.Context, request UpdateTaxonomyFamilyRequestObject) (UpdateTaxonomyFamilyResponseObject, error)
 
 	// (GET /api/v1/taxonomy/profiles)
-	ListTaxonomyProfilesV2(ctx context.Context, request ListTaxonomyProfilesV2RequestObject) (ListTaxonomyProfilesV2ResponseObject, error)
+	ListTaxonomyProfiles(ctx context.Context, request ListTaxonomyProfilesRequestObject) (ListTaxonomyProfilesResponseObject, error)
 
 	// (POST /api/v1/taxonomy/profiles)
-	CreateTaxonomyProfileV2(ctx context.Context, request CreateTaxonomyProfileV2RequestObject) (CreateTaxonomyProfileV2ResponseObject, error)
+	CreateTaxonomyProfile(ctx context.Context, request CreateTaxonomyProfileRequestObject) (CreateTaxonomyProfileResponseObject, error)
 
 	// (DELETE /api/v1/taxonomy/profiles/{code})
-	ArchiveTaxonomyProfileV2(ctx context.Context, request ArchiveTaxonomyProfileV2RequestObject) (ArchiveTaxonomyProfileV2ResponseObject, error)
+	ArchiveTaxonomyProfile(ctx context.Context, request ArchiveTaxonomyProfileRequestObject) (ArchiveTaxonomyProfileResponseObject, error)
 
 	// (GET /api/v1/taxonomy/profiles/{code})
-	GetTaxonomyProfileV2(ctx context.Context, request GetTaxonomyProfileV2RequestObject) (GetTaxonomyProfileV2ResponseObject, error)
+	GetTaxonomyProfile(ctx context.Context, request GetTaxonomyProfileRequestObject) (GetTaxonomyProfileResponseObject, error)
 
 	// (PATCH /api/v1/taxonomy/profiles/{code})
-	UpdateTaxonomyProfileV2(ctx context.Context, request UpdateTaxonomyProfileV2RequestObject) (UpdateTaxonomyProfileV2ResponseObject, error)
+	UpdateTaxonomyProfile(ctx context.Context, request UpdateTaxonomyProfileRequestObject) (UpdateTaxonomyProfileResponseObject, error)
 
 	// (PUT /api/v1/taxonomy/profiles/{code}/default-template)
-	SetTaxonomyProfileDefaultTemplateV2(ctx context.Context, request SetTaxonomyProfileDefaultTemplateV2RequestObject) (SetTaxonomyProfileDefaultTemplateV2ResponseObject, error)
+	SetTaxonomyProfileDefaultTemplate(ctx context.Context, request SetTaxonomyProfileDefaultTemplateRequestObject) (SetTaxonomyProfileDefaultTemplateResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1535,23 +1535,23 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
-// ListTaxonomyAreasV2 operation middleware
-func (sh *strictHandler) ListTaxonomyAreasV2(w http.ResponseWriter, r *http.Request) {
-	var request ListTaxonomyAreasV2RequestObject
+// ListTaxonomyAreas operation middleware
+func (sh *strictHandler) ListTaxonomyAreas(w http.ResponseWriter, r *http.Request) {
+	var request ListTaxonomyAreasRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListTaxonomyAreasV2(ctx, request.(ListTaxonomyAreasV2RequestObject))
+		return sh.ssi.ListTaxonomyAreas(ctx, request.(ListTaxonomyAreasRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListTaxonomyAreasV2")
+		handler = middleware(handler, "ListTaxonomyAreas")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListTaxonomyAreasV2ResponseObject); ok {
-		if err := validResponse.VisitListTaxonomyAreasV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListTaxonomyAreasResponseObject); ok {
+		if err := validResponse.VisitListTaxonomyAreasResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1559,23 +1559,23 @@ func (sh *strictHandler) ListTaxonomyAreasV2(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// CreateTaxonomyAreaV2 operation middleware
-func (sh *strictHandler) CreateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request) {
-	var request CreateTaxonomyAreaV2RequestObject
+// CreateTaxonomyArea operation middleware
+func (sh *strictHandler) CreateTaxonomyArea(w http.ResponseWriter, r *http.Request) {
+	var request CreateTaxonomyAreaRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateTaxonomyAreaV2(ctx, request.(CreateTaxonomyAreaV2RequestObject))
+		return sh.ssi.CreateTaxonomyArea(ctx, request.(CreateTaxonomyAreaRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateTaxonomyAreaV2")
+		handler = middleware(handler, "CreateTaxonomyArea")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateTaxonomyAreaV2ResponseObject); ok {
-		if err := validResponse.VisitCreateTaxonomyAreaV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CreateTaxonomyAreaResponseObject); ok {
+		if err := validResponse.VisitCreateTaxonomyAreaResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1583,25 +1583,25 @@ func (sh *strictHandler) CreateTaxonomyAreaV2(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// ArchiveTaxonomyAreaV2 operation middleware
-func (sh *strictHandler) ArchiveTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request ArchiveTaxonomyAreaV2RequestObject
+// ArchiveTaxonomyArea operation middleware
+func (sh *strictHandler) ArchiveTaxonomyArea(w http.ResponseWriter, r *http.Request, code string) {
+	var request ArchiveTaxonomyAreaRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ArchiveTaxonomyAreaV2(ctx, request.(ArchiveTaxonomyAreaV2RequestObject))
+		return sh.ssi.ArchiveTaxonomyArea(ctx, request.(ArchiveTaxonomyAreaRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ArchiveTaxonomyAreaV2")
+		handler = middleware(handler, "ArchiveTaxonomyArea")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ArchiveTaxonomyAreaV2ResponseObject); ok {
-		if err := validResponse.VisitArchiveTaxonomyAreaV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ArchiveTaxonomyAreaResponseObject); ok {
+		if err := validResponse.VisitArchiveTaxonomyAreaResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1609,25 +1609,25 @@ func (sh *strictHandler) ArchiveTaxonomyAreaV2(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// GetTaxonomyAreaV2 operation middleware
-func (sh *strictHandler) GetTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request GetTaxonomyAreaV2RequestObject
+// GetTaxonomyArea operation middleware
+func (sh *strictHandler) GetTaxonomyArea(w http.ResponseWriter, r *http.Request, code string) {
+	var request GetTaxonomyAreaRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetTaxonomyAreaV2(ctx, request.(GetTaxonomyAreaV2RequestObject))
+		return sh.ssi.GetTaxonomyArea(ctx, request.(GetTaxonomyAreaRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetTaxonomyAreaV2")
+		handler = middleware(handler, "GetTaxonomyArea")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetTaxonomyAreaV2ResponseObject); ok {
-		if err := validResponse.VisitGetTaxonomyAreaV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetTaxonomyAreaResponseObject); ok {
+		if err := validResponse.VisitGetTaxonomyAreaResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1635,25 +1635,25 @@ func (sh *strictHandler) GetTaxonomyAreaV2(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// UpdateTaxonomyAreaV2 operation middleware
-func (sh *strictHandler) UpdateTaxonomyAreaV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request UpdateTaxonomyAreaV2RequestObject
+// UpdateTaxonomyArea operation middleware
+func (sh *strictHandler) UpdateTaxonomyArea(w http.ResponseWriter, r *http.Request, code string) {
+	var request UpdateTaxonomyAreaRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateTaxonomyAreaV2(ctx, request.(UpdateTaxonomyAreaV2RequestObject))
+		return sh.ssi.UpdateTaxonomyArea(ctx, request.(UpdateTaxonomyAreaRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateTaxonomyAreaV2")
+		handler = middleware(handler, "UpdateTaxonomyArea")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateTaxonomyAreaV2ResponseObject); ok {
-		if err := validResponse.VisitUpdateTaxonomyAreaV2Response(w); err != nil {
+	} else if validResponse, ok := response.(UpdateTaxonomyAreaResponseObject); ok {
+		if err := validResponse.VisitUpdateTaxonomyAreaResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1661,25 +1661,25 @@ func (sh *strictHandler) UpdateTaxonomyAreaV2(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// ListTaxonomyFamiliesV2 operation middleware
-func (sh *strictHandler) ListTaxonomyFamiliesV2(w http.ResponseWriter, r *http.Request, params ListTaxonomyFamiliesV2Params) {
-	var request ListTaxonomyFamiliesV2RequestObject
+// ListTaxonomyFamilies operation middleware
+func (sh *strictHandler) ListTaxonomyFamilies(w http.ResponseWriter, r *http.Request, params ListTaxonomyFamiliesParams) {
+	var request ListTaxonomyFamiliesRequestObject
 
 	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListTaxonomyFamiliesV2(ctx, request.(ListTaxonomyFamiliesV2RequestObject))
+		return sh.ssi.ListTaxonomyFamilies(ctx, request.(ListTaxonomyFamiliesRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListTaxonomyFamiliesV2")
+		handler = middleware(handler, "ListTaxonomyFamilies")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListTaxonomyFamiliesV2ResponseObject); ok {
-		if err := validResponse.VisitListTaxonomyFamiliesV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListTaxonomyFamiliesResponseObject); ok {
+		if err := validResponse.VisitListTaxonomyFamiliesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1687,23 +1687,23 @@ func (sh *strictHandler) ListTaxonomyFamiliesV2(w http.ResponseWriter, r *http.R
 	}
 }
 
-// CreateTaxonomyFamilyV2 operation middleware
-func (sh *strictHandler) CreateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request) {
-	var request CreateTaxonomyFamilyV2RequestObject
+// CreateTaxonomyFamily operation middleware
+func (sh *strictHandler) CreateTaxonomyFamily(w http.ResponseWriter, r *http.Request) {
+	var request CreateTaxonomyFamilyRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateTaxonomyFamilyV2(ctx, request.(CreateTaxonomyFamilyV2RequestObject))
+		return sh.ssi.CreateTaxonomyFamily(ctx, request.(CreateTaxonomyFamilyRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateTaxonomyFamilyV2")
+		handler = middleware(handler, "CreateTaxonomyFamily")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateTaxonomyFamilyV2ResponseObject); ok {
-		if err := validResponse.VisitCreateTaxonomyFamilyV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CreateTaxonomyFamilyResponseObject); ok {
+		if err := validResponse.VisitCreateTaxonomyFamilyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1711,25 +1711,25 @@ func (sh *strictHandler) CreateTaxonomyFamilyV2(w http.ResponseWriter, r *http.R
 	}
 }
 
-// DeactivateTaxonomyFamilyV2 operation middleware
-func (sh *strictHandler) DeactivateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request DeactivateTaxonomyFamilyV2RequestObject
+// DeactivateTaxonomyFamily operation middleware
+func (sh *strictHandler) DeactivateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string) {
+	var request DeactivateTaxonomyFamilyRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeactivateTaxonomyFamilyV2(ctx, request.(DeactivateTaxonomyFamilyV2RequestObject))
+		return sh.ssi.DeactivateTaxonomyFamily(ctx, request.(DeactivateTaxonomyFamilyRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeactivateTaxonomyFamilyV2")
+		handler = middleware(handler, "DeactivateTaxonomyFamily")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeactivateTaxonomyFamilyV2ResponseObject); ok {
-		if err := validResponse.VisitDeactivateTaxonomyFamilyV2Response(w); err != nil {
+	} else if validResponse, ok := response.(DeactivateTaxonomyFamilyResponseObject); ok {
+		if err := validResponse.VisitDeactivateTaxonomyFamilyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1737,25 +1737,25 @@ func (sh *strictHandler) DeactivateTaxonomyFamilyV2(w http.ResponseWriter, r *ht
 	}
 }
 
-// GetTaxonomyFamilyV2 operation middleware
-func (sh *strictHandler) GetTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request GetTaxonomyFamilyV2RequestObject
+// GetTaxonomyFamily operation middleware
+func (sh *strictHandler) GetTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string) {
+	var request GetTaxonomyFamilyRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetTaxonomyFamilyV2(ctx, request.(GetTaxonomyFamilyV2RequestObject))
+		return sh.ssi.GetTaxonomyFamily(ctx, request.(GetTaxonomyFamilyRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetTaxonomyFamilyV2")
+		handler = middleware(handler, "GetTaxonomyFamily")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetTaxonomyFamilyV2ResponseObject); ok {
-		if err := validResponse.VisitGetTaxonomyFamilyV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetTaxonomyFamilyResponseObject); ok {
+		if err := validResponse.VisitGetTaxonomyFamilyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1763,25 +1763,25 @@ func (sh *strictHandler) GetTaxonomyFamilyV2(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// UpdateTaxonomyFamilyV2 operation middleware
-func (sh *strictHandler) UpdateTaxonomyFamilyV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request UpdateTaxonomyFamilyV2RequestObject
+// UpdateTaxonomyFamily operation middleware
+func (sh *strictHandler) UpdateTaxonomyFamily(w http.ResponseWriter, r *http.Request, code string) {
+	var request UpdateTaxonomyFamilyRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateTaxonomyFamilyV2(ctx, request.(UpdateTaxonomyFamilyV2RequestObject))
+		return sh.ssi.UpdateTaxonomyFamily(ctx, request.(UpdateTaxonomyFamilyRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateTaxonomyFamilyV2")
+		handler = middleware(handler, "UpdateTaxonomyFamily")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateTaxonomyFamilyV2ResponseObject); ok {
-		if err := validResponse.VisitUpdateTaxonomyFamilyV2Response(w); err != nil {
+	} else if validResponse, ok := response.(UpdateTaxonomyFamilyResponseObject); ok {
+		if err := validResponse.VisitUpdateTaxonomyFamilyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1789,23 +1789,23 @@ func (sh *strictHandler) UpdateTaxonomyFamilyV2(w http.ResponseWriter, r *http.R
 	}
 }
 
-// ListTaxonomyProfilesV2 operation middleware
-func (sh *strictHandler) ListTaxonomyProfilesV2(w http.ResponseWriter, r *http.Request) {
-	var request ListTaxonomyProfilesV2RequestObject
+// ListTaxonomyProfiles operation middleware
+func (sh *strictHandler) ListTaxonomyProfiles(w http.ResponseWriter, r *http.Request) {
+	var request ListTaxonomyProfilesRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListTaxonomyProfilesV2(ctx, request.(ListTaxonomyProfilesV2RequestObject))
+		return sh.ssi.ListTaxonomyProfiles(ctx, request.(ListTaxonomyProfilesRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListTaxonomyProfilesV2")
+		handler = middleware(handler, "ListTaxonomyProfiles")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListTaxonomyProfilesV2ResponseObject); ok {
-		if err := validResponse.VisitListTaxonomyProfilesV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ListTaxonomyProfilesResponseObject); ok {
+		if err := validResponse.VisitListTaxonomyProfilesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1813,23 +1813,23 @@ func (sh *strictHandler) ListTaxonomyProfilesV2(w http.ResponseWriter, r *http.R
 	}
 }
 
-// CreateTaxonomyProfileV2 operation middleware
-func (sh *strictHandler) CreateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request) {
-	var request CreateTaxonomyProfileV2RequestObject
+// CreateTaxonomyProfile operation middleware
+func (sh *strictHandler) CreateTaxonomyProfile(w http.ResponseWriter, r *http.Request) {
+	var request CreateTaxonomyProfileRequestObject
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateTaxonomyProfileV2(ctx, request.(CreateTaxonomyProfileV2RequestObject))
+		return sh.ssi.CreateTaxonomyProfile(ctx, request.(CreateTaxonomyProfileRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateTaxonomyProfileV2")
+		handler = middleware(handler, "CreateTaxonomyProfile")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CreateTaxonomyProfileV2ResponseObject); ok {
-		if err := validResponse.VisitCreateTaxonomyProfileV2Response(w); err != nil {
+	} else if validResponse, ok := response.(CreateTaxonomyProfileResponseObject); ok {
+		if err := validResponse.VisitCreateTaxonomyProfileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1837,25 +1837,25 @@ func (sh *strictHandler) CreateTaxonomyProfileV2(w http.ResponseWriter, r *http.
 	}
 }
 
-// ArchiveTaxonomyProfileV2 operation middleware
-func (sh *strictHandler) ArchiveTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request ArchiveTaxonomyProfileV2RequestObject
+// ArchiveTaxonomyProfile operation middleware
+func (sh *strictHandler) ArchiveTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string) {
+	var request ArchiveTaxonomyProfileRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ArchiveTaxonomyProfileV2(ctx, request.(ArchiveTaxonomyProfileV2RequestObject))
+		return sh.ssi.ArchiveTaxonomyProfile(ctx, request.(ArchiveTaxonomyProfileRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ArchiveTaxonomyProfileV2")
+		handler = middleware(handler, "ArchiveTaxonomyProfile")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ArchiveTaxonomyProfileV2ResponseObject); ok {
-		if err := validResponse.VisitArchiveTaxonomyProfileV2Response(w); err != nil {
+	} else if validResponse, ok := response.(ArchiveTaxonomyProfileResponseObject); ok {
+		if err := validResponse.VisitArchiveTaxonomyProfileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1863,25 +1863,25 @@ func (sh *strictHandler) ArchiveTaxonomyProfileV2(w http.ResponseWriter, r *http
 	}
 }
 
-// GetTaxonomyProfileV2 operation middleware
-func (sh *strictHandler) GetTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request GetTaxonomyProfileV2RequestObject
+// GetTaxonomyProfile operation middleware
+func (sh *strictHandler) GetTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string) {
+	var request GetTaxonomyProfileRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetTaxonomyProfileV2(ctx, request.(GetTaxonomyProfileV2RequestObject))
+		return sh.ssi.GetTaxonomyProfile(ctx, request.(GetTaxonomyProfileRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetTaxonomyProfileV2")
+		handler = middleware(handler, "GetTaxonomyProfile")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetTaxonomyProfileV2ResponseObject); ok {
-		if err := validResponse.VisitGetTaxonomyProfileV2Response(w); err != nil {
+	} else if validResponse, ok := response.(GetTaxonomyProfileResponseObject); ok {
+		if err := validResponse.VisitGetTaxonomyProfileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1889,25 +1889,25 @@ func (sh *strictHandler) GetTaxonomyProfileV2(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// UpdateTaxonomyProfileV2 operation middleware
-func (sh *strictHandler) UpdateTaxonomyProfileV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request UpdateTaxonomyProfileV2RequestObject
+// UpdateTaxonomyProfile operation middleware
+func (sh *strictHandler) UpdateTaxonomyProfile(w http.ResponseWriter, r *http.Request, code string) {
+	var request UpdateTaxonomyProfileRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateTaxonomyProfileV2(ctx, request.(UpdateTaxonomyProfileV2RequestObject))
+		return sh.ssi.UpdateTaxonomyProfile(ctx, request.(UpdateTaxonomyProfileRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateTaxonomyProfileV2")
+		handler = middleware(handler, "UpdateTaxonomyProfile")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateTaxonomyProfileV2ResponseObject); ok {
-		if err := validResponse.VisitUpdateTaxonomyProfileV2Response(w); err != nil {
+	} else if validResponse, ok := response.(UpdateTaxonomyProfileResponseObject); ok {
+		if err := validResponse.VisitUpdateTaxonomyProfileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1915,25 +1915,25 @@ func (sh *strictHandler) UpdateTaxonomyProfileV2(w http.ResponseWriter, r *http.
 	}
 }
 
-// SetTaxonomyProfileDefaultTemplateV2 operation middleware
-func (sh *strictHandler) SetTaxonomyProfileDefaultTemplateV2(w http.ResponseWriter, r *http.Request, code string) {
-	var request SetTaxonomyProfileDefaultTemplateV2RequestObject
+// SetTaxonomyProfileDefaultTemplate operation middleware
+func (sh *strictHandler) SetTaxonomyProfileDefaultTemplate(w http.ResponseWriter, r *http.Request, code string) {
+	var request SetTaxonomyProfileDefaultTemplateRequestObject
 
 	request.Code = code
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.SetTaxonomyProfileDefaultTemplateV2(ctx, request.(SetTaxonomyProfileDefaultTemplateV2RequestObject))
+		return sh.ssi.SetTaxonomyProfileDefaultTemplate(ctx, request.(SetTaxonomyProfileDefaultTemplateRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "SetTaxonomyProfileDefaultTemplateV2")
+		handler = middleware(handler, "SetTaxonomyProfileDefaultTemplate")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(SetTaxonomyProfileDefaultTemplateV2ResponseObject); ok {
-		if err := validResponse.VisitSetTaxonomyProfileDefaultTemplateV2Response(w); err != nil {
+	} else if validResponse, ok := response.(SetTaxonomyProfileDefaultTemplateResponseObject); ok {
+		if err := validResponse.VisitSetTaxonomyProfileDefaultTemplateResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1946,43 +1946,44 @@ func (sh *strictHandler) SetTaxonomyProfileDefaultTemplateV2(w http.ResponseWrit
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"AAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -14,9 +14,9 @@ paths:
         '404': { description: not_found }
   /api/v1/templates:
     get:
-      summary: List templates for tenant (docx-v2)
+      summary: List templates for tenant (docx)
       tags: [templates]
-      operationId: listTemplatesV2
+      operationId: listTemplates
       responses:
         '200':
           description: ok
@@ -36,9 +36,14 @@ paths:
                     updated_at: { type: string, format: date-time }
         '403': { description: forbidden }
     post:
-      summary: Create template (docx-v2)
+      summary: Create template (docx)
       tags: [templates]
-      operationId: createTemplateV2
+      operationId: createTemplate
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -50,19 +55,17 @@ paths:
                 key: { type: string }
                 name: { type: string }
                 description: { type: string }
+                doc_type_code: { type: string, description: "Profile code (e.g. DC, POP). Omit or null for generic templates." }
       responses:
         '201':
           description: created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  id: { type: string, format: uuid }
-                  version_id: { type: string, format: uuid }
+                $ref: '#/components/schemas/CreateTemplateResponse'
   /api/v1/templates/{id}/versions/{n}:
     get:
-      summary: Get template version metadata (docx-v2)
+      summary: Get template version metadata (docx)
       tags: [templates]
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }
@@ -70,6 +73,18 @@ paths:
       responses:
         '200': { description: ok }
         '404': { description: not_found }
+  /api/v1/templates/placeholder-catalog:
+    get:
+      summary: List supported template placeholder catalog entries
+      tags: [templates]
+      operationId: listTemplatePlaceholderCatalog
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaceholderCatalogResponse'
   /api/v1/templates/{id}/versions/{n}/docx-upload-url:
     post:
       summary: Presign PUT URL for draft .docx upload
@@ -185,3 +200,68 @@ components:
         templateId: { type: string, format: uuid }
         templateVersionId: { type: string, format: uuid }
         name: { type: string }
+    TemplateDTO:
+      type: object
+      required: [id, tenant_id, key, name, latest_version, created_by, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        doc_type_code: { type: string, nullable: true }
+        key: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        latest_version: { type: integer, minimum: 1 }
+        published_version_id: { type: string, format: uuid, nullable: true }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+        archived_at: { type: string, format: date-time, nullable: true }
+    VersionDTO:
+      type: object
+      required: [id, template_id, version_number, status, author_id, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        template_id: { type: string, format: uuid }
+        version_number: { type: integer, minimum: 1 }
+        status: { type: string, enum: [draft, in_review, approved, published, obsolete] }
+        docx_storage_key: { type: string, nullable: true }
+        content_hash: { type: string, nullable: true }
+        metadata_schema: { type: object, nullable: true, additionalProperties: true }
+        placeholder_schema: { type: object, nullable: true, additionalProperties: true }
+        author_id: { type: string }
+        pending_reviewer_role: { type: string, nullable: true }
+        pending_approver_role: { type: string, nullable: true }
+        reviewer_id: { type: string, nullable: true }
+        approver_id: { type: string, nullable: true }
+        submitted_at: { type: string, format: date-time, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        approved_at: { type: string, format: date-time, nullable: true }
+        published_at: { type: string, format: date-time, nullable: true }
+        obsoleted_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    CreateTemplateResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [template, version]
+          properties:
+            template:
+              $ref: '#/components/schemas/TemplateDTO'
+            version:
+              $ref: '#/components/schemas/VersionDTO'
+    PlaceholderCatalogEntry:
+      type: object
+      required: [key, label, description]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        description: { type: string }
+    PlaceholderCatalogResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlaceholderCatalogEntry'

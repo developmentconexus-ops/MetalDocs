@@ -49,7 +49,7 @@ Surfaced now so Phase 1/2/4/6 do not miss them:
 ## In-edges (Phase 3 will confirm)
 
 - `apps/api/cmd/metaldocs-api/main.go:197` — module wiring.
-- `apps/api/cmd/metaldocs-api/main.go:225` — `profileRepo` re-instantiated for documents-v2 adapter (`profileDefaultsAdapter`).
+- `apps/api/cmd/metaldocs-api/main.go:225` — `profileRepo` re-instantiated for documents adapter (`profileDefaultsAdapter`).
 - `permissions.go:158-180` — path-prefix capability dispatcher.
 
 ## Open questions deferred to tech-debt

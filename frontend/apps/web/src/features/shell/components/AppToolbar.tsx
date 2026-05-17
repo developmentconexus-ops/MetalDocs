@@ -47,7 +47,7 @@ export function AppToolbar() {
 
       <button
         className={styles.newDocBtn}
-        onClick={() => navigate('/documents-v2/new')}
+        onClick={() => navigate('/documents/new')}
         aria-label="Novo documento"
       >
         <Icon name="plus" size={14} />

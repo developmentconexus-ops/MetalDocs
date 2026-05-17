@@ -39,3 +39,10 @@ See `artifacts/phase0-audit.md`. Headline:
 
 - `artifacts/phase0-audit.md`
 - `artifacts/phase1-map.md`
+
+## Plan 12.4 update (2026-05-15)
+
+Final runtime truth supersedes the earlier mocked DOCX selection:
+- **Keep:** blank starting point only; it creates a real draft version and redirects to the editor.
+- **Disable:** `.docx` import card remains visible as "em breve" but is not selectable.
+- **Defer:** upload, placeholder extraction, and richer editor handoff remain backend/product prerequisites in `wiki/backlog/novo-template-wizard.md`.

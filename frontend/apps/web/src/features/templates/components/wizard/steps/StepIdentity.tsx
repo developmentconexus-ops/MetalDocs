@@ -6,6 +6,7 @@ import styles from './StepIdentity.module.css';
 export type StepIdentityProps = {
   scopeType: ScopeType;
   selectedProfile: DocumentProfile | null;
+  templateKey: string;
   name: string;
   description: string;
   onChangeName: (value: string) => void;
@@ -14,11 +15,13 @@ export type StepIdentityProps = {
   onBack: () => void;
   onChangeScope: () => void;
   advanceDisabled: boolean;
+  keyError?: string | null;
 };
 
 export function StepIdentity({
   scopeType,
   selectedProfile,
+  templateKey,
   name,
   description,
   onChangeName,
@@ -27,22 +30,17 @@ export function StepIdentity({
   onBack,
   onChangeScope,
   advanceDisabled,
+  keyError = null,
 }: StepIdentityProps): JSX.Element {
   const kicker =
     scopeType === 'generic'
-      ? 'Etapa 2 de 5 · Template genérico'
+      ? 'Etapa 2 de 4 · Template genérico'
       : selectedProfile
-        ? `Etapa 2 de 5 · Perfil ${selectedProfile.code} — ${selectedProfile.name}`
-        : 'Etapa 2 de 5';
+        ? `Etapa 2 de 4 · Perfil ${selectedProfile.code} - ${selectedProfile.name}`
+        : 'Etapa 2 de 4';
 
-  // TODO(novo-template-wizard:next-code-preview): replace with useNextTemplateCodeQuery(profileCode)
-  // when GET /api/v1/templates/next-code?profile=<CODE> ships.
-  // Backlog: wiki/backlog/novo-template-wizard.md (next-code-preview).
-  const codePreview =
-    scopeType === 'generic'
-      ? 'TPL-GEN-XXX'
-      : `TPL-${(selectedProfile?.code ?? 'XXX').toUpperCase()}-XXX`;
-
+  // TODO(novo-template-wizard:next-code-preview): replace the slug key preview
+  // with a server sequence only when the next-code endpoint ships.
   return (
     <div className="card">
       <div className="kicker">{kicker}</div>
@@ -112,11 +110,17 @@ export function StepIdentity({
           maxLength={120}
           required
           aria-required="true"
-          aria-describedby="tpl-name-hint"
+          aria-invalid={keyError ? 'true' : 'false'}
+          aria-describedby={keyError ? 'tpl-name-hint tpl-name-error' : 'tpl-name-hint'}
         />
         <span id="tpl-name-hint" className={styles.fieldHint}>
           Aparece para os autores que forem cloná-lo no wizard de novo documento.
         </span>
+        {keyError && (
+          <span id="tpl-name-error" role="alert" className={styles.fieldHint}>
+            {keyError}
+          </span>
+        )}
       </div>
 
       {/* Description */}
@@ -135,23 +139,20 @@ export function StepIdentity({
         />
       </div>
 
-      {/* Code preview (mocked — see TODO above) */}
+      {/* Honest key preview. Next-code sequencing remains deferred in the backlog. */}
       <div className={styles.codePreview}>
-        <div className={`kicker ${styles.codePreviewKicker}`}>
-          Código sugerido · próximo template{' '}
-          {scopeType === 'profile' && selectedProfile ? selectedProfile.code : 'genérico'}
-        </div>
-        <div className={`mono ${styles.codePreviewValue}`}>{codePreview}</div>
+        <div className={`kicker ${styles.codePreviewKicker}`}>Identificador tecnico</div>
+        <div className={`mono ${styles.codePreviewValue}`}>{templateKey || 'preencha-o-nome'}</div>
         <div className={styles.codePreviewHint}>
-          Sequência atribuída na publicação · códigos não são reutilizados.
+          Gerado a partir do nome nesta versão. A prévia de código sequencial permanece no backlog.
         </div>
       </div>
 
       <WizardFooter
         stepLabel={
           advanceDisabled
-            ? 'Etapa 2 de 5 · Informe o nome para continuar'
-            : 'Etapa 2 de 5 · Pronto para avançar'
+            ? 'Etapa 2 de 4 · Informe o nome para continuar'
+            : 'Etapa 2 de 4 · Pronto para avançar'
         }
         showBack
         onBack={onBack}

@@ -33,7 +33,7 @@ Other internal files that import this module or its named exports.
 
 ### Name collision: `AutosaveStatus` / `AutosaveState`
 
-`features/documents/hooks/v2/useDocumentAutosave.ts:5` declares a **local** exported type:
+`features/documents/hooks/editor/useDocumentAutosave.ts:5` declares a **local** exported type:
 ```ts
 export type AutosaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'stale' | 'session_lost' | 'error';
 ```

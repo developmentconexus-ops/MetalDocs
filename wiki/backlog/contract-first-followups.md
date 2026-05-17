@@ -40,10 +40,10 @@ Bootstrap landed (commit `81e7ec23`) — codegen wired, `internal/modules/docume
 **Handlers with no spec op (need spec authoring before migration):**
 - `renameDocument` — PATCH or PUT on document name
 - `duplicateDocument` — clone-from-existing
-- `listComments`, `createComment`, `updateComment`, `deleteComment` — `/api/v2/documents/{id}/comments` CRUD
+- `listComments`, `createComment`, `updateComment`, `deleteComment` — `/api/v1/documents/{id}/comments` CRUD
 
 **Spec ops with no handler (need impl OR spec removal):**
-- `createDocumentV2` — POST /api/v2/documents
+- `createDocument` — POST /api/v1/documents
 - `renderDocumentPDF` — POST/GET on documents render
 
 ## Central wiring TODO

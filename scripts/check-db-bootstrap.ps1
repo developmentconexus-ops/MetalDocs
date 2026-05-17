@@ -110,8 +110,8 @@ $criticalTables = @(
   "public.schema_migrations",
   "public.documents",
   "public.controlled_documents",
-  "public.templates_v2_template",
-  "public.templates_v2_template_version",
+  "public.templates_template",
+  "public.templates_template_version",
   "public.approval_routes"
 )
 $criticalSqlList = ($criticalTables | ForEach-Object { "'$_'" }) -join ", "

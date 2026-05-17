@@ -51,7 +51,7 @@ export function LibrarySidebar({
           type="button"
           className={styles.headerAdd}
           aria-label="Novo documento"
-          onClick={() => navigate('/documents-v2/new')}
+          onClick={() => navigate('/documents/new')}
         >
           +
         </button>

@@ -4,8 +4,8 @@
 
 ServerInterface method signatures:
 - RedirectSignedUrlV2 - (GET /api/v1/signed) - internal/modules/templates/api/api.gen.go:564
-- ListTemplatesV2 - (GET /api/v1/templates) - internal/modules/templates/api/api.gen.go:567
-- CreateTemplateV2 - (POST /api/v1/templates) - internal/modules/templates/api/api.gen.go:570
+- ListTemplates - (GET /api/v1/templates) - internal/modules/templates/api/api.gen.go:567
+- CreateTemplate - (POST /api/v1/templates) - internal/modules/templates/api/api.gen.go:570
 - GetTemplateVersionV2 - (GET /api/v1/templates/{id}/versions/{n}) -
   internal/modules/templates/api/api.gen.go:573
 - PresignTemplateDocxUploadUrlV2 -
@@ -20,9 +20,9 @@ ServerInterface method signatures:
   internal/modules/templates/api/api.gen.go:585
 
 Route mounts in lines 954-961:
-- GET options.BaseURL+/api/v1/templates -> wrapper.ListTemplatesV2 -
+- GET options.BaseURL+/api/v1/templates -> wrapper.ListTemplates -
   internal/modules/templates/api/api.gen.go:954
-- POST options.BaseURL+/api/v1/templates -> wrapper.CreateTemplateV2 -
+- POST options.BaseURL+/api/v1/templates -> wrapper.CreateTemplate -
   internal/modules/templates/api/api.gen.go:955
 - GET options.BaseURL+/api/v1/templates/{id}/versions/{n} -> wrapper.GetTemplateVersionV2 -
   internal/modules/templates/api/api.gen.go:956
@@ -40,9 +40,9 @@ Route mounts in lines 954-961:
 Routes in handler.go lines 39-61:
 - GET /api/v1/signed -> generated.RedirectSignedUrlV2 -
   internal/modules/templates/delivery/http/handler.go:39
-- GET /api/v1/templates -> generated.ListTemplatesV2 -
+- GET /api/v1/templates -> generated.ListTemplates -
   internal/modules/templates/delivery/http/handler.go:40
-- POST /api/v1/templates -> generated.CreateTemplateV2 -
+- POST /api/v1/templates -> generated.CreateTemplate -
   internal/modules/templates/delivery/http/handler.go:41
 - GET /api/v1/templates/{id}/versions/{n} -> generated.GetTemplateVersionV2 -
   internal/modules/templates/delivery/http/handler.go:42
@@ -151,7 +151,7 @@ Exported type declarations (struct/interface):
 - DocumentTemplateSectionFrameNodeResponse (struct) - internal/modules/templates/api/api.gen.go:260
 - DocumentTemplateTableSlotNodeResponse (struct) - internal/modules/templates/api/api.gen.go:271
 - RedirectSignedUrlV2Params (struct) - internal/modules/templates/api/api.gen.go:285
-- CreateTemplateV2JSONBody (struct) - internal/modules/templates/api/api.gen.go:290
+- CreateTemplateJSONBody (struct) - internal/modules/templates/api/api.gen.go:290
 - SaveTemplateDraftV2JSONBody (struct) - internal/modules/templates/api/api.gen.go:298
 - PublishTemplateVersionV2JSONBody (struct) - internal/modules/templates/api/api.gen.go:307
 - ServerInterface (interface) - internal/modules/templates/api/api.gen.go:561
@@ -167,12 +167,12 @@ Exported type declarations (struct/interface):
 - RedirectSignedUrlV2RequestObject (struct) - internal/modules/templates/api/api.gen.go:965
 - RedirectSignedUrlV2ResponseObject (interface) - internal/modules/templates/api/api.gen.go:969
 - RedirectSignedUrlV2302Response (struct) - internal/modules/templates/api/api.gen.go:973
-- ListTemplatesV2RequestObject (struct) - internal/modules/templates/api/api.gen.go:981
-- ListTemplatesV2ResponseObject (interface) - internal/modules/templates/api/api.gen.go:984
-- ListTemplatesV2403Response (struct) - internal/modules/templates/api/api.gen.go:1009
-- CreateTemplateV2RequestObject (struct) - internal/modules/templates/api/api.gen.go:1017
-- CreateTemplateV2ResponseObject (interface) - internal/modules/templates/api/api.gen.go:1021
-- CreateTemplateV2201JSONResponse (struct) - internal/modules/templates/api/api.gen.go:1025
+- ListTemplatesRequestObject (struct) - internal/modules/templates/api/api.gen.go:981
+- ListTemplatesResponseObject (interface) - internal/modules/templates/api/api.gen.go:984
+- ListTemplates403Response (struct) - internal/modules/templates/api/api.gen.go:1009
+- CreateTemplateRequestObject (struct) - internal/modules/templates/api/api.gen.go:1017
+- CreateTemplateResponseObject (interface) - internal/modules/templates/api/api.gen.go:1021
+- CreateTemplate201JSONResponse (struct) - internal/modules/templates/api/api.gen.go:1025
 - GetTemplateVersionV2RequestObject (struct) - internal/modules/templates/api/api.gen.go:1042
 - GetTemplateVersionV2ResponseObject (interface) - internal/modules/templates/api/api.gen.go:1047
 - GetTemplateVersionV2200Response (struct) - internal/modules/templates/api/api.gen.go:1051
@@ -322,7 +322,7 @@ Const blocks and identifiers:
   - AuditCreated, AuditSaved, AuditSubmitted, AuditReviewed, AuditApproved, AuditRejected,
     AuditPublished, AuditObsoleted, AuditArchived, AuditRestored, AuditApprovalConfigUpdated
 - internal/modules/templates/domain/template.go:10
-  - VisibilityPublic, VisibilityInternal, VisibilitySpecific
+  - no exported template-use visibility enum remains in the runtime domain; legacy DB compatibility values are repository-local constants only
 - internal/modules/templates/domain/schemas.go:12
   - PHText, PHDate, PHNumber, PHSelect, PHUser, PHPicture, PHComputed
 - internal/modules/templates/domain/version.go:10

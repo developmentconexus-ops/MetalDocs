@@ -161,8 +161,8 @@ export const documentsRoutes: RouteObject[] = [
   { path: "documents", lazy: () => import("./pages/LibraryPage") },
   // fixed-segment sub-routes first (all/area/:x/type/:x/doc/:x/mine/recent)
   { path: "documents/:documentId", lazy: () => import("./pages/DocumentPublishedPage") },
-  { path: "documents-v2/new",      lazy: () => import("./pages/NewDocumentWizardPage") },
-  { path: "documents-v2/:documentID", lazy: () => import("./pages/DocumentEditorRoutePage") },
+  { path: "documents/new",      lazy: () => import("./pages/NewDocumentWizardPage") },
+  { path: "documents/:documentID/edit", lazy: () => import("./pages/DocumentEditorRoutePage") },
 ];
 ```
 

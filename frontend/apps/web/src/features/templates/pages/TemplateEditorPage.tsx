@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import { filterTransactionGuard } from '../../../editor-adapters/filter-transaction-guard';
-import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/templatesV2';
+import { type TemplateSchemas, type VersionDTO, submitForReview } from '../api/templates';
 import { useTemplateDraft } from '../hooks/useTemplateDraft';
 import { useTemplateAutosave } from '../hooks/useTemplateAutosave';
 import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
@@ -36,7 +36,7 @@ const OUTLINE_REFRESH_DEBOUNCE_MS = 600;
 
 const AUTOSAVE_LABELS_PT = {
   idle: '',
-  saving: 'Salvando…',
+  saving: 'Salvando...',
   saved: 'Salvo',
   error: 'Falha ao salvar',
 };
@@ -88,7 +88,7 @@ export function TemplateEditorPage({
 
   const syncPlaceholdersFromDocument = useCallback(() => {
     if (!isDraft) return;
-    // getAgent is a deferred ACL violation — MetalDocsEditorRef does not expose it;
+    // getAgent is a deferred ACL violation - MetalDocsEditorRef does not expose it;
     // optional chaining returns undefined silently. Follow-up: forward getAgent in the adapter.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawVariables: string[] = (editorRef.current as any)?.getAgent?.()?.getVariables?.() ?? [];
@@ -202,7 +202,7 @@ export function TemplateEditorPage({
   }
 
   if (draft.loading || (schemaState.loading && !localSchemas)) {
-    return <div className={styles.loading}>Carregando template…</div>;
+    return <div className={styles.loading}>Carregando template...</div>;
   }
   if (draft.error) return <div role="alert" className={styles.error}>{draft.error}</div>;
   if (schemaState.error && !localSchemas) {
@@ -304,7 +304,7 @@ export function TemplateEditorPage({
                       onClick={() => fileInputRef.current?.click()}
                       disabled={importing}
                     >
-                      {importing ? 'Importando…' : 'Importar .docx'}
+                      {importing ? 'Importando...' : 'Importar .docx'}
                     </button>
                     <button
                       type="button"
@@ -312,7 +312,7 @@ export function TemplateEditorPage({
                       onClick={() => void handleSubmitForReview()}
                       disabled={submitting}
                     >
-                      {submitting ? 'Enviando…' : 'Submeter para revisão'}
+                      {submitting ? 'Enviando...' : 'Submeter para revisão'}
                     </button>
                   </>
                 )}
@@ -354,7 +354,7 @@ export function TemplateEditorPage({
   );
 }
 
-/* Inline SVG icons (Lucide-style). Kept colocated — single-use. */
+/* Inline SVG icons (Lucide-style). Kept colocated - single-use. */
 
 const SVG_BASE = {
   width: 18,

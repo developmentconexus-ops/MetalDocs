@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-12 (Plan 8) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-15 (Novo Documento runtime repair) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -177,13 +177,13 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/delivery/http/handler.go:316` | `finalizeDocument` | func | `POST /api/v1/documents/{id}/finalize` (T-006 idempotency gap) |
 | `internal/modules/documents/delivery/http/handler.go:869` | `authorizeDocumentScope` | func | Role + ownership gate (tier-1) |
 | `internal/modules/documents/delivery/http/handler.go:958..1009` | `mapErr` | func | Legacy envelope mapping (T-001) |
-| `internal/modules/documents/repository/repository.go:73` | `CreateDocumentTx` impl | func | Tx-scoped CD+document insert (ADR 0011) |
+| `internal/modules/documents/repository/repository.go:76` | `CreateDocumentTx` impl | func | Tx-scoped CD+document insert (ADR 0011); asserts `document.create` before INSERT and `document.edit` before pointer/snapshot UPDATEs |
 | `internal/modules/documents/repository/repository.go:216` | `UpdateDocumentName` | func | UPDATE inside tx with `authz.Require(CapDocumentEdit)` (T-003 closed Plan 5) |
 | `internal/modules/documents/repository/repository.go:343` | `ListDocumentsPaginated` | func | LIMIT/OFFSET; pageSize cap 50 |
 | `internal/modules/documents/repository/repository.go:376` | `CountDocuments` | func | Sibling COUNT(*) for list |
 | `internal/modules/documents/approval/repository/postgres_approval_repository.go:34` | `InsertInstance` | func | Tripwire-gated INSERT into `approval_instances` |
 | `internal/modules/documents/approval/application/idempotency.go:20` | `ComputeIdempotencyKey` | func | Internal deterministic key for submit (NOT HTTP header) |
-| `internal/modules/documents/api/api.gen.go:1` | generated stubs (`ListDocumentsV2`, `PostApiV2DocumentsIdFinalize`, â€¦) | iface | Codegen bootstrap (unmounted) |
+| `internal/modules/documents/api/api.gen.go:1` | generated stubs (`ListDocuments`, `PostApiDocumentsIdFinalize`, â€¦) | iface | Codegen bootstrap (unmounted) |
 
 The remaining ~480 symbols are domain DTOs, repository internal helpers, and codegen artifacts â€” treated as undocumented-on-purpose at module level (see tech-debt `Coverage stats`).
 
@@ -193,9 +193,9 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 
 | Method | Path | OperationID | Handler | Authz |
 |---|---|---|---|---|
-| GET | `/api/v1/documents` | `listDocumentsV2` | `Handler.listDocuments` (`handler.go:145`) | role: admin\|filler; filler scoped to `created_by` |
+| GET | `/api/v1/documents` | `listDocuments` | `Handler.listDocuments` (`handler.go:145`) | role: admin\|filler; filler scoped to `created_by` |
 | GET | `/api/v1/documents/stats` | â€” | `Handler.documentStats` (`handler.go:174`) | role |
-| GET | `/api/v1/documents/{id}` | `getDocumentV2` | `Handler.getDocument` (`handler.go:114`) | role + ownership |
+| GET | `/api/v1/documents/{id}` | `getDocument` | `Handler.getDocument` (`handler.go:114`) | role + ownership |
 | PATCH | `/api/v1/documents/{id}` | â€” | `Handler.renameDocument` (`handler.go:285`) | role + ownership; **dup registration at `:86`+`:115`** (T-004) |
 | POST | `/api/v1/documents/{id}/finalize` | â€” (path at `openapi.yaml:3251`) | `Handler.finalizeDocument` (`handler.go:316`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
 | POST | `/api/v1/documents/{id}/archive` | â€” | `Handler.archiveDocument` | role |
@@ -222,8 +222,8 @@ Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 an
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/documents` | `internal/modules/documents/delivery/http/handler.go:83` | `h.listDocuments` | `/api/v1/documents` | `listDocumentsV2` | `ListDocumentsV2` | Aligned | Also re-registered at `handler.go:112` |
-| GET | `/api/v1/documents/stats` | `internal/modules/documents/delivery/http/handler.go:84` | `h.documentStats` | `/api/v1/documents/stats` | `documentStatsV2` | `DocumentStatsV2` | Aligned | Also re-registered at `handler.go:113` |
+| GET | `/api/v1/documents` | `internal/modules/documents/delivery/http/handler.go:83` | `h.listDocuments` | `/api/v1/documents` | `listDocuments` | `ListDocuments` | Aligned | Also re-registered at `handler.go:112` |
+| GET | `/api/v1/documents/stats` | `internal/modules/documents/delivery/http/handler.go:84` | `h.documentStats` | `/api/v1/documents/stats` | `documentStats` | `DocumentStats` | Aligned | Also re-registered at `handler.go:113` |
 | GET | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:86` | `h.getDocument` | `/api/v1/documents/{id}` | â€” | `GetApiV2DocumentsId` | Aligned | Also re-registered at `handler.go:115` |
 | PATCH | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:87` | `h.renameDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:116` |
 | POST | `/api/v1/documents/{id}/finalize` | `internal/modules/documents/delivery/http/handler.go:88` | `h.finalizeDocument` | `/api/v1/documents/{id}/finalize` | â€” | `PostApiV2DocumentsIdFinalize` | Aligned | Also re-registered at `handler.go:117` |
@@ -419,8 +419,8 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 ### 8.6 Concurrency / Transactions
 - Repository methods accept `context.Context` and accept tx where the SubmitService composes one (`approval/application/submit_service.go:68`).
 - `Service.RenameDocument` does **not** wrap UPDATE + audit in a tx (T-005).
-- Atomic CD+draft create uses an explicit tx via `CreateDocumentTx` port (ADR 0011).
-- One-active-instance constraint enforced by partial unique index `ux_approval_instances_active` on `approval_instances(document_v2_id) WHERE status='in_progress'` (`migrations/0135_*.sql:33`).
+- Atomic CD+draft create uses an explicit tx via `CreateDocumentTx` port (ADR 0011). Because migration 0188 tripwires `documents` INSERT as `document.create` and UPDATE as `document.edit`, `CreateDocumentTx` asserts both capabilities in-order inside the caller-owned tx.
+- One-active-instance constraint enforced by partial unique index `ux_approval_instances_active` on `approval_instances(document_id) WHERE status='in_progress'` (`migrations/0135_*.sql:33`, renamed by 0194).
 
 ### 8.7 Snapshot & freeze (placeholder lifecycle)
 - `SnapshotService` populates `placeholder_schema_snapshot` (ADR 0008; `wiki/concepts/placeholders.md`).
@@ -501,17 +501,19 @@ Top 3 (by severity, then blast radius):
 - Related concepts: `wiki/concepts/placeholders.md`, `wiki/concepts/token-syntax.md`
 - Upstream template publisher: [`wiki/modules/templates.md`](templates.md) â€” publishes the `template_version` rows (with `placeholder_schema`) that documents instantiates from; `documents` snapshots `placeholder_schema` at create time (Â§8.7 of that doc)
 - Frontend counterpart: `frontend/apps/web/src/features/documents/` â€” Library, Wizard, Editor, Published view (see `wiki/architecture/frontend-structure.md`)
-- Predecessor stub: `wiki/modules/documents-v2.md` â€” DEPRECATED, retired by R-100
+- Predecessor stub: `retired documents module stub` â€” DEPRECATED, retired by R-100
 - Backlog: `wiki/backlog/documents-refactor.md`, `wiki/backlog/contract-first-followups.md`
 - Tech debt: `wiki/modules/documents-tech-debt.md`
 - Iam cross-refs: `wiki/modules/iam-tech-debt.md` T-001 (namespaces), T-006 (RFC 9457), T-009 (`ErrCapabilityDenied`)
 - Auth cross-ref: [`wiki/modules/auth.md Â§8.8`](auth.md) â€” `authdomain.CurrentUserFromContext` is the IN-edge this module reads after middleware injection; Â§8.1 of auth.md covers the middleware that sets the context value
-- See also: [`modules/audit.md`](audit.md) â€” documents emits audit events via `documentsV2AuditAdapter` (`main.go:445-479`); T-005 (rename outside tx) and T-007 (latent consumer port) are the open gaps in the consumer-side register
+- See also: [`modules/audit.md`](audit.md) â€” documents emits audit events via `documentsAuditAdapter` (`main.go:477-492`); T-005 (rename outside tx) and T-007 (latent consumer port) are the open gaps in the consumer-side register
 - See also: [`modules/registry.md`](registry.md) â€” registry owns the CD identity (`controlled_documents`); documents exposes the `CreateDocumentTx` port that registry calls inside the atomic create transaction (ADR 0011)
 - See also: [`modules/taxonomy.md`](taxonomy.md) â€” documents reads `process_areas.name` live at document-create time for the `area_name_snapshot` column (`repository.go:94-101`); taxonomy Â§8.9 documents this cross-module data contract
+
 - Research artifacts: `wiki/modules/documents/_artifacts/00-context.md` â€¦ `06-selfreview.md`
 
 ## Changelog (this doc)
 
-- 2026-05-10 â€” Full Arc42 + C4 rewrite via `metaldocs-module-doc` skill (Phases 0â€“8). Supersedes prior FE-leaning doc; FE Key files now live under `wiki/architecture/frontend-structure.md` cross-link.
+- 2026-05-15 - Novo Documento runtime repair: `CreateDocumentTx` now asserts `document.edit` before the initial pointer/snapshot `documents` UPDATEs so the Plan 5 tripwire accepts atomic blank-template creation.
 
+- 2026-05-10 â€” Full Arc42 + C4 rewrite via `metaldocs-module-doc` skill (Phases 0â€“8). Supersedes prior FE-leaning doc; FE Key files now live under `wiki/architecture/frontend-structure.md` cross-link.

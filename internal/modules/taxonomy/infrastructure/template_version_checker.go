@@ -12,8 +12,8 @@ type TemplateVersionChecker struct {
 
 const templateVersionQuery = `
 	SELECT v.status, t.doc_type_code
-	FROM templates_v2_template_version v
-	JOIN templates_v2_template t ON t.id = v.template_id
+	FROM templates_template_version v
+	JOIN templates_template t ON t.id = v.template_id
 	WHERE v.id = $1
 `
 

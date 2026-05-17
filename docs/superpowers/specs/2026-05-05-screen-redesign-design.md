@@ -235,7 +235,7 @@ createBrowserRouter([
 `src/features/shell/components/Rail.tsx`
 - Width: 56px, background: `var(--rail)`, full height
 - Top: `<Logo />` (icon only, 32px)
-- Middle: nav items — Home (`/`), Documents (`/documents`), Templates (`/templates-v2`), Registry (`/registry-v2`), Approvals (`/approvals`), Audit (`/audit`)
+- Middle: nav items — Home (`/`), Documents (`/documents`), Templates (`/templates`), Registry (`/controlled-documents`), Approvals (`/approvals`), Audit (`/audit`)
 - Bottom: user `<Avatar />` + logout icon button
 - Active: `useMatch` per path → `var(--rail-active)` pill highlight
 - Tooltips: each nav icon shows label on hover (title attribute, CSS tooltip)
@@ -247,7 +247,7 @@ createBrowserRouter([
 - Keeps from legacy: search input, "Novo documento" CTA, notifications bell, user display name
 - Drops: old Zustand-driven search handler, hardcoded colors, DM Sans
 - Search: local state + `useNavigate('/documents?q=...')` on submit
-- "Novo documento": navigates to `/documents-v2/new`
+- "Novo documento": navigates to `/documents/new`
 - Notifications bell: `useQuery(QK.notifications.unreadCount())`
 - Uses `var(--brand)` for CTA button, Inter Tight font via CSS inheritance
 - CSS Module
@@ -328,7 +328,7 @@ export const QK = {
 - `useQuery(QK.inbox({ limit: 3 }))` → pending approvals in sidebar
 - `useQuery(QK.audit.recent())` → audit trail in sidebar
 
-### 6.3 Editor `/documents-v2/:documentId`
+### 6.3 Editor `/documents/:documentId/edit`
 
 **Layout:** AppShell, no SectionPanel
 **Design source:** `selected-editor-v2.jsx` → `SelectedEditorV2`
@@ -345,10 +345,10 @@ export const QK = {
 - `useQuery(QK.approval.instance(id))` → next approvers
 - `useMutation(submit)` + `invalidateQueries(QK.documents.detail(id))`
 
-### 6.4 Wizard `/documents-v2/new`
+### 6.4 Wizard `/documents/new`
 
 **Layout:** AppShell, no SectionPanel
-**Design source:** `selected-wizard-v2.jsx` + `screens-2.jsx` → `WizardStep2V2`, `CreateWizard`
+**Design source:** `screens-2.jsx` → `WizardStep2`, `CreateWizard`
 
 **State:** local `useState` form object `{ profileCode, areaCode, title, visibility, invitees, templateId }` + `activeStep: 0-3`
 
@@ -358,18 +358,18 @@ export const QK = {
 - Step 3 (Template): 3-col template card grid — `useQuery(QK.templates.list())`
 - Step 4 (Confirmação): summary of all selections
 
-**Submit:** `useMutation(createDocument)` → on success `navigate('/documents-v2/:newId')` + `invalidateQueries(QK.documents.list())`
+**Submit:** `useMutation(createDocument)` → on success `navigate('/documents/:newId/edit')` + `invalidateQueries(QK.documents.list())`
 
-### 6.5 Templates `/templates-v2`
+### 6.5 Templates `/templates`
 
 **Layout:** AppShell, no SectionPanel
 **Design source:** `screens-2.jsx` → `Templates`
 
 - 3-column card grid, mini doc preview per card
-- `useQuery(QK.templates.list())` → `listTemplates()` from `features/templates/api/templatesV2.ts`
+- `useQuery(QK.templates.list())` → `listTemplates()` from `features/templates/api/templates.ts`
 - "Novo template" CTA → existing `TemplateCreateDialog` at `features/templates/TemplateCreateDialog.tsx` (kept as-is)
 
-### 6.6 Registry `/registry-v2`
+### 6.6 Registry `/controlled-documents`
 
 **Layout:** AppShell, no SectionPanel
 **Design source:** `screens-2.jsx` → `Registry`

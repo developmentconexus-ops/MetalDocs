@@ -49,7 +49,7 @@ Sampled all wiki cross-links in the composed doc:
 - `wiki/backlog/contract-first-followups.md` — exists
 - `wiki/backlog/documents-refactor.md` — created this run
 - `wiki/modules/documents-tech-debt.md` — created this run
-- `wiki/modules/documents-v2.md` — exists, retired by R-100 in Phase 7
+- `retired documents module stub` — exists, retired by R-100 in Phase 7
 - `wiki/architecture/frontend-structure.md` — exists (per `wiki/README.md` index)
 - `wiki/architecture/persistence.md` — exists (per `wiki/README.md` index)
 - `wiki/architecture/api-contract.md` — referenced indirectly via ADR 0012; not directly linked. **OK.**

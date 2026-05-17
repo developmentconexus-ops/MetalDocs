@@ -42,20 +42,20 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 		body   []byte
 		want   int
 	}{
-		{name: "listTemplatesV2", method: http.MethodGet, path: "/api/v1/templates", want: http.StatusOK},
-		{name: "createTemplateV2", method: http.MethodPost, path: "/api/v1/templates", body: jsonBody(t, map[string]any{"key": "new-contract", "name": "New Contract", "description": "Default"}), want: http.StatusCreated},
-		{name: "getTemplateVersionV2", method: http.MethodGet, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1", want: http.StatusOK},
-		{name: "presignTemplateDocxUploadUrlV2", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/docx-upload-url", want: http.StatusOK},
-		{name: "presignTemplateSchemaUploadUrlV2", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema-upload-url", want: http.StatusOK},
-		{name: "redirectSignedUrlV2", method: http.MethodGet, path: "/api/v1/signed?key=templates/11111111-1111-1111-1111-111111111111/versions/1.docx", want: http.StatusFound},
-		{name: "saveTemplateDraftV2", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: jsonBody(t, map[string]any{
+		{name: "listTemplates", method: http.MethodGet, path: "/api/v1/templates", want: http.StatusOK},
+		{name: "createTemplate", method: http.MethodPost, path: "/api/v1/templates", body: jsonBody(t, map[string]any{"key": "new-contract", "name": "New Contract", "description": "Default"}), want: http.StatusCreated},
+		{name: "getTemplateVersion", method: http.MethodGet, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1", want: http.StatusOK},
+		{name: "presignTemplateDocxUploadUrl", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/docx-upload-url", want: http.StatusOK},
+		{name: "presignTemplateSchemaUploadUrl", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/schema-upload-url", want: http.StatusOK},
+		{name: "redirectSignedUrl", method: http.MethodGet, path: "/api/v1/signed?key=templates/11111111-1111-1111-1111-111111111111/versions/1.docx", want: http.StatusFound},
+		{name: "saveTemplateDraft", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: jsonBody(t, map[string]any{
 			"expected_lock_version": 0,
 			"docx_storage_key":      "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 			"schema_storage_key":    "templates/11111111-1111-1111-1111-111111111111/versions/1.schema.json",
 			"docx_content_hash":     "hash_saved",
 			"schema_content_hash":   "schema_hash",
 		}), want: http.StatusNoContent},
-		{name: "publishTemplateVersionV2", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: jsonBody(t, map[string]any{
+		{name: "publishTemplateVersion", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: jsonBody(t, map[string]any{
 			"docx_key":   "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
 			"schema_key": "templates/11111111-1111-1111-1111-111111111111/versions/1.schema.json",
 		}), want: http.StatusOK},
@@ -133,14 +133,14 @@ func TestGeneratedTemplatesRoutes_RejectValidation(t *testing.T) {
 		path   string
 		body   string
 	}{
-		{name: "listTemplatesV2 invalid limit", method: http.MethodGet, path: "/api/v1/templates?limit=bad"},
-		{name: "createTemplateV2 missing key", method: http.MethodPost, path: "/api/v1/templates", body: `{"name":"Contract"}`},
-		{name: "getTemplateVersionV2 invalid version", method: http.MethodGet, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int"},
-		{name: "presignTemplateDocxUploadUrlV2 invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/docx-upload-url"},
-		{name: "presignTemplateSchemaUploadUrlV2 invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/schema-upload-url"},
-		{name: "redirectSignedUrlV2 missing key", method: http.MethodGet, path: "/api/v1/signed"},
-		{name: "saveTemplateDraftV2 missing schema key", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","docx_content_hash":"h","schema_content_hash":"sh"}`},
-		{name: "publishTemplateVersionV2 missing docx key", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s"}`},
+		{name: "listTemplates invalid limit", method: http.MethodGet, path: "/api/v1/templates?limit=bad"},
+		{name: "createTemplate missing key", method: http.MethodPost, path: "/api/v1/templates", body: `{"name":"Contract"}`},
+		{name: "getTemplateVersion invalid version", method: http.MethodGet, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int"},
+		{name: "presignTemplateDocxUploadUrl invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/docx-upload-url"},
+		{name: "presignTemplateSchemaUploadUrl invalid version", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/not-int/schema-upload-url"},
+		{name: "redirectSignedUrl missing key", method: http.MethodGet, path: "/api/v1/signed"},
+		{name: "saveTemplateDraft missing schema key", method: http.MethodPut, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/draft", body: `{"expected_lock_version":0,"docx_storage_key":"d","docx_content_hash":"h","schema_content_hash":"sh"}`},
+		{name: "publishTemplateVersion missing docx key", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: `{"schema_key":"s"}`},
 	}
 
 	for _, tt := range tests {

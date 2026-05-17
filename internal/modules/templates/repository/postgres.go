@@ -39,16 +39,16 @@ var _ application.Repository = (*Repository)(nil)
 
 func (r *Repository) CreateTemplate(ctx context.Context, t *domain.Template) error {
 	const q = `
-INSERT INTO templates_v2_template (
+INSERT INTO templates_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
 	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8,
-	$9, $10, $11, $12, $13, $14, $15
+	$1, $2, $3, $4, $5, $6, '{}'::text[], 'public',
+	'{}'::text[], $7, $8, $9, $10, $11, $12
 )`
 	_, err := r.db.ExecContext(ctx, q,
-		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description, t.Areas, string(t.Visibility),
-		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
+		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
+		t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -63,9 +63,9 @@ INSERT INTO templates_v2_template (
 func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
+	id::text, tenant_id, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
-FROM templates_v2_template
+FROM templates_template
 WHERE id = $1 AND tenant_id = $2`
 
 	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, id, tenantID))
@@ -81,9 +81,9 @@ WHERE id = $1 AND tenant_id = $2`
 func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
+	id::text, tenant_id, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
-FROM templates_v2_template
+FROM templates_template
 WHERE tenant_id = $1 AND key = $2`
 
 	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, tenantID, key))
@@ -99,31 +99,22 @@ WHERE tenant_id = $1 AND key = $2`
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description, array_to_json(areas)::text, visibility, array_to_json(specific_areas)::text,
+	id::text, tenant_id, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
-FROM templates_v2_template
+FROM templates_template
 WHERE tenant_id = $1
   AND system_owned = false
   AND ($2::text IS NULL OR doc_type_code = $2)
-  AND (cardinality($3::text[]) = 0 OR areas && $3::text[])
-  AND (
-    visibility = 'public'
-    OR (visibility = 'internal' AND NOT $6::boolean)
-    OR (visibility = 'specific' AND cardinality($7::text[]) > 0 AND specific_areas && $7::text[])
-  )
 ORDER BY created_at DESC
-LIMIT $4 OFFSET $5`
+LIMIT $3 OFFSET $4`
 
 	rows, err := r.db.QueryContext(
 		ctx,
 		q,
 		f.TenantID,
 		f.DocTypeCode,
-		normalizedTextArray(f.AreaAny),
 		f.Limit,
 		f.Offset,
-		f.IsExternalViewer,
-		normalizedTextArray(f.ActorAreas),
 	)
 	if err != nil {
 		return nil, err
@@ -143,24 +134,21 @@ LIMIT $4 OFFSET $5`
 
 func (r *Repository) UpdateTemplate(ctx context.Context, t *domain.Template) error {
 	const q = `
-UPDATE templates_v2_template
+UPDATE templates_template
 SET
 	doc_type_code = $3,
 	key = $4,
 	name = $5,
 	description = $6,
-	areas = $7,
-	visibility = $8,
-	specific_areas = $9,
-	latest_version = $10,
-	published_version_id = $11,
-	system_owned = $12,
-	archived_at = $13
+	latest_version = $7,
+	published_version_id = $8,
+	system_owned = $9,
+	archived_at = $10
 WHERE id = $1 AND tenant_id = $2`
 
 	res, err := r.db.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
-		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
+		t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
 	)
 	if err != nil {
 		return err
@@ -179,7 +167,7 @@ func (r *Repository) CreateVersion(ctx context.Context, v *domain.TemplateVersio
 	}
 
 	const q = `
-INSERT INTO templates_v2_template_version (
+INSERT INTO templates_template_version (
 	id, template_id, version_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
@@ -205,7 +193,7 @@ func (r *Repository) CreateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.
 		return err
 	}
 	const q = `
-INSERT INTO templates_v2_template_version (
+INSERT INTO templates_template_version (
 	id, template_id, version_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
@@ -232,7 +220,7 @@ SELECT
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
-FROM templates_v2_template_version
+FROM templates_template_version
 WHERE template_id = $1 AND version_number = $2`
 
 	v, err := scanTemplateVersion(r.db.QueryRowContext(ctx, q, templateID, n))
@@ -252,7 +240,7 @@ SELECT
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
-FROM templates_v2_template_version
+FROM templates_template_version
 WHERE id = $1`
 
 	v, err := scanTemplateVersion(r.db.QueryRowContext(ctx, q, id))
@@ -272,7 +260,7 @@ func (r *Repository) UpdateVersion(ctx context.Context, v *domain.TemplateVersio
 	}
 
 	const q = `
-UPDATE templates_v2_template_version
+UPDATE templates_template_version
 SET
 	status = $2,
 	docx_storage_key = $3,
@@ -308,16 +296,16 @@ WHERE id = $1`
 
 func (r *Repository) CreateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
 	const q = `
-INSERT INTO templates_v2_template (
+INSERT INTO templates_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
 	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, $7, $8,
-	$9, $10, $11, $12, $13, $14, $15
+	$1, $2, $3, $4, $5, $6, '{}'::text[], 'public',
+	'{}'::text[], $7, $8, $9, $10, $11, $12
 )`
 	_, err := tx.ExecContext(ctx, q,
-		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description, t.Areas, string(t.Visibility),
-		t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
+		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
+		t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -331,23 +319,20 @@ INSERT INTO templates_v2_template (
 
 func (r *Repository) UpdateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
 	const q = `
-UPDATE templates_v2_template
+UPDATE templates_template
 SET
 	doc_type_code = $3,
 	key = $4,
 	name = $5,
 	description = $6,
-	areas = $7,
-	visibility = $8,
-	specific_areas = $9,
-	latest_version = $10,
-	published_version_id = $11,
-	system_owned = $12,
-	archived_at = $13
+	latest_version = $7,
+	published_version_id = $8,
+	system_owned = $9,
+	archived_at = $10
 WHERE id = $1 AND tenant_id = $2`
 	res, err := tx.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
-		t.Areas, string(t.Visibility), t.SpecificAreas, t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
+		t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
 	)
 	if err != nil {
 		return err
@@ -366,7 +351,7 @@ func (r *Repository) UpdateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.
 	}
 
 	const q = `
-UPDATE templates_v2_template_version
+UPDATE templates_template_version
 SET
 	status = $2,
 	docx_storage_key = $3,
@@ -401,15 +386,28 @@ WHERE id = $1`
 }
 
 func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return updateVersionDraftCAS(ctx, r.db, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+}
+
+func (r *Repository) UpdateVersionDraftCASTx(ctx context.Context, tx *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return updateVersionDraftCAS(ctx, tx, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+}
+
+type draftCASExecutor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func updateVersionDraftCAS(ctx context.Context, db draftCASExecutor, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	const q = `
-UPDATE templates_v2_template_version
+UPDATE templates_template_version
 SET
 	docx_storage_key = $3,
 	content_hash = $4,
 	lock_version = lock_version + 1
 WHERE id = $1
   AND lock_version = $2`
-	res, err := r.db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+	res, err := db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 	if err != nil {
 		return err
 	}
@@ -419,7 +417,7 @@ WHERE id = $1
 	}
 
 	var exists bool
-	if err := r.db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM templates_v2_template_version WHERE id = $1)", versionID).Scan(&exists); err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM templates_template_version WHERE id = $1)", versionID).Scan(&exists); err != nil {
 		return err
 	}
 	if !exists {
@@ -430,7 +428,7 @@ WHERE id = $1
 
 func (r *Repository) ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error {
 	const q = `
-UPDATE templates_v2_template_version
+UPDATE templates_template_version
 SET status = 'obsolete', obsoleted_at = now()
 WHERE template_id = $1 AND status = 'published' AND id <> $2`
 	_, err := r.db.ExecContext(ctx, q, templateID, keepVersionID)
@@ -439,7 +437,7 @@ WHERE template_id = $1 AND status = 'published' AND id <> $2`
 
 func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx *sql.Tx, templateID, keepVersionID string) error {
 	const q = `
-UPDATE templates_v2_template_version
+UPDATE templates_template_version
 SET status = 'obsolete', obsoleted_at = now()
 WHERE template_id = $1 AND status = 'published' AND id <> $2`
 	_, err := tx.ExecContext(ctx, q, templateID, keepVersionID)
@@ -449,7 +447,7 @@ WHERE template_id = $1 AND status = 'published' AND id <> $2`
 func (r *Repository) GetApprovalConfig(ctx context.Context, templateID string) (*domain.ApprovalConfig, error) {
 	const q = `
 SELECT template_id::text, reviewer_role, approver_role
-FROM templates_v2_approval_config
+FROM templates_approval_config
 WHERE template_id = $1`
 	var (
 		cfg      domain.ApprovalConfig
@@ -470,7 +468,7 @@ WHERE template_id = $1`
 
 func (r *Repository) UpsertApprovalConfig(ctx context.Context, c *domain.ApprovalConfig) error {
 	const q = `
-INSERT INTO templates_v2_approval_config (template_id, reviewer_role, approver_role)
+INSERT INTO templates_approval_config (template_id, reviewer_role, approver_role)
 VALUES ($1, $2, $3)
 ON CONFLICT (template_id) DO UPDATE
 SET reviewer_role = EXCLUDED.reviewer_role,
@@ -481,7 +479,7 @@ SET reviewer_role = EXCLUDED.reviewer_role,
 
 func (r *Repository) UpsertApprovalConfigTx(ctx context.Context, tx *sql.Tx, c *domain.ApprovalConfig) error {
 	const q = `
-INSERT INTO templates_v2_approval_config (template_id, reviewer_role, approver_role)
+INSERT INTO templates_approval_config (template_id, reviewer_role, approver_role)
 VALUES ($1, $2, $3)
 ON CONFLICT (template_id) DO UPDATE
 SET reviewer_role = EXCLUDED.reviewer_role,
@@ -520,7 +518,7 @@ func (r *Repository) AppendAuditTx(ctx context.Context, _ *sql.Tx, entry *domain
 func (r *Repository) ListAudit(ctx context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
 	const q = `
 SELECT tenant_id, template_id::text, version_id::text, actor_id, action, details, occurred_at
-FROM templates_v2_audit_log
+FROM templates_audit_log
 WHERE template_id = $1
 ORDER BY occurred_at DESC
 LIMIT $2 OFFSET $3`

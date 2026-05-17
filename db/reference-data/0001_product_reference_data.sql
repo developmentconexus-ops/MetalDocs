@@ -84,7 +84,7 @@ SELECT set_config(
   true
 );
 
-INSERT INTO public.templates_v2_template (
+INSERT INTO public.templates_template (
   id, tenant_id, doc_type_code, key, name, description, areas, visibility,
   specific_areas, latest_version, published_version_id, created_by, system_owned, archived_at
 ) VALUES (
@@ -104,7 +104,7 @@ INSERT INTO public.templates_v2_template (
   NULL
 ) ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.templates_v2_template_version (
+INSERT INTO public.templates_template_version (
   id, template_id, version_number, status, docx_storage_key, content_hash, metadata_schema,
   placeholder_schema, author_id, pending_reviewer_role, pending_approver_role, reviewer_id,
   approver_id, submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version
@@ -130,7 +130,7 @@ INSERT INTO public.templates_v2_template_version (
   0
 ) ON CONFLICT (id) DO NOTHING;
 
-UPDATE public.templates_v2_template
+UPDATE public.templates_template
 SET
   system_owned = true,
   latest_version = 1,

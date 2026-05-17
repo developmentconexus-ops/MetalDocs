@@ -10,7 +10,7 @@ func TestMemoryEmitter(t *testing.T) {
 	em := &MemoryEmitter{}
 	ev := GovernanceEvent{
 		TenantID: "t1", EventType: "doc_submitted",
-		ActorUserID: "u1", ResourceType: "document_v2",
+		ActorUserID: "u1", ResourceType: "document",
 		ResourceID: "doc-1", Reason: "approval submit",
 		PayloadJSON: json.RawMessage(`{"stage":1}`),
 	}

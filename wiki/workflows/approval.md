@@ -1,6 +1,6 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-15
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
@@ -12,7 +12,7 @@
 
 ## Quick summary
 
-1. Author clicks **Finalizar** in the editor → `POST /api/v2/documents/{id}/finalize` fires.
+1. Author clicks **Finalizar** in the editor → `POST /api/v1/documents/{id}/finalize` fires.
 2. Handler resolves the active approval route for the document's profile, then calls `SubmitRevisionForReview` in a single transaction: document status moves `draft → under_review` **and** an `approval_instance` + `approval_stage_instances` rows are created atomically.
 3. Each approver opens **Caixa de Entrada de Aprovação** and signs off (with password confirm).
 4. ISO segregation blocks the submitter from approving their own version.
@@ -22,7 +22,7 @@ See [workflows/user-onboarding.md](user-onboarding.md) for the full step-by-step
 
 ## Finalize → submit atomicity (fixed 2026-05-02)
 
-Previously `POST /api/v2/documents/{id}/finalize` only updated the document status to `under_review`. No approval instance was created, so the inbox was always empty after finalize.
+Previously `POST /api/v1/documents/{id}/finalize` only updated the document status to `under_review`. No approval instance was created, so the inbox was always empty after finalize.
 
 Now `finalizeDocument` at `handler.go:316`:
 
