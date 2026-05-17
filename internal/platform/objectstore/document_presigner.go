@@ -127,6 +127,20 @@ func (p *DocumentPresigner) HashObject(ctx context.Context, key string) (string,
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+func (p *DocumentPresigner) Exists(ctx context.Context, key string) (bool, error) {
+	if p.client == nil {
+		return false, errors.New("document presigner minio client is nil")
+	}
+	_, err := p.client.StatObject(ctx, p.bucket, key, minio.StatObjectOptions{})
+	if err == nil {
+		return true, nil
+	}
+	if isNoSuchKeyErr(err) {
+		return false, nil
+	}
+	return false, err
+}
+
 func isNoSuchKeyErr(err error) bool {
 	if err == nil {
 		return false
