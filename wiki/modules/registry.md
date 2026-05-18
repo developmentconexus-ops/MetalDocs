@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-15 (Novo Documento atomic create runtime repair) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-05-18 (controlled-document visibility consumed by editor sidebar) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/registry/module.go:25` â€” module wiring (`New`, dependencies)
@@ -460,6 +460,7 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-05-18 - Frontend contract sync: the controlled-document detail contract remains the source of truth for `visibility`, and the editor sidebar now consumes that runtime field directly through generated frontend types instead of a registry-local handwritten omission.
 - 2026-05-15 - Database foundation sync: removed startup migration alias references (`RunStartupMigrations`), confirmed legacy maintenance is explicit recovery-only, and aligned startup notes with the current DB bootstrap workflow.
 - 2026-05-15 - Runtime repair: atomic create now primes `metaldocs.tenant_id`/`metaldocs.actor_id` and asserts `registry.create` inside the caller-owned transaction before sequence/CD writes, restoring Plan 5 tripwire pairing for `/api/v1/controlled-documents`.
 

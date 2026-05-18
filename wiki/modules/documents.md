@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-18 (approval comments + editor error-state sync + typed document detail contract) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-18 (governed sidebar runtime + contract sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -197,7 +197,8 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | GET | `/api/v1/documents/stats` | â€” | `Handler.documentStats` (`handler.go:174`) | role |
 | GET | `/api/v1/documents/{id}` | `getDocument` | `Handler.getDocument` (`handler.go:114`) | role + ownership |
 | PATCH | `/api/v1/documents/{id}` | â€” | `Handler.renameDocument` (`handler.go:285`) | role + ownership; **dup registration at `:86`+`:115`** (T-004) |
-| POST | `/api/v1/documents/{id}/finalize` | â€” (path at `openapi.yaml:3251`) | `Handler.finalizeDocument` (`handler.go:316`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
+| POST | `/api/v1/documents/{id}/finalize` | `finalizeDocument` | `Handler.finalizeDocument` (`handler.go:403`) | role + ownership + tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` |
+| GET | `/api/v1/documents/{id}/revision-history` | `getDocumentRevisionHistory` | `Handler.listRevisionHistory` (`handler.go:694`) | role + ownership |
 | POST | `/api/v1/documents/{id}/archive` | â€” | `Handler.archiveDocument` | role |
 | POST | `/api/v1/documents/{id}/duplicate` | â€” | `Handler.duplicateDocument` | role |
 | GET/POST/PATCH/DELETE | `/api/v1/documents/{id}/comments[/{commentId}]` | â€” | comments CRUD | role + ownership |
@@ -213,7 +214,7 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | POST | `/api/v1/documents/{id}/schedule-publish` | â€” | `ApprovalHandler` | tier-2 |
 | POST | `/api/v1/documents/{id}/supersede` | â€” | `ApprovalHandler` | tier-2 |
 | POST | `/api/v1/documents/{id}/obsolete` | â€” | `ApprovalHandler` | tier-2 |
-| GET | `/api/v1/documents/{id}/approval-instance` | â€” | `ApprovalHandler` | role |
+| GET | `/api/v1/documents/{id}/approval-instance` | `getApprovalInstanceByDocument` | `ApprovalHandler` | role |
 | various | `/api/v1/approval-routes/*` | â€” | `ApprovalHandler` admin | role: admin |
 
 Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 and `wiki/backlog/contract-first-followups.md`.
@@ -482,8 +483,9 @@ Top 3 (by severity, then blast radius):
 
 | Term | Definition |
 |---|---|
-| Document | Instance row in `documents` table, filled from a template version, bound to a controlled-document code |
-| Revision | Snapshot of document body in `document_revisions`; monotonic per document |
+| Document | Governed revision row in `documents`, filled from a template version, bound to a controlled-document code |
+| Governed revision | Business revision lineage stored in `documents`, grouped by `controlled_document_id`, with `revision_number` and frozen `revision_title` captured at finalize |
+| Technical revision | Autosave / artifact lineage in `document_revisions`; never the source of governed sidebar history |
 | Checkpoint | Editor autosave point in `document_checkpoints` |
 | Snapshot (placeholder schema) | Pinned placeholder catalog stored in `placeholder_schema_snapshot`; required for `under_review` |
 | Approval instance | Row in `approval_instances`; one active per document via `ux_approval_instances_active` |
@@ -514,6 +516,8 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-18 - Governed sidebar sync: `documents.revision_title` is now part of the runtime model and required on `POST /api/v1/documents/{id}/finalize`; the editor sidebar reads governed history from `GET /api/v1/documents/{id}/revision-history`, and that history is sourced from `documents` lineage by `controlled_document_id`, not from technical `document_revisions`.
+- 2026-05-18 - Approval/registry sidebar boundary sync: the editor consumes `GET /api/v1/documents/{id}/approval-instance` only for `under_review`, and visibility is resolved from the registry-controlled document contract instead of a documents-local duplicate field.
 - 2026-05-18 - Approval/review comments hardening sync: final approval now stops server-side with `approval.unresolved_comments` when active document comments remain unresolved; the signoff dialog maps that conflict inline and the editor keeps comment-load failures visible with a persistent retry banner instead of toast-only feedback.
 - 2026-05-18 - Comments contract sync: `/api/v1/documents/{id}/comments*` now has named OpenAPI request/response schemas, generated backend/frontend types, and the editor comments wrapper consumes those generated types instead of handwritten payload rows.
 - 2026-05-17 - Review comments lifecycle audit sync: recorded backend/API prerequisite that unresolved active comments must block approval/release server-side before frontend can claim enforcement.
