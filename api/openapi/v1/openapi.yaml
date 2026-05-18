@@ -3508,7 +3508,14 @@ paths:
       tags: [documents]
       operationId: getDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok }, '404': { description: not_found } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentDetailResponse'
+        '404': { description: not_found }
     patch:
       tags: [documents]
       operationId: renameDocument
@@ -4426,6 +4433,57 @@ components:
         FormDataJSON:
           type: string
           format: byte
+        CurrentRevisionID:
+          type: string
+        RevisionVersion:
+          type: integer
+          format: int64
+        ActiveSessionID:
+          type: string
+        ValuesFrozenAt:
+          type: string
+          format: date-time
+          nullable: true
+        ArchivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+        CreatedBy:
+          type: string
+        ControlledDocumentID:
+          type: string
+          nullable: true
+        ProfileCodeSnapshot:
+          type: string
+          nullable: true
+        ProcessAreaCodeSnapshot:
+          type: string
+          nullable: true
+        Code:
+          type: string
+    DocumentDetailResponse:
+      type: object
+      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, Code]
+      properties:
+        ID:
+          type: string
+        TenantID:
+          type: string
+        TemplateVersionID:
+          type: string
+        Name:
+          type: string
+        Status:
+          type: string
+        FormDataJSON:
+          type: object
+          additionalProperties: true
         CurrentRevisionID:
           type: string
         RevisionVersion:

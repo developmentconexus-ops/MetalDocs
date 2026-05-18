@@ -3,6 +3,7 @@
 // the client.
 
 import { apiFetch } from '../../../lib/api';
+import type { components } from '../../../lib/api-types';
 
 export type DocumentRow = {
   id: string;
@@ -21,30 +22,13 @@ export type PresignResult = { upload_url: string; pending_upload_id: string; exp
 export type CommitResult = { revision_id: string; revision_num: number; idempotent_replay?: boolean };
 export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; VersionNum: number; Label: string; CreatedAt: string; CreatedBy: string };
 export type FinalizeDocumentResult = { instanceId: string };
-export type DocumentResponse = {
-  ID?: string;
-  id?: string;
-  Code?: string;
-  code?: string;
-  Status?: string;
-  status?: string;
-  Name?: string;
-  name?: string;
-  CreatedBy?: string;
-  created_by?: string;
-  CurrentRevisionID?: string;
-  current_revision_id?: string;
-  RevisionVersion?: number;
-  revision_version?: number;
-  FormDataJSON?: unknown;
-  form_data?: unknown;
-};
+export type DocumentDetail = components['schemas']['DocumentDetailResponse'];
 
 export async function listDocuments(): Promise<DocumentRow[]> {
   return apiFetch('/api/v1/documents');
 }
-export async function getDocument(id: string): Promise<DocumentResponse> {
-  return apiFetch(`/api/v1/documents/${id}`);
+export async function getDocument(id: string): Promise<DocumentDetail> {
+  return apiFetch<DocumentDetail>(`/api/v1/documents/${id}`);
 }
 export async function renameDocument(id: string, name: string): Promise<void> {
   await apiFetch<void>(`/api/v1/documents/${id}`, {

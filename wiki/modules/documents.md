@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-18 (approval comments + editor error-state sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-18 (approval comments + editor error-state sync + typed document detail contract) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -224,7 +224,7 @@ Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 an
 |---|---|---|---|---|---|---|---|---|
 | GET | `/api/v1/documents` | `internal/modules/documents/delivery/http/handler.go:83` | `h.listDocuments` | `/api/v1/documents` | `listDocuments` | `ListDocuments` | Aligned | Also re-registered at `handler.go:112` |
 | GET | `/api/v1/documents/stats` | `internal/modules/documents/delivery/http/handler.go:84` | `h.documentStats` | `/api/v1/documents/stats` | `documentStats` | `DocumentStats` | Aligned | Also re-registered at `handler.go:113` |
-| GET | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:86` | `h.getDocument` | `/api/v1/documents/{id}` | â€” | `GetApiV2DocumentsId` | Aligned | Also re-registered at `handler.go:115` |
+| GET | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:86` | `h.getDocument` | `/api/v1/documents/{id}` | `getDocument` | `GetDocument` | Aligned | 200 response is now schema-backed by `DocumentDetailResponse`, including embedded JSON `FormDataJSON` |
 | PATCH | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:87` | `h.renameDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:116` |
 | POST | `/api/v1/documents/{id}/finalize` | `internal/modules/documents/delivery/http/handler.go:88` | `h.finalizeDocument` | `/api/v1/documents/{id}/finalize` | â€” | `PostApiV2DocumentsIdFinalize` | Aligned | Also re-registered at `handler.go:117` |
 | POST | `/api/v1/documents/{id}/archive` | `internal/modules/documents/delivery/http/handler.go:89` | `h.archiveDocument` | `/api/v1/documents/{id}/archive` | â€” | `PostApiV2DocumentsIdArchive` | Aligned | Also re-registered at `handler.go:118` |

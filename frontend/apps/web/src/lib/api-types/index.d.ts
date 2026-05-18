@@ -5754,6 +5754,33 @@ export interface components {
             ProcessAreaCodeSnapshot?: string | null;
             Code: string;
         };
+        DocumentDetailResponse: {
+            ID: string;
+            TenantID: string;
+            TemplateVersionID: string;
+            Name: string;
+            Status: string;
+            FormDataJSON: {
+                [key: string]: unknown;
+            };
+            CurrentRevisionID: string;
+            /** Format: int64 */
+            RevisionVersion: number;
+            ActiveSessionID: string;
+            /** Format: date-time */
+            ValuesFrozenAt?: string | null;
+            /** Format: date-time */
+            ArchivedAt?: string | null;
+            /** Format: date-time */
+            CreatedAt: string;
+            /** Format: date-time */
+            UpdatedAt: string;
+            CreatedBy: string;
+            ControlledDocumentID?: string | null;
+            ProfileCodeSnapshot?: string | null;
+            ProcessAreaCodeSnapshot?: string | null;
+            Code: string;
+        };
         DocumentStatsResponse: {
             byStatus: {
                 [key: string]: number;
@@ -8649,7 +8676,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentDetailResponse"];
+                };
             };
             /** @description not_found */
             404: {

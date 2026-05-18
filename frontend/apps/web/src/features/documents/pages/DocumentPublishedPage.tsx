@@ -85,16 +85,16 @@ export function DocumentPublishedPage() {
   const approval = approvalQuery.data ?? null;
 
   // Normalize response casing (API returns both PascalCase and snake_case)
-  const code            = doc.code    ?? doc.Code           ?? '—';
-  const docName         = doc.name    ?? doc.Name;
-  const status          = doc.status  ?? doc.Status         ?? '';
-  const createdByRaw    = doc.created_by ?? doc.CreatedBy   ?? '—';
+  const code            = doc.Code ?? '—';
+  const docName         = doc.Name;
+  const status          = doc.Status ?? '';
+  const createdByRaw    = doc.CreatedBy ?? '—';
   // TODO(backlog): API should return created_by_display_name snapshot — wiki/backlog/documento-publicado.md
   // Fallback: created_by stores user_id; if creator is the current user, use displayName
   const createdBy = (user?.userId && createdByRaw === user.userId)
     ? (user.displayName ?? createdByRaw)
     : createdByRaw;
-  const revisionVersion = doc.revision_version ?? doc.RevisionVersion;
+  const revisionVersion = doc.RevisionVersion;
   const versionLabel    = revisionVersion != null ? `v${revisionVersion}` : '—';
 
   // Published date: use approval instance updated_at (= when approval completed)
