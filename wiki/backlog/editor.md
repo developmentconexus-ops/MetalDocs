@@ -220,3 +220,55 @@ Evidence used:
 - `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
 - `cd frontend/apps/web; pnpm.cmd vitest run src/features/documents/pages/DocumentEditorPage.test.tsx src/features/documents/hooks/editor/__tests__/useDocumentComments.load.test.tsx src/features/approval/components/SignoffDialog.test.tsx`
 - Finalize prerequisite repair verified on 2026-05-18: `api/openapi/v1/openapi.yaml`, generated frontend types, `frontend/apps/web/src/features/documents/api/documents.ts`, and `internal/modules/documents/delivery/http/handler.go` now agree on required `Idempotency-Key` and `201 { instanceId }`
+
+## Integration Audit (2026-05-18 Sidebar)
+
+Scope: right `EditorMetaSidebar` on `/documents/:documentID/edit`, with emphasis on replacing mock rows using real `documents`, `registry`, `taxonomy`, and `approval` truth without leaking draft-incorrect workflow semantics into the editor.
+
+Evidence used:
+
+- Current sidebar implementation: `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx`
+- Editor screen wiring: `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`
+- Documents detail contract/runtime: `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/lib/api-types/index.d.ts` (`DocumentDetailResponse`), `wiki/modules/documents.md`
+- Taxonomy lookup surfaces: `frontend/apps/web/src/features/taxonomy/api/taxonomy.ts`, `frontend/apps/web/src/features/taxonomy/queries/useProfilesQuery.ts`, `frontend/apps/web/src/features/documents/queries/useAreasQuery.ts`
+- Registry/controlled-document truth: `frontend/apps/web/src/features/registry/api/controlledDocuments.ts`, `frontend/apps/web/src/features/registry/types.ts`, `frontend/apps/web/src/lib/api-types/index.d.ts` (`ControlledDocumentVisibility`, controlled-document schema), `wiki/modules/registry.md`
+- Approval-instance runtime + contract truth: `internal/modules/documents/approval/http/doc_approval_handler.go`, `internal/modules/documents/approval/http/get_instance_handler.go`, `internal/modules/documents/approval/http/contracts/instance_read.go`, `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/lib/api-types/index.d.ts`
+
+| Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
+|---|---|---|---|---|---|
+| Sidebar shell (collapse toggle, persisted open state, right-rail container) | `EditorMetaSidebar`, `DocumentEditorPage` | Pure screen-local UI; no backend dependency | Already wired with `editor-sidebar-open` localStorage and toggle button | implemented and aligned | Keep |
+| Section heading `Metadados` | design + component | Static shell label only | Already rendered correctly | implemented and aligned | Keep |
+| `Código` row | `DocumentDetailResponse.Code` | `GET /api/v1/documents/{id}` already returns `Code` | Sidebar already receives `code` prop from `DocumentEditorPage` | implemented and aligned | Keep |
+| `Perfil` display | `DocumentDetailResponse.ProfileCodeSnapshot` + taxonomy profiles list | Runtime already returns the profile code snapshot; taxonomy API can resolve code -> human name | Sidebar is still mock-only | screen-local integration fix | Resolve `ProfileCodeSnapshot` through `useProfilesQuery()` and render the real name with code fallback; do not invent a backend extension first |
+| `Área` display | `DocumentDetailResponse.ProcessAreaCodeSnapshot` + taxonomy areas list | Runtime already returns the process-area code snapshot; taxonomy API can resolve code -> human name | Sidebar is still mock-only | screen-local integration fix | Resolve `ProcessAreaCodeSnapshot` through `useAreasQuery()` and render the real name with code fallback |
+| `Visibilidade` row | `DocumentDetailResponse.ControlledDocumentID` + `GET /api/v1/controlled-documents/{id}` | Registry contract already has `visibility`; controlled-document identity is already present on document detail | Registry frontend wrapper is legacy-manual and omits `visibility` from `ControlledDocument`; sidebar is mock-only | implemented but legacy-wired | Normalize registry wrapper/types to generated contract, then show real visibility from the controlled document instead of adding a new documents field |
+| `Vigência atual` row in draft editor | design + documents/registry module semantics | Controlled Document owns identity; document revisions own approval/publish lifecycle. For a draft editor, the draft under edit is not necessarily the currently effective published version. Current editor/detail contracts do not expose a truthful "effective version + effective date" pair for this row | Mock row incorrectly suggests the draft itself is already the current effective version | defer | Remove or hide this row in draft-focused first implementation; only reintroduce after product semantics for "current effective version from inside draft editor" are explicitly defined |
+| `Próx. revisão` row | profile governance + effective-version semantics | Taxonomy profile exposes `reviewIntervalDays`, but computing the next review date also needs the effective approval/publish anchor for the currently valid revision. That anchor is not available on the editor detail contract | Mock row invents a due date | missing backend capability | Do not derive from draft timestamps. Add only after a truthful effective-date field/source exists |
+| `Revisões` timeline | sidebar design + module wiki | No runtime list endpoint currently exposes revision lineage for this editor sidebar. `signedRevisionURL` exists for a specific revision file, but not the historical list needed for `TimelineRail` | Sidebar uses hardcoded revisions | missing backend capability | Keep deferred until a real revisions-list route or equivalent runtime surface exists |
+| `Próximos aprovadores` section semantics | approval lifecycle + user requirement | Active approval instance only exists while a document is in review. Draft documents should not show approvers as if a route were already active | Current mock section shows approvers even in draft | screen-local integration fix | Render this section only when the document is `under_review` and an active approval instance exists; hide it in `draft`, `rejected`, `approved`, `published`, `obsolete`, etc. |
+| `Próximos aprovadores` data source | `GET /api/v1/documents/{id}/approval-instance` runtime | Runtime endpoint exists and returns stage/signoff data with human display-name fallback in the handler mapper | Frontend wrapper is manual, the generated contract has no typed 200 body, and the handwritten status unions are wrong for runtime values (`in_progress`, `active`, `passed`, `failed`, `cancelled`) | shared contract prerequisite | Repair the approval-instance OpenAPI response schema and generated frontend types before using this endpoint as a professional sidebar contract |
+| Approver badges (`próximo` / `aguarda`) | design + approval runtime | Once the approval-instance contract is fixed, the first active stage is enough to derive "próximo" vs later pending stages "aguarda" | Current mock badges are not connected to real stage status | screen-local integration fix | After contract repair, map active stage -> `próximo`, later pending stages -> `aguarda`, and ignore completed/rejected stages for this sidebar slice |
+
+### Ready for implementation
+
+- Sidebar shell stays as-is.
+- Real profile and area labels can be wired now from document snapshot codes + taxonomy queries.
+- Real visibility can be wired from the controlled document after local registry wrapper/type cleanup.
+- Draft-incorrect workflow sections should be hidden instead of mocked.
+
+### Prerequisites
+
+- Approval-instance contract repair: runtime already responds, but OpenAPI/generated frontend types do not yet model the payload, and the current handwritten wrapper has status drift.
+
+### Deferred
+
+- `Vigência atual` until product semantics distinguish "draft being edited" from "currently effective published revision" inside this screen.
+- `Próx. revisão` until an effective-date source exists.
+- `Revisões` timeline until a real revisions-list capability exists.
+
+### Verification needed next
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module documents`
+- `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
+- `cd frontend/apps/web; pnpm.cmd vitest run src/features/documents/pages/DocumentEditorPage.test.tsx`
+- Before wiring approvers: repair and re-verify the `GET /api/v1/documents/{id}/approval-instance` contract/codegen/wrapper boundary

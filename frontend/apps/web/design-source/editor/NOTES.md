@@ -37,3 +37,14 @@ Current editor boundary:
 - finalize route contract prerequisite closed on 2026-05-18: frontend wrapper now sends `Idempotency-Key`, and OpenAPI/generated types match the runtime `201 { instanceId }` response
 - editor no longer polls PDF readiness; PDF download/readiness belongs to published/view flows, not `/documents/:documentID/edit`
 - keep sidebar and template-comment items deferred until backend capability exists
+
+## Sidebar Audit Status (2026-05-18)
+
+The right sidebar is no longer "all-or-nothing deferred". The current integration boundary is:
+
+- keep the sidebar shell, collapse behavior, and `Código` row
+- wire `Perfil` and `Área` from `DocumentDetailResponse` snapshot codes plus taxonomy queries
+- wire `Visibilidade` from the controlled-document record, but first remove the legacy-manual registry wrapper drift so frontend uses the real contract
+- do not show `Próximos aprovadores` in `draft`; that section only makes sense when an active approval instance exists
+- treat approval-instance wiring as a contract prerequisite before using it in the sidebar, because the runtime exists but the current OpenAPI/generated frontend surface does not yet type the response body correctly
+- keep `Vigência atual`, `Próx. revisão`, and `Revisões` deferred until truthful product/runtime semantics exist for the editor route
