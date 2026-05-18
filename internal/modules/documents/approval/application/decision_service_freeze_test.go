@@ -57,6 +57,7 @@ type freezeDecisionConn struct {
 	areaCode      string
 	actorID       string
 	tenantID      string
+	unresolvedComments int
 
 	documentStatus string
 	pendingStatus  *string
@@ -106,6 +107,9 @@ func (s *freezeDecisionStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "from documents") {
 		return &freezeDecisionSingleValueRows{value: s.conn.areaCode}, nil
+	}
+	if strings.Contains(q, "from document_comments") {
+		return &freezeDecisionSingleValueRows{value: s.conn.unresolvedComments}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &freezeDecisionSingleValueRows{value: false}, nil
@@ -455,5 +459,70 @@ func TestRecordSignoff_WasReplay_DoesNotCallFreeze(t *testing.T) {
 	}
 	if freeze.calls != 0 {
 		t.Fatalf("Freeze must not run on replay, got %d call(s)", freeze.calls)
+	}
+}
+
+func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
+	const (
+		instanceID = "inst-freeze-comments"
+		stageID    = "stage-freeze-comments"
+		actorID    = "approver-1"
+		authorID   = "author-1"
+	)
+	signedAt := time.Date(2026, 4, 23, 12, 40, 0, 0, time.UTC)
+	repo := &fakeDecisionRepo{
+		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
+		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-comments", WasReplay: false},
+	}
+	freeze := &fakeFreezeInvoker{}
+	conn := &freezeDecisionConn{
+		actorID: actorID,
+		unresolvedComments: 1,
+		stageSignoffs: []signoffRow{{
+			id:                 "sig-comments",
+			approvalInstanceID: instanceID,
+			stageInstanceID:    stageID,
+			actorUserID:        actorID,
+			actorTenantID:      "tenant-1",
+			decision:           "approve",
+			signedAt:           signedAt,
+			signatureMethod:    "password",
+			signaturePayload:   []byte(`{}`),
+			contentHash:        validContentHash,
+		}},
+	}
+	db := newFreezeDecisionTestDB(t, conn)
+	svc := &DecisionService{
+		repo:          repo,
+		emitter:       &MemoryEmitter{},
+		clock:         fixedClock{t: signedAt},
+		freezeInvoker: freeze,
+		pdfDispatcher: &fakePDFDispatchInvoker{},
+	}
+
+	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "abc"},
+		ContentFormData:  map[string]any{"title": "Doc"},
+	})
+	if !errors.Is(err, ErrApprovalBlockedByUnresolvedComments) {
+		t.Fatalf("expected ErrApprovalBlockedByUnresolvedComments, got %v", err)
+	}
+	if conn.committed {
+		t.Fatal("transaction should not commit when unresolved comments block approval")
+	}
+	if !conn.rolledBack {
+		t.Fatal("transaction should roll back when unresolved comments block approval")
+	}
+	if conn.documentStatus != "under_review" {
+		t.Fatalf("document status should stay under_review, got %q", conn.documentStatus)
+	}
+	if freeze.calls != 0 {
+		t.Fatalf("freeze must not run when unresolved comments block approval, got %d calls", freeze.calls)
 	}
 }

@@ -17,6 +17,8 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+var ErrApprovalBlockedByUnresolvedComments = errors.New("approval: unresolved comments block approval")
+
 type FreezeInvoker interface {
 	Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
 }
@@ -272,6 +274,16 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		}
 
 		if instance.Status == domain.InstanceApproved {
+			blocked, err := hasUnresolvedComments(ctx, tx, req.TenantID, instance.DocumentID)
+			if err != nil {
+				_ = tx.Rollback()
+				return SignoffResult{}, fmt.Errorf("recordSignoff: check unresolved comments: %w", err)
+			}
+			if blocked {
+				_ = tx.Rollback()
+				return SignoffResult{}, ErrApprovalBlockedByUnresolvedComments
+			}
+
 			// All stages done — complete instance.
 			if err := s.repo.UpdateInstanceStatus(ctx, tx, req.TenantID, req.InstanceID,
 				domain.InstanceApproved, domain.InstanceInProgress, &now); err != nil {
@@ -514,4 +526,20 @@ func marshalSignaturePayload(payload map[string]any) (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.RawMessage(b), nil
+}
+
+func hasUnresolvedComments(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (bool, error) {
+	var unresolvedCount int
+	err := tx.QueryRowContext(ctx, `
+		SELECT COUNT(*)
+		  FROM document_comments
+		 WHERE tenant_id = $1
+		   AND document_id = $2
+		   AND resolved_at IS NULL`,
+		tenantID, documentID,
+	).Scan(&unresolvedCount)
+	if err != nil {
+		return false, err
+	}
+	return unresolvedCount > 0, nil
 }

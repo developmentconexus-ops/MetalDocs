@@ -87,6 +87,7 @@ type decisionTestConn struct {
 	areaCode      string
 	actorID       string
 	tenantID      string
+	unresolvedComments int
 	execQueries   []string // SQL passed to Exec calls, for assertion
 }
 
@@ -162,6 +163,9 @@ func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: s.conn.areaCode}, nil
+	}
+	if strings.Contains(q, "from document_comments") {
+		return &decisionSingleValueRows{value: s.conn.unresolvedComments}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &decisionSingleValueRows{value: false}, nil // non-admin
@@ -688,5 +692,79 @@ func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on denied capability; got %d", len(emitter.Events))
+	}
+}
+
+func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
+	const (
+		instanceID = "inst-comments-1"
+		stageID    = "stage-comments-1"
+		actorID    = "approver-comments-1"
+		authorID   = "author-comments-1"
+	)
+
+	inst := buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID})
+	signedAt := time.Date(2026, 4, 22, 16, 0, 0, 0, time.UTC)
+	stageSignoffs := []signoffRow{
+		{
+			id:                 "signoff-comments-1",
+			approvalInstanceID: instanceID,
+			stageInstanceID:    stageID,
+			actorUserID:        actorID,
+			actorTenantID:      "tenant-1",
+			decision:           "approve",
+			signedAt:           signedAt,
+			signatureMethod:    "password",
+			signaturePayload:   []byte(`{}`),
+			contentHash:        validContentHash,
+		},
+	}
+
+	conn := &decisionTestConn{
+		stageSignoffs:      stageSignoffs,
+		authzGranted:       true,
+		areaCode:           "QA",
+		actorID:            actorID,
+		unresolvedComments: 2,
+	}
+	repo := &fakeDecisionRepo{
+		instance:         inst,
+		insertSignoffRes: repository.SignoffInsertResult{ID: "signoff-comments-1", WasReplay: false},
+	}
+	emitter := &MemoryEmitter{}
+	freeze := &fakeFreezeInvoker{}
+	svc := &DecisionService{
+		repo:          repo,
+		emitter:       emitter,
+		clock:         fixedClock{t: signedAt},
+		freezeInvoker: freeze,
+		pdfDispatcher: &fakePDFDispatchInvoker{},
+	}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "abc"},
+		ContentFormData:  map[string]any{"title": "Doc"},
+	})
+	if err == nil {
+		t.Fatal("expected unresolved comments error")
+	}
+	if !errors.Is(err, ErrApprovalBlockedByUnresolvedComments) {
+		t.Fatalf("expected ErrApprovalBlockedByUnresolvedComments, got %v", err)
+	}
+	if freeze.calls != 0 {
+		t.Fatalf("freeze must not run when unresolved comments block approval, got %d calls", freeze.calls)
+	}
+	if repo.instanceStatusTo != "" {
+		t.Fatalf("instance status should not advance when blocked, got %q", repo.instanceStatusTo)
+	}
+	if len(emitter.Events) != 0 {
+		t.Fatalf("no governance event should be emitted when approval is blocked, got %d", len(emitter.Events))
 	}
 }

@@ -91,6 +91,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.As(err, &capabilityDenied):
 			statusCode = http.StatusForbidden
 			code = "authz.capability_denied"
+		case errors.Is(err, application.ErrApprovalBlockedByUnresolvedComments):
+			statusCode = http.StatusConflict
+			code = "approval.unresolved_comments"
 		case errors.Is(err, application.ErrReasonRequired):
 			statusCode = http.StatusBadRequest
 			code = "validation.reason_required"

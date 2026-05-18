@@ -5,6 +5,7 @@
   "authz.capability_denied": "Você não tem permissão para executar esta ação.",
   "sod.submitter_cannot_sign": "Você submeteu este documento e não pode aprová-lo. Outro usuário precisa assinar.",
   "sod.cross_stage_duplicate": "Este usuário já assinou em outra etapa e não pode assinar novamente.",
+  "approval.unresolved_comments": "Resolva os comentários pendentes antes de aprovar ou liberar este documento.",
   "conflict.stale_revision": "O documento foi alterado por outro usuário. Atualize e tente novamente.",
   "conflict.duplicate_submission": "Esta submissão já foi registrada.",
   "signoff.duplicate": "Esta aprovação já foi registrada.",
