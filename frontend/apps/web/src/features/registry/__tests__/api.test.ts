@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchControlledDocuments, fetchActiveDocumentInstance } from '../api/controlledDocuments';
+import { fetchControlledDocuments, fetchActiveDocumentInstance, fetchControlledDocument } from '../api/controlledDocuments';
 import { ApiError } from '../../../lib/api';
 
 describe('registry/api with apiFetch', () => {
@@ -27,5 +27,26 @@ describe('registry/api with apiFetch', () => {
       Promise.resolve(new Response(JSON.stringify({ error: { code: 'authz.capability_denied' } }), { status: 403 })),
     );
     await expect(fetchActiveDocumentInstance('cd-1')).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it('reads controlled document detail including visibility', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({
+        id: 'cd-1',
+        tenantId: 'tenant-1',
+        profileCode: 'POP',
+        processAreaCode: 'RH',
+        code: 'POP-RH-001',
+        title: 'Procedimento RH',
+        ownerUserId: 'user-1',
+        status: 'active',
+        visibility: { scope: 'restricted', areaCodes: ['RH'], userIds: [] },
+        createdAt: '2026-05-18T12:00:00Z',
+        updatedAt: '2026-05-18T12:00:00Z',
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+
+    const result = await fetchControlledDocument('cd-1');
+    expect(result.visibility.scope).toBe('restricted');
   });
 });

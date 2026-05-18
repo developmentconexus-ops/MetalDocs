@@ -1,5 +1,5 @@
 import { apiFetch, ApiError } from "../../../lib/api";
-import type { components, operations } from "../../../lib/api-types";
+import type { components } from "../../../lib/api-types";
 import type { ControlledDocument } from "../types";
 
 const BASE = "/api/v1/controlled-documents";
