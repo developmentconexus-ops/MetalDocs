@@ -82,21 +82,6 @@ vi.mock('./ExportMenuButton', () => ({
   ExportMenuButton: () => null,
 }));
 
-// Default mock — polls return pending. Individual tests override via mockReturnValue.
-vi.mock('../hooks/editor/useDocumentPdfStatus', () => ({
-  useDocumentPdfStatus: vi.fn(() => ({
-    status: 'pending' as string,
-    url: undefined as string | undefined,
-    retry: vi.fn(),
-  })),
-}));
-
-vi.mock('./PDFCell', () => ({
-  PDFCell: ({ status, url }: { status: string; url?: string }) => {
-    if (status === 'ready' && url) return <a href={url} download>Baixar PDF</a>;
-    return <span>{status}</span>;
-  },
-}));
 
 vi.mock('../api/documents', () => ({
   getDocument: vi.fn(),
@@ -108,7 +93,6 @@ vi.mock('../api/documents', () => ({
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 import * as api from '../api/documents';
-import * as pdfHook from '../hooks/editor/useDocumentPdfStatus';
 import { toast } from 'sonner';
 
 function renderPage(ui: React.ReactElement) {
@@ -259,22 +243,6 @@ describe('DocumentEditorPage E9 rename rollback', () => {
 
     expect(vi.mocked(api.renameDocument)).toHaveBeenCalledWith('d1', 'NewName');
     expect(toastSpy).toHaveBeenCalled();
-  });
-});
-
-describe('DocumentEditorPage E11 PDF polling', () => {
-  it('keeps readonly editor mode for published documents while pdf status hook reports ready', async () => {
-    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('published') as never);
-    vi.mocked(pdfHook.useDocumentPdfStatus).mockReturnValue({
-      status: 'ready',
-      url: 'https://s3/p.pdf',
-      retry: vi.fn(),
-    });
-
-    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
-    await waitFor(() =>
-      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
-    );
   });
 });
 

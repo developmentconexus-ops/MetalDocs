@@ -179,7 +179,7 @@ Scope: editor screen re-audit after autosave/runtime fixes and approval unresolv
 Evidence used:
 
 - Screen route/page: `frontend/apps/web/src/features/documents/pages/DocumentEditorRoutePage.tsx`, `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`
-- Editor hooks/wrappers: `useDocumentAutosave.ts`, `useDocumentComments.ts`, `useDocumentSession.ts`, `useDocumentPdfStatus.ts`, `api/documents.ts`, `queries/useDocumentCommentsQuery.ts`
+- Editor hooks/wrappers: `useDocumentAutosave.ts`, `useDocumentComments.ts`, `useDocumentSession.ts`, `api/documents.ts`, `queries/useDocumentCommentsQuery.ts`
 - Query key ownership: `frontend/apps/web/src/lib/queryKeys.ts`
 - Runtime/handler truth: `internal/modules/documents/delivery/http/handler.go`, `internal/modules/documents/application/service.go`, `internal/modules/documents/repository/repository.go`, `internal/modules/documents/approval/application/decision_service.go`
 - Contract truth: `api/openapi/v1/openapi.yaml`
@@ -195,7 +195,7 @@ Evidence used:
 | Comments list + CRUD | comments OpenAPI/runtime/generated surface + comments query hook | Runtime handler, OpenAPI, generated backend surface, generated frontend types, and query wrapper now agree on named comments schemas for list/create/update | Screen uses TanStack Query + `QK.documents.comments(id)` backed by generated comments types; the only remaining adaptation is the explicit editor-package content bridge between Eigenpal `Comment['content']` and open JSON payloads | implemented and aligned | Keep |
 | Comment load failure visibility | `useDocumentComments` + `DocumentEditorPage` | Query failure is a real runtime possibility with persisted review-state implications | Screen now keeps the failure visible with inline retry instead of toast-only UX | implemented and aligned | Keep |
 | Approval blocked by unresolved comments | approval decision service + shared error mapping | Final approval now fails server-side with `approval.unresolved_comments` while active comments remain unresolved | Screen-side UX aligns: editor shows persistent comment-load failure, approval dialog maps the business conflict inline | implemented and aligned | Keep server-owned rule |
-| Non-draft PDF polling state | `/api/v1/documents/{id}/view` + `useDocumentPdfStatus` | Runtime view endpoint exists and the hook polls it | `DocumentEditorPage` starts the polling hook for non-draft documents, but the returned `pdf` state is not rendered anywhere and `PDFCell` is unused | screen-local integration fix | Remove background polling until the screen has a real visible PDF status consumer, or wire the visible consumer now |
+| Non-draft PDF polling state | editor screen boundary vs published/view boundary | PDF availability belongs to published/view flows, not the editor | Unused editor-side polling was removed; the editor no longer owns background PDF readiness checks | implemented and aligned | Keep PDF status/download concerns out of `/documents/:documentID/edit`; wire them only on the published/view screen |
 | Sidebar metadata rows | existing backlog item 1 | Runtime still lacks one complete response shape for profile/area/review-date/visibility rows | Sidebar remains mock-backed | missing backend capability | Keep deferred exactly as backlog row 1 |
 | Sidebar revisions timeline | existing backlog item 2 | No editor-side revisions list endpoint is wired | Sidebar remains mock timeline | missing backend capability | Keep deferred exactly as backlog row 2 |
 | Sidebar next approvers | existing backlog item 3 | No editor-side payload is wired for signoff sequence in this screen | Sidebar remains mock approvers list | missing backend capability | Keep deferred exactly as backlog row 3 |
@@ -205,8 +205,6 @@ Evidence used:
 ### Ready for implementation
 
 - Comments wrapper normalization to generated frontend types.
-- Removal or real wiring of the currently unused PDF polling state.
-
 ### Prerequisites
 
 - Template comments database/backend/OpenAPI/generated/frontend surfaces before parity claims.
