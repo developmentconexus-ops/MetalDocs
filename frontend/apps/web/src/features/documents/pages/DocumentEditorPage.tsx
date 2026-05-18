@@ -171,7 +171,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       if (latestBuf) {
         await autosave.queue(latestBuf, doc.FormDataJSON ?? doc.form_data ?? null);
       }
-      await autosave.flush();
+      const flushOk = await autosave.flush();
+      if (!flushOk) {
+        toast.error('Erro ao salvar documento antes da submissão.');
+        return;
+      }
       await finalizeDocument(documentID);
       await session.release();
       onDone();

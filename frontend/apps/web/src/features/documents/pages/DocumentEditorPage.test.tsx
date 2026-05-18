@@ -148,7 +148,7 @@ beforeEach(() => {
   mockState.editorSaveNowSpy.mockReset();
   mockState.editorSaveNowSpy.mockResolvedValue(null);
   mockState.autosaveFlushSpy.mockReset();
-  mockState.autosaveFlushSpy.mockResolvedValue(undefined);
+  mockState.autosaveFlushSpy.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -300,6 +300,31 @@ describe('DocumentEditorPage autosave wiring', () => {
     await waitFor(() => expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1'));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not finalize when flush fails', async () => {
+    const onDone = vi.fn();
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      FormDataJSON: { foo: 'bar' },
+      form_data: { foo: 'bar' },
+    }) as never);
+    const finalBuf = new Uint8Array([1, 2, 3]).buffer;
+    mockState.editorSaveNowSpy.mockResolvedValue(finalBuf);
+    mockState.autosaveFlushSpy.mockResolvedValue(false);
+
+    render(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+
+    await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(finalBuf, { foo: 'bar' }));
+    await waitFor(() => expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.finalizeDocument)).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
   });
 });
 
