@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import type { Comment } from '@metaldocs/editor-ui';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
+import { QK } from '../../../lib/queryKeys';
 import { useDocumentSession } from '../hooks/editor/useDocumentSession';
 import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
 import { useDocumentComments } from '../hooks/editor/useDocumentComments';
-import { finalizeDocument, renameDocument, signedRevisionURL } from '../api/documents';
+import { finalizeDocument, getApprovalInstance, renameDocument, signedRevisionURL } from '../api/documents';
 import type { DocumentDetail } from '../api/documents';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
+import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
 import { EditorMetaSidebar } from '../components/EditorMetaSidebar';
 import {
   EditorChrome,
@@ -18,6 +21,10 @@ import {
   type AutosaveState,
 } from '../../shared/components/editor-chrome';
 import { CodeChip, StatusPill, type DocumentStatus } from '../../../components/ui';
+import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
+import { useAreasQuery } from '../queries/useAreasQuery';
+import { useControlledDocumentDetailQuery } from '../../registry/queries/useControlledDocumentDetailQuery';
+import { buildVisibilityLabel, formatRevisionCode, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
 import styles from './styles/DocumentEditorPage.module.css';
 
 export type DocumentEditorPageProps = {
@@ -38,6 +45,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
   const editorRef = useRef<MetalDocsEditorRef>(null);
   const doc: EditorDocumentDetail | null = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
+  const controlledDocumentId = doc?.ControlledDocumentID ?? '';
+  const profilesQuery = useProfilesQuery();
+  const areasQuery = useAreasQuery();
+  const controlledDocumentQuery = useControlledDocumentDetailQuery(controlledDocumentId);
+  const revisionHistoryQuery = useDocumentRevisionHistoryQuery(documentID);
 
   const fetchRevisionBuffer = useCallback(async (revisionID: string) => {
     if (!revisionID) {
@@ -222,6 +234,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }
 
   const docStatus = doc?.Status ?? '';
+  const approvalInstanceQuery = useQuery({
+    queryKey: QK.approval.instance(documentID),
+    queryFn: () => getApprovalInstance(documentID),
+    enabled: documentID.length > 0 && docStatus === 'under_review',
+  });
   const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
   const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review' || docStatus === 'rejected');
   const docCode = doc?.Code ?? '';
@@ -252,6 +269,22 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     ];
     return (allowed as string[]).includes(docStatus) ? (docStatus as DocumentStatus) : null;
   })();
+
+  const profileLabel = doc?.ProfileCodeSnapshot
+    ? resolveProfileLabel(doc.ProfileCodeSnapshot, profilesQuery.data ?? [])
+    : '—';
+  const areaLabel = doc?.ProcessAreaCodeSnapshot
+    ? resolveAreaLabel(doc.ProcessAreaCodeSnapshot, areasQuery.data ?? [])
+    : '—';
+  const visibilityLabel = buildVisibilityLabel(controlledDocumentQuery.data?.visibility, areasQuery.data ?? []);
+  const sidebarHistory = (revisionHistoryQuery.data?.items ?? []).map((item) => ({
+    documentId: item.documentId,
+    revisionCode: formatRevisionCode(item.revisionNumber),
+    revisionTitle: item.revisionTitle,
+    status: item.status,
+    createdAt: item.createdAt,
+    isCurrent: item.isCurrent,
+  }));
 
   return (
     <div className={styles.page} data-editor-root>
@@ -345,6 +378,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             });
           }}
           code={docCode || undefined}
+          profileLabel={profileLabel}
+          areaLabel={areaLabel}
+          visibilityLabel={visibilityLabel}
+          history={sidebarHistory}
+          approvalChain={docStatus === 'under_review' ? approvalInstanceQuery.data ?? null : null}
+          documentStatus={docStatus}
           />
         ) : null}
         {revisionTitleDialogOpen ? (

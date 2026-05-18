@@ -24,6 +24,7 @@ export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; V
 export type FinalizeDocumentResult = { instanceId: string };
 export type FinalizeDocumentRequest = components['schemas']['FinalizeDocumentRequest'];
 export type DocumentDetail = components['schemas']['DocumentDetailResponse'];
+export type DocumentRevisionHistoryResponse = components['schemas']['DocumentRevisionHistoryResponse'];
 export type DocumentComment = components['schemas']['DocumentCommentResponse'];
 export type DocumentCommentCreateRequest = components['schemas']['DocumentCommentCreateRequest'];
 export type DocumentCommentUpdateRequest = components['schemas']['DocumentCommentUpdateRequest'];
@@ -51,6 +52,10 @@ export async function finalizeDocument(id: string, body: FinalizeDocumentRequest
 }
 export async function archiveDocument(id: string) {
   return apiFetch(`/api/v1/documents/${id}/archive`, { method: 'POST' });
+}
+
+export async function getDocumentRevisionHistory(id: string): Promise<DocumentRevisionHistoryResponse> {
+  return apiFetch<DocumentRevisionHistoryResponse>(`/api/v1/documents/${id}/revision-history`);
 }
 
 export async function acquireSession(id: string): Promise<AcquireResult> {

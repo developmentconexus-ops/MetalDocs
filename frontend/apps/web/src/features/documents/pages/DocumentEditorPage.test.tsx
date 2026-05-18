@@ -74,6 +74,41 @@ vi.mock('../hooks/editor/useDocumentComments', () => ({
   }),
 }));
 
+vi.mock('../../taxonomy/queries/useProfilesQuery', () => ({
+  useProfilesQuery: () => ({
+    data: [{ code: 'POP', name: 'Procedimento Operacional' }],
+  }),
+}));
+
+vi.mock('../queries/useAreasQuery', () => ({
+  useAreasQuery: () => ({
+    data: [{ code: 'RH', name: 'Recursos Humanos' }],
+  }),
+}));
+
+vi.mock('../../registry/queries/useControlledDocumentDetailQuery', () => ({
+  useControlledDocumentDetailQuery: () => ({
+    data: { visibility: { scope: 'restricted', areaCodes: ['RH'], userIds: [] } },
+  }),
+}));
+
+vi.mock('../queries/useDocumentRevisionHistoryQuery', () => ({
+  useDocumentRevisionHistoryQuery: () => ({
+    data: {
+      items: [
+        {
+          documentId: 'doc-2',
+          revisionNumber: 2,
+          revisionTitle: 'Ajuste operacional',
+          status: 'draft',
+          createdAt: '2026-05-18T12:00:00Z',
+          isCurrent: true,
+        },
+      ],
+    },
+  }),
+}));
+
 vi.mock('./CheckpointsDialog', () => ({
   CheckpointsDialog: () => null,
 }));
@@ -86,6 +121,7 @@ vi.mock('./ExportMenuButton', () => ({
 vi.mock('../api/documents', () => ({
   getDocument: vi.fn(),
   finalizeDocument: vi.fn().mockResolvedValue(undefined),
+  getApprovalInstance: vi.fn().mockResolvedValue({ stages: [] }),
   renameDocument: vi.fn().mockResolvedValue(undefined),
   signedRevisionURL: vi.fn().mockReturnValue('/revisions/r1/signed-url'),
 }));
@@ -121,6 +157,9 @@ function makeDoc(status: string, overrides: Record<string, unknown> = {}) {
     name: 'Original.docx',
     Code: 'C-001',
     code: 'C-001',
+    ControlledDocumentID: 'cd-1',
+    ProfileCodeSnapshot: 'POP',
+    ProcessAreaCodeSnapshot: 'RH',
     RevisionVersion: 1,
     revision_version: 1,
     ...overrides,
