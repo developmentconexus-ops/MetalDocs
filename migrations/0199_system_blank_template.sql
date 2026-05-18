@@ -1,5 +1,11 @@
 BEGIN;
 
+-- Historical evidence migration:
+-- this migration seeds the immutable blank template metadata row, but the runtime
+-- invariant also requires the MinIO object `system/templates/blank.docx` to exist.
+-- Curated bootstrap/runtime scripts own that storage seed path; do not treat this
+-- SQL row alone as sufficient for controlled document creation.
+
 -- Migration-time writes on templates_* tables pass through authz tripwire checks.
 -- Seed with an asserted capability set that satisfies template mutation guards.
 SELECT set_config(
