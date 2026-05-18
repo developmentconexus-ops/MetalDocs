@@ -27,8 +27,8 @@ export function useDocumentAutosave(args: AutosaveArgs) {
   const timer = useRef<number | null>(null);
   const [status, setStatus] = useState<AutosaveStatus>('idle');
 
-  const flush = useCallback(async () => {
-    if (!pending.current) return;
+  const flush = useCallback(async (): Promise<boolean> => {
+    if (!pending.current) return true;
     setStatus('saving');
     const buf = pending.current;
     const hash = pendingHash.current;
@@ -68,27 +68,29 @@ export function useDocumentAutosave(args: AutosaveArgs) {
       pending.current = null; pendingHash.current = '';
       onAdvanceBase(commit.revision_id);
       setStatus('saved');
+      return true;
     } catch (e: any) {
       if (e?.status === 409) {
         const body = e?.body ? (() => { try { return JSON.parse(e.body); } catch { return {}; } })() : {};
-        if (body?.error === 'stale_base') { onSessionLost('stale_base'); setStatus('stale'); return; }
+        if (body?.error === 'stale_base') { onSessionLost('stale_base'); setStatus('stale'); return false; }
         if (body?.error === 'session_inactive' || body?.error === 'session_not_holder') {
-          onSessionLost('session_inactive'); setStatus('session_lost'); return;
+          onSessionLost('session_inactive'); setStatus('session_lost'); return false;
         }
       }
       if (e?.status === 410) {
         // upload_missing or expired_upload: the S3 object is gone.
         try { await deletePending(documentID, hash); } catch { /* ignore */ }
         pending.current = null; pendingHash.current = '';
-        setStatus('error'); return;
+        setStatus('error'); return false;
       }
       if (e?.status === 422) {
         // content_hash_mismatch: discard local pending.
         try { await deletePending(documentID, hash); } catch { /* ignore */ }
         pending.current = null; pendingHash.current = '';
-        setStatus('error'); return;
+        setStatus('error'); return false;
       }
       setStatus('error');
+      return false;
     }
   }, [documentID, sessionID, baseRevisionID, onAdvanceBase, onSessionLost]);
 
