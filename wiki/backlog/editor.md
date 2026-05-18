@@ -1,6 +1,6 @@
 # Editor — Deferred Backlog
 
-> **Last verified:** 2026-05-17
+> **Last verified:** 2026-05-18
 > **Scope:** Deferred implementation items for the `/documents/:documentID/edit` editor screen. The right `EditorMetaSidebar` ships with mock data while backend endpoints are designed.
 > **Out of scope:** Bug fixes (see `bugs/`), shared editor primitive (`EditorChrome`).
 > **Key files:**
@@ -171,3 +171,55 @@ Remaining follow-up:
 - `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
 - `cd frontend/apps/web; pnpm test -- src/features/documents/hooks/editor/__tests__/useDocumentComments.load.test.tsx src/features/documents/hooks/editor/__tests__/useDocumentComments.add.test.tsx src/features/documents/hooks/editor/__tests__/useDocumentComments.orphan.test.tsx src/features/documents/pages/DocumentEditorPage.test.tsx`
 - Manual/Navegador smoke on `/documents/:documentID/edit` and template route for parity/defer checks.
+
+## Integration Audit (2026-05-18)
+
+Scope: editor screen re-audit after autosave/runtime fixes and approval unresolved-comments hardening, with emphasis on API contract truth, TanStack Query usage, frontend feature placement, and persistence-backed behaviors.
+
+Evidence used:
+
+- Screen route/page: `frontend/apps/web/src/features/documents/pages/DocumentEditorRoutePage.tsx`, `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`
+- Editor hooks/wrappers: `useDocumentAutosave.ts`, `useDocumentComments.ts`, `useDocumentSession.ts`, `useDocumentPdfStatus.ts`, `api/documents.ts`, `queries/useDocumentCommentsQuery.ts`
+- Query key ownership: `frontend/apps/web/src/lib/queryKeys.ts`
+- Runtime/handler truth: `internal/modules/documents/delivery/http/handler.go`, `internal/modules/documents/application/service.go`, `internal/modules/documents/repository/repository.go`, `internal/modules/documents/approval/application/decision_service.go`
+- Contract truth: `api/openapi/v1/openapi.yaml`
+
+| Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
+|---|---|---|---|---|---|
+| Editor route + screen ownership | route page + frontend structure | `/documents/:documentID/edit` is owned by `features/documents` and mounted through `documentsRoutes` | `DocumentEditorRoutePage` delegates cleanly to `DocumentEditorPage` | implemented and aligned | Keep |
+| Toolbar identity block (code, title, revision, status) | `GET /api/v1/documents/{id}` + `DocumentEditorPage` | Runtime document payload exposes the fields the screen uses | Page still loads via local `useEffect` + handwritten `DocumentResponse` wrapper instead of generated types/query options | implemented but legacy-wired | Normalize document detail loading to generated types + query hook before final screen polish |
+| DOCX artifact load for current revision | signed revision URL route + page blob fetch | Runtime provides `/revisions/{rid}/url` and the editor can fetch the artifact bytes | Screen handles signed-url fetch + blob load correctly and shows inline error if artifact fetch fails | implemented and aligned | Keep |
+| Writer/readonly session lease | session acquire/heartbeat/release handlers + `useDocumentSession` | Runtime supports single-writer lease with readonly fallback and best-effort release semantics | Dedicated hook models lease lifecycle directly; this is screen state, not a normal TanStack query | implemented and aligned | Keep custom hook boundary |
+| Autosave debounce + commit persistence | autosave presign/commit handlers + repository/session invariants | Runtime path is now working: presign + upload + commit create new revision lineage and advance the base ack | `useDocumentAutosave` has crash-recovery, debounce, explicit flush gating, and local status state | implemented and aligned | Keep |
+| Submit for review CTA (`Submeter para revisão`) | OpenAPI finalize contract + runtime `finalizeDocument` handler | Contract and runtime now align on required `Idempotency-Key` plus `201 { instanceId }` response semantics | `finalizeDocument()` now sends `idempotencyKey` and consumes the response body correctly, though it still lives in the legacy handwritten wrapper slice | implemented and aligned | Keep behavior; normalize this wrapper to generated frontend types only when the broader documents API slice is migrated |
+| Comments list + CRUD | comments OpenAPI/runtime/generated surface + comments query hook | Runtime, OpenAPI, and generated backend surface exist for comments CRUD | Screen now uses TanStack Query + `QK.documents.comments(id)`, but still relies on handwritten payload/row types in the feature wrapper | implemented but legacy-wired | Keep runtime behavior; normalize wrappers to generated frontend types when touching the comments surface again |
+| Comment load failure visibility | `useDocumentComments` + `DocumentEditorPage` | Query failure is a real runtime possibility with persisted review-state implications | Screen now keeps the failure visible with inline retry instead of toast-only UX | implemented and aligned | Keep |
+| Approval blocked by unresolved comments | approval decision service + shared error mapping | Final approval now fails server-side with `approval.unresolved_comments` while active comments remain unresolved | Screen-side UX aligns: editor shows persistent comment-load failure, approval dialog maps the business conflict inline | implemented and aligned | Keep server-owned rule |
+| Non-draft PDF polling state | `/api/v1/documents/{id}/view` + `useDocumentPdfStatus` | Runtime view endpoint exists and the hook polls it | `DocumentEditorPage` starts the polling hook for non-draft documents, but the returned `pdf` state is not rendered anywhere and `PDFCell` is unused | screen-local integration fix | Remove background polling until the screen has a real visible PDF status consumer, or wire the visible consumer now |
+| Sidebar metadata rows | existing backlog item 1 | Runtime still lacks one complete response shape for profile/area/review-date/visibility rows | Sidebar remains mock-backed | missing backend capability | Keep deferred exactly as backlog row 1 |
+| Sidebar revisions timeline | existing backlog item 2 | No editor-side revisions list endpoint is wired | Sidebar remains mock timeline | missing backend capability | Keep deferred exactly as backlog row 2 |
+| Sidebar next approvers | existing backlog item 3 | No editor-side payload is wired for signoff sequence in this screen | Sidebar remains mock approvers list | missing backend capability | Keep deferred exactly as backlog row 3 |
+| Released output remains clean | lifecycle design + documents/approval persistence | Runtime approval/comments model keeps active comments out of clean released output | Published-view cleanup is still a separate product slice, not this editor screen | defer | Keep deferred until published-screen work |
+| Template editor comments parity | lifecycle design + template backend truth | No template-owned comments capability exists yet | No real parity path can be claimed from the editor screen | missing backend capability | Keep deferred until template comments exist |
+
+### Ready for implementation
+
+- Document detail loading normalization to generated types/query options.
+- Comments wrapper normalization to generated frontend types.
+- Removal or real wiring of the currently unused PDF polling state.
+
+### Prerequisites
+
+- Template comments database/backend/OpenAPI/generated/frontend surfaces before parity claims.
+
+### Deferred
+
+- Sidebar metadata/revisions/approvers sections that still depend on missing backend capability.
+- Published-view discussion/comment surfaces until the released-view product boundary is defined.
+- Generic cross-module comments platform.
+
+### Verification needed next
+
+- `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
+- `cd frontend/apps/web; pnpm.cmd vitest run src/features/documents/pages/DocumentEditorPage.test.tsx src/features/documents/hooks/editor/__tests__/useDocumentComments.load.test.tsx src/features/approval/components/SignoffDialog.test.tsx`
+- Finalize prerequisite repair verified on 2026-05-18: `api/openapi/v1/openapi.yaml`, generated frontend types, `frontend/apps/web/src/features/documents/api/documents.ts`, and `internal/modules/documents/delivery/http/handler.go` now agree on required `Idempotency-Key` and `201 { instanceId }`

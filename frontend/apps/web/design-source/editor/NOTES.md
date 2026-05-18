@@ -1,6 +1,6 @@
 # Editor Design Notes
 
-> Last updated: 2026-05-17
+> Last updated: 2026-05-18
 > Route: `/documents/:documentID/edit`
 > Owning feature: `frontend/apps/web/src/features/documents`
 
@@ -25,3 +25,14 @@ Current implementation boundary:
 - keep unresolved-comment approval blocking as backend/API prerequisite
 - keep template comments deferred until real template comments capability exists
 - never fake template comments UI
+
+## Audit Status (2026-05-18)
+
+The refreshed integration classification is recorded in `wiki/backlog/editor.md` under `Integration Audit (2026-05-18)`.
+
+Current editor boundary:
+
+- keep session lease and autosave as intentional editor-local hooks
+- treat document detail loading and comments wrappers as legacy wiring to normalize later
+- finalize route contract prerequisite closed on 2026-05-18: frontend wrapper now sends `Idempotency-Key`, and OpenAPI/generated types match the runtime `201 { instanceId }` response
+- keep sidebar and template-comment items deferred until backend capability exists
