@@ -22,11 +22,13 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
   comments: Comment[];
   orphans: Comment[];
   loading: boolean;
+  loadError: string | null;
   add: (c: Comment) => Promise<void>;
   resolve: (c: Comment) => Promise<void>;
   reopen: (c: Comment) => Promise<void>;
   remove: (c: Comment) => Promise<void>;
   reply: (replyC: Comment, parent: Comment) => Promise<void>;
+  retry: () => Promise<void>;
   setComments: Dispatch<SetStateAction<Comment[]>>;
 } {
   const query = useDocumentCommentsQuery(documentID);
@@ -40,19 +42,22 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
   );
   const comments = localComments ?? serverComments;
   const orphans = useMemo(() => [] as Comment[], []);
+  const loadError = useMemo(
+    () => (query.isError ? resolveQueryError(query.error, 'Falha ao carregar comentários.') : null),
+    [query.error, query.isError],
+  );
 
   useEffect(() => {
-    if (!query.isError) {
+    if (!loadError) {
       lastErrorMessage.current = null;
       return;
     }
-    const message = resolveQueryError(query.error, 'Falha ao carregar comentÃ¡rios.');
-    if (lastErrorMessage.current === message) {
+    if (lastErrorMessage.current === loadError) {
       return;
     }
-    lastErrorMessage.current = message;
-    toast.error(message);
-  }, [query.error, query.isError]);
+    lastErrorMessage.current = loadError;
+    toast.error(loadError);
+  }, [loadError]);
 
   const add = useCallback(async (c: Comment) => {
     try {
@@ -106,15 +111,21 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
     });
   }, [serverComments]);
 
+  const retry = useCallback(async () => {
+    await query.refetch();
+  }, [query]);
+
   return {
     comments,
     orphans,
     loading: query.isLoading,
+    loadError,
     add,
     resolve,
     reopen,
     remove,
     reply,
+    retry,
     setComments,
   };
 }

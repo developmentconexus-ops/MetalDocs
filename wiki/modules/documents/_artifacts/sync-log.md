@@ -97,3 +97,18 @@
 - **Counts after:** Critical=1 Major=5 Minor=4; missing-ADR=6
 - **Tally gate:** PASS
 - **Patched files:** wiki/modules/documents.md; wiki/modules/documents-tech-debt.md; wiki/backlog/documents-refactor.md; wiki/modules/documents/_artifacts/*
+## 2026-05-18 - approval comments + editor error-state sync
+
+- **Context:** post-review hardening for unresolved-comment approval enforcement and persistent editor comment-load error UX
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** no new routes; documented existing 409 `approval.unresolved_comments` behavior and editor-side retry banner expectations
+- **Routes/API:** none
+- **Runtime flows:** document editor now keeps comment-query failures visible with retry; approval-release prerequisite row closed in editor backlog
+- **Persistence:** documents T-011 closed with evidence in approval decision service/tests
+- **Dependencies:** `wiki/backlog/editor.md` and `wiki/concepts/error-ux.md` synced to the shipped behavior
+- **T-NNN touched:** T-011 -> closed (2026-05-18)
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=5 Minor=3
+- **Tally gate:** pending
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents-tech-debt.md`; `wiki/modules/documents/_artifacts/sync-log.md`; `wiki/backlog/editor.md`; `wiki/concepts/error-ux.md`

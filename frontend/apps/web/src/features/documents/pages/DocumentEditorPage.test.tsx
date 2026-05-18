@@ -10,6 +10,8 @@ const mockState = vi.hoisted(() => ({
   autosaveQueueSpy: vi.fn(),
   editorSaveNowSpy: vi.fn(),
   autosaveFlushSpy: vi.fn(),
+  commentsLoadError: null as string | null,
+  retryCommentsSpy: vi.fn(),
 }));
 
 // ── Mock heavy dependencies ────────────────────────────────────────────────
@@ -66,6 +68,8 @@ vi.mock('../hooks/editor/useDocumentComments', () => ({
     reopen: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn().mockResolvedValue(undefined),
     reply: vi.fn().mockResolvedValue(undefined),
+    loadError: mockState.commentsLoadError,
+    retry: mockState.retryCommentsSpy,
   }),
 }));
 
@@ -149,6 +153,8 @@ beforeEach(() => {
   mockState.editorSaveNowSpy.mockResolvedValue(null);
   mockState.autosaveFlushSpy.mockReset();
   mockState.autosaveFlushSpy.mockResolvedValue(true);
+  mockState.commentsLoadError = null;
+  mockState.retryCommentsSpy.mockReset();
 });
 
 afterEach(() => {
@@ -373,5 +379,19 @@ describe('DocumentEditorPage load failure state', () => {
     expect(screen.queryByTestId('editor')).toBeNull();
     expect(screen.queryByText('http_403')).toBeNull();
     expect(screen.queryByText('missing_signed_url')).toBeNull();
+  });
+
+  it('shows a persistent comments load banner and offers retry when comments fail to load', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review') as never);
+    mockState.commentsLoadError = 'Falha ao carregar comentários.';
+
+    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Falha ao carregar comentários.'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    expect(mockState.retryCommentsSpy).toHaveBeenCalledTimes(1);
   });
 });

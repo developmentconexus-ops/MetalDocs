@@ -134,7 +134,7 @@ Route truth evidence:
 | Reviewer can comment in `under_review` | lifecycle design spec | API supports comments regardless of draft-only frontend guard | UI currently blocks comment mutations when not draft+writer | screen-local integration fix or Eigenpal adapter prerequisite | Implement permission split, then manual smoke; if readonly cannot comment at editor level, reclassify as Eigenpal prerequisite |
 | Rejected->draft keeps comments visible | lifecycle design spec + `document_comments` persistence | Comments are document-scoped and persisted | Hook loads all comments for document | implemented and aligned | Keep; document lifecycle rule in notes/wiki |
 | Released output remains clean (no active comments) | lifecycle design spec | Editor comments are separate from released PDF rendering pipeline | Published screen currently has placeholder "discussion comments" section | defer | Plan 12.6 published-screen cleanup must avoid surfacing active editor comments as released content |
-| Unresolved comments block approval/release | lifecycle design spec | No verified server-side guard found in finalize/approval path in this audit | Frontend has no reliable server-enforced check | missing backend capability | Backend/API prerequisite; do not claim enforcement in UI |
+| Unresolved comments block approval/release | lifecycle design spec | Final approval now fails server-side with `approval.unresolved_comments` while active comments remain unresolved | Signoff dialog maps the conflict inline; editor keeps comment-load failures visible with persistent retry UI | implemented and aligned | Keep rule server-owned; mirror the mapped conflict in approval UX only |
 | Sidebar metadata rows (Perfil/Área/Vigência/Próx revisão/Visibilidade) | `EditorMetaSidebar` + backlog | No complete single response shape currently wired for all rows | Mock values marked TODO | missing backend capability | Keep deferred exactly as backlog row 1 |
 | Sidebar revisions timeline | `EditorMetaSidebar` + backlog | No `/documents/:id/revisions` list wired for editor sidebar | Mock timeline | missing backend capability | Keep deferred exactly as backlog row 2 |
 | Sidebar next approvers | `EditorMetaSidebar` + backlog | No dedicated editor-side signoffs payload wired for this section | Mock approvers list | missing backend capability | Keep deferred exactly as backlog row 3 |
@@ -149,7 +149,6 @@ Route truth evidence:
 
 ### Prerequisites
 
-- Backend/API enforcement for unresolved-comment approval blocking.
 - Template comments database/backend/OpenAPI/generated/frontend surfaces before template comments UI parity.
 - Potential Eigenpal adapter prerequisite if readonly mode cannot create review comments.
 
@@ -161,15 +160,11 @@ Route truth evidence:
 
 ## approval-blocking-unresolved-comments
 
-**Prerequisite, not screen-local.** The approved product lifecycle says unresolved comments and pending suggestions must block approval/release. Current document comments persist review feedback, but approval/signoff/finalize enforcement must be server-side before the UI can claim this rule is guaranteed.
+Resolved 2026-05-18. Final approval now checks unresolved active comments server-side and returns 409 `approval.unresolved_comments`. The approval dialog resolves that code inline, and the document editor no longer hides comment-query failures behind a toast-only state.
 
-Required future work:
+Remaining follow-up:
 
-- Add a backend service check for unresolved active comments before final approval/release.
-- Expose a stable Problem code when approval is blocked by unresolved comments.
-- Regenerate OpenAPI/backend/frontend types if response contracts change.
-- Add frontend error mapping through `resolveErrorMessage`.
-- Apply the same rule to templates only after template comments exist.
+- Apply the same lifecycle rule to templates only after template comments exist.
 
 ### Verification needed next
 

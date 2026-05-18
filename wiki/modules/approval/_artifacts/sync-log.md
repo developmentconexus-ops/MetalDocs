@@ -62,3 +62,18 @@
 - **Tally gate:** PASS
 - **Patched files:** wiki/modules/approval.md; wiki/modules/approval-tech-debt.md; wiki/backlog/approval-refactor.md; wiki/modules/approval/_artifacts/*
 
+## 2026-05-18 - approval unresolved-comments hardening sync
+
+- **Context:** commits after `ac448cdc` closing review findings on approval conflict UX and editor comment-load persistence
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** documented 409 `approval.unresolved_comments` failure mode on final-stage signoff
+- **Routes/API:** no route shape change; problem-code behavior now recorded in failure table
+- **Runtime flows:** signoff dialog resolves mapped business conflicts inline; unknown approval codes still fall back to safe generic copy
+- **Persistence:** none
+- **Dependencies:** `wiki/concepts/error-ux.md` updated to reflect shared `resolveErrorMessage(code)` handling on approval dialog conflicts
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=4 Minor=6; missing-ADR=10
+- **Tally gate:** PASS
+- **Patched files:** `wiki/modules/approval.md`; `wiki/modules/approval/_artifacts/sync-log.md`; `wiki/concepts/error-ux.md`

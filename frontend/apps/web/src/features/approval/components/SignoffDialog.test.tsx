@@ -153,6 +153,22 @@ describe('SignoffDialog', () => {
     });
   });
 
+  it('renders the unresolved comments business message inline', async () => {
+    vi.mocked(approvalApi.signoff).mockRejectedValue(
+      new ApprovalError('approval.unresolved_comments', 409, 'pending comments'),
+    );
+    renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain(
+        'Resolva os comentários pendentes antes de aprovar ou liberar este documento.',
+      );
+    });
+  });
+
   it('412 conflict — shows stale banner (simulate via ApprovalError code=conflict.stale status=412)', async () => {
     vi.mocked(approvalApi.signoff).mockRejectedValue(new ApprovalError('conflict.stale', 412, 'stale'));
     renderDialog();

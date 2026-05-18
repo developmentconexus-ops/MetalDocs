@@ -71,10 +71,11 @@ describe('useDocumentComments load', () => {
   it('shows a toast when the comments query fails', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network down'));
 
-    renderHook(() => useDocumentComments('doc-1', 'Alice Doe'), { wrapper: wrapper() });
+    const { result } = renderHook(() => useDocumentComments('doc-1', 'Alice Doe'), { wrapper: wrapper() });
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith('network down'),
     );
+    expect(result.current.loadError).toBe('network down');
   });
 });

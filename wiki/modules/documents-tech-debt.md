@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-18 (approval comments + editor error-state sync)
 
 ## Severity scale
 
@@ -90,12 +90,12 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** none yet — gated on T-002 closure
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`
 
-### T-011 · Approval can complete without verified unresolved-comment server gate
-- **Severity:** major
-- **Surface:** `internal/modules/documents/delivery/http/handler.go:316` (`finalizeDocument`) · `internal/modules/documents/approval/application/submit_service.go` · `internal/modules/documents/approval/http/signoff_handler.go`
-- **Observation:** Documents approval can complete without a verified server-side unresolved-comment gate. Review comments are active review feedback; release should be clean. Until the approval/signoff path checks unresolved comments, frontend screens must not claim enforcement beyond local UI hints.
-- **Evidence:** `wiki/backlog/editor.md` (`Integration Audit (2026-05-17)` + `approval-blocking-unresolved-comments`) and grep audit over documents approval/finalize paths (no unresolved-comment blocking check found in current runtime owner files).
-- **Linked backlog row:** `wiki/backlog/editor.md#approval-blocking-unresolved-comments`
+### T-011 · Approval can complete without verified unresolved-comment server gate — CLOSED 2026-05-18
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/documents/approval/application/decision_service.go` now checks unresolved `document_comments` before final approval completion/freeze/document status transition; `internal/modules/documents/approval/http/errors.go` maps the guard to 409 `approval.unresolved_comments`; frontend signoff/editor flows consume the mapped conflict and persistent comment-load error state.
+- **Observation (original):** Documents approval could complete without a verified server-side unresolved-comment gate. Review comments are active review feedback; release should be clean. Until the approval/signoff path checked unresolved comments, frontend screens could not claim enforcement beyond local UI hints.
+- **Evidence:** `wiki/backlog/editor.md` (`Integration Audit (2026-05-17)` + `approval-blocking-unresolved-comments`), `decision_service_test.go`, `decision_service_freeze_test.go`, `errors_test.go`, `SignoffDialog.test.tsx`, `useDocumentComments.load.test.tsx`, `DocumentEditorPage.test.tsx`.
+- **Linked backlog row:** `wiki/backlog/editor.md#approval-blocking-unresolved-comments` (closed by implementation sync 2026-05-18)
 - **Linked ADR:** missing-ADR
 
 ---
@@ -107,3 +107,4 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - Cross-deps missing in §5/§8: 0 / 25 (all 14 OUT + 11 IN edges from `_artifacts/03-deps.md` appear in §3.2 or §5).
 - State transitions missing in §6: 0 / 5 (draft → under_review → approved → published → superseded/obsolete + rejected branch all tabled).
 - Decisions without ADR link: 4 / 9 (T-004, T-005, T-007, T-009 flagged missing-ADR; T-008 closed by Plan 4).
+
