@@ -145,9 +145,10 @@ services:
       METALDOCS_STORAGE_PROVIDER: ${METALDOCS_STORAGE_PROVIDER}
       METALDOCS_ATTACHMENTS_SIGNING_SECRET: ${METALDOCS_ATTACHMENTS_SIGNING_SECRET}
       METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS: ${METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS}
-      # Presigned DOCX URLs are consumed by the host browser, so the API must sign
-      # with a host-resolvable endpoint instead of Docker-only DNS (`minio:9000`).
-      METALDOCS_MINIO_ENDPOINT: host.docker.internal:9000
+      # Runtime object-store access stays on Docker DNS; browser-facing presigned URLs
+      # use a separate public endpoint so the host browser can fetch them reliably.
+      METALDOCS_MINIO_ENDPOINT: minio:9000
+      METALDOCS_MINIO_PUBLIC_ENDPOINT: 127.0.0.1:9000
       METALDOCS_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       METALDOCS_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       METALDOCS_MINIO_BUCKET: ${METALDOCS_MINIO_BUCKET}

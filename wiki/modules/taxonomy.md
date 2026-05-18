@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-12 (Plan 8 baseline) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-05-17 (v2-reference memory sync) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` â€” `DocumentFamily` aggregate
@@ -17,14 +17,14 @@
 > - `internal/modules/taxonomy/infrastructure/repository.go:102` â€” `ProfileRepository.Create` (now in tx + `authz.Require(CapTaxonomyManage)` â€” Plan 5 wired)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:91-99` â€” `HasActiveProfiles` (no tenant predicate; TOCTOU race with `Update`)
 > - `apps/api/cmd/metaldocs-api/permissions.go:158-180` â€” path-prefix capability dispatcher (PATCH /families/{code} not matched â†’ falls through)
-> - `apps/api/cmd/metaldocs-api/main.go:197-201,225,508-524` â€” module wiring + standalone `ProfileRepository` + `profileDefaultsAdapter` for documents_v2
+> - `apps/api/cmd/metaldocs-api/main.go:197-201,225,508-524` â€” module wiring + standalone `ProfileRepository` + `profileDefaultsAdapter` for documents
 > - `migrations/0023_init_document_family_and_profile_registry.sql` Â· `0025_init_document_taxonomy.sql` Â· `0122_taxonomy_extend_document_profiles.sql` Â· `0123_taxonomy_extend_process_areas.sql` Â· `0161_grant_families_write_privileges.sql` Â· `0175_documents_area_name_snapshot.sql`
 
 ---
 
 ## 1. Introduction & Goals
 
-`internal/modules/taxonomy` owns the **flat, code-keyed classification catalog** that other modules bind controlled documents to: 3 entities â€” `DocumentFamily`, `DocumentProfile`, `ProcessArea` â€” each a row in its own Postgres table. Profiles bind to families; areas are flat with optional `parent_code` self-FK and cycle prevention. The module exposes 16 HTTP routes under `/api/v1/taxonomy/*` and serves three downstream consumers: registry (CD code prefix `{profile}-{area}-{seq}`), documents_v2 (template defaults via `profileDefaultsAdapter`), documents (live read of `process_areas.name` for snapshot).
+`internal/modules/taxonomy` owns the **flat, code-keyed classification catalog** that other modules bind controlled documents to: 3 entities â€” `DocumentFamily`, `DocumentProfile`, `ProcessArea` â€” each a row in its own Postgres table. Profiles bind to families; areas are flat with optional `parent_code` self-FK and cycle prevention. The module exposes 16 HTTP routes under `/api/v1/taxonomy/*` and serves downstream consumers: registry (CD code prefix `{profile}-{area}-{seq}`), documents (template defaults via `profileDefaultsAdapter`), and documents snapshot creation (live read of `process_areas.name`).
 
 ### 1.1 Requirements overview
 
@@ -49,7 +49,7 @@
 |---|---|
 | Admin / QMS | CRUD profiles + areas + families with audit trail; immutable codes once published. |
 | Registry module | `document_profiles.code` and `process_areas.code` as stable FKs for CD code generation. |
-| documents_v2 wizard | `profile.default_template_version_id` resolved via `profileDefaultsAdapter`. |
+| documents wizard | `profile.default_template_version_id` resolved via `profileDefaultsAdapter`. |
 | documents module | `process_areas.name` resolvable at document-create time for snapshot column. |
 
 ---
@@ -74,15 +74,14 @@ C4Context
     System_Boundary(b1, "MetalDocs") {
         System(taxonomy, "taxonomy", "Catalog of families, profiles, areas")
         System_Ext(registry, "registry", "Reads profile + area codes for CD prefix")
-        System_Ext(documents_v2, "documents_v2", "Reads profile.default_template_version_id via adapter")
-        System_Ext(documents, "documents", "Reads process_areas.name for snapshot")
+        System_Ext(documents, "documents", "Reads profile.default_template_version_id via adapter and process_areas.name for snapshot")
         System_Ext(templates, "templates", "Owns templates_template_version (FK target)")
     }
     System_Ext(pg, "Postgres", "metaldocs.document_families Â· _profiles Â· _process_areas")
     Rel(admin, taxonomy, "HTTP /api/v1/taxonomy/*")
     Rel(taxonomy, pg, "SQL (sql.DB; no tx)")
     Rel(registry, pg, "Direct SQL on _profiles + _process_areas (TaxonomyProfileReader / TaxonomyAreaReader)")
-    Rel(documents_v2, taxonomy, "Go: profileDefaultsAdapter.GetDefaultTemplateVersionID")
+    Rel(documents, taxonomy, "Go: profileDefaultsAdapter.GetDefaultTemplateVersionID")
     Rel(documents, pg, "Direct SQL: SELECT name FROM _process_areas at document-create")
     Rel(taxonomy, templates, "READ join: _template_version for IsPublished check")
 ```
@@ -355,7 +354,7 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 
 ### 8.9 Cross-module data contracts
 - `document_profiles.code` + `process_areas.code` â†’ CD code prefix (`{profile}-{area}-{seq}`) in `registry/domain/controlled_document.go:48`.
-- `document_profiles.default_template_version_id` â†’ documents_v2 wizard via `profileDefaultsAdapter` (`main.go:508-524`).
+- `document_profiles.default_template_version_id` â†’ documents wizard via `profileDefaultsAdapter` (`main.go:508-524`).
 - `process_areas.name` â†’ snapshotted live by documents (`internal/modules/documents/repository/repository.go:94-101`) into `documents.area_name_snapshot`.
 - `document_profiles.family_code` â†’ FK to `document_families.code`.
 
@@ -412,7 +411,7 @@ Top 3 (by severity, then by blast-radius):
 | Term | Definition |
 |---|---|
 | `document_family` | Top-level catalog grouping ("Procedimento", "InstruÃ§Ã£o"). Global across tenants; no `tenant_id`. |
-| `document_profile` | Per-tenant document type bound to a family. Has `default_template_version_id` for documents_v2 wizard. |
+| `document_profile` | Per-tenant document type bound to a family. Has `default_template_version_id` for the documents wizard. |
 | `process_area` | Per-tenant operational area with optional `parent_code` self-FK. Cycle prevention is application-layer. |
 | `taxonomy.manage` | IAM capability gating writes on all 16 taxonomy routes; held by `system_admin` (migration 0165) + `qms_admin` (migration 0169). |
 | `governance_events` | Module-local audit sink written via `DBGovernanceLogger`. Parallel to `audit.Writer`; not unified. |
@@ -432,6 +431,8 @@ Top 3 (by severity, then by blast-radius):
 - Artifacts: `wiki/modules/taxonomy/_artifacts/`
 
 ## Changelog (this doc)
+
+- 2026-05-17 - Lite memory sync: active taxonomy docs now name the downstream consumer as `documents` instead of historical `documents_v2`; route and persistence behavior unchanged.
 
 - 2026-05-11 â€” initial publish (metaldocs-module-doc skill v1.2). Supersedes the 2026-05-02 stub which incorrectly claimed `ErrFamilyCodeImmutable` exists.
 

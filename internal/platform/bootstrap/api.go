@@ -47,8 +47,10 @@ type APIDependencies struct {
 	DocgenV2Client *servicebus.DocgenV2Client
 	// MinioClient is the minio client for presigning. Nil when storage is not minio.
 	MinioClient *miniogo.Client
-	MinioBucket string
-	Cleanup     func()
+	// MinioPublicClient signs browser-facing URLs against a browser-reachable endpoint.
+	MinioPublicClient *miniogo.Client
+	MinioBucket       string
+	Cleanup           func()
 }
 
 type bucketEnsurer interface {
@@ -83,33 +85,42 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			)
 		}
 		var minioClient *miniogo.Client
+		var minioPublicClient *miniogo.Client
 		var minioBucket string
 		if attachmentsCfg.Provider == config.StorageProviderMinIO {
 			mc, mcErr := miniogo.New(attachmentsCfg.MinIOEndpoint, &miniogo.Options{
 				Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
 				Secure: attachmentsCfg.MinIOUseSSL,
+				Region: "us-east-1",
 			})
-			if mcErr == nil {
+			mpc, mpcErr := miniogo.New(attachmentsCfg.MinIOPublicEndpoint, &miniogo.Options{
+				Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
+				Secure: attachmentsCfg.MinIOUseSSL,
+				Region: "us-east-1",
+			})
+			if mcErr == nil && mpcErr == nil {
 				minioClient = mc
+				minioPublicClient = mpc
 				minioBucket = attachmentsCfg.MinIOBucket
 			}
 		}
 		auditStore := auditpg.NewWriter(db)
 		return APIDependencies{
-			RoleProvider:    iampg.NewRoleProvider(db),
-			RoleAdminRepo:   iampg.NewRoleAdminRepository(db),
-			AuthRepo:        authRepo,
-			AuditWriter:     auditStore,
-			AuditReader:     auditStore,
-			AuditValidator:  auditStore,
-			Publisher:       outboxpg.NewPublisher(db),
-			GotenbergClient: gotenbergClient,
-			StatusProvider:  observability.NewPostgresRuntimeStatusProvider(db, repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
-			SQLDB:           db,
-			DocgenV2Client:  docgenV2Client,
-			MinioClient:     minioClient,
-			MinioBucket:     minioBucket,
-			Cleanup:         func() { _ = closeDB(db) },
+			RoleProvider:      iampg.NewRoleProvider(db),
+			RoleAdminRepo:     iampg.NewRoleAdminRepository(db),
+			AuthRepo:          authRepo,
+			AuditWriter:       auditStore,
+			AuditReader:       auditStore,
+			AuditValidator:    auditStore,
+			Publisher:         outboxpg.NewPublisher(db),
+			GotenbergClient:   gotenbergClient,
+			StatusProvider:    observability.NewPostgresRuntimeStatusProvider(db, repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
+			SQLDB:             db,
+			DocgenV2Client:    docgenV2Client,
+			MinioClient:       minioClient,
+			MinioPublicClient: minioPublicClient,
+			MinioBucket:       minioBucket,
+			Cleanup:           func() { _ = closeDB(db) },
 		}, nil
 	default:
 		roles := authn.DevRoleMap()

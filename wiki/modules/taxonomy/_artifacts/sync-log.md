@@ -2,6 +2,18 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-17 - active v2 reference memory sync
+
+- **Context:** post-merge scan found active taxonomy module memory still naming the documents consumer as `documents_v2` after the production module/API naming moved to `documents` and `/api/v1`.
+- **Mode:** lite patch.
+- **Affected-surface scan:** taxonomy module doc + tech-debt register only; historical migration/drop facts left unchanged.
+- **Routes/API:** no taxonomy route change.
+- **Runtime flows:** downstream consumer wording corrected from `documents_v2` to `documents`.
+- **Persistence:** none.
+- **Debt/backlog:** no T/R rows opened or closed.
+- **Tally gate:** preflight PASS before edits; final tally recorded in session output.
+- **Patched files:** `wiki/modules/taxonomy.md`; `wiki/modules/taxonomy-tech-debt.md`; `wiki/modules/taxonomy/_artifacts/sync-log.md`.
+
 ## 2026-05-11 · Plan 6a — close T-004 T-005 T-010
 
 - **Context:** Plan 6a (commits 115cb635 + 20bf2067 + 71a2dc53) · FamilyService gets govLogger; Profile/Area emit; governance_events collapsed onto canonical audit_events

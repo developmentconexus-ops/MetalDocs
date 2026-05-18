@@ -12,7 +12,7 @@ export interface AutosaveArgs {
   onSessionLost: (reason: 'stale_base' | 'session_inactive' | 'force_released') => void;
 }
 
-const SYNC_DEBOUNCE_MS = 15_000;
+const SYNC_DEBOUNCE_MS = 8_000;
 
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', buf);
@@ -47,11 +47,17 @@ export function useDocumentAutosave(args: AutosaveArgs) {
         base_revision_id: baseRevisionID,
         content_hash: hash,
       });
-      await fetch(presigned.upload_url, {
+      const uploadRes = await fetch(presigned.upload_url, {
         method: 'PUT',
         headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
         body: buf,
       });
+      if (!uploadRes.ok) {
+        throw Object.assign(new Error('autosave upload failed'), {
+          status: uploadRes.status,
+          body: await uploadRes.text(),
+        });
+      }
       // Server re-computes content_hash from S3; client does NOT send a hash.
       const commit = await commitAutosave(documentID, {
         session_id: sessionID,

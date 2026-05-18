@@ -1,23 +1,47 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import React from 'react';
 import { DocumentEditorPage } from './DocumentEditorPage';
+
+const mockState = vi.hoisted(() => ({
+  editorProps: [] as Record<string, unknown>[],
+  addCommentSpy: vi.fn(),
+  setCommentsSpy: vi.fn(),
+  autosaveQueueSpy: vi.fn(),
+  editorSaveNowSpy: vi.fn(),
+  autosaveFlushSpy: vi.fn(),
+}));
 
 // ── Mock heavy dependencies ────────────────────────────────────────────────
 
 vi.mock('@metaldocs/editor-ui', () => ({
-  MetalDocsEditor: (props: Record<string, unknown>) => (
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <div
-      data-testid="editor"
-      data-mode={props.mode as any}
-      onClick={() =>
-        (props.onTitleChange as ((name: string) => void) | undefined)?.('NewName')
-      }
-    />
-  ),
+  MetalDocsEditor: React.forwardRef((props: Record<string, unknown>, ref) => {
+    React.useImperativeHandle(ref, () => ({
+      async saveNow() {
+        return mockState.editorSaveNowSpy();
+      },
+      async getDocumentBuffer() {
+        return null;
+      },
+      focus() {},
+    }));
+    return (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      <div
+        data-testid="editor"
+        data-mode={props.mode as any}
+        ref={() => {
+          mockState.editorProps.push(props);
+        }}
+        onClick={() =>
+          (props.onDocumentNameChange as ((name: string) => void) | undefined)?.('NewName')
+        }
+      />
+    );
+  }),
 }));
 
-vi.mock('./hooks/useDocumentSession', () => ({
+vi.mock('../hooks/editor/useDocumentSession', () => ({
   useDocumentSession: () => ({
     state: { phase: 'writer', sessionID: 's1', lastAckRevisionID: 'r1' },
     setLastAck: vi.fn(),
@@ -25,19 +49,19 @@ vi.mock('./hooks/useDocumentSession', () => ({
   }),
 }));
 
-vi.mock('./hooks/useDocumentAutosave', () => ({
+vi.mock('../hooks/editor/useDocumentAutosave', () => ({
   useDocumentAutosave: () => ({
     status: 'idle',
-    queue: vi.fn().mockResolvedValue(undefined),
-    flush: vi.fn().mockResolvedValue(undefined),
+    queue: mockState.autosaveQueueSpy,
+    flush: mockState.autosaveFlushSpy,
   }),
 }));
 
-vi.mock('./hooks/useDocumentComments', () => ({
+vi.mock('../hooks/editor/useDocumentComments', () => ({
   useDocumentComments: () => ({
     comments: [],
-    setComments: vi.fn(),
-    add: vi.fn().mockResolvedValue(undefined),
+    setComments: mockState.setCommentsSpy,
+    add: mockState.addCommentSpy,
     resolve: vi.fn().mockResolvedValue(undefined),
     reopen: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn().mockResolvedValue(undefined),
@@ -115,6 +139,16 @@ function makeFetchForBuffer() {
 
 beforeEach(() => {
   global.fetch = makeFetchForBuffer();
+  mockState.editorProps = [];
+  mockState.addCommentSpy.mockReset();
+  mockState.addCommentSpy.mockResolvedValue(undefined);
+  mockState.setCommentsSpy.mockReset();
+  mockState.autosaveQueueSpy.mockReset();
+  mockState.autosaveQueueSpy.mockResolvedValue(undefined);
+  mockState.editorSaveNowSpy.mockReset();
+  mockState.editorSaveNowSpy.mockResolvedValue(null);
+  mockState.autosaveFlushSpy.mockReset();
+  mockState.autosaveFlushSpy.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -138,6 +172,22 @@ describe('DocumentEditorPage E1 gate', () => {
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
     );
+  });
+
+  it('allows review comment callbacks when status=under_review without enabling content editing', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review') as never);
+    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
+    );
+
+    const props = mockState.editorProps.at(-1) as {
+      onCommentAdd?: (comment: { id: number; content: unknown[] }) => void;
+    };
+    props.onCommentAdd?.({ id: 77, content: [] });
+
+    expect(mockState.addCommentSpy).toHaveBeenCalledWith({ id: 77, content: [] });
   });
 
   it('refetches doc on window focus and updates mode', async () => {
@@ -173,15 +223,15 @@ describe('DocumentEditorPage E9 rename rollback', () => {
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
 
-    // Title: C-001-Original (docCode-displayName, strips .docx)
-    expect(screen.getByText(/C-001-Original/)).toBeTruthy();
+    // Title uses separate code chip + title span.
+    expect(screen.getByText('Original')).toBeTruthy();
 
     // Click editor → onTitleChange('NewName') → handleRename('NewName')
     fireEvent.click(screen.getByTestId('editor'));
 
     // After reject + rollback, title should revert
     await waitFor(() =>
-      expect(screen.getByText(/C-001-Original/)).toBeTruthy(),
+      expect(screen.getByText('Original')).toBeTruthy(),
     );
 
     expect(vi.mocked(api.renameDocument)).toHaveBeenCalledWith('d1', 'NewName');
@@ -189,8 +239,8 @@ describe('DocumentEditorPage E9 rename rollback', () => {
   });
 });
 
-describe('DocumentEditorPage E11 PDF cell', () => {
-  it('shows PDF download link when doc is published and pdf is ready', async () => {
+describe('DocumentEditorPage E11 PDF polling', () => {
+  it('keeps readonly editor mode for published documents while pdf status hook reports ready', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('published') as never);
     vi.mocked(pdfHook.useDocumentPdfStatus).mockReturnValue({
       status: 'ready',
@@ -199,7 +249,104 @@ describe('DocumentEditorPage E11 PDF cell', () => {
     });
 
     render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
-    const link = await screen.findByRole('link', { name: /Baixar PDF/i });
-    expect(link.getAttribute('href')).toBe('https://s3/p.pdf');
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
+    );
+  });
+});
+
+describe('DocumentEditorPage autosave wiring', () => {
+  it('queues the buffer provided by MetalDocsEditor without re-reading the editor ref', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      FormDataJSON: { foo: 'bar' },
+      form_data: { foo: 'bar' },
+    }) as never);
+
+    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    const props = mockState.editorProps.at(-1) as {
+      onAutoSave?: (buf: ArrayBuffer) => Promise<void>;
+    };
+    const emittedBuffer = new Uint8Array([9, 8, 7]).buffer;
+    await props.onAutoSave?.(emittedBuffer);
+
+    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' });
+  });
+
+  it('forces an immediate editor save before finalize so latest bytes are queued', async () => {
+    const onDone = vi.fn();
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      FormDataJSON: { foo: 'bar' },
+      form_data: { foo: 'bar' },
+    }) as never);
+    const finalBuf = new Uint8Array([5, 4, 3]).buffer;
+    mockState.editorSaveNowSpy.mockResolvedValue(finalBuf);
+    vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
+
+    render(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+
+    await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(finalBuf, { foo: 'bar' }));
+    await waitFor(() => expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1'));
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('DocumentEditorPage load failure state', () => {
+  it('shows an inline not-found style error and does not render metadata chrome when the document fetch fails', async () => {
+    vi.mocked(api.getDocument).mockRejectedValueOnce({
+      code: 'not_found',
+      message: 'not_found',
+    });
+
+    render(<DocumentEditorPage documentID="missing-doc" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Documento não encontrado.'),
+    );
+
+    expect(screen.queryByTestId('editor')).toBeNull();
+    expect(screen.queryByText('Metadados')).toBeNull();
+    expect(screen.queryByText('Próximos aprovadores')).toBeNull();
+  });
+
+  it('keeps metadata chrome visible and shows a friendly editor error when revision blob fetch fails', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes('signed-url')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ url: 'https://s3/doc.docx' }),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 403,
+      });
+    }) as typeof fetch;
+
+    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Falha ao carregar o arquivo do documento. Tente novamente.'),
+    );
+
+    expect(screen.getAllByText('C-001').length).toBeGreaterThan(0);
+    expect(screen.getByText('Original')).toBeTruthy();
+    expect(screen.getByText('Metadados')).toBeTruthy();
+    expect(screen.queryByTestId('editor')).toBeNull();
+    expect(screen.queryByText('http_403')).toBeNull();
+    expect(screen.queryByText('missing_signed_url')).toBeNull();
   });
 });

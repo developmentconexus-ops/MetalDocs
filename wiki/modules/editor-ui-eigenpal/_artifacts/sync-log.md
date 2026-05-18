@@ -1,5 +1,17 @@
 # Sync Log — editor-ui-eigenpal
 
+## 2026-05-17 - active v2 reference memory sync
+
+- **Context:** post-merge scan found the editor-ui C4 context still pointing at `/api/v2/documents` even though production route truth is `/api/v1/documents`.
+- **Mode:** lite patch.
+- **Affected-surface scan:** editor-ui module doc C4 context only.
+- **Routes/API:** no adapter behavior or backend route change; relationship label corrected to `/api/v1/documents`.
+- **Runtime flows:** none.
+- **Persistence:** none.
+- **Debt/backlog:** no T/R rows opened or closed.
+- **Tally gate:** preflight PASS before edits; final tally recorded in session output.
+- **Patched files:** `wiki/modules/editor-ui-eigenpal.md`; `wiki/modules/editor-ui-eigenpal/_artifacts/sync-log.md`.
+
 ## 2026-05-17 - blank editable Eigenpal mount
 
 - **Context:** uncommitted diff: packages/editor-ui blank no-buffer mount behavior plus tests.

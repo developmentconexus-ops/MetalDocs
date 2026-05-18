@@ -48,8 +48,6 @@ function renderIcon(status: AutosaveState) {
   switch (status) {
     case 'saving':
       return <span className={`${styles.dot} ${styles.dotSaving}`} aria-hidden="true" />;
-    case 'saved':
-      return <CheckIcon className={styles.check} />;
     case 'error':
     case 'session_lost':
       return <span className={`${styles.dot} ${styles.dotError}`} aria-hidden="true" />;
@@ -57,27 +55,9 @@ function renderIcon(status: AutosaveState) {
       return <span className={`${styles.dot} ${styles.dotWarn}`} aria-hidden="true" />;
     case 'dirty':
       return <span className={`${styles.dot} ${styles.dotDirty}`} aria-hidden="true" />;
+    case 'saved':
     case 'idle':
     default:
       return <span className={`${styles.dot} ${styles.dotIdle}`} aria-hidden="true" />;
   }
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
 }

@@ -1,6 +1,19 @@
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useDocumentComments } from '../useDocumentComments';
+
+function wrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
 
 describe('useDocumentComments load', () => {
   afterEach(() => {
@@ -38,11 +51,11 @@ describe('useDocumentComments load', () => {
       ]),
     } as Response);
 
-    const { result } = renderHook(() => useDocumentComments('doc-1', 'Alice Doe'));
+    const { result } = renderHook(() => useDocumentComments('doc-1', 'Alice Doe'), { wrapper: wrapper() });
 
     await waitFor(() => expect(result.current.comments.length).toBe(2));
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/documents/doc-1/comments');
+    expect(fetchSpy).toHaveBeenCalledWith('/api/v1/documents/doc-1/comments', undefined);
     expect(typeof result.current.comments[0].id).toBe('number');
     expect(result.current.comments[1].parentId).toBe(42);
     expect(typeof result.current.comments[1].done).toBe('boolean');

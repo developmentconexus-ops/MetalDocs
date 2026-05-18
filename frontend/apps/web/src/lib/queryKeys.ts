@@ -30,6 +30,7 @@ export const QK = {
     list: (params: DocumentLibraryListParams = {}) => ['documents', 'list', params] as const,
     stats: () => ['documents', 'stats'] as const,
     detail: (id: string) => ['documents', 'detail', id] as const,
+    comments: (id: string) => ['documents', 'comments', id] as const,
   },
   inbox: (params: InboxParams = {}) =>
     ['approval', 'inbox', params] as const,

@@ -107,6 +107,17 @@ describe('AutosaveStatus', () => {
     render(<AutosaveStatus status="idle" className="extra" />);
     expect(screen.getByRole('status').className).toContain('extra');
   });
+
+  it('uses the same green dot icon for idle and saved states', () => {
+    const { rerender } = render(<AutosaveStatus status="idle" />);
+    const idleDot = screen.getByRole('status').querySelector('[aria-hidden="true"]');
+    expect(idleDot?.tagName).toBe('SPAN');
+
+    rerender(<AutosaveStatus status="saved" />);
+    const savedDot = screen.getByRole('status').querySelector('[aria-hidden="true"]');
+    expect(savedDot?.tagName).toBe('SPAN');
+    expect(savedDot?.className).toContain('dotIdle');
+  });
 });
 
 // --- VersionBadge passthrough ---

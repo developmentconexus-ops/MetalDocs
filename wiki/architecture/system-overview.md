@@ -1,6 +1,6 @@
 # System Overview
 
-> **Last verified:** 2026-05-05
+> **Last verified:** 2026-05-17
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -52,9 +52,9 @@ Modules:
 - `App.tsx` - root, routing
 - `routing/workspaceRoutes.ts` - route table
 - `features/` - one folder per feature area
-  - `templates/v2/` - template list + author page
-  - `documents/v2/` - document list + create wizard + editor
-  - `documents/DocumentsHubView.tsx` - hub list; "Duplicar" button opens an inline confirmation modal (added 2026-04-27) with three actions: cancel, duplicate (→ `#/documents/doc/{id}`), or duplicate-and-edit (→ `/documents-v2/{id}` via react-router `navigate`). Both call `POST /api/v2/documents/{id}/duplicate`.
+  - `templates/` - template list, creation wizard, and template editor routes (`/templates`, `/templates/new`, `/templates/{id}/versions/{n}`)
+  - `documents/` - document library, create wizard, published/detail views, distribution, and editor routes (`/documents/*`)
+  - `documents/pages/DocumentsHubPage.tsx` - hub-style document lists for library, mine, recent, area, type, and selected-document views.
   - `taxonomy/` - profile/area admin
   - `iam/` - user/membership admin
   - `approval/` - inbox, etag/mutation client

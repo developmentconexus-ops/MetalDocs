@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-17 (v2-reference memory sync)
 
 ## Severity scale
 
@@ -83,7 +83,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-009 · No OpenAPI spec; raw `http.ServeMux` instead of oapi-codegen
 - **Severity:** major
-- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:51-68` (raw `mux.HandleFunc` for 16 routes); `api/openapi/v1/openapi.yaml` (no `/api/v1/taxonomy/*` paths — verified by grep); contrast `internal/modules/registry/delivery/http/routes.go` (also raw mux but routes documented in stub) and documents_v2/templates modules which ship `*.gen.go` from oapi-codegen
+- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:51-68` (raw `mux.HandleFunc` for 16 routes); `api/openapi/v1/openapi.yaml` (no `/api/v1/taxonomy/*` paths — verified by grep); contrast `internal/modules/registry/delivery/http/routes.go` (also raw mux but routes documented in stub) and documents/templates modules which ship `*.gen.go` from oapi-codegen
 - **Observation:** All 16 routes are mounted on raw `net/http.ServeMux` with no operationId, no request/response schemas in the OpenAPI spec, no generated stubs. ADR 0012 (`wiki/decisions/0012-contract-first-api.md`) commits the project to contract-first; taxonomy was never migrated. Frontend client codegen (`lib/api/openapi.gen.ts` consumers) cannot bind taxonomy methods — feature code in `frontend/apps/web/src/features/taxonomy/*` hand-rolls each call. Trigger fired: documented contract not followed with measurable consumer impact (Major).
 - **Evidence:** `_artifacts/01-surface.md` (handler.go route list, no spec anchors); `_artifacts/03-deps.md` §1 (no codegen-related imports); `_artifacts/05-industry.md` IP-005 "not applicable".
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009`

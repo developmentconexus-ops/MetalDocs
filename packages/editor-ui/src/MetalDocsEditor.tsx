@@ -21,6 +21,10 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
         if (!inner.current) return null;
         return (await inner.current.save()) ?? null;
       },
+      async saveNow() {
+        if (!inner.current) return null;
+        return (await inner.current.save()) ?? null;
+      },
       focus() {},
     }), []);
 

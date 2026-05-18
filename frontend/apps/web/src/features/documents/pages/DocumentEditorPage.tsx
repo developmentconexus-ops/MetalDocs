@@ -29,6 +29,8 @@ export type DocumentEditorPageProps = {
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
   const session = useDocumentSession(documentID);
   const [doc, setDoc] = useState<DocumentResponse | null>(null);
+  const [pageLoadError, setPageLoadError] = useState<string | null>(null);
+  const [editorLoadError, setEditorLoadError] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState('');
   const [buffer, setBuffer] = useState<ArrayBuffer | null | undefined>(undefined);
   const editorRef = useRef<MetalDocsEditorRef>(null);
@@ -50,15 +52,34 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   useEffect(() => {
     void (async () => {
       try {
+        setPageLoadError(null);
+        setEditorLoadError(null);
         setBuffer(undefined);
         const loadedDoc = await getDocument(documentID);
         const name = loadedDoc.Name ?? loadedDoc.name ?? 'Document';
         const revisionID = loadedDoc.CurrentRevisionID ?? loadedDoc.current_revision_id ?? '';
         setDoc(loadedDoc);
         setDocumentName(name);
-        await fetchRevisionBuffer(revisionID);
-      } catch {
-        toast.error('Failed to load document.');
+        try {
+          await fetchRevisionBuffer(revisionID);
+        } catch {
+          setBuffer(null);
+          setEditorLoadError('Falha ao carregar o arquivo do documento. Tente novamente.');
+        }
+      } catch (err) {
+        setDoc(null);
+        setBuffer(null);
+        if (err instanceof ApiError) {
+          setPageLoadError(err.code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(err.code, err.message));
+        } else if (err && typeof err === 'object' && 'code' in err) {
+          const code = (err as { code?: string }).code;
+          const message = 'message' in err ? (err as { message?: string }).message : undefined;
+          setPageLoadError(code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(code, message));
+        } else if (err instanceof Error && err.message.trim()) {
+          setPageLoadError(err.message);
+        } else {
+          setPageLoadError('Falha ao carregar documento.');
+        }
       }
     })();
   }, [documentID, fetchRevisionBuffer]);
@@ -138,17 +159,18 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     });
   }, [documentID, documentName]);
 
-  async function handleSave() {
-    if (!editorRef.current) return;
+  async function handleSave(buf: ArrayBuffer) {
     if (!doc) return;
-    const buf = await editorRef.current.getDocumentBuffer();
-    if (!buf) return;
     await autosave.queue(buf, doc.FormDataJSON ?? doc.form_data ?? null);
   }
 
   async function handleFinalize() {
     if (session.state.phase !== 'writer' || !doc) return;
     try {
+      const latestBuf = await editorRef.current?.saveNow();
+      if (latestBuf) {
+        await autosave.queue(latestBuf, doc.FormDataJSON ?? doc.form_data ?? null);
+      }
       await autosave.flush();
       await finalizeDocument(documentID);
       await session.release();
@@ -163,7 +185,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }
 
   const docStatus = doc?.Status ?? doc?.status ?? '';
-  const isEditable = session.state.phase === 'writer' && docStatus === 'draft';
+  const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
+  const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review' || docStatus === 'rejected');
   // Poll view endpoint for PDF status when doc is not a draft (E11).
   const pdf = useDocumentPdfStatus(documentID, docStatus !== '' && docStatus !== 'draft');
   const docCode = doc?.Code ?? doc?.code ?? '';
@@ -211,7 +234,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
           </button>
         </aside>
         <main className={styles.canvas}>
-          <EditorChrome
+          {pageLoadError ? (
+            <div role="alert" className={styles.error}>
+              {pageLoadError}
+            </div>
+          ) : (
+            <EditorChrome
             center={
               <>
                 {docCode && <CodeChip>{docCode}</CodeChip>}
@@ -227,33 +255,39 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                   type="button"
                   className={editorChromeStyles.primaryBtn}
                   onClick={() => void handleFinalize()}
-                  disabled={!isEditable}
+                  disabled={!canEditContent}
                 >
                   Submeter para revisão
                 </button>
               </>
             }
           >
-            {canMountEditor ? (
+            {editorLoadError ? (
+              <div role="alert" className={styles.error}>
+                {editorLoadError}
+              </div>
+            ) : canMountEditor ? (
               <MetalDocsEditor
                 ref={editorRef}
-                mode={isEditable ? 'document-edit' : 'readonly'}
+                mode={canEditContent ? 'document-edit' : 'readonly'}
                 documentBuffer={buffer ?? undefined}
                 author={authorDisplay}
                 comments={commentsHook.comments}
                 onCommentsChange={commentsHook.setComments}
-                onCommentAdd={(c: Comment) => { if (isEditable) void commentsHook.add(c); }}
-                onCommentResolve={(c: Comment) => { if (isEditable) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
-                onCommentDelete={(c: Comment) => { if (isEditable) void commentsHook.remove(c); }}
-                onCommentReply={(reply: Comment, parent: Comment) => { if (isEditable) void commentsHook.reply(reply, parent); }}
+                onCommentAdd={(c: Comment) => { if (canComment) void commentsHook.add(c); }}
+                onCommentResolve={(c: Comment) => { if (canComment) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
+                onCommentDelete={(c: Comment) => { if (canComment) void commentsHook.remove(c); }}
+                onCommentReply={(reply: Comment, parent: Comment) => { if (canComment) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}
                 onDocumentNameChange={handleRename}
                 showRuler={false}
               />
             ) : null}
           </EditorChrome>
+          )}
         </main>
-        <EditorMetaSidebar
+        {!pageLoadError ? (
+          <EditorMetaSidebar
           open={sidebarOpen}
           onToggle={() => {
             setSidebarOpen((prev) => {
@@ -263,8 +297,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             });
           }}
           code={docCode || undefined}
-        />
+          />
+        ) : null}
       </div>
     </div>
   );
 }
+

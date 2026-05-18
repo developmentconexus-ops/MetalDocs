@@ -100,6 +100,23 @@ describe('useDocumentAutosave', () => {
     expect(vi.mocked(idb.getAllPending)).toBeDefined(); // verifies import wired
   });
 
+  it('upload PUT non-2xx -> commit not called, local pending retained, status error', async () => {
+    const args = baseArgs();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: vi.fn().mockResolvedValue('forbidden'),
+    } as any);
+    const { result } = renderHook(() => useDocumentAutosave(args));
+    await act(async () => {
+      await result.current.queue(new ArrayBuffer(4), null);
+      await result.current.flush();
+    });
+    expect(result.current.status).toBe('error');
+    expect(api.commitAutosave).not.toHaveBeenCalled();
+    expect(vi.mocked(idb.deletePending)).not.toHaveBeenCalled();
+  });
+
   it('410 expired_upload -> status error, pending cleared', async () => {
     const args = baseArgs();
     vi.mocked(api.commitAutosave).mockRejectedValueOnce(

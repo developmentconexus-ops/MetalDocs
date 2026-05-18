@@ -83,7 +83,7 @@ func (r *SnapshotSchemaReader) LoadPlaceholderSchema(ctx context.Context, tenant
 }
 
 // parsePlaceholderSchema handles both storage formats:
-//   - raw array:          [{"id":"..."}]           (eigenpal native, stored in templates_v2)
+//   - raw array:          [{"id":"..."}]           (eigenpal native, stored on template versions)
 //   - wrapped object:     {"placeholders":[...]}   (legacy snapshot format)
 func parsePlaceholderSchema(raw []byte) ([]templatesdomain.Placeholder, error) {
 	if len(raw) == 0 {

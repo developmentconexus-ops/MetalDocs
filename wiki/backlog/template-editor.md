@@ -1,6 +1,6 @@
 # Backlog: Template editor screen (`/templates/:templateId/versions/:n`)
 
-> Last updated: 2026-05-10 (Phase 5 docs after rebuild)
+> Last updated: 2026-05-17 (v1 route memory sync)
 
 Tracks deferred work from the 2026-05-10 template-editor rebuild. The screen now mirrors `DocumentEditorPage` layout (inner rail 48px + variables/outline panels + EditorChrome + eigenpal canvas). Items below were intentionally cut or deferred during the rebuild — none are bugs.
 
@@ -8,10 +8,10 @@ Tracks deferred work from the 2026-05-10 template-editor rebuild. The screen now
 
 ## version-history
 
-**Cut from rebuild — backend gap.** Right-rail "Versões" panel (a la `EditorMetaSidebar` Revisões tab) was not wired because there is no `GET /api/v2/templates/:id/versions` list endpoint today. Only the latest version is returned by `GET /api/v2/templates/:id`.
+**Cut from rebuild — backend gap.** Right-rail "Versões" panel (a la `EditorMetaSidebar` Revisões tab) was not wired because there is no `GET /api/v1/templates/:id/versions` list endpoint today. Only the latest version is returned by `GET /api/v1/templates/:id`.
 
 Backend work:
-- Add `GET /api/v2/templates/:id/versions` returning `[{ id, version_number, status, author_id, created_at, published_at }]`.
+- Add `GET /api/v1/templates/:id/versions` returning `[{ id, version_number, status, author_id, created_at, published_at }]`.
 - Frontend can then add a right sidebar (or modal) listing versions with status pills + jump-to action.
 
 Frontend impact: new component `TemplateVersionTimeline.tsx` (mirror `DocumentVersionTimeline`).
@@ -20,7 +20,7 @@ Frontend impact: new component `TemplateVersionTimeline.tsx` (mirror `DocumentVe
 
 ## comments
 
-**Cut from rebuild — model gap.** Templates have no comment thread today (documents do via `GET /api/v2/documents/:id/comments`). Reviewer feedback during `in_review` flows through `VersionActionPanel` reason field only.
+**Cut from rebuild — model gap.** Templates have no comment thread today (documents do via `GET /api/v1/documents/:id/comments`). Reviewer feedback during `in_review` flows through `VersionActionPanel` reason field only.
 
 Decide before implementing:
 1. Reuse the document comments table with a `template_version_id` column.

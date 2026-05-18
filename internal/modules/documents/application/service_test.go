@@ -59,6 +59,7 @@ type fakeRepo struct {
 	statsByStatusErr    error
 	statsByAreaReturn   map[string]int64
 	statsByAreaErr      error
+	commitTenantID      string
 }
 
 var _ application.Repository = (*fakeRepo)(nil)
@@ -175,7 +176,8 @@ func (f *fakeRepo) GetPendingForCommit(_ context.Context, _ string) (*applicatio
 	return f.pendingMeta, nil
 }
 
-func (f *fakeRepo) CommitUpload(_ context.Context, _, _, _, _, _ string, _ []byte) (*application.CommitResult, error) {
+func (f *fakeRepo) CommitUpload(_ context.Context, tenantID, _, _, _, _, _ string, _ []byte) (*application.CommitResult, error) {
+	f.commitTenantID = tenantID
 	if f.commitErr != nil {
 		return nil, f.commitErr
 	}

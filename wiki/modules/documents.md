@@ -468,7 +468,7 @@ Pointer-only. Body in `wiki/modules/documents-tech-debt.md`. Severity rubric in 
 
 Summary counts (T-008 closed Plan 4; all rows counted by tally including closed):
 - Critical: 1
-- Major: 5
+- Major: 6
 - Minor: 4
 
 Top 3 (by severity, then blast radius):
@@ -514,6 +514,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-17 - Review comments lifecycle audit sync: recorded backend/API prerequisite that unresolved active comments must block approval/release server-side before frontend can claim enforcement.
 - 2026-05-15 - Novo Documento runtime repair: `CreateDocumentTx` now asserts `document.edit` before the initial pointer/snapshot `documents` UPDATEs so the Plan 5 tripwire accepts atomic blank-template creation.
 
 - 2026-05-10 â€” Full Arc42 + C4 rewrite via `metaldocs-module-doc` skill (Phases 0â€“8). Supersedes prior FE-leaning doc; FE Key files now live under `wiki/architecture/frontend-structure.md` cross-link.
