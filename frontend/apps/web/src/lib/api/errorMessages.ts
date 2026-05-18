@@ -11,6 +11,7 @@
   "state.instance_completed": "Este fluxo já foi concluído.",
   "route.in_use": "Esta rota está em uso e não pode ser alterada.",
   "route.duplicate_profile": "Já existe uma rota para este perfil.",
+  "template.artifact_missing": "Não foi possível criar o documento porque o template base não está disponível no momento.",
   "not_found.instance": "Documento não encontrado.",
   "not_found.route": "Nenhuma rota de aprovação configurada para este perfil de documento. Configure uma rota antes de finalizar.",
   "precondition.if_match_required": "A revisão do documento é obrigatória para esta operação.",
