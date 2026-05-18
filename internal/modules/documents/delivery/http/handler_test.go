@@ -42,6 +42,9 @@ type fakeSvc struct {
 	listPaginatedOpts  application.ListOptions
 	listPaginatedUser  string
 
+	revisionHistory []domain.RevisionHistoryItem
+	revisionHistErr error
+
 	statsResult *application.DocumentStats
 	statsErr    error
 }
@@ -155,6 +158,23 @@ func (f *fakeSvc) CreateCheckpoint(_ context.Context, _, _, _, _ string) (*domai
 
 func (f *fakeSvc) ListCheckpoints(_ context.Context, _, _ string) ([]domain.Checkpoint, error) {
 	return []domain.Checkpoint{{ID: "cp_1", VersionNum: 1}}, nil
+}
+
+func (f *fakeSvc) ListRevisionHistory(_ context.Context, _, _ string) ([]domain.RevisionHistoryItem, error) {
+	if f.revisionHistErr != nil {
+		return nil, f.revisionHistErr
+	}
+	if f.revisionHistory == nil {
+		return []domain.RevisionHistoryItem{{
+			DocumentID:     "doc_1",
+			RevisionNumber: 2,
+			RevisionTitle:  "Ajuste operacional",
+			Status:         domain.DocStatusDraft,
+			CreatedAt:      time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC),
+			IsCurrent:      true,
+		}}, nil
+	}
+	return f.revisionHistory, nil
 }
 
 func (f *fakeSvc) RestoreCheckpoint(_ context.Context, _, _, _ string, _ int) (*application.RestoreResult, error) {
@@ -462,5 +482,32 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	}
 	if submitter.called {
 		t.Fatalf("submit service should not be called on replay")
+	}
+}
+
+func TestListRevisionHistory_ReturnsGovernedItems(t *testing.T) {
+	mux := newMux(t, &fakeSvc{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/revision-history", nil)
+	req.SetPathValue("id", "doc_1")
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var body struct {
+		Items []domain.RevisionHistoryItem `json:"items"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if len(body.Items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(body.Items))
+	}
+	if body.Items[0].RevisionTitle != "Ajuste operacional" {
+		t.Fatalf("revision title = %q", body.Items[0].RevisionTitle)
 	}
 }
