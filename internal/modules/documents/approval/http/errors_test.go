@@ -128,6 +128,13 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantTitle:  "wrap: authz: capability \"x\" denied for actor \"u1\" in area \"tenant\"",
 		},
 		{
+			name:       "approval blocked by unresolved comments",
+			err:        application.ErrApprovalBlockedByUnresolvedComments,
+			wantStatus: http.StatusConflict,
+			wantCode:   "approval.unresolved_comments",
+			wantTitle:  application.ErrApprovalBlockedByUnresolvedComments.Error(),
+		},
+		{
 			name:       "application reason required",
 			err:        application.ErrReasonRequired,
 			wantStatus: http.StatusBadRequest,

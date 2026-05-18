@@ -100,6 +100,7 @@ func (r *phase5Repo) ListScheduledDue(_ context.Context, _ *sql.Tx, _ time.Time,
 type phase5Conn struct {
 	stageSignoffs []signoffRow // reuse decisionTestConn's signoffRow type
 	updateResults []int64
+	unresolvedComments int
 	updateIdx     int32 // atomic
 }
 
@@ -143,6 +144,9 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
+	}
+	if strings.Contains(q, "from document_comments") {
+		return &submitSingleValueRows{value: s.conn.unresolvedComments}, nil
 	}
 	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
 		return &submitSingleValueRows{value: false}, nil

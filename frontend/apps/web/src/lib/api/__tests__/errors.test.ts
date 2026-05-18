@@ -6,6 +6,10 @@ describe("resolveErrorMessage", () => {
     expect(resolveErrorMessage("sod.submitter_cannot_sign", "fallback")).toContain("submeteu este documento");
   });
 
+  it("returns the unresolved comments approval message for approval.unresolved_comments", () => {
+    expect(resolveErrorMessage("approval.unresolved_comments", "fallback")).toContain("comentários pendentes");
+  });
+
   it("returns the backend message for an unknown code", () => {
     expect(resolveErrorMessage("unknown.code", "Mensagem do backend")).toBe("Mensagem do backend");
   });
