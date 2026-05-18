@@ -1,5 +1,17 @@
 ## 2026-05-15 - D4 hard-cutover wiki/docs sync
 
+## 2026-05-17 - active v2 reference memory sync
+
+- **Context:** post-merge scan after documents/templates v2 name polish and template wizard completion; active wiki/backlog surfaces still referenced removed `documentsV2.ts`, `/api/v2/documents`, and historical route names.
+- **Mode:** lite patch.
+- **Affected-surface scan:** `rg` across active wiki/backlog/architecture/module docs; historical migrations, release inventory, runbooks, and test artifacts intentionally left unchanged.
+- **Routes/API:** no runtime route change; documentation corrected active future endpoints to `/api/v1/documents/*`.
+- **Runtime flows:** none.
+- **Persistence:** none.
+- **Debt/backlog:** editor backlog contract-gate blocker marked resolved after `scripts/check-module-contract-sync.ps1 -Module documents` passed; distribution backlog future endpoints canonicalized to v1.
+- **Tally gate:** preflight PASS before edits; final tally recorded in session output.
+- **Patched files:** `internal/modules/documents/application/fillin_service.go`; `wiki/backlog/editor.md`; `wiki/backlog/distribuicao.md`; `wiki/architecture/system-overview.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-16 - documents frontend V2 naming polish
 
 - **Context:** uncommitted diff: documents frontend API wrappers renamed editor hooks folder renamed the editor hook folder to `hooks/editor`.

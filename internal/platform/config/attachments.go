@@ -20,6 +20,7 @@ type AttachmentsConfig struct {
 	DownloadSecret        string
 	DownloadTTLSeconds    int
 	MinIOEndpoint         string
+	MinIOPublicEndpoint   string
 	MinIOAccessKey        string
 	MinIOSecretKey        string
 	MinIOBucket           string
@@ -72,6 +73,7 @@ func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 
 	if provider == StorageProviderMinIO {
 		cfg.MinIOEndpoint = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_ENDPOINT"))
+		cfg.MinIOPublicEndpoint = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_PUBLIC_ENDPOINT"))
 		cfg.MinIOAccessKey = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_ACCESS_KEY"))
 		cfg.MinIOSecretKey = os.Getenv("METALDOCS_MINIO_SECRET_KEY")
 		cfg.MinIOBucket = strings.TrimSpace(os.Getenv("METALDOCS_MINIO_BUCKET"))
@@ -80,6 +82,9 @@ func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 
 		if cfg.MinIOEndpoint == "" || cfg.MinIOAccessKey == "" || cfg.MinIOSecretKey == "" || cfg.MinIOBucket == "" {
 			return AttachmentsConfig{}, fmt.Errorf("minio config missing: set METALDOCS_MINIO_ENDPOINT/METALDOCS_MINIO_ACCESS_KEY/METALDOCS_MINIO_SECRET_KEY/METALDOCS_MINIO_BUCKET")
+		}
+		if cfg.MinIOPublicEndpoint == "" {
+			cfg.MinIOPublicEndpoint = cfg.MinIOEndpoint
 		}
 	}
 

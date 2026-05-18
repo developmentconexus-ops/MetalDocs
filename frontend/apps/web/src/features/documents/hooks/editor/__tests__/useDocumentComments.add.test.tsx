@@ -1,3 +1,5 @@
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Comment } from '@metaldocs/editor-ui';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +21,17 @@ function makeComment(id: number): Comment {
     content: [{ type: 'paragraph' }] as unknown as Comment['content'],
     done: false,
   };
+}
+
+function wrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: queryClient }, children);
 }
 
 describe('useDocumentComments add', () => {
@@ -49,7 +62,7 @@ describe('useDocumentComments add', () => {
       } as Response)
       .mockRejectedValueOnce(new Error('network'));
 
-    const { result } = renderHook(() => useDocumentComments('doc-1', 'Alice Doe'));
+    const { result } = renderHook(() => useDocumentComments('doc-1', 'Alice Doe'), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     await act(async () => {

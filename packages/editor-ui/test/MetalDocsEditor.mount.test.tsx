@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { createRef, type ReactNode } from 'react';
+import type { MetalDocsEditorRef } from '../src/types';
 
 afterEach(cleanup);
 import { MetalDocsEditor } from '../src/MetalDocsEditor';
@@ -23,16 +24,21 @@ vi.mock('@eigenpal/docx-js-editor', async () => {
       document,
       mode,
       renderTitleBarRight,
-    }, _ref) => (
-      <div
-        data-testid="docx-editor-mock"
-        data-has-buffer={documentBuffer ? 'yes' : 'no'}
-        data-has-document={document ? 'yes' : 'no'}
-      >
-        {mode === 'editing' ? <div role="toolbar" data-testid="toolbar" /> : null}
-        {renderTitleBarRight ? renderTitleBarRight() : null}
-      </div>
-    )),
+    }, ref) => {
+      React.useImperativeHandle(ref, () => ({
+        save: async () => new ArrayBuffer(16),
+      }));
+      return (
+        <div
+          data-testid="docx-editor-mock"
+          data-has-buffer={documentBuffer ? 'yes' : 'no'}
+          data-has-document={document ? 'yes' : 'no'}
+        >
+          {mode === 'editing' ? <div role="toolbar" data-testid="toolbar" /> : null}
+          {renderTitleBarRight ? renderTitleBarRight() : null}
+        </div>
+      );
+    }),
   };
 });
 
@@ -75,5 +81,14 @@ describe('MetalDocsEditor', () => {
       />
     );
     expect(screen.queryByTestId('sentinel')).not.toBeNull();
+  });
+
+  it('exposes saveNow on ref and returns saved buffer', async () => {
+    const ref = createRef<MetalDocsEditorRef>();
+    render(<MetalDocsEditor ref={ref} mode="document-edit" author="u1" />);
+    expect(ref.current).not.toBeNull();
+    const buf = await ref.current!.saveNow();
+    expect(buf).toBeInstanceOf(ArrayBuffer);
+    expect(buf?.byteLength).toBe(16);
   });
 });

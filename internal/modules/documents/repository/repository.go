@@ -730,12 +730,30 @@ func (r *Repository) GetPendingForCommit(ctx context.Context, pendingID string) 
 // method is called; `serverComputedHash` is the hash the service streamed from
 // S3 and therefore trusted. CommitUpload still compares it to pending.content_hash
 // under FOR UPDATE to catch TOCTOU races.
-func (r *Repository) CommitUpload(ctx context.Context, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte) (*CommitResult, error) {
+func (r *Repository) setAuthzGUC(ctx context.Context, tx *sql.Tx, stmt, tenantID, actorID string) error {
+	if _, err := tx.ExecContext(ctx, stmt, tenantID, actorID); err != nil {
+		return fmt.Errorf("set authz guc: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte) (*CommitResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
+	authzGUCStmt := `
+		SELECT
+			set_config('metaldocs.tenant_id', $1, true),
+			set_config('metaldocs.actor_id', $2, true)
+	`
+	if err := r.setAuthzGUC(ctx, tx, authzGUCStmt, tenantID, userID); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return nil, fmt.Errorf("commit autosave: authz check: %w", err)
+	}
 
 	// Lock pending row.
 	var p domain.PendingUpload

@@ -47,7 +47,7 @@ type Repository interface {
 	ExpireStaleSessions(ctx context.Context, now time.Time) (int, error)
 	PresignReserve(ctx context.Context, sessionID, userID, docID, baseRev, contentHash, storageKey string, expiresAt time.Time) (string, error)
 	GetPendingForCommit(ctx context.Context, pendingID string) (*PendingCommitMeta, error)
-	CommitUpload(ctx context.Context, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte) (*CommitResult, error)
+	CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte) (*CommitResult, error)
 	CreateCheckpoint(ctx context.Context, docID, actorUserID, label string) (*domain.Checkpoint, error)
 	ListCheckpoints(ctx context.Context, docID string) ([]domain.Checkpoint, error)
 	RestoreCheckpoint(ctx context.Context, docID, actorUserID string, versionNum int) (*RestoreResult, error)
@@ -727,7 +727,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		return nil, domain.ErrContentHashMismatch
 	}
 
-	res, err := s.repo.CommitUpload(ctx, cmd.SessionID, cmd.ActorUserID, cmd.DocumentID, cmd.PendingUploadID, serverHash, cmd.FormDataSnapshot)
+	res, err := s.repo.CommitUpload(ctx, cmd.TenantID, cmd.SessionID, cmd.ActorUserID, cmd.DocumentID, cmd.PendingUploadID, serverHash, cmd.FormDataSnapshot)
 	if err != nil {
 		return nil, err
 	}

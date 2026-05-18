@@ -33,5 +33,6 @@ export interface MetalDocsEditorProps {
 
 export interface MetalDocsEditorRef {
   getDocumentBuffer(): Promise<ArrayBuffer | null>;
+  saveNow(): Promise<ArrayBuffer | null>;
   focus(): void;
 }

@@ -95,7 +95,7 @@
 
 ### template-counts
 **Context:** Step 1 (Escopo) shows `— templates` per profile card.
-**Blocked by:** No summary/aggregate endpoint — `GET /api/v2/templates` returns list, no per-profile count.
+**Blocked by:** No summary/aggregate endpoint — `GET /api/v1/templates` returns list, no per-profile count.
 **File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepScope.tsx`
 **TODO tag:** `TODO(novo-template-wizard:template-counts)`
 **Resolution:** When API ships a count field or aggregate endpoint, replace `—` placeholder with real count.
@@ -113,7 +113,7 @@
 
 ### next-code-preview
 **Context:** Step 2 (Identidade) shows code preview card "TPL-POP-009".
-**Blocked by:** No `GET /api/v2/templates/next-code?profile=<CODE>` endpoint. Currently mocked client-side as `TPL-{PROFILE}-XXX` (placeholder digits).
+**Blocked by:** No `GET /api/v1/templates/next-code?profile=<CODE>` endpoint. Currently mocked client-side as `TPL-{PROFILE}-XXX` (placeholder digits).
 **File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepIdentity.tsx`
 **TODO tag:** `TODO(novo-template-wizard:next-code-preview)`
 **Resolution:** When endpoint ships, replace mock with `useNextTemplateCodeQuery(profileCode)`. Show loading + error states.
@@ -121,7 +121,7 @@
 ---
 
 ### key-generation
-**Context:** Backend `POST /api/v2/templates` requires `key` field (unique identifier). Design has no key input — derived auto from name.
+**Context:** Backend `POST /api/v1/templates` requires `key` field (unique identifier). Design has no key input — derived auto from name.
 **Blocked by:** No design decision on key UX. Auto-slug from name is fragile (collisions, edits break links).
 **File:** Step 5 (Confirmação) submit handler — `frontend/apps/web/src/features/templates/pages/TemplateWizardPage.tsx`
 **TODO tag:** `TODO(novo-template-wizard:key-generation)`
@@ -142,7 +142,7 @@
 The wizard now performs the real import after create: selected `.docx` bytes are uploaded via the autosave presign URL, SHA-256 is computed client-side, and `/autosave/commit` stores `docx_storage_key` plus `content_hash` on the draft version before redirecting to Eigenpal.
 
 **Context:** Step 3 lets user pick `.docx` as starting point. Real upload requires presigned URL flow — but template `id`+`n` only exist after Step 5 create.
-**Blocked by:** Wizard ordering — `POST /api/v2/templates` runs at Step 5. Upload flow `POST /api/v2/templates/{id}/{n}/docx-upload-url` then PUT then `PUT /draft` happens **after** create.
+**Blocked by:** Wizard ordering — `POST /api/v1/templates` runs at Step 5. Upload flow `POST /api/v1/templates/{id}/{n}/docx-upload-url` then PUT then `PUT /draft` happens **after** create.
 **File:** `frontend/apps/web/src/features/templates/components/wizard/steps/StepStructure.tsx`
 **TODO tag:** `TODO(novo-template-wizard:step3-docx-upload)`
 **Resolution:** Step 3 currently captures `selectedDocxName` + `selectedDocxSize` only (filename echo, no upload). After Step 5 create, if `startingPoint === 'docx'`, redirect to editor with `?import=<file-blob-ref>` so editor performs presigned upload + draft save. Or stage file in IndexedDB between Step 3 and Step 5.
@@ -154,7 +154,7 @@ The wizard now performs the real import after create: selected `.docx` bytes are
 **Blocked by:** No backend endpoint extracts tokens without publishing. `POST /publish` returns `missing_tokens` / `orphan_tokens` but is destructive.
 **File:** N/A (cut at Phase 0).
 **TODO tag:** `TODO(novo-template-wizard:step3-placeholder-extract)`
-**Resolution:** Add `POST /api/v2/templates/{id}/{n}/extract-tokens` that runs docgen-v2's parser without publishing. Then Step 3 can preview placeholders inline. Auto-fill flag also requires schema metadata not yet defined — design separately.
+**Resolution:** Add `POST /api/v1/templates/{id}/{n}/extract-tokens` that runs docgen-v2's parser without publishing. Then Step 3 can preview placeholders inline. Auto-fill flag also requires schema metadata not yet defined — design separately.
 
 ---
 
@@ -208,7 +208,7 @@ The former company-wide audience count belonged to the removed template-use perm
 
 ### confirmacao-backend-submit
 **Status: RESOLVED 2026-05-10.**
-`TemplateWizardPage.handleSubmit` now calls `POST /api/v2/templates { key, name, description }` and redirects to `/templates/<id>/versions/<n>` on success. Error state surfaces inline in `StepConfirmation` via `submitError` prop.
+`TemplateWizardPage.handleSubmit` now calls `POST /api/v1/templates { key, name, description }` and redirects to `/templates/<id>/versions/<n>` on success. Error state surfaces inline in `StepConfirmation` via `submitError` prop.
 
 ---
 
@@ -216,7 +216,7 @@ The former company-wide audience count belonged to the removed template-use perm
 **Status: REMOVED 2026-05-17.**
 The product decision is to avoid per-template creation/use visibility because it conflicts with document-type permission semantics. OpenAPI, generated backend code, domain create command, frontend create wrapper, and wizard state no longer expose `visibility`, `areas`, or `specific_areas` as author-controlled template-use gates.
 
-**Context:** `POST /api/v2/templates` generated handler (`routes_generated.go`) only accepts `key`, `name`, `description?`, `doc_type_code?`. It hardcodes `Visibility: VisibilityPublic` and `ApproverRole: "approver"`. The wizard collects permissions (Step 4: by area / by role / all-company) and structure origin (Step 3: blank / docx) — none of those are forwarded to the create API.
+**Context:** `POST /api/v1/templates` generated handler (`routes_generated.go`) only accepts `key`, `name`, `description?`, `doc_type_code?`. It hardcodes `Visibility: VisibilityPublic` and `ApproverRole: "approver"`. The wizard collects permissions (Step 4: by area / by role / all-company) and structure origin (Step 3: blank / docx) — none of those are forwarded to the create API.
 **Blocked by:** Backend API contract. The generated OpenAPI spec (`api.gen.go` `CreateTemplateJSONBody`) does not expose `visibility`, `areas`, `specific_areas`, or `approver_role` in the create body.
 **Files:**
 - Backend: `internal/modules/templates/api/api.gen.go` (`CreateTemplateJSONBody`)

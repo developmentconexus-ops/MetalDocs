@@ -18,27 +18,32 @@ import (
 )
 
 type DocumentPresigner struct {
-	client       *minio.Client
-	bucket       string
-	ttl          time.Duration
-	maxSizeBytes int64
+	client        *minio.Client
+	signingClient *minio.Client
+	bucket        string
+	ttl           time.Duration
+	maxSizeBytes  int64
 }
 
-func NewDocumentPresigner(client *minio.Client, bucket string, ttl time.Duration, maxSizeBytes int64) *DocumentPresigner {
+func NewDocumentPresigner(client *minio.Client, signingClient *minio.Client, bucket string, ttl time.Duration, maxSizeBytes int64) *DocumentPresigner {
+	if signingClient == nil {
+		signingClient = client
+	}
 	return &DocumentPresigner{
-		client:       client,
-		bucket:       bucket,
-		ttl:          ttl,
-		maxSizeBytes: maxSizeBytes,
+		client:        client,
+		signingClient: signingClient,
+		bucket:        bucket,
+		ttl:           ttl,
+		maxSizeBytes:  maxSizeBytes,
 	}
 }
 
 func (p *DocumentPresigner) PresignRevisionPUT(ctx context.Context, tenantID, docID, contentHash string) (string, string, error) {
-	if p.client == nil {
+	if p.signingClient == nil {
 		return "", "", errors.New("document presigner minio client is nil")
 	}
 	key := fmt.Sprintf("tenants/%s/documents/%s/revisions/%s.docx", tenantID, docID, contentHash)
-	u, err := p.client.PresignedPutObject(ctx, p.bucket, key, p.ttl)
+	u, err := p.signingClient.PresignedPutObject(ctx, p.bucket, key, p.ttl)
 	if err != nil {
 		return "", "", err
 	}
@@ -46,10 +51,10 @@ func (p *DocumentPresigner) PresignRevisionPUT(ctx context.Context, tenantID, do
 }
 
 func (p *DocumentPresigner) PresignObjectGET(ctx context.Context, storageKey string) (string, error) {
-	if p.client == nil {
+	if p.signingClient == nil {
 		return "", errors.New("document presigner minio client is nil")
 	}
-	u, err := p.client.PresignedGetObject(ctx, p.bucket, storageKey, p.ttl, nil)
+	u, err := p.signingClient.PresignedGetObject(ctx, p.bucket, storageKey, p.ttl, nil)
 	if err != nil {
 		return "", err
 	}

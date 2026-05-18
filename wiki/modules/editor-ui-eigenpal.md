@@ -63,7 +63,7 @@ C4Context
         System(chrome, "EditorChrome", "Toolbar overlay + eigenpal CSS overrides")
     }
     System_Ext(eigenpal, "@eigenpal/docx-js-editor", "External DOCX WYSIWYG (ProseMirror)")
-    System_Ext(docs, "documents backend", "/api/v2/documents (autosave upload, freeze)")
+    System_Ext(docs, "documents backend", "/api/v1/documents (autosave upload, freeze)")
     Rel(author, docPage, "Edits DOCX")
     Rel(author, tplPage, "Authors templates")
     Rel(docPage, adapter, "Mounts MetalDocsEditor")
@@ -353,6 +353,8 @@ Top 3 (by severity, then by blast-radius):
 - Tech debt: `wiki/modules/editor-ui-eigenpal-tech-debt.md`
 
 ## Changelog (this doc)
+
+- 2026-05-17 - Route-memory sync: C4 context now points the documents backend relationship at the canonical `/api/v1/documents` surface. This is a documentation correction only; no adapter runtime behavior changed.
 
 - 2026-05-17 - Blank-template authoring fix: `MetalDocsEditor` now seeds editable no-buffer mounts with `createEmptyDocument()`, keeping Eigenpal's blank-document contract inside the adapter. Updated requirements, strategy, mode mapping, plugin-registration flow, quality requirements, and dependency facts. Verified with editor-ui tests, editor-ui typecheck, frontend typecheck, and Navegador on a fresh blank template (`a93b9271-470c-4178-b557-a914733de92e`).
 

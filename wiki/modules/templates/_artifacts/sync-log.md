@@ -2,6 +2,18 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-17 - active v2 reference memory sync
+
+- **Context:** post-merge scan after templates route/name polish and wizard DOCX import completion; active backlog/roadmap text still referenced `/api/v2/templates` for future work.
+- **Mode:** lite patch.
+- **Affected-surface scan:** `rg` across active wiki/backlog/architecture/module docs; historical migrations, release inventory, runbooks, and test artifacts intentionally left unchanged.
+- **Routes/API:** no runtime route change; active future template endpoints canonicalized to `/api/v1/templates/*`.
+- **Runtime flows:** none.
+- **Persistence:** none.
+- **Debt/backlog:** template editor and novo-template-wizard backlog route text aligned with production v1; roadmap Plan 9/10 examples aligned to v1.
+- **Tally gate:** preflight PASS before edits; final tally recorded in session output.
+- **Patched files:** `wiki/backlog/template-editor.md`; `wiki/backlog/novo-template-wizard.md`; `wiki/backlog/roadmap.md`; `wiki/modules/templates/_artifacts/sync-log.md`.
+
 ## 2026-05-17 - Template wizard DOCX import + permission simplification sync
 
 - **Context:** uncommitted implementation diff for `/templates/new`, template create/list OpenAPI/domain/API cleanup, frontend generated types/wrapper changes, and browser validation of blank + imported DOCX Eigenpal editor handoff.

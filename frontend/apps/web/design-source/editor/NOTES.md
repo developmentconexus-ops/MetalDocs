@@ -12,15 +12,16 @@ Documents are the baseline for Template Editor parity. Template Editor may only 
 
 ## Audit Status (2026-05-17)
 
-Task 1 is currently blocked by a prerequisite gate failure:
+Task 1 gates are currently passing:
 
 - `scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents` -> PASS
-- `scripts/check-module-contract-sync.ps1 -Module documents` -> FAIL (`shared contract prerequisite`, missing expected wrapper path `frontend/apps/web/src/features/documents/api/documentsV2.ts`)
+- `scripts/check-module-contract-sync.ps1 -Module documents` -> PASS
 
-See `wiki/backlog/editor.md` under `Integration Audit (2026-05-17)` for full evidence and next steps.
+The full integration classification is recorded in `wiki/backlog/editor.md` under `Integration Audit (2026-05-17)`.
 
-Until the gate is repaired and rerun as PASS:
+Current implementation boundary:
 
-- do not implement new editor behavior
-- do not claim lifecycle hardening is complete
-- keep template comments deferred and never fake comment UI
+- proceed with document comments query normalization and permission split
+- keep unresolved-comment approval blocking as backend/API prerequisite
+- keep template comments deferred until real template comments capability exists
+- never fake template comments UI

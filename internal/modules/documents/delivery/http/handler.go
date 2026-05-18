@@ -709,6 +709,8 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		FormDataSnapshot: req.FormDataSnapshot,
 	})
 	if err != nil {
+		log.Printf("documents.commit_autosave failed: doc_id=%s tenant_id=%s actor_id=%s session_id=%s pending_upload_id=%s err=%v",
+			docID, tenantID, userID, req.SessionID, req.PendingUploadID, err)
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return

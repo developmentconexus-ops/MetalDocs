@@ -225,6 +225,6 @@ The original 2026-05-06 worksheet predates the approved review-comments lifecycl
 Current gate status for Plan 12 Task 1:
 
 - `scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents` -> PASS
-- `scripts/check-module-contract-sync.ps1 -Module documents` -> FAIL (`shared contract prerequisite`)
+- `scripts/check-module-contract-sync.ps1 -Module documents` -> PASS (post-merge gate alignment to `documents.ts`)
 
-Per stop rules, implementation is blocked until the documents contract gate is repaired and rerun as PASS.
+Per stop rules, implementation can proceed only within the classified audit boundary in `wiki/backlog/editor.md` Integration Audit (2026-05-17).

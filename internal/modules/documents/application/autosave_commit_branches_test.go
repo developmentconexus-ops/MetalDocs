@@ -95,6 +95,9 @@ func TestCommitAutosave_RejectionBranches(t *testing.T) {
 				if result == nil || !result.AlreadyConsumed {
 					t.Fatalf("expected AlreadyConsumed=true result, got %+v", result)
 				}
+				if repo.commitTenantID != "tenant_1" {
+					t.Fatalf("expected tenant_1 forwarded to CommitUpload, got %q", repo.commitTenantID)
+				}
 			}
 		})
 	}

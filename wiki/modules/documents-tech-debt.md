@@ -90,6 +90,14 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** none yet — gated on T-002 closure
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`
 
+### T-011 · Approval can complete without verified unresolved-comment server gate
+- **Severity:** major
+- **Surface:** `internal/modules/documents/delivery/http/handler.go:316` (`finalizeDocument`) · `internal/modules/documents/approval/application/submit_service.go` · `internal/modules/documents/approval/http/signoff_handler.go`
+- **Observation:** Documents approval can complete without a verified server-side unresolved-comment gate. Review comments are active review feedback; release should be clean. Until the approval/signoff path checks unresolved comments, frontend screens must not claim enforcement beyond local UI hints.
+- **Evidence:** `wiki/backlog/editor.md` (`Integration Audit (2026-05-17)` + `approval-blocking-unresolved-comments`) and grep audit over documents approval/finalize paths (no unresolved-comment blocking check found in current runtime owner files).
+- **Linked backlog row:** `wiki/backlog/editor.md#approval-blocking-unresolved-comments`
+- **Linked ADR:** missing-ADR
+
 ---
 
 ## Coverage stats (computed at compose time)

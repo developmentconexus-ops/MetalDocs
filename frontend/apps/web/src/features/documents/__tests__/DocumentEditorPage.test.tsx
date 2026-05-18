@@ -6,22 +6,39 @@ import { DocumentEditorPage } from '../pages/DocumentEditorPage';
 
 const queueSpy = vi.fn();
 const flushSpy = vi.fn();
-const saveBuffer = new Uint8Array([1, 2, 3, 4]).buffer;
+const emittedBuffer = new Uint8Array([9]).buffer;
 
 vi.mock('../api/documents', () => ({
   getDocument: vi.fn(),
   signedRevisionURL: vi.fn(),
   finalizeDocument: vi.fn(),
-  acquireSession: vi.fn(),
-  heartbeatSession: vi.fn(),
-  releaseSession: vi.fn(),
 }));
 
-vi.mock('../hooks/useDocumentAutosave', () => ({
+vi.mock('../hooks/editor/useDocumentAutosave', () => ({
   useDocumentAutosave: () => ({
     status: 'idle',
     queue: queueSpy,
     flush: flushSpy,
+  }),
+}));
+
+vi.mock('../hooks/editor/useDocumentSession', () => ({
+  useDocumentSession: () => ({
+    state: { phase: 'writer', sessionID: 'sess-1', lastAckRevisionID: 'rev-1' },
+    setLastAck: vi.fn(),
+    release: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
+vi.mock('../hooks/editor/useDocumentComments', () => ({
+  useDocumentComments: () => ({
+    comments: [],
+    setComments: vi.fn(),
+    add: vi.fn().mockResolvedValue(undefined),
+    resolve: vi.fn().mockResolvedValue(undefined),
+    reopen: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined),
+    reply: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -36,14 +53,17 @@ vi.mock('../CheckpointsPanel', () => ({
 vi.mock('@metaldocs/editor-ui', () => ({
   MetalDocsEditor: forwardRef<any, any>(function MockMetalDocsEditor(props, ref) {
     useImperativeHandle(ref, () => ({
+      async saveNow() {
+        return emittedBuffer;
+      },
       async getDocumentBuffer() {
-        return saveBuffer;
+        throw new Error('DocumentEditorPage should not re-read the editor buffer during autosave');
       },
       focus() {},
     }), []);
     return (
       <div data-testid="metaldocs-editor">
-        <button type="button" onClick={() => void props.onAutoSave?.(new Uint8Array([9]).buffer)}>
+        <button type="button" onClick={() => void props.onAutoSave?.(emittedBuffer)}>
           trigger-autosave
         </button>
       </div>
@@ -64,14 +84,6 @@ describe('DocumentEditorPage', () => {
       Status: 'draft',
     });
     vi.mocked(api.signedRevisionURL).mockReturnValue('/signed/url');
-    vi.mocked(api.acquireSession).mockResolvedValue({
-      mode: 'writer',
-      session_id: 'sess-1',
-      expires_at: '2099-01-01T00:00:00Z',
-      last_ack_revision_id: 'rev-1',
-    });
-    vi.mocked(api.heartbeatSession).mockResolvedValue(undefined);
-    vi.mocked(api.releaseSession).mockResolvedValue(undefined);
 
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
@@ -102,7 +114,7 @@ describe('DocumentEditorPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'trigger-autosave' }));
 
     await waitFor(() =>
-      expect(queueSpy).toHaveBeenCalledWith(saveBuffer, { foo: 'bar' }),
+      expect(queueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' }),
     );
   });
 });

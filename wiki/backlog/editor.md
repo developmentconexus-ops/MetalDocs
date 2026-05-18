@@ -1,6 +1,6 @@
 # Editor — Deferred Backlog
 
-> **Last verified:** 2026-05-06
+> **Last verified:** 2026-05-17
 > **Scope:** Deferred implementation items for the `/documents/:documentID/edit` editor screen. The right `EditorMetaSidebar` ships with mock data while backend endpoints are designed.
 > **Out of scope:** Bug fixes (see `bugs/`), shared editor primitive (`EditorChrome`).
 > **Key files:**
@@ -113,35 +113,66 @@ Scope: Documents Editor review comments, revision sidebar, clean release semanti
 Required gates:
 
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents` -> PASS
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module documents` -> FAIL (`[MISSING] feature API wrapper presence - frontend/apps/web/src/features/documents/api/documentsV2.ts`)
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module documents` -> PASS (wrapper truth aligned to `frontend/apps/web/src/features/documents/api/documents.ts` by `0e446607`)
 
-Gate decision:
-
-- Classification: `runtime-contract-prereq` (script result: `shared contract prerequisite`)
-- Stop status: implementation blocked until contract gate is repaired and rerun as PASS
-
-Route truth evidence snapshot:
+Route truth evidence:
 
 - OpenAPI comments paths: `api/openapi/v1/openapi.yaml:3723` and `api/openapi/v1/openapi.yaml:3741`
-- Generated backend surface: `internal/modules/documents/api/api.gen.go`
-- Runtime route wiring: `internal/modules/documents/delivery/http/handler.go:120` and `internal/modules/documents/delivery/http/handler.go:155`
-- Active frontend wrapper currently in use: `frontend/apps/web/src/features/documents/api/documents.ts`
+- Generated backend comments surface: `internal/modules/documents/api/api.gen.go` (`ListDocumentComments`, `CreateDocumentComment`, `UpdateDocumentComment`, `DeleteDocumentComment`)
+- Runtime route wiring: `internal/modules/documents/delivery/http/handler.go:120-123` and `internal/modules/documents/delivery/http/handler.go:155-158`
+- Frontend wrapper: `frontend/apps/web/src/features/documents/api/documents.ts`
 
 | Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
 |---|---|---|---|---|---|
-| Documents module contract gate | `scripts/check-module-contract-sync.ps1 -Module documents` | Gate expects wrapper `frontend/apps/web/src/features/documents/api/documentsV2.ts` | Screen uses `frontend/apps/web/src/features/documents/api/documents.ts` | runtime-contract-prereq | Stop screen implementation and repair/align module contract gate expectations first |
-| Inline document comments load | `DocumentEditorPage`, `useDocumentComments`, OpenAPI comments paths | GET comments route exists in runtime + OpenAPI + generated backend | Wrapper exists in `documents.ts` | blocked by prerequisite gate | Re-audit after gate repair |
-| Add/reply/resolve/delete comments | document comments API + Eigenpal callbacks | POST/PATCH/DELETE comment routes exist | Page-level behavior still needs full lifecycle audit | blocked by prerequisite gate | Re-audit after gate repair |
-| Reviewer adds comments during review | approved lifecycle spec | Not verified yet under current gate failure | Not verified yet under current gate failure | blocked by prerequisite gate | Re-audit after gate repair; if readonly commenting unsupported, classify `Eigenpal adapter prerequisite` |
-| Unresolved comments block approval | approved lifecycle spec | No server-side enforcement verified in this run | No enforcement verified in this run | backend/API prerequisite (pending) | Keep as prerequisite candidate; confirm after gate repair |
-| Template parity baseline | lifecycle spec + template backlog | Template comments capability still unknown in this run | No fake comments UI allowed | defer/prerequisite (pending) | Keep deferred until backend/database/API capability is proven |
+| Documents runtime + contract gates | `check-system-runnable`, `check-module-contract-sync` | Both required gates pass | N/A | implemented and aligned | Proceed with screen-level hardening scope |
+| Editor mounts by status/session | `DocumentEditorPage` + `useDocumentSession` | Runtime supports writer/readonly/lost session modes | Editor mode toggles by `isEditable` (draft+writer only) | implemented and aligned | Keep |
+| Comments list load | comments route + wrapper + hook | GET route exists and is wired end-to-end | `useDocumentComments` uses local `useEffect` state, not TanStack Query | implemented but legacy-wired | Normalize to TanStack Query hooks/query keys |
+| Add comment | POST comments route | Route exists | Callback gated by `if (isEditable)` | screen-local integration fix | Split `canEditContent` vs `canComment` and verify behavior |
+| Reply comment | POST comments route (`parent_library_id`) | Route exists | Callback gated by `if (isEditable)` | screen-local integration fix | Same permission split as add |
+| Resolve/reopen comment | PATCH comments route (`done`) | Route exists; `resolved_at` semantics present | Callback gated by `if (isEditable)` | screen-local integration fix | Same permission split as add |
+| Delete comment | DELETE comments route | Route exists | Callback gated by `if (isEditable)` | screen-local integration fix | Same permission split as add |
+| Reviewer can comment in `under_review` | lifecycle design spec | API supports comments regardless of draft-only frontend guard | UI currently blocks comment mutations when not draft+writer | screen-local integration fix or Eigenpal adapter prerequisite | Implement permission split, then manual smoke; if readonly cannot comment at editor level, reclassify as Eigenpal prerequisite |
+| Rejected->draft keeps comments visible | lifecycle design spec + `document_comments` persistence | Comments are document-scoped and persisted | Hook loads all comments for document | implemented and aligned | Keep; document lifecycle rule in notes/wiki |
+| Released output remains clean (no active comments) | lifecycle design spec | Editor comments are separate from released PDF rendering pipeline | Published screen currently has placeholder "discussion comments" section | defer | Plan 12.6 published-screen cleanup must avoid surfacing active editor comments as released content |
+| Unresolved comments block approval/release | lifecycle design spec | No verified server-side guard found in finalize/approval path in this audit | Frontend has no reliable server-enforced check | missing backend capability | Backend/API prerequisite; do not claim enforcement in UI |
+| Sidebar metadata rows (Perfil/Área/Vigência/Próx revisão/Visibilidade) | `EditorMetaSidebar` + backlog | No complete single response shape currently wired for all rows | Mock values marked TODO | missing backend capability | Keep deferred exactly as backlog row 1 |
+| Sidebar revisions timeline | `EditorMetaSidebar` + backlog | No `/documents/:id/revisions` list wired for editor sidebar | Mock timeline | missing backend capability | Keep deferred exactly as backlog row 2 |
+| Sidebar next approvers | `EditorMetaSidebar` + backlog | No dedicated editor-side signoffs payload wired for this section | Mock approvers list | missing backend capability | Keep deferred exactly as backlog row 3 |
+| Orphan comment partitioning | `useDocumentComments` + contract doc | Backend stores metadata; anchor ownership is DOCX-side | Hook currently returns empty `orphans` | implemented but legacy-wired | Keep as follow-up; do not block current lifecycle hardening |
+| Template editor comments parity | lifecycle design + template backlog | No template comments persistence/API contract in current truth | No real template comments UI | missing backend capability | Prerequisite for template comments; never fake UI |
 
-### Prerequisite to unblock Task 1
+### Ready for implementation
 
-- Fix the documents module contract-sync failure (wrapper truth drift between expected `documentsV2.ts` and actual `documents.ts`), then rerun:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-system-runnable.ps1 -TargetRoute /api/v1/documents`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module documents`
+- Document comments query normalization to TanStack Query.
+- Document editor permission split: content editability vs commentability (draft/review/rejected).
+- Notes/worksheet alignment with active-review-feedback lifecycle.
 
-### Next step after prerequisite passes
+### Prerequisites
 
-- Resume this audit and classify every visible comment/revision/sidebar/action item to completion before any code implementation.
+- Backend/API enforcement for unresolved-comment approval blocking.
+- Template comments database/backend/OpenAPI/generated/frontend surfaces before template comments UI parity.
+- Potential Eigenpal adapter prerequisite if readonly mode cannot create review comments.
+
+### Deferred
+
+- Sidebar metadata/revisions/approvers sections that still depend on missing backend capability.
+- Published-view discussion/comments surfaces until real product and backend behavior is defined for released views.
+- Generic cross-module comments platform.
+
+## approval-blocking-unresolved-comments
+
+**Prerequisite, not screen-local.** The approved product lifecycle says unresolved comments and pending suggestions must block approval/release. Current document comments persist review feedback, but approval/signoff/finalize enforcement must be server-side before the UI can claim this rule is guaranteed.
+
+Required future work:
+
+- Add a backend service check for unresolved active comments before final approval/release.
+- Expose a stable Problem code when approval is blocked by unresolved comments.
+- Regenerate OpenAPI/backend/frontend types if response contracts change.
+- Add frontend error mapping through `resolveErrorMessage`.
+- Apply the same rule to templates only after template comments exist.
+
+### Verification needed next
+
+- `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
+- `cd frontend/apps/web; pnpm test -- src/features/documents/hooks/editor/__tests__/useDocumentComments.load.test.tsx src/features/documents/hooks/editor/__tests__/useDocumentComments.add.test.tsx src/features/documents/hooks/editor/__tests__/useDocumentComments.orphan.test.tsx src/features/documents/pages/DocumentEditorPage.test.tsx`
+- Manual/Navegador smoke on `/documents/:documentID/edit` and template route for parity/defer checks.

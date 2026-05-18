@@ -219,7 +219,7 @@ func main() {
 
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
-	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
+	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
 	cdRepo := registryinfra.NewPostgresControlledDocumentRepository(deps.SQLDB)
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
@@ -323,7 +323,7 @@ func main() {
 	// needs RegistryDuplicator), hence the post-construction setter.
 	registryModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
-	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioBucket, 25*1024*1024)
+	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
 	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())

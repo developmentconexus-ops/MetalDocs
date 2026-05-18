@@ -15,17 +15,21 @@ import (
 
 // TemplatesPresigner implements templates/application.Presigner.
 type TemplatesPresigner struct {
-	client       *minio.Client
-	bucket       string
-	maxSizeBytes int64
+	client        *minio.Client
+	signingClient *minio.Client
+	bucket        string
+	maxSizeBytes  int64
 }
 
-func NewTemplatesPresigner(client *minio.Client, bucket string, maxSizeBytes int64) *TemplatesPresigner {
-	return &TemplatesPresigner{client: client, bucket: bucket, maxSizeBytes: maxSizeBytes}
+func NewTemplatesPresigner(client *minio.Client, signingClient *minio.Client, bucket string, maxSizeBytes int64) *TemplatesPresigner {
+	if signingClient == nil {
+		signingClient = client
+	}
+	return &TemplatesPresigner{client: client, signingClient: signingClient, bucket: bucket, maxSizeBytes: maxSizeBytes}
 }
 
 func (p *TemplatesPresigner) PresignPUT(ctx context.Context, key string, expires time.Duration) (string, error) {
-	u, err := p.client.PresignedPutObject(ctx, p.bucket, key, expires)
+	u, err := p.signingClient.PresignedPutObject(ctx, p.bucket, key, expires)
 	if err != nil {
 		return "", err
 	}
@@ -33,7 +37,7 @@ func (p *TemplatesPresigner) PresignPUT(ctx context.Context, key string, expires
 }
 
 func (p *TemplatesPresigner) PresignGET(ctx context.Context, key string, expires time.Duration) (string, error) {
-	u, err := p.client.PresignedGetObject(ctx, p.bucket, key, expires, nil)
+	u, err := p.signingClient.PresignedGetObject(ctx, p.bucket, key, expires, nil)
 	if err != nil {
 		return "", err
 	}
