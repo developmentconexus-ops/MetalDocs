@@ -3534,7 +3534,21 @@ paths:
           in: header
           required: true
           schema: { type: string, format: uuid }
-      responses: { '200': { description: ok }, '409': { description: invalid_state_transition } }
+      responses:
+        '201':
+          description: created
+          headers:
+            Idempotent-Replay:
+              schema: { type: string }
+              description: Present with value `true` when an idempotent replay response is returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [instanceId]
+                properties:
+                  instanceId: { type: string, format: uuid }
+        '409': { description: invalid_state_transition }
   /api/v1/documents/{id}/archive:
     post:
       tags: [documents]

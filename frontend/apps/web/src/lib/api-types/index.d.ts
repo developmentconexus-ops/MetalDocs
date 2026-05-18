@@ -8699,12 +8699,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
-            200: {
+            /** @description created */
+            201: {
                 headers: {
+                    /** @description Present with value `true` when an idempotent replay response is returned. */
+                    "Idempotent-Replay"?: string;
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        instanceId: string;
+                    };
+                };
             };
             /** @description invalid_state_transition */
             409: {

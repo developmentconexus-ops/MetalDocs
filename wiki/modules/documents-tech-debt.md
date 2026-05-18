@@ -50,13 +50,13 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-005
 - **Linked ADR:** missing-ADR
 
-### T-006 · `POST /api/v1/documents/{id}/finalize` lacks HTTP `Idempotency-Key` integration
-- **Severity:** major
-- **Surface:** `internal/modules/documents/delivery/http/handler.go:316` (handler entry) · `internal/modules/documents/approval/application/submit_service.go:61` (internal key compute) · `internal/modules/documents/approval/application/idempotency.go:20` (ComputeIdempotencyKey)
-- **Observation:** Submit path computes a deterministic internal key but does not read the `Idempotency-Key` header nor write `metaldocs.idempotency_keys`. Replay safety relies entirely on the partial unique index `ux_approval_instances_active` (`migrations/0135_*.sql:33`) — a retry returns 409, not a replayed 201. Contract drift vs. Stripe-style idempotency (`internal/platform/idempotency/`).
-- **Evidence:** `_artifacts/02-flow-finalizeDocument.md` §6 ("Idempotency: no"); `_artifacts/05-industry.md` IP-002.
-- **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-006
-- **Linked ADR:** `wiki/decisions/0011-cd-atomic-create.md` (sibling pattern on CD create)
+### T-006 · `POST /api/v1/documents/{id}/finalize` HTTP idempotency contract — CLOSED 2026-05-18
+- **Severity:** major (closed)
+- **Surface (resolved):** `internal/modules/documents/delivery/http/handler.go:316` now enforces `Idempotency-Key`, records replay entries through `internal/platform/idempotency`, and returns `201 { instanceId }` with `Idempotent-Replay: true` on replay; `api/openapi/v1/openapi.yaml` and `frontend/apps/web/src/lib/api-types/index.d.ts` were aligned to the same response shape; `frontend/apps/web/src/features/documents/api/documents.ts` now sends the header.
+- **Observation (original):** The runtime path already enforced HTTP idempotency, but the shared contract and frontend wrapper drifted: OpenAPI still documented a bare `200`, generated frontend types inherited that drift, and the handwritten wrapper did not send `Idempotency-Key`.
+- **Evidence:** `internal/modules/documents/delivery/http/handler_test.go` (`MissingIdempotencyKey`, `InvalidIdempotencyKey`, `ReplayReturnsCreatedAndHeader`); `frontend/apps/web/src/features/documents/__tests__/documents.test.ts`; contract/codegen regeneration on 2026-05-18.
+- **Linked backlog row:** `wiki/backlog/editor.md` integration audit item `Submit for review CTA` (closed prerequisite)
+- **Linked ADR:** `wiki/decisions/0011-cd-atomic-create.md` (sibling idempotency pattern); `wiki/decisions/0012-contract-first-api.md`
 
 ### T-007 · Audit emission relies on `Audit` interface with no `audit/domain` import in module graph
 - **Severity:** minor
@@ -107,4 +107,3 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - Cross-deps missing in §5/§8: 0 / 25 (all 14 OUT + 11 IN edges from `_artifacts/03-deps.md` appear in §3.2 or §5).
 - State transitions missing in §6: 0 / 5 (draft → under_review → approved → published → superseded/obsolete + rejected branch all tabled).
 - Decisions without ADR link: 4 / 9 (T-004, T-005, T-007, T-009 flagged missing-ADR; T-008 closed by Plan 4).
-

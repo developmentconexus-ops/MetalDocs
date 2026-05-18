@@ -20,6 +20,7 @@ export type AcquireResult = AcquireWriter | AcquireReadonly;
 export type PresignResult = { upload_url: string; pending_upload_id: string; expires_at: string };
 export type CommitResult = { revision_id: string; revision_num: number; idempotent_replay?: boolean };
 export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; VersionNum: number; Label: string; CreatedAt: string; CreatedBy: string };
+export type FinalizeDocumentResult = { instanceId: string };
 export type DocumentResponse = {
   ID?: string;
   id?: string;
@@ -52,8 +53,11 @@ export async function renameDocument(id: string, name: string): Promise<void> {
     body: JSON.stringify({ name }),
   });
 }
-export async function finalizeDocument(id: string) {
-  return apiFetch(`/api/v1/documents/${id}/finalize`, { method: 'POST' });
+export async function finalizeDocument(id: string): Promise<FinalizeDocumentResult> {
+  return apiFetch<FinalizeDocumentResult>(`/api/v1/documents/${id}/finalize`, {
+    method: 'POST',
+    idempotencyKey: crypto.randomUUID(),
+  });
 }
 export async function archiveDocument(id: string) {
   return apiFetch(`/api/v1/documents/${id}/archive`, { method: 'POST' });

@@ -29,4 +29,21 @@ describe('documents with apiFetch', () => {
     await expect(finalizeDocument('doc-1')).rejects.toBeInstanceOf(ApiError);
     await expect(finalizeDocument('doc-1')).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
   });
+
+  it('finalizeDocument sends Idempotency-Key and returns instanceId on 201', async () => {
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ instanceId: 'inst_1' }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const result = await finalizeDocument('doc-1');
+
+    expect(result).toEqual({ instanceId: 'inst_1' });
+    const [, init] = fetchSpy.mock.calls[0] ?? [];
+    const headers = init?.headers as Record<string, string> | undefined;
+    expect(headers).toMatchObject({ 'Idempotency-Key': '11111111-1111-4111-8111-111111111111' });
+  });
 });

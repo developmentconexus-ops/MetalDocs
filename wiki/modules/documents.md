@@ -174,7 +174,7 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/delivery/http/handler.go:76` | `NewHandlerWithSubmit` | func | Wires db + submitSvc for atomic finalize |
 | `internal/modules/documents/delivery/http/handler.go:145` | `listDocuments` | func | `GET /api/v1/documents` |
 | `internal/modules/documents/delivery/http/handler.go:285` | `renameDocument` | func | `PATCH /api/v1/documents/{id}` (T-002 spec gap, T-004 dup route, T-005 audit-tx gap) |
-| `internal/modules/documents/delivery/http/handler.go:316` | `finalizeDocument` | func | `POST /api/v1/documents/{id}/finalize` (T-006 idempotency gap) |
+| `internal/modules/documents/delivery/http/handler.go:316` | `finalizeDocument` | func | `POST /api/v1/documents/{id}/finalize` with HTTP idempotency header + replay support |
 | `internal/modules/documents/delivery/http/handler.go:869` | `authorizeDocumentScope` | func | Role + ownership gate (tier-1) |
 | `internal/modules/documents/delivery/http/handler.go:958..1009` | `mapErr` | func | Legacy envelope mapping (T-001) |
 | `internal/modules/documents/repository/repository.go:76` | `CreateDocumentTx` impl | func | Tx-scoped CD+document insert (ADR 0011); asserts `document.create` before INSERT and `document.edit` before pointer/snapshot UPDATEs |
@@ -343,7 +343,7 @@ sequenceDiagram
     H-->>C: 201 {"instanceId": ...}
 ```
 
-Source: `_artifacts/02-flow-finalizeDocument.md`. Full tripwire defense-in-depth on approval tables. No HTTP `Idempotency-Key` (T-006); replay collides on `ux_approval_instances_active` partial unique index.
+Source: `_artifacts/02-flow-finalizeDocument.md`. Full tripwire defense-in-depth on approval tables. Runtime now enforces HTTP `Idempotency-Key`, stores replay responses through `internal/platform/idempotency`, and replays as `201 { instanceId }` with `Idempotent-Replay: true`.
 
 ### State transitions
 
@@ -404,7 +404,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 ### 8.3 Idempotency
 - `internal/platform/idempotency` provides Stripe-style header replay store.
 - Used by signoff via `approval/infrastructure/postgres_signoff_idemp_store.go:9`.
-- **Not** used on finalize (T-006): submit path computes an internal deterministic `ComputeIdempotencyKey` (`approval/application/idempotency.go:20`) and relies on `ux_approval_instances_active` partial unique index for replay safety.
+- Used on finalize: handler requires `Idempotency-Key`, hashes the request payload, checks/records replay entries through `internal/platform/idempotency`, and returns `Idempotent-Replay: true` on replay. The submit path still computes its internal deterministic key (`approval/application/idempotency.go:20`) for approval-side consistency.
 
 ### 8.4 Pagination
 - Offset only: `page` + `pageSize` (default 1 / 20, cap 50). Repo `LIMIT/OFFSET` at `repository.go:343`.
@@ -456,7 +456,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Authz isolation (documents table) | A user with stale role token calls `PATCH /documents/{id}` | 403 from role gate; in-tx `authz.Require` + tripwire trigger on `documents` table (T-003 closed Plan 5) |
 | Atomic CD create | Crash mid-registry insert | Whole tx rolls back; `cd_sequence_counters` unchanged (ADR 0011) |
 | Audit completeness on rename | Crash between UPDATE and audit.Write | **T-005: row mutated, no audit row** â€” fails today |
-| Replay safety on finalize | Client retries finalize over flaky network | Second call â†’ 409 from `ux_approval_instances_active`. **T-006: not a true idempotent replay** |
+| Replay safety on finalize | Client retries finalize with the same `Idempotency-Key` and unchanged payload | Second call replays `201 { instanceId }` with `Idempotent-Replay: true`; mismatched payload under the same key is rejected by the shared idempotency store |
 | Snapshot guard on submit | Submit with null placeholder snapshot | DB trigger `enforce_snapshot_on_submit_trg` raises; 500 surfaces as mapped error |
 | Multi-tenant isolation | Cross-tenant id guessed | Every owned table carries `tenant_id`; repo queries scope (`repository.go:343, :376`) |
 
