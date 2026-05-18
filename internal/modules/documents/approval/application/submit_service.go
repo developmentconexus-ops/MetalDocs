@@ -12,8 +12,8 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // SubmitService handles document submission for approval.
@@ -26,9 +26,10 @@ type SubmitService struct {
 // SubmitRequest carries all inputs for SubmitRevisionForReview.
 type SubmitRequest struct {
 	TenantID        string
-	DocumentID      string         // UUID as string
-	RouteID         string         // UUID as string
-	SubmittedBy     string         // user_id
+	DocumentID      string // UUID as string
+	RouteID         string // UUID as string
+	SubmittedBy     string // user_id
+	RevisionTitle   string
 	ContentFormData map[string]any // raw form data for hashing
 	RevisionVersion int            // OCC version from caller
 }
@@ -169,12 +170,13 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 	res, err := tx.ExecContext(ctx, `
 		UPDATE documents
 		   SET status           = 'under_review',
+		       revision_title   = $4,
 		       revision_version = revision_version + 1
 		 WHERE id               = $1
 		   AND tenant_id        = $2
 		   AND status           = 'draft'
 		   AND revision_version = $3`,
-		req.DocumentID, req.TenantID, req.RevisionVersion,
+		req.DocumentID, req.TenantID, req.RevisionVersion, req.RevisionTitle,
 	)
 	if err != nil {
 		_ = tx.Rollback()

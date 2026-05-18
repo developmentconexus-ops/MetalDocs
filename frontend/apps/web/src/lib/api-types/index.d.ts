@@ -5750,6 +5750,7 @@ export interface components {
             UpdatedAt: string;
             CreatedBy: string;
             ControlledDocumentID?: string | null;
+            RevisionTitle?: string | null;
             ProfileCodeSnapshot?: string | null;
             ProcessAreaCodeSnapshot?: string | null;
             Code: string;
@@ -5777,6 +5778,7 @@ export interface components {
             UpdatedAt: string;
             CreatedBy: string;
             ControlledDocumentID?: string | null;
+            RevisionTitle?: string | null;
             ProfileCodeSnapshot?: string | null;
             ProcessAreaCodeSnapshot?: string | null;
             Code: string;
@@ -6690,6 +6692,9 @@ export interface components {
             signature_method: string;
             /** Format: date-time */
             signed_at: string;
+        };
+        FinalizeDocumentRequest: {
+            revisionTitle: string;
         };
         FieldError: {
             /** @description JSON pointer or dot path */
@@ -8794,7 +8799,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalizeDocumentRequest"];
+            };
+        };
         responses: {
             /** @description created */
             201: {

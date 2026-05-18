@@ -35,8 +35,8 @@ describe('documents with apiFetch', () => {
         ),
       ),
     );
-    await expect(finalizeDocument('doc-1')).rejects.toBeInstanceOf(ApiError);
-    await expect(finalizeDocument('doc-1')).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
+    await expect(finalizeDocument('doc-1', { revisionTitle: 'Ajuste operacional' })).rejects.toBeInstanceOf(ApiError);
+    await expect(finalizeDocument('doc-1', { revisionTitle: 'Ajuste operacional' })).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
   });
 
   it('getDocument returns typed detail payload with embedded FormDataJSON', async () => {
@@ -99,12 +99,13 @@ describe('documents with apiFetch', () => {
       ),
     );
 
-    const result = await finalizeDocument('doc-1');
+    const result = await finalizeDocument('doc-1', { revisionTitle: 'Ajuste operacional' });
 
     expect(result).toEqual({ instanceId: 'inst_1' });
     const [, init] = fetchSpy.mock.calls[0] ?? [];
     const headers = init?.headers as Record<string, string> | undefined;
     expect(headers).toMatchObject({ 'Idempotency-Key': '11111111-1111-4111-8111-111111111111' });
+    expect(JSON.parse(String(init?.body))).toEqual({ revisionTitle: 'Ajuste operacional' });
   });
 
   it('reads approval-instance with runtime-aligned statuses and signoff payload', async () => {

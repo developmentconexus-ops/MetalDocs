@@ -3541,6 +3541,12 @@ paths:
           in: header
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinalizeDocumentRequest'
       responses:
         '201':
           description: created
@@ -4503,6 +4509,9 @@ components:
         ControlledDocumentID:
           type: string
           nullable: true
+        RevisionTitle:
+          type: string
+          nullable: true
         ProfileCodeSnapshot:
           type: string
           nullable: true
@@ -4552,6 +4561,9 @@ components:
         CreatedBy:
           type: string
         ControlledDocumentID:
+          type: string
+          nullable: true
+        RevisionTitle:
           type: string
           nullable: true
         ProfileCodeSnapshot:
@@ -6174,6 +6186,13 @@ components:
         reason: { type: string }
         signature_method: { type: string }
         signed_at: { type: string, format: date-time }
+    FinalizeDocumentRequest:
+      type: object
+      required: [revisionTitle]
+      properties:
+        revisionTitle:
+          type: string
+          minLength: 1
     FieldError:
       type: object
       required: [field, code, message]

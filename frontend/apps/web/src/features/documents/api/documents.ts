@@ -22,6 +22,7 @@ export type PresignResult = { upload_url: string; pending_upload_id: string; exp
 export type CommitResult = { revision_id: string; revision_num: number; idempotent_replay?: boolean };
 export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; VersionNum: number; Label: string; CreatedAt: string; CreatedBy: string };
 export type FinalizeDocumentResult = { instanceId: string };
+export type FinalizeDocumentRequest = components['schemas']['FinalizeDocumentRequest'];
 export type DocumentDetail = components['schemas']['DocumentDetailResponse'];
 export type DocumentComment = components['schemas']['DocumentCommentResponse'];
 export type DocumentCommentCreateRequest = components['schemas']['DocumentCommentCreateRequest'];
@@ -41,10 +42,11 @@ export async function renameDocument(id: string, name: string): Promise<void> {
     body: JSON.stringify({ name }),
   });
 }
-export async function finalizeDocument(id: string): Promise<FinalizeDocumentResult> {
+export async function finalizeDocument(id: string, body: FinalizeDocumentRequest): Promise<FinalizeDocumentResult> {
   return apiFetch<FinalizeDocumentResult>(`/api/v1/documents/${id}/finalize`, {
     method: 'POST',
     idempotencyKey: crypto.randomUUID(),
+    body: JSON.stringify(body),
   });
 }
 export async function archiveDocument(id: string) {
