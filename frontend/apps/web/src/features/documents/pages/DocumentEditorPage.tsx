@@ -199,6 +199,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const userID = doc?.CreatedBy ?? doc?.created_by ?? '';
   const authorDisplay = String(userID);
   const commentsHook = useDocumentComments(documentID, authorDisplay);
+  const canUseComments = canComment && !commentsHook.loadError;
   const canMountEditor = !!doc
     && session.state.phase !== 'idle'
     && session.state.phase !== 'acquiring'
@@ -266,6 +267,18 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
               </>
             }
           >
+            {commentsHook.loadError ? (
+              <div className={styles.errorBanner} role="alert">
+                <span>{commentsHook.loadError}</span>
+                <button
+                  type="button"
+                  className={styles.retryButton}
+                  onClick={() => void commentsHook.retry()}
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            ) : null}
             {editorLoadError ? (
               <div role="alert" className={styles.error}>
                 {editorLoadError}
@@ -278,10 +291,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 author={authorDisplay}
                 comments={commentsHook.comments}
                 onCommentsChange={commentsHook.setComments}
-                onCommentAdd={(c: Comment) => { if (canComment) void commentsHook.add(c); }}
-                onCommentResolve={(c: Comment) => { if (canComment) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
-                onCommentDelete={(c: Comment) => { if (canComment) void commentsHook.remove(c); }}
-                onCommentReply={(reply: Comment, parent: Comment) => { if (canComment) void commentsHook.reply(reply, parent); }}
+                onCommentAdd={(c: Comment) => { if (canUseComments) void commentsHook.add(c); }}
+                onCommentResolve={(c: Comment) => { if (canUseComments) void (c.done ? commentsHook.resolve(c) : commentsHook.reopen(c)); }}
+                onCommentDelete={(c: Comment) => { if (canUseComments) void commentsHook.remove(c); }}
+                onCommentReply={(reply: Comment, parent: Comment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}
                 onDocumentNameChange={handleRename}
                 showRuler={false}

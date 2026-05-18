@@ -71,6 +71,7 @@ Priority: `errorMessages[code]` → `backendMessage` (non-empty) → `'Ocorreu u
 Key codes:
 - `sod.submitter_cannot_sign` — submitter ≠ approver SoD
 - `sod.cross_stage_duplicate` — same user, multiple stages
+- `approval.unresolved_comments` — final approval/release is blocked until active document comments are resolved; handled inline in `SignoffDialog`, not as a generic outage message
 - `signoff.not_eligible` — actor not in `eligible_actor_ids` snapshot frozen at submit time; HTTP 403. Mapped from `domain.ErrActorNotEligible` at `internal/modules/documents/approval/http/errors.go:48-50`. Handle analogously to SoD codes in `SignoffDialog` — inline dialog error, not a toast.
 - `not_found.route` — no approval route configured for document profile
 - `authn.expired` — session expired
@@ -133,6 +134,8 @@ No `toast.error` on 401 — the login redirect is the UX.
 - `error_sod_duplicate` — shown when `code === 'sod.cross_stage_duplicate'`
 
 Messages come from `resolveErrorMessage` against the shared `errorMessages` map — Portuguese, displayed inline in the dialog, not as a toast.
+
+The same dialog now also resolves mapped business conflicts such as `approval.unresolved_comments` through `resolveErrorMessage(code)` before falling back to the generic `error_server` copy. Unmapped backend codes still keep the safe generic message.
 
 ---
 

@@ -52,6 +52,7 @@ export function SignoffDialog({
   onSuccess,
 }: SignoffDialogProps) {
   const [state, setState] = useState<DialogState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [decision, setDecision] = useState<Decision>(initialDecision ?? 'approve');
   const [reason, setReason] = useState('');
   const [password, setPassword] = useState('');
@@ -135,6 +136,8 @@ export function SignoffDialog({
       if (error.status === 429 || error.code === 'authn.rate_limited') return 'error_rate_limited';
       if (error.code === 'sod.submitter_cannot_sign') return 'error_sod_submitter';
       if (error.code === 'sod.cross_stage_duplicate') return 'error_sod_duplicate';
+      const resolvedMessage = resolveErrorMessage(error.code);
+      setErrorMessage(resolvedMessage === 'Erro inesperado.' ? null : resolvedMessage);
       return 'error_server';
     }
 
@@ -157,6 +160,7 @@ export function SignoffDialog({
 
     setReasonError(null);
     setShowStaleBanner(false);
+    setErrorMessage(null);
 
     const normalizedReason = reason.trim();
     if (decision === 'reject' && normalizedReason.length === 0) {
@@ -207,7 +211,7 @@ export function SignoffDialog({
 
         {hasError ? (
           <div className={styles.errorBox} role="alert">
-            {ERROR_MESSAGES[state as keyof typeof ERROR_MESSAGES]}
+            {errorMessage ?? ERROR_MESSAGES[state as keyof typeof ERROR_MESSAGES]}
           </div>
         ) : null}
 
