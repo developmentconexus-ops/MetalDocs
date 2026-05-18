@@ -157,4 +157,28 @@ describe('useDocumentAutosave', () => {
     await vi.waitFor(() => expect(api.commitAutosave).toHaveBeenCalled());
     expect(idb.deletePending).toHaveBeenCalledWith('doc-1', 'abc');
   });
+
+  it('debounces autosave flush for 3 seconds after queue', async () => {
+    vi.useFakeTimers();
+    const args = baseArgs();
+    const { result } = renderHook(() => useDocumentAutosave(args));
+
+    await act(async () => {
+      await result.current.queue(new ArrayBuffer(4), null);
+    });
+
+    expect(api.presignAutosave).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_999);
+    });
+    expect(api.presignAutosave).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(api.presignAutosave).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
 });

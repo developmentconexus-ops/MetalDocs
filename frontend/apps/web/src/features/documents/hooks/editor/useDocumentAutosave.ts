@@ -12,7 +12,7 @@ export interface AutosaveArgs {
   onSessionLost: (reason: 'stale_base' | 'session_inactive' | 'force_released') => void;
 }
 
-const SYNC_DEBOUNCE_MS = 8_000;
+const SYNC_DEBOUNCE_MS = 3_000;
 
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', buf);
