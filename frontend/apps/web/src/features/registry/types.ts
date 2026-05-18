@@ -1,18 +1,6 @@
-export interface ControlledDocument {
-  id: string;
-  tenantId: string;
-  profileCode: string;
-  processAreaCode: string;
-  departmentCode: string | null;
-  code: string;
-  sequenceNum: number | null;
-  title: string;
-  ownerUserId: string;
-  overrideTemplateVersionId: string | null;
-  status: 'active' | 'obsolete' | 'superseded';
-  createdAt: string;
-  updatedAt: string;
-}
+import type { components } from "../../lib/api-types";
+
+export type ControlledDocument = components["schemas"]["ControlledDocument"];
 
 export interface CreateControlledDocumentRequest {
   profileCode: string;
