@@ -483,6 +483,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		_ = problem.Write(w, problem.New(http.StatusUnprocessableEntity, "template_invalid", "template version does not match the document profile"))
 	case errors.Is(err, application.ErrTemplateArtifactMissing):
 		httpresponse.WriteError(w, http.StatusConflict, "template.artifact_missing", "template artifact missing")
+	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
+		httpresponse.WriteError(w, http.StatusInternalServerError, "template.artifact_invariant_unconfigured", "template artifact invariant not configured")
 	case errors.Is(err, registrydomain.ErrProfileHasNoDefaultTemplate):
 		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_NO_DEFAULT_TEMPLATE", "profile has no default template")
 	case errors.Is(err, registrydomain.ErrDefaultObsolete):

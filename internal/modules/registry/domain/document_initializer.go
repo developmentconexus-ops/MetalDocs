@@ -29,4 +29,6 @@ type DocumentRef struct {
 // demand.
 type DocumentInitializer interface {
 	CloneTemplate(ctx context.Context, tx *sql.Tx, cd *ControlledDocument, req CloneTemplateRequest) (*DocumentRef, error)
+	ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
+	Exists(ctx context.Context, storageKey string) (bool, error)
 }
