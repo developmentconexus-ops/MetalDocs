@@ -97,9 +97,9 @@ export function DocumentPublishedPage() {
   const revisionVersion = doc.RevisionVersion;
   const versionLabel    = revisionVersion != null ? `v${revisionVersion}` : '—';
 
-  // Published date: use approval instance updated_at (= when approval completed)
-  const publishedAt = formatPublishedAt(approval?.updated_at);
-  const sinceDateHint = approval?.updated_at ? formatShortDate(approval.updated_at) : '—';
+  // Published/approval-completion date comes from the approval instance completion timestamp.
+  const publishedAt = formatPublishedAt(approval?.completed_at ?? undefined);
+  const sinceDateHint = approval?.completed_at ? formatShortDate(approval.completed_at) : '—';
 
   // ObsoleteBanner
   const isObsolete = status === 'obsolete';
@@ -305,11 +305,11 @@ export function DocumentPublishedPage() {
                   // Show first signoff per stage (one actor per stage in current workflow)
                   const signoff = stage.signoffs[0] ?? null;
                   return (
-                    <div key={stage.stage_id} className={styles.signoffStage}>
+                    <div key={stage.id} className={styles.signoffStage}>
                       <div className={styles.signoffPin}>
                         <Icon name="check" size={16} />
                       </div>
-                      <div className={styles.signoffStageName}>{stage.name}</div>
+                      <div className={styles.signoffStageName}>{stage.label}</div>
                       {signoff && (
                         <>
                           <div className={styles.signoffActor}>

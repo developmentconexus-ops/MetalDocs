@@ -6652,6 +6652,45 @@ export interface components {
             /** Format: uuid */
             approvalInstanceId?: string;
         };
+        ApprovalInstanceByDocumentResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            document_id: string;
+            /** Format: uuid */
+            route_id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            /** @enum {string} */
+            status: "in_progress" | "approved" | "rejected" | "cancelled";
+            submitted_by: string;
+            /** Format: date-time */
+            submitted_at: string;
+            /** Format: date-time */
+            completed_at?: string | null;
+            stages: components["schemas"]["ApprovalStageInstanceResponse"][];
+            etag: string;
+        };
+        ApprovalStageInstanceResponse: {
+            /** Format: uuid */
+            id: string;
+            stage_index: number;
+            label: string;
+            /** @enum {string} */
+            status: "pending" | "active" | "passed" | "failed" | "cancelled";
+            signoffs: components["schemas"]["ApprovalSignoffRecordResponse"][];
+        };
+        ApprovalSignoffRecordResponse: {
+            /** Format: uuid */
+            id: string;
+            actor_user_id: string;
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            reason?: string;
+            signature_method: string;
+            /** Format: date-time */
+            signed_at: string;
+        };
         FieldError: {
             /** @description JSON pointer or dot path */
             field: string;
@@ -9674,7 +9713,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApprovalInstanceByDocumentResponse"];
+                };
+            };
+            /** @description no_active_instance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -9694,7 +9744,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApprovalInstanceByDocumentResponse"];
+                };
+            };
+            /** @description no_active_instance */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
