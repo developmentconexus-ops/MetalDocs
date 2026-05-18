@@ -17,11 +17,81 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for ApprovalInstanceByDocumentResponseStatus.
+const (
+	ApprovalInstanceByDocumentResponseStatusApproved   ApprovalInstanceByDocumentResponseStatus = "approved"
+	ApprovalInstanceByDocumentResponseStatusCancelled  ApprovalInstanceByDocumentResponseStatus = "cancelled"
+	ApprovalInstanceByDocumentResponseStatusInProgress ApprovalInstanceByDocumentResponseStatus = "in_progress"
+	ApprovalInstanceByDocumentResponseStatusRejected   ApprovalInstanceByDocumentResponseStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the ApprovalInstanceByDocumentResponseStatus enum.
+func (e ApprovalInstanceByDocumentResponseStatus) Valid() bool {
+	switch e {
+	case ApprovalInstanceByDocumentResponseStatusApproved:
+		return true
+	case ApprovalInstanceByDocumentResponseStatusCancelled:
+		return true
+	case ApprovalInstanceByDocumentResponseStatusInProgress:
+		return true
+	case ApprovalInstanceByDocumentResponseStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ApprovalSignoffRecordResponseDecision.
+const (
+	Approve ApprovalSignoffRecordResponseDecision = "approve"
+	Reject  ApprovalSignoffRecordResponseDecision = "reject"
+)
+
+// Valid indicates whether the value is a known member of the ApprovalSignoffRecordResponseDecision enum.
+func (e ApprovalSignoffRecordResponseDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Reject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ApprovalStageInstanceResponseStatus.
+const (
+	ApprovalStageInstanceResponseStatusActive    ApprovalStageInstanceResponseStatus = "active"
+	ApprovalStageInstanceResponseStatusCancelled ApprovalStageInstanceResponseStatus = "cancelled"
+	ApprovalStageInstanceResponseStatusFailed    ApprovalStageInstanceResponseStatus = "failed"
+	ApprovalStageInstanceResponseStatusPassed    ApprovalStageInstanceResponseStatus = "passed"
+	ApprovalStageInstanceResponseStatusPending   ApprovalStageInstanceResponseStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the ApprovalStageInstanceResponseStatus enum.
+func (e ApprovalStageInstanceResponseStatus) Valid() bool {
+	switch e {
+	case ApprovalStageInstanceResponseStatusActive:
+		return true
+	case ApprovalStageInstanceResponseStatusCancelled:
+		return true
+	case ApprovalStageInstanceResponseStatusFailed:
+		return true
+	case ApprovalStageInstanceResponseStatusPassed:
+		return true
+	case ApprovalStageInstanceResponseStatusPending:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for DocumentTemplateFieldSlotNodeResponseFieldKind.
 const (
@@ -188,6 +258,48 @@ func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
 	}
 }
 
+// ApprovalInstanceByDocumentResponse defines model for ApprovalInstanceByDocumentResponse.
+type ApprovalInstanceByDocumentResponse struct {
+	CompletedAt *time.Time                               `json:"completed_at,omitempty"`
+	DocumentId  openapi_types.UUID                       `json:"document_id"`
+	Etag        string                                   `json:"etag"`
+	Id          openapi_types.UUID                       `json:"id"`
+	RouteId     openapi_types.UUID                       `json:"route_id"`
+	Stages      []ApprovalStageInstanceResponse          `json:"stages"`
+	Status      ApprovalInstanceByDocumentResponseStatus `json:"status"`
+	SubmittedAt time.Time                                `json:"submitted_at"`
+	SubmittedBy string                                   `json:"submitted_by"`
+	TenantId    openapi_types.UUID                       `json:"tenant_id"`
+}
+
+// ApprovalInstanceByDocumentResponseStatus defines model for ApprovalInstanceByDocumentResponse.Status.
+type ApprovalInstanceByDocumentResponseStatus string
+
+// ApprovalSignoffRecordResponse defines model for ApprovalSignoffRecordResponse.
+type ApprovalSignoffRecordResponse struct {
+	ActorUserId     string                                `json:"actor_user_id"`
+	Decision        ApprovalSignoffRecordResponseDecision `json:"decision"`
+	Id              openapi_types.UUID                    `json:"id"`
+	Reason          *string                               `json:"reason,omitempty"`
+	SignatureMethod string                                `json:"signature_method"`
+	SignedAt        time.Time                             `json:"signed_at"`
+}
+
+// ApprovalSignoffRecordResponseDecision defines model for ApprovalSignoffRecordResponse.Decision.
+type ApprovalSignoffRecordResponseDecision string
+
+// ApprovalStageInstanceResponse defines model for ApprovalStageInstanceResponse.
+type ApprovalStageInstanceResponse struct {
+	Id         openapi_types.UUID                  `json:"id"`
+	Label      string                              `json:"label"`
+	Signoffs   []ApprovalSignoffRecordResponse     `json:"signoffs"`
+	StageIndex int                                 `json:"stage_index"`
+	Status     ApprovalStageInstanceResponseStatus `json:"status"`
+}
+
+// ApprovalStageInstanceResponseStatus defines model for ApprovalStageInstanceResponse.Status.
+type ApprovalStageInstanceResponseStatus string
+
 // DocumentTemplateFieldSlotNodeResponse defines model for DocumentTemplateFieldSlotNodeResponse.
 type DocumentTemplateFieldSlotNodeResponse struct {
 	FieldKind DocumentTemplateFieldSlotNodeResponseFieldKind `json:"fieldKind"`
@@ -279,6 +391,27 @@ type DocumentTemplateTableSlotNodeResponseFieldKind string
 
 // DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
 type DocumentTemplateTableSlotNodeResponseType string
+
+// FieldError defines model for FieldError.
+type FieldError struct {
+	Code string `json:"code"`
+
+	// Field JSON pointer or dot path
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
+// Problem defines model for Problem.
+type Problem struct {
+	// Code Machine-readable code from canonical taxonomy
+	Code     string        `json:"code"`
+	Detail   *string       `json:"detail,omitempty"`
+	Errors   *[]FieldError `json:"errors,omitempty"`
+	Instance *string       `json:"instance,omitempty"`
+	Status   int           `json:"status"`
+	Title    string        `json:"title"`
+	Type     string        `json:"type"`
+}
 
 // AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
 func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
@@ -1132,12 +1265,32 @@ type GetApprovalInstanceResponseObject interface {
 	VisitGetApprovalInstanceResponse(w http.ResponseWriter) error
 }
 
-type GetApprovalInstance200Response struct {
+type GetApprovalInstance200JSONResponse ApprovalInstanceByDocumentResponse
+
+func (response GetApprovalInstance200JSONResponse) VisitGetApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-func (response GetApprovalInstance200Response) VisitGetApprovalInstanceResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+type GetApprovalInstance404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetApprovalInstance404ApplicationProblemPlusJSONResponse) VisitGetApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CancelApprovalInstanceRequestObject struct {
@@ -1243,12 +1396,32 @@ type GetApprovalInstanceByDocumentResponseObject interface {
 	VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error
 }
 
-type GetApprovalInstanceByDocument200Response struct {
+type GetApprovalInstanceByDocument200JSONResponse ApprovalInstanceByDocumentResponse
+
+func (response GetApprovalInstanceByDocument200JSONResponse) VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-func (response GetApprovalInstanceByDocument200Response) VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+type GetApprovalInstanceByDocument404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetApprovalInstanceByDocument404ApplicationProblemPlusJSONResponse) VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CancelDocumentApprovalRequestObject struct {
@@ -1860,38 +2033,47 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"totJDx8O/wkAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

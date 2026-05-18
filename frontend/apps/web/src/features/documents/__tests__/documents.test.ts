@@ -1,6 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { finalizeDocument, getDocument, listComments, listDocuments } from '../api/documents';
+import {
+  finalizeDocument,
+  getApprovalInstance,
+  getDocument,
+  listComments,
+  listDocuments,
+} from '../api/documents';
 import { ApiError } from '../../../lib/api';
+import type { components } from '../../../lib/api-types';
+
+type ApprovalInstanceContract = components['schemas']['ApprovalInstanceByDocumentResponse'];
 
 describe('documents with apiFetch', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -96,5 +105,54 @@ describe('documents with apiFetch', () => {
     const [, init] = fetchSpy.mock.calls[0] ?? [];
     const headers = init?.headers as Record<string, string> | undefined;
     expect(headers).toMatchObject({ 'Idempotency-Key': '11111111-1111-4111-8111-111111111111' });
+  });
+
+  it('reads approval-instance with runtime-aligned statuses and signoff payload', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'inst-1',
+          document_id: 'doc-1',
+          route_id: 'route-1',
+          tenant_id: 'tenant-1',
+          status: 'in_progress',
+          submitted_by: 'user-1',
+          submitted_at: '2026-05-18T12:00:00Z',
+          stages: [
+            {
+              id: 'stage-1',
+              stage_index: 1,
+              label: 'Qualidade',
+              status: 'active',
+              signoffs: [],
+            },
+            {
+              id: 'stage-2',
+              stage_index: 2,
+              label: 'Diretoria',
+              status: 'pending',
+              signoffs: [
+                {
+                  id: 'signoff-1',
+                  actor_user_id: 'Maria Souza',
+                  decision: 'approve',
+                  signature_method: 'password_reauth',
+                  signed_at: '2026-05-18T12:30:00Z',
+                },
+              ],
+            },
+          ],
+          etag: '"v1"',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const result = await getApprovalInstance('doc-1');
+    const typedResult: ApprovalInstanceContract = result;
+
+    expect(typedResult.status).toBe('in_progress');
+    expect(typedResult.stages[0]?.status).toBe('active');
+    expect(typedResult.stages[1]?.signoffs[0]?.actor_user_id).toBe('Maria Souza');
   });
 });

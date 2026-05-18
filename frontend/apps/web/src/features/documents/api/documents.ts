@@ -26,6 +26,7 @@ export type DocumentDetail = components['schemas']['DocumentDetailResponse'];
 export type DocumentComment = components['schemas']['DocumentCommentResponse'];
 export type DocumentCommentCreateRequest = components['schemas']['DocumentCommentCreateRequest'];
 export type DocumentCommentUpdateRequest = components['schemas']['DocumentCommentUpdateRequest'];
+export type ApprovalInstanceResponse = components['schemas']['ApprovalInstanceByDocumentResponse'];
 
 export async function listDocuments(): Promise<DocumentRow[]> {
   return apiFetch('/api/v1/documents');
@@ -142,30 +143,6 @@ export async function deleteComment(documentID: string, libraryID: number): Prom
   await apiFetch<void>(`/api/v1/documents/${documentID}/comments/${libraryID}`, { method: 'DELETE' });
 }
 
-// Approval instance types
-export type SignoffRecord = {
-  actor_user_id: string;  // actually display name snapshot from backend
-  status: 'pending' | 'approved' | 'rejected' | 'abstained';
-  signed_at: string | null;
-  comment: string | null;
-};
-
-export type StageInstance = {
-  stage_id: string;
-  name: string;
-  status: 'pending' | 'approved' | 'rejected' | 'skipped';
-  signoffs: SignoffRecord[];
-};
-
-export type ApprovalInstanceResponse = {
-  id: string;
-  document_id: string;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
-  stages: StageInstance[];
-  created_at: string;
-  updated_at: string;
-};
-
 export async function getApprovalInstance(documentId: string): Promise<ApprovalInstanceResponse> {
-  return apiFetch(`/api/v1/documents/${documentId}/approval-instance`);
+  return apiFetch<ApprovalInstanceResponse>(`/api/v1/documents/${documentId}/approval-instance`);
 }
