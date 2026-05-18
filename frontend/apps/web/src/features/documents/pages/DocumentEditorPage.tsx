@@ -6,10 +6,10 @@ import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
 import { useDocumentSession } from '../hooks/editor/useDocumentSession';
 import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
 import { useDocumentComments } from '../hooks/editor/useDocumentComments';
-import { getDocument, finalizeDocument, renameDocument, signedRevisionURL } from '../api/documents';
+import { finalizeDocument, renameDocument, signedRevisionURL } from '../api/documents';
 import { useDocumentPdfStatus } from '../hooks/editor/useDocumentPdfStatus';
-import { PDFCell } from '../components/PDFCell';
 import type { DocumentResponse } from '../api/documents';
+import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { EditorMetaSidebar } from '../components/EditorMetaSidebar';
 import {
   EditorChrome,
@@ -28,12 +28,12 @@ export type DocumentEditorPageProps = {
 
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
   const session = useDocumentSession(documentID);
-  const [doc, setDoc] = useState<DocumentResponse | null>(null);
-  const [pageLoadError, setPageLoadError] = useState<string | null>(null);
+  const docQuery = useDocumentDetailQuery(documentID);
   const [editorLoadError, setEditorLoadError] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState('');
   const [buffer, setBuffer] = useState<ArrayBuffer | null | undefined>(undefined);
   const editorRef = useRef<MetalDocsEditorRef>(null);
+  const doc = (docQuery.data as DocumentResponse | undefined) ?? null;
 
   const fetchRevisionBuffer = useCallback(async (revisionID: string) => {
     if (!revisionID) {
@@ -48,51 +48,62 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     if (!fileRes.ok) throw Object.assign(new Error(`http_${fileRes.status}`), { status: fileRes.status });
     setBuffer(await fileRes.arrayBuffer());
   }, [documentID]);
-
   useEffect(() => {
+    if (!doc) {
+      setBuffer(docQuery.isLoading ? undefined : null);
+      setEditorLoadError(null);
+      return;
+    }
+
+    const name = doc.Name ?? doc.name ?? 'Document';
+    const revisionID = doc.CurrentRevisionID ?? doc.current_revision_id ?? '';
+    let cancelled = false;
+
+    setDocumentName(name);
+    setEditorLoadError(null);
+    setBuffer(undefined);
+
     void (async () => {
       try {
-        setPageLoadError(null);
-        setEditorLoadError(null);
-        setBuffer(undefined);
-        const loadedDoc = await getDocument(documentID);
-        const name = loadedDoc.Name ?? loadedDoc.name ?? 'Document';
-        const revisionID = loadedDoc.CurrentRevisionID ?? loadedDoc.current_revision_id ?? '';
-        setDoc(loadedDoc);
-        setDocumentName(name);
-        try {
-          await fetchRevisionBuffer(revisionID);
-        } catch {
-          setBuffer(null);
-          setEditorLoadError('Falha ao carregar o arquivo do documento. Tente novamente.');
-        }
-      } catch (err) {
-        setDoc(null);
+        await fetchRevisionBuffer(revisionID);
+      } catch {
+        if (cancelled) return;
         setBuffer(null);
-        if (err instanceof ApiError) {
-          setPageLoadError(err.code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(err.code, err.message));
-        } else if (err && typeof err === 'object' && 'code' in err) {
-          const code = (err as { code?: string }).code;
-          const message = 'message' in err ? (err as { message?: string }).message : undefined;
-          setPageLoadError(code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(code, message));
-        } else if (err instanceof Error && err.message.trim()) {
-          setPageLoadError(err.message);
-        } else {
-          setPageLoadError('Falha ao carregar documento.');
-        }
+        setEditorLoadError('Falha ao carregar o arquivo do documento. Tente novamente.');
       }
     })();
-  }, [documentID, fetchRevisionBuffer]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [doc, docQuery.isLoading, fetchRevisionBuffer]);
+
+  const pageLoadError = (() => {
+    const err = docQuery.error;
+    if (!docQuery.isError || !err) return null;
+    if (err instanceof ApiError) {
+      return err.code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(err.code, err.message);
+    }
+    if (err && typeof err === 'object' && 'code' in err) {
+      const code = (err as { code?: string }).code;
+      const message = 'message' in err ? (err as { message?: string }).message : undefined;
+      return code === 'not_found' ? 'Documento não encontrado.' : resolveErrorMessage(code, message);
+    }
+    if (err instanceof Error && err.message.trim()) {
+      return err.message;
+    }
+    return 'Falha ao carregar documento.';
+  })();
 
   // Refetch doc status when the user returns to the tab so the editor mode
   // updates without requiring a manual reload (E1).
   useEffect(() => {
     const onFocus = () => {
-      void getDocument(documentID).then((d) => setDoc(d)).catch(() => {});
+      void docQuery.refetch().catch(() => {});
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [documentID]);
+  }, [docQuery]);
 
   const sessionPhase = session.state.phase;
   const sessionID = sessionPhase === 'writer' ? session.state.sessionID : '';
@@ -320,4 +331,3 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     </div>
   );
 }
-

@@ -187,7 +187,7 @@ Evidence used:
 | Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
 |---|---|---|---|---|---|
 | Editor route + screen ownership | route page + frontend structure | `/documents/:documentID/edit` is owned by `features/documents` and mounted through `documentsRoutes` | `DocumentEditorRoutePage` delegates cleanly to `DocumentEditorPage` | implemented and aligned | Keep |
-| Toolbar identity block (code, title, revision, status) | `GET /api/v1/documents/{id}` + `DocumentEditorPage` | Runtime document payload exposes the fields the screen uses | Page still loads via local `useEffect` + handwritten `DocumentResponse` wrapper instead of generated types/query options | implemented but legacy-wired | Normalize document detail loading to generated types + query hook before final screen polish |
+| Toolbar identity block (code, title, revision, status) | `GET /api/v1/documents/{id}` + `DocumentEditorPage` | Runtime document payload exposes the fields the screen uses | `DocumentEditorPage` now loads and refetches detail through `useDocumentDetailQuery`, but still depends on the handwritten `DocumentResponse` wrapper because the shared contract does not yet expose a mature response schema | implemented but legacy-wired | Keep the query-hook boundary; normalize the wrapper to generated frontend types only after the document detail contract is upgraded |
 | DOCX artifact load for current revision | signed revision URL route + page blob fetch | Runtime provides `/revisions/{rid}/url` and the editor can fetch the artifact bytes | Screen handles signed-url fetch + blob load correctly and shows inline error if artifact fetch fails | implemented and aligned | Keep |
 | Writer/readonly session lease | session acquire/heartbeat/release handlers + `useDocumentSession` | Runtime supports single-writer lease with readonly fallback and best-effort release semantics | Dedicated hook models lease lifecycle directly; this is screen state, not a normal TanStack query | implemented and aligned | Keep custom hook boundary |
 | Autosave debounce + commit persistence | autosave presign/commit handlers + repository/session invariants | Runtime path is now working: presign + upload + commit create new revision lineage and advance the base ack | `useDocumentAutosave` has crash-recovery, debounce, explicit flush gating, and local status state | implemented and aligned | Keep |
@@ -204,7 +204,6 @@ Evidence used:
 
 ### Ready for implementation
 
-- Document detail loading normalization to generated types/query options.
 - Comments wrapper normalization to generated frontend types.
 - Removal or real wiring of the currently unused PDF polling state.
 

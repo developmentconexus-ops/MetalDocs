@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DocumentEditorPage } from './DocumentEditorPage';
 
 const mockState = vi.hoisted(() => ({
@@ -110,6 +111,22 @@ import * as api from '../api/documents';
 import * as pdfHook from '../hooks/editor/useDocumentPdfStatus';
 import { toast } from 'sonner';
 
+function renderPage(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {ui}
+    </QueryClientProvider>,
+  );
+}
+
 function makeDoc(status: string, overrides: Record<string, unknown> = {}) {
   return {
     Status: status,
@@ -166,7 +183,7 @@ afterEach(() => {
 describe('DocumentEditorPage E1 gate', () => {
   it('renders document-edit when status=draft', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
@@ -174,7 +191,7 @@ describe('DocumentEditorPage E1 gate', () => {
 
   it('renders readonly when status=under_review', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review') as never);
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
     );
@@ -182,7 +199,7 @@ describe('DocumentEditorPage E1 gate', () => {
 
   it('allows review comment callbacks when status=under_review without enabling content editing', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review') as never);
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
 
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
@@ -203,7 +220,7 @@ describe('DocumentEditorPage E1 gate', () => {
       return makeDoc(callCount === 1 ? 'draft' : 'under_review') as never;
     });
 
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
@@ -222,7 +239,7 @@ describe('DocumentEditorPage E9 rename rollback', () => {
     vi.mocked(api.renameDocument).mockRejectedValueOnce(new Error('Server error'));
     const toastSpy = vi.spyOn(toast, 'error');
 
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
 
     // Wait for editor to mount with draft mode
     await waitFor(() =>
@@ -254,7 +271,7 @@ describe('DocumentEditorPage E11 PDF polling', () => {
       retry: vi.fn(),
     });
 
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
     );
@@ -268,7 +285,7 @@ describe('DocumentEditorPage autosave wiring', () => {
       form_data: { foo: 'bar' },
     }) as never);
 
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
 
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
@@ -293,7 +310,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     mockState.editorSaveNowSpy.mockResolvedValue(finalBuf);
     vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
 
-    render(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
 
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
@@ -318,7 +335,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     mockState.editorSaveNowSpy.mockResolvedValue(finalBuf);
     mockState.autosaveFlushSpy.mockResolvedValue(false);
 
-    render(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
 
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
@@ -341,7 +358,7 @@ describe('DocumentEditorPage load failure state', () => {
       message: 'not_found',
     });
 
-    render(<DocumentEditorPage documentID="missing-doc" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="missing-doc" onDone={() => {}} />);
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Documento não encontrado.'),
@@ -367,7 +384,7 @@ describe('DocumentEditorPage load failure state', () => {
       });
     }) as typeof fetch;
 
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Falha ao carregar o arquivo do documento. Tente novamente.'),
@@ -385,7 +402,7 @@ describe('DocumentEditorPage load failure state', () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review') as never);
     mockState.commentsLoadError = 'Falha ao carregar comentários.';
 
-    render(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
 
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('Falha ao carregar comentários.'),
