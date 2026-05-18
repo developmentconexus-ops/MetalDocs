@@ -33,6 +33,6 @@ The refreshed integration classification is recorded in `wiki/backlog/editor.md`
 Current editor boundary:
 
 - keep session lease and autosave as intentional editor-local hooks
-- document detail loading now uses `useDocumentDetailQuery` backed by the generated `DocumentDetailResponse` contract; comments wrappers remain the next legacy wiring item to normalize
+- document detail loading now uses `useDocumentDetailQuery` backed by the generated `DocumentDetailResponse` contract; comments wrappers now consume generated comment schemas, with only the explicit Eigenpal content adapter remaining at the query boundary
 - finalize route contract prerequisite closed on 2026-05-18: frontend wrapper now sends `Idempotency-Key`, and OpenAPI/generated types match the runtime `201 { instanceId }` response
 - keep sidebar and template-comment items deferred until backend capability exists

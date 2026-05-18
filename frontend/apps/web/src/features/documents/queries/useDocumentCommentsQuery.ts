@@ -6,8 +6,11 @@ import {
   deleteComment,
   listComments,
   patchComment,
-  type CommentRow,
+  type DocumentComment,
+  type DocumentCommentCreateRequest,
 } from '../api/documents';
+
+type DocumentCommentContent = DocumentCommentCreateRequest['content'];
 
 function toInitials(author: string): string {
   return author
@@ -19,20 +22,20 @@ function toInitials(author: string): string {
     .slice(0, 2);
 }
 
-export function rowToLibraryComment(row: CommentRow): Comment {
+export function rowToLibraryComment(row: DocumentComment): Comment {
   return {
     id: row.library_comment_id,
     parentId: row.parent_library_id ?? undefined,
     author: row.author,
     initials: toInitials(row.author),
     date: row.created_at,
-    content: row.content as Comment['content'],
+    content: row.content as unknown as Comment['content'],
     done: row.done,
   };
 }
 
-function libraryCommentToPayloadContent(comment: Comment): unknown[] {
-  return comment.content as unknown[];
+function libraryCommentToPayloadContent(comment: Comment): DocumentCommentContent {
+  return comment.content as unknown as DocumentCommentContent;
 }
 
 export function useDocumentCommentsQuery(documentID: string) {
@@ -48,8 +51,8 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
   const queryClient = useQueryClient();
   const queryKey = QK.documents.comments(documentID);
 
-  const replaceComment = (comment: CommentRow) => {
-    queryClient.setQueryData<CommentRow[]>(queryKey, (rows = []) =>
+  const replaceComment = (comment: DocumentComment) => {
+    queryClient.setQueryData<DocumentComment[]>(queryKey, (rows = []) =>
       rows.map((row) => (row.library_comment_id === comment.library_comment_id ? comment : row)),
     );
   };
@@ -58,12 +61,12 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
     mutationFn: (comment: Comment) => createComment(documentID, {
       library_comment_id: comment.id,
       author_display: authorDisplay,
-      content: libraryCommentToPayloadContent(comment),
+      content: libraryCommentToPayloadContent(comment) as DocumentCommentCreateRequest['content'],
     }),
     onMutate: async (comment) => {
       await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<CommentRow[]>(queryKey) ?? [];
-      queryClient.setQueryData<CommentRow[]>(queryKey, [
+      const previous = queryClient.getQueryData<DocumentComment[]>(queryKey) ?? [];
+      queryClient.setQueryData<DocumentComment[]>(queryKey, [
         ...previous,
         {
           id: `optimistic-${comment.id}`,
@@ -94,10 +97,10 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
       library_comment_id: reply.id,
       parent_library_id: parent.id,
       author_display: authorDisplay,
-      content: libraryCommentToPayloadContent(reply),
+      content: libraryCommentToPayloadContent(reply) as DocumentCommentCreateRequest['content'],
     }),
     onSuccess: (row) => {
-      queryClient.setQueryData<CommentRow[]>(queryKey, (rows = []) => [...rows, row]);
+      queryClient.setQueryData<DocumentComment[]>(queryKey, (rows = []) => [...rows, row]);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey });
@@ -123,7 +126,7 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
   const deleteMutation = useMutation({
     mutationFn: (comment: Comment) => deleteComment(documentID, comment.id),
     onSuccess: (_void, comment) => {
-      queryClient.setQueryData<CommentRow[]>(queryKey, (rows = []) =>
+      queryClient.setQueryData<DocumentComment[]>(queryKey, (rows = []) =>
         rows.filter((row) => row.library_comment_id !== comment.id && row.parent_library_id !== comment.id),
       );
     },
@@ -140,4 +143,3 @@ export function useDocumentCommentMutations(documentID: string, authorDisplay: s
     deleteMutation,
   };
 }
-

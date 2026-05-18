@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { finalizeDocument, getDocument, listDocuments } from '../api/documents';
+import { finalizeDocument, getDocument, listComments, listDocuments } from '../api/documents';
 import { ApiError } from '../../../lib/api';
 
 describe('documents with apiFetch', () => {
@@ -51,6 +51,34 @@ describe('documents with apiFetch', () => {
 
     expect(doc.FormDataJSON).toEqual({ foo: 'bar' });
     expect(doc.CurrentRevisionID).toBe('rev-1');
+  });
+
+  it('listComments returns typed comment payloads', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            id: '11111111-1111-4111-8111-111111111111',
+            library_comment_id: 42,
+            parent_library_id: null,
+            author: 'Alice Doe',
+            author_id: 'iam-alice',
+            content: [{ type: 'paragraph', children: [{ text: 'hello' }] }],
+            done: false,
+            created_at: '2026-05-18T10:00:00Z',
+            updated_at: '2026-05-18T10:00:00Z',
+            resolved_at: null,
+          },
+        ]),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const comments = await listComments('doc-1');
+
+    expect(comments).toHaveLength(1);
+    expect(comments[0].library_comment_id).toBe(42);
+    expect(comments[0].content[0]).toMatchObject({ type: 'paragraph' });
   });
 
   it('finalizeDocument sends Idempotency-Key and returns instanceId on 201', async () => {
