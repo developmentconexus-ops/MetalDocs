@@ -101,6 +101,20 @@ func TestBuildAPIDependenciesMarksGotenbergDownWhenHealthCheckFails(t *testing.T
 	}
 }
 
+func TestBuildMinioClientsFailsWhenPublicEndpointIsInvalid(t *testing.T) {
+	_, _, _, err := buildMinioClients(config.AttachmentsConfig{
+		Provider:            config.StorageProviderMinIO,
+		MinIOEndpoint:       "localhost:9000",
+		MinIOPublicEndpoint: "://bad endpoint",
+		MinIOAccessKey:      "minioadmin",
+		MinIOSecretKey:      "minioadmin",
+		MinIOBucket:         "metaldocs",
+	})
+	if err == nil {
+		t.Fatal("expected public endpoint init error")
+	}
+}
+
 func findCheck(t *testing.T, payload map[string]any, name string) map[string]any {
 	t.Helper()
 

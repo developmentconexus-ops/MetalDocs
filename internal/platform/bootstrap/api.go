@@ -88,20 +88,11 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 		var minioPublicClient *miniogo.Client
 		var minioBucket string
 		if attachmentsCfg.Provider == config.StorageProviderMinIO {
-			mc, mcErr := miniogo.New(attachmentsCfg.MinIOEndpoint, &miniogo.Options{
-				Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
-				Secure: attachmentsCfg.MinIOUseSSL,
-				Region: "us-east-1",
-			})
-			mpc, mpcErr := miniogo.New(attachmentsCfg.MinIOPublicEndpoint, &miniogo.Options{
-				Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
-				Secure: attachmentsCfg.MinIOUseSSL,
-				Region: "us-east-1",
-			})
-			if mcErr == nil && mpcErr == nil {
-				minioClient = mc
-				minioPublicClient = mpc
-				minioBucket = attachmentsCfg.MinIOBucket
+			var err error
+			minioClient, minioPublicClient, minioBucket, err = buildMinioClients(attachmentsCfg)
+			if err != nil {
+				_ = closeDB(db)
+				return APIDependencies{}, err
 			}
 		}
 		auditStore := auditpg.NewWriter(db)
@@ -149,6 +140,28 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			Cleanup:         func() {},
 		}, nil
 	}
+}
+
+func buildMinioClients(attachmentsCfg config.AttachmentsConfig) (*miniogo.Client, *miniogo.Client, string, error) {
+	internalClient, err := miniogo.New(attachmentsCfg.MinIOEndpoint, &miniogo.Options{
+		Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
+		Secure: attachmentsCfg.MinIOUseSSL,
+		Region: "us-east-1",
+	})
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("init minio internal client: %w", err)
+	}
+
+	publicClient, err := miniogo.New(attachmentsCfg.MinIOPublicEndpoint, &miniogo.Options{
+		Creds:  credentials.NewStaticV4(attachmentsCfg.MinIOAccessKey, attachmentsCfg.MinIOSecretKey, ""),
+		Secure: attachmentsCfg.MinIOUseSSL,
+		Region: "us-east-1",
+	})
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("init minio public client: %w", err)
+	}
+
+	return internalClient, publicClient, attachmentsCfg.MinIOBucket, nil
 }
 
 func closeDB(db *sql.DB) error {
