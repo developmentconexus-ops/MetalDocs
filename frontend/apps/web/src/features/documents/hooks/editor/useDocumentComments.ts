@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Comment } from '@metaldocs/editor-ui';
 import { toast } from 'sonner';
 import {
@@ -6,6 +6,7 @@ import {
   useDocumentCommentMutations,
   useDocumentCommentsQuery,
 } from '../../queries/useDocumentCommentsQuery';
+import { resolveQueryError } from '../../../../lib/api';
 
 export function partitionByMarkers(comments: Comment[], markerIds: Set<number>): { live: Comment[]; orphans: Comment[] } {
   const live: Comment[] = [];
@@ -31,6 +32,7 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
   const query = useDocumentCommentsQuery(documentID);
   const mutations = useDocumentCommentMutations(documentID, authorDisplay);
   const [localComments, setLocalComments] = useState<Comment[] | null>(null);
+  const lastErrorMessage = useRef<string | null>(null);
 
   const serverComments = useMemo(
     () => (query.data ?? []).map(rowToLibraryComment),
@@ -38,6 +40,19 @@ export function useDocumentComments(documentID: string, authorDisplay: string): 
   );
   const comments = localComments ?? serverComments;
   const orphans = useMemo(() => [] as Comment[], []);
+
+  useEffect(() => {
+    if (!query.isError) {
+      lastErrorMessage.current = null;
+      return;
+    }
+    const message = resolveQueryError(query.error, 'Falha ao carregar comentários.');
+    if (lastErrorMessage.current === message) {
+      return;
+    }
+    lastErrorMessage.current = message;
+    toast.error(message);
+  }, [query.error, query.isError]);
 
   const add = useCallback(async (c: Comment) => {
     try {

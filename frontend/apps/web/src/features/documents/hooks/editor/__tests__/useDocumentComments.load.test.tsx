@@ -2,7 +2,14 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 import { useDocumentComments } from '../useDocumentComments';
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+  },
+}));
 
 function wrapper() {
   const queryClient = new QueryClient({
@@ -59,5 +66,15 @@ describe('useDocumentComments load', () => {
     expect(typeof result.current.comments[0].id).toBe('number');
     expect(result.current.comments[1].parentId).toBe(42);
     expect(typeof result.current.comments[1].done).toBe('boolean');
+  });
+
+  it('shows a toast when the comments query fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network down'));
+
+    renderHook(() => useDocumentComments('doc-1', 'Alice Doe'), { wrapper: wrapper() });
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('network down'),
+    );
   });
 });
