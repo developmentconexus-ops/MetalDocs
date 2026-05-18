@@ -5781,6 +5781,35 @@ export interface components {
             ProcessAreaCodeSnapshot?: string | null;
             Code: string;
         };
+        DocumentCommentContentNode: {
+            [key: string]: unknown;
+        };
+        DocumentCommentResponse: {
+            /** Format: uuid */
+            id: string;
+            library_comment_id: number;
+            parent_library_id?: number | null;
+            author: string;
+            author_id: string;
+            content: components["schemas"]["DocumentCommentContentNode"][];
+            done: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** Format: date-time */
+            resolved_at?: string | null;
+        };
+        DocumentCommentCreateRequest: {
+            library_comment_id: number;
+            parent_library_id?: number | null;
+            author_display: string;
+            content: components["schemas"]["DocumentCommentContentNode"][];
+        };
+        DocumentCommentUpdateRequest: {
+            content?: components["schemas"]["DocumentCommentContentNode"][];
+            done?: boolean;
+        };
         DocumentStatsResponse: {
             byStatus: {
                 [key: string]: number;
@@ -9179,7 +9208,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentResponse"][];
+                };
             };
         };
     };
@@ -9194,7 +9225,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["DocumentCommentCreateRequest"];
             };
         };
         responses: {
@@ -9203,7 +9234,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentResponse"];
+                };
             };
         };
     };
@@ -9240,7 +9273,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": Record<string, never>;
+                "application/json": components["schemas"]["DocumentCommentUpdateRequest"];
             };
         };
         responses: {
@@ -9249,7 +9282,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentCommentResponse"];
+                };
             };
         };
     };

@@ -23,6 +23,9 @@ export type CommitResult = { revision_id: string; revision_num: number; idempote
 export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; VersionNum: number; Label: string; CreatedAt: string; CreatedBy: string };
 export type FinalizeDocumentResult = { instanceId: string };
 export type DocumentDetail = components['schemas']['DocumentDetailResponse'];
+export type DocumentComment = components['schemas']['DocumentCommentResponse'];
+export type DocumentCommentCreateRequest = components['schemas']['DocumentCommentCreateRequest'];
+export type DocumentCommentUpdateRequest = components['schemas']['DocumentCommentUpdateRequest'];
 
 export async function listDocuments(): Promise<DocumentRow[]> {
   return apiFetch('/api/v1/documents');
@@ -108,28 +111,15 @@ export function signedRevisionURL(documentID: string, revisionID: string): strin
   return `/api/v1/documents/${documentID}/revisions/${revisionID}/url`;
 }
 
-export type CommentRow = {
-  id: string;
-  library_comment_id: number;
-  parent_library_id: number | null;
-  author: string;
-  author_id: string;
-  content: unknown[];
-  done: boolean;
-  created_at: string;
-  updated_at: string;
-  resolved_at: string | null;
-};
-
-export async function listComments(documentID: string): Promise<CommentRow[]> {
-  return apiFetch(`/api/v1/documents/${documentID}/comments`);
+export async function listComments(documentID: string): Promise<DocumentComment[]> {
+  return apiFetch<DocumentComment[]>(`/api/v1/documents/${documentID}/comments`);
 }
 
 export async function createComment(
   documentID: string,
-  body: { library_comment_id: number; parent_library_id?: number; author_display: string; content: unknown[] },
-): Promise<CommentRow> {
-  return apiFetch(`/api/v1/documents/${documentID}/comments`, {
+  body: DocumentCommentCreateRequest,
+): Promise<DocumentComment> {
+  return apiFetch<DocumentComment>(`/api/v1/documents/${documentID}/comments`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -139,9 +129,9 @@ export async function createComment(
 export async function patchComment(
   documentID: string,
   libraryID: number,
-  body: { content?: unknown[]; done?: boolean },
-): Promise<CommentRow> {
-  return apiFetch(`/api/v1/documents/${documentID}/comments/${libraryID}`, {
+  body: DocumentCommentUpdateRequest,
+): Promise<DocumentComment> {
+  return apiFetch<DocumentComment>(`/api/v1/documents/${documentID}/comments/${libraryID}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),

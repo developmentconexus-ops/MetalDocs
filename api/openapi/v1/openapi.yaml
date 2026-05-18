@@ -3751,7 +3751,15 @@ paths:
       tags: [documents]
       operationId: listDocumentComments
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentCommentResponse'
     post:
       tags: [documents]
       operationId: createDocumentComment
@@ -3761,8 +3769,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-      responses: { '201': { description: created } }
+              $ref: '#/components/schemas/DocumentCommentCreateRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentCommentResponse'
 
   /api/v1/documents/{id}/comments/{libraryID}:
     patch:
@@ -3776,8 +3790,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-      responses: { '200': { description: ok } }
+              $ref: '#/components/schemas/DocumentCommentUpdateRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentCommentResponse'
     delete:
       tags: [documents]
       operationId: deleteDocumentComment
@@ -4518,6 +4538,65 @@ components:
           nullable: true
         Code:
           type: string
+    DocumentCommentContentNode:
+      type: object
+      additionalProperties: true
+    DocumentCommentResponse:
+      type: object
+      required: [id, library_comment_id, author, author_id, content, done, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        library_comment_id:
+          type: integer
+        parent_library_id:
+          type: integer
+          nullable: true
+        author:
+          type: string
+        author_id:
+          type: string
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentCommentContentNode'
+        done:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+    DocumentCommentCreateRequest:
+      type: object
+      required: [library_comment_id, author_display, content]
+      properties:
+        library_comment_id:
+          type: integer
+        parent_library_id:
+          type: integer
+          nullable: true
+        author_display:
+          type: string
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentCommentContentNode'
+    DocumentCommentUpdateRequest:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentCommentContentNode'
+        done:
+          type: boolean
     DocumentStatsResponse:
       type: object
       required: [byStatus, byArea]
