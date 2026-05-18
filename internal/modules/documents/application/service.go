@@ -23,6 +23,7 @@ import (
 type PendingCommitMeta = repository.PendingCommitMeta
 type CommitResult = repository.CommitResult
 type RestoreResult = repository.RestoreResult
+type RevisionHistoryItem = domain.RevisionHistoryItem
 
 type Repository interface {
 	CreateDocument(ctx context.Context, d *domain.Document, initialContentHash string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
@@ -50,6 +51,7 @@ type Repository interface {
 	CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte) (*CommitResult, error)
 	CreateCheckpoint(ctx context.Context, docID, actorUserID, label string) (*domain.Checkpoint, error)
 	ListCheckpoints(ctx context.Context, docID string) ([]domain.Checkpoint, error)
+	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
 	RestoreCheckpoint(ctx context.Context, docID, actorUserID string, versionNum int) (*RestoreResult, error)
 	GetRevision(ctx context.Context, docID, revID string) (*domain.Revision, error)
 	DeleteExpiredPending(ctx context.Context, olderThan time.Time) (int, error)
@@ -780,6 +782,10 @@ func (s *Service) CreateCheckpoint(ctx context.Context, tenantID, docID, actorID
 
 func (s *Service) ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error) {
 	return s.repo.ListCheckpoints(ctx, docID)
+}
+
+func (s *Service) ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error) {
+	return s.repo.ListRevisionHistory(ctx, tenantID, docID)
 }
 
 func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*RestoreResult, error) {

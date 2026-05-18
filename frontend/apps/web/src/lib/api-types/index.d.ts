@@ -4963,6 +4963,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/documents/{id}/revision-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDocumentRevisionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents/{id}/duplicate": {
         parameters: {
             query?: never;
@@ -6695,6 +6711,20 @@ export interface components {
         };
         FinalizeDocumentRequest: {
             revisionTitle: string;
+        };
+        DocumentRevisionHistoryItem: {
+            /** Format: uuid */
+            documentId: string;
+            /** Format: int64 */
+            revisionNumber: number;
+            revisionTitle: string;
+            status: string;
+            /** Format: date-time */
+            createdAt: string;
+            isCurrent: boolean;
+        };
+        DocumentRevisionHistoryResponse: {
+            items: components["schemas"]["DocumentRevisionHistoryItem"][];
         };
         FieldError: {
             /** @description JSON pointer or dot path */
@@ -8845,6 +8875,28 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getDocumentRevisionHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ok */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentRevisionHistoryResponse"];
+                };
             };
         };
     };

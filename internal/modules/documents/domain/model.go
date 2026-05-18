@@ -74,6 +74,15 @@ type Revision struct {
 	CreatedAt        time.Time
 }
 
+type RevisionHistoryItem struct {
+	DocumentID     string
+	RevisionNumber int64
+	RevisionTitle  string
+	Status         DocumentStatus
+	CreatedAt      time.Time
+	IsCurrent      bool
+}
+
 type PendingUpload struct {
 	ID             string
 	SessionID      string

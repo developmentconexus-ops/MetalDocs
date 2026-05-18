@@ -3568,6 +3568,19 @@ paths:
       operationId: archiveDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
+  /api/v1/documents/{id}/revision-history:
+    get:
+      tags: [documents]
+      operationId: getDocumentRevisionHistory
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentRevisionHistoryResponse'
   /api/v1/documents/{id}/duplicate:
     post:
       tags: [documents]
@@ -6193,6 +6206,33 @@ components:
         revisionTitle:
           type: string
           minLength: 1
+    DocumentRevisionHistoryItem:
+      type: object
+      required: [documentId, revisionNumber, revisionTitle, status, createdAt, isCurrent]
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        revisionNumber:
+          type: integer
+          format: int64
+        revisionTitle:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        isCurrent:
+          type: boolean
+    DocumentRevisionHistoryResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentRevisionHistoryItem'
     FieldError:
       type: object
       required: [field, code, message]

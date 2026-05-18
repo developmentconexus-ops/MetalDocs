@@ -913,6 +913,51 @@ func (r *Repository) ListCheckpoints(ctx context.Context, docID string) ([]domai
 	return out, rows.Err()
 }
 
+func (r *Repository) ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error) {
+	const q = `
+WITH anchor AS (
+  SELECT controlled_document_id, id AS current_document_id
+  FROM documents
+  WHERE tenant_id = $1::uuid AND id = $2::uuid
+)
+SELECT d.id::text,
+       d.revision_number,
+       COALESCE(d.revision_title, ''),
+       d.status,
+       d.created_at,
+       (d.id = a.current_document_id) AS is_current
+FROM anchor a
+JOIN documents d
+  ON (a.controlled_document_id IS NOT NULL AND d.controlled_document_id = a.controlled_document_id)
+  OR (a.controlled_document_id IS NULL AND d.id = a.current_document_id)
+WHERE d.tenant_id = $1::uuid
+ORDER BY d.revision_number DESC, d.created_at DESC
+`
+
+	rows, err := r.db.QueryContext(ctx, q, tenantID, docID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]domain.RevisionHistoryItem, 0)
+	for rows.Next() {
+		var item domain.RevisionHistoryItem
+		if err := rows.Scan(
+			&item.DocumentID,
+			&item.RevisionNumber,
+			&item.RevisionTitle,
+			&item.Status,
+			&item.CreatedAt,
+			&item.IsCurrent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (r *Repository) GetRevision(ctx context.Context, docID, revID string) (*domain.Revision, error) {
 	var rv domain.Revision
 	err := r.db.QueryRowContext(ctx,

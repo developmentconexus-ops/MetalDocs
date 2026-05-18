@@ -17,15 +17,16 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	ctx := context.Background()
 
 	userID := DeterministicID(t, "user")
+	templateKey := "test-template-" + randomSuffix(t)
 
 	// Insert minimal stub template.
 	var tplID string
 	if err := db.QueryRowContext(ctx,
 		`INSERT INTO `+Qualified(schema, "templates")+
 			` (tenant_id, key, name, created_by)
-		 VALUES ($1::uuid, 'test-template', 'Test Template', $2::uuid)
+		 VALUES ($1::uuid, $2, 'Test Template', $3::uuid)
 		 RETURNING id::text`,
-		tenantID, userID,
+		tenantID, templateKey, userID,
 	).Scan(&tplID); err != nil {
 		t.Fatalf("InsertDraftDocument: insert template: %v", err)
 	}

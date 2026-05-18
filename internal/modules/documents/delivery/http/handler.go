@@ -50,6 +50,7 @@ type Service interface {
 	CommitAutosave(ctx context.Context, cmd application.CommitAutosaveCmd) (*application.CommitResult, error)
 	CreateCheckpoint(ctx context.Context, tenantID, docID, actorID, label string) (*domain.Checkpoint, error)
 	ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error)
+	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
 	RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*application.RestoreResult, error)
 	Finalize(ctx context.Context, tenantID, docID, actorID string) error
 	Archive(ctx context.Context, tenantID, docID, actorID string) error
@@ -116,6 +117,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
+	mux.HandleFunc("GET /api/v1/documents/{id}/revision-history", h.listRevisionHistory)
 
 	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
 	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
@@ -151,6 +153,7 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints/{version}/restore", h.restoreCheckpoint)
+	mux.HandleFunc("GET /api/v1/documents/{id}/revision-history", h.listRevisionHistory)
 
 	mux.HandleFunc("GET /api/v1/documents/{id}/revisions/{rid}/url", h.signedRevisionURL)
 	mux.HandleFunc("GET /api/v1/documents/{id}/comments", h.listComments)
@@ -814,6 +817,26 @@ func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, items)
+}
+
+func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
+	r = withAdminCtx(r)
+	docID := r.PathValue("id")
+	tenantID, _, ok := h.authorizeDocumentScope(w, r, docID)
+	if !ok {
+		return
+	}
+
+	items, err := h.svc.ListRevisionHistory(r.Context(), tenantID, docID)
+	if err != nil {
+		status, msg := mapErr(err)
+		httpErr(w, status, msg)
+		return
+	}
+
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
+		"items": items,
+	})
 }
 
 func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
