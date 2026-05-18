@@ -127,6 +127,7 @@ Current curated-baseline table owned by `documents`. See the owning module wiki 
 | `pdf_generated_at` | `timestamp with time zone` | yes | Baseline column. |
 | `reconstruction_attempts` | `jsonb` | no | Baseline column. |
 | `controlled_document_id` | `uuid` | yes | Baseline column. |
+| `revision_title` | `text` | yes | Post-baseline governed revision label stored on the document lineage row; nullable for legacy rows and drafts not yet finalized. |
 | `profile_code_snapshot` | `text` | yes | Baseline column. |
 | `process_area_code_snapshot` | `text` | yes | Baseline column. |
 | `code` | `text` | yes | Baseline column. |
@@ -170,6 +171,7 @@ id uuid DEFAULT gen_random_uuid() NOT NULL,
     pdf_generated_at timestamp with time zone,
     reconstruction_attempts jsonb DEFAULT '[]'::jsonb NOT NULL,
     controlled_document_id uuid,
+    revision_title text,
     profile_code_snapshot text,
     process_area_code_snapshot text,
     code text,
