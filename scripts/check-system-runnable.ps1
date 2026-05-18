@@ -1,6 +1,7 @@
 param(
     [string]$TargetRoute = '/api/v1/health/ready',
-    [switch]$StartApi
+    [switch]$StartApi,
+    [string]$EnvFile = '.env'
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +15,7 @@ $loginRoute = '/api/v1/auth/login'
 $meRoute = '/api/v1/auth/me'
 $loginIdentifier = 'admin'
 $loginPassword = 'AdminMetalDocs123!'
+$blankTemplateSeedScript = Join-Path $PSScriptRoot 'seed-system-blank-template.ps1'
 
 function Resolve-TargetRoute {
     param(
@@ -44,6 +46,25 @@ function Pass-Checkpoint {
     )
 
     Write-Host "PASS $Name - $Message"
+}
+
+function Assert-SystemBlankTemplateObject {
+    if (-not (Test-Path $blankTemplateSeedScript)) {
+        Fail-Checkpoint -Name 'blank-template-object' -Message "seed script missing at $blankTemplateSeedScript"
+    }
+
+    & (Join-Path $PSHOME 'powershell.exe') `
+        -NoProfile `
+        -ExecutionPolicy Bypass `
+        -File $blankTemplateSeedScript `
+        -EnvFile $EnvFile `
+        -VerifyOnly | Out-Host
+
+    if ($LASTEXITCODE -ne 0) {
+        Fail-Checkpoint -Name 'blank-template-object' -Message 'system blank template object missing; run scripts/seed-system-blank-template.ps1 before document creation/runtime validation'
+    }
+
+    Pass-Checkpoint -Name 'blank-template-object' -Message 'system/templates/blank.docx is present in MinIO'
 }
 
 function Normalize-ProcessPathEnvironment {
@@ -174,6 +195,8 @@ try {
             $null = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 30 -ConsecutiveSuccesses 1
         }
     }
+
+    Assert-SystemBlankTemplateObject
 
     $loginPayload = @{
         identifier = $loginIdentifier

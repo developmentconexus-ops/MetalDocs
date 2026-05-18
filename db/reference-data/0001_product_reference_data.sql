@@ -78,6 +78,9 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'template.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
 -- System blank template required for controlled document creation defaults.
+-- Invariant: this reference-data row is valid only when bootstrap/storage also seeds
+-- `system/templates/blank.docx` into the configured attachments bucket.
+-- Runtime gates must fail if the object is absent rather than allowing broken editor loads.
 SELECT set_config(
   'metaldocs.asserted_caps',
   '[{"cap":"template.create"},{"cap":"template.edit"},{"cap":"template.submit"},{"cap":"template.approve"},{"cap":"template.publish"}]',
