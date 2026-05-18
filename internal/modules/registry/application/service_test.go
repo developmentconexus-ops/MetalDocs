@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"regexp"
-	"strings"
 	"testing"
 	"time"
 
@@ -359,9 +358,12 @@ type fakeDocumentInitializer struct {
 	gotReq registrydomain.CloneTemplateRequest
 	gotCD  *registrydomain.ControlledDocument
 
-	storageKey string
-	exists     bool
-	existsErr  error
+	storageKey                     string
+	exists                         bool
+	existsErr                      error
+	gotResolveTemplateStorageKeyCalls int
+	gotExistsCalls                 int
+	gotExistsStorageKey            string
 }
 
 func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd *registrydomain.ControlledDocument, req registrydomain.CloneTemplateRequest) (*registrydomain.DocumentRef, error) {
@@ -375,51 +377,18 @@ func (f *fakeDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, cd
 }
 
 func (f *fakeDocumentInitializer) ResolveTemplateStorageKey(_ context.Context, _, _ string, _ *string) (string, error) {
+	f.gotResolveTemplateStorageKeyCalls++
 	if f.storageKey == "" {
 		return "system/templates/blank.docx", nil
 	}
 	return f.storageKey, nil
 }
 
-func (f *fakeDocumentInitializer) Exists(_ context.Context, _ string) (bool, error) {
+func (f *fakeDocumentInitializer) Exists(_ context.Context, storageKey string) (bool, error) {
+	f.gotExistsCalls++
+	f.gotExistsStorageKey = storageKey
 	if f.existsErr != nil {
 		return false, f.existsErr
-	}
-	return f.exists, nil
-}
-
-type legacyDocumentInitializer struct{}
-
-func (legacyDocumentInitializer) CloneTemplate(_ context.Context, _ *sql.Tx, _ *registrydomain.ControlledDocument, _ registrydomain.CloneTemplateRequest) (*registrydomain.DocumentRef, error) {
-	return &registrydomain.DocumentRef{ID: "doc-legacy", ContentHash: "hash-legacy"}, nil
-}
-
-type fakeTemplateArtifactResolver struct {
-	storageKey string
-	err        error
-	called     bool
-}
-
-func (f *fakeTemplateArtifactResolver) ResolveTemplateStorageKey(_ context.Context, _, _ string, _ *string) (string, error) {
-	f.called = true
-	if f.err != nil {
-		return "", f.err
-	}
-	return f.storageKey, nil
-}
-
-type fakeTemplateArtifactChecker struct {
-	exists        bool
-	err           error
-	called        bool
-	gotStorageKey string
-}
-
-func (f *fakeTemplateArtifactChecker) Exists(_ context.Context, storageKey string) (bool, error) {
-	f.called = true
-	f.gotStorageKey = storageKey
-	if f.err != nil {
-		return false, f.err
 	}
 	return f.exists, nil
 }
@@ -505,24 +474,18 @@ func TestRegistryService_Create_InitializerError_RollsBack(t *testing.T) {
 }
 
 func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforePersisting(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	resolver := &fakeTemplateArtifactResolver{storageKey: "system/templates/blank.docx"}
-	checker := &fakeTemplateArtifactChecker{exists: false}
-
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
 	seq := &fakeSequenceAllocator{next: 4}
-	docInit := &fakeDocumentInitializer{ref: &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"}, exists: true}
-	svc := NewRegistryService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
-	svc.withTemplateArtifactResolver(resolver)
-	svc.withTemplateArtifactChecker(checker)
+	docInit := &fakeDocumentInitializer{
+		ref:        &registrydomain.DocumentRef{ID: "doc-xyz", ContentHash: "hash-1"},
+		storageKey: "system/templates/blank.docx",
+		exists:     false,
+	}
+	svc := NewRegistryService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, logger, docInit)
 
 	templateVersionID := "00000000-0000-0000-0000-000000000102"
-	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
 		TenantID:          "tenant-a",
 		ProfileCode:       "dc",
 		ProcessAreaCode:   "rh",
@@ -535,14 +498,14 @@ func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforeP
 	if !errors.Is(err, ErrTemplateArtifactMissing) {
 		t.Fatalf("expected ErrTemplateArtifactMissing, got %v", err)
 	}
-	if !resolver.called {
-		t.Fatalf("expected template artifact resolver to be called")
+	if docInit.gotResolveTemplateStorageKeyCalls != 1 {
+		t.Fatalf("expected template artifact resolver to be called once, got %d", docInit.gotResolveTemplateStorageKeyCalls)
 	}
-	if !checker.called {
-		t.Fatalf("expected template artifact checker to be called")
+	if docInit.gotExistsCalls != 1 {
+		t.Fatalf("expected template artifact checker to be called once, got %d", docInit.gotExistsCalls)
 	}
-	if checker.gotStorageKey != "system/templates/blank.docx" {
-		t.Fatalf("storage key = %q, want system/templates/blank.docx", checker.gotStorageKey)
+	if docInit.gotExistsStorageKey != "system/templates/blank.docx" {
+		t.Fatalf("storage key = %q, want system/templates/blank.docx", docInit.gotExistsStorageKey)
 	}
 	if repo.created != nil {
 		t.Fatalf("expected controlled document not to persist when template artifact is missing")
@@ -552,9 +515,6 @@ func TestRegistryService_Create_AtomicTemplateArtifactMissing_FailsClosedBeforeP
 	}
 	if docInit.called {
 		t.Fatalf("expected document initializer not to run when template artifact is missing")
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatalf("sqlmock expectations: %v", err)
 	}
 }
 
@@ -577,8 +537,8 @@ func TestRegistryService_Create_TemplateArtifactInvariantUnconfigured_FailsClose
 	if err == nil {
 		t.Fatalf("expected invariant configuration error, got nil")
 	}
-	if !strings.Contains(err.Error(), "template artifact invariant") {
-		t.Fatalf("expected template artifact invariant error, got %v", err)
+	if !errors.Is(err, ErrTemplateArtifactInvariantUnconfigured) {
+		t.Fatalf("expected ErrTemplateArtifactInvariantUnconfigured, got %v", err)
 	}
 	if repo.created != nil {
 		t.Fatalf("expected controlled document not to persist when invariant is unconfigured")
@@ -588,16 +548,105 @@ func TestRegistryService_Create_TemplateArtifactInvariantUnconfigured_FailsClose
 	}
 }
 
-func TestRegistryService_WithDocumentInitializer_PanicsWithoutArtifactSeams(t *testing.T) {
-	svc := NewRegistryService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+func TestRegistryService_Create_ManualCodeReasonWinsBeforeArtifactCheck(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	seq := &fakeSequenceAllocator{next: 6}
+	docInit := &fakeDocumentInitializer{storageKey: "system/templates/blank.docx", exists: false}
+	svc := NewRegistryService(nil, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
 
-	defer func() {
-		if recover() == nil {
-			t.Fatalf("expected panic when document initializer lacks artifact seams")
-		}
-	}()
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:        "tenant-a",
+		ProfileCode:     "dc",
+		ProcessAreaCode: "rh",
+		Title:           "HR Policy",
+		OwnerUserID:     "owner-1",
+		ActorUserID:     "actor-1",
+		ManualCode:      stringPtr("HR-001"),
+	})
+	if !errors.Is(err, registrydomain.ErrManualCodeReasonRequired) {
+		t.Fatalf("expected ErrManualCodeReasonRequired, got %v", err)
+	}
+	if docInit.gotResolveTemplateStorageKeyCalls != 0 {
+		t.Fatalf("expected no template artifact resolution for invalid manual-code request, got %d", docInit.gotResolveTemplateStorageKeyCalls)
+	}
+	if docInit.gotExistsCalls != 0 {
+		t.Fatalf("expected no template artifact existence checks for invalid manual-code request, got %d", docInit.gotExistsCalls)
+	}
+	if seq.next != 6 {
+		t.Fatalf("expected sequence allocation to remain unused, got next=%d", seq.next)
+	}
+}
 
-	svc.WithDocumentInitializer(legacyDocumentInitializer{})
+func TestRegistryService_Create_AutoTemplateArtifactMissing_AfterAuthzBeforeSequence(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	mock.ExpectBegin()
+	expectRegistryCreateAuthz(mock, "actor-1", "tenant-a")
+	mock.ExpectRollback()
+
+	repo := newFakeControlledDocumentRepository()
+	seq := &fakeSequenceAllocator{next: 9}
+	docInit := &fakeDocumentInitializer{storageKey: "system/templates/blank.docx", exists: false}
+	svc := NewRegistryService(db, repo, seq, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+
+	_, err = svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:        "tenant-a",
+		ProfileCode:     "dc",
+		ProcessAreaCode: "rh",
+		Title:           "HR Policy",
+		OwnerUserID:     "owner-1",
+		ActorUserID:     "actor-1",
+		DocumentName:    "HR Policy v1",
+	})
+	if !errors.Is(err, ErrTemplateArtifactMissing) {
+		t.Fatalf("expected ErrTemplateArtifactMissing, got %v", err)
+	}
+	if docInit.gotResolveTemplateStorageKeyCalls != 1 {
+		t.Fatalf("expected template artifact resolution after authz, got %d calls", docInit.gotResolveTemplateStorageKeyCalls)
+	}
+	if seq.next != 9 {
+		t.Fatalf("expected sequence allocation to remain unused, got next=%d", seq.next)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestRegistryService_Create_OverrideTemplateValidationWinsBeforeArtifactCheck(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	seq := &fakeSequenceAllocator{next: 10}
+	docInit := &fakeDocumentInitializer{storageKey: "system/templates/blank.docx", exists: false}
+	checker := &fakeTemplateVersionChecker{byID: map[string]templateVersionState{
+		"tpl-ovr-1": {status: stringPtr("published"), profileCode: "qa"},
+	}}
+	svc := NewRegistryService(nil, repo, seq, checker, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, docInit)
+
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:                  "tenant-a",
+		ProfileCode:               "dc",
+		ProcessAreaCode:           "rh",
+		Title:                     "HR Policy",
+		OwnerUserID:               "owner-1",
+		ActorUserID:               "actor-1",
+		DocumentName:              "HR Policy v1",
+		OverrideTemplateVersionID: stringPtr("tpl-ovr-1"),
+		OverrideTemplateReason:    stringPtr("Emergency temporary override for legal form"),
+	})
+	if !errors.Is(err, registrydomain.ErrTemplateProfileMismatch) {
+		t.Fatalf("expected ErrTemplateProfileMismatch, got %v", err)
+	}
+	if docInit.gotResolveTemplateStorageKeyCalls != 0 {
+		t.Fatalf("expected no template artifact resolution for invalid override request, got %d", docInit.gotResolveTemplateStorageKeyCalls)
+	}
+	if docInit.gotExistsCalls != 0 {
+		t.Fatalf("expected no template artifact existence checks for invalid override request, got %d", docInit.gotExistsCalls)
+	}
+	if seq.next != 10 {
+		t.Fatalf("expected sequence allocation to remain unused, got next=%d", seq.next)
+	}
 }
 
 func TestRegistryService_PreviewCode_ReturnsFormatted(t *testing.T) {

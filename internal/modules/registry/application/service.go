@@ -22,14 +22,6 @@ type TemplateVersionChecker interface {
 	GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error)
 }
 
-type TemplateArtifactChecker interface {
-	Exists(ctx context.Context, storageKey string) (bool, error)
-}
-
-type templateArtifactResolver interface {
-	ResolveTemplateStorageKey(ctx context.Context, tenantID, profileCode string, templateVersionID *string) (string, error)
-}
-
 type ProfileReader interface {
 	GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)
 }
@@ -50,8 +42,6 @@ type RegistryService struct {
 	areas                    AreaReader
 	govLogger                taxonomydomain.GovernanceLogger
 	docInit                  registrydomain.DocumentInitializer
-	templateArtifactResolver templateArtifactResolver
-	templateArtifactChecker  TemplateArtifactChecker
 	now                      func() time.Time
 }
 
@@ -76,15 +66,14 @@ type CreateControlledDocumentCmd struct {
 }
 
 // CreateResult is the atomic-create return: the persisted ControlledDocument
-// plus the optional DocumentRef returned by DocumentInitializer (nil when no
-// initializer is wired).
+// plus the DocumentRef returned by DocumentInitializer.
 type CreateResult struct {
 	ControlledDocument *registrydomain.ControlledDocument
 	DocumentRef        *registrydomain.DocumentRef
 }
 
 var ErrTemplateArtifactMissing = errors.New("template artifact missing")
-var errTemplateArtifactInvariantUnconfigured = errors.New("registry: template artifact invariant not configured")
+var ErrTemplateArtifactInvariantUnconfigured = errors.New("registry: template artifact invariant not configured")
 
 func NewRegistryService(
 	db *sql.DB,
@@ -124,27 +113,7 @@ func (s *RegistryService) WithDocumentInitializer(d registrydomain.DocumentIniti
 	if d == nil {
 		panic("registry: document initializer must not be nil")
 	}
-	resolver, ok := d.(templateArtifactResolver)
-	if !ok {
-		panic("registry: document initializer must implement template artifact resolver")
-	}
-	checker, ok := d.(TemplateArtifactChecker)
-	if !ok {
-		panic("registry: document initializer must implement template artifact checker")
-	}
 	s.docInit = d
-	s.templateArtifactResolver = resolver
-	s.templateArtifactChecker = checker
-	return s
-}
-
-func (s *RegistryService) withTemplateArtifactResolver(resolver templateArtifactResolver) *RegistryService {
-	s.templateArtifactResolver = resolver
-	return s
-}
-
-func (s *RegistryService) withTemplateArtifactChecker(checker TemplateArtifactChecker) *RegistryService {
-	s.templateArtifactChecker = checker
 	return s
 }
 
@@ -163,10 +132,6 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 	}
 	if !area.IsActive() {
 		return nil, taxonomydomain.ErrAreaArchived
-	}
-
-	if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
-		return nil, err
 	}
 
 	var (
@@ -217,8 +182,36 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 			if err := authz.Require(ctx, createTx, string(iamdomain.CapRegistryCreate), "tenant"); err != nil {
 				return nil, fmt.Errorf("registry: authz check sequence allocation: %w", err)
 			}
+		}
+	}
+	if cmd.OverrideTemplateVersionID != nil {
+		if !isReasonValid(cmd.OverrideTemplateReason) {
+			return nil, registrydomain.ErrOverrideReasonRequired
+		}
+		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, *cmd.OverrideTemplateVersionID)
+		if err != nil {
+			return nil, err
+		}
+		_, err = registrydomain.Resolve(registrydomain.TemplateResolutionInput{
+			ProfileCode: cmd.ProfileCode,
+			OverrideTemplate: &registrydomain.TemplateVersionCandidate{
+				ID:          *cmd.OverrideTemplateVersionID,
+				ProfileCode: profileCode,
+				Status:      status,
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		overrideID = cmd.OverrideTemplateVersionID
+	}
+	if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
+		return nil, err
+	}
 
-			next, err := s.seq.NextAndIncrement(ctx, tx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
+	if cmd.ManualCode == nil {
+		if createTx != nil {
+			next, err := s.seq.NextAndIncrement(ctx, createTx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
 				return nil, err
 			}
@@ -248,26 +241,7 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 		}
 	}
 
-	if cmd.OverrideTemplateVersionID != nil {
-		if !isReasonValid(cmd.OverrideTemplateReason) {
-			return nil, registrydomain.ErrOverrideReasonRequired
-		}
-		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, *cmd.OverrideTemplateVersionID)
-		if err != nil {
-			return nil, err
-		}
-		_, err = registrydomain.Resolve(registrydomain.TemplateResolutionInput{
-			ProfileCode: cmd.ProfileCode,
-			OverrideTemplate: &registrydomain.TemplateVersionCandidate{
-				ID:          *cmd.OverrideTemplateVersionID,
-				ProfileCode: profileCode,
-				Status:      status,
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		overrideID = cmd.OverrideTemplateVersionID
+	if overrideID != nil {
 		payload, _ := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
 		events = append(events, taxonomydomain.GovernanceEvent{
 			TenantID:     cmd.TenantID,
@@ -342,17 +316,17 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 }
 
 func (s *RegistryService) ensureTemplateArtifact(ctx context.Context, cmd CreateControlledDocumentCmd) error {
-	if s.templateArtifactResolver == nil || s.templateArtifactChecker == nil {
-		return errTemplateArtifactInvariantUnconfigured
+	if s.docInit == nil {
+		return ErrTemplateArtifactInvariantUnconfigured
 	}
-	storageKey, err := s.templateArtifactResolver.ResolveTemplateStorageKey(ctx, cmd.TenantID, cmd.ProfileCode, cmd.TemplateVersionID)
+	storageKey, err := s.docInit.ResolveTemplateStorageKey(ctx, cmd.TenantID, cmd.ProfileCode, cmd.TemplateVersionID)
 	if err != nil {
 		return fmt.Errorf("resolve template artifact: %w", err)
 	}
 	if strings.TrimSpace(storageKey) == "" {
 		return ErrTemplateArtifactMissing
 	}
-	exists, err := s.templateArtifactChecker.Exists(ctx, storageKey)
+	exists, err := s.docInit.Exists(ctx, storageKey)
 	if err != nil {
 		return fmt.Errorf("check template artifact: %w", err)
 	}
