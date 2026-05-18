@@ -40,11 +40,11 @@ Current editor boundary:
 
 ## Sidebar Audit Status (2026-05-18)
 
-The right sidebar is no longer "all-or-nothing deferred". The current integration boundary is:
+The governed sidebar slice is now implemented. The current integration boundary is:
 
 - keep the sidebar shell, collapse behavior, and `Código` row
-- wire `Perfil` and `Área` from `DocumentDetailResponse` snapshot codes plus taxonomy queries
-- wire `Visibilidade` from the controlled-document record, but first remove the legacy-manual registry wrapper drift so frontend uses the real contract
-- do not show `Próximos aprovadores` in `draft`; that section only makes sense when an active approval instance exists
-- treat approval-instance wiring as a contract prerequisite before using it in the sidebar, because the runtime exists but the current OpenAPI/generated frontend surface does not yet type the response body correctly
-- keep `Vigência atual`, `Próx. revisão`, and `Revisões` deferred until truthful product/runtime semantics exist for the editor route
+- `Perfil` and `Área` are resolved from `DocumentDetailResponse` snapshot codes plus taxonomy queries
+- `Visibilidade` is resolved from the controlled-document record through the real registry contract
+- `Próximos aprovadores` is hidden in `draft` and shown only when the document is `under_review` with a live approval instance
+- governed history comes from `GET /api/v1/documents/{id}/revision-history` and must stay sourced from `documents` lineage, never from technical `document_revisions`
+- keep `Vigência atual` and `Próx. revisão` deferred until truthful effective-version semantics exist for the editor route

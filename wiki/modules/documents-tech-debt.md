@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-18 (approval comments + editor error-state sync)
+**Last verified:** 2026-05-18 (governed sidebar runtime + contract sync)
 
 ## Severity scale
 
@@ -99,6 +99,14 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Linked ADR:** missing-ADR
 
 ---
+
+### T-012 · Editor sidebar depended on mock governed revision / visibility / approver data — CLOSED 2026-05-18
+- **Severity:** major (closed)
+- **Surface (resolved):** `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx`, `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`, `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/features/registry/api/controlledDocuments.ts`
+- **Observation (original):** The editor sidebar shipped mock metadata, revision history, and approver rows. That violated runtime truth and blurred the boundary between governed `documents` lineage and technical `document_revisions`.
+- **Evidence:** `GET /api/v1/documents/{id}/revision-history`, `GET /api/v1/documents/{id}/approval-instance`, `GET /api/v1/controlled-documents/{id}`; focused frontend/backend tests added on 2026-05-18.
+- **Linked backlog row:** `wiki/backlog/editor.md`
+- **Linked ADR:** missing-ADR
 
 ## Coverage stats (computed at compose time)
 

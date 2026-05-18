@@ -1,7 +1,7 @@
 # Editor — Deferred Backlog
 
 > **Last verified:** 2026-05-18
-> **Scope:** Deferred implementation items for the `/documents/:documentID/edit` editor screen. The right `EditorMetaSidebar` ships with mock data while backend endpoints are designed.
+> **Scope:** Historical backlog and audit memory for the `/documents/:documentID/edit` editor screen. The governed sidebar slice is now implemented with real runtime data; this page now tracks only the remaining editor defers and the audit history that led to the implementation.
 > **Out of scope:** Bug fixes (see `bugs/`), shared editor primitive (`EditorChrome`).
 > **Key files:**
 > - `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx:12` — TODO block for `MOCK_META`
@@ -21,6 +21,16 @@
 | Próximos aprovadores (signoff list) | Medium | New endpoint `GET /api/v1/documents/:id/signoffs` | Deferred |
 
 ---
+
+## Governed Sidebar Sync (2026-05-18)
+
+This supersedes the older "sidebar deferred" assumptions recorded later in this file.
+
+- `Código`, `Perfil`, `Área`, and `Visibilidade` now render from real runtime data composed from document detail, taxonomy lookups, and controlled-document visibility from the registry contract.
+- Governed history now comes from `GET /api/v1/documents/{id}/revision-history` and formats business revisions as `REV00`, `REV01`, and so on.
+- The history source is `documents` lineage by `controlled_document_id`; `document_revisions` remains technical/autosave-only and must not appear as business history.
+- The approval chain now comes from `GET /api/v1/documents/{id}/approval-instance` and is rendered only when the document is `under_review`.
+- Remaining sidebar defers are limited to `Vigência atual` and `Próx. revisão`, because the editor route still lacks a truthful effective-version/effective-date contract for those rows.
 
 ## Item 1 — Metadados rows
 
@@ -196,9 +206,9 @@ Evidence used:
 | Comment load failure visibility | `useDocumentComments` + `DocumentEditorPage` | Query failure is a real runtime possibility with persisted review-state implications | Screen now keeps the failure visible with inline retry instead of toast-only UX | implemented and aligned | Keep |
 | Approval blocked by unresolved comments | approval decision service + shared error mapping | Final approval now fails server-side with `approval.unresolved_comments` while active comments remain unresolved | Screen-side UX aligns: editor shows persistent comment-load failure, approval dialog maps the business conflict inline | implemented and aligned | Keep server-owned rule |
 | Non-draft PDF polling state | editor screen boundary vs published/view boundary | PDF availability belongs to published/view flows, not the editor | Unused editor-side polling was removed; the editor no longer owns background PDF readiness checks | implemented and aligned | Keep PDF status/download concerns out of `/documents/:documentID/edit`; wire them only on the published/view screen |
-| Sidebar metadata rows | existing backlog item 1 | Runtime still lacks one complete response shape for profile/area/review-date/visibility rows | Sidebar remains mock-backed | missing backend capability | Keep deferred exactly as backlog row 1 |
-| Sidebar revisions timeline | existing backlog item 2 | No editor-side revisions list endpoint is wired | Sidebar remains mock timeline | missing backend capability | Keep deferred exactly as backlog row 2 |
-| Sidebar next approvers | existing backlog item 3 | No editor-side payload is wired for signoff sequence in this screen | Sidebar remains mock approvers list | missing backend capability | Keep deferred exactly as backlog row 3 |
+| Sidebar metadata rows (`Código`, `Perfil`, `Área`, `Visibilidade`) | governed sidebar implementation | Runtime truth now comes from document detail, taxonomy, and controlled-document visibility | Sidebar is runtime-backed | implemented and aligned | Keep |
+| Sidebar governed revisions timeline | governed sidebar implementation | Runtime truth now comes from `GET /api/v1/documents/{id}/revision-history` | Sidebar is runtime-backed and excludes `document_revisions` autosave rows | implemented and aligned | Keep |
+| Sidebar approval chain | governed sidebar implementation | Runtime truth now comes from `GET /api/v1/documents/{id}/approval-instance` | Sidebar renders the full chain only in `under_review` | implemented and aligned | Keep |
 | Released output remains clean | lifecycle design + documents/approval persistence | Runtime approval/comments model keeps active comments out of clean released output | Published-view cleanup is still a separate product slice, not this editor screen | defer | Keep deferred until published-screen work |
 | Template editor comments parity | lifecycle design + template backend truth | No template-owned comments capability exists yet | No real parity path can be claimed from the editor screen | missing backend capability | Keep deferred until template comments exist |
 
@@ -211,7 +221,7 @@ Evidence used:
 
 ### Deferred
 
-- Sidebar metadata/revisions/approvers sections that still depend on missing backend capability.
+- `Vigência atual` and `Próx. revisão` rows until the editor has a truthful effective-version contract.
 - Published-view discussion/comment surfaces until the released-view product boundary is defined.
 - Generic cross-module comments platform.
 
@@ -268,7 +278,5 @@ Evidence used:
 
 ### Verification needed next
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-module-contract-sync.ps1 -Module documents`
-- `cd frontend/apps/web; pnpm.cmd tsc --noEmit -p tsconfig.build.json`
-- `cd frontend/apps/web; pnpm.cmd vitest run src/features/documents/pages/DocumentEditorPage.test.tsx`
-- Before wiring approvers: repair and re-verify the `GET /api/v1/documents/{id}/approval-instance` contract/codegen/wrapper boundary
+- Browser E2E on `/documents/:documentID/edit` covering draft sidebar truth, finalize `revisionTitle`, under-review approval chain, and governed history ordering.
+- Runtime/API spot-check that `revision-history` is sourced from governed `documents` lineage and not from technical `document_revisions`.
