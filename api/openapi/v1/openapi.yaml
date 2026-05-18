@@ -3303,7 +3303,12 @@ paths:
                 $ref: '#/components/schemas/AtomicCreateResponse'
         '400': { description: validation_error }
         '401': { description: unauthenticated }
-        '409': { description: code_taken or domain conflict }
+        '409':
+          description: code_taken or domain conflict, including template artifact missing
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '422': { description: template_invalid }
 
   /api/v1/controlled-documents/preview-code:

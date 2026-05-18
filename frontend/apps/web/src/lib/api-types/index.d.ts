@@ -8312,12 +8312,14 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description code_taken or domain conflict */
+            /** @description code_taken or domain conflict, including template artifact missing */
             409: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description template_invalid */
             422: {
