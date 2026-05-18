@@ -25,14 +25,19 @@ export type DocumentEditorPageProps = {
   onDone: () => void;
 };
 
+type EditorDocumentDetail = DocumentDetail & { RevisionTitle?: string | null };
+
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
   const session = useDocumentSession(documentID);
   const docQuery = useDocumentDetailQuery(documentID);
   const [editorLoadError, setEditorLoadError] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState('');
   const [buffer, setBuffer] = useState<ArrayBuffer | null | undefined>(undefined);
+  const [revisionTitleDialogOpen, setRevisionTitleDialogOpen] = useState(false);
+  const [revisionTitleInput, setRevisionTitleInput] = useState('');
+  const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
   const editorRef = useRef<MetalDocsEditorRef>(null);
-  const doc: DocumentDetail | null = docQuery.data ?? null;
+  const doc: EditorDocumentDetail | null = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
 
   const fetchRevisionBuffer = useCallback(async (revisionID: string) => {
     if (!revisionID) {
@@ -174,7 +179,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     await autosave.queue(buf, doc.FormDataJSON ?? null);
   }
 
-  async function handleFinalize() {
+  async function submitForReview(revisionTitle: string) {
     if (session.state.phase !== 'writer' || !doc) return;
     try {
       const latestBuf = await editorRef.current?.saveNow();
@@ -186,8 +191,11 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         toast.error('Erro ao salvar documento antes da submissão.');
         return;
       }
-      await finalizeDocument(documentID);
+      await finalizeDocument(documentID, { revisionTitle });
       await session.release();
+      setRevisionTitleDialogOpen(false);
+      setRevisionTitleInput('');
+      setRevisionTitleError(null);
       onDone();
     } catch (err) {
       if (err instanceof ApiError) {
@@ -196,6 +204,21 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         toast.error('Erro ao finalizar documento.');
       }
     }
+  }
+
+  function handleFinalize() {
+    setRevisionTitleInput(doc?.RevisionTitle ?? '');
+    setRevisionTitleError(null);
+    setRevisionTitleDialogOpen(true);
+  }
+
+  function handleConfirmFinalize() {
+    const trimmed = revisionTitleInput.trim();
+    if (!trimmed) {
+      setRevisionTitleError('Informe o tÃ­tulo da revisÃ£o para submeter.');
+      return;
+    }
+    void submitForReview(trimmed);
   }
 
   const docStatus = doc?.Status ?? '';
@@ -264,12 +287,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             right={
               <>
                 <AutosaveStatus status={autosaveState} />
-                <button
-                  type="button"
-                  className={editorChromeStyles.primaryBtn}
-                  onClick={() => void handleFinalize()}
-                  disabled={!canEditContent}
-                >
+                  <button
+                    type="button"
+                    className={editorChromeStyles.primaryBtn}
+                    onClick={handleFinalize}
+                    disabled={!canEditContent}
+                  >
                   Submeter para revisão
                 </button>
               </>
@@ -323,6 +346,35 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
           }}
           code={docCode || undefined}
           />
+        ) : null}
+        {revisionTitleDialogOpen ? (
+          <div className={styles.dialogBackdrop} role="presentation">
+            <div className={styles.dialogPanel} role="dialog" aria-modal="true" aria-labelledby="revision-title-dialog-title">
+              <h2 id="revision-title-dialog-title" className={styles.dialogTitle}>TÃ­tulo da revisÃ£o</h2>
+              <p className={styles.dialogText}>Informe o motivo governado desta revisÃ£o antes de submeter o documento para aprovaÃ§Ã£o.</p>
+              <label className={styles.dialogField}>
+                <span>TÃ­tulo</span>
+                <input
+                  type="text"
+                  value={revisionTitleInput}
+                  onChange={(event) => {
+                    setRevisionTitleInput(event.target.value);
+                    if (revisionTitleError) setRevisionTitleError(null);
+                  }}
+                  placeholder="Ex.: Ajuste de procedimento operacional"
+                />
+              </label>
+              {revisionTitleError ? <p role="alert" className={styles.dialogError}>{revisionTitleError}</p> : null}
+              <div className={styles.dialogActions}>
+                <button type="button" className={styles.dialogSecondaryBtn} onClick={() => setRevisionTitleDialogOpen(false)}>
+                  Cancelar
+                </button>
+                <button type="button" className={styles.dialogPrimaryBtn} onClick={handleConfirmFinalize}>
+                  Confirmar submissÃ£o
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>

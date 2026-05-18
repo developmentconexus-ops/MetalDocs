@@ -112,3 +112,87 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+.dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.dialogPanel {
+  width: min(100%, 520px);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+}
+
+.dialogTitle {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.dialogText {
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.dialogField {
+  display: grid;
+  gap: 8px;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.dialogField input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  font: inherit;
+}
+
+.dialogError {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.92rem;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dialogSecondaryBtn,
+.dialogPrimaryBtn {
+  padding: 10px 16px;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dialogSecondaryBtn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+}
+
+.dialogPrimaryBtn {
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #fff;
+}

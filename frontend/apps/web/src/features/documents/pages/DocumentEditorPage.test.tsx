@@ -285,11 +285,13 @@ describe('DocumentEditorPage autosave wiring', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+    fireEvent.change(screen.getByLabelText('TÃ­tulo'), { target: { value: 'Atualizacao de procedimento' } });
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(finalBuf, { foo: 'bar' }));
     await waitFor(() => expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1'));
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', { revisionTitle: 'Atualizacao de procedimento' }));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 
@@ -310,12 +312,30 @@ describe('DocumentEditorPage autosave wiring', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+    fireEvent.change(screen.getByLabelText('TÃ­tulo'), { target: { value: 'Atualizacao de procedimento' } });
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(finalBuf, { foo: 'bar' }));
     await waitFor(() => expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1));
     expect(vi.mocked(api.finalizeDocument)).not.toHaveBeenCalled();
     expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it('blocks submit confirmation when revision title is blank', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Informe o tÃ­tulo da revisÃ£o para submeter.');
+    expect(vi.mocked(api.finalizeDocument)).not.toHaveBeenCalled();
   });
 });
 

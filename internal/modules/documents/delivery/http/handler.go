@@ -328,6 +328,7 @@ type documentDetailResponse struct {
 	UpdatedAt               time.Time             `json:"UpdatedAt"`
 	CreatedBy               string                `json:"CreatedBy"`
 	ControlledDocumentID    *string               `json:"ControlledDocumentID"`
+	RevisionTitle           *string               `json:"RevisionTitle"`
 	ProfileCodeSnapshot     *string               `json:"ProfileCodeSnapshot"`
 	ProcessAreaCodeSnapshot *string               `json:"ProcessAreaCodeSnapshot"`
 	Code                    string                `json:"Code"`
@@ -358,6 +359,7 @@ func toDocumentDetailResponse(doc domain.Document) (*documentDetailResponse, err
 		UpdatedAt:               doc.UpdatedAt,
 		CreatedBy:               doc.CreatedBy,
 		ControlledDocumentID:    doc.ControlledDocumentID,
+		RevisionTitle:           doc.RevisionTitle,
 		ProfileCodeSnapshot:     doc.ProfileCodeSnapshot,
 		ProcessAreaCodeSnapshot: doc.ProcessAreaCodeSnapshot,
 		Code:                    doc.Code,
@@ -396,6 +398,10 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
+	var reqBody struct {
+		RevisionTitle string `json:"revisionTitle"`
+	}
+
 	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
 	if idempotencyKey == "" {
 		httpErr(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_REQUIRED")
@@ -403,6 +409,23 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	if !idempotency.IsValidKey(idempotencyKey) {
 		httpErr(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_INVALID")
+		return
+	}
+
+	payloadHash, err := idempotency.RequestHash(r)
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	revisionTitle := strings.TrimSpace(reqBody.RevisionTitle)
+	if revisionTitle == "" {
+		_ = problem.Write(w, problem.FromValidation([]problem.FieldError{
+			{Field: "revisionTitle", Code: problem.FieldCodeRequired, Message: "revisionTitle is required"},
+		}))
 		return
 	}
 
@@ -423,11 +446,6 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payloadHash, err := idempotency.RequestHash(r)
-	if err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
-		return
-	}
 	tenantForReplay, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, "internal_error")
@@ -531,6 +549,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		DocumentID:      docID,
 		RouteID:         routeID,
 		SubmittedBy:     actorID,
+		RevisionTitle:   revisionTitle,
 		ContentFormData: map[string]any{"_content_hash": contentHash},
 		RevisionVersion: int(revisionVersion),
 	})
