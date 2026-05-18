@@ -52,7 +52,16 @@ func (f *fakeSvc) CreateDocument(_ context.Context, _ application.CreateDocument
 }
 
 func (f *fakeSvc) GetDocument(_ context.Context, _, _ string) (*domain.Document, error) {
-	return &domain.Document{ID: "doc_1", Name: "Doc"}, nil
+	return &domain.Document{
+		ID:                "doc_1",
+		Name:              "Doc",
+		Status:            domain.DocStatusDraft,
+		FormDataJSON:      []byte(`{"foo":"bar"}`),
+		CurrentRevisionID: "rev_1",
+		RevisionVersion:   1,
+		CreatedBy:         "user_1",
+		Code:              "DOC-1",
+	}, nil
 }
 
 func (f *fakeSvc) RenameDocument(_ context.Context, _, _, _, newName string) error {
@@ -225,6 +234,35 @@ func TestListDocuments_Happy(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestGetDocument_EmbedsFormDataJSON(t *testing.T) {
+	svc := &fakeSvc{}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1", nil)
+	req.SetPathValue("id", "doc_1")
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+
+	formData, ok := body["FormDataJSON"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected FormDataJSON object, got %#v", body["FormDataJSON"])
+	}
+	if got := formData["foo"]; got != "bar" {
+		t.Fatalf("expected FormDataJSON.foo=bar, got %#v", got)
 	}
 }
 

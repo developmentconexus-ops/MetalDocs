@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { finalizeDocument, listDocuments } from '../api/documents';
+import { finalizeDocument, getDocument, listDocuments } from '../api/documents';
 import { ApiError } from '../../../lib/api';
 
 describe('documents with apiFetch', () => {
@@ -28,6 +28,29 @@ describe('documents with apiFetch', () => {
     );
     await expect(finalizeDocument('doc-1')).rejects.toBeInstanceOf(ApiError);
     await expect(finalizeDocument('doc-1')).rejects.toMatchObject({ code: 'not_found.route', status: 404 });
+  });
+
+  it('getDocument returns typed detail payload with embedded FormDataJSON', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ID: 'doc-1',
+          Name: 'Doc',
+          Status: 'draft',
+          FormDataJSON: { foo: 'bar' },
+          CurrentRevisionID: 'rev-1',
+          RevisionVersion: 1,
+          CreatedBy: 'user-1',
+          Code: 'DOC-1',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const doc = await getDocument('doc-1');
+
+    expect(doc.FormDataJSON).toEqual({ foo: 'bar' });
+    expect(doc.CurrentRevisionID).toBe('rev-1');
   });
 
   it('finalizeDocument sends Idempotency-Key and returns instanceId on 201', async () => {

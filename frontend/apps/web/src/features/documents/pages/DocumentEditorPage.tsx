@@ -8,7 +8,7 @@ import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
 import { useDocumentComments } from '../hooks/editor/useDocumentComments';
 import { finalizeDocument, renameDocument, signedRevisionURL } from '../api/documents';
 import { useDocumentPdfStatus } from '../hooks/editor/useDocumentPdfStatus';
-import type { DocumentResponse } from '../api/documents';
+import type { DocumentDetail } from '../api/documents';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { EditorMetaSidebar } from '../components/EditorMetaSidebar';
 import {
@@ -33,7 +33,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [documentName, setDocumentName] = useState('');
   const [buffer, setBuffer] = useState<ArrayBuffer | null | undefined>(undefined);
   const editorRef = useRef<MetalDocsEditorRef>(null);
-  const doc = (docQuery.data as DocumentResponse | undefined) ?? null;
+  const doc: DocumentDetail | null = docQuery.data ?? null;
 
   const fetchRevisionBuffer = useCallback(async (revisionID: string) => {
     if (!revisionID) {
@@ -55,8 +55,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       return;
     }
 
-    const name = doc.Name ?? doc.name ?? 'Document';
-    const revisionID = doc.CurrentRevisionID ?? doc.current_revision_id ?? '';
+    const name = doc.Name ?? 'Document';
+    const revisionID = doc.CurrentRevisionID ?? '';
     let cancelled = false;
 
     setDocumentName(name);
@@ -172,7 +172,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
 
   async function handleSave(buf: ArrayBuffer) {
     if (!doc) return;
-    await autosave.queue(buf, doc.FormDataJSON ?? doc.form_data ?? null);
+    await autosave.queue(buf, doc.FormDataJSON ?? null);
   }
 
   async function handleFinalize() {
@@ -180,7 +180,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     try {
       const latestBuf = await editorRef.current?.saveNow();
       if (latestBuf) {
-        await autosave.queue(latestBuf, doc.FormDataJSON ?? doc.form_data ?? null);
+        await autosave.queue(latestBuf, doc.FormDataJSON ?? null);
       }
       const flushOk = await autosave.flush();
       if (!flushOk) {
@@ -199,15 +199,15 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     }
   }
 
-  const docStatus = doc?.Status ?? doc?.status ?? '';
+  const docStatus = doc?.Status ?? '';
   const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
   const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review' || docStatus === 'rejected');
   // Poll view endpoint for PDF status when doc is not a draft (E11).
   const pdf = useDocumentPdfStatus(documentID, docStatus !== '' && docStatus !== 'draft');
-  const docCode = doc?.Code ?? doc?.code ?? '';
-  const revNum = doc?.RevisionVersion ?? doc?.revision_version ?? 0;
+  const docCode = doc?.Code ?? '';
+  const revNum = doc?.RevisionVersion ?? 0;
   const displayName = documentName.replace(/\.docx$/i, '');
-  const userID = doc?.CreatedBy ?? doc?.created_by ?? '';
+  const userID = doc?.CreatedBy ?? '';
   const authorDisplay = String(userID);
   const commentsHook = useDocumentComments(documentID, authorDisplay);
   const canUseComments = canComment && !commentsHook.loadError;

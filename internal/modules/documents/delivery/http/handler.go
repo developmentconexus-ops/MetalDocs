@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -303,7 +304,64 @@ func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, status, msg)
 		return
 	}
-	httpresponse.WriteJSON(w, http.StatusOK, doc)
+	resp, err := toDocumentDetailResponse(*doc)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	httpresponse.WriteJSON(w, http.StatusOK, resp)
+}
+
+type documentDetailResponse struct {
+	ID                      string                `json:"ID"`
+	TenantID                string                `json:"TenantID"`
+	TemplateVersionID       string                `json:"TemplateVersionID"`
+	Name                    string                `json:"Name"`
+	Status                  domain.DocumentStatus `json:"Status"`
+	FormDataJSON            json.RawMessage       `json:"FormDataJSON"`
+	CurrentRevisionID       string                `json:"CurrentRevisionID"`
+	RevisionVersion         int64                 `json:"RevisionVersion"`
+	ActiveSessionID         string                `json:"ActiveSessionID"`
+	ValuesFrozenAt          *time.Time            `json:"ValuesFrozenAt"`
+	ArchivedAt              *time.Time            `json:"ArchivedAt"`
+	CreatedAt               time.Time             `json:"CreatedAt"`
+	UpdatedAt               time.Time             `json:"UpdatedAt"`
+	CreatedBy               string                `json:"CreatedBy"`
+	ControlledDocumentID    *string               `json:"ControlledDocumentID"`
+	ProfileCodeSnapshot     *string               `json:"ProfileCodeSnapshot"`
+	ProcessAreaCodeSnapshot *string               `json:"ProcessAreaCodeSnapshot"`
+	Code                    string                `json:"Code"`
+}
+
+func toDocumentDetailResponse(doc domain.Document) (*documentDetailResponse, error) {
+	formData := json.RawMessage(doc.FormDataJSON)
+	if len(formData) == 0 {
+		formData = json.RawMessage(`{}`)
+	}
+	if !json.Valid(formData) {
+		return nil, fmt.Errorf("invalid document form_data_json for document %s", doc.ID)
+	}
+
+	return &documentDetailResponse{
+		ID:                      doc.ID,
+		TenantID:                doc.TenantID,
+		TemplateVersionID:       doc.TemplateVersionID,
+		Name:                    doc.Name,
+		Status:                  doc.Status,
+		FormDataJSON:            formData,
+		CurrentRevisionID:       doc.CurrentRevisionID,
+		RevisionVersion:         doc.RevisionVersion,
+		ActiveSessionID:         doc.ActiveSessionID,
+		ValuesFrozenAt:          doc.ValuesFrozenAt,
+		ArchivedAt:              doc.ArchivedAt,
+		CreatedAt:               doc.CreatedAt,
+		UpdatedAt:               doc.UpdatedAt,
+		CreatedBy:               doc.CreatedBy,
+		ControlledDocumentID:    doc.ControlledDocumentID,
+		ProfileCodeSnapshot:     doc.ProfileCodeSnapshot,
+		ProcessAreaCodeSnapshot: doc.ProcessAreaCodeSnapshot,
+		Code:                    doc.Code,
+	}, nil
 }
 
 func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {

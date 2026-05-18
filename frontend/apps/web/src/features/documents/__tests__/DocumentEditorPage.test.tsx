@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PropsWithChildren } from 'react';
 import { forwardRef, useImperativeHandle } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DocumentEditorPage } from '../pages/DocumentEditorPage';
+import type { DocumentDetail } from '../api/documents';
 
 const queueSpy = vi.fn();
 const flushSpy = vi.fn();
@@ -75,14 +77,22 @@ describe('DocumentEditorPage', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const api = await import('../api/documents');
-    vi.mocked(api.getDocument).mockResolvedValue({
+    const doc: DocumentDetail = {
       ID: 'doc-1',
+      TenantID: 'tenant-1',
+      TemplateVersionID: 'tv-1',
       Name: 'Quarterly Report',
-      CurrentRevisionID: 'rev-1',
-      CreatedBy: 'user-1',
-      FormDataJSON: { foo: 'bar' },
       Status: 'draft',
-    });
+      FormDataJSON: { foo: 'bar' },
+      CurrentRevisionID: 'rev-1',
+      RevisionVersion: 1,
+      ActiveSessionID: '',
+      CreatedAt: '2026-05-18T10:00:00Z',
+      UpdatedAt: '2026-05-18T10:00:00Z',
+      CreatedBy: 'user-1',
+      Code: 'DOC-1',
+    };
+    vi.mocked(api.getDocument).mockResolvedValue(doc);
     vi.mocked(api.signedRevisionURL).mockReturnValue('/signed/url');
 
     const fetchMock = vi.fn()
@@ -99,7 +109,7 @@ describe('DocumentEditorPage', () => {
   });
 
   it('renders editor root and mounts editor after session acquisition', async () => {
-    render(<DocumentEditorPage documentID="doc-1" onDone={vi.fn()} />);
+    renderWithQueryClient(<DocumentEditorPage documentID="doc-1" onDone={vi.fn()} />);
 
     expect(document.querySelector('[data-editor-root]')).toBeTruthy();
     expect(screen.queryByTestId('metaldocs-editor')).toBeNull();
@@ -108,7 +118,7 @@ describe('DocumentEditorPage', () => {
   });
 
   it('queues autosave from editor callback', async () => {
-    render(<DocumentEditorPage documentID="doc-1" onDone={vi.fn()} />);
+    renderWithQueryClient(<DocumentEditorPage documentID="doc-1" onDone={vi.fn()} />);
 
     await waitFor(() => expect(screen.getByTestId('metaldocs-editor')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: 'trigger-autosave' }));
@@ -118,3 +128,19 @@ describe('DocumentEditorPage', () => {
     );
   });
 });
+
+function renderWithQueryClient(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {ui}
+    </QueryClientProvider>,
+  );
+}
