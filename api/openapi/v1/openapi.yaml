@@ -3693,7 +3693,9 @@ paths:
               properties:
                 session_id: { type: string, format: uuid }
                 pending_upload_id: { type: string, format: uuid }
-                form_data_snapshot: { type: object }
+                form_data_snapshot:
+                  type: object
+                  additionalProperties: true
                 page_count: { type: integer, minimum: 1, nullable: true }
               # NOTE: content_hash is NOT a request field. The server streams
               # S3 -> SHA256 and compares to the expected hash captured at
@@ -4542,7 +4544,7 @@ components:
           type: string
     DocumentDetailResponse:
       type: object
-      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, Code]
+      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, RevisionNumber, Code]
       properties:
         ID:
           type: string
@@ -4580,6 +4582,9 @@ components:
           format: date-time
         CreatedBy:
           type: string
+        RevisionNumber:
+          type: integer
+          format: int64
         ControlledDocumentID:
           type: string
           nullable: true

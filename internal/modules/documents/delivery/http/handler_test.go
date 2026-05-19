@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
+
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	httphandler "metaldocs/internal/modules/documents/delivery/http"
@@ -70,6 +72,7 @@ func (f *fakeSvc) GetDocument(_ context.Context, _, _ string) (*domain.Document,
 		FormDataJSON:      []byte(`{"foo":"bar"}`),
 		CurrentRevisionID: "rev_1",
 		RevisionVersion:   1,
+		RevisionNumber:    0,
 		CreatedBy:         "user_1",
 		Code:              "DOC-1",
 	}, nil
@@ -529,6 +532,42 @@ func TestFinalizeDocument_AllowsMissingRevisionTitleAtHTTPBoundary(t *testing.T)
 	mux.ServeHTTP(rr, req)
 	if rr.Code == http.StatusBadRequest && strings.Contains(rr.Body.String(), "revisionTitle") {
 		t.Fatalf("revisionTitle should be conditionally validated by the submit service, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestFinalizeDocument_ProfileNotFoundUsesProblemEnvelope(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT revision_version, revision_number, controlled_document_id::text").
+		WithArgs("doc_1", "tenant_1").
+		WillReturnRows(sqlmock.NewRows([]string{"revision_version", "revision_number", "controlled_document_id"}).
+			AddRow(int64(0), int64(1), nil))
+
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(&fakeSvc{}, db, &fakeApprovalSubmitter{}, &fakeFinalizeIdempotencyStore{})
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste"}`)))
+	withAuthHeaders(req, "document_filler")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("want application/problem+json, got %s", ct)
+	}
+	if !strings.Contains(rr.Body.String(), "profile_not_found") {
+		t.Fatalf("expected profile_not_found problem, got %s", rr.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
 	}
 }
 

@@ -5793,6 +5793,8 @@ export interface components {
             /** Format: date-time */
             UpdatedAt: string;
             CreatedBy: string;
+            /** Format: int64 */
+            RevisionNumber: number;
             ControlledDocumentID?: string | null;
             RevisionTitle?: string | null;
             ProfileCodeSnapshot?: string | null;
@@ -9140,7 +9142,9 @@ export interface operations {
                     session_id: string;
                     /** Format: uuid */
                     pending_upload_id: string;
-                    form_data_snapshot?: Record<string, never>;
+                    form_data_snapshot?: {
+                        [key: string]: unknown;
+                    };
                     page_count?: number | null;
                 };
             };

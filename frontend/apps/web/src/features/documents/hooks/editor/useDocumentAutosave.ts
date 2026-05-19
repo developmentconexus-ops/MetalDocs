@@ -15,6 +15,12 @@ export interface AutosaveArgs {
 
 const SYNC_DEBOUNCE_MS = 3_000;
 
+function asAutosaveFormSnapshot(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
 async function sha256Hex(buf: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', buf);
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -64,7 +70,7 @@ export function useDocumentAutosave(args: AutosaveArgs) {
       const commit = await commitAutosave(documentID, {
         session_id: sessionID,
         pending_upload_id: presigned.pending_upload_id,
-        form_data_snapshot: formSnapshot.current,
+        form_data_snapshot: asAutosaveFormSnapshot(formSnapshot.current),
         page_count: pendingPageCount.current ?? undefined,
       });
       await deletePending(documentID, hash);

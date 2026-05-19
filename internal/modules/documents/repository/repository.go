@@ -213,7 +213,7 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		        coalesce(d.current_revision_id::text, ''), coalesce(d.active_session_id::text, ''),
 		        d.archived_at, d.created_at, d.updated_at, d.created_by, d.revision_title,
 		        d.controlled_document_id, d.profile_code_snapshot, d.process_area_code_snapshot,
-		        coalesce(d.code,''), d.revision_version,
+		        coalesce(d.code,''), d.revision_version, d.revision_number,
 		        cr.file_size_bytes, cr.page_count, cr.page_count_source
 		 FROM documents d
 		 LEFT JOIN document_revisions cr
@@ -224,7 +224,7 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.RevisionTitle, &d.ControlledDocumentID, &d.ProfileCodeSnapshot,
 		&d.ProcessAreaCodeSnapshot, &d.Code,
-		&d.RevisionVersion, &currentFileSize, &currentPageCount, &currentPageCountSource)
+		&d.RevisionVersion, &d.RevisionNumber, &currentFileSize, &currentPageCount, &currentPageCountSource)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}

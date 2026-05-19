@@ -320,7 +320,9 @@ describe('DocumentEditorPage autosave wiring', () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
       FormDataJSON: { foo: 'bar' },
       form_data: { foo: 'bar' },
+      RevisionNumber: 1,
       RevisionVersion: 1,
+      revision_number: 1,
       revision_version: 1,
     }) as never);
     mockState.autosaveStatus = 'dirty';
@@ -406,7 +408,9 @@ describe('DocumentEditorPage autosave wiring', () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
       FormDataJSON: { foo: 'bar' },
       form_data: { foo: 'bar' },
+      RevisionNumber: 1,
       RevisionVersion: 1,
+      revision_number: 1,
       revision_version: 1,
     }) as never);
     mockState.autosaveStatus = 'dirty';
@@ -440,7 +444,9 @@ describe('DocumentEditorPage autosave wiring', () => {
 
   it('blocks submit confirmation when revision title is blank', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      RevisionNumber: 1,
       RevisionVersion: 1,
+      revision_number: 1,
       revision_version: 1,
     }) as never);
 

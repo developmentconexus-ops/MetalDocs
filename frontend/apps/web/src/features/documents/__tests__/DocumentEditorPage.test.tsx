@@ -93,6 +93,7 @@ describe('DocumentEditorPage', () => {
       CreatedAt: '2026-05-18T10:00:00Z',
       UpdatedAt: '2026-05-18T10:00:00Z',
       CreatedBy: 'user-1',
+      RevisionNumber: 0,
       Code: 'DOC-1',
       currentRevisionFileSizeBytes: 1304,
       currentRevisionPageCount: 3,

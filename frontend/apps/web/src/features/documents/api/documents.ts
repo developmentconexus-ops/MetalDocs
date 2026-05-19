@@ -3,7 +3,7 @@
 // the client.
 
 import { apiFetch } from '../../../lib/api';
-import type { components } from '../../../lib/api-types';
+import type { components, operations } from '../../../lib/api-types';
 
 export type DocumentRow = {
   id: string;
@@ -19,14 +19,9 @@ export type AcquireWriter = { mode: 'writer'; session_id: string; expires_at: st
 export type AcquireReadonly = { mode: 'readonly'; held_by: string; held_until: string };
 export type AcquireResult = AcquireWriter | AcquireReadonly;
 export type PresignResult = { upload_url: string; pending_upload_id: string; expires_at: string };
-export type CommitResult = {
-  revision_id: string;
-  revision_num: number;
-  idempotent_replay?: boolean;
-  file_size_bytes?: number | null;
-  page_count?: number | null;
-  page_count_source?: 'eigenpal_client' | 'server_renderer' | null;
-};
+type CommitDocumentAutosaveOperation = operations['commitDocumentAutosave'];
+export type CommitAutosaveRequest = CommitDocumentAutosaveOperation['requestBody']['content']['application/json'];
+export type CommitResult = CommitDocumentAutosaveOperation['responses'][200]['content']['application/json'];
 export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; VersionNum: number; Label: string; CreatedAt: string; CreatedBy: string };
 export type FinalizeDocumentResult = { instanceId: string };
 export type FinalizeDocumentRequest = components['schemas']['FinalizeDocumentRequest'];
@@ -95,7 +90,7 @@ export async function presignAutosave(id: string, req: { session_id: string; bas
 }
 // Server is authoritative for content_hash -- it re-computes SHA256 from S3 on
 // commit. Client does NOT forward a client-computed hash.
-export async function commitAutosave(id: string, req: { session_id: string; pending_upload_id: string; form_data_snapshot?: unknown; page_count?: number }): Promise<CommitResult> {
+export async function commitAutosave(id: string, req: CommitAutosaveRequest): Promise<CommitResult> {
   return apiFetch(`/api/v1/documents/${id}/autosave/commit`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify(req),

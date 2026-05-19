@@ -19,8 +19,7 @@ BEGIN
     );
 
     UPDATE public.documents
-       SET revision_number = revision_number - 1,
-           updated_at = now()
+       SET revision_number = revision_number - 1
      WHERE revision_number > 0;
 
     INSERT INTO public.schema_migrations (version, description)

@@ -2114,7 +2114,7 @@ CREATE TABLE public.documents (
     created_by text NOT NULL,
     effective_from timestamp with time zone,
     effective_to timestamp with time zone,
-    revision_number integer DEFAULT 1 NOT NULL,
+    revision_number integer DEFAULT 0 NOT NULL,
     revision_version integer DEFAULT 0 NOT NULL,
     content_hash_at_submit text,
     placeholder_schema_snapshot jsonb,
