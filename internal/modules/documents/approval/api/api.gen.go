@@ -50,16 +50,58 @@ func (e ApprovalInstanceByDocumentResponseStatus) Valid() bool {
 
 // Defines values for ApprovalSignoffRecordResponseDecision.
 const (
-	Approve ApprovalSignoffRecordResponseDecision = "approve"
-	Reject  ApprovalSignoffRecordResponseDecision = "reject"
+	ApprovalSignoffRecordResponseDecisionApprove ApprovalSignoffRecordResponseDecision = "approve"
+	ApprovalSignoffRecordResponseDecisionReject  ApprovalSignoffRecordResponseDecision = "reject"
 )
 
 // Valid indicates whether the value is a known member of the ApprovalSignoffRecordResponseDecision enum.
 func (e ApprovalSignoffRecordResponseDecision) Valid() bool {
 	switch e {
-	case Approve:
+	case ApprovalSignoffRecordResponseDecisionApprove:
 		return true
-	case Reject:
+	case ApprovalSignoffRecordResponseDecisionReject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ApprovalStageActorResponseDecision.
+const (
+	ApprovalStageActorResponseDecisionApprove ApprovalStageActorResponseDecision = "approve"
+	ApprovalStageActorResponseDecisionReject  ApprovalStageActorResponseDecision = "reject"
+)
+
+// Valid indicates whether the value is a known member of the ApprovalStageActorResponseDecision enum.
+func (e ApprovalStageActorResponseDecision) Valid() bool {
+	switch e {
+	case ApprovalStageActorResponseDecisionApprove:
+		return true
+	case ApprovalStageActorResponseDecisionReject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ApprovalStageActorResponseStatus.
+const (
+	ApprovalStageActorResponseStatusActive   ApprovalStageActorResponseStatus = "active"
+	ApprovalStageActorResponseStatusApproved ApprovalStageActorResponseStatus = "approved"
+	ApprovalStageActorResponseStatusRejected ApprovalStageActorResponseStatus = "rejected"
+	ApprovalStageActorResponseStatusWaiting  ApprovalStageActorResponseStatus = "waiting"
+)
+
+// Valid indicates whether the value is a known member of the ApprovalStageActorResponseStatus enum.
+func (e ApprovalStageActorResponseStatus) Valid() bool {
+	switch e {
+	case ApprovalStageActorResponseStatusActive:
+		return true
+	case ApprovalStageActorResponseStatusApproved:
+		return true
+	case ApprovalStageActorResponseStatusRejected:
+		return true
+	case ApprovalStageActorResponseStatusWaiting:
 		return true
 	default:
 		return false
@@ -68,25 +110,25 @@ func (e ApprovalSignoffRecordResponseDecision) Valid() bool {
 
 // Defines values for ApprovalStageInstanceResponseStatus.
 const (
-	ApprovalStageInstanceResponseStatusActive    ApprovalStageInstanceResponseStatus = "active"
-	ApprovalStageInstanceResponseStatusCancelled ApprovalStageInstanceResponseStatus = "cancelled"
-	ApprovalStageInstanceResponseStatusFailed    ApprovalStageInstanceResponseStatus = "failed"
-	ApprovalStageInstanceResponseStatusPassed    ApprovalStageInstanceResponseStatus = "passed"
-	ApprovalStageInstanceResponseStatusPending   ApprovalStageInstanceResponseStatus = "pending"
+	Active    ApprovalStageInstanceResponseStatus = "active"
+	Cancelled ApprovalStageInstanceResponseStatus = "cancelled"
+	Failed    ApprovalStageInstanceResponseStatus = "failed"
+	Passed    ApprovalStageInstanceResponseStatus = "passed"
+	Pending   ApprovalStageInstanceResponseStatus = "pending"
 )
 
 // Valid indicates whether the value is a known member of the ApprovalStageInstanceResponseStatus enum.
 func (e ApprovalStageInstanceResponseStatus) Valid() bool {
 	switch e {
-	case ApprovalStageInstanceResponseStatusActive:
+	case Active:
 		return true
-	case ApprovalStageInstanceResponseStatusCancelled:
+	case Cancelled:
 		return true
-	case ApprovalStageInstanceResponseStatusFailed:
+	case Failed:
 		return true
-	case ApprovalStageInstanceResponseStatusPassed:
+	case Passed:
 		return true
-	case ApprovalStageInstanceResponseStatusPending:
+	case Pending:
 		return true
 	default:
 		return false
@@ -288,8 +330,23 @@ type ApprovalSignoffRecordResponse struct {
 // ApprovalSignoffRecordResponseDecision defines model for ApprovalSignoffRecordResponse.Decision.
 type ApprovalSignoffRecordResponseDecision string
 
+// ApprovalStageActorResponse defines model for ApprovalStageActorResponse.
+type ApprovalStageActorResponse struct {
+	Decision    *ApprovalStageActorResponseDecision `json:"decision,omitempty"`
+	DisplayName string                              `json:"display_name"`
+	Status      ApprovalStageActorResponseStatus    `json:"status"`
+	UserId      string                              `json:"user_id"`
+}
+
+// ApprovalStageActorResponseDecision defines model for ApprovalStageActorResponse.Decision.
+type ApprovalStageActorResponseDecision string
+
+// ApprovalStageActorResponseStatus defines model for ApprovalStageActorResponse.Status.
+type ApprovalStageActorResponseStatus string
+
 // ApprovalStageInstanceResponse defines model for ApprovalStageInstanceResponse.
 type ApprovalStageInstanceResponse struct {
+	Actors     []ApprovalStageActorResponse        `json:"actors"`
 	Id         openapi_types.UUID                  `json:"id"`
 	Label      string                              `json:"label"`
 	Signoffs   []ApprovalSignoffRecordResponse     `json:"signoffs"`
@@ -2033,47 +2090,48 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"totJDx8O/wkAAP//",
+	"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",
+	"+7btc8mzrWLi4/vjfwIAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

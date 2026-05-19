@@ -14,11 +14,19 @@ type InstanceResponse struct {
 }
 
 type StageInstance struct {
-	ID          string         `json:"id"`
-	StageIndex  int            `json:"stage_index"`
-	Label       string         `json:"label"`
-	Status      string         `json:"status"`
-	Signoffs    []SignoffRecord `json:"signoffs"`
+	ID         string          `json:"id"`
+	StageIndex int             `json:"stage_index"`
+	Label      string          `json:"label"`
+	Status     string          `json:"status"`
+	Signoffs   []SignoffRecord `json:"signoffs"`
+	Actors     []StageActor    `json:"actors"`
+}
+
+type StageActor struct {
+	UserID      string  `json:"user_id"`
+	DisplayName string  `json:"display_name"`
+	Status      string  `json:"status"`
+	Decision    *string `json:"decision,omitempty"`
 }
 
 type SignoffRecord struct {

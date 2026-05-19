@@ -125,3 +125,13 @@
   color: var(--text-faint);
   border: 1px solid var(--border);
 }
+
+.approverBadgeApproved {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.approverBadgeRejected {
+  background: var(--danger-bg);
+  color: var(--danger);
+}

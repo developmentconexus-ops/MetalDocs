@@ -68,6 +68,29 @@ export function formatRevisionCode(revisionNumber: number): string {
   return `REV${String(Math.max(revisionNumber - 1, 0)).padStart(2, '0')}`;
 }
 
+export function formatRevisionStatus(status: string): string {
+  switch (status) {
+    case 'draft':
+      return 'Draft';
+    case 'under_review':
+      return 'Em revisão';
+    case 'approved':
+      return 'Aprovado';
+    case 'rejected':
+      return 'Rejeitado';
+    case 'scheduled':
+      return 'Agendado';
+    case 'published':
+      return 'Publicada';
+    case 'superseded':
+      return 'Substituida';
+    case 'obsolete':
+      return 'Obsoleta';
+    default:
+      return status;
+  }
+}
+
 export function buildVisibilityLabel(
   visibility: ControlledDocumentVisibility | null | undefined,
   areas: Array<{ code: string; name: string }>,

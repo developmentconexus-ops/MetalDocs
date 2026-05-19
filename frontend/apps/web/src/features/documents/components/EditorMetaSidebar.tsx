@@ -2,7 +2,7 @@ import styles from './EditorMetaSidebar.module.css';
 import { CodeChip } from '../../../components/ui/CodeChip';
 import { Avatar } from '../../../components/ui/Avatar';
 import { TimelineRail } from '../../../components/ui/TimelineRail';
-import { formatShortDate } from '../lib/documentDetailMeta';
+import { formatRevisionStatus, formatShortDate } from '../lib/documentDetailMeta';
 
 export type EditorSidebarRevisionItem = {
   documentId: string;
@@ -17,11 +17,24 @@ export type EditorSidebarApprovalStage = {
   id: string;
   label: string;
   status: string;
+  actors: Array<{
+    user_id: string;
+    display_name: string;
+    status: string;
+    decision?: string | null;
+  }>;
   signoffs: Array<{
     id: string;
     actor_user_id: string;
     decision: string;
   }>;
+};
+
+const APPROVAL_BADGE_LABELS: Record<string, string> = {
+  approved: 'aprovou',
+  rejected: 'rejeitou',
+  active: 'proximo',
+  waiting: 'aguarda',
 };
 
 type EditorMetaSidebarProps = {
@@ -49,7 +62,7 @@ export function EditorMetaSidebar({
 }: EditorMetaSidebarProps) {
   const historyItems = history.map((item) => ({
     id: item.documentId,
-    title: item.revisionCode,
+    title: `${item.revisionCode} · ${formatRevisionStatus(item.status)}`,
     subtitle: item.revisionTitle,
     aside: formatShortDate(item.createdAt),
     active: item.isCurrent,
@@ -107,19 +120,28 @@ export function EditorMetaSidebar({
                 <div className={styles.sectionHeader}>Proximos aprovadores</div>
                 <div className={styles.approverList}>
                   {approvalChain.stages.map((stage) => {
-                    const primarySignoff = stage.signoffs[0];
-                    return (
-                      <div key={stage.id} className={styles.approverRow}>
-                        <Avatar name={primarySignoff?.actor_user_id ?? stage.label} size="sm" />
-                        <div className={styles.approverInfo}>
-                          <span className={styles.approverName}>{primarySignoff?.actor_user_id ?? stage.label}</span>
-                          <span className={styles.approverRole}>{stage.label}</span>
+                    return stage.actors.map((actor) => {
+                      const badgeClassName =
+                        actor.status === 'approved'
+                          ? styles.approverBadgeApproved
+                          : actor.status === 'rejected'
+                            ? styles.approverBadgeRejected
+                            : actor.status === 'active'
+                              ? styles.approverBadgeNext
+                              : styles.approverBadgeWait;
+                      return (
+                        <div key={`${stage.id}:${actor.user_id}:${actor.status}`} className={styles.approverRow}>
+                          <Avatar name={actor.display_name} size="sm" />
+                          <div className={styles.approverInfo}>
+                            <span className={styles.approverName}>{actor.display_name}</span>
+                            <span className={styles.approverRole}>{stage.label}</span>
+                          </div>
+                          <span className={`${styles.approverBadge} ${badgeClassName}`}>
+                            {APPROVAL_BADGE_LABELS[actor.status] ?? actor.status}
+                          </span>
                         </div>
-                        <span className={`${styles.approverBadge} ${stage.status === 'active' ? styles.approverBadgeNext : styles.approverBadgeWait}`}>
-                          {stage.status === 'active' ? 'proximo' : stage.status}
-                        </span>
-                      </div>
-                    );
+                      );
+                    });
                   })}
                 </div>
               </section>
