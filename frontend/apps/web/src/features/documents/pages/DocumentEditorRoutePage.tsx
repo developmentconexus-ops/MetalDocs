@@ -13,7 +13,7 @@ export function Component() {
     <DocumentEditorPage
       documentID={documentId}
       onDone={() => {
-        navigate("/controlled-documents");
+        navigate(`/documents/${documentId}/edit`, { replace: true });
       }}
     />
   );
