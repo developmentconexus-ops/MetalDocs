@@ -77,7 +77,7 @@
 
 ### 2026-05-19 review follow-up
 
-- **Context:** code-review follow-up for commits through `f4c48e74`.
+- **Context:** code-review follow-up for commits through `cbdcfa1f`.
 - **Changes:** `GET /api/v1/documents/{id}` now exposes governed `RevisionNumber`; editor submission title gating uses `RevisionNumber` instead of technical `RevisionVersion`; finalize profile prerequisite errors now use the API problem envelope; autosave request/response wrapper types derive from generated OpenAPI operations; baseline/migration truth for zero-based revision numbers no longer rewrites `updated_at`.
 - **Verification:** focused documents frontend tests, frontend build typecheck, `go generate ./internal/modules/documents/api/...`, `go test -vet=off ./internal/modules/documents/... -count=1`, and DB dictionary coverage passed. Redocly lint remained blocked by local `npm ECOMPROMISED` before execution.
 

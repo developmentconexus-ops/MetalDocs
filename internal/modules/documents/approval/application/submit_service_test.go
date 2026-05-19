@@ -25,11 +25,13 @@ import (
 type fakeSubmitRepo struct {
 	insertInstanceErr       error
 	insertStageInstancesErr error
+	lastInstance            domain.Instance
 	// Embed a no-op for the full interface; all other methods panic if called.
 	repository.ApprovalRepository
 }
 
-func (r *fakeSubmitRepo) InsertInstance(_ context.Context, _ *sql.Tx, _ domain.Instance) error {
+func (r *fakeSubmitRepo) InsertInstance(_ context.Context, _ *sql.Tx, inst domain.Instance) error {
+	r.lastInstance = inst
 	return r.insertInstanceErr
 }
 
@@ -323,6 +325,55 @@ func TestSubmitRevisionForReview_RequiresRevisionTitleAfterFirstGovernedRevision
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted when revision title is missing; got %d", len(emitter.Events))
+	}
+}
+
+func TestSubmitRevisionForReview_ContentHashUsesGovernedRevisionNumber(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, _ := newSubmitTestDBWithConn(t, true)
+	formData := map[string]any{"title": "My Doc"}
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		RevisionTitle:   "Atualizacao",
+		ContentFormData: formData,
+		RevisionVersion: 7,
+		RevisionNumber:  1,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), db, req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
+	}
+	want, err := ComputeContentHash(ContentHashInput{
+		TenantID:       req.TenantID,
+		DocumentID:     req.DocumentID,
+		RevisionNumber: req.RevisionNumber,
+		FormData:       formData,
+	})
+	if err != nil {
+		t.Fatalf("ComputeContentHash: %v", err)
+	}
+	if repo.lastInstance.ContentHashAtSubmit != want {
+		t.Fatalf("content hash revision binding mismatch: got %s want %s", repo.lastInstance.ContentHashAtSubmit, want)
+	}
+	staleVersionHash, err := ComputeContentHash(ContentHashInput{
+		TenantID:       req.TenantID,
+		DocumentID:     req.DocumentID,
+		RevisionNumber: req.RevisionVersion,
+		FormData:       formData,
+	})
+	if err != nil {
+		t.Fatalf("ComputeContentHash stale version: %v", err)
+	}
+	if repo.lastInstance.ContentHashAtSubmit == staleVersionHash {
+		t.Fatalf("content hash must not bind to technical RevisionVersion when it differs from governed RevisionNumber")
 	}
 }
 
