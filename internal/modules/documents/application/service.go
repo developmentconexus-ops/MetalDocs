@@ -43,12 +43,12 @@ type Repository interface {
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, error)
 	HeartbeatSession(ctx context.Context, sessionID, userID string) error
-	ReleaseSession(ctx context.Context, sessionID, userID string) error
-	ForceReleaseSession(ctx context.Context, sessionID string) error
+	ReleaseSession(ctx context.Context, tenantID, sessionID, userID string) error
+	ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID string) error
 	ExpireStaleSessions(ctx context.Context, now time.Time) (int, error)
 	PresignReserve(ctx context.Context, sessionID, userID, docID, baseRev, contentHash, storageKey string, expiresAt time.Time) (string, error)
 	GetPendingForCommit(ctx context.Context, pendingID string) (*PendingCommitMeta, error)
-	CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte) (*CommitResult, error)
+	CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error)
 	CreateCheckpoint(ctx context.Context, docID, actorUserID, label string) (*domain.Checkpoint, error)
 	ListCheckpoints(ctx context.Context, docID string) ([]domain.Checkpoint, error)
 	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
@@ -71,6 +71,7 @@ type Presigner interface {
 	AdoptTempObject(ctx context.Context, tmpKey, finalKey string) error
 	DeleteObject(ctx context.Context, key string) error
 	HashObject(ctx context.Context, key string) (string, error)
+	SizeObject(ctx context.Context, key string) (int64, error)
 	Exists(ctx context.Context, storageKey string) (bool, error)
 }
 
@@ -702,9 +703,14 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 type CommitAutosaveCmd struct {
 	TenantID, ActorUserID, DocumentID, SessionID, PendingUploadID string
 	FormDataSnapshot                                              json.RawMessage
+	PageCount                                                     *int
 }
 
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*CommitResult, error) {
+	if cmd.PageCount != nil && *cmd.PageCount <= 0 {
+		return nil, domain.ErrInvalidPageCount
+	}
+
 	doc, err := s.repo.GetDocument(ctx, cmd.TenantID, cmd.DocumentID)
 	if err != nil {
 		return nil, err
@@ -729,7 +735,25 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		return nil, domain.ErrContentHashMismatch
 	}
 
-	res, err := s.repo.CommitUpload(ctx, cmd.TenantID, cmd.SessionID, cmd.ActorUserID, cmd.DocumentID, cmd.PendingUploadID, serverHash, cmd.FormDataSnapshot)
+	fileSizeBytes, err := s.presigner.SizeObject(ctx, meta.StorageKey)
+	if err != nil {
+		return nil, fmt.Errorf("size s3 object: %w", err)
+	}
+
+	pageCountSource := "eigenpal_client"
+	res, err := s.repo.CommitUpload(
+		ctx,
+		cmd.TenantID,
+		cmd.SessionID,
+		cmd.ActorUserID,
+		cmd.DocumentID,
+		cmd.PendingUploadID,
+		serverHash,
+		cmd.FormDataSnapshot,
+		fileSizeBytes,
+		cmd.PageCount,
+		&pageCountSource,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -756,7 +780,7 @@ func (s *Service) HeartbeatSession(ctx context.Context, sessionID, userID string
 }
 
 func (s *Service) ReleaseSession(ctx context.Context, tenantID, sessionID, userID, docID string) error {
-	if err := s.repo.ReleaseSession(ctx, sessionID, userID); err != nil {
+	if err := s.repo.ReleaseSession(ctx, tenantID, sessionID, userID); err != nil {
 		return err
 	}
 	s.audit.Write(ctx, tenantID, userID, "session.released", docID, map[string]any{"session_id": sessionID})
@@ -764,7 +788,7 @@ func (s *Service) ReleaseSession(ctx context.Context, tenantID, sessionID, userI
 }
 
 func (s *Service) ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID, docID string) error {
-	if err := s.repo.ForceReleaseSession(ctx, sessionID); err != nil {
+	if err := s.repo.ForceReleaseSession(ctx, tenantID, adminID, sessionID); err != nil {
 		return err
 	}
 	s.audit.Write(ctx, tenantID, adminID, "session.force_released", docID, map[string]any{"session_id": sessionID})

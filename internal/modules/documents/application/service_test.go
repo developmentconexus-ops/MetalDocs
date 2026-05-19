@@ -60,6 +60,9 @@ type fakeRepo struct {
 	statsByAreaReturn   map[string]int64
 	statsByAreaErr      error
 	commitTenantID      string
+	commitFileSizeBytes int64
+	commitPageCount     *int
+	commitPageSource    *string
 	revisionHistory     []domain.RevisionHistoryItem
 	revisionHistoryErr  error
 }
@@ -161,9 +164,9 @@ func (f *fakeRepo) AcquireSession(_ context.Context, _, _, _ string) (*domain.Se
 
 func (f *fakeRepo) HeartbeatSession(_ context.Context, _, _ string) error { return nil }
 
-func (f *fakeRepo) ReleaseSession(_ context.Context, _, _ string) error { return nil }
+func (f *fakeRepo) ReleaseSession(_ context.Context, _, _, _ string) error { return nil }
 
-func (f *fakeRepo) ForceReleaseSession(_ context.Context, _ string) error { return nil }
+func (f *fakeRepo) ForceReleaseSession(_ context.Context, _, _, _ string) error { return nil }
 
 func (f *fakeRepo) ExpireStaleSessions(_ context.Context, _ time.Time) (int, error) { return 0, nil }
 
@@ -178,8 +181,11 @@ func (f *fakeRepo) GetPendingForCommit(_ context.Context, _ string) (*applicatio
 	return f.pendingMeta, nil
 }
 
-func (f *fakeRepo) CommitUpload(_ context.Context, tenantID, _, _, _, _, _ string, _ []byte) (*application.CommitResult, error) {
+func (f *fakeRepo) CommitUpload(_ context.Context, tenantID, _, _, _, _, _ string, _ []byte, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*application.CommitResult, error) {
 	f.commitTenantID = tenantID
+	f.commitFileSizeBytes = fileSizeBytes
+	f.commitPageCount = pageCount
+	f.commitPageSource = pageCountSource
 	if f.commitErr != nil {
 		return nil, f.commitErr
 	}
@@ -251,6 +257,8 @@ func (f *fakeRepo) MarkArchived(_ context.Context, _, _, _ string) error { retur
 type fakePresigner struct {
 	hashReturn  string
 	hashErr     error
+	sizeReturn  int64
+	sizeErr     error
 	adoptErr    error
 	deleteCalls int
 	deleteErr   error
@@ -267,6 +275,13 @@ func (f *fakePresigner) HashObject(_ context.Context, _ string) (string, error) 
 		return "", f.hashErr
 	}
 	return f.hashReturn, nil
+}
+
+func (f *fakePresigner) SizeObject(_ context.Context, _ string) (int64, error) {
+	if f.sizeErr != nil {
+		return 0, f.sizeErr
+	}
+	return f.sizeReturn, nil
 }
 
 func (f *fakePresigner) AdoptTempObject(_ context.Context, _, _ string) error {
@@ -519,5 +534,56 @@ func TestRenameDocument_InvalidName(t *testing.T) {
 	err := svc.RenameDocument(context.Background(), "tenant_1", "user_1", "doc_1", "   ")
 	if !errors.Is(err, domain.ErrInvalidName) {
 		t.Fatalf("expected ErrInvalidName, got %v", err)
+	}
+}
+
+func TestCommitAutosave_ForwardsArtifactMetadata(t *testing.T) {
+	repo := &fakeRepo{
+		docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft},
+		pendingMeta: &application.PendingCommitMeta{
+			ExpectedContentHash: "h1",
+			StorageKey:          "tenants/t/documents/d/revisions/h1.docx",
+		},
+		commitResult: &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2},
+	}
+	presigner := &fakePresigner{hashReturn: "h1", sizeReturn: 1304}
+	svc := application.New(repo, fakeDocgen{}, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	pageCount := 3
+
+	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+		TenantID:         "tenant_1",
+		ActorUserID:      "user_1",
+		DocumentID:       "doc_1",
+		SessionID:        "sess_1",
+		PendingUploadID:  "pending_1",
+		FormDataSnapshot: []byte(`{"ok":true}`),
+		PageCount:        &pageCount,
+	})
+	if err != nil {
+		t.Fatalf("CommitAutosave: %v", err)
+	}
+	if repo.commitFileSizeBytes != 1304 {
+		t.Fatalf("file size = %d, want 1304", repo.commitFileSizeBytes)
+	}
+	if repo.commitPageCount == nil || *repo.commitPageCount != 3 {
+		t.Fatalf("page count not forwarded: %#v", repo.commitPageCount)
+	}
+	if repo.commitPageSource == nil || *repo.commitPageSource != "eigenpal_client" {
+		t.Fatalf("page count source = %#v, want eigenpal_client", repo.commitPageSource)
+	}
+}
+
+func TestCommitAutosave_InvalidPageCount(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	invalid := 0
+
+	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+		TenantID:   "tenant_1",
+		DocumentID: "doc_1",
+		PageCount:  &invalid,
+	})
+	if !errors.Is(err, domain.ErrInvalidPageCount) {
+		t.Fatalf("expected ErrInvalidPageCount, got %v", err)
 	}
 }

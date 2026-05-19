@@ -107,7 +107,7 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO documents (tenant_id, template_version_id, name, status, form_data_json, created_by, controlled_document_id, profile_code_snapshot, process_area_code_snapshot, code, revision_number, created_by_display_name_snapshot, area_name_snapshot)
 		 SELECT $1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9,
-		        COALESCE((SELECT MAX(d2.revision_number) FROM documents d2 WHERE d2.controlled_document_id = $6), 0) + 1,
+		        COALESCE((SELECT MAX(d2.revision_number) + 1 FROM documents d2 WHERE d2.controlled_document_id = $6), 0),
 		        $10, $11
 		 RETURNING id`,
 		d.TenantID, d.TemplateVersionID, d.Name, d.FormDataJSON, d.CreatedBy, d.ControlledDocumentID, d.ProfileCodeSnapshot, d.ProcessAreaCodeSnapshot, d.Code, createdByDisplayName, areaName,
@@ -506,6 +506,16 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 		return nil, err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", userID); err != nil {
+		return nil, err
+	}
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return nil, fmt.Errorf("acquire session: authz check: %w", err)
+	}
 
 	var existingID, existingUser, existingStatus, existingAck string
 	err = tx.QueryRowContext(ctx,
@@ -572,12 +582,21 @@ func (r *Repository) HeartbeatSession(ctx context.Context, sessionID, userID str
 	return nil
 }
 
-func (r *Repository) ReleaseSession(ctx context.Context, sessionID, userID string) error {
+func (r *Repository) ReleaseSession(ctx context.Context, tenantID, sessionID, userID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", userID); err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return fmt.Errorf("release session: authz check: %w", err)
+	}
 	res, err := tx.ExecContext(ctx,
 		`UPDATE editor_sessions SET status='released', released_at=now()
 		 WHERE id=$1 AND user_id=$2 AND status='active'`, sessionID, userID)
@@ -594,12 +613,21 @@ func (r *Repository) ReleaseSession(ctx context.Context, sessionID, userID strin
 	return tx.Commit()
 }
 
-func (r *Repository) ForceReleaseSession(ctx context.Context, sessionID string) error {
+func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", adminID); err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return fmt.Errorf("force release session: authz check: %w", err)
+	}
 	res, err := tx.ExecContext(ctx,
 		`UPDATE editor_sessions SET status='force_released', released_at=now()
 		 WHERE id=$1 AND status='active'`, sessionID)
@@ -618,21 +646,33 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, sessionID string) 
 
 func (r *Repository) ExpireStaleSessions(ctx context.Context, now time.Time) (int, error) {
 	// Single atomic CTE: expire sessions and clear document pointers in one tx.
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		return 0, err
+	}
+
 	var n int
-	err := r.db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		WITH expired AS (
 			UPDATE editor_sessions SET status='expired'
 			WHERE status='active' AND expires_at < $1
 			RETURNING id
+		),
+		cleared AS (
+			UPDATE documents SET active_session_id=NULL, updated_at=now()
+			WHERE active_session_id IN (SELECT id FROM expired)
+			RETURNING 1
 		)
-		UPDATE documents SET active_session_id=NULL, updated_at=now()
-		WHERE active_session_id IN (SELECT id FROM expired)
-		RETURNING (SELECT count(*) FROM expired)`, now,
+		SELECT count(*) FROM expired`, now,
 	).Scan(&n)
 	if err != nil {
 		return 0, err
 	}
-	return n, nil
+	return n, tx.Commit()
 }
 
 func (r *Repository) PresignReserve(ctx context.Context, sessionID, userID, docID, baseRevisionID, contentHash, storageKey string, expiresAt time.Time) (pendingID string, err error) {
@@ -683,6 +723,9 @@ type CommitResult struct {
 	RevisionID      string
 	RevisionNum     int64
 	AlreadyConsumed bool
+	FileSizeBytes   *int64
+	PageCount       *int
+	PageCountSource *string
 }
 
 type PendingCommitMeta struct {
@@ -739,7 +782,7 @@ func (r *Repository) setAuthzGUC(ctx context.Context, tx *sql.Tx, stmt, tenantID
 	return nil
 }
 
-func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte) (*CommitResult, error) {
+func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -780,13 +823,27 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 		// active. Return the existing revision so the client can ack it safely.
 		var rid string
 		var rnum int64
+		var replayFileSize sql.NullInt64
+		var replayPageCount sql.NullInt64
+		var replayPageCountSource sql.NullString
 		if err := tx.QueryRowContext(ctx,
-			`SELECT id::text, revision_num FROM document_revisions
+			`SELECT id::text, revision_num, file_size_bytes, page_count, page_count_source FROM document_revisions
 			 WHERE document_id=$1 AND content_hash=$2`, docID, p.ContentHash,
-		).Scan(&rid, &rnum); err != nil {
+		).Scan(&rid, &rnum, &replayFileSize, &replayPageCount, &replayPageCountSource); err != nil {
 			return nil, fmt.Errorf("replay lookup: %w", err)
 		}
-		return &CommitResult{RevisionID: rid, RevisionNum: rnum, AlreadyConsumed: true}, tx.Commit()
+		res := &CommitResult{RevisionID: rid, RevisionNum: rnum, AlreadyConsumed: true}
+		if replayFileSize.Valid {
+			res.FileSizeBytes = &replayFileSize.Int64
+		}
+		if replayPageCount.Valid {
+			pc := int(replayPageCount.Int64)
+			res.PageCount = &pc
+		}
+		if replayPageCountSource.Valid {
+			res.PageCountSource = &replayPageCountSource.String
+		}
+		return res, tx.Commit()
 	}
 	if time.Now().After(p.ExpiresAt) {
 		return nil, domain.ErrExpiredUpload
@@ -820,12 +877,16 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 
 	var revID string
 	var revNum int64
+	var committedFileSize sql.NullInt64
+	var committedPageCount sql.NullInt64
+	var committedPageCountSource sql.NullString
 	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO document_revisions
-		   (document_id, parent_revision_id, session_id, storage_key, content_hash, form_data_snapshot)
-		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id::text, revision_num`,
-		docID, p.BaseRevisionID, sessionID, p.StorageKey, p.ContentHash, formDataSnapshot,
-	).Scan(&revID, &revNum); err != nil {
+		   (document_id, parent_revision_id, session_id, storage_key, content_hash, form_data_snapshot, file_size_bytes, page_count, page_count_source)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		 RETURNING id::text, revision_num, file_size_bytes, page_count, page_count_source`,
+		docID, p.BaseRevisionID, sessionID, p.StorageKey, p.ContentHash, formDataSnapshot, fileSizeBytes, pageCount, pageCountSource,
+	).Scan(&revID, &revNum, &committedFileSize, &committedPageCount, &committedPageCountSource); err != nil {
 		return nil, fmt.Errorf("insert revision: %w", err)
 	}
 
@@ -846,7 +907,18 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 		return nil, err
 	}
 
-	return &CommitResult{RevisionID: revID, RevisionNum: revNum}, tx.Commit()
+	res := &CommitResult{RevisionID: revID, RevisionNum: revNum}
+	if committedFileSize.Valid {
+		res.FileSizeBytes = &committedFileSize.Int64
+	}
+	if committedPageCount.Valid {
+		pc := int(committedPageCount.Int64)
+		res.PageCount = &pc
+	}
+	if committedPageCountSource.Valid {
+		res.PageCountSource = &committedPageCountSource.String
+	}
+	return res, tx.Commit()
 }
 
 func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Time) (int, error) {

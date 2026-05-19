@@ -118,6 +118,7 @@ var (
 	ErrSessionTaken           = errors.New("session_taken")
 	ErrForbidden              = errors.New("forbidden")
 	ErrUploadMissing          = errors.New("upload_missing")
+	ErrInvalidPageCount       = errors.New("invalid_page_count")
 	ErrCheckpointNotFound     = errors.New("checkpoint_not_found")
 	ErrDocumentNotOwner       = errors.New("document_not_owner")
 	ErrNotFound               = errors.New("not_found")
