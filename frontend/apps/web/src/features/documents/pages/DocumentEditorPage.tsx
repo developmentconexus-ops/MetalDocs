@@ -293,7 +293,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const canEditContent = session.state.phase === 'writer' && docStatus === 'draft';
   const canComment = Boolean(doc) && (docStatus === 'draft' || docStatus === 'under_review' || docStatus === 'rejected');
   const docCode = doc?.Code ?? '';
-  const revNum = doc?.RevisionVersion ?? 0;
+  const revisionBadge = doc?.RevisionNumber != null ? formatRevisionCode(doc.RevisionNumber) : null;
   const displayName = documentName.replace(/\.docx$/i, '');
   const userID = doc?.CreatedBy ?? '';
   const authorDisplay = String(userID);
@@ -438,7 +438,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
               <>
                 {docCode && <CodeChip>{docCode}</CodeChip>}
                 {displayName && <span className={editorChromeStyles.docTitle}>{displayName}</span>}
-                {revNum > 0 && <VersionBadge>{`v${revNum}`}</VersionBadge>}
+                {revisionBadge && <VersionBadge>{revisionBadge}</VersionBadge>}
                 {statusForPill && <StatusPill status={statusForPill} />}
               </>
             }

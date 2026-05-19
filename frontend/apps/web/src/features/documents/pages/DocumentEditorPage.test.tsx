@@ -215,6 +215,20 @@ afterEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────────
 
 describe('DocumentEditorPage E1 gate', () => {
+  it('shows governed revision badge and avoids raw v1 label', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('under_review', {
+      RevisionNumber: 0,
+      RevisionVersion: 1,
+      revision_number: 0,
+      revision_version: 1,
+    }) as never);
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+    await waitFor(() =>
+      expect(screen.getByText('REV00')).toBeTruthy(),
+    );
+    expect(screen.queryByText(/^v1$/i)).toBeNull();
+  });
+
   it('renders document-edit when status=draft', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
     renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
