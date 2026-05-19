@@ -21,7 +21,7 @@ Technical/autosave artifact-revision storage owned by `documents`. This table is
 | `form_data_snapshot` | `jsonb` | yes | Baseline column. |
 | `file_size_bytes` | `bigint` | yes | Server-authoritative size in bytes of the saved DOCX artifact for this technical revision row. |
 | `page_count` | `integer` | yes | Client- or server-derived rendered page count for this saved technical revision row. |
-| `page_count_source` | `text` | yes | Provenance for `page_count`; allowed values are `eigenpal_client` and `server_renderer`. Coupled with `page_count`: both must be `NULL`, or `page_count` must be present with one of the allowed source values. |
+| `page_count_source` | `text` | yes | Provenance for `page_count`; allowed values are `eigenpal_client` and `server_renderer`. Coupled with `page_count`: both must be `NULL`, or `page_count` must be present with one of the allowed source values (enforced by DB check constraint). |
 | `created_at` | `timestamp with time zone` | no | Baseline column. |
 
 ## Baseline Definition
