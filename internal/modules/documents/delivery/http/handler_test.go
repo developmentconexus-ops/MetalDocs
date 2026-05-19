@@ -499,7 +499,13 @@ func TestListRevisionHistory_ReturnsGovernedItems(t *testing.T) {
 	}
 
 	var body struct {
-		Items []domain.RevisionHistoryItem `json:"items"`
+		Items []struct {
+			DocumentID     string `json:"documentId"`
+			RevisionNumber int64  `json:"revisionNumber"`
+			RevisionTitle  string `json:"revisionTitle"`
+			Status         string `json:"status"`
+			IsCurrent      bool   `json:"isCurrent"`
+		} `json:"items"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode body: %v", err)
@@ -507,7 +513,16 @@ func TestListRevisionHistory_ReturnsGovernedItems(t *testing.T) {
 	if len(body.Items) != 1 {
 		t.Fatalf("len(items) = %d, want 1", len(body.Items))
 	}
+	if body.Items[0].RevisionNumber != 2 {
+		t.Fatalf("revision number = %d", body.Items[0].RevisionNumber)
+	}
 	if body.Items[0].RevisionTitle != "Ajuste operacional" {
 		t.Fatalf("revision title = %q", body.Items[0].RevisionTitle)
+	}
+	if body.Items[0].Status != "draft" {
+		t.Fatalf("status = %q", body.Items[0].Status)
+	}
+	if !body.Items[0].IsCurrent {
+		t.Fatal("expected current revision item")
 	}
 }

@@ -209,11 +209,13 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
 		        archived_at, created_at, updated_at, created_by, revision_title,
-		        controlled_document_id, coalesce(code,''), revision_version
+		        controlled_document_id, profile_code_snapshot, process_area_code_snapshot,
+		        coalesce(code,''), revision_version
 		 FROM documents WHERE id=$1 AND tenant_id=$2`, id, tenantID,
 	).Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
 		&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
-		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.RevisionTitle, &d.ControlledDocumentID, &d.Code,
+		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.RevisionTitle, &d.ControlledDocumentID, &d.ProfileCodeSnapshot,
+		&d.ProcessAreaCodeSnapshot, &d.Code,
 		&d.RevisionVersion)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
