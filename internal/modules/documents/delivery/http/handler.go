@@ -1184,6 +1184,8 @@ func mapErr(err error) (int, string) {
 		return http.StatusNotFound, "not_found"
 	case errors.Is(err, domain.ErrInvalidName):
 		return http.StatusBadRequest, "invalid_name"
+	case errors.Is(err, domain.ErrInvalidPageCount):
+		return http.StatusBadRequest, "invalid_page_count"
 	case errors.Is(err, application.ErrControlledDocumentRequired):
 		return http.StatusBadRequest, "controlled_document_required"
 	case errors.Is(err, approvalapp.ErrRevisionTitleRequired):
