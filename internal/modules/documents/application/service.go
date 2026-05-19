@@ -740,7 +740,11 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		return nil, fmt.Errorf("size s3 object: %w", err)
 	}
 
-	pageCountSource := "eigenpal_client"
+	var pageCountSource *string
+	if cmd.PageCount != nil {
+		source := "eigenpal_client"
+		pageCountSource = &source
+	}
 	res, err := s.repo.CommitUpload(
 		ctx,
 		cmd.TenantID,
@@ -752,7 +756,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		cmd.FormDataSnapshot,
 		fileSizeBytes,
 		cmd.PageCount,
-		&pageCountSource,
+		pageCountSource,
 	)
 	if err != nil {
 		return nil, err
