@@ -455,7 +455,7 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
 	withAuthHeaders(req, "document_filler")
 	req.Header.Set("Idempotency-Key", key)
 	if tid, err := tenant.FromContext(req.Context()); err != nil || tid == "" {

@@ -36,7 +36,11 @@ func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	resp := mapInstanceResponse(inst)
+	resp, err := h.mapInstanceResponse(r.Context(), tenantID, inst)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	w.Header().Set("ETag", "\"v1\"")
 	WriteJSON(w, http.StatusOK, resp)
 }

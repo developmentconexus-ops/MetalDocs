@@ -6175,7 +6175,7 @@ components:
         etag: { type: string }
     ApprovalStageInstanceResponse:
       type: object
-      required: [id, stage_index, label, status, signoffs]
+      required: [id, stage_index, label, status, signoffs, actors]
       properties:
         id: { type: string, format: uuid }
         stage_index: { type: integer, minimum: 1 }
@@ -6187,6 +6187,23 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ApprovalSignoffRecordResponse'
+        actors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalStageActorResponse'
+    ApprovalStageActorResponse:
+      type: object
+      required: [user_id, display_name, status]
+      properties:
+        user_id: { type: string }
+        display_name: { type: string }
+        status:
+          type: string
+          enum: [approved, rejected, active, waiting]
+        decision:
+          type: string
+          nullable: true
+          enum: [approve, reject]
     ApprovalSignoffRecordResponse:
       type: object
       required: [id, actor_user_id, decision, signature_method, signed_at]

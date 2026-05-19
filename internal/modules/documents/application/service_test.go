@@ -60,6 +60,8 @@ type fakeRepo struct {
 	statsByAreaReturn   map[string]int64
 	statsByAreaErr      error
 	commitTenantID      string
+	revisionHistory     []domain.RevisionHistoryItem
+	revisionHistoryErr  error
 }
 
 var _ application.Repository = (*fakeRepo)(nil)
@@ -217,6 +219,13 @@ func (f *fakeRepo) GetRevision(_ context.Context, _, _ string) (*domain.Revision
 		return nil, errors.New("revision not configured")
 	}
 	return f.revisionReturn, nil
+}
+
+func (f *fakeRepo) ListRevisionHistory(_ context.Context, _, _ string) ([]domain.RevisionHistoryItem, error) {
+	if f.revisionHistoryErr != nil {
+		return nil, f.revisionHistoryErr
+	}
+	return f.revisionHistory, nil
 }
 
 func (f *fakeRepo) DeleteExpiredPending(_ context.Context, _ time.Time) (int, error) { return 0, nil }

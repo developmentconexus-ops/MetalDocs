@@ -6697,6 +6697,15 @@ export interface components {
             /** @enum {string} */
             status: "pending" | "active" | "passed" | "failed" | "cancelled";
             signoffs: components["schemas"]["ApprovalSignoffRecordResponse"][];
+            actors: components["schemas"]["ApprovalStageActorResponse"][];
+        };
+        ApprovalStageActorResponse: {
+            user_id: string;
+            display_name: string;
+            /** @enum {string} */
+            status: "approved" | "rejected" | "active" | "waiting";
+            /** @enum {string|null} */
+            decision?: "approve" | "reject" | null;
         };
         ApprovalSignoffRecordResponse: {
             /** Format: uuid */
