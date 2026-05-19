@@ -110,7 +110,7 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 	if _, err := db.ExecContext(ctx,
 		`UPDATE `+testdb.Qualified(schema, "documents")+`
 		    SET controlled_document_id = $2::uuid,
-		        revision_number = 1,
+		        revision_number = 0,
 		        revision_title = 'Primeira versao',
 		        created_at = '2026-05-10T12:00:00Z'::timestamptz,
 		        updated_at = '2026-05-10T12:00:00Z'::timestamptz,
@@ -142,7 +142,7 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 	if _, err := db.ExecContext(ctx,
 		`UPDATE `+testdb.Qualified(schema, "documents")+`
 		    SET controlled_document_id = $2::uuid,
-		        revision_number = 2,
+		        revision_number = 1,
 		        revision_title = 'Ajuste operacional',
 		        created_at = '2026-05-18T12:00:00Z'::timestamptz,
 		        updated_at = '2026-05-18T12:00:00Z'::timestamptz
@@ -179,7 +179,13 @@ func TestListRevisionHistory_ReturnsGovernedDocumentsNotAutosaveRows(t *testing.
 	if items[0].DocumentID != secondDocID || items[0].RevisionTitle != "Ajuste operacional" || !items[0].IsCurrent {
 		t.Fatalf("items[0] = %#v", items[0])
 	}
+	if items[0].RevisionNumber != 1 {
+		t.Fatalf("items[0].RevisionNumber = %d, want 1", items[0].RevisionNumber)
+	}
 	if items[1].DocumentID != firstDocID || items[1].RevisionTitle != "Primeira versao" || items[1].IsCurrent {
 		t.Fatalf("items[1] = %#v", items[1])
+	}
+	if items[1].RevisionNumber != 0 {
+		t.Fatalf("items[1].RevisionNumber = %d, want 0", items[1].RevisionNumber)
 	}
 }

@@ -72,3 +72,25 @@ func TestCreateDocumentTx_AssertsEditBeforeDocumentUpdates(t *testing.T) {
 		t.Fatal("CreateDocumentTx asserts document.edit after documents update; tripwire requires it before UPDATE")
 	}
 }
+
+func TestCreateDocumentTx_AllocatesZeroBasedGovernedRevisionNumbers(t *testing.T) {
+	src, err := os.ReadFile("repository.go")
+	if err != nil {
+		t.Fatalf("read repository.go: %v", err)
+	}
+
+	body := string(src)
+	start := strings.Index(body, "func (r *Repository) CreateDocumentTx")
+	if start == -1 {
+		t.Fatal("CreateDocumentTx not found")
+	}
+	end := strings.Index(body[start:], "func (r *Repository) SetRevisionStorageKey")
+	if end == -1 {
+		t.Fatal("SetRevisionStorageKey not found")
+	}
+	createDocumentTx := body[start : start+end]
+
+	if !strings.Contains(createDocumentTx, "COALESCE((SELECT MAX(d2.revision_number) + 1 FROM documents d2 WHERE d2.controlled_document_id = $6), 0)") {
+		t.Fatal("CreateDocumentTx must allocate first governed revision_number as 0 and increment later revisions from persisted max")
+	}
+}

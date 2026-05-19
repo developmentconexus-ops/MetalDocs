@@ -117,7 +117,7 @@ func TestCreateDocumentTx_StorageKeyInvariant(t *testing.T) {
 }
 
 // TestCreateDocument_RevisionNumberIncrementsForSameCD verifies that two documents
-// created for the same controlled_document_id get revision_number 1 and 2.
+// created for the same controlled_document_id get revision_number 0 and 1.
 func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
 	ctx := context.Background()
 	db, schema := testdb.Open(t)
@@ -183,11 +183,11 @@ func TestCreateDocument_RevisionNumberIncrementsForSameCD(t *testing.T) {
 		t.Fatalf("query second revision_number: %v", err)
 	}
 
-	if firstRevision != 1 {
-		t.Fatalf("first revision_number = %d, want 1", firstRevision)
+	if firstRevision != 0 {
+		t.Fatalf("first revision_number = %d, want 0", firstRevision)
 	}
-	if secondRevision != 2 {
-		t.Fatalf("second revision_number = %d, want 2", secondRevision)
+	if secondRevision != 1 {
+		t.Fatalf("second revision_number = %d, want 1", secondRevision)
 	}
 }
 
