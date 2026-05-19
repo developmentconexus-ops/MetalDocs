@@ -240,3 +240,61 @@ func TestCreateDocument_RejectsEmptyName(t *testing.T) {
 		t.Fatalf("expected CHECK violation documents_name_not_empty, got: %v", err)
 	}
 }
+
+func TestGetDocument_ReturnsSnapshotMetadata(t *testing.T) {
+	ctx := context.Background()
+	db, schema := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(`SET search_path TO %q`, schema)); err != nil {
+		t.Fatalf("set search_path: %v", err)
+	}
+
+	tenantID := testdb.DeterministicID(t, "tenant")
+	actorID := testdb.DeterministicID(t, "actor")
+	templateVersionID := testdb.DeterministicID(t, "template-version")
+	controlledDocumentID := testdb.DeterministicID(t, "controlled-document")
+
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO controlled_documents (
+			id, tenant_id, profile_code, process_area_code, code, title, owner_user_id, status
+		) VALUES (
+			$1::uuid, $2::uuid, 'pop', 'general', 'POP-GENERAL-001',
+			'Snapshot Metadata CD', $3::uuid, 'active'
+		)`,
+		controlledDocumentID, tenantID, actorID,
+	); err != nil {
+		t.Fatalf("seed controlled_documents: %v", err)
+	}
+
+	profileCode := "pop"
+	processAreaCode := "general"
+	repo := repository.New(db)
+	doc := &domain.Document{
+		TenantID:                tenantID,
+		TemplateVersionID:       templateVersionID,
+		Name:                    "Snapshot Metadata Doc",
+		FormDataJSON:            []byte(`{}`),
+		CreatedBy:               actorID,
+		ControlledDocumentID:    &controlledDocumentID,
+		ProfileCodeSnapshot:     &profileCode,
+		ProcessAreaCodeSnapshot: &processAreaCode,
+		Code:                    "POP-GENERAL-001",
+	}
+
+	docID, _, _, err := repo.CreateDocument(ctx, doc, "hash-snapshot", nil)
+	if err != nil {
+		t.Fatalf("CreateDocument: %v", err)
+	}
+
+	got, err := repo.GetDocument(ctx, tenantID, docID)
+	if err != nil {
+		t.Fatalf("GetDocument: %v", err)
+	}
+	if got.ProfileCodeSnapshot == nil || *got.ProfileCodeSnapshot != profileCode {
+		t.Fatalf("ProfileCodeSnapshot = %#v, want %q", got.ProfileCodeSnapshot, profileCode)
+	}
+	if got.ProcessAreaCodeSnapshot == nil || *got.ProcessAreaCodeSnapshot != processAreaCode {
+		t.Fatalf("ProcessAreaCodeSnapshot = %#v, want %q", got.ProcessAreaCodeSnapshot, processAreaCode)
+	}
+}

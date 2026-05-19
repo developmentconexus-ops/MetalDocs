@@ -835,8 +835,32 @@ func (h *Handler) listRevisionHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items": items,
+		"items": toRevisionHistoryResponse(items),
 	})
+}
+
+type revisionHistoryItemResponse struct {
+	DocumentID     string    `json:"documentId"`
+	RevisionNumber int64     `json:"revisionNumber"`
+	RevisionTitle  string    `json:"revisionTitle"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"createdAt"`
+	IsCurrent      bool      `json:"isCurrent"`
+}
+
+func toRevisionHistoryResponse(items []domain.RevisionHistoryItem) []revisionHistoryItemResponse {
+	out := make([]revisionHistoryItemResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, revisionHistoryItemResponse{
+			DocumentID:     item.DocumentID,
+			RevisionNumber: item.RevisionNumber,
+			RevisionTitle:  item.RevisionTitle,
+			Status:         string(item.Status),
+			CreatedAt:      item.CreatedAt,
+			IsCurrent:      item.IsCurrent,
+		})
+	}
+	return out
 }
 
 func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
