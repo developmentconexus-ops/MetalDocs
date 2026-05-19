@@ -38,6 +38,15 @@ type ControlledDocumentVisibility = {
   userIds: string[];
 };
 
+export function hasSettledSidebarIdentity(input: {
+  code: string | null | undefined;
+  profileLabel: string | null | undefined;
+  areaLabel: string | null | undefined;
+  visibilityLabel: string | null | undefined;
+}): boolean {
+  return Boolean(input.code && input.profileLabel && input.areaLabel && input.visibilityLabel);
+}
+
 // "08 de maio de 2026" — used in published-doc owner banner
 export function formatPublishedAt(input: string | null | undefined): string {
   const d = parseDate(input);

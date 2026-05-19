@@ -8,7 +8,7 @@ import { QK } from '../../../lib/queryKeys';
 import { useDocumentSession } from '../hooks/editor/useDocumentSession';
 import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
 import { useDocumentComments } from '../hooks/editor/useDocumentComments';
-import { finalizeDocument, getApprovalInstance, renameDocument, signedRevisionURL } from '../api/documents';
+import { finalizeDocument, getApprovalInstance, renameDocument, signedRevisionURL, syncArtifactMetadata } from '../api/documents';
 import type { DocumentDetail } from '../api/documents';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
@@ -24,7 +24,7 @@ import { CodeChip, StatusPill, type DocumentStatus } from '../../../components/u
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useControlledDocumentDetailQuery } from '../../registry/queries/useControlledDocumentDetailQuery';
-import { buildVisibilityLabel, formatRevisionCode, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
+import { buildVisibilityLabel, formatRevisionCode, hasSettledSidebarIdentity, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
 import styles from './styles/DocumentEditorPage.module.css';
 
 export type DocumentEditorPageProps = {
@@ -34,6 +34,9 @@ export type DocumentEditorPageProps = {
 
 type EditorDocumentDetail = DocumentDetail & { RevisionTitle?: string | null };
 type ArtifactMetadata = { fileSizeBytes?: number | null; pageCount?: number | null };
+
+const ARTIFACT_SYNC_MAX_ATTEMPTS = 8;
+const ARTIFACT_SYNC_RETRY_DELAY_MS = 400;
 
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
   const docQuery = useDocumentDetailQuery(documentID);
@@ -47,6 +50,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [artifactMetadata, setArtifactMetadata] = useState<ArtifactMetadata>({});
   const editorRef = useRef<MetalDocsEditorRef>(null);
   const skipInitialEditorChangeRef = useRef(false);
+  const syncedArtifactRevisionRef = useRef<string | null>(null);
+  const artifactSyncRetryTimeoutRef = useRef<number | null>(null);
   const doc: EditorDocumentDetail | null = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
   const docStatus = doc?.Status ?? '';
   const session = useDocumentSession(documentID, { enabled: docStatus === 'draft' });
@@ -108,6 +113,16 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     skipInitialEditorChangeRef.current = true;
     setEditorDirty(false);
   }, [buffer]);
+
+  useEffect(() => {
+    if (!doc) {
+      syncedArtifactRevisionRef.current = null;
+      return;
+    }
+    if (doc.CurrentRevisionID !== syncedArtifactRevisionRef.current) {
+      syncedArtifactRevisionRef.current = null;
+    }
+  }, [doc]);
 
   const pageLoadError = (() => {
     const err = docQuery.error;
@@ -290,6 +305,71 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       : true)
     && buffer !== undefined;
 
+  useEffect(() => {
+    if (!doc || docStatus !== 'draft' || sessionPhase !== 'writer') {
+      return;
+    }
+    if (artifactMetadata.fileSizeBytes != null && artifactMetadata.pageCount != null) {
+      return;
+    }
+    if (!doc.CurrentRevisionID || syncedArtifactRevisionRef.current === doc.CurrentRevisionID) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const clearRetry = () => {
+      if (artifactSyncRetryTimeoutRef.current != null) {
+        window.clearTimeout(artifactSyncRetryTimeoutRef.current);
+        artifactSyncRetryTimeoutRef.current = null;
+      }
+    };
+
+    const attemptSync = (attempt: number) => {
+      const pageCount = editorRef.current?.getPageCount() ?? null;
+      syncedArtifactRevisionRef.current = doc.CurrentRevisionID;
+
+      void syncArtifactMetadata(documentID, {
+        session_id: sessionID,
+        page_count: pageCount && pageCount > 0 ? pageCount : null,
+      }).then((metadata) => {
+        if (cancelled) {
+          return;
+        }
+
+        setArtifactMetadata({
+          fileSizeBytes: metadata.file_size_bytes ?? null,
+          pageCount: metadata.page_count ?? null,
+        });
+
+        if ((metadata.page_count ?? null) == null && attempt < ARTIFACT_SYNC_MAX_ATTEMPTS) {
+          clearRetry();
+          artifactSyncRetryTimeoutRef.current = window.setTimeout(() => {
+            attemptSync(attempt + 1);
+          }, ARTIFACT_SYNC_RETRY_DELAY_MS);
+        }
+      }).catch(() => {
+        if (cancelled) {
+          return;
+        }
+        syncedArtifactRevisionRef.current = null;
+        if (attempt < ARTIFACT_SYNC_MAX_ATTEMPTS) {
+          clearRetry();
+          artifactSyncRetryTimeoutRef.current = window.setTimeout(() => {
+            attemptSync(attempt + 1);
+          }, ARTIFACT_SYNC_RETRY_DELAY_MS);
+        }
+      });
+    };
+
+    attemptSync(0);
+
+    return () => {
+      cancelled = true;
+      clearRetry();
+    };
+  }, [artifactMetadata.fileSizeBytes, artifactMetadata.pageCount, doc, docStatus, documentID, sessionID, sessionPhase]);
+
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(
     () => localStorage.getItem('editor-sidebar-open') !== 'false'
   );
@@ -307,13 +387,21 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     return (allowed as string[]).includes(docStatus) ? (docStatus as DocumentStatus) : null;
   })();
 
-  const profileLabel = doc?.ProfileCodeSnapshot
-    ? resolveProfileLabel(doc.ProfileCodeSnapshot, profilesQuery.data ?? [])
-    : '—';
-  const areaLabel = doc?.ProcessAreaCodeSnapshot
-    ? resolveAreaLabel(doc.ProcessAreaCodeSnapshot, areasQuery.data ?? [])
-    : '—';
-  const visibilityLabel = buildVisibilityLabel(controlledDocumentQuery.data?.visibility, areasQuery.data ?? []);
+  const profileLabel = doc?.ProfileCodeSnapshot && profilesQuery.data
+    ? resolveProfileLabel(doc.ProfileCodeSnapshot, profilesQuery.data)
+    : null;
+  const areaLabel = doc?.ProcessAreaCodeSnapshot && areasQuery.data
+    ? resolveAreaLabel(doc.ProcessAreaCodeSnapshot, areasQuery.data)
+    : null;
+  const visibilityLabel = areasQuery.data && controlledDocumentQuery.data?.visibility
+    ? buildVisibilityLabel(controlledDocumentQuery.data.visibility, areasQuery.data)
+    : null;
+  const sidebarIdentityReady = hasSettledSidebarIdentity({
+    code: docCode || null,
+    profileLabel,
+    areaLabel,
+    visibilityLabel,
+  });
   const sidebarHistory = (revisionHistoryQuery.data?.items ?? []).map((item) => ({
     documentId: item.documentId,
     revisionCode: formatRevisionCode(item.revisionNumber),
@@ -416,9 +504,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
             });
           }}
           code={docCode || undefined}
-          profileLabel={profileLabel}
-          areaLabel={areaLabel}
-          visibilityLabel={visibilityLabel}
+          loading={!sidebarIdentityReady}
+          profileLabel={profileLabel ?? undefined}
+          areaLabel={areaLabel ?? undefined}
+          visibilityLabel={visibilityLabel ?? undefined}
           fileSizeBytes={artifactMetadata.fileSizeBytes ?? null}
           pageCount={artifactMetadata.pageCount ?? null}
           history={sidebarHistory}
@@ -459,3 +548,4 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     </div>
   );
 }
+
