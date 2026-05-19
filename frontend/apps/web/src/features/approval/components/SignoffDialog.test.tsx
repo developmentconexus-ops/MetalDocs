@@ -149,7 +149,21 @@ describe('SignoffDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert').textContent).toMatch(/Fluxo de aprova/i);
+      expect(screen.getByRole('alert').textContent).toContain('Voce nao esta mais elegivel para assinar esta etapa.');
+    });
+  });
+
+  it('maps AUTH_INVALID_CREDENTIALS to bad password guidance', async () => {
+    vi.mocked(approvalApi.signoff).mockRejectedValue(
+      new ApprovalError('AUTH_INVALID_CREDENTIALS', 401, 'invalid credentials'),
+    );
+    renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Senha incorreta. Verifique e tente novamente.');
     });
   });
 
