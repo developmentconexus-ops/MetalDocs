@@ -33,6 +33,7 @@ export type DocumentEditorPageProps = {
 };
 
 type EditorDocumentDetail = DocumentDetail & { RevisionTitle?: string | null };
+type ArtifactMetadata = { fileSizeBytes?: number | null; pageCount?: number | null };
 
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
   const docQuery = useDocumentDetailQuery(documentID);
@@ -43,6 +44,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [revisionTitleInput, setRevisionTitleInput] = useState('');
   const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
+  const [artifactMetadata, setArtifactMetadata] = useState<ArtifactMetadata>({});
   const editorRef = useRef<MetalDocsEditorRef>(null);
   const skipInitialEditorChangeRef = useRef(false);
   const doc: EditorDocumentDetail | null = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
@@ -79,6 +81,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     let cancelled = false;
 
     setDocumentName(name);
+    setArtifactMetadata({
+      fileSizeBytes: doc.currentRevisionFileSizeBytes ?? null,
+      pageCount: doc.currentRevisionPageCount ?? null,
+    });
     setEditorLoadError(null);
     setBuffer(undefined);
 
@@ -144,6 +150,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
         onAdvanceBase: (newRevisionID: string) => {
           setLastAck(newRevisionID);
         },
+        onArtifactMetadata: setArtifactMetadata,
         onSessionLost: () => {
           toast.error('Writer session lost.');
         },
@@ -154,6 +161,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       sessionID: '',
       baseRevisionID: '',
       onAdvanceBase: () => {},
+      onArtifactMetadata: setArtifactMetadata,
       onSessionLost: () => {},
     };
   }, [documentID, sessionPhase, sessionID, lastAckRevisionID, setLastAck]);
@@ -197,7 +205,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
 
   async function handleSave(buf: ArrayBuffer) {
     if (!doc) return;
-    await autosave.queue(buf, doc.FormDataJSON ?? null);
+    const pageCount = editorRef.current?.getPageCount() ?? null;
+    await autosave.queue(buf, doc.FormDataJSON ?? null, pageCount);
     setEditorDirty(false);
   }
 
@@ -215,7 +224,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       if (editorDirty) {
         const latestBuf = await editorRef.current?.saveNow();
         if (latestBuf) {
-          await autosave.queue(latestBuf, doc.FormDataJSON ?? null);
+          const pageCount = editorRef.current?.getPageCount() ?? null;
+          await autosave.queue(latestBuf, doc.FormDataJSON ?? null, pageCount);
         }
         const flushOk = await autosave.flush();
         if (!flushOk) {
@@ -409,6 +419,8 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
           profileLabel={profileLabel}
           areaLabel={areaLabel}
           visibilityLabel={visibilityLabel}
+          fileSizeBytes={artifactMetadata.fileSizeBytes ?? null}
+          pageCount={artifactMetadata.pageCount ?? null}
           history={sidebarHistory}
           approvalChain={docStatus === 'under_review' ? approvalInstanceQuery.data ?? null : null}
           documentStatus={docStatus}

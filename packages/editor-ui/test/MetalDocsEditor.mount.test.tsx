@@ -27,6 +27,7 @@ vi.mock('@eigenpal/docx-js-editor', async () => {
     }, ref) => {
       React.useImperativeHandle(ref, () => ({
         save: async () => new ArrayBuffer(16),
+        getTotalPages: () => 3,
       }));
       return (
         <div
@@ -90,5 +91,11 @@ describe('MetalDocsEditor', () => {
     const buf = await ref.current!.saveNow();
     expect(buf).toBeInstanceOf(ArrayBuffer);
     expect(buf?.byteLength).toBe(16);
+  });
+
+  it('exposes positive EigenPal page count through the MetalDocs ref', () => {
+    const ref = createRef<MetalDocsEditorRef>();
+    render(<MetalDocsEditor ref={ref} mode="document-edit" author="u1" />);
+    expect(ref.current?.getPageCount()).toBe(3);
   });
 });

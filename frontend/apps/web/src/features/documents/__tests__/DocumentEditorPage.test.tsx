@@ -61,6 +61,9 @@ vi.mock('@metaldocs/editor-ui', () => ({
       async getDocumentBuffer() {
         throw new Error('DocumentEditorPage should not re-read the editor buffer during autosave');
       },
+      getPageCount() {
+        return 3;
+      },
       focus() {},
     }), []);
     return (
@@ -91,19 +94,26 @@ describe('DocumentEditorPage', () => {
       UpdatedAt: '2026-05-18T10:00:00Z',
       CreatedBy: 'user-1',
       Code: 'DOC-1',
+      currentRevisionFileSizeBytes: 1304,
+      currentRevisionPageCount: 3,
+      currentRevisionPageCountSource: 'eigenpal_client',
     };
     vi.mocked(api.getDocument).mockResolvedValue(doc);
-    vi.mocked(api.signedRevisionURL).mockReturnValue('/signed/url');
+    vi.mocked(api.signedRevisionURL).mockReturnValue('/api/v1/documents/doc-1/revisions/rev-1/url');
 
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ url: 'https://cdn.example.com/doc.docx' }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        arrayBuffer: async () => new Uint8Array([7, 8, 9]).buffer,
-      });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === 'https://cdn.example.com/doc.docx') {
+        return new Response(new Uint8Array([7, 8, 9]).buffer, { status: 200 });
+      }
+      if (url.includes('/api/v1/documents/doc-1/revisions/rev-1/url')) {
+        return Response.json({ url: 'https://cdn.example.com/doc.docx' });
+      }
+      if (url.includes('/api/v1/taxonomy/profiles') || url.includes('/api/v1/taxonomy/areas')) {
+        return Response.json({ items: [] });
+      }
+      return Response.json({});
+    });
 
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -124,7 +134,7 @@ describe('DocumentEditorPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'trigger-autosave' }));
 
     await waitFor(() =>
-      expect(queueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' }),
+      expect(queueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' }, 3),
     );
   });
 });

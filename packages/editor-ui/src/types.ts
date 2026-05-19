@@ -34,5 +34,6 @@ export interface MetalDocsEditorProps {
 export interface MetalDocsEditorRef {
   getDocumentBuffer(): Promise<ArrayBuffer | null>;
   saveNow(): Promise<ArrayBuffer | null>;
+  getPageCount(): number | null;
   focus(): void;
 }
