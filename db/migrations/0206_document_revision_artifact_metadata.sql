@@ -27,6 +27,16 @@ BEGIN
         OR page_count_source IN ('eigenpal_client', 'server_renderer')
       );
 
+    ALTER TABLE public.document_revisions
+      ADD CONSTRAINT document_revisions_page_count_provenance_coupling_check
+      CHECK (
+        (page_count IS NULL AND page_count_source IS NULL)
+        OR (
+          page_count IS NOT NULL
+          AND page_count_source IN ('eigenpal_client', 'server_renderer')
+        )
+      );
+
     INSERT INTO public.schema_migrations (version, description)
     VALUES ('0206', 'add artifact metadata to document_revisions');
   END IF;
