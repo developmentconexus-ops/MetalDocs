@@ -205,23 +205,43 @@ func (r *Repository) SetRevisionStorageKey(ctx context.Context, revID, storageKe
 
 func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error) {
 	var d domain.Document
+	var currentFileSize sql.NullInt64
+	var currentPageCount sql.NullInt64
+	var currentPageCountSource sql.NullString
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
-		        coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
-		        archived_at, created_at, updated_at, created_by, revision_title,
-		        controlled_document_id, profile_code_snapshot, process_area_code_snapshot,
-		        coalesce(code,''), revision_version
-		 FROM documents WHERE id=$1 AND tenant_id=$2`, id, tenantID,
+		`SELECT d.id, d.tenant_id, d.template_version_id, d.name, d.status, d.form_data_json,
+		        coalesce(d.current_revision_id::text, ''), coalesce(d.active_session_id::text, ''),
+		        d.archived_at, d.created_at, d.updated_at, d.created_by, d.revision_title,
+		        d.controlled_document_id, d.profile_code_snapshot, d.process_area_code_snapshot,
+		        coalesce(d.code,''), d.revision_version,
+		        cr.file_size_bytes, cr.page_count, cr.page_count_source
+		 FROM documents d
+		 LEFT JOIN document_revisions cr
+		   ON cr.id = d.current_revision_id
+		  AND cr.document_id = d.id
+		 WHERE d.id=$1 AND d.tenant_id=$2`, id, tenantID,
 	).Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
 		&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
 		&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.RevisionTitle, &d.ControlledDocumentID, &d.ProfileCodeSnapshot,
 		&d.ProcessAreaCodeSnapshot, &d.Code,
-		&d.RevisionVersion)
+		&d.RevisionVersion, &currentFileSize, &currentPageCount, &currentPageCountSource)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	if currentFileSize.Valid {
+		fileSize := currentFileSize.Int64
+		d.CurrentRevisionFileSizeBytes = &fileSize
+	}
+	if currentPageCount.Valid {
+		pageCount := int(currentPageCount.Int64)
+		d.CurrentRevisionPageCount = &pageCount
+	}
+	if currentPageCountSource.Valid {
+		pageCountSource := currentPageCountSource.String
+		d.CurrentRevisionPageCountSource = &pageCountSource
 	}
 	return &d, nil
 }

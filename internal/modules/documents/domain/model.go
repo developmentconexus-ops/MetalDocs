@@ -39,10 +39,13 @@ type Document struct {
 	CreatedBy         string
 	RevisionTitle     *string
 	// Bridge fields (Spec 1 — added as nullable for Phase A; NOT NULL enforced in migration 0129)
-	ControlledDocumentID    *string
-	ProfileCodeSnapshot     *string
-	ProcessAreaCodeSnapshot *string
-	Code                    string
+	ControlledDocumentID           *string
+	ProfileCodeSnapshot            *string
+	ProcessAreaCodeSnapshot        *string
+	Code                           string
+	CurrentRevisionFileSizeBytes   *int64
+	CurrentRevisionPageCount       *int
+	CurrentRevisionPageCountSource *string
 	// TemplateVersionID is already present above — now semantically write-once after this migration
 
 	// TemplateSnapshot is the frozen template payload. Populated by Service.Create

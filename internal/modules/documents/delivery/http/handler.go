@@ -316,25 +316,28 @@ func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 type documentDetailResponse struct {
-	ID                      string                `json:"ID"`
-	TenantID                string                `json:"TenantID"`
-	TemplateVersionID       string                `json:"TemplateVersionID"`
-	Name                    string                `json:"Name"`
-	Status                  domain.DocumentStatus `json:"Status"`
-	FormDataJSON            json.RawMessage       `json:"FormDataJSON"`
-	CurrentRevisionID       string                `json:"CurrentRevisionID"`
-	RevisionVersion         int64                 `json:"RevisionVersion"`
-	ActiveSessionID         string                `json:"ActiveSessionID"`
-	ValuesFrozenAt          *time.Time            `json:"ValuesFrozenAt"`
-	ArchivedAt              *time.Time            `json:"ArchivedAt"`
-	CreatedAt               time.Time             `json:"CreatedAt"`
-	UpdatedAt               time.Time             `json:"UpdatedAt"`
-	CreatedBy               string                `json:"CreatedBy"`
-	ControlledDocumentID    *string               `json:"ControlledDocumentID"`
-	RevisionTitle           *string               `json:"RevisionTitle"`
-	ProfileCodeSnapshot     *string               `json:"ProfileCodeSnapshot"`
-	ProcessAreaCodeSnapshot *string               `json:"ProcessAreaCodeSnapshot"`
-	Code                    string                `json:"Code"`
+	ID                             string                `json:"ID"`
+	TenantID                       string                `json:"TenantID"`
+	TemplateVersionID              string                `json:"TemplateVersionID"`
+	Name                           string                `json:"Name"`
+	Status                         domain.DocumentStatus `json:"Status"`
+	FormDataJSON                   json.RawMessage       `json:"FormDataJSON"`
+	CurrentRevisionID              string                `json:"CurrentRevisionID"`
+	RevisionVersion                int64                 `json:"RevisionVersion"`
+	ActiveSessionID                string                `json:"ActiveSessionID"`
+	ValuesFrozenAt                 *time.Time            `json:"ValuesFrozenAt"`
+	ArchivedAt                     *time.Time            `json:"ArchivedAt"`
+	CreatedAt                      time.Time             `json:"CreatedAt"`
+	UpdatedAt                      time.Time             `json:"UpdatedAt"`
+	CreatedBy                      string                `json:"CreatedBy"`
+	ControlledDocumentID           *string               `json:"ControlledDocumentID"`
+	RevisionTitle                  *string               `json:"RevisionTitle"`
+	ProfileCodeSnapshot            *string               `json:"ProfileCodeSnapshot"`
+	ProcessAreaCodeSnapshot        *string               `json:"ProcessAreaCodeSnapshot"`
+	Code                           string                `json:"Code"`
+	CurrentRevisionFileSizeBytes   *int64                `json:"currentRevisionFileSizeBytes,omitempty"`
+	CurrentRevisionPageCount       *int                  `json:"currentRevisionPageCount,omitempty"`
+	CurrentRevisionPageCountSource *string               `json:"currentRevisionPageCountSource,omitempty"`
 }
 
 func toDocumentDetailResponse(doc domain.Document) (*documentDetailResponse, error) {
@@ -347,25 +350,28 @@ func toDocumentDetailResponse(doc domain.Document) (*documentDetailResponse, err
 	}
 
 	return &documentDetailResponse{
-		ID:                      doc.ID,
-		TenantID:                doc.TenantID,
-		TemplateVersionID:       doc.TemplateVersionID,
-		Name:                    doc.Name,
-		Status:                  doc.Status,
-		FormDataJSON:            formData,
-		CurrentRevisionID:       doc.CurrentRevisionID,
-		RevisionVersion:         doc.RevisionVersion,
-		ActiveSessionID:         doc.ActiveSessionID,
-		ValuesFrozenAt:          doc.ValuesFrozenAt,
-		ArchivedAt:              doc.ArchivedAt,
-		CreatedAt:               doc.CreatedAt,
-		UpdatedAt:               doc.UpdatedAt,
-		CreatedBy:               doc.CreatedBy,
-		ControlledDocumentID:    doc.ControlledDocumentID,
-		RevisionTitle:           doc.RevisionTitle,
-		ProfileCodeSnapshot:     doc.ProfileCodeSnapshot,
-		ProcessAreaCodeSnapshot: doc.ProcessAreaCodeSnapshot,
-		Code:                    doc.Code,
+		ID:                             doc.ID,
+		TenantID:                       doc.TenantID,
+		TemplateVersionID:              doc.TemplateVersionID,
+		Name:                           doc.Name,
+		Status:                         doc.Status,
+		FormDataJSON:                   formData,
+		CurrentRevisionID:              doc.CurrentRevisionID,
+		RevisionVersion:                doc.RevisionVersion,
+		ActiveSessionID:                doc.ActiveSessionID,
+		ValuesFrozenAt:                 doc.ValuesFrozenAt,
+		ArchivedAt:                     doc.ArchivedAt,
+		CreatedAt:                      doc.CreatedAt,
+		UpdatedAt:                      doc.UpdatedAt,
+		CreatedBy:                      doc.CreatedBy,
+		ControlledDocumentID:           doc.ControlledDocumentID,
+		RevisionTitle:                  doc.RevisionTitle,
+		ProfileCodeSnapshot:            doc.ProfileCodeSnapshot,
+		ProcessAreaCodeSnapshot:        doc.ProcessAreaCodeSnapshot,
+		Code:                           doc.Code,
+		CurrentRevisionFileSizeBytes:   doc.CurrentRevisionFileSizeBytes,
+		CurrentRevisionPageCount:       doc.CurrentRevisionPageCount,
+		CurrentRevisionPageCountSource: doc.CurrentRevisionPageCountSource,
 	}, nil
 }
 
@@ -767,6 +773,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		SessionID        string          `json:"session_id"`
 		PendingUploadID  string          `json:"pending_upload_id"`
 		FormDataSnapshot json.RawMessage `json:"form_data_snapshot"`
+		PageCount        *int            `json:"page_count"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
@@ -780,6 +787,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		SessionID:        req.SessionID,
 		PendingUploadID:  req.PendingUploadID,
 		FormDataSnapshot: req.FormDataSnapshot,
+		PageCount:        req.PageCount,
 	})
 	if err != nil {
 		log.Printf("documents.commit_autosave failed: doc_id=%s tenant_id=%s actor_id=%s session_id=%s pending_upload_id=%s err=%v",
@@ -792,6 +800,9 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 		"revision_id":       res.RevisionID,
 		"revision_num":      res.RevisionNum,
 		"idempotent_replay": res.AlreadyConsumed,
+		"file_size_bytes":   res.FileSizeBytes,
+		"page_count":        res.PageCount,
+		"page_count_source": res.PageCountSource,
 	})
 }
 
