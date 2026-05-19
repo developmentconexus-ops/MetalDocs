@@ -10,6 +10,7 @@ type DialogState =
   | 'submitting'
   | 'success'
   | 'error_bad_password'
+  | 'error_not_eligible'
   | 'error_session_expired'
   | 'error_rate_limited'
   | 'error_network'
@@ -21,6 +22,7 @@ type Decision = 'approve' | 'reject';
 
 const ERROR_MESSAGES: Record<Exclude<DialogState, 'idle' | 'submitting' | 'success'>, string> = {
   error_bad_password: 'Senha incorreta. Verifique e tente novamente.',
+  error_not_eligible: 'Voce nao esta mais elegivel para assinar esta etapa.',
   error_session_expired: 'Sessão expirada. Autentique novamente para assinar.',
   error_rate_limited: 'Muitas tentativas. Aguarde 30 segundos antes de tentar novamente.',
   error_network: 'Erro de conexão. Verifique sua internet e tente novamente.',
@@ -131,7 +133,8 @@ export function SignoffDialog({
         setShowStaleBanner(true);
         return 'idle';
       }
-      if (error.code === 'authn.signature_invalid') return 'error_bad_password';
+      if (error.code === 'authn.signature_invalid' || error.code === 'AUTH_INVALID_CREDENTIALS') return 'error_bad_password';
+      if (error.code === 'signoff.not_eligible' || error.code === 'SIGNOFF_NOT_ELIGIBLE') return 'error_not_eligible';
       if (error.status === 401) return 'error_session_expired';
       if (error.status === 429 || error.code === 'authn.rate_limited') return 'error_rate_limited';
       if (error.code === 'sod.submitter_cannot_sign') return 'error_sod_submitter';
@@ -311,3 +314,4 @@ export function SignoffDialog({
     </div>
   );
 }
+
