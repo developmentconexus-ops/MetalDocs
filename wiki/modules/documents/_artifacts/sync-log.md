@@ -75,6 +75,12 @@
 - **Tally gate:** PASS before edits and after sync patch
 - **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`; `wiki/database/tables/document_revisions.md` already updated in DB slice. `_artifacts/04-persistence.md` was not patched because it currently contains invalid UTF-8 bytes that block safe `apply_patch` editing.
 
+### 2026-05-19 review follow-up
+
+- **Context:** code-review follow-up for commits through `f4c48e74`.
+- **Changes:** `GET /api/v1/documents/{id}` now exposes governed `RevisionNumber`; editor submission title gating uses `RevisionNumber` instead of technical `RevisionVersion`; finalize profile prerequisite errors now use the API problem envelope; autosave request/response wrapper types derive from generated OpenAPI operations; baseline/migration truth for zero-based revision numbers no longer rewrites `updated_at`.
+- **Verification:** focused documents frontend tests, frontend build typecheck, `go generate ./internal/modules/documents/api/...`, `go test -vet=off ./internal/modules/documents/... -count=1`, and DB dictionary coverage passed. Redocly lint remained blocked by local `npm ECOMPROMISED` before execution.
+
 ## 2026-05-15 - Novo Documento blank-template create tripwire repair
 
 - **Context:** uncommitted runtime repair for Documents v2 initialization inside Registry atomic create

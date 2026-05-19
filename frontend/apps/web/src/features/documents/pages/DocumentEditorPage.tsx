@@ -252,7 +252,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }
 
   function handleFinalize() {
-    if ((doc?.RevisionVersion ?? 0) === 0) {
+    if ((doc?.RevisionNumber ?? 0) === 0) {
       void submitForReview();
       return;
     }

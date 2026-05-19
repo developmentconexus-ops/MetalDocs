@@ -330,6 +330,7 @@ type documentDetailResponse struct {
 	CreatedAt                      time.Time             `json:"CreatedAt"`
 	UpdatedAt                      time.Time             `json:"UpdatedAt"`
 	CreatedBy                      string                `json:"CreatedBy"`
+	RevisionNumber                 int64                 `json:"RevisionNumber"`
 	ControlledDocumentID           *string               `json:"ControlledDocumentID"`
 	RevisionTitle                  *string               `json:"RevisionTitle"`
 	ProfileCodeSnapshot            *string               `json:"ProfileCodeSnapshot"`
@@ -364,6 +365,7 @@ func toDocumentDetailResponse(doc domain.Document) (*documentDetailResponse, err
 		CreatedAt:                      doc.CreatedAt,
 		UpdatedAt:                      doc.UpdatedAt,
 		CreatedBy:                      doc.CreatedBy,
+		RevisionNumber:                 doc.RevisionNumber,
 		ControlledDocumentID:           doc.ControlledDocumentID,
 		RevisionTitle:                  doc.RevisionTitle,
 		ProfileCodeSnapshot:            doc.ProfileCodeSnapshot,
@@ -515,7 +517,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if profileCode == "" {
-		http.Error(w, `{"error":"profile not found"}`, http.StatusBadRequest)
+		httpErr(w, http.StatusBadRequest, "profile_not_found")
 		return
 	}
 

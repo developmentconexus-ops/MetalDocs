@@ -37,6 +37,7 @@ type Document struct {
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 	CreatedBy         string
+	RevisionNumber    int64
 	RevisionTitle     *string
 	// Bridge fields (Spec 1 — added as nullable for Phase A; NOT NULL enforced in migration 0129)
 	ControlledDocumentID           *string
