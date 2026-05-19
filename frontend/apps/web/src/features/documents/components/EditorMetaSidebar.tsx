@@ -64,6 +64,7 @@ function formatPageSizeSummary(pageCount?: number | null, fileSizeBytes?: number
 type EditorMetaSidebarProps = {
   open: boolean;
   onToggle: () => void;
+  loading?: boolean;
   code?: string;
   profileLabel?: string;
   areaLabel?: string;
@@ -78,6 +79,7 @@ type EditorMetaSidebarProps = {
 export function EditorMetaSidebar({
   open,
   onToggle,
+  loading = false,
   code,
   profileLabel,
   areaLabel,
@@ -120,6 +122,13 @@ export function EditorMetaSidebar({
           <div className={styles.panelFrame}>
             <section className={styles.section}>
               <div className={styles.sectionHeader}>Identificacao</div>
+              {loading ? (
+                <div className={styles.metaRows}>
+                  <div className={styles.metaRow}>
+                    <span className={styles.metaValue}>Carregando metadados do documento</span>
+                  </div>
+                </div>
+              ) : (
               <div className={styles.metaRows}>
                 {code ? (
                   <div className={styles.metaRow}>
@@ -146,6 +155,7 @@ export function EditorMetaSidebar({
                   </div>
                 ) : null}
               </div>
+              )}
             </section>
             <div className={styles.divider} />
             <section className={styles.section}>

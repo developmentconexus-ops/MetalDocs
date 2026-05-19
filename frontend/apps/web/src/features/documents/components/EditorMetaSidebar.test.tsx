@@ -3,6 +3,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { EditorMetaSidebar } from './EditorMetaSidebar';
 
 describe('EditorMetaSidebar', () => {
+  it('renders loading state instead of partial technical metadata during hydration', () => {
+    render(
+      <EditorMetaSidebar
+        open
+        onToggle={() => {}}
+        loading
+        code="POP-GENERAL-011"
+      />,
+    );
+
+    expect(screen.getByText('Carregando metadados do documento')).toBeInTheDocument();
+    expect(screen.queryByText('---')).not.toBeInTheDocument();
+    expect(screen.queryByText('pop')).not.toBeInTheDocument();
+    expect(screen.queryByText('general')).not.toBeInTheDocument();
+  });
+
   it('renders real governed metadata and hides approval chain in draft', () => {
     render(
       <EditorMetaSidebar
