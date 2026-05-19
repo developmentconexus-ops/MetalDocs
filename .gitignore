@@ -25,6 +25,7 @@ frontend/apps/web/vite.config.js
 frontend/apps/web/vite.config.d.ts
 carbone/renders/
 .tmp/
+.tmp*
 tmp/
 .superpowers/
 frontend/apps/web/test-results/
