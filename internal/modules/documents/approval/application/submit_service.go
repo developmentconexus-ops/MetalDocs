@@ -54,7 +54,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 	contentHash, err := ComputeContentHash(ContentHashInput{
 		TenantID:       req.TenantID,
 		DocumentID:     req.DocumentID,
-		RevisionNumber: req.RevisionVersion,
+		RevisionNumber: req.RevisionNumber,
 		FormData:       req.ContentFormData,
 	})
 	if err != nil {
