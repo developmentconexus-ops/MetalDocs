@@ -109,6 +109,9 @@ func (r *ProfileRepository) Create(ctx context.Context, p *domain.DocumentProfil
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Create profile: %w", err)
 	}
@@ -145,6 +148,9 @@ func (r *ProfileRepository) Update(ctx context.Context, p *domain.DocumentProfil
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Update profile: %w", err)
 	}
@@ -280,6 +286,9 @@ func (r *AreaRepository) Create(ctx context.Context, a *domain.ProcessArea) erro
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Create area: %w", err)
 	}
@@ -313,6 +322,9 @@ func (r *AreaRepository) Update(ctx context.Context, a *domain.ProcessArea) erro
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Update area: %w", err)
 	}
