@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import styles from './EditorMetaSidebar.module.css';
-import { CodeChip } from '../../../components/ui/CodeChip';
 import { Avatar } from '../../../components/ui/Avatar';
 import { displayRevisionTitle, formatShortDate } from '../lib/documentDetailMeta';
 
@@ -89,23 +88,23 @@ export function EditorMetaSidebar({
         </svg>
       </button>
       {open && (
-        <aside className={styles.sidebar} aria-label="Metadados do documento">
+        <aside className={styles.sidebar} aria-label="Identificacao do documento">
           <div className={styles.panelFrame}>
             <section className={styles.section}>
-              <div className={styles.sectionHeader}>Metadados</div>
+              <div className={styles.sectionHeader}>Identificacao</div>
               <div className={styles.metaRows}>
                 {code ? (
                   <div className={styles.metaRow}>
                     <span className={styles.metaLabel}>Codigo</span>
-                    <CodeChip>{code}</CodeChip>
+                    <span className={styles.metaCode}>{code}</span>
                   </div>
                 ) : null}
                 <div className={styles.metaRow}>
-                  <span className={styles.metaLabel}>Perfil</span>
+                  <span className={styles.metaLabel}>Tipo</span>
                   <span className={styles.metaValue}>{profileLabel ?? '---'}</span>
                 </div>
                 <div className={styles.metaRow}>
-                  <span className={styles.metaLabel}>Area</span>
+                  <span className={styles.metaLabel}>Area responsavel</span>
                   <span className={styles.metaValue}>{areaLabel ?? '---'}</span>
                 </div>
                 <div className={styles.metaRow}>

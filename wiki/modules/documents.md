@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-18 (governed sidebar runtime + contract sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-19 (editor sidebar identification visual sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -469,7 +469,7 @@ Pointer-only. Body in `wiki/modules/documents-tech-debt.md`. Severity rubric in 
 
 Summary counts (T-008 closed Plan 4; all rows counted by tally including closed):
 - Critical: 1
-- Major: 6
+- Major: 7
 - Minor: 4
 
 Top 3 (by severity, then blast radius):
@@ -516,6 +516,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-19 - Editor sidebar identification layout sync: the editor sidebar now labels document identity as `Identificacao`, renders identity fields as stacked editorial labels (`Codigo`, `Tipo`, `Area responsavel`, `Visibilidade`), removes the extra outer sidebar padding, and intentionally does not show page count/file size until DB/API/TanStack runtime contract work exposes those values truthfully.
 - 2026-05-19 - Editor sidebar revision-title/density sync: `REV00` now uses the canonical initial governed title `Criacao do documento` when `revisionTitle` is omitted; later governed revisions still require `revisionTitle` at formal submission. The editor sidebar renders governed revision rows as code/title/date without inline workflow status, keeps draft approvers hidden, and collapses long governed histories without using technical `document_revisions`.
 - 2026-05-18 - Governed sidebar sync: `documents.revision_title` is now part of the runtime model and required on `POST /api/v1/documents/{id}/finalize`; the editor sidebar reads governed history from `GET /api/v1/documents/{id}/revision-history`, and that history is sourced from `documents` lineage by `controlled_document_id`, not from technical `document_revisions`.
 - 2026-05-18 - Approval/registry sidebar boundary sync: the editor consumes `GET /api/v1/documents/{id}/approval-instance` only for `under_review`, and visibility is resolved from the registry-controlled document contract instead of a documents-local duplicate field.
