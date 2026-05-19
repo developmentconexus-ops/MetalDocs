@@ -33,6 +33,7 @@ type fakeSvc struct {
 
 	commitResult *application.CommitResult
 	commitErr    error
+	commitCmd    application.CommitAutosaveCmd
 
 	renameErr  error
 	renameName string
@@ -48,6 +49,8 @@ type fakeSvc struct {
 
 	statsResult *application.DocumentStats
 	statsErr    error
+
+	getDocumentResult *domain.Document
 }
 
 var _ httphandler.Service = (*fakeSvc)(nil)
@@ -57,6 +60,9 @@ func (f *fakeSvc) CreateDocument(_ context.Context, _ application.CreateDocument
 }
 
 func (f *fakeSvc) GetDocument(_ context.Context, _, _ string) (*domain.Document, error) {
+	if f.getDocumentResult != nil {
+		return f.getDocumentResult, nil
+	}
 	return &domain.Document{
 		ID:                "doc_1",
 		Name:              "Doc",
@@ -143,7 +149,8 @@ func (f *fakeSvc) PresignAutosave(_ context.Context, _ application.PresignAutosa
 	return &application.PresignAutosaveResult{UploadURL: "https://example/upload", PendingUploadID: "pending_1", ExpiresAt: time.Now().Add(time.Minute)}, nil
 }
 
-func (f *fakeSvc) CommitAutosave(_ context.Context, _ application.CommitAutosaveCmd) (*application.CommitResult, error) {
+func (f *fakeSvc) CommitAutosave(_ context.Context, cmd application.CommitAutosaveCmd) (*application.CommitResult, error) {
+	f.commitCmd = cmd
 	if f.commitErr != nil {
 		return nil, f.commitErr
 	}
@@ -288,6 +295,50 @@ func TestGetDocument_EmbedsFormDataJSON(t *testing.T) {
 	}
 }
 
+func TestGetDocument_ReturnsCurrentRevisionArtifactMetadata(t *testing.T) {
+	fileSizeBytes := int64(1304)
+	pageCount := 3
+	pageCountSource := "eigenpal_client"
+	svc := &fakeSvc{getDocumentResult: &domain.Document{
+		ID:                             "doc_1",
+		Name:                           "Doc",
+		Status:                         domain.DocStatusDraft,
+		FormDataJSON:                   []byte(`{"foo":"bar"}`),
+		CurrentRevisionID:              "rev_1",
+		RevisionVersion:                1,
+		CreatedBy:                      "user_1",
+		Code:                           "DOC-1",
+		CurrentRevisionFileSizeBytes:   &fileSizeBytes,
+		CurrentRevisionPageCount:       &pageCount,
+		CurrentRevisionPageCountSource: &pageCountSource,
+	}}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1", nil)
+	req.SetPathValue("id", "doc_1")
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if got := body["currentRevisionFileSizeBytes"]; got != float64(1304) {
+		t.Fatalf("currentRevisionFileSizeBytes = %v", got)
+	}
+	if got := body["currentRevisionPageCount"]; got != float64(3) {
+		t.Fatalf("currentRevisionPageCount = %v", got)
+	}
+	if got := body["currentRevisionPageCountSource"]; got != "eigenpal_client" {
+		t.Fatalf("currentRevisionPageCountSource = %v", got)
+	}
+}
+
 func TestListDocuments_Forbidden(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
@@ -349,6 +400,47 @@ func TestCommitAutosave_IdempotentReplay_Returns200(t *testing.T) {
 	}
 	if ok, _ := out["idempotent_replay"].(bool); !ok {
 		t.Fatalf("expected idempotent_replay=true, got %v", out["idempotent_replay"])
+	}
+}
+
+func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T) {
+	fileSizeBytes := int64(1304)
+	pageCount := 3
+	pageCountSource := "eigenpal_client"
+	svc := &fakeSvc{commitResult: &application.CommitResult{
+		RevisionID:      "rev_2",
+		RevisionNum:     2,
+		FileSizeBytes:   &fileSizeBytes,
+		PageCount:       &pageCount,
+		PageCountSource: &pageCountSource,
+	}}
+	mux := newMux(t, svc)
+
+	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1},"page_count":3}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if svc.commitCmd.PageCount == nil || *svc.commitCmd.PageCount != 3 {
+		t.Fatalf("page_count not passed to service: %#v", svc.commitCmd.PageCount)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got := out["file_size_bytes"]; got != float64(1304) {
+		t.Fatalf("file_size_bytes = %v", got)
+	}
+	if got := out["page_count"]; got != float64(3) {
+		t.Fatalf("page_count = %v", got)
+	}
+	if got := out["page_count_source"]; got != "eigenpal_client" {
+		t.Fatalf("page_count_source = %v", got)
 	}
 }
 

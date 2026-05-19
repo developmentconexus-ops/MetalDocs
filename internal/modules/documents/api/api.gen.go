@@ -25,6 +25,24 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for DocumentDetailResponseCurrentRevisionPageCountSource.
+const (
+	DocumentDetailResponseCurrentRevisionPageCountSourceEigenpalClient DocumentDetailResponseCurrentRevisionPageCountSource = "eigenpal_client"
+	DocumentDetailResponseCurrentRevisionPageCountSourceServerRenderer DocumentDetailResponseCurrentRevisionPageCountSource = "server_renderer"
+)
+
+// Valid indicates whether the value is a known member of the DocumentDetailResponseCurrentRevisionPageCountSource enum.
+func (e DocumentDetailResponseCurrentRevisionPageCountSource) Valid() bool {
+	switch e {
+	case DocumentDetailResponseCurrentRevisionPageCountSourceEigenpalClient:
+		return true
+	case DocumentDetailResponseCurrentRevisionPageCountSourceServerRenderer:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DocumentSummaryStatus.
 const (
 	Approved    DocumentSummaryStatus = "approved"
@@ -226,6 +244,24 @@ func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
 	}
 }
 
+// Defines values for CommitDocumentAutosave200JSONResponseBodyPageCountSource.
+const (
+	CommitDocumentAutosave200JSONResponseBodyPageCountSourceEigenpalClient CommitDocumentAutosave200JSONResponseBodyPageCountSource = "eigenpal_client"
+	CommitDocumentAutosave200JSONResponseBodyPageCountSourceServerRenderer CommitDocumentAutosave200JSONResponseBodyPageCountSource = "server_renderer"
+)
+
+// Valid indicates whether the value is a known member of the CommitDocumentAutosave200JSONResponseBodyPageCountSource enum.
+func (e CommitDocumentAutosave200JSONResponseBodyPageCountSource) Valid() bool {
+	switch e {
+	case CommitDocumentAutosave200JSONResponseBodyPageCountSourceEigenpalClient:
+		return true
+	case CommitDocumentAutosave200JSONResponseBodyPageCountSourceServerRenderer:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExportDocumentPDFJSONBodyPaperSize.
 const (
 	A4     ExportDocumentPDFJSONBodyPaperSize = "A4"
@@ -290,26 +326,32 @@ type DocumentCommentUpdateRequest struct {
 
 // DocumentDetailResponse defines model for DocumentDetailResponse.
 type DocumentDetailResponse struct {
-	ActiveSessionID         string                 `json:"ActiveSessionID"`
-	ArchivedAt              *time.Time             `json:"ArchivedAt,omitempty"`
-	Code                    string                 `json:"Code"`
-	ControlledDocumentID    *string                `json:"ControlledDocumentID,omitempty"`
-	CreatedAt               time.Time              `json:"CreatedAt"`
-	CreatedBy               string                 `json:"CreatedBy"`
-	CurrentRevisionID       string                 `json:"CurrentRevisionID"`
-	FormDataJSON            map[string]interface{} `json:"FormDataJSON"`
-	ID                      string                 `json:"ID"`
-	Name                    string                 `json:"Name"`
-	ProcessAreaCodeSnapshot *string                `json:"ProcessAreaCodeSnapshot,omitempty"`
-	ProfileCodeSnapshot     *string                `json:"ProfileCodeSnapshot,omitempty"`
-	RevisionTitle           *string                `json:"RevisionTitle,omitempty"`
-	RevisionVersion         int64                  `json:"RevisionVersion"`
-	Status                  string                 `json:"Status"`
-	TemplateVersionID       string                 `json:"TemplateVersionID"`
-	TenantID                string                 `json:"TenantID"`
-	UpdatedAt               time.Time              `json:"UpdatedAt"`
-	ValuesFrozenAt          *time.Time             `json:"ValuesFrozenAt,omitempty"`
+	ActiveSessionID                string                                                `json:"ActiveSessionID"`
+	ArchivedAt                     *time.Time                                            `json:"ArchivedAt,omitempty"`
+	Code                           string                                                `json:"Code"`
+	ControlledDocumentID           *string                                               `json:"ControlledDocumentID,omitempty"`
+	CreatedAt                      time.Time                                             `json:"CreatedAt"`
+	CreatedBy                      string                                                `json:"CreatedBy"`
+	CurrentRevisionID              string                                                `json:"CurrentRevisionID"`
+	FormDataJSON                   map[string]interface{}                                `json:"FormDataJSON"`
+	ID                             string                                                `json:"ID"`
+	Name                           string                                                `json:"Name"`
+	ProcessAreaCodeSnapshot        *string                                               `json:"ProcessAreaCodeSnapshot,omitempty"`
+	ProfileCodeSnapshot            *string                                               `json:"ProfileCodeSnapshot,omitempty"`
+	RevisionTitle                  *string                                               `json:"RevisionTitle,omitempty"`
+	RevisionVersion                int64                                                 `json:"RevisionVersion"`
+	Status                         string                                                `json:"Status"`
+	TemplateVersionID              string                                                `json:"TemplateVersionID"`
+	TenantID                       string                                                `json:"TenantID"`
+	UpdatedAt                      time.Time                                             `json:"UpdatedAt"`
+	ValuesFrozenAt                 *time.Time                                            `json:"ValuesFrozenAt,omitempty"`
+	CurrentRevisionFileSizeBytes   *int64                                                `json:"currentRevisionFileSizeBytes,omitempty"`
+	CurrentRevisionPageCount       *int                                                  `json:"currentRevisionPageCount,omitempty"`
+	CurrentRevisionPageCountSource *DocumentDetailResponseCurrentRevisionPageCountSource `json:"currentRevisionPageCountSource,omitempty"`
 }
+
+// DocumentDetailResponseCurrentRevisionPageCountSource defines model for DocumentDetailResponse.CurrentRevisionPageCountSource.
+type DocumentDetailResponseCurrentRevisionPageCountSource string
 
 // DocumentListResponse defines model for DocumentListResponse.
 type DocumentListResponse struct {
@@ -492,9 +534,13 @@ type RenameDocumentJSONBody struct {
 // CommitDocumentAutosaveJSONBody defines parameters for CommitDocumentAutosave.
 type CommitDocumentAutosaveJSONBody struct {
 	FormDataSnapshot *map[string]interface{} `json:"form_data_snapshot,omitempty"`
+	PageCount        *int                    `json:"page_count,omitempty"`
 	PendingUploadId  openapi_types.UUID      `json:"pending_upload_id"`
 	SessionId        openapi_types.UUID      `json:"session_id"`
 }
+
+// CommitDocumentAutosave200JSONResponseBodyPageCountSource defines parameters for CommitDocumentAutosave.
+type CommitDocumentAutosave200JSONResponseBodyPageCountSource string
 
 // PresignDocumentAutosaveJSONBody defines parameters for PresignDocumentAutosave.
 type PresignDocumentAutosaveJSONBody struct {
@@ -2235,9 +2281,12 @@ type CommitDocumentAutosaveResponseObject interface {
 }
 
 type CommitDocumentAutosave200JSONResponse struct {
-	IdempotentReplay *bool              `json:"idempotent_replay,omitempty"`
-	RevisionId       openapi_types.UUID `json:"revision_id"`
-	RevisionNum      int                `json:"revision_num"`
+	FileSizeBytes    *int64                                                    `json:"file_size_bytes,omitempty"`
+	IdempotentReplay *bool                                                     `json:"idempotent_replay,omitempty"`
+	PageCount        *int                                                      `json:"page_count,omitempty"`
+	PageCountSource  *CommitDocumentAutosave200JSONResponseBodyPageCountSource `json:"page_count_source,omitempty"`
+	RevisionId       openapi_types.UUID                                        `json:"revision_id"`
+	RevisionNum      int                                                       `json:"revision_num"`
 }
 
 func (response CommitDocumentAutosave200JSONResponse) VisitCommitDocumentAutosaveResponse(w http.ResponseWriter) error {
@@ -3846,74 +3895,76 @@ func (sh *strictHandler) ViewDocument(w http.ResponseWriter, r *http.Request, id
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"GedZZDHe9vP2PwEAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

@@ -3694,6 +3694,7 @@ paths:
                 session_id: { type: string, format: uuid }
                 pending_upload_id: { type: string, format: uuid }
                 form_data_snapshot: { type: object }
+                page_count: { type: integer, minimum: 1, nullable: true }
               # NOTE: content_hash is NOT a request field. The server streams
               # S3 -> SHA256 and compares to the expected hash captured at
               # presign time. Client cannot forge the hash.
@@ -3709,6 +3710,12 @@ paths:
                   revision_id: { type: string, format: uuid }
                   revision_num: { type: integer, minimum: 1 }
                   idempotent_replay: { type: boolean }
+                  file_size_bytes: { type: integer, format: int64, minimum: 0, nullable: true }
+                  page_count: { type: integer, minimum: 1, nullable: true }
+                  page_count_source:
+                    type: string
+                    nullable: true
+                    enum: [eigenpal_client, server_renderer]
         '403': { description: session_not_holder | document_not_owner }
         '404': { description: pending_not_found }
         '409': { description: misbound | session_inactive | stale_base }
@@ -4587,6 +4594,19 @@ components:
           nullable: true
         Code:
           type: string
+        currentRevisionFileSizeBytes:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        currentRevisionPageCount:
+          type: integer
+          minimum: 1
+          nullable: true
+        currentRevisionPageCountSource:
+          type: string
+          nullable: true
+          enum: [eigenpal_client, server_renderer]
     DocumentCommentContentNode:
       type: object
       additionalProperties: true

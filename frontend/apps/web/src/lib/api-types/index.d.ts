@@ -5798,6 +5798,11 @@ export interface components {
             ProfileCodeSnapshot?: string | null;
             ProcessAreaCodeSnapshot?: string | null;
             Code: string;
+            /** Format: int64 */
+            currentRevisionFileSizeBytes?: number | null;
+            currentRevisionPageCount?: number | null;
+            /** @enum {string|null} */
+            currentRevisionPageCountSource?: "eigenpal_client" | "server_renderer" | null;
         };
         DocumentCommentContentNode: {
             [key: string]: unknown;
@@ -9136,6 +9141,7 @@ export interface operations {
                     /** Format: uuid */
                     pending_upload_id: string;
                     form_data_snapshot?: Record<string, never>;
+                    page_count?: number | null;
                 };
             };
         };
@@ -9151,6 +9157,11 @@ export interface operations {
                         revision_id: string;
                         revision_num: number;
                         idempotent_replay?: boolean;
+                        /** Format: int64 */
+                        file_size_bytes?: number | null;
+                        page_count?: number | null;
+                        /** @enum {string|null} */
+                        page_count_source?: "eigenpal_client" | "server_renderer" | null;
                     };
                 };
             };
