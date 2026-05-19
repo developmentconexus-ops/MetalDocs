@@ -5,6 +5,7 @@ import type { TemplateDTO } from '../../../../templates';
 import { VISIBILITY_META, type VisibilityKey } from '../../../lib/visibilityMeta';
 import { DocPaperPreview } from '../DocPaperPreview';
 import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
+import { formatRevisionCode } from '../../../lib/documentDetailMeta';
 import styles from './StepConfirm.module.css';
 
 type SummaryField = { label: string; value: string };
@@ -57,7 +58,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
   } = props;
 
   const codePreview = previewCode ?? `${profile?.code ?? '???'}-${area?.code ?? '???'}-???`;
-  const versionLabel = 'v1'; // first version of a new doc; literal until version-bumping flow exists
+  const revisionCode = formatRevisionCode(0);
   const visibilityLabel = buildVisibilityLabel(visibility, visibilityAreaCodes, inviteeCount);
   const profileLabel = profile ? `${profile.code} — ${profile.name}` : '—';
   const areaLabel = area ? `${area.code} — ${area.name}` : '—';
@@ -88,12 +89,12 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
       </p>
 
       <div className={styles.previewCard}>
-        <DocPaperPreview lines={11} code={`${codePreview} ${versionLabel}`} variant="thumbnail" />
+        <DocPaperPreview lines={11} code={`${codePreview} ${revisionCode}`} variant="thumbnail" />
         <div>
           <div className={styles.summaryHeaderRow}>
             <CodeChip>{codePreview}</CodeChip>
             <StatusPill status="draft" />
-            <span className="pill mono">v1</span>
+            <span className="pill mono">{revisionCode}</span>
           </div>
           <div className={styles.docTitle}>{title || '—'}</div>
           <div className={styles.fieldGrid}>
