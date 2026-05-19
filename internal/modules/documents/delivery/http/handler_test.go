@@ -447,6 +447,26 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 	}
 }
 
+func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
+	mux := newMux(t, &fakeSvc{commitErr: domain.ErrInvalidPageCount})
+
+	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","page_count":0}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Fatalf("want application/problem+json, got %s", ct)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid_page_count") {
+		t.Fatalf("expected invalid_page_count problem, got %s", rr.Body.String())
+	}
+}
+
 func TestForceReleaseSession_RequiresAdmin(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
