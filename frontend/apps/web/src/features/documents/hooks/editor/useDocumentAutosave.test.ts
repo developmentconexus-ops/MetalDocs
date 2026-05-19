@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useDocumentAutosave, type AutosaveArgs } from './useDocumentAutosave';
 import * as api from '../../api/documents';
 import * as idb from './useIndexedDBRestore';
@@ -41,6 +41,26 @@ describe('useDocumentAutosave', () => {
     });
     expect(result.current.status).toBe('saved');
     expect(args.onAdvanceBase).toHaveBeenCalledWith('rev-1');
+  });
+
+  it('sends page count to commit and emits returned artifact metadata', async () => {
+    const args = { ...baseArgs(), onArtifactMetadata: vi.fn() };
+    vi.mocked(api.commitAutosave).mockResolvedValueOnce({
+      revision_id: 'rev-1',
+      revision_num: 2,
+      file_size_bytes: 1304,
+      page_count: 3,
+      page_count_source: 'eigenpal_client',
+    });
+    const { result } = renderHook(() => useDocumentAutosave(args));
+
+    await act(async () => {
+      await result.current.queue(new ArrayBuffer(4), { field: 'val' }, 3);
+      await result.current.flush();
+    });
+
+    expect(api.commitAutosave).toHaveBeenCalledWith('doc-1', expect.objectContaining({ page_count: 3 }));
+    expect(args.onArtifactMetadata).toHaveBeenCalledWith({ fileSizeBytes: 1304, pageCount: 3 });
   });
 
   it('409 stale_base -> onSessionLost stale_base, status stale', async () => {
@@ -154,7 +174,7 @@ describe('useDocumentAutosave', () => {
     vi.mocked(idb.getAllPending).mockResolvedValueOnce([leftover as any]);
     renderHook(() => useDocumentAutosave(args));
     // Recovery runs asynchronously on mount -- verify commit was called
-    await vi.waitFor(() => expect(api.commitAutosave).toHaveBeenCalled());
+    await waitFor(() => expect(api.commitAutosave).toHaveBeenCalled());
     expect(idb.deletePending).toHaveBeenCalledWith('doc-1', 'abc');
   });
 

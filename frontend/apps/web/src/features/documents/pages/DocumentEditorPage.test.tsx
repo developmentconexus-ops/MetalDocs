@@ -27,6 +27,9 @@ vi.mock('@metaldocs/editor-ui', () => ({
       async getDocumentBuffer() {
         return null;
       },
+      getPageCount() {
+        return 3;
+      },
       focus() {},
     }));
     return (
@@ -308,7 +311,7 @@ describe('DocumentEditorPage autosave wiring', () => {
       await props.onAutoSave?.(emittedBuffer);
     });
 
-    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' });
+    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' }, 3);
   });
 
   it('saves dirty editor content before submitting the governed revision', async () => {
@@ -341,7 +344,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
-    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' });
+    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' }, 3);
     expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', { revisionTitle: 'Atualizacao de procedimento' }));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
@@ -428,7 +431,7 @@ describe('DocumentEditorPage autosave wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
-    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' });
+    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' }, 3);
     expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1);
     expect(toastSpy).toHaveBeenCalledWith('Erro ao salvar documento antes da submissão.');
     expect(vi.mocked(api.finalizeDocument)).not.toHaveBeenCalled();
@@ -474,7 +477,7 @@ describe('DocumentEditorPage load failure state', () => {
     );
 
     expect(screen.queryByTestId('editor')).toBeNull();
-    expect(screen.queryByText('Metadados')).toBeNull();
+    expect(screen.queryByText('Identificacao')).toBeNull();
     expect(screen.queryByText('Próximos aprovadores')).toBeNull();
   });
 
@@ -501,7 +504,7 @@ describe('DocumentEditorPage load failure state', () => {
 
     expect(screen.getAllByText('C-001').length).toBeGreaterThan(0);
     expect(screen.getByText('Original')).toBeTruthy();
-    expect(screen.getByText('Metadados')).toBeTruthy();
+    expect(screen.getByText('Identificacao')).toBeTruthy();
     expect(screen.queryByTestId('editor')).toBeNull();
     expect(screen.queryByText('http_403')).toBeNull();
     expect(screen.queryByText('missing_signed_url')).toBeNull();

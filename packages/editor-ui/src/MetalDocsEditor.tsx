@@ -25,6 +25,11 @@ export const MetalDocsEditor = forwardRef<MetalDocsEditorRef, MetalDocsEditorPro
         if (!inner.current) return null;
         return (await inner.current.save()) ?? null;
       },
+      getPageCount() {
+        if (!inner.current) return null;
+        const total = inner.current.getTotalPages();
+        return Number.isInteger(total) && total > 0 ? total : null;
+      },
       focus() {},
     }), []);
 

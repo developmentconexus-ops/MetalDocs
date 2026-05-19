@@ -38,6 +38,29 @@ const APPROVAL_BADGE_LABELS: Record<string, string> = {
 
 const MAX_COLLAPSED_HISTORY_ITEMS = 3;
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(value)} ${units[unitIndex]}`;
+}
+
+function formatPageSizeSummary(pageCount?: number | null, fileSizeBytes?: number | null): string | null {
+  const parts: string[] = [];
+  if (typeof pageCount === 'number' && Number.isFinite(pageCount) && pageCount > 0) {
+    parts.push(`${pageCount} ${pageCount === 1 ? 'pagina' : 'paginas'}`);
+  }
+  if (typeof fileSizeBytes === 'number' && Number.isFinite(fileSizeBytes) && fileSizeBytes >= 0) {
+    parts.push(formatFileSize(fileSizeBytes));
+  }
+  return parts.length ? parts.join(' \u00b7 ') : null;
+}
+
 type EditorMetaSidebarProps = {
   open: boolean;
   onToggle: () => void;
@@ -45,6 +68,8 @@ type EditorMetaSidebarProps = {
   profileLabel?: string;
   areaLabel?: string;
   visibilityLabel?: string;
+  fileSizeBytes?: number | null;
+  pageCount?: number | null;
   history?: EditorSidebarRevisionItem[];
   approvalChain?: { stages: EditorSidebarApprovalStage[] } | null;
   documentStatus?: string;
@@ -57,11 +82,14 @@ export function EditorMetaSidebar({
   profileLabel,
   areaLabel,
   visibilityLabel,
+  fileSizeBytes,
+  pageCount,
   history = [],
   approvalChain = null,
   documentStatus = '',
 }: EditorMetaSidebarProps) {
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  const pageSizeSummary = formatPageSizeSummary(pageCount, fileSizeBytes);
   const recentNonCurrentHistory = [...history]
     .filter((item) => !item.isCurrent)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -111,6 +139,12 @@ export function EditorMetaSidebar({
                   <span className={styles.metaLabel}>Visibilidade</span>
                   <span className={styles.metaValue}>{visibilityLabel ?? '---'}</span>
                 </div>
+                {pageSizeSummary ? (
+                  <div className={styles.metaRow}>
+                    <span className={styles.metaLabel}>Paginas</span>
+                    <span className={styles.metaValue}>{pageSizeSummary}</span>
+                  </div>
+                ) : null}
               </div>
             </section>
             <div className={styles.divider} />

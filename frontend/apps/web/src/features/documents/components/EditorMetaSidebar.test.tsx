@@ -12,6 +12,8 @@ describe('EditorMetaSidebar', () => {
         profileLabel="Procedimento Operacional"
         areaLabel="Recursos Humanos"
         visibilityLabel="Restrito a area Recursos Humanos"
+        pageCount={3}
+        fileSizeBytes={1304}
         history={[
           {
             documentId: 'doc-2',
@@ -43,6 +45,8 @@ describe('EditorMetaSidebar', () => {
     expect(screen.getByText('Procedimento Operacional')).toBeInTheDocument();
     expect(screen.getByText('Recursos Humanos')).toBeInTheDocument();
     expect(screen.getByText('Restrito a area Recursos Humanos')).toBeInTheDocument();
+    expect(screen.getByText('Paginas')).toBeInTheDocument();
+    expect(screen.getByText('3 paginas \u00b7 1,3 KB')).toBeInTheDocument();
     expect(screen.getByText('REV01')).toBeInTheDocument();
     expect(screen.getByText('Ajuste operacional')).toBeInTheDocument();
     expect(screen.queryByText(/Draft|Em revis/i)).not.toBeInTheDocument();

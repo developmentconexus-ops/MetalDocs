@@ -9,6 +9,7 @@ export interface AutosaveArgs {
   sessionID: string;
   baseRevisionID: string;
   onAdvanceBase: (newRevisionID: string) => void;
+  onArtifactMetadata?: (metadata: { fileSizeBytes?: number | null; pageCount?: number | null }) => void;
   onSessionLost: (reason: 'stale_base' | 'session_inactive' | 'force_released') => void;
 }
 
@@ -20,9 +21,10 @@ async function sha256Hex(buf: ArrayBuffer): Promise<string> {
 }
 
 export function useDocumentAutosave(args: AutosaveArgs) {
-  const { documentID, sessionID, baseRevisionID, onAdvanceBase, onSessionLost } = args;
+  const { documentID, sessionID, baseRevisionID, onAdvanceBase, onArtifactMetadata, onSessionLost } = args;
   const pending = useRef<ArrayBuffer | null>(null);
   const pendingHash = useRef<string>('');
+  const pendingPageCount = useRef<number | null>(null);
   const formSnapshot = useRef<unknown>(null);
   const timer = useRef<number | null>(null);
   const [status, setStatus] = useState<AutosaveStatus>('idle');
@@ -63,10 +65,15 @@ export function useDocumentAutosave(args: AutosaveArgs) {
         session_id: sessionID,
         pending_upload_id: presigned.pending_upload_id,
         form_data_snapshot: formSnapshot.current,
+        page_count: pendingPageCount.current ?? undefined,
       });
       await deletePending(documentID, hash);
-      pending.current = null; pendingHash.current = '';
+      pending.current = null; pendingHash.current = ''; pendingPageCount.current = null;
       onAdvanceBase(commit.revision_id);
+      onArtifactMetadata?.({
+        fileSizeBytes: commit.file_size_bytes ?? null,
+        pageCount: commit.page_count ?? null,
+      });
       setStatus('saved');
       return true;
     } catch (e: any) {
@@ -80,28 +87,29 @@ export function useDocumentAutosave(args: AutosaveArgs) {
       if (e?.status === 410) {
         // upload_missing or expired_upload: the S3 object is gone.
         try { await deletePending(documentID, hash); } catch { /* ignore */ }
-        pending.current = null; pendingHash.current = '';
+        pending.current = null; pendingHash.current = ''; pendingPageCount.current = null;
         setStatus('error'); return false;
       }
       if (e?.status === 422) {
         // content_hash_mismatch: discard local pending.
         try { await deletePending(documentID, hash); } catch { /* ignore */ }
-        pending.current = null; pendingHash.current = '';
+        pending.current = null; pendingHash.current = ''; pendingPageCount.current = null;
         setStatus('error'); return false;
       }
       setStatus('error');
       return false;
     }
-  }, [documentID, sessionID, baseRevisionID, onAdvanceBase, onSessionLost]);
+  }, [documentID, sessionID, baseRevisionID, onAdvanceBase, onArtifactMetadata, onSessionLost]);
 
   const schedule = useCallback(() => {
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(flush, SYNC_DEBOUNCE_MS);
   }, [flush]);
 
-  const queue = useCallback(async (buf: ArrayBuffer, snapshot: unknown) => {
+  const queue = useCallback(async (buf: ArrayBuffer, snapshot: unknown, pageCount?: number | null) => {
     pending.current = buf;
     formSnapshot.current = snapshot;
+    pendingPageCount.current = pageCount ?? null;
     pendingHash.current = await sha256Hex(buf);
     setStatus('dirty');
     schedule();
