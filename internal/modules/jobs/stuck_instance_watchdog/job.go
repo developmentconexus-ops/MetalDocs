@@ -103,9 +103,11 @@ SELECT
     ai.tenant_id::text,
     ai.document_id::text,
     ai.submitted_by,
-    COALESCE(ar.on_eligibility_drift, '') AS drift_policy
+    COALESCE(asi.on_eligibility_drift_snapshot, '') AS drift_policy
 FROM approval_instances ai
-LEFT JOIN approval_routes ar ON ar.id = ai.route_id
+LEFT JOIN approval_stage_instances asi
+  ON asi.approval_instance_id = ai.id
+ AND asi.status = 'active'
 WHERE ai.status = 'in_progress'
   AND ai.submitted_at < now() - interval '7 days'
 LIMIT $1`, BatchSize)

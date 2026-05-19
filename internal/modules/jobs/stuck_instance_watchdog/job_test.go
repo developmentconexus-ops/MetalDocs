@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -198,6 +199,21 @@ func TestWatchdog_NoStuck(t *testing.T) {
 	}
 	if got := emitter.count(); got != 0 {
 		t.Fatalf("alerts emitted = %d, want 0", got)
+	}
+}
+
+func TestListStuckInstances_UsesStageSnapshotDriftPolicy(t *testing.T) {
+	src, err := os.ReadFile("job.go")
+	if err != nil {
+		t.Fatalf("read job.go: %v", err)
+	}
+
+	body := string(src)
+	if strings.Contains(body, "ar.on_eligibility_drift") {
+		t.Fatal("watchdog must not read on_eligibility_drift from approval_routes; the column belongs to route stages/stage snapshots")
+	}
+	if !strings.Contains(body, "asi.on_eligibility_drift_snapshot") {
+		t.Fatal("watchdog must read drift policy from active approval_stage_instances snapshot")
 	}
 }
 

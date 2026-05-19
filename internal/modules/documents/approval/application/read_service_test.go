@@ -2,11 +2,36 @@ package application
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
+
+func TestReadService_LoadsLockedApprovalInstancesOutsideReadOnlyTransactions(t *testing.T) {
+	source, err := os.ReadFile("read_service.go")
+	if err != nil {
+		t.Fatalf("read read_service.go: %v", err)
+	}
+
+	text := string(source)
+	for _, fn := range []string{"LoadInstance", "LoadActiveInstanceByDocument", "ListPendingForActor"} {
+		start := strings.Index(text, "func (s *ReadService) "+fn)
+		if start < 0 {
+			t.Fatalf("missing %s", fn)
+		}
+		body := text[start:]
+		next := strings.Index(body[len("func "):], "\nfunc ")
+		if next >= 0 {
+			body = body[:len("func ")+next]
+		}
+		if strings.Contains(body, "ReadOnly: true") {
+			t.Fatalf("%s must not open a read-only transaction because approval repository stage loads use SELECT ... FOR UPDATE", fn)
+		}
+	}
+}
 
 func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 	db, mock, err := sqlmock.New()
