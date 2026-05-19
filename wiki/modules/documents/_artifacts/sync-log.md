@@ -78,8 +78,8 @@
 ### 2026-05-19 review follow-up
 
 - **Context:** code-review follow-up for commits through `12431266`.
-- **Changes:** `GET /api/v1/documents/{id}` now exposes governed `RevisionNumber`; editor submission title gating uses `RevisionNumber` instead of technical `RevisionVersion`; approval submission hashes use governed `RevisionNumber` instead of technical `RevisionVersion`; finalize profile prerequisite and invalid autosave page-count errors now use the API problem envelope; autosave request/response wrapper types derive from generated OpenAPI operations; baseline/migration truth for zero-based revision numbers no longer rewrites `updated_at`.
-- **Verification:** focused documents frontend tests, frontend build typecheck, `go generate ./internal/modules/documents/api/...`, `go test -vet=off ./internal/modules/documents/... -count=1`, and DB dictionary coverage passed. Redocly lint remained blocked by local `npm ECOMPROMISED` before execution.
+- **Changes:** `GET /api/v1/documents/{id}` now exposes governed `RevisionNumber`; editor submission title gating uses `RevisionNumber` instead of technical `RevisionVersion`; approval submission hashes use governed `RevisionNumber` instead of technical `RevisionVersion`; finalize profile prerequisite and invalid autosave page-count errors now use the API problem envelope; autosave request/response wrapper types derive from generated OpenAPI operations; baseline/migration truth for zero-based revision numbers no longer rewrites `updated_at` and uses a two-phase shift to avoid transient unique-index collisions.
+- **Verification:** focused documents frontend tests, frontend build typecheck, `go generate ./internal/modules/documents/api/...`, `go test -vet=off ./internal/modules/documents/... -count=1`, DB dictionary coverage, and `go test -tags integration -vet=off ./internal/platform/migrate -run TestDocumentsRevisionNumberZeroBasedShiftAvoidsUniqueCollisions -count=1` passed. Redocly lint remained blocked by local `npm ECOMPROMISED` before execution.
 
 ## 2026-05-15 - Novo Documento blank-template create tripwire repair
 
