@@ -36,7 +36,7 @@ func newReadService(repo repository.ApprovalRepository) *ReadService {
 
 // LoadInstance loads a single approval instance by ID for the given tenant.
 func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, actorID, instanceID string) (*domain.Instance, error) {
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("read load instance: begin tx: %w", err)
 	}
@@ -61,7 +61,7 @@ func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, ac
 
 // LoadActiveInstanceByDocument finds the current active approval instance for a document.
 func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.DB, tenantID, documentID string) (*domain.Instance, error) {
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("read load instance by document: begin tx: %w", err)
 	}
@@ -95,7 +95,7 @@ func (s *ReadService) ListPendingForActor(ctx context.Context, db *sql.DB, tenan
 		return nil, fmt.Errorf("list pending: marshal actor: %w", err)
 	}
 
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("list pending: begin tx: %w", err)
 	}
