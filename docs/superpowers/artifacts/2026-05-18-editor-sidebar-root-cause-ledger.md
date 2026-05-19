@@ -62,6 +62,51 @@ That is a `runtime prerequisite` discovery, not a feature behavior. The next E2E
 | B5 | Draft sidebar profile label sometimes showed raw `pop` before hydration | screen-local implementation | browser + TanStack Query | unconfirmed on clean runtime | not fixed |
 | B6 | Approval instance query was requested while document was draft in one runtime log | screen-local implementation | logs + frontend code | unconfirmed on clean runtime | not fixed |
 | B7 | `scripts/start-api.ps1` held the shell until timeout while API was healthy | workflow/tooling gap | execution truth | confirmed on clean runtime | not fixed |
+| B8 | Approval route creator / automatic route assignment needed verification after legacy-memory concern | runtime prerequisite + shared contract prerequisite | runtime + DB + OpenAPI + frontend code + wiki | confirmed: runtime route catalog exists and finalize resolves by `controlled_documents.profile_code`; contract/wiki/frontend drift remains | investigation added; fixes pending |
+| B9 | Approval route admin UI still defaults stage `required_capability` to legacy `doc.signoff` while runtime IAM uses `document.signoff` | screen-local implementation + wiki-memory drift | frontend code + DB runtime + IAM model + wiki | confirmed by source scan; current seeded runtime row is correct (`document.signoff`) | not fixed |
+
+## Approval Route Creator / Profile Binding Debug Addendum
+
+User memory was correct: MetalDocs still has an approval route catalog and the intended product model is profile-driven route assignment, not author-selected approvers.
+
+Runtime truth gathered on 2026-05-19:
+
+```text
+approval_routes:
+- profile_code=pop
+- name=POP E2E Approval Route
+- active=true
+- version=1
+
+approval_route_stages:
+- stage_order=1
+- name=Aprovacao
+- required_role=approver
+- required_capability=document.signoff
+- area_code=general
+- quorum=any_1_of
+- on_eligibility_drift=fail_stage
+```
+
+Code/runtime truth:
+
+- `POST /api/v1/documents/{id}/finalize` reads the document's `controlled_document_id`, loads `controlled_documents.profile_code`, then selects the newest active row in `approval_routes` for that profile before calling `SubmitRevisionForReview`.
+- `RouteAdminService` supports create/update/deactivate of routes and persists route stages.
+- Frontend route admin exists at `/approval-routes` through `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx`.
+- OpenAPI/generated surfaces now include `/api/v1/approval/routes`, but some wiki/module text still says these routes are spec missing.
+
+Mismatches to carry into full debug:
+
+- `screen-local implementation`: `RouteAdminPage` uses legacy `doc.signoff` defaults/fallbacks, while current IAM capability truth is `document.signoff`.
+- `wiki-memory drift`: `wiki/modules/approval.md`, `wiki/concepts/authz-tiers.md`, and older workflow notes still reference `doc.submit` / `doc.signoff` in places where current code uses `document.submit` / `document.signoff`.
+- `shared contract prerequisite`: route admin should be reviewed against generated OpenAPI/frontend types; `frontend/features/approval/api/approvalTypes.ts` remains handwritten despite generated route operations existing.
+- `runtime prerequisite`: E2E setup must ensure a profile has an active route and at least one eligible actor in the route stage area/role before testing submit/finalize.
+
+Important product conclusion:
+
+- The document author should not need to manually choose approvers in the editor finalize flow.
+- The route is selected automatically by document profile.
+- Manual route selection that remains in older approval panels should be treated as legacy/screen-specific and must not be reintroduced into the governed editor sidebar flow without a new product decision.
 
 ## Next Evidence Needed
 
@@ -69,4 +114,5 @@ That is a `runtime prerequisite` discovery, not a feature behavior. The next E2E
 - Create a document through the real document wizard.
 - Re-check `documents.created_by`, `documents.active_session_id`, and `editor_sessions.user_id`.
 - Validate editor sidebar draft behavior against runtime API payloads.
+- Validate route admin UI/API creates a route using current capability namespace (`document.signoff`) and that finalize automatically binds by profile without manual approver selection.
 - Only then decide whether B2/B5/B6 require code changes.
