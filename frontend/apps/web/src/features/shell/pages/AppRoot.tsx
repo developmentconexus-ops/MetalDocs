@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import * as authApi from '../../auth/api/auth';
 import { onAuthExpired } from '../../../lib/api';
@@ -29,16 +29,20 @@ export function AppRoot() {
   const authState = useAuthStore((s) => s.authState);
   const setAuthState = useAuthStore((s) => s.setAuthState);
   const setUser = useAuthStore((s) => s.setUser);
+  const [hasBootstrapped, setHasBootstrapped] = useState(false);
 
   // Bootstrap: call me() once on mount to hydrate auth state.
   useEffect(() => {
     async function bootstrap() {
+      setAuthState('loading');
       try {
         const user = await authApi.me();
         setUser(user);
         setAuthState('ready');
       } catch (err) {
         setAuthState(statusOf(err) === 401 ? 'idle' : 'error');
+      } finally {
+        setHasBootstrapped(true);
       }
     }
     void bootstrap();
@@ -55,7 +59,7 @@ export function AppRoot() {
     });
   }, [setAuthState, setUser]);
 
-  if (authState === 'loading') return <FullPageSpinner />;
+  if (!hasBootstrapped || authState === 'loading') return <FullPageSpinner />;
   if (authState === 'idle') return <Navigate to="/login" replace />;
   if (authState === 'error') {
     return (

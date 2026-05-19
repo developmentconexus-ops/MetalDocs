@@ -3,15 +3,15 @@ import { DocumentEditorPage } from "./DocumentEditorPage";
 
 export function Component() {
   const navigate = useNavigate();
-  const { documentID } = useParams();
+  const { documentId } = useParams();
 
-  if (!documentID) {
+  if (!documentId) {
     return null;
   }
 
   return (
     <DocumentEditorPage
-      documentID={documentID}
+      documentID={documentId}
       onDone={() => {
         navigate("/controlled-documents");
       }}

@@ -53,6 +53,16 @@ describe('AppRoot', () => {
     expect(screen.getByRole('status')).toBeTruthy();
   });
 
+  it('does not redirect protected routes before session bootstrap completes', () => {
+    useAuthStore.setState({ authState: 'idle', user: null });
+    vi.mocked(authApi.me).mockImplementation(() => new Promise(() => {}));
+
+    render(<AppRoot />, { wrapper });
+
+    expect(screen.getByRole('status')).toBeTruthy();
+    expect(screen.queryByText('Login Page')).toBeNull();
+  });
+
   it('redirects to /login when me() returns 401', async () => {
     vi.mocked(authApi.me).mockRejectedValue(
       Object.assign(new Error('unauth'), { status: 401 }),

@@ -47,6 +47,11 @@ export const documentsRoutes: RouteObject[] = [
     lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.RecentDocumentsPage })),
   },
   {
+    path: "documents/:documentId/edit",
+    handle: { workspaceView: "document-editor" },
+    lazy: () => import("./pages/DocumentEditorRoutePage"),
+  },
+  {
     path: 'documents/:documentId',
     handle: { workspaceView: 'library' },
     lazy: () => import('./pages/DocumentDetailLayout').then(m => ({ Component: m.DocumentDetailLayout })),
@@ -65,10 +70,5 @@ export const documentsRoutes: RouteObject[] = [
     path: "documents/new",
     handle: { workspaceView: "document-editor" },
     lazy: () => import("./pages/NewDocumentWizardPage").then((m) => ({ Component: m.NewDocumentWizardPage })),
-  },
-  {
-    path: "documents/:documentID/edit",
-    handle: { workspaceView: "document-editor" },
-    lazy: () => import("./pages/DocumentEditorRoutePage"),
   },
 ];
