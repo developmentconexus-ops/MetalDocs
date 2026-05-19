@@ -5,7 +5,7 @@
 > **Owner:** documents
 
 ## Purpose
-Current curated-baseline table owned by `documents`. See the owning module wiki and runtime repositories for business behavior.
+Technical/autosave artifact-revision storage owned by `documents`. This table is not governed business revision history; business/governed lineage remains sourced from `public.documents` revision state.
 
 ## Columns
 
@@ -19,6 +19,9 @@ Current curated-baseline table owned by `documents`. See the owning module wiki 
 | `storage_key` | `text` | no | Baseline column. |
 | `content_hash` | `text` | no | Baseline column. |
 | `form_data_snapshot` | `jsonb` | yes | Baseline column. |
+| `file_size_bytes` | `bigint` | yes | Server-authoritative size in bytes of the saved DOCX artifact for this technical revision row. |
+| `page_count` | `integer` | yes | Client- or server-derived rendered page count for this saved technical revision row. |
+| `page_count_source` | `text` | yes | Provenance for `page_count`; allowed values are `eigenpal_client` and `server_renderer`. |
 | `created_at` | `timestamp with time zone` | no | Baseline column. |
 
 ## Baseline Definition
