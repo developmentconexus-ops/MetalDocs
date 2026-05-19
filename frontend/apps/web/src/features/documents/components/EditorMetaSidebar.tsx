@@ -90,95 +90,101 @@ export function EditorMetaSidebar({
       </button>
       {open && (
         <aside className={styles.sidebar} aria-label="Metadados do documento">
-          <section className={styles.section}>
-            <div className={styles.sectionHeader}>Metadados</div>
-            <div className={styles.metaRows}>
-              {code ? (
-                <div className={styles.metaRow}>
-                  <span className={styles.metaLabel}>Codigo</span>
-                  <CodeChip>{code}</CodeChip>
-                </div>
-              ) : null}
-              <div className={styles.metaRow}>
-                <span className={styles.metaLabel}>Perfil</span>
-                <span className={styles.metaValue}>{profileLabel ?? '---'}</span>
-              </div>
-              <div className={styles.metaRow}>
-                <span className={styles.metaLabel}>Area</span>
-                <span className={styles.metaValue}>{areaLabel ?? '---'}</span>
-              </div>
-              <div className={styles.metaRow}>
-                <span className={styles.metaLabel}>Visibilidade</span>
-                <span className={styles.metaValue}>{visibilityLabel ?? '---'}</span>
-              </div>
-            </div>
-          </section>
-          <div className={styles.divider} />
-          <section className={styles.section}>
-            <div className={styles.sectionHeader}>Revisoes</div>
-            <div className={styles.revisionList} aria-label="Historico de revisoes">
-              {visibleHistory.map((item) => (
-                <div
-                  key={item.documentId}
-                  className={`${styles.revisionRow} ${item.isCurrent ? styles.revisionRowCurrent : ''}`}
-                >
-                  <span className={styles.revisionMarker} aria-hidden="true" />
-                  <div className={styles.revisionBody}>
-                    <span className={styles.revisionCode}>{item.revisionCode}</span>
-                    <span className={styles.revisionTitle}>
-                      {displayRevisionTitle(item.revisionTitle, item.revisionCode)}
-                    </span>
+          <div className={styles.panelFrame}>
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>Metadados</div>
+              <div className={styles.metaRows}>
+                {code ? (
+                  <div className={styles.metaRow}>
+                    <span className={styles.metaLabel}>Codigo</span>
+                    <CodeChip>{code}</CodeChip>
                   </div>
-                  <time className={styles.revisionDate} dateTime={item.createdAt}>
-                    {formatShortDate(item.createdAt)}
-                  </time>
+                ) : null}
+                <div className={styles.metaRow}>
+                  <span className={styles.metaLabel}>Perfil</span>
+                  <span className={styles.metaValue}>{profileLabel ?? '---'}</span>
                 </div>
-              ))}
-            </div>
-            {history.length > MAX_COLLAPSED_HISTORY_ITEMS ? (
-              <button
-                type="button"
-                className={styles.historyToggle}
-                onClick={() => setHistoryExpanded((expanded) => !expanded)}
-              >
-                {historyExpanded ? 'Ver menos revisoes' : 'Ver todas as revisoes'}
-              </button>
-            ) : null}
-          </section>
-          {documentStatus === 'under_review' && approvalChain ? (
-            <>
-              <div className={styles.divider} />
-              <section className={styles.section}>
-                <div className={styles.sectionHeader}>Proximos aprovadores</div>
-                <div className={styles.approverList}>
-                  {approvalChain.stages.map((stage) => {
-                    return stage.actors.map((actor) => {
-                      const badgeClassName =
-                        actor.status === 'approved'
-                          ? styles.approverBadgeApproved
-                          : actor.status === 'rejected'
-                            ? styles.approverBadgeRejected
-                            : actor.status === 'active'
-                              ? styles.approverBadgeNext
-                              : styles.approverBadgeWait;
-                      return (
-                        <div key={`${stage.id}:${actor.user_id}:${actor.status}`} className={styles.approverRow}>
-                          <Avatar name={actor.display_name} size="sm" />
-                          <div className={styles.approverInfo}>
-                            <span className={styles.approverName}>{actor.display_name}</span>
-                            <span className={styles.approverRole}>{stage.label}</span>
+                <div className={styles.metaRow}>
+                  <span className={styles.metaLabel}>Area</span>
+                  <span className={styles.metaValue}>{areaLabel ?? '---'}</span>
+                </div>
+                <div className={styles.metaRow}>
+                  <span className={styles.metaLabel}>Visibilidade</span>
+                  <span className={styles.metaValue}>{visibilityLabel ?? '---'}</span>
+                </div>
+              </div>
+            </section>
+            <div className={styles.divider} />
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>Revisoes</div>
+              <div className={styles.revisionList} aria-label="Historico de revisoes">
+                {visibleHistory.map((item) => (
+                  <div
+                    key={item.documentId}
+                    className={`${styles.revisionRow} ${item.isCurrent ? styles.revisionRowCurrent : ''}`}
+                  >
+                    <span className={styles.revisionMarker} aria-hidden="true" />
+                    <div className={styles.revisionBody}>
+                      <span className={styles.revisionCode}>{item.revisionCode}</span>
+                      <span className={styles.revisionTitle}>
+                        {displayRevisionTitle(item.revisionTitle, item.revisionCode)}
+                      </span>
+                    </div>
+                    <time className={styles.revisionDate} dateTime={item.createdAt}>
+                      {formatShortDate(item.createdAt)}
+                    </time>
+                  </div>
+                ))}
+              </div>
+              {history.length > MAX_COLLAPSED_HISTORY_ITEMS ? (
+                <button
+                  type="button"
+                  className={styles.historyToggle}
+                  onClick={() => setHistoryExpanded((expanded) => !expanded)}
+                >
+                  {historyExpanded ? 'Ver menos revisoes' : 'Ver todas as revisoes'}
+                </button>
+              ) : null}
+            </section>
+            {documentStatus === 'under_review' && approvalChain ? (
+              <>
+                <div className={styles.divider} />
+                <section className={styles.section}>
+                  <div className={styles.sectionHeader}>Proximos aprovadores</div>
+                  <div className={styles.approverList}>
+                    {approvalChain.stages.map((stage) => {
+                      return stage.actors.map((actor) => {
+                        const badgeClassName =
+                          actor.status === 'approved'
+                            ? styles.approverBadgeApproved
+                            : actor.status === 'rejected'
+                              ? styles.approverBadgeRejected
+                              : actor.status === 'active'
+                                ? styles.approverBadgeNext
+                                : styles.approverBadgeWait;
+                        return (
+                          <div key={`${stage.id}:${actor.user_id}:${actor.status}`} className={styles.approverRow}>
+                            <Avatar name={actor.display_name} size="sm" />
+                            <div className={styles.approverInfo}>
+                              <span className={styles.approverName}>{actor.display_name}</span>
+                              <span className={styles.approverRole}>{stage.label}</span>
+                            </div>
+                            <span className={`${styles.approverBadge} ${badgeClassName}`}>
+                              {APPROVAL_BADGE_LABELS[actor.status] ?? actor.status}
+                            </span>
                           </div>
-                          <span className={`${styles.approverBadge} ${badgeClassName}`}>
-                            {APPROVAL_BADGE_LABELS[actor.status] ?? actor.status}
-                          </span>
-                        </div>
-                      );
-                    });
-                  })}
-                </div>
-              </section>
-            </>
-          ) : null}
+                        );
+                      });
+                    })}
+                  </div>
+                </section>
+              </>
+            ) : null}
+            <div className={styles.panelFill} aria-hidden="true">
+              <span className={styles.panelFillLine} />
+              <span className={styles.panelFillText}>Dossie governado</span>
+            </div>
+          </div>
         </aside>
       )}
     </div>

@@ -66,6 +66,25 @@ describe('EditorMetaSidebar', () => {
     expect(screen.queryByText(/Draft|Em revis/i)).not.toBeInTheDocument();
   });
 
+  it('keeps a governed dossier fill area when sidebar content is short', () => {
+    render(
+      <EditorMetaSidebar
+        open
+        onToggle={() => {}}
+        history={[{
+          documentId: 'doc-1',
+          revisionCode: 'REV00',
+          revisionTitle: 'Criacao do documento',
+          status: 'draft',
+          createdAt: '2026-05-19T10:00:00-03:00',
+          isCurrent: true,
+        }]}
+      />,
+    );
+
+    expect(screen.getByText('Dossie governado')).toBeInTheDocument();
+  });
+
   it('collapses long governed histories and can expand them', async () => {
     const history = Array.from({ length: 5 }, (_, index) => ({
       documentId: `doc-${index}`,
