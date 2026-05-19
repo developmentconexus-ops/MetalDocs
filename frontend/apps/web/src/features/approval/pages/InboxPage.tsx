@@ -52,8 +52,18 @@ export function InboxPage() {
     setSelectedIdx((prev) => Math.max(prev - 1, 0));
   }
 
-  function openDocument(item: InboxItem) {
-    navigate(`/controlled-documents/${item.controlled_document_id}`);
+  async function openDocument(item: InboxItem) {
+    setActionError(null);
+    try {
+      const active = await getActiveDocumentContext(item.controlled_document_id);
+      if (!active?.documentId) {
+        setActionError('Documento indisponivel no editor moderno no momento.');
+        return;
+      }
+      navigate(`/documents/${active.documentId}/edit`);
+    } catch {
+      setActionError('Documento indisponivel no editor moderno no momento.');
+    }
   }
 
   async function openDecisionFlow(item: InboxItem, initialDecision: 'approve' | 'reject') {
@@ -91,7 +101,12 @@ export function InboxPage() {
         </div>
       ) : null}
       {view === 'timeline' ? (
-        <InboxTimeline items={items} onOpenDocument={openDocument} />
+        <InboxTimeline
+          items={items}
+          onOpenDocument={(item) => {
+            void openDocument(item);
+          }}
+        />
       ) : (
         <InboxStack
           items={items}
@@ -101,7 +116,9 @@ export function InboxPage() {
           onPrev={handlePrev}
           isLoading={isLoading}
           isError={isError}
-          onOpenDocument={openDocument}
+          onOpenDocument={(item) => {
+            void openDocument(item);
+          }}
           onApprove={(item) => {
             void openDecisionFlow(item, 'approve');
           }}

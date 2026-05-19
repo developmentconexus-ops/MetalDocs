@@ -128,6 +128,12 @@ vi.mock('../api/documents', () => ({
   getApprovalInstance: vi.fn().mockResolvedValue({ stages: [] }),
   renameDocument: vi.fn().mockResolvedValue(undefined),
   signedRevisionURL: vi.fn().mockReturnValue('/revisions/r1/signed-url'),
+  syncArtifactMetadata: vi.fn().mockResolvedValue({
+    revision_id: 'r1',
+    file_size_bytes: 1304,
+    page_count: 3,
+    page_count_source: 'eigenpal_client',
+  }),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -291,6 +297,28 @@ describe('DocumentEditorPage E9 rename rollback', () => {
 });
 
 describe('DocumentEditorPage autosave wiring', () => {
+  it('keeps submit transition inside modern flow without delegating legacy navigation side effects', async () => {
+    const onDone = vi.fn();
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      RevisionNumber: 0,
+      RevisionVersion: 0,
+      revision_number: 0,
+      revision_version: 0,
+    }) as never);
+    vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+
   it('queues the buffer provided by MetalDocsEditor without re-reading the editor ref', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
       FormDataJSON: { foo: 'bar' },
@@ -312,6 +340,30 @@ describe('DocumentEditorPage autosave wiring', () => {
     });
 
     expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' }, 3);
+  });
+
+  it('syncs missing artifact metadata on first draft load without waiting for content edits', async () => {
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      currentRevisionFileSizeBytes: null,
+      currentRevisionPageCount: null,
+      currentRevisionPageCountSource: null,
+    }) as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    await waitFor(() =>
+      expect(vi.mocked(api.syncArtifactMetadata)).toHaveBeenCalledWith('d1', {
+        session_id: 's1',
+        page_count: null,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByText('3 paginas · 1,3 KB')).toBeTruthy(),
+    );
   });
 
   it('saves dirty editor content before submitting the governed revision', async () => {

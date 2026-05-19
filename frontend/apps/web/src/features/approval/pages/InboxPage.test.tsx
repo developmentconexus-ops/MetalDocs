@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNextSelectedIdx, InboxPage } from './InboxPage';
 import type { InboxItem } from '../api/approvalTypes';
-import { getActiveDocumentContext } from '../api/approvalApi';
+import { getActiveDocumentContext, signoff } from '../api/approvalApi';
 
 const navigateMock = vi.fn();
 
@@ -21,6 +21,7 @@ vi.mock('../api/approvalApi', async () => {
   return {
     ...actual,
     getActiveDocumentContext: vi.fn(),
+    signoff: vi.fn(),
   };
 });
 
@@ -204,7 +205,12 @@ describe('InboxPage', () => {
     expect(screen.queryByText('POP-QUA-0148')).toBeNull();
   });
 
-  it('Abrir documento navigates to the registry detail route', async () => {
+  it('Abrir documento navigates to the modern editor route', async () => {
+    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+      documentId: 'doc-123',
+      contentHash: 'hash-123',
+      approvalInstanceId: 'inst-123',
+    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
       isLoading: false,
@@ -215,7 +221,51 @@ describe('InboxPage', () => {
     renderPage();
     fireEvent.click(screen.getByText('Abrir documento'));
 
-    expect(navigateMock).toHaveBeenCalledWith('/controlled-documents/cd-123');
+    await waitFor(() => {
+      expect(getActiveDocumentContext).toHaveBeenCalledWith('cd-123');
+    });
+    expect(navigateMock).toHaveBeenCalledWith('/documents/doc-123/edit');
+  });
+
+  it('Abrir documento keeps navigation in modern editor flow', async () => {
+    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+      documentId: 'doc-modern',
+      contentHash: 'hash-modern',
+      approvalInstanceId: 'inst-modern',
+    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem({ controlled_document_id: 'cd-modern' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Abrir documento'));
+
+    await waitFor(() => {
+      expect(getActiveDocumentContext).toHaveBeenCalledWith('cd-modern');
+    });
+    expect(navigateMock).toHaveBeenCalledWith('/documents/doc-modern/edit');
+    expect(navigateMock).not.toHaveBeenCalledWith('/controlled-documents/cd-modern');
+  });
+
+  it('Abrir documento shows modern-flow error when active context is unavailable', async () => {
+    vi.mocked(getActiveDocumentContext).mockRejectedValue(new Error('context unavailable'));
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem({ controlled_document_id: 'cd-fail' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Abrir documento'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Documento indisponivel no editor moderno no momento.');
+    });
+    expect(navigateMock).not.toHaveBeenCalledWith('/controlled-documents/cd-fail');
   });
 
   it('approve action opens signoff flow only when active-document context is complete', async () => {
@@ -257,5 +307,38 @@ describe('InboxPage', () => {
       expect(screen.getByText('Fluxo de aprovação indisponível para este documento no momento.')).toBeTruthy();
     });
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('refreshes the modern inbox after signoff without redirecting to legacy controlled-document screens', async () => {
+    vi.useFakeTimers();
+    const refetchSpy = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(signoff).mockResolvedValue(undefined as never);
+    vi.mocked(getActiveDocumentContext).mockResolvedValue({
+      documentId: 'doc-1',
+      contentHash: 'hash-1',
+      approvalInstanceId: 'inst-1',
+    } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
+    vi.mocked(useInboxQuery).mockReturnValue({
+      data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
+      isLoading: false,
+      isError: false,
+      refetch: refetchSpy,
+    } as unknown as ReturnType<typeof useInboxQuery>);
+
+    renderPage();
+    fireEvent.click(screen.getByText('Aprovar e assinar Ã¢â€ â€™'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
+
+    await waitFor(() => expect(vi.mocked(signoff)).toHaveBeenCalled());
+    vi.advanceTimersByTime(1600);
+    await waitFor(() => expect(refetchSpy).toHaveBeenCalledTimes(1));
+    expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/controlled-documents'));
+    vi.useRealTimers();
   });
 });
