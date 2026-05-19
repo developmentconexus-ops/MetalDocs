@@ -1,3 +1,19 @@
+## 2026-05-19 - editor sidebar identification visual sync
+
+- **Context:** uncommitted frontend diff for `EditorMetaSidebar` identity layout refinement.
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** frontend-only sidebar copy/style changed; no exported backend/API surface changed
+- **Routes/API:** none; page count/file size intentionally classified as DB/API/TanStack follow-up prerequisite before UI exposure
+- **Runtime flows:** editor sidebar still uses real document detail, governed revision history, and approval-chain data; no workflow behavior changed
+- **Persistence:** none
+- **Dependencies:** documents frontend remains feature-local under `frontend/apps/web/src/features/documents/components`
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8
+- **Tally gate:** PASS (severity count drift repaired; warnings remain for backlog rows T-007/T-010/T-011/T-012)
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
+
 ## 2026-05-15 - D4 hard-cutover wiki/docs sync
 
 ## 2026-05-17 - active v2 reference memory sync

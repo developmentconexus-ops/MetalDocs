@@ -35,6 +35,11 @@ describe('EditorMetaSidebar', () => {
       />,
     );
 
+    expect(screen.getByLabelText('Identificacao do documento')).toBeInTheDocument();
+    expect(screen.getByText('Identificacao')).toBeInTheDocument();
+    expect(screen.queryByText('Metadados')).not.toBeInTheDocument();
+    expect(screen.getByText('Tipo')).toBeInTheDocument();
+    expect(screen.getByText('Area responsavel')).toBeInTheDocument();
     expect(screen.getByText('Procedimento Operacional')).toBeInTheDocument();
     expect(screen.getByText('Recursos Humanos')).toBeInTheDocument();
     expect(screen.getByText('Restrito a area Recursos Humanos')).toBeInTheDocument();
