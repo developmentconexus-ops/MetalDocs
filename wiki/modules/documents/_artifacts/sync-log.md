@@ -59,6 +59,22 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-19 - Document revision artifact metadata runtime sync
+
+- **Context:** commits `ccdf7e16`, `14cd2005`, and `f1cf7988` from the 2026-05-19 artifact metadata plan; migration 0206/0207, documents API contract, generated frontend types, EigenPal wrapper page count, autosave commit plumbing, and editor sidebar rendering.
+- **Mode:** structural refresh
+- **Anchors moved:** none
+- **Public surface:** `DocumentDetailResponse` now exposes `currentRevisionFileSizeBytes`, `currentRevisionPageCount`, and `currentRevisionPageCountSource`; autosave commit response includes `file_size_bytes`, `page_count`, and `page_count_source`; `MetalDocsEditorRef` includes `getPageCount()`.
+- **Routes/API:** `POST /api/v1/documents/{id}/autosave/commit` accepts `page_count`; `GET /api/v1/documents/{id}` reads current-head artifact metadata through `documents.current_revision_id -> document_revisions`.
+- **Runtime flows:** editor autosave collects EigenPal page count client-side, backend computes saved DOCX size server-side, and sidebar renders pages/size from real API/runtime data only.
+- **Persistence:** `public.document_revisions` carries technical artifact metadata (`file_size_bytes`, `page_count`, `page_count_source`); governed revision history remains sourced from `public.documents` lineage by `controlled_document_id`.
+- **Dependencies:** EigenPal remains isolated behind `packages/editor-ui`; frontend documents feature consumes generated API contract via documents API wrapper/TanStack detail state.
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8
+- **Tally gate:** PASS before edits and after sync patch
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`; `wiki/database/tables/document_revisions.md` already updated in DB slice. `_artifacts/04-persistence.md` was not patched because it currently contains invalid UTF-8 bytes that block safe `apply_patch` editing.
+
 ## 2026-05-15 - Novo Documento blank-template create tripwire repair
 
 - **Context:** uncommitted runtime repair for Documents v2 initialization inside Registry atomic create

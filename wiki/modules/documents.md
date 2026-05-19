@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-19 (editor sidebar identification visual sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-19 (artifact metadata runtime sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -18,6 +18,8 @@
 - Placeholder snapshot pinned at submit â€” `wiki/concepts/placeholders.md`
 - `{name}` single-brace token substitution at freeze â€” `wiki/concepts/token-syntax.md`
 - Spec-as-source-of-truth for `/api/v1/documents/*` (in progress) â€” `wiki/decisions/0012-contract-first-api.md`
+
+- DOCX artifact metadata (`file_size_bytes`, `page_count`, `page_count_source`) is stored on technical `document_revisions`, exposed through document detail/autosave responses, and rendered in the editor sidebar from runtime API data.
 
 ### 1.2 Quality Goals
 
@@ -429,6 +431,11 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - `FreezeService` performs `{name}` token substitution at freeze (`wiki/concepts/token-syntax.md`).
 - `document_placeholder_values` schema bug surfaced: `revision_id REFERENCES documents(id)` (T-009).
 
+### 8.8 Artifact metadata
+- Technical DOCX revisions in `document_revisions` carry `file_size_bytes`, `page_count`, and `page_count_source`. `file_size_bytes` is server-authoritative for the saved object; `page_count` is currently supplied by EigenPal through `MetalDocsEditorRef.getPageCount()`; `page_count_source='eigenpal_client'` marks that provenance.
+- `POST /api/v1/documents/{id}/autosave/commit` accepts `page_count` and returns the persisted artifact metadata. `GET /api/v1/documents/{id}` surfaces the current head via `currentRevisionFileSizeBytes`, `currentRevisionPageCount`, and `currentRevisionPageCountSource`.
+- The editor sidebar renders `Paginas` from document detail/autosave runtime data only. It still uses governed history from `documents` lineage by `controlled_document_id`; technical `document_revisions` never become business revision history.
+
 ---
 
 ## 9. Architecture Decisions
@@ -485,7 +492,7 @@ Top 3 (by severity, then blast radius):
 |---|---|
 | Document | Governed revision row in `documents`, filled from a template version, bound to a controlled-document code |
 | Governed revision | Business revision lineage stored in `documents`, grouped by `controlled_document_id`, with zero-based `revision_number` (`0` = `REV00`) and frozen `revision_title` captured at finalize |
-| Technical revision | Autosave / artifact lineage in `document_revisions`; never the source of governed sidebar history |
+| Technical revision | Autosave / artifact lineage in `document_revisions`, including saved DOCX artifact metadata (`file_size_bytes`, `page_count`, `page_count_source`); never the source of governed sidebar history |
 | Checkpoint | Editor autosave point in `document_checkpoints` |
 | Snapshot (placeholder schema) | Pinned placeholder catalog stored in `placeholder_schema_snapshot`; required for `under_review` |
 | Approval instance | Row in `approval_instances`; one active per document via `ux_approval_instances_active` |
@@ -516,7 +523,8 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
-- 2026-05-19 - Editor sidebar identification layout sync: the editor sidebar now labels document identity as `Identificacao`, renders identity fields as stacked editorial labels (`Codigo`, `Tipo`, `Area responsavel`, `Visibilidade`), removes the extra outer sidebar padding, and intentionally does not show page count/file size until DB/API/TanStack runtime contract work exposes those values truthfully.
+- 2026-05-19 - Artifact metadata runtime sync: autosave technical revisions now persist DOCX `file_size_bytes`, `page_count`, and `page_count_source`; document detail/autosave responses expose current-head metadata; the editor collects EigenPal page count through `MetalDocsEditorRef.getPageCount()` and renders `Paginas`/size in the sidebar from runtime data.
+- 2026-05-19 - Editor sidebar identification layout sync: the editor sidebar now labels document identity as `Identificacao`, renders identity fields as stacked editorial labels (`Codigo`, `Tipo`, `Area responsavel`, `Visibilidade`), and removes the extra outer sidebar padding.
 - 2026-05-19 - Editor sidebar revision-title/density sync: `REV00` now uses the canonical initial governed title `Criacao do documento` when `revisionTitle` is omitted; later governed revisions still require `revisionTitle` at formal submission. The editor sidebar renders governed revision rows as code/title/date without inline workflow status, keeps draft approvers hidden, and collapses long governed histories without using technical `document_revisions`.
 - 2026-05-18 - Governed sidebar sync: `documents.revision_title` is now part of the runtime model and required on `POST /api/v1/documents/{id}/finalize`; the editor sidebar reads governed history from `GET /api/v1/documents/{id}/revision-history`, and that history is sourced from `documents` lineage by `controlled_document_id`, not from technical `document_revisions`.
 - 2026-05-18 - Approval/registry sidebar boundary sync: the editor consumes `GET /api/v1/documents/{id}/approval-instance` only for `under_review`, and visibility is resolved from the registry-controlled document contract instead of a documents-local duplicate field.
