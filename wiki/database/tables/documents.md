@@ -109,7 +109,7 @@ Current curated-baseline table owned by `documents`. See the owning module wiki 
 | `created_by` | `text` | no | Baseline column. |
 | `effective_from` | `timestamp with time zone` | yes | Baseline column. |
 | `effective_to` | `timestamp with time zone` | yes | Baseline column. |
-| `revision_number` | `integer` | no | Baseline column. |
+| `revision_number` | `integer` | no | Governed revision number within a controlled-document lineage. Since post-baseline migration `0205`, this is zero-based and maps directly to the `REVxx` suffix (`0` -> `REV00`). |
 | `revision_version` | `integer` | no | Baseline column. |
 | `content_hash_at_submit` | `text` | yes | Baseline column. |
 | `placeholder_schema_snapshot` | `jsonb` | yes | Baseline column. |
@@ -153,7 +153,7 @@ id uuid DEFAULT gen_random_uuid() NOT NULL,
     created_by text NOT NULL,
     effective_from timestamp with time zone,
     effective_to timestamp with time zone,
-    revision_number integer DEFAULT 1 NOT NULL,
+    revision_number integer DEFAULT 0 NOT NULL,
     revision_version integer DEFAULT 0 NOT NULL,
     content_hash_at_submit text,
     placeholder_schema_snapshot jsonb,
@@ -200,3 +200,5 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 ## Notes and Debt
 
 Retained in `public` because current runtime/baseline truth still uses it. Do not move schemas without an approved migration plan.
+
+Post-baseline migration `0205_documents_revision_number_zero_based.sql` changed `revision_number` from one-based allocation to zero-based persisted truth so business recovery from the database matches displayed labels directly (`REV00`, `REV01`, ...), without frontend offset rules.

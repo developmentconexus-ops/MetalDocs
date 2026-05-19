@@ -39,9 +39,9 @@ The governed revision sequence is the user-facing revision history.
 
 Visual format:
 
-- `revision_number = 1` -> `REV00`
-- `revision_number = 2` -> `REV01`
-- `revision_number = 3` -> `REV02`
+- `revision_number = 0` -> `REV00`
+- `revision_number = 1` -> `REV01`
+- `revision_number = 2` -> `REV02`
 
 Interpretation:
 
@@ -50,7 +50,7 @@ Interpretation:
 - the next governed draft becomes `REV01 · Draft`
 - then `REV01 · Publicada`, followed by `REV02 · Draft`, and so on
 
-The zero-padded `REVxx` string is presentation logic. Backend remains authoritative for `revision_number`; frontend derives `REV00`, `REV01`, etc. from that numeric value.
+The zero-padded `REVxx` string is presentation logic, but it must not hide an offset. Backend/database truth is zero-based `documents.revision_number`; frontend formats `REV00`, `REV01`, etc. directly from that persisted numeric value.
 
 ### 2.3 Revision title / reason
 
@@ -218,7 +218,7 @@ Retain existing useful fields:
 - `Status`
 - `Code`
 
-Do **not** add formatted `REV00` strings here. `RevisionVersion` remains the contract truth; frontend formats the badge.
+Do **not** add formatted `REV00` strings here. `revisionNumber` remains the contract truth for governed revision history; frontend formats the badge without applying an offset.
 
 ### 5.2 Add governed revision-history endpoint
 
