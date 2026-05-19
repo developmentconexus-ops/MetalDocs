@@ -282,7 +282,7 @@ describe('InboxPage', () => {
     } as unknown as ReturnType<typeof useInboxQuery>);
 
     renderPage();
-    fireEvent.click(screen.getByText('Aprovar e assinar →'));
+    fireEvent.click(screen.getByRole('button', { name: /Aprovar e assinar/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeTruthy();
@@ -300,7 +300,7 @@ describe('InboxPage', () => {
     } as unknown as ReturnType<typeof useInboxQuery>);
 
     renderPage();
-    fireEvent.click(screen.getByText('Aprovar e assinar →'));
+    fireEvent.click(screen.getByRole('button', { name: /Aprovar e assinar/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeTruthy();
@@ -310,7 +310,6 @@ describe('InboxPage', () => {
   });
 
   it('refreshes the modern inbox after signoff without redirecting to legacy controlled-document screens', async () => {
-    vi.useFakeTimers();
     const refetchSpy = vi.fn().mockResolvedValue(undefined);
     vi.mocked(signoff).mockResolvedValue(undefined as never);
     vi.mocked(getActiveDocumentContext).mockResolvedValue({
@@ -326,7 +325,7 @@ describe('InboxPage', () => {
     } as unknown as ReturnType<typeof useInboxQuery>);
 
     renderPage();
-    fireEvent.click(screen.getByText('Aprovar e assinar Ã¢â€ â€™'));
+    fireEvent.click(screen.getByRole('button', { name: /Aprovar e assinar/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeTruthy();
@@ -336,9 +335,8 @@ describe('InboxPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
 
     await waitFor(() => expect(vi.mocked(signoff)).toHaveBeenCalled());
-    vi.advanceTimersByTime(1600);
-    await waitFor(() => expect(refetchSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(refetchSpy).toHaveBeenCalledTimes(1), { timeout: 3000 });
     expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/controlled-documents'));
-    vi.useRealTimers();
   });
 });
+
