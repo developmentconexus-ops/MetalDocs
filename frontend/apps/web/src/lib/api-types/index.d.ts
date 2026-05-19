@@ -6719,7 +6719,8 @@ export interface components {
             signed_at: string;
         };
         FinalizeDocumentRequest: {
-            revisionTitle: string;
+            /** @description Required for governed revisions after REV00. Omit for REV00 to use the canonical initial title. */
+            revisionTitle?: string;
         };
         DocumentRevisionHistoryItem: {
             /** Format: uuid */

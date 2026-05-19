@@ -25,16 +25,21 @@
 .toggleTab:hover { background: var(--surface-3); color: var(--text-soft); }
 
 .sidebar {
-  width: 300px;
-  flex: 0 0 300px;
+  width: 280px;
+  flex: 0 0 280px;
   border-left: 1px solid var(--border);
-  background: var(--surface-2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(250, 247, 244, 0.97));
   overflow-y: auto;
-  padding: var(--sp-5) var(--sp-5);
+  padding: var(--sp-4);
 }
 
 .section {
-  margin-bottom: var(--sp-4);
+  padding: var(--sp-3) 0;
+}
+
+.section:first-child {
+  padding-top: 0;
 }
 
 .sectionHeader {
@@ -73,7 +78,81 @@
 .divider {
   height: 1px;
   background: var(--border);
-  margin: 0 calc(-1 * var(--sp-5)) var(--sp-4);
+  margin: 0 calc(-1 * var(--sp-4));
+}
+
+.revisionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.revisionRow {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 42px;
+  padding: var(--sp-2);
+  border: 1px solid rgba(80, 27, 42, 0.08);
+  border-radius: var(--r-2);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 1px 0 rgba(80, 27, 42, 0.03);
+}
+
+.revisionRowCurrent {
+  border-color: rgba(142, 41, 63, 0.18);
+  background: rgba(248, 239, 241, 0.86);
+}
+
+.revisionMarker {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--brand);
+  box-shadow: 0 0 0 4px rgba(142, 41, 63, 0.12);
+}
+
+.revisionBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.revisionCode {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.revisionTitle {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.revisionDate {
+  align-self: start;
+  color: var(--text-faint);
+  font-size: 0.625rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.historyToggle {
+  margin-top: var(--sp-2);
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  cursor: pointer;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
 }
 
 .approverList {

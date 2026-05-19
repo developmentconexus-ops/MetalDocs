@@ -484,7 +484,7 @@ Top 3 (by severity, then blast radius):
 | Term | Definition |
 |---|---|
 | Document | Governed revision row in `documents`, filled from a template version, bound to a controlled-document code |
-| Governed revision | Business revision lineage stored in `documents`, grouped by `controlled_document_id`, with `revision_number` and frozen `revision_title` captured at finalize |
+| Governed revision | Business revision lineage stored in `documents`, grouped by `controlled_document_id`, with zero-based `revision_number` (`0` = `REV00`) and frozen `revision_title` captured at finalize |
 | Technical revision | Autosave / artifact lineage in `document_revisions`; never the source of governed sidebar history |
 | Checkpoint | Editor autosave point in `document_checkpoints` |
 | Snapshot (placeholder schema) | Pinned placeholder catalog stored in `placeholder_schema_snapshot`; required for `under_review` |
@@ -516,6 +516,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-19 - Editor sidebar revision-title/density sync: `REV00` now uses the canonical initial governed title `Criacao do documento` when `revisionTitle` is omitted; later governed revisions still require `revisionTitle` at formal submission. The editor sidebar renders governed revision rows as code/title/date without inline workflow status, keeps draft approvers hidden, and collapses long governed histories without using technical `document_revisions`.
 - 2026-05-18 - Governed sidebar sync: `documents.revision_title` is now part of the runtime model and required on `POST /api/v1/documents/{id}/finalize`; the editor sidebar reads governed history from `GET /api/v1/documents/{id}/revision-history`, and that history is sourced from `documents` lineage by `controlled_document_id`, not from technical `document_revisions`.
 - 2026-05-18 - Approval/registry sidebar boundary sync: the editor consumes `GET /api/v1/documents/{id}/approval-instance` only for `under_review`, and visibility is resolved from the registry-controlled document contract instead of a documents-local duplicate field.
 - 2026-05-18 - Approval/review comments hardening sync: final approval now stops server-side with `approval.unresolved_comments` when active document comments remain unresolved; the signoff dialog maps that conflict inline and the editor keeps comment-load failures visible with a persistent retry banner instead of toast-only feedback.

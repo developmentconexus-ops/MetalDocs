@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DocumentEditorPage } from './DocumentEditorPage';
@@ -11,6 +11,7 @@ const mockState = vi.hoisted(() => ({
   autosaveQueueSpy: vi.fn(),
   editorSaveNowSpy: vi.fn(),
   autosaveFlushSpy: vi.fn(),
+  autosaveStatus: 'idle',
   commentsLoadError: null as string | null,
   retryCommentsSpy: vi.fn(),
 }));
@@ -54,7 +55,7 @@ vi.mock('../hooks/editor/useDocumentSession', () => ({
 
 vi.mock('../hooks/editor/useDocumentAutosave', () => ({
   useDocumentAutosave: () => ({
-    status: 'idle',
+    status: mockState.autosaveStatus,
     queue: mockState.autosaveQueueSpy,
     flush: mockState.autosaveFlushSpy,
   }),
@@ -160,8 +161,8 @@ function makeDoc(status: string, overrides: Record<string, unknown> = {}) {
     ControlledDocumentID: 'cd-1',
     ProfileCodeSnapshot: 'POP',
     ProcessAreaCodeSnapshot: 'RH',
-    RevisionVersion: 1,
-    revision_version: 1,
+    RevisionVersion: 0,
+    revision_version: 0,
     ...overrides,
   };
 }
@@ -193,6 +194,7 @@ beforeEach(() => {
   mockState.editorSaveNowSpy.mockResolvedValue(null);
   mockState.autosaveFlushSpy.mockReset();
   mockState.autosaveFlushSpy.mockResolvedValue(true);
+  mockState.autosaveStatus = 'idle';
   mockState.commentsLoadError = null;
   mockState.retryCommentsSpy.mockReset();
 });
@@ -302,19 +304,24 @@ describe('DocumentEditorPage autosave wiring', () => {
       onAutoSave?: (buf: ArrayBuffer) => Promise<void>;
     };
     const emittedBuffer = new Uint8Array([9, 8, 7]).buffer;
-    await props.onAutoSave?.(emittedBuffer);
+    await act(async () => {
+      await props.onAutoSave?.(emittedBuffer);
+    });
 
     expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' });
   });
 
-  it('forces an immediate editor save before finalize so latest bytes are queued', async () => {
+  it('saves dirty editor content before submitting the governed revision', async () => {
     const onDone = vi.fn();
+    const latestBuffer = new Uint8Array([1, 2, 3]).buffer;
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
       FormDataJSON: { foo: 'bar' },
       form_data: { foo: 'bar' },
+      RevisionVersion: 1,
+      revision_version: 1,
     }) as never);
-    const finalBuf = new Uint8Array([5, 4, 3]).buffer;
-    mockState.editorSaveNowSpy.mockResolvedValue(finalBuf);
+    mockState.autosaveStatus = 'dirty';
+    mockState.editorSaveNowSpy.mockResolvedValue(latestBuffer);
     vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
 
     renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
@@ -323,26 +330,28 @@ describe('DocumentEditorPage autosave wiring', () => {
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
 
+    const dirtyPropsWithChanges = mockState.editorProps.at(-1) as { onChange?: () => void };
+    act(() => {
+      dirtyPropsWithChanges.onChange?.();
+      dirtyPropsWithChanges.onChange?.();
+    });
+
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
     fireEvent.change(screen.getByLabelText('TÃ­tulo'), { target: { value: 'Atualizacao de procedimento' } });
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(finalBuf, { foo: 'bar' }));
-    await waitFor(() => expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1));
+    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' });
+    expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', { revisionTitle: 'Atualizacao de procedimento' }));
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
   });
 
-  it('does not finalize when flush fails', async () => {
+  it('does not block finalize on saveNow when the editor has no unsaved changes', async () => {
     const onDone = vi.fn();
-    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      FormDataJSON: { foo: 'bar' },
-      form_data: { foo: 'bar' },
-    }) as never);
-    const finalBuf = new Uint8Array([1, 2, 3]).buffer;
-    mockState.editorSaveNowSpy.mockResolvedValue(finalBuf);
-    mockState.autosaveFlushSpy.mockResolvedValue(false);
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    mockState.editorSaveNowSpy.mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
 
     renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
 
@@ -350,25 +359,98 @@ describe('DocumentEditorPage autosave wiring', () => {
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
 
+    const initialChangeProps = mockState.editorProps.at(-1) as { onChange?: () => void };
+    act(() => {
+      initialChangeProps.onChange?.();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    expect(mockState.editorSaveNowSpy).not.toHaveBeenCalled();
+    expect(mockState.autosaveFlushSpy).not.toHaveBeenCalled();
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not block finalize when the load-time editor change leaves autosave idle', async () => {
+    const onDone = vi.fn();
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    mockState.editorSaveNowSpy.mockImplementation(() => new Promise(() => {}));
+    vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    const loadProps = mockState.editorProps.at(-1) as { onChange?: () => void };
+    act(() => {
+      loadProps.onChange?.();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    expect(mockState.editorSaveNowSpy).not.toHaveBeenCalled();
+    expect(mockState.autosaveFlushSpy).not.toHaveBeenCalled();
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+
+  it('blocks governed revision submission when dirty content cannot be flushed', async () => {
+    const onDone = vi.fn();
+    const latestBuffer = new Uint8Array([4, 5, 6]).buffer;
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      FormDataJSON: { foo: 'bar' },
+      form_data: { foo: 'bar' },
+      RevisionVersion: 1,
+      revision_version: 1,
+    }) as never);
+    mockState.autosaveStatus = 'dirty';
+    mockState.editorSaveNowSpy.mockResolvedValue(latestBuffer);
+    mockState.autosaveFlushSpy.mockResolvedValue(false);
+    const toastSpy = vi.spyOn(toast, 'error');
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    const dirtyProps = mockState.editorProps.at(-1) as { onChange?: () => void };
+    act(() => {
+      dirtyProps.onChange?.();
+      dirtyProps.onChange?.();
+    });
+
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
     fireEvent.change(screen.getByLabelText('TÃ­tulo'), { target: { value: 'Atualizacao de procedimento' } });
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));
 
     await waitFor(() => expect(mockState.editorSaveNowSpy).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(finalBuf, { foo: 'bar' }));
-    await waitFor(() => expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1));
+    expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(latestBuffer, { foo: 'bar' });
+    expect(mockState.autosaveFlushSpy).toHaveBeenCalledTimes(1);
+    expect(toastSpy).toHaveBeenCalledWith('Erro ao salvar documento antes da submissão.');
     expect(vi.mocked(api.finalizeDocument)).not.toHaveBeenCalled();
     expect(onDone).not.toHaveBeenCalled();
   });
 
   it('blocks submit confirmation when revision title is blank', async () => {
-    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft') as never);
+    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
+      RevisionVersion: 1,
+      revision_version: 1,
+    }) as never);
 
     renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
 
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
     );
+
+    const dirtyProps = mockState.editorProps.at(-1) as { onChange?: () => void };
+    act(() => {
+      dirtyProps.onChange?.();
+    });
 
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
     fireEvent.click(screen.getByRole('button', { name: /Confirmar submiss/i }));

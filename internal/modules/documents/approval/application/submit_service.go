@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +33,7 @@ type SubmitRequest struct {
 	RevisionTitle   string
 	ContentFormData map[string]any // raw form data for hashing
 	RevisionVersion int            // OCC version from caller
+	RevisionNumber  int            // governed documents.revision_number
 }
 
 // SubmitResult is returned on successful submission.
@@ -88,6 +90,10 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 		_ = tx.Rollback()
 		return SubmitResult{}, err
 	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+		_ = tx.Rollback()
+		return SubmitResult{}, err
+	}
 
 	// Step 5: load route with stages.
 	route, err := s.loadRoute(ctx, tx, req.TenantID, req.RouteID)
@@ -100,6 +106,12 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 	if err := route.Validate(); err != nil {
 		_ = tx.Rollback()
 		return SubmitResult{}, fmt.Errorf("submit: invalid route: %w", err)
+	}
+
+	revisionTitle, err := normalizeGovernedRevisionTitle(req.RevisionNumber, req.RevisionTitle)
+	if err != nil {
+		_ = tx.Rollback()
+		return SubmitResult{}, err
 	}
 
 	// Step 7: create the approval instance.
@@ -176,7 +188,7 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 		   AND tenant_id        = $2
 		   AND status           = 'draft'
 		   AND revision_version = $3`,
-		req.DocumentID, req.TenantID, req.RevisionVersion, req.RevisionTitle,
+		req.DocumentID, req.TenantID, req.RevisionVersion, revisionTitle,
 	)
 	if err != nil {
 		_ = tx.Rollback()
@@ -220,6 +232,21 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 
 	// Step 11: return result.
 	return SubmitResult{InstanceID: instanceID}, nil
+}
+
+const defaultInitialRevisionTitle = "Criacao do documento"
+
+var ErrRevisionTitleRequired = errors.New("revisionTitle is required")
+
+func normalizeGovernedRevisionTitle(revisionNumber int, title string) (string, error) {
+	trimmed := strings.TrimSpace(title)
+	if trimmed != "" {
+		return trimmed, nil
+	}
+	if revisionNumber == 0 {
+		return defaultInitialRevisionTitle, nil
+	}
+	return "", ErrRevisionTitleRequired
 }
 
 // loadRoute fetches an approval route and its stages from the database within the
