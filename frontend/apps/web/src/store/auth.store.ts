@@ -18,7 +18,7 @@ interface AuthStore {
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
-  authState: "loading",
+  authState: "idle",
   user: null,
   loginForm: { identifier: "admin", password: "" },
   passwordForm: { currentPassword: "", newPassword: "", confirmPassword: "" },

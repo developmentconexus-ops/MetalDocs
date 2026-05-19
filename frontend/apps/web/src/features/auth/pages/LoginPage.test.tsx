@@ -50,6 +50,12 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: /entrar/i })).toBeTruthy();
   });
 
+  it('keeps the public login form enabled before shell bootstrap runs', () => {
+    useAuthStore.setState(useAuthStore.getInitialState(), true);
+    renderPage();
+    expect(screen.getByRole('button', { name: /entrar/i })).toBeEnabled();
+  });
+
   it('disables submit button when loading', () => {
     useAuthStore.setState({ authState: 'loading', user: null });
     renderPage();

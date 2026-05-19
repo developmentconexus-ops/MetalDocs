@@ -13,7 +13,8 @@ const VISIBILITY_REACQUIRE_MS = 2 * 60_000;
 
 type AcquireOutcome = 'writer' | 'readonly' | 'failed' | 'skipped';
 
-export function useDocumentSession(documentID: string) {
+export function useDocumentSession(documentID: string, opts: { enabled?: boolean } = {}) {
+  const enabled = opts.enabled ?? true;
   const [state, setState] = useState<SessionState>({ phase: 'idle' });
   const stateRef = useRef<SessionState>(state);
   stateRef.current = state;
@@ -90,7 +91,14 @@ export function useDocumentSession(documentID: string) {
 
   useEffect(() => {
     mountedRef.current = true;
-    // Acquire on mount.
+    if (!enabled) {
+      setState({ phase: 'idle' });
+      return () => {
+        mountedRef.current = false;
+        stopHeartbeat();
+      };
+    }
+    // Acquire on mount when the current document state allows editing.
     acquire();
     // Release on unmount + on page hide (best-effort -- browser may block async fetch).
     const onHide = () => { if (stateRef.current.phase === 'writer') navigator.sendBeacon(`/api/v1/documents/${documentID}/session/release`, JSON.stringify({ session_id: (stateRef.current as any).sessionID })); };
@@ -119,7 +127,7 @@ export function useDocumentSession(documentID: string) {
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documentID]);
+  }, [documentID, enabled]);
 
   const setLastAck = useCallback((newAck: string) => {
     setState((cur) => (cur.phase === 'writer' ? { ...cur, lastAckRevisionID: newAck } : cur));

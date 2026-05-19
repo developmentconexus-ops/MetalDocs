@@ -61,6 +61,13 @@ describe('useDocumentSession (phase 3)', () => {
     unmount();
   });
 
+  it('does not acquire an editing session when disabled', async () => {
+    const { result } = renderHook(() => useDocumentSession('doc-1', { enabled: false }));
+
+    expect(result.current.state.phase).toBe('idle');
+    expect(api.acquireSession).not.toHaveBeenCalled();
+  });
+
   it('heartbeat 409 performs silent retry and stays writer', async () => {
     vi.mocked(api.acquireSession).mockResolvedValueOnce(WRITER_ONE).mockResolvedValueOnce(WRITER_TWO);
     vi.mocked(api.heartbeatSession)
