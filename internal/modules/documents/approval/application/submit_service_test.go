@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -54,11 +55,12 @@ func (c fixedClock) Now() time.Time { return c.t }
 //   4. COMMIT/ROLLBACK   — tx lifecycle
 
 type submitTestConn struct {
-	name         string // driver instance name, unused but kept for debugging
-	authzGranted bool
-	areaCode     string
-	actorID      string
-	tenantID     string
+	name          string // driver instance name, unused but kept for debugging
+	authzGranted  bool
+	areaCode      string
+	actorID       string
+	tenantID      string
+	revisionTitle string
 }
 
 type submitNoopResult struct{}
@@ -180,6 +182,18 @@ func (s *submitTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	return submitEmptyRows{}, nil
 }
 
+func (s *submitTestStmt) ExecContext(_ context.Context, args []driver.NamedValue) (driver.Result, error) {
+	q := strings.ToLower(s.query)
+	if strings.Contains(q, "update documents") && len(args) >= 4 {
+		if title, ok := args[3].Value.(string); ok {
+			s.conn.revisionTitle = title
+		}
+	}
+	return submitNoopResult{}, nil
+}
+
+var _ driver.StmtExecContext = (*submitTestStmt)(nil)
+
 func (c *submitTestConn) Prepare(query string) (driver.Stmt, error) {
 	return &submitTestStmt{conn: c, query: query}, nil
 }
@@ -193,7 +207,7 @@ type submitTestDriver struct{ conn *submitTestConn }
 func (d *submitTestDriver) Open(_ string) (driver.Conn, error) { return d.conn, nil }
 
 // newSubmitTestDB registers a unique driver per test and returns a *sql.DB.
-func newSubmitTestDB(t *testing.T, authzGranted ...bool) *sql.DB {
+func newSubmitTestDBWithConn(t *testing.T, authzGranted ...bool) (*sql.DB, *submitTestConn) {
 	t.Helper()
 	granted := true
 	if len(authzGranted) > 0 {
@@ -212,6 +226,12 @@ func newSubmitTestDB(t *testing.T, authzGranted ...bool) *sql.DB {
 		t.Fatalf("open submit test db: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	return db, conn
+}
+
+func newSubmitTestDB(t *testing.T, authzGranted ...bool) *sql.DB {
+	t.Helper()
+	db, _ := newSubmitTestDBWithConn(t, authzGranted...)
 	return db
 }
 
@@ -248,6 +268,98 @@ func TestSubmitRevisionForReview_HappyPath(t *testing.T) {
 	}
 	if emitter.Events[0].EventType != "approval_submitted" {
 		t.Errorf("event type = %q; want %q", emitter.Events[0].EventType, "approval_submitted")
+	}
+}
+
+func TestSubmitRevisionForReview_DefaultsRevisionTitleForFirstGovernedRevision(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, conn := newSubmitTestDBWithConn(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		RevisionTitle:   "",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		RevisionNumber:  0,
+	}
+
+	if _, err := svc.SubmitRevisionForReview(context.Background(), db, req); err != nil {
+		t.Fatalf("SubmitRevisionForReview: unexpected error: %v", err)
+	}
+	if conn.revisionTitle != defaultInitialRevisionTitle {
+		t.Fatalf("revision title = %q, want %q", conn.revisionTitle, defaultInitialRevisionTitle)
+	}
+}
+
+func TestSubmitRevisionForReview_RequiresRevisionTitleAfterFirstGovernedRevision(t *testing.T) {
+	repo := &fakeSubmitRepo{}
+	emitter := &MemoryEmitter{}
+	clock := fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)}
+
+	svc := &SubmitService{repo: repo, emitter: emitter, clock: clock}
+	db, _ := newSubmitTestDBWithConn(t, true)
+
+	req := SubmitRequest{
+		TenantID:        "tenant-uuid-1",
+		DocumentID:      "doc-uuid-1",
+		RouteID:         "route-uuid-1",
+		SubmittedBy:     "user-1",
+		RevisionTitle:   "   ",
+		ContentFormData: map[string]any{"title": "My Doc"},
+		RevisionVersion: 1,
+		RevisionNumber:  1,
+	}
+
+	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
+	if !errors.Is(err, ErrRevisionTitleRequired) {
+		t.Fatalf("error = %v, want ErrRevisionTitleRequired", err)
+	}
+	if len(emitter.Events) != 0 {
+		t.Errorf("no governance event should be emitted when revision title is missing; got %d", len(emitter.Events))
+	}
+}
+
+func TestSubmitRevisionForReview_AssertsDocumentEditBeforeDocumentsUpdate(t *testing.T) {
+	src, err := os.ReadFile("submit_service.go")
+	if err != nil {
+		t.Fatalf("read submit_service.go: %v", err)
+	}
+
+	body := string(src)
+	start := strings.Index(body, "func (s *SubmitService) SubmitRevisionForReview")
+	if start == -1 {
+		t.Fatal("SubmitRevisionForReview not found")
+	}
+	end := strings.Index(body[start:], "func (s *SubmitService) loadRoute")
+	if end == -1 {
+		t.Fatal("loadRoute not found")
+	}
+	submit := body[start : start+end]
+
+	submitRequire := strings.Index(submit, "CapDocumentSubmit")
+	if submitRequire == -1 {
+		t.Fatal("SubmitRevisionForReview must assert document.submit")
+	}
+	editRequire := strings.Index(submit, "CapDocumentEdit")
+	if editRequire == -1 {
+		t.Fatal("SubmitRevisionForReview must assert document.edit before updating documents")
+	}
+	updateDocuments := strings.Index(submit, "UPDATE documents")
+	if updateDocuments == -1 {
+		t.Fatal("SubmitRevisionForReview documents update not found")
+	}
+	if editRequire < submitRequire {
+		t.Fatal("SubmitRevisionForReview must assert document.submit before document.edit")
+	}
+	if editRequire > updateDocuments {
+		t.Fatal("SubmitRevisionForReview asserts document.edit after documents update; tripwire requires it before UPDATE")
 	}
 }
 

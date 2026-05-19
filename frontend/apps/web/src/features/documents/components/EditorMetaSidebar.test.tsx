@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { EditorMetaSidebar } from './EditorMetaSidebar';
 
@@ -38,9 +38,51 @@ describe('EditorMetaSidebar', () => {
     expect(screen.getByText('Procedimento Operacional')).toBeInTheDocument();
     expect(screen.getByText('Recursos Humanos')).toBeInTheDocument();
     expect(screen.getByText('Restrito a area Recursos Humanos')).toBeInTheDocument();
-    expect(screen.getByText('REV01 · Draft')).toBeInTheDocument();
+    expect(screen.getByText('REV01')).toBeInTheDocument();
     expect(screen.getByText('Ajuste operacional')).toBeInTheDocument();
+    expect(screen.queryByText(/Draft|Em revis/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Proximos aprovadores')).not.toBeInTheDocument();
+  });
+
+  it('renders revision code, title, and date without workflow status text', () => {
+    render(
+      <EditorMetaSidebar
+        open
+        onToggle={() => {}}
+        history={[{
+          documentId: 'doc-1',
+          revisionCode: 'REV00',
+          revisionTitle: 'Criacao do documento',
+          status: 'draft',
+          createdAt: '2026-05-19T10:00:00-03:00',
+          isCurrent: true,
+        }]}
+      />,
+    );
+
+    expect(screen.getByText('REV00')).toBeInTheDocument();
+    expect(screen.getByText('Criacao do documento')).toBeInTheDocument();
+    expect(screen.getByText('19/05/2026')).toBeInTheDocument();
+    expect(screen.queryByText(/Draft|Em revis/i)).not.toBeInTheDocument();
+  });
+
+  it('collapses long governed histories and can expand them', async () => {
+    const history = Array.from({ length: 5 }, (_, index) => ({
+      documentId: `doc-${index}`,
+      revisionCode: `REV0${index}`,
+      revisionTitle: `Revision ${index}`,
+      status: 'approved',
+      createdAt: `2026-05-${String(10 + index).padStart(2, '0')}T10:00:00-03:00`,
+      isCurrent: index === 4,
+    }));
+
+    render(<EditorMetaSidebar open onToggle={() => {}} history={history} />);
+
+    expect(screen.getByText('REV04')).toBeInTheDocument();
+    expect(screen.queryByText('REV00')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /ver todas as revis/i }));
+    expect(screen.getByText('REV00')).toBeInTheDocument();
   });
 
   it('renders full approval chain only during under review', () => {

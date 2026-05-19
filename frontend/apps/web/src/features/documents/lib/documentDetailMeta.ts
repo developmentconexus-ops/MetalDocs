@@ -4,6 +4,8 @@
 
 const EM_DASH = '—';
 
+export const DEFAULT_INITIAL_REVISION_TITLE = 'Criacao do documento';
+
 function parseDate(input: string | null | undefined): Date | null {
   if (!input) return null;
   const d = new Date(input);
@@ -64,8 +66,15 @@ export function resolveAreaLabel(code: string, areas: Array<{ code: string; name
   return areas.find((a) => a.code === code)?.name ?? code;
 }
 
-export function formatRevisionCode(revisionNumber: number): string {
-  return `REV${String(Math.max(revisionNumber - 1, 0)).padStart(2, '0')}`;
+export function formatRevisionCode(revisionNumber: number | null | undefined): string {
+  const safeRevisionNumber = typeof revisionNumber === 'number' && Number.isFinite(revisionNumber) ? revisionNumber : 0;
+  return `REV${String(Math.max(safeRevisionNumber, 0)).padStart(2, '0')}`;
+}
+
+export function displayRevisionTitle(title: string | null | undefined, revisionCode: string): string {
+  const trimmed = title?.trim();
+  if (trimmed) return trimmed;
+  return revisionCode === 'REV00' ? DEFAULT_INITIAL_REVISION_TITLE : EM_DASH;
 }
 
 export function formatRevisionStatus(status: string): string {

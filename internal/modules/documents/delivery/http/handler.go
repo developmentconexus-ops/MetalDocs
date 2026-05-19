@@ -425,12 +425,6 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	revisionTitle := strings.TrimSpace(reqBody.RevisionTitle)
-	if revisionTitle == "" {
-		_ = problem.Write(w, problem.FromValidation([]problem.FieldError{
-			{Field: "revisionTitle", Code: problem.FieldCodeRequired, Message: "revisionTitle is required"},
-		}))
-		return
-	}
 
 	if h.submitSvc == nil || h.db == nil {
 		// Fallback: legacy status-only transition when submit service not wired.
@@ -487,13 +481,14 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 
 	// Load document revision version and controlled document ID.
 	var revisionVersion int64
+	var revisionNumber int64
 	var cdID sql.NullString
 	if err := h.db.QueryRowContext(r.Context(),
-		`SELECT revision_version, controlled_document_id::text
+		`SELECT revision_version, revision_number, controlled_document_id::text
 		   FROM documents
 		  WHERE id = $1 AND tenant_id = $2 AND status = 'draft'`,
 		docID, tenantID,
-	).Scan(&revisionVersion, &cdID); err != nil {
+	).Scan(&revisionVersion, &revisionNumber, &cdID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			httpErr(w, http.StatusConflict, "document not in draft state")
 		} else {
@@ -555,14 +550,12 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		RevisionTitle:   revisionTitle,
 		ContentFormData: map[string]any{"_content_hash": contentHash},
 		RevisionVersion: int(revisionVersion),
+		RevisionNumber:  int(revisionNumber),
 	})
 	if err != nil {
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
-	}
-	if err := h.svc.Finalize(r.Context(), tenantID, docID, actorID); err != nil {
-		log.Printf("documents finalize audit-only error: %v", err)
 	}
 	respBody := map[string]string{"instanceId": result.InstanceID}
 	if idempStore != nil {
@@ -1180,6 +1173,8 @@ func mapErr(err error) (int, string) {
 		return http.StatusBadRequest, "invalid_name"
 	case errors.Is(err, application.ErrControlledDocumentRequired):
 		return http.StatusBadRequest, "controlled_document_required"
+	case errors.Is(err, approvalapp.ErrRevisionTitleRequired):
+		return http.StatusBadRequest, "revision_title_required"
 	case errors.Is(err, domain.ErrCommentInvalid):
 		return http.StatusBadRequest, "comment_invalid"
 	case errors.Is(err, iamapp.ErrCapabilityDenied):

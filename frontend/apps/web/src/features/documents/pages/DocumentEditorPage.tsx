@@ -35,7 +35,6 @@ export type DocumentEditorPageProps = {
 type EditorDocumentDetail = DocumentDetail & { RevisionTitle?: string | null };
 
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
-  const session = useDocumentSession(documentID);
   const docQuery = useDocumentDetailQuery(documentID);
   const [editorLoadError, setEditorLoadError] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState('');
@@ -43,8 +42,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [revisionTitleDialogOpen, setRevisionTitleDialogOpen] = useState(false);
   const [revisionTitleInput, setRevisionTitleInput] = useState('');
   const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
   const editorRef = useRef<MetalDocsEditorRef>(null);
+  const skipInitialEditorChangeRef = useRef(false);
   const doc: EditorDocumentDetail | null = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
+  const docStatus = doc?.Status ?? '';
+  const session = useDocumentSession(documentID, { enabled: docStatus === 'draft' });
   const controlledDocumentId = doc?.ControlledDocumentID ?? '';
   const profilesQuery = useProfilesQuery();
   const areasQuery = useAreasQuery();
@@ -93,6 +96,12 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       cancelled = true;
     };
   }, [doc, docQuery.isLoading, fetchRevisionBuffer]);
+
+  useEffect(() => {
+    if (buffer === undefined) return;
+    skipInitialEditorChangeRef.current = true;
+    setEditorDirty(false);
+  }, [buffer]);
 
   const pageLoadError = (() => {
     const err = docQuery.error;
@@ -189,21 +198,35 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   async function handleSave(buf: ArrayBuffer) {
     if (!doc) return;
     await autosave.queue(buf, doc.FormDataJSON ?? null);
+    setEditorDirty(false);
   }
 
-  async function submitForReview(revisionTitle: string) {
+  function handleEditorChange() {
+    if (skipInitialEditorChangeRef.current) {
+      skipInitialEditorChangeRef.current = false;
+      return;
+    }
+    setEditorDirty(true);
+  }
+
+  async function submitForReview(revisionTitle?: string) {
     if (session.state.phase !== 'writer' || !doc) return;
     try {
-      const latestBuf = await editorRef.current?.saveNow();
-      if (latestBuf) {
-        await autosave.queue(latestBuf, doc.FormDataJSON ?? null);
+      if (editorDirty) {
+        const latestBuf = await editorRef.current?.saveNow();
+        if (latestBuf) {
+          await autosave.queue(latestBuf, doc.FormDataJSON ?? null);
+        }
+        const flushOk = await autosave.flush();
+        if (!flushOk) {
+          toast.error('Erro ao salvar documento antes da submissão.');
+          return;
+        }
+        setEditorDirty(false);
       }
-      const flushOk = await autosave.flush();
-      if (!flushOk) {
-        toast.error('Erro ao salvar documento antes da submissão.');
-        return;
-      }
-      await finalizeDocument(documentID, { revisionTitle });
+      const trimmedRevisionTitle = revisionTitle?.trim();
+      await finalizeDocument(documentID, trimmedRevisionTitle ? { revisionTitle: trimmedRevisionTitle } : {});
+      setEditorDirty(false);
       await session.release();
       setRevisionTitleDialogOpen(false);
       setRevisionTitleInput('');
@@ -219,6 +242,10 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   }
 
   function handleFinalize() {
+    if ((doc?.RevisionVersion ?? 0) === 0) {
+      void submitForReview();
+      return;
+    }
     setRevisionTitleInput(doc?.RevisionTitle ?? '');
     setRevisionTitleError(null);
     setRevisionTitleDialogOpen(true);
@@ -233,7 +260,6 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     void submitForReview(trimmed);
   }
 
-  const docStatus = doc?.Status ?? '';
   const approvalInstanceQuery = useQuery({
     queryKey: QK.approval.instance(documentID),
     queryFn: () => getApprovalInstance(documentID),
@@ -249,8 +275,9 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const commentsHook = useDocumentComments(documentID, authorDisplay);
   const canUseComments = canComment && !commentsHook.loadError;
   const canMountEditor = !!doc
-    && session.state.phase !== 'idle'
-    && session.state.phase !== 'acquiring'
+    && (docStatus === 'draft'
+      ? session.state.phase !== 'idle' && session.state.phase !== 'acquiring'
+      : true)
     && buffer !== undefined;
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(
@@ -360,6 +387,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
                 onCommentDelete={(c: Comment) => { if (canUseComments) void commentsHook.remove(c); }}
                 onCommentReply={(reply: Comment, parent: Comment) => { if (canUseComments) void commentsHook.reply(reply, parent); }}
                 onAutoSave={handleSave}
+                onChange={handleEditorChange}
                 onDocumentNameChange={handleRename}
                 showRuler={false}
               />

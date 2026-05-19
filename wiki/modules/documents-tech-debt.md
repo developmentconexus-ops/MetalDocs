@@ -104,9 +104,11 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - **Severity:** major (closed)
 - **Surface (resolved):** `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx`, `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`, `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/features/registry/api/controlledDocuments.ts`
 - **Observation (original):** The editor sidebar shipped mock metadata, revision history, and approver rows. That violated runtime truth and blurred the boundary between governed `documents` lineage and technical `document_revisions`.
-- **Evidence:** `GET /api/v1/documents/{id}/revision-history`, `GET /api/v1/documents/{id}/approval-instance`, `GET /api/v1/controlled-documents/{id}`; focused frontend/backend tests added on 2026-05-18.
+- **Evidence:** `GET /api/v1/documents/{id}/revision-history`, `GET /api/v1/documents/{id}/approval-instance`, `GET /api/v1/controlled-documents/{id}`; focused frontend/backend tests added on 2026-05-18. Runtime debug on 2026-05-19 added migration `0205` so persisted `documents.revision_number` is zero-based and matches `REV00`/`REV01` labels directly, fixed approval-instance read transactions, and prevented readonly `under_review` editor loads from acquiring writer sessions.
 - **Linked backlog row:** `wiki/backlog/editor.md`
 - **Linked ADR:** missing-ADR
+
+2026-05-19 follow-up: sidebar revision rows were tightened to code/title/date and `REV00` now defaults to `Criacao do documento`; no new debt opened. Rich history search/filtering remains deferred until governed lineages are long enough to need more than collapse/expand.
 
 ## Coverage stats (computed at compose time)
 

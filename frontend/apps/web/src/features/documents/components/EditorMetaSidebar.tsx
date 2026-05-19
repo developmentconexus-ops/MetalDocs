@@ -1,8 +1,8 @@
+import { useState } from 'react';
 import styles from './EditorMetaSidebar.module.css';
 import { CodeChip } from '../../../components/ui/CodeChip';
 import { Avatar } from '../../../components/ui/Avatar';
-import { TimelineRail } from '../../../components/ui/TimelineRail';
-import { formatRevisionStatus, formatShortDate } from '../lib/documentDetailMeta';
+import { displayRevisionTitle, formatShortDate } from '../lib/documentDetailMeta';
 
 export type EditorSidebarRevisionItem = {
   documentId: string;
@@ -37,6 +37,8 @@ const APPROVAL_BADGE_LABELS: Record<string, string> = {
   waiting: 'aguarda',
 };
 
+const MAX_COLLAPSED_HISTORY_ITEMS = 3;
+
 type EditorMetaSidebarProps = {
   open: boolean;
   onToggle: () => void;
@@ -60,13 +62,16 @@ export function EditorMetaSidebar({
   approvalChain = null,
   documentStatus = '',
 }: EditorMetaSidebarProps) {
-  const historyItems = history.map((item) => ({
-    id: item.documentId,
-    title: `${item.revisionCode} · ${formatRevisionStatus(item.status)}`,
-    subtitle: item.revisionTitle,
-    aside: formatShortDate(item.createdAt),
-    active: item.isCurrent,
-  }));
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const recentNonCurrentHistory = [...history]
+    .filter((item) => !item.isCurrent)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const visibleHistory = historyExpanded || history.length <= MAX_COLLAPSED_HISTORY_ITEMS
+    ? history
+    : [
+        ...history.filter((item) => item.isCurrent),
+        ...recentNonCurrentHistory.slice(0, MAX_COLLAPSED_HISTORY_ITEMS - 1),
+      ].slice(0, MAX_COLLAPSED_HISTORY_ITEMS);
 
   return (
     <div className={styles.sidebarOuter}>
@@ -96,22 +101,49 @@ export function EditorMetaSidebar({
               ) : null}
               <div className={styles.metaRow}>
                 <span className={styles.metaLabel}>Perfil</span>
-                <span className={styles.metaValue}>{profileLabel ?? '—'}</span>
+                <span className={styles.metaValue}>{profileLabel ?? '---'}</span>
               </div>
               <div className={styles.metaRow}>
                 <span className={styles.metaLabel}>Area</span>
-                <span className={styles.metaValue}>{areaLabel ?? '—'}</span>
+                <span className={styles.metaValue}>{areaLabel ?? '---'}</span>
               </div>
               <div className={styles.metaRow}>
                 <span className={styles.metaLabel}>Visibilidade</span>
-                <span className={styles.metaValue}>{visibilityLabel ?? '—'}</span>
+                <span className={styles.metaValue}>{visibilityLabel ?? '---'}</span>
               </div>
             </div>
           </section>
           <div className={styles.divider} />
           <section className={styles.section}>
             <div className={styles.sectionHeader}>Revisoes</div>
-            <TimelineRail items={historyItems} ariaLabel="Historico de revisoes" variant="flat" />
+            <div className={styles.revisionList} aria-label="Historico de revisoes">
+              {visibleHistory.map((item) => (
+                <div
+                  key={item.documentId}
+                  className={`${styles.revisionRow} ${item.isCurrent ? styles.revisionRowCurrent : ''}`}
+                >
+                  <span className={styles.revisionMarker} aria-hidden="true" />
+                  <div className={styles.revisionBody}>
+                    <span className={styles.revisionCode}>{item.revisionCode}</span>
+                    <span className={styles.revisionTitle}>
+                      {displayRevisionTitle(item.revisionTitle, item.revisionCode)}
+                    </span>
+                  </div>
+                  <time className={styles.revisionDate} dateTime={item.createdAt}>
+                    {formatShortDate(item.createdAt)}
+                  </time>
+                </div>
+              ))}
+            </div>
+            {history.length > MAX_COLLAPSED_HISTORY_ITEMS ? (
+              <button
+                type="button"
+                className={styles.historyToggle}
+                onClick={() => setHistoryExpanded((expanded) => !expanded)}
+              >
+                {historyExpanded ? 'Ver menos revisoes' : 'Ver todas as revisoes'}
+              </button>
+            ) : null}
           </section>
           {documentStatus === 'under_review' && approvalChain ? (
             <>

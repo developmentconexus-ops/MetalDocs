@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -425,7 +426,7 @@ func TestFinalizeDocument_InvalidIdempotencyKey_Returns400(t *testing.T) {
 	}
 }
 
-func TestFinalizeDocument_RequiresRevisionTitle(t *testing.T) {
+func TestFinalizeDocument_AllowsMissingRevisionTitleAtHTTPBoundary(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{}`)))
@@ -434,14 +435,8 @@ func TestFinalizeDocument_RequiresRevisionTitle(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
-	}
-	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Fatalf("expected problem content-type, got %q", ct)
-	}
-	if !strings.Contains(rr.Body.String(), "revisionTitle") {
-		t.Fatalf("expected revisionTitle validation error, got %s", rr.Body.String())
+	if rr.Code == http.StatusBadRequest && strings.Contains(rr.Body.String(), "revisionTitle") {
+		t.Fatalf("revisionTitle should be conditionally validated by the submit service, got %d body=%s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -482,6 +477,33 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	}
 	if submitter.called {
 		t.Fatalf("submit service should not be called on replay")
+	}
+}
+
+func TestFinalizeDocument_SubmitPathDoesNotCallLegacyFinalize(t *testing.T) {
+	src, err := os.ReadFile("handler.go")
+	if err != nil {
+		t.Fatalf("read handler.go: %v", err)
+	}
+
+	body := string(src)
+	start := strings.Index(body, "func (h *Handler) finalizeDocument")
+	if start == -1 {
+		t.Fatal("finalizeDocument not found")
+	}
+	end := strings.Index(body[start:], "func (h *Handler) archiveDocument")
+	if end == -1 {
+		t.Fatal("archiveDocument not found")
+	}
+	finalize := body[start : start+end]
+
+	submitCall := strings.Index(finalize, "h.submitSvc.SubmitRevisionForReview")
+	if submitCall == -1 {
+		t.Fatal("finalizeDocument submit path not found")
+	}
+	legacyFinalize := strings.Index(finalize[submitCall:], "h.svc.Finalize")
+	if legacyFinalize != -1 {
+		t.Fatal("submit-backed finalize path must not call legacy Finalize after approval submit")
 	}
 }
 
