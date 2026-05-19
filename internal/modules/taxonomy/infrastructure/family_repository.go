@@ -81,6 +81,9 @@ func (r *FamilyRepository) Create(ctx context.Context, f *domain.DocumentFamily)
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Create family: %w", err)
 	}
@@ -100,6 +103,9 @@ func (r *FamilyRepository) Update(ctx context.Context, f *domain.DocumentFamily)
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Update family: %w", err)
 	}
@@ -180,6 +186,9 @@ func (r *FamilyRepository) UpdateTx(ctx context.Context, tx domain.FamilyTx, f *
 	sqlTx, ok := tx.(familyTx)
 	if !ok {
 		return fmt.Errorf("invalid family tx type %T", tx)
+	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return err
 	}
 	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Update family: %w", err)

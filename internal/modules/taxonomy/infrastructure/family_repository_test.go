@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
+	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -36,5 +37,14 @@ SELECT EXISTS(
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func family(code string) *domain.DocumentFamily {
+	return &domain.DocumentFamily{
+		Code:        code,
+		Name:        "Procedimentos",
+		Description: "Familia global para fluxo de editor",
+		IsActive:    true,
 	}
 }
