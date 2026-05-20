@@ -11,13 +11,15 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // PublishService handles transitioning an approved document to published state.
 type PublishService struct {
-	repo    repository.ApprovalRepository
-	emitter EventEmitter
-	clock   Clock
+	repo                     repository.ApprovalRepository
+	emitter                  EventEmitter
+	clock                    Clock
+	scheduledPublishEnqueuer ScheduledPublishEnqueuer
 }
 
 // ErrInstanceNotApproved is returned when PublishApproved is called on an
@@ -79,6 +81,12 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		return PublishResult{}, fmt.Errorf("publishApproved: load document area: %w", err)
 	}
 	if err := authz.Require(ctx, tx, "doc.publish", areaCode); err != nil {
+		_ = tx.Rollback()
+		return PublishResult{}, err
+	}
+	// public.documents is protected by the shared documents tripwire, so the
+	// approval publish transaction must assert document.edit before updating it.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
 		_ = tx.Rollback()
 		return PublishResult{}, err
 	}
@@ -147,16 +155,24 @@ var ErrEffectiveDateInPast = errors.New("approval: effective_date must be in the
 
 // SchedulePublishRequest carries all inputs for SchedulePublish.
 type SchedulePublishRequest struct {
-	TenantID      string
-	InstanceID    string
-	EffectiveDate time.Time // must be strictly after clock.Now()
-	ScheduledBy   string
+	TenantID             string
+	InstanceID           string
+	ExpectedRevision     int       // optional client precondition; 0 means "not provided"
+	EffectiveDate        time.Time // must be strictly after clock.Now()
+	ScheduledBy          string
+	SupersededDocumentID string
 }
 
 // SchedulePublishResult is returned on successful scheduling.
 type SchedulePublishResult struct {
-	DocumentID    string
-	EffectiveDate time.Time
+	DocumentID         string
+	EffectiveDate      time.Time
+	ScheduleGeneration int64
+}
+
+func (s *PublishService) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueuer) *PublishService {
+	s.scheduledPublishEnqueuer = enqueuer
+	return s
 }
 
 // SchedulePublish transitions an approved document to "scheduled" state with a
@@ -188,6 +204,10 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, repository.ErrNoActiveInstance
 	}
+	if req.ExpectedRevision > 0 && req.ExpectedRevision != instance.RevisionVersion {
+		_ = tx.Rollback()
+		return SchedulePublishResult{}, repository.ErrStaleRevision
+	}
 
 	// Verify instance is in approved state.
 	if instance.Status != domain.InstanceApproved {
@@ -209,31 +229,68 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, err
 	}
+	// Scheduling also mutates public.documents and must satisfy the shared
+	// document-edit tripwire in the same transaction.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+		_ = tx.Rollback()
+		return SchedulePublishResult{}, err
+	}
+	supersededDocumentID, err := s.repo.LoadCurrentPublishedHeadForDocument(ctx, tx, req.TenantID, instance.DocumentID)
+	if err != nil {
+		_ = tx.Rollback()
+		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: load current published head: %w", err)
+	}
+	if req.SupersededDocumentID != "" {
+		if req.SupersededDocumentID == instance.DocumentID {
+			_ = tx.Rollback()
+			return SchedulePublishResult{}, repository.ErrInvalidScheduledSupersedeTarget
+		}
+		if supersededDocumentID == "" || req.SupersededDocumentID != supersededDocumentID {
+			_ = tx.Rollback()
+			return SchedulePublishResult{}, repository.ErrInvalidScheduledSupersedeTarget
+		}
+	}
+	if supersededDocumentID == instance.DocumentID {
+		_ = tx.Rollback()
+		return SchedulePublishResult{}, repository.ErrInvalidScheduledSupersedeTarget
+	}
 
 	// Step 4: OCC transition the document from "approved" to "scheduled".
-	result, err := tx.ExecContext(ctx, `
+	var scheduleGeneration int64
+	err = tx.QueryRowContext(ctx, `
 		UPDATE documents
 		   SET status           = 'scheduled',
-		       effective_date   = $1,
-		       revision_version = revision_version + 1
-		 WHERE id               = $2
-		   AND tenant_id        = $3
+		       effective_from   = $1,
+		       superseded_document_id = NULLIF($2, '')::uuid,
+		       revision_version = revision_version + 1,
+		       schedule_generation = schedule_generation + 1
+		 WHERE id               = $3
+		   AND tenant_id        = $4
 		   AND status           = 'approved'
-		   AND revision_version = $4`,
-		req.EffectiveDate.UTC(), instance.DocumentID, req.TenantID, instance.RevisionVersion,
-	)
+		   AND revision_version = $5
+		RETURNING schedule_generation`,
+		req.EffectiveDate.UTC(), supersededDocumentID, instance.DocumentID, req.TenantID, instance.RevisionVersion,
+	).Scan(&scheduleGeneration)
+	if errors.Is(err, sql.ErrNoRows) {
+		_ = tx.Rollback()
+		return SchedulePublishResult{}, repository.ErrStaleRevision
+	}
 	if err != nil {
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: update document state: %w", err)
 	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		_ = tx.Rollback()
-		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: rows affected: %w", err)
-	}
-	if affected == 0 {
-		_ = tx.Rollback()
-		return SchedulePublishResult{}, repository.ErrStaleRevision
+
+	if s.scheduledPublishEnqueuer != nil {
+		if err := s.scheduledPublishEnqueuer.EnqueueScheduledPublishTx(ctx, tx, ScheduledPublishJobInput{
+			TenantID:                req.TenantID,
+			DocumentID:              instance.DocumentID,
+			ExpectedRevisionVersion: instance.RevisionVersion + 1,
+			ScheduledEffectiveAt:    req.EffectiveDate.UTC(),
+			ScheduleGeneration:      scheduleGeneration,
+		}); err != nil {
+			_ = tx.Rollback()
+			return SchedulePublishResult{}, fmt.Errorf("schedulePublish: enqueue scheduled publish job: %w", err)
+		}
 	}
 
 	// Step 5: emit "publish_scheduled" governance event.
@@ -265,5 +322,9 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: commit: %w", err)
 	}
 
-	return SchedulePublishResult{DocumentID: instance.DocumentID, EffectiveDate: req.EffectiveDate}, nil
+	return SchedulePublishResult{
+		DocumentID:         instance.DocumentID,
+		EffectiveDate:      req.EffectiveDate,
+		ScheduleGeneration: scheduleGeneration,
+	}, nil
 }

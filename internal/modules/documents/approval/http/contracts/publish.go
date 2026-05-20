@@ -11,9 +11,10 @@ type PublishRequest struct {
 }
 
 type SchedulePublishRequest struct {
-	EffectiveFrom  string `json:"effective_from"`
-	IdempotencyKey string
-	IfMatchVersion int
+	EffectiveFrom        string `json:"effective_from"`
+	SupersededDocumentID string `json:"superseded_document_id,omitempty"`
+	IdempotencyKey       string
+	IfMatchVersion       int
 }
 
 func (r SchedulePublishRequest) Validate() error {
@@ -27,6 +28,11 @@ func (r SchedulePublishRequest) Validate() error {
 	_, offset := t.Zone()
 	if offset != 0 {
 		return fmt.Errorf("effective_from must be UTC")
+	}
+	if r.SupersededDocumentID != "" {
+		if err := validateUUID("superseded_document_id", r.SupersededDocumentID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

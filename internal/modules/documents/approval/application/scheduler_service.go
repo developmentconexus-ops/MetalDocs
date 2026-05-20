@@ -4,83 +4,110 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"time"
 
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 )
 
-// SchedulerService processes scheduled publish jobs (F6 — ListScheduledDue).
+// SchedulerService processes River-delivered scheduled publish jobs.
 type SchedulerService struct {
 	repo    repository.ApprovalRepository
 	emitter EventEmitter
 	clock   Clock
 }
 
-// RunDuePublishesResult summarises a scheduler batch run.
-type RunDuePublishesResult struct {
-	Processed int
-	Errors    []error
-}
-
-const schedulerBatchLimit = 50
-
 const updateScheduledDocSQL = `
 UPDATE documents
    SET status = 'published',
+       effective_from = NULL,
        revision_version = revision_version + 1
  WHERE id = $1
    AND tenant_id = $2
    AND status = 'scheduled'
    AND revision_version = $3`
 
-// RunDuePublishes fetches up to 50 rows whose effective_date <= now and
-// status = 'scheduled', then publishes each one inside its own transaction.
-// Per-row errors are collected in result.Errors; the method only returns a
-// non-nil top-level error when the initial fetch itself fails.
-func (s *SchedulerService) RunDuePublishes(ctx context.Context, db *sql.DB) (RunDuePublishesResult, error) {
-	var result RunDuePublishesResult
-
-	// Open a read-committed transaction for the SKIP LOCKED fetch.
-	fetchTx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
-	if err != nil {
-		return result, fmt.Errorf("scheduler: begin fetch tx: %w", err)
-	}
-
-	rows, err := s.repo.ListScheduledDue(ctx, fetchTx, s.clock.Now(), schedulerBatchLimit)
-	if err != nil {
-		_ = fetchTx.Rollback()
-		return result, fmt.Errorf("scheduler: fetch due publishes: %w", err)
-	}
-
-	// Release the fetch transaction — the rows are already in memory.
-	if err = fetchTx.Commit(); err != nil {
-		return result, fmt.Errorf("scheduler: commit fetch tx: %w", err)
-	}
-
-	for _, row := range rows {
-		published, procErr := s.processRow(ctx, db, row)
-		if procErr != nil {
-			result.Errors = append(result.Errors, procErr)
-		} else if published {
-			result.Processed++
-		}
-	}
-
-	return result, nil
+type scheduledDocumentState struct {
+	DocumentID           string
+	TenantID             string
+	Status               string
+	ControlledDocumentID string
+	SupersededDocumentID sql.NullString
+	EffectiveFrom        sql.NullTime
+	RevisionVersion      int
+	ScheduleGeneration   int64
 }
 
-// processRow publishes a single scheduled document inside its own transaction.
-// It returns (true, nil) on successful publish, (false, nil) when another runner
-// already published the row (RowsAffected == 0), and (false, err) on failure.
-func (s *SchedulerService) processRow(ctx context.Context, db *sql.DB, row repository.ScheduledPublishRow) (bool, error) {
+func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, db *sql.DB, input ScheduledPublishJobInput) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
-		return false, fmt.Errorf("scheduler: begin publish tx for doc %s: %w", row.DocumentID, err)
+		return fmt.Errorf("scheduler: begin publish tx for doc %s: %w", input.DocumentID, err)
 	}
 	if err := authz.BypassSystem(ctx, tx); err != nil {
 		_ = tx.Rollback()
-		return false, fmt.Errorf("scheduler: bypass authz for doc %s: %w", row.DocumentID, err)
+		return fmt.Errorf("scheduler: bypass authz for doc %s: %w", input.DocumentID, err)
+	}
+
+	state, err := s.loadScheduledDocumentState(ctx, tx, input.TenantID, input.DocumentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		_ = tx.Rollback()
+		return nil
+	}
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("scheduler: load scheduled state for doc %s: %w", input.DocumentID, err)
+	}
+	if !scheduledJobMatchesState(state, input) {
+		_ = tx.Rollback()
+		return nil
+	}
+	if s.clock.Now().UTC().Before(state.EffectiveFrom.Time.UTC()) {
+		_ = tx.Rollback()
+		return nil
+	}
+
+	if _, err := s.publishScheduledDocumentTx(ctx, tx, scheduledPublishState{
+		DocumentID:           state.DocumentID,
+		TenantID:             state.TenantID,
+		ControlledDocumentID: state.ControlledDocumentID,
+		SupersededDocumentID: state.SupersededDocumentID,
+		EffectiveFrom:        state.EffectiveFrom.Time,
+		RevisionVersion:      state.RevisionVersion,
+		ScheduleGeneration:   state.ScheduleGeneration,
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type scheduledPublishState struct {
+	DocumentID           string
+	TenantID             string
+	ControlledDocumentID string
+	SupersededDocumentID sql.NullString
+	EffectiveFrom        time.Time
+	RevisionVersion      int
+	ScheduleGeneration   int64
+}
+
+func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *sql.Tx, row scheduledPublishState) (bool, error) {
+	if row.SupersededDocumentID.Valid {
+		currentPublishedID, err := s.repo.LoadCurrentPublishedHead(ctx, tx, row.TenantID, row.ControlledDocumentID)
+		if err != nil {
+			_ = tx.Rollback()
+			return false, fmt.Errorf("scheduler: load current published head for doc %s: %w", row.DocumentID, err)
+		}
+		if currentPublishedID != row.SupersededDocumentID.String {
+			_ = tx.Rollback()
+			return false, repository.ErrScheduledSupersedeConflict
+		}
+		if err := s.repo.MarkSuperseded(ctx, tx, row.TenantID, row.SupersededDocumentID.String); err != nil {
+			_ = tx.Rollback()
+			return false, fmt.Errorf("scheduler: supersede prior head for doc %s: %w", row.DocumentID, err)
+		}
 	}
 
 	res, err := tx.ExecContext(ctx, updateScheduledDocSQL,
@@ -98,15 +125,20 @@ func (s *SchedulerService) processRow(ctx context.Context, db *sql.DB, row repos
 	}
 
 	if affected == 0 {
-		// Another runner already published this document — skip cleanly.
-		_ = tx.Commit()
+		// Another runner already won the scheduled row. Roll back so any
+		// supersede work done earlier in this transaction is not persisted.
+		_ = tx.Rollback()
 		return false, nil
 	}
 
-	payload, _ := json.Marshal(map[string]any{
+	payloadMap := map[string]any{
 		"revision_version": row.RevisionVersion + 1,
 		"effective_date":   row.EffectiveFrom.Format("2006-01-02T15:04:05Z"),
-	})
+	}
+	if row.SupersededDocumentID.Valid {
+		payloadMap["superseded_document_id"] = row.SupersededDocumentID.String
+	}
+	payload, _ := json.Marshal(payloadMap)
 
 	ev := GovernanceEvent{
 		TenantID:     row.TenantID,
@@ -129,4 +161,43 @@ func (s *SchedulerService) processRow(ctx context.Context, db *sql.DB, row repos
 	}
 
 	return true, nil
+}
+
+func (s *SchedulerService) loadScheduledDocumentState(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (scheduledDocumentState, error) {
+	var state scheduledDocumentState
+	err := tx.QueryRowContext(ctx, `
+		SELECT id, tenant_id, status, controlled_document_id, superseded_document_id,
+		       effective_from, revision_version, schedule_generation
+		  FROM documents
+		 WHERE tenant_id = $1
+		   AND id = $2
+		 FOR UPDATE`,
+		tenantID, documentID,
+	).Scan(
+		&state.DocumentID,
+		&state.TenantID,
+		&state.Status,
+		&state.ControlledDocumentID,
+		&state.SupersededDocumentID,
+		&state.EffectiveFrom,
+		&state.RevisionVersion,
+		&state.ScheduleGeneration,
+	)
+	return state, err
+}
+
+func scheduledJobMatchesState(state scheduledDocumentState, input ScheduledPublishJobInput) bool {
+	if state.Status != "scheduled" {
+		return false
+	}
+	if !state.EffectiveFrom.Valid {
+		return false
+	}
+	if state.ScheduleGeneration != input.ScheduleGeneration {
+		return false
+	}
+	if state.RevisionVersion != input.ExpectedRevisionVersion {
+		return false
+	}
+	return state.EffectiveFrom.Time.UTC().Equal(input.ScheduledEffectiveAt.UTC())
 }

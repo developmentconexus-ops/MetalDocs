@@ -24,11 +24,11 @@ import (
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	approvalhttp "metaldocs/internal/modules/documents/approval/http"
 	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
+	approvaljobs "metaldocs/internal/modules/documents/approval/jobs"
 	approvalrepo "metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/documents/jobs"
 	docrepo "metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/jobs/audit_integrity_validator"
-	"metaldocs/internal/modules/jobs/effective_date_publisher"
 	"metaldocs/internal/modules/jobs/idempotency_janitor"
 	jobscheduler "metaldocs/internal/modules/jobs/scheduler"
 	"metaldocs/internal/modules/jobs/stuck_instance_watchdog"
@@ -67,6 +67,7 @@ import (
 	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
+	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/internal/platform/security"
 	e2etest "metaldocs/internal/test"
 )
@@ -298,6 +299,24 @@ func main() {
 	approvalRepo := approvalrepo.NewPostgresApprovalRepository(deps.SQLDB)
 	approvalEmitter := approvalapp.NewSQLEmitter()
 	approvalServices := approvalapp.NewServices(approvalRepo, approvalEmitter, approvalapp.RealClock{})
+	jobsCfg, err := config.LoadJobsConfig()
+	if err != nil {
+		log.Fatalf("invalid jobs config: %v", err)
+	}
+	if deps.SQLDB != nil {
+		if err := bootstrap.MigrateRiverSchema(ctx, deps.SQLDB, jobsCfg.RiverSchema); err != nil {
+			log.Fatalf("migrate river schema: %v", err)
+		}
+		riverBundle, err := riverjobs.NewClientBundle(deps.SQLDB, riverjobs.Config{
+			Queues:              jobsCfg.Queues,
+			Schema:              jobsCfg.RiverSchema,
+			SkipUnknownJobCheck: true,
+		}, nil)
+		if err != nil {
+			log.Fatalf("build scheduled publish enqueuer client: %v", err)
+		}
+		approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))
+	}
 	var effectiveFreezeInvoker approvalapp.FreezeInvoker = noopFreezeInvoker{}
 	if freezeSvc != nil {
 		effectiveFreezeInvoker = freezeSvc
@@ -333,21 +352,10 @@ func main() {
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
-	e2etest.RegisterE2EHandlers(mux, deps.SQLDB, func(ctx context.Context) error {
-		_, err := approvalServices.Scheduler.RunDuePublishes(ctx, deps.SQLDB)
-		return err
-	})
+	e2etest.RegisterE2EHandlers(mux, deps.SQLDB, nil)
 
 	leaderID := schedulerLeaderID()
 	s := jobscheduler.New(deps.SQLDB, leaderID)
-	if jobEnabled("ENABLE_JOB_EFFECTIVE_DATE_PUBLISHER") {
-		s.Register(jobscheduler.JobConfig{
-			Name:     "effective-date-publisher",
-			Interval: time.Minute,
-			Fn:       effective_date_publisher.New(deps.SQLDB, approvalServices.Scheduler),
-			Policy:   jobscheduler.SkipOnPressure,
-		})
-	}
 	if jobEnabled("ENABLE_JOB_STUCK_INSTANCE_WATCHDOG") {
 		s.Register(jobscheduler.JobConfig{
 			Name:     "stuck-instance-watchdog",

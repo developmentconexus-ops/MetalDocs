@@ -21,10 +21,13 @@ internal/modules/documents/approval/
 │   ├── publish_service.go                — PublishService.PublishApproved + SchedulePublish
 │   ├── read_service.go                   — ReadService (LoadInstance, ListInbox, CountPending)
 │   ├── route_admin_service.go            — RouteAdminService (Create/Update/Deactivate routes)
-│   ├── scheduler_service.go              — SchedulerService.RunDuePublishes (cron worker)
+│   ├── scheduler_service.go              — SchedulerService.RunScheduledPublishJob
 │   ├── services.go                       — Services struct (composition root for module); Clock; ValidateEventPayload
 │   ├── submit_service.go                 — SubmitService.SubmitRevisionForReview (draft → under_review + instance create)
 │   └── supersede_service.go              — SupersedeService.PublishSuperseding (publish-as-superseder atomic)
+├── jobs/                                 (dedicated River worker package for scheduled publish)
+│   ├── scheduled_publish_args.go         — ScheduledPublishArgs (River payload; kind `scheduled_publish_cutover`)
+│   └── scheduled_publish_job.go          — ScheduledPublishWorker + RiverScheduledPublishEnqueuer + NewWorkers
 ├── domain/                               (pure rules; 8 .go + 9 _test.go)
 │   ├── drift.go                          — ApplyEligibilityDrift (DriftPolicy reconciliation)
 │   ├── eligibility.go                    — CheckEligibility + ErrActorNotEligible (J1 sentinel)
@@ -161,13 +164,15 @@ Test files: 43 total `_test.go` files across application/domain/http/repository/
 | `route_admin_service.go:23` | var | `ErrRouteNotFound` | error | (undocumented) |
 | `route_admin_service.go:26..67` | types/methods | `CreateRouteInput/Result`, `UpdateRouteInput/Result`, `DeactivateRouteInput/Result`, `Create`, `Update`, `Deactivate` | per file | (undocumented) |
 | `scheduler_service.go:14` | type | `SchedulerService` | struct | (undocumented) |
-| `scheduler_service.go:21` | type | `RunDuePublishesResult` | struct | (undocumented) |
-| `scheduler_service.go:41` | method | `(*SchedulerService).RunDuePublishes` | `(ctx, *sql.DB) (RunDuePublishesResult, error)` | (undocumented) |
+| `scheduler_service.go:34` | method | `(*SchedulerService).RunScheduledPublishJob` | `(ctx, *sql.DB, ScheduledPublishJobInput) error` | dedicated jobs-runtime path; stale, mismatched, or early jobs no-op before publish |
 | `services.go:12` | iface | `Clock` | `Now() time.Time` | (undocumented) |
 | `services.go:17` | type | `RealClock` | struct | (undocumented) |
 | `services.go:24` | var | `ErrFloatInPayload` | error | (undocumented) |
 | `services.go:29` | type | `Services` | struct (composition root) | (undocumented) |
+| `services.go:39` | type | `ScheduledPublishJobInput` | struct | River scheduled-publish payload boundary shared by API enqueue + jobs runtime |
+| `services.go:47` | iface | `ScheduledPublishEnqueuer` | `EnqueueScheduledPublishTx(context.Context, *sql.Tx, ScheduledPublishJobInput) error` | transactional enqueue seam |
 | `services.go:43` | func | `NewServices` | `(repo, EventEmitter, Clock) *Services` | (undocumented) |
+| `services.go:61` | method | `(*Services).WithScheduledPublishEnqueuer` | `(ScheduledPublishEnqueuer) *Services` | wires the River enqueue seam into PublishService |
 | `services.go:61` | func | `ValidateEventPayload` | `(map[string]any) error` | (undocumented) |
 | `submit_service.go:19` | type | `SubmitService` | struct | (undocumented) |
 | `submit_service.go:26` | type | `SubmitRequest` | struct | (undocumented) |
@@ -205,10 +210,10 @@ Test files: 43 total `_test.go` files across application/domain/http/repository/
 |---|---|---|
 | `approval_repository.go:12` | type | `SignoffInsertResult` (doc commented) |
 | `approval_repository.go:18` | type | `ScheduledPublishRow` (doc commented) |
-| `approval_repository.go:28` | iface | `ApprovalRepository` (doc commented; 9 methods) |
+| `approval_repository.go:28` | iface | `ApprovalRepository` (doc commented; scheduling/publish persistence surface) |
 | `errors.go:28,34` | type/func | `MapHints`, `MapPgError` |
 | `postgres_approval_repository.go:20` | func | `NewPostgresApprovalRepository(*sql.DB) ApprovalRepository` |
-| `postgres_approval_repository.go:32..491` | methods (private receiver) | `InsertInstance`, `InsertStageInstances`, `InsertSignoff`, `LoadSignoffByActor`, `LoadInstance`, `LoadActiveInstanceByDocument`, `UpdateStageStatus`, `UpdateInstanceStatus`, `ListScheduledDue` (+ private helpers `loadStageInstances`, `loadSignoffsForInstance`) |
+| `postgres_approval_repository.go:32..514` | methods (private receiver) | `InsertInstance`, `InsertStageInstances`, `InsertSignoff`, `LoadSignoffByActor`, `LoadInstance`, `LoadActiveInstanceByDocument`, `ValidateScheduledSupersedeTarget`, `LoadCurrentPublishedHeadForDocument`, `LoadCurrentPublishedHead`, `MarkSuperseded`, `UpdateStageStatus`, `UpdateInstanceStatus` (+ private helpers `loadStageInstances`, `loadSignoffsForInstance`) |
 
 ### infrastructure/
 
@@ -216,6 +221,18 @@ Test files: 43 total `_test.go` files across application/domain/http/repository/
 |---|---|---|
 | `postgres_signoff_idemp_store.go:14` | type | `PostgresSignoffIdempStore` |
 | `postgres_signoff_idemp_store.go:18,25,42` | funcs | `NewPostgresSignoffIdempStore`, `CheckReplay`, `RecordReplay` |
+
+### jobs/
+
+| File:line | Kind | Name |
+|---|---|---|
+| `scheduled_publish_args.go:5` | type | `ScheduledPublishArgs` |
+| `scheduled_publish_args.go:13` | method | `(ScheduledPublishArgs).Kind` |
+| `scheduled_publish_job.go:11` | type | `ScheduledPublishWorker` |
+| `scheduled_publish_job.go:27` | type | `RiverScheduledPublishEnqueuer` |
+| `scheduled_publish_job.go:31` | method | `(*RiverScheduledPublishEnqueuer).EnqueueScheduledPublishTx` |
+| `scheduled_publish_job.go:44` | func | `NewWorkers` |
+| `scheduled_publish_job.go:52` | func | `NewScheduledPublishEnqueuer` |
 
 ### infra/signature/
 

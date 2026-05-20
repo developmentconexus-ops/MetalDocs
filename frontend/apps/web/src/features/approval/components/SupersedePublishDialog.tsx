@@ -1,14 +1,30 @@
 ﻿import { type FormEvent, useMemo, useState } from 'react';
 
 import { publish, schedulePublish, supersede } from '../api/approvalApi';
+import { ApprovalError } from '../api/mutationClient';
+import { resolveErrorMessage } from '../../../lib/api';
 import styles from './SupersedePublishDialog.module.css';
 
 type PublishMode = 'now' | 'schedule';
-type DialogState = 'idle' | 'submitting' | 'success' | 'error';
+type DialogState =
+  | 'idle'
+  | 'submitting'
+  | 'success'
+  | 'error_invalid_supersede_target'
+  | 'error_network'
+  | 'error_server';
+
+const ERROR_MESSAGES: Record<Exclude<DialogState, 'idle' | 'submitting' | 'success'>, string> = {
+  error_invalid_supersede_target:
+    'A publicação agendada não pode continuar porque a versão publicada vigente mudou. Atualize a página e revise o contexto antes de tentar novamente.',
+  error_network: 'Erro de conexão. Verifique sua internet e tente novamente.',
+  error_server: 'Não foi possível concluir a publicação. Tente novamente.',
+};
 
 interface SupersedePublishDialogProps {
   documentId: string;
   contentHash: string;
+  revisionVersion?: number;
   publishedDocumentId?: string;
   onClose: () => void;
   onSuccess: () => void;
@@ -30,15 +46,16 @@ function toDateTimeLocalValue(date: Date): string {
 export function SupersedePublishDialog({
   documentId,
   contentHash,
+  revisionVersion,
   publishedDocumentId,
   onClose,
   onSuccess,
 }: SupersedePublishDialogProps) {
   const [mode, setMode] = useState<PublishMode>('now');
   const [scheduledAt, setScheduledAt] = useState('');
-  const [replacePublished, setReplacePublished] = useState(false);
   const [state, setState] = useState<DialogState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showStaleBanner, setShowStaleBanner] = useState(false);
 
   const minScheduleDate = useMemo(() => {
     const date = new Date(Date.now() + 5 * 60 * 1000);
@@ -59,6 +76,33 @@ export function SupersedePublishDialog({
         })()
       : null;
   const submitDisabled = isSubmitting || (mode === 'schedule' && (!scheduledAt || scheduleValidationMessage !== null));
+  const ifMatch = typeof revisionVersion === 'number' ? `"v${revisionVersion}"` : undefined;
+  const hasError = state.startsWith('error_');
+
+  const mapErrorToState = (error: unknown): DialogState => {
+    if (error instanceof ApprovalError) {
+      if (error.status === 412 || error.code === 'conflict.stale' || error.code === 'conflict.stale_revision') {
+        setShowStaleBanner(true);
+        return 'idle';
+      }
+      if (error.code === 'publish.invalid_supersede_target') {
+        return 'error_invalid_supersede_target';
+      }
+      const resolvedMessage = resolveErrorMessage(error.code);
+      setErrorMessage(resolvedMessage === 'Erro inesperado.' ? null : resolvedMessage);
+      return 'error_server';
+    }
+
+    if (error instanceof TypeError) {
+      return 'error_network';
+    }
+
+    if (error instanceof Error && /network|failed to fetch|fetch/i.test(error.message)) {
+      return 'error_network';
+    }
+
+    return 'error_server';
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -67,6 +111,7 @@ export function SupersedePublishDialog({
     }
 
     setErrorMessage(null);
+    setShowStaleBanner(false);
     setState('submitting');
 
     try {
@@ -77,26 +122,24 @@ export function SupersedePublishDialog({
         }
         const scheduledDate = new Date(scheduledAt);
         await schedulePublish(documentId, {
-          content_hash: contentHash,
           effective_from: scheduledDate.toISOString(),
-        });
-      } else if (publishedDocumentId && replacePublished) {
+          superseded_document_id: publishedDocumentId,
+        }, { ifMatch });
+      } else if (publishedDocumentId) {
         await supersede(documentId, {
-          content_hash: contentHash,
-          supersedes_document_id: publishedDocumentId,
-        });
+          superseded_document_id: publishedDocumentId,
+        }, { ifMatch });
       } else {
         await publish(documentId, {
           content_hash: contentHash,
-        });
+        }, { ifMatch });
       }
 
       setState('success');
       onSuccess();
       onClose();
-    } catch (_error) {
-      setState('error');
-      setErrorMessage('Não foi possível concluir a publicação. Tente novamente.');
+    } catch (error) {
+      setState(mapErrorToState(error));
     }
   };
 
@@ -105,9 +148,15 @@ export function SupersedePublishDialog({
       <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Publicação">
         <h2 className={styles.title}>Publicação</h2>
 
-        {state === 'error' && errorMessage ? (
+        {showStaleBanner ? (
+          <div className={styles.errorBox} role="status">
+            O documento foi alterado. Atualize a página antes de tentar novamente.
+          </div>
+        ) : null}
+
+        {hasError ? (
           <div className={styles.errorBox} role="alert">
-            {errorMessage}
+            {errorMessage ?? ERROR_MESSAGES[state as keyof typeof ERROR_MESSAGES]}
           </div>
         ) : null}
 
@@ -162,19 +211,18 @@ export function SupersedePublishDialog({
                     {scheduleValidationMessage}
                   </p>
                 ) : null}
+                {publishedDocumentId ? (
+                  <p className={styles.label}>
+                    A publicação agendada substituirá automaticamente a versão publicada atual.
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
             {mode === 'now' && publishedDocumentId ? (
-              <label className={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={replacePublished}
-                  onChange={(event) => setReplacePublished(event.target.checked)}
-                  disabled={isSubmitting}
-                />
-                Substituir versão publicada atual
-              </label>
+              <p className={styles.label}>
+                Esta publicação substituirá automaticamente a versão publicada atual.
+              </p>
             ) : null}
 
             <div className={styles.actions}>
@@ -196,4 +244,3 @@ export function SupersedePublishDialog({
     </div>
   );
 }
-

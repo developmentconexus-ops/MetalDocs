@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-19 (artifact metadata runtime sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-20 (scheduled publish River cutover) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -89,7 +89,8 @@ Quality-managed documents. Each instance traces back to a template + a controlle
 - `apps/api/internal/wiring/documents.go:6` â€” `NewCapabilityChecker` adapter at `:24` (ADR 0007 J2)
 - `apps/worker/cmd/metaldocs-worker/main.go:8` â€” worker side
 - `internal/modules/iam/integration_test.go:16`
-- `internal/jobs/effective_date_publisher/job.go:8` Â· `internal/jobs/stuck_instance_watchdog/job.go:10`
+- `apps/jobs/cmd/metaldocs-jobs/main.go:1` Ã¢â‚¬â€ dedicated scheduled-publish jobs runtime built from the approval/documents scheduler path
+- `internal/modules/jobs/stuck_instance_watchdog/job.go:10`
 - `internal/platform/docgenv2/templates_snapshot_reader.go:8`
 - `internal/platform/objectstore/document_presigner.go:17`
 
@@ -378,12 +379,12 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 
 ## 7. Deployment View
 
-- Binary: `apps/api/cmd/metaldocs-api` (single Go server); worker side mounted via `apps/worker/cmd/metaldocs-worker`.
-- Process: container on port `:8081` (per `scripts/start-api.ps1`).
+- Binaries: `apps/api/cmd/metaldocs-api` for HTTP ownership, `apps/jobs/cmd/metaldocs-jobs` for scheduled publish temporal work, and `apps/worker/cmd/metaldocs-worker` for PDF/outbox work.
+- Process: local startup now runs API on `:8081` and starts the dedicated jobs host by default (per `scripts/start-api.ps1`).
 - Migrations: applied at startup; documents-owned files live in `migrations/` chronological set (0001..0183 to date) â€” full enumeration in `_artifacts/04-persistence.md`. Forward-only (IP-006).
 - Environment: documents reads no env/config vars directly (verified in `_artifacts/03-deps.md`). All knobs come through DI from `apps/api/cmd/metaldocs-api/main.go`.
 - Background jobs:
-  - `internal/jobs/effective_date_publisher/job.go:8` â€” promotes approved â†’ published at effective date
+  - `metaldocs-jobs` River temporal worker â€” promotes scheduled â†’ published at effective time from the dedicated jobs runtime; the API now owns only transactional enqueue
   - `internal/jobs/stuck_instance_watchdog/job.go:10` â€” watchdog for stalled approval instances
   - `internal/modules/documents/jobs/orphan_pending_sweeper.go`, `session_sweeper.go` â€” orphan + session cleanup
 
@@ -524,12 +525,26 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-20 - Scheduled publish River cutover sync: scheduling a publish now increments `documents.schedule_generation`, enqueues exactly one River temporal job in the same transaction, and leaves future execution to the dedicated `metaldocs-jobs` runtime instead of the API host.
+- 2026-05-20 - Scheduled supersede lineage sync: a scheduled replacement now persists the previously published lineage head on `documents.superseded_document_id`; after cutover, the new revision becomes `published` and the recorded head is transitioned to `superseded` in the same lineage.
+- 2026-05-20 - Revision-title lifecycle sync: modern revision creation from `/documents/:id` now treats the composer field as the draft working document name only; the governed `documents.revision_title` remains born at finalize / submit-for-review, preserving a single source of truth on the governed lineage row instead of duplicating title capture during draft creation.
+- 2026-05-20 - Canonical active-sibling gating sync: `/documents/:id` now blocks new revision creation whenever an active sibling exists in runtime (`draft`, `under_review`, `approved`, `scheduled`, `rejected`) and maps the CTA label by sibling state instead of always exposing `Iniciar revisao`.
+- 2026-05-20 - Canonical publish replacement sync: the modern publish dialog now treats `publishedDocumentId` as mandatory replacement context and always uses supersede semantics for publish-now when a lineage head is already published.
+- 2026-05-19 - Modern editor submit-state sync: after `POST /api/v1/documents/{id}/finalize`, the modern editor now promotes the local screen state to `under_review`, rehydrates document detail in-place, and warms governed history / approval-instance caches on `/documents/{id}/edit`. This prevents a stale `draft` snapshot from leaving the canvas blank after the server has already moved the document to `under_review`, while still degrading safely if auxiliary rehydration retries are needed.
 - 2026-05-19 - Artifact metadata runtime sync: autosave technical revisions now persist DOCX `file_size_bytes`, `page_count`, and `page_count_source`; document detail/autosave responses expose current-head metadata; document detail exposes governed `RevisionNumber`; the editor collects EigenPal page count through `MetalDocsEditorRef.getPageCount()` and renders `Paginas`/size in the sidebar from runtime data.
+- 2026-05-19 - Approval signoff tripwire sync: final approve/reject now assert `document.edit` in the approval transaction before freeze/status writes touch `public.documents`, fixing the runtime 500 where modern inbox signoff passed `document.signoff` but failed the documents-table tripwire on the final state change.
+- 2026-05-20 - Approval supersede tripwire sync: the approval-side supersede publish path now asserts `document.edit` before its `public.documents` updates, removing the runtime `500 internal.unknown` that appeared when the canonical `/documents/:id` flow tried to publish an approved revision over the previously published lineage head.
+- 2026-05-20 - Publish-only active-document sync: after canonical publish, the technical `GET /api/v1/controlled-documents/{id}/active-document` lookup now omits `approvalState` when no draft/review revision exists, instead of drifting to a false `draft` state. This keeps `/documents/:id` aligned with runtime truth between publish and the next governed revision create.
 - 2026-05-19 - Editor sidebar identification layout sync: the editor sidebar now labels document identity as `Identificacao`, renders identity fields as stacked editorial labels (`Codigo`, `Tipo`, `Area responsavel`, `Visibilidade`), and removes the extra outer sidebar padding.
 - 2026-05-19 - Editor sidebar revision-title/density sync: `REV00` now uses the canonical initial governed title `Criacao do documento` when `revisionTitle` is omitted; later governed revisions still require `revisionTitle` at formal submission. The editor sidebar renders governed revision rows as code/title/date without inline workflow status, keeps draft approvers hidden, and collapses long governed histories without using technical `document_revisions`.
 - 2026-05-18 - Governed sidebar sync: `documents.revision_title` is now part of the runtime model and required on `POST /api/v1/documents/{id}/finalize`; the editor sidebar reads governed history from `GET /api/v1/documents/{id}/revision-history`, and that history is sourced from `documents` lineage by `controlled_document_id`, not from technical `document_revisions`.
 - 2026-05-18 - Approval/registry sidebar boundary sync: the editor consumes `GET /api/v1/documents/{id}/approval-instance` only for `under_review`, and visibility is resolved from the registry-controlled document contract instead of a documents-local duplicate field.
 - 2026-05-18 - Approval/review comments hardening sync: final approval now stops server-side with `approval.unresolved_comments` when active document comments remain unresolved; the signoff dialog maps that conflict inline and the editor keeps comment-load failures visible with a persistent retry banner instead of toast-only feedback.
+- 2026-05-20 - Canonical `/documents/:id` hardening sync: `DocumentPublishedPage` now distinguishes `approved` from `published` in runtime UI. Approved documents render `Publicar / Agendar` using the technical `GET /api/v1/controlled-documents/{id}/active-document` lookup for publish context, while `Iniciar revisão` is withheld until the document is actually `published`, preventing false-positive create-revision attempts against `ux_documents_cd_active`.
+- 2026-05-20 - Canonical published-detail sync: once a governed draft already exists for the same `controlled_document_id`, `/documents/{id}` now renders `Continuar revisÃ£o ativa` instead of offering another revision create. The page also replaced its placeholder version timeline with governed lineage from `GET /api/v1/documents/{id}/revision-history`, so the canonical surface now shows runtime `REV00/REV01` history instead of mock-era `v3.2` content.
+- 2026-05-20 - Canonical revision-label sync: `DocumentPublishedPage` now renders the governed revision code from `documents.revision_number` (`REV00`, `REV01`, …) in its hero/status/KPI surfaces instead of leaking the technical `document_revisions.version_number` counter (`v1`, `v2`, …). The canonical `/documents/:id` page therefore keeps business lineage consistent across hero copy, current-version KPI, and governed history.
+- 2026-05-20 - Canonical status-presentation sync: `DocumentPublishedPage` now maps hero badge/subtitle/owner-meta from the governed `documents.status` of the viewed document itself (`approved`, `scheduled`, `published`, `superseded`, `obsolete`) instead of collapsing every non-approved state to `vigente`. This keeps the canonical `/documents/:id` hero aligned with lineage truth when a revision is scheduled, published after cutover, or superseded by a newer head.
+- 2026-05-20 - Canonical scheduled-cutover freshness sync: `/documents/:id` keeps the canonical `GET /api/v1/documents/{id}` detail route as source of truth and now treats scheduled lifecycle freshness as TanStack Query policy, not page-local control flow. While the governed detail is `scheduled`, the page enables selective query-layer polling for detail/history/active-document context; when the detail converges to `published`, polling stops automatically. This codifies the frontend rule that server-driven workflow transitions must stay synchronized through query hooks and invalidation, not component-level timer loops or legacy fallback calls.
 - 2026-05-18 - Comments contract sync: `/api/v1/documents/{id}/comments*` now has named OpenAPI request/response schemas, generated backend/frontend types, and the editor comments wrapper consumes those generated types instead of handwritten payload rows.
 - 2026-05-17 - Review comments lifecycle audit sync: recorded backend/API prerequisite that unresolved active comments must block approval/release server-side before frontend can claim enforcement.
 - 2026-05-15 - Novo Documento runtime repair: `CreateDocumentTx` now asserts `document.edit` before the initial pointer/snapshot `documents` UPDATEs so the Plan 5 tripwire accepts atomic blank-template creation.

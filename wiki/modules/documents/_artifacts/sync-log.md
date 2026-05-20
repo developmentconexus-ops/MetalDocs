@@ -1,3 +1,19 @@
+## 2026-05-20 - scheduled publish River cutover sync
+
+- **Context:** current uncommitted scheduled publish River migration and dedicated `metaldocs-jobs` runtime cutover.
+- **Mode:** structural refresh
+- **Anchors moved:** none
+- **Public surface:** no new documents HTTP routes; runtime ownership moved so schedule requests enqueue one River job instead of relying on API-hosted scheduled publish execution
+- **Routes/API:** existing `POST /api/v1/documents/{id}/schedule-publish` contract now persists `documents.schedule_generation` and leaves future execution to the dedicated jobs runtime
+- **Runtime flows:** API remains the transactional writer for schedule requests; `metaldocs-jobs` performs future publish cutover; worker/outbox ownership stays separate
+- **Persistence:** `public.documents.schedule_generation` added as the stale-job invalidation discriminator for scheduled publish
+- **Dependencies:** startup truth now includes `scripts/start-jobs.ps1` and default `start-api.ps1` jobs boot; no legacy API scheduled-publish owner remains
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8
+- **Tally gate:** PASS preflight
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`; `wiki/references/local-dev-startup.md`
+
 ## 2026-05-19 - editor sidebar identification visual sync
 
 - **Context:** uncommitted frontend diff for `EditorMetaSidebar` identity layout refinement.
@@ -150,3 +166,35 @@
 - **Counts after:** Critical=1 Major=5 Minor=3
 - **Tally gate:** pending
 - **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents-tech-debt.md`; `wiki/modules/documents/_artifacts/sync-log.md`; `wiki/backlog/editor.md`; `wiki/concepts/error-ux.md`
+
+## 2026-05-20 - canonical published-detail status presentation sync
+
+- **Context:** current uncommitted `/documents/:id` screen-local fix after deep-QA runtime evidence showed the canonical hero still rendering `vigente`/published copy for `scheduled`, `published`, and `superseded` documents
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** no new routes; canonical detail page now derives hero badge/subtitle/owner-meta from governed `documents.status`
+- **Routes/API:** none; existing `GET /api/v1/documents/{id}` + `GET /api/v1/documents/{id}/approval-instance` payloads were sufficient for the UI fix
+- **Runtime flows:** canonical `/documents/:id` hero now stays aligned with lineage truth across `approved`, `scheduled`, `published`, `superseded`, and `obsolete`
+- **Persistence:** none
+- **Dependencies:** frontend-only `DocumentPublishedPage` rendering; no TanStack key/contract changes
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=7 Minor=4
+- **Tally gate:** PASS
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
+
+## 2026-05-20 - canonical scheduled-cutover freshness sync
+
+- **Context:** current uncommitted `/documents/:id` hardening after deep-QA runtime evidence showed scheduler cutover had already promoted a scheduled revision to `published`, but the canonical screen stayed stale on `AGENDADO`
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** no new routes; canonical detail screen still uses `GET /api/v1/documents/{id}` as governed source of truth and `GET /api/v1/controlled-documents/{id}/active-document` only as auxiliary active-lineage context
+- **Routes/API:** none; no legacy route fallback introduced or retained
+- **Runtime flows:** scheduled revisions now keep detail/history/active-document synchronized through query-layer polling only while the governed detail remains `scheduled`; polling stops once runtime detail converges to a stable state such as `published`
+- **Persistence:** none
+- **Dependencies:** `DocumentPublishedPage` now delegates scheduled freshness policy to TanStack Query hook options instead of page-local timer control flow
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=7 Minor=4
+- **Tally gate:** PASS
+- **Patched files:** `frontend/apps/web/src/features/documents/pages/DocumentPublishedPage.tsx`; `frontend/apps/web/src/features/documents/pages/DocumentPublishedPage.test.tsx`; `frontend/apps/web/src/features/documents/queries/useDocumentDetailQuery.ts`; `frontend/apps/web/src/features/documents/queries/useDocumentRevisionHistoryQuery.ts`; `frontend/apps/web/src/features/documents/queries/useControlledDocumentActiveDocumentQuery.ts`; `wiki/architecture/frontend-structure.md`; `.agents/skills/metaldocs-tanstack-query/SKILL.md`; `.agents/skills/metaldocs-frontend/SKILL.md`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`

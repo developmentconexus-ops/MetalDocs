@@ -7,10 +7,9 @@ package application
 // the same fake-driver pattern as the per-service tests in this package, then
 // chain real service method calls to prove end-to-end service wiring works.
 //
-// Three scenarios:
+// Two scenarios:
 //   1. FullApprovalAndPublish   — Submit → approve signoff → PublishApproved
 //   2. RejectThenResubmit       — Submit → reject signoff → Submit again (new instance)
-//   3. ScheduleAndRunScheduler  — SchedulePublish → RunDuePublishes (clock advanced)
 
 import (
 	"context"
@@ -50,10 +49,6 @@ type phase5Repo struct {
 	insertSignoffErr  error
 	updateStageErr    error
 	updateInstanceErr error
-
-	// Scheduler method
-	scheduledRows []repository.ScheduledPublishRow
-	listDueErr    error
 }
 
 func (r *phase5Repo) InsertInstance(_ context.Context, _ *sql.Tx, _ domain.Instance) error {
@@ -80,10 +75,6 @@ func (r *phase5Repo) UpdateInstanceStatus(_ context.Context, _ *sql.Tx, _, _ str
 	return r.updateInstanceErr
 }
 
-func (r *phase5Repo) ListScheduledDue(_ context.Context, _ *sql.Tx, _ time.Time, _ int) ([]repository.ScheduledPublishRow, error) {
-	return r.scheduledRows, r.listDueErr
-}
-
 // ---------------------------------------------------------------------------
 // Phase 5 combined fake SQL driver
 //
@@ -98,10 +89,10 @@ func (r *phase5Repo) ListScheduledDue(_ context.Context, _ *sql.Tx, _ time.Time,
 // ---------------------------------------------------------------------------
 
 type phase5Conn struct {
-	stageSignoffs []signoffRow // reuse decisionTestConn's signoffRow type
-	updateResults []int64
+	stageSignoffs      []signoffRow // reuse decisionTestConn's signoffRow type
+	updateResults      []int64
 	unresolvedComments int
-	updateIdx     int32 // atomic
+	updateIdx          int32 // atomic
 }
 
 func (c *phase5Conn) nextRowsAffected() int64 {
@@ -190,7 +181,7 @@ func (c *phase5Conn) Prepare(query string) (driver.Stmt, error) {
 func (c *phase5Conn) Close() error              { return nil }
 func (c *phase5Conn) Begin() (driver.Tx, error) { return c, nil }
 
-// BeginTx honours non-default isolation levels (used by SchedulerService fetch tx).
+// BeginTx honours non-default isolation levels used by service transactions.
 func (c *phase5Conn) BeginTx(_ context.Context, _ driver.TxOptions) (driver.Tx, error) {
 	return c, nil
 }
@@ -566,123 +557,5 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 	}
 	if emitter.Events[2].EventType != "approval_submitted" {
 		t.Errorf("event[2].EventType = %q; want approval_submitted", emitter.Events[2].EventType)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Scenario 3: ScheduleAndRunScheduler
-//
-// Flow: SchedulePublish (future effective_date) → RunDuePublishes (clock advanced past it)
-//
-// SchedulePublish needs:
-//   • clock.Now() strictly before effective_date (guard check)
-//   • LoadInstance returns an approved instance
-//   • UPDATE documents returns rowsAffected=1
-//
-// RunDuePublishes needs:
-//   • ListScheduledDue returns 1 row (the scheduled doc)
-//   • UPDATE documents returns rowsAffected=1
-//   • Result.Processed == 1
-// ---------------------------------------------------------------------------
-
-func TestPhase5_ScheduleAndRunScheduler(t *testing.T) {
-	ctx := context.Background()
-
-	// Clock is set to "before" for SchedulePublish, "after" for RunDuePublishes.
-	pastClock := fixedClock{t: time.Date(2026, 4, 22, 9, 0, 0, 0, time.UTC)}
-	effectiveDate := time.Date(2026, 4, 23, 0, 0, 0, 0, time.UTC) // 1 day in the future
-	futureClock := fixedClock{t: time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC)}
-
-	const (
-		tenantID   = "tenant-p5-sched"
-		documentID = "doc-p5-sched"
-		instanceID = "inst-p5-sched"
-	)
-
-	approvedInstance := &domain.Instance{
-		ID:              instanceID,
-		TenantID:        tenantID,
-		DocumentID:      documentID,
-		Status:          domain.InstanceApproved,
-		RevisionVersion: 2,
-	}
-
-	scheduledRow := repository.ScheduledPublishRow{
-		DocumentID:      documentID,
-		TenantID:        tenantID,
-		EffectiveFrom:   effectiveDate,
-		RevisionVersion: 2,
-	}
-
-	repo := &phase5Repo{
-		instance:      approvedInstance,
-		scheduledRows: []repository.ScheduledPublishRow{scheduledRow},
-	}
-	emitter := &MemoryEmitter{}
-
-	// --- Step 1: SchedulePublish ---
-	// DB needs: UPDATE documents (rowsAffected=1).
-	schedConn := &phase5Conn{updateResults: []int64{1}}
-	schedDB := newPhase5DB(t, schedConn)
-
-	publishSvc := &PublishService{repo: repo, emitter: emitter, clock: pastClock}
-
-	schedReq := SchedulePublishRequest{
-		TenantID:      tenantID,
-		InstanceID:    instanceID,
-		EffectiveDate: effectiveDate, // strictly after pastClock.Now()
-		ScheduledBy:   "scheduler-user",
-	}
-	schedResult, err := publishSvc.SchedulePublish(ctx, schedDB, schedReq)
-	if err != nil {
-		t.Fatalf("SchedulePublish: unexpected error: %v", err)
-	}
-	if schedResult.DocumentID != documentID {
-		t.Errorf("SchedulePublish.DocumentID = %q; want %q", schedResult.DocumentID, documentID)
-	}
-	if !schedResult.EffectiveDate.Equal(effectiveDate) {
-		t.Errorf("SchedulePublish.EffectiveDate = %v; want %v", schedResult.EffectiveDate, effectiveDate)
-	}
-	if len(emitter.Events) != 1 {
-		t.Fatalf("after SchedulePublish: want 1 event; got %d", len(emitter.Events))
-	}
-	if emitter.Events[0].EventType != "publish_scheduled" {
-		t.Errorf("event[0].EventType = %q; want publish_scheduled", emitter.Events[0].EventType)
-	}
-
-	// --- Step 2: RunDuePublishes (clock advanced past effective_date) ---
-	// The fetch tx uses LevelReadCommitted — schedulerTestConn handles that.
-	// We reuse the scheduler driver pattern: BeginTx must be satisfied.
-	runConn := &schedulerTestConn{updateResults: []int64{1}}
-	runConnName := fmt.Sprintf("phase5_run_test_%p", runConn)
-	sql.Register(runConnName, &schedulerTestDriver{conn: runConn})
-	runDB, err := sql.Open(runConnName, "")
-	if err != nil {
-		t.Fatalf("open scheduler run test db: %v", err)
-	}
-	t.Cleanup(func() { _ = runDB.Close() })
-
-	schedulerSvc := &SchedulerService{repo: repo, emitter: emitter, clock: futureClock}
-
-	runResult, err := schedulerSvc.RunDuePublishes(ctx, runDB)
-	if err != nil {
-		t.Fatalf("RunDuePublishes: unexpected top-level error: %v", err)
-	}
-	if runResult.Processed != 1 {
-		t.Errorf("RunDuePublishes.Processed = %d; want 1", runResult.Processed)
-	}
-	if len(runResult.Errors) != 0 {
-		t.Errorf("RunDuePublishes.Errors = %v; want empty", runResult.Errors)
-	}
-
-	// Total events: 1 (publish_scheduled) + 1 (document_published from scheduler).
-	if len(emitter.Events) != 2 {
-		t.Fatalf("after RunDuePublishes: want 2 events; got %d", len(emitter.Events))
-	}
-	if emitter.Events[1].EventType != "document_published" {
-		t.Errorf("event[1].EventType = %q; want document_published", emitter.Events[1].EventType)
-	}
-	if emitter.Events[1].ResourceID != documentID {
-		t.Errorf("event[1].ResourceID = %q; want %q", emitter.Events[1].ResourceID, documentID)
 	}
 }

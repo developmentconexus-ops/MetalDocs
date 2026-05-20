@@ -33,8 +33,9 @@ Other internal OUT imports observed (non-self):
 | .\\apps\\api\\internal\\wiring\\documents.go | .\\apps\\api\\internal\\wiring\\documents.go:6 |
 | .\\apps\\worker\\cmd\\metaldocs-worker\\main.go | .\\apps\\worker\\cmd\\metaldocs-worker\\main.go:8 |
 | .\\internal\\modules\\iam\\integration_test.go | .\\internal\\modules\\iam\\integration_test.go:16 |
-| .\\internal\\modules\\jobs\\effective_date_publisher\\job.go | .\\internal\\modules\\jobs\\effective_date_publisher\\job.go:8 |
-| .\\internal\\modules\\jobs\\effective_date_publisher\\job_test.go | .\\internal\\modules\\jobs\\effective_date_publisher\\job_test.go:13 |
+| .\\apps\\jobs\\cmd\\metaldocs-jobs\\main.go | .\\apps\\jobs\\cmd\\metaldocs-jobs\\main.go:14 |
+| .\\internal\\modules\\documents\\approval\\jobs\\scheduled_publish_job.go | .\\internal\\modules\\documents\\approval\\jobs\\scheduled_publish_job.go:8 |
+| .\\internal\\modules\\documents\\approval\\jobs\\scheduled_publish_job_test.go | .\\internal\\modules\\documents\\approval\\jobs\\scheduled_publish_job_test.go:14 |
 | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job.go | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job.go:10 |
 | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job_test.go | .\\internal\\modules\\jobs\\stuck_instance_watchdog\\job_test.go:14 |
 | .\\internal\\platform\\docgenv2\\templates_snapshot_reader.go | .\\internal\\platform\\docgenv2\\templates_snapshot_reader.go:8 |
@@ -114,7 +115,7 @@ Expected-path verification:
 | internal/modules/documents\approval\application\publish_service_test.go | unit | default classification |
 | internal/modules/documents\approval\application\read_service_test.go | unit | default classification |
 | internal/modules/documents\approval\application\route_admin_service_test.go | unit | default classification |
-| internal/modules/documents\approval\application\scheduler_service_test.go | unit | default classification |
+| internal/modules/documents\approval\application\scheduler_test_helpers_test.go | unit | default classification |
 | internal/modules/documents\approval\application\submit_eligible_actors_test.go | unit | default classification |
 | internal/modules/documents\approval\application\submit_service_test.go | unit | default classification |
 | internal/modules/documents\approval\application\supersede_service_test.go | unit | default classification |

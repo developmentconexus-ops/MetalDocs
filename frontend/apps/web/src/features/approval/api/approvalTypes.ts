@@ -108,8 +108,8 @@ export interface PublishResponse {
 }
 
 export interface SchedulePublishRequest {
-  content_hash: string;
   effective_from: string;
+  superseded_document_id?: string;
 }
 
 export interface SchedulePublishResponse {
@@ -118,8 +118,7 @@ export interface SchedulePublishResponse {
 }
 
 export interface SupersedeRequest {
-  content_hash: string;
-  supersedes_document_id: string;
+  superseded_document_id: string;
 }
 
 export interface SupersedeResponse {

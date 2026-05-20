@@ -1,5 +1,21 @@
 # Sync log - approval
 
+## 2026-05-20 - scheduled publish River cutover sync
+
+- **Context:** current uncommitted scheduled publish River migration and dedicated `metaldocs-jobs` runtime cutover.
+- **Mode:** structural refresh
+- **Anchors moved:** scheduled publish runtime ownership moved from API cron lane to `metaldocs-jobs`
+- **Public surface:** documented `RunScheduledPublishJob`, `ScheduledPublishJobInput`, `ScheduledPublishEnqueuer`, and the River worker/enqueuer package
+- **Routes/API:** no approval HTTP route shape change; `POST /api/v1/documents/{id}/schedule-publish` now enqueues one River `scheduled_publish_cutover` job in the same transaction
+- **Runtime flows:** scheduled publish execution now lives in the dedicated jobs host; stale jobs no-op when state, revision, effective time, or `schedule_generation` drifted
+- **Persistence:** documented `documents.schedule_generation` as the invalidation fence carried in the job payload
+- **Dependencies:** API now owns River schema migration plus transactional enqueue wiring; `apps/jobs/cmd/metaldocs-jobs` owns worker execution; legacy `effective_date_publisher` ownership removed
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=4 Minor=6; missing-ADR=10
+- **Tally gate:** PASS preflight
+- **Patched files:** `wiki/modules/approval.md`; `wiki/modules/approval/_artifacts/01-surface.md`; `wiki/modules/approval/_artifacts/03-deps.md`; `wiki/modules/approval/_artifacts/sync-log.md`
+
 ## 2026-05-16 - controlled-document review route polish
 
 - **Context:** uncommitted diff: approval inbox navigation target changed from `/controlled-documents/{controlled_document_id}` to `/controlled-documents/{controlled_document_id}`.

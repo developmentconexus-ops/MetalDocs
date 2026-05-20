@@ -1,6 +1,7 @@
 param(
     [switch]$Build,
-    [switch]$NoWorker
+    [switch]$NoWorker,
+    [switch]$NoJobs
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,6 +22,15 @@ $workerCriticalPaths = @(
     'internal/platform',
     'db',
     'scripts/start-api.ps1'
+)
+
+$jobsCriticalPaths = @(
+    'apps/jobs/cmd/metaldocs-jobs',
+    'internal/modules',
+    'internal/platform',
+    'db',
+    'scripts/start-api.ps1',
+    'scripts/start-jobs.ps1'
 )
 
 function Get-LatestWriteTimeUtc {
@@ -177,6 +187,18 @@ function Stop-ExistingWorkerProcesses {
     Start-Sleep -Seconds 1
 }
 
+function Stop-ExistingJobsProcesses {
+    $existingJobs = @(Get-Process -Name 'metaldocs-jobs' -ErrorAction SilentlyContinue)
+    if ($existingJobs.Count -eq 0) {
+        return
+    }
+
+    $jobsIds = ($existingJobs | Select-Object -ExpandProperty Id) -join ', '
+    Write-Host "Detected existing metaldocs-jobs process(es); stopping before starting a new jobs host (PID $jobsIds)"
+    $existingJobs | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+}
+
 function Ensure-GoBinary {
     param(
         [string]$Name,
@@ -220,6 +242,7 @@ Get-Content ".env" | ForEach-Object {
 
 $binary = Join-Path $root "metaldocs-api.exe"
 $workerBinary = Join-Path $root "metaldocs-worker.exe"
+$jobsBinary = Join-Path $root "metaldocs-jobs.exe"
 
 $held = netstat -ano 2>$null | Select-String ":8081 " | ForEach-Object { ($_ -split '\s+')[5] } | Select-Object -First 1
 if ($held) {
@@ -261,6 +284,16 @@ if (-not $NoWorker) {
         -ForceBuild:$Build
 }
 
+if (-not $NoJobs) {
+    Ensure-GoBinary `
+        -Name "MetalDocs Jobs" `
+        -BinaryPath $jobsBinary `
+        -OutputName "metaldocs-jobs.exe" `
+        -PackagePattern "./apps/jobs/cmd/metaldocs-jobs/..." `
+        -CriticalPaths $jobsCriticalPaths `
+        -ForceBuild:$Build
+}
+
 if (-not $NoWorker) {
     Stop-ExistingWorkerProcesses
 
@@ -274,7 +307,20 @@ if (-not $NoWorker) {
     Write-Host ("Worker process launched and remained alive for the initial check window (PID: " + $workerProc.Id + ")")
 }
 
-Write-Host "Starting MetalDocs API on :8081 after timestamp-based binary checks"
+if (-not $NoJobs) {
+    Stop-ExistingJobsProcesses
+
+    Write-Host "Starting MetalDocs Jobs host in background..."
+    $jobsProc = Start-Process -FilePath $jobsBinary -PassThru -WindowStyle Hidden
+    Start-Sleep -Seconds 1
+    if ($jobsProc.HasExited) {
+        Write-Error "Jobs host process exited immediately after startup"
+        exit 1
+    }
+    Write-Host ("Jobs host launched and remained alive for the initial check window (PID: " + $jobsProc.Id + ")")
+}
+
+Write-Host "Starting MetalDocs API on :8081 after timestamp-based binary checks (scheduled publish ownership lives in metaldocs-jobs)"
 try {
     & $binary
 } catch {

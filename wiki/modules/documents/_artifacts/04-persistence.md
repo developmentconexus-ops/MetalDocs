@@ -1,9 +1,9 @@
-# 04 — Persistence
+# 04 - Persistence
 
 ## 1. Tables Owned
 | Table | Created in | Notes |
 |---|---|---|
-| public.documents | 0110_docx_v2_documents.sql:14 | Replaced `documents_v2` workflow; later bridge/state fixes in 0167 and checks in 0183. |
+| public.documents | 0110_docx_v2_documents.sql:14 | Replaced `documents_v2` workflow; later bridge/state fixes in 0167, checks in 0183, and `schedule_generation` for scheduled-publish job invalidation in 0208. |
 | public.editor_sessions | 0110_docx_v2_documents.sql:34 | Session table used by repository methods; checklist name `public.document_sessions` not found (unclear: no migration defines that name). |
 | public.document_revisions | 0110_docx_v2_documents.sql:49 | Revision ledger with unique `(document_id, content_hash)`. |
 | public.document_checkpoints | 0110_docx_v2_documents.sql:90 | Checkpoint labels by `(document_id, version_num)`. |
@@ -28,6 +28,7 @@ status TEXT NOT NULL
 current_revision_id UUID REFERENCES document_revisions(id)
 active_session_id UUID REFERENCES editor_sessions(id)
 created_by UUID NOT NULL
+schedule_generation BIGINT NOT NULL DEFAULT 0
 ```
 
 ```sql
@@ -243,3 +244,4 @@ Tripwire rule evaluation facts:
 | 29 | 0181_drop_documents_locked_at.sql | ALTER `public.documents` drop `locked_at` | (unclear: filename has no date) |
 | 30 | 0182_cd_sequence_per_area.sql | DROP old counter; CREATE `cd_sequence_counters` | (unclear: filename has no date) |
 | 31 | 0183_documents_name_not_empty.sql | UPDATE + ALTER `documents` NOT NULL/CHECK name | (unclear: filename has no date) |
+| 32 | 0208_documents_schedule_generation.sql | ALTER `public.documents` add `schedule_generation` discriminator for scheduled publish jobs | (unclear: filename has no date) |
