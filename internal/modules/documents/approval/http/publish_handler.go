@@ -89,7 +89,12 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 		WriteError(w, err)
 		return
 	}
-	_ = ifMatchVersion
+
+	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, documentID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 
 	var body contracts.SchedulePublishRequest
 	if err := contracts.Decode(r, &body); err != nil {
@@ -108,10 +113,12 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := schedulePublish(h, r.Context(), h.db, application.SchedulePublishRequest{
-		TenantID:      tenantID,
-		InstanceID:    documentID,
-		EffectiveDate: effectiveFrom,
-		ScheduledBy:   actorID,
+		TenantID:             tenantID,
+		InstanceID:           inst.ID,
+		ExpectedRevision:     ifMatchVersion,
+		EffectiveDate:        effectiveFrom,
+		ScheduledBy:          actorID,
+		SupersededDocumentID: body.SupersededDocumentID,
 	})
 	if err != nil {
 		WriteError(w, err)

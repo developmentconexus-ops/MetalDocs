@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -63,8 +64,20 @@ type supersedeTestStmt struct {
 func (s *supersedeTestStmt) Close() error  { return nil }
 func (s *supersedeTestStmt) NumInput() int { return -1 }
 
-func (s *supersedeTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	if !strings.Contains(strings.ToLower(s.query), "update") {
+func (s *supersedeTestStmt) Exec(args []driver.Value) (driver.Result, error) {
+	q := strings.ToLower(s.query)
+	if strings.Contains(q, "set_config('metaldocs.asserted_caps'") {
+		if len(args) > 0 {
+			if raw, ok := args[0].(string); ok {
+				s.conn.setAssertedCaps(raw)
+			}
+		}
+		return supersedeTestResult{rowsAffected: 1}, nil
+	}
+	if strings.Contains(q, "update documents") && !s.conn.hasAssertedCap("document.edit") {
+		return nil, fmt.Errorf("ErrCapabilityNotAsserted: document.edit required on documents")
+	}
+	if !strings.Contains(q, "update") {
 		// Non-UPDATE (governance_events INSERT, etc.) always succeed with 1.
 		return supersedeTestResult{rowsAffected: 1}, nil
 	}
@@ -109,6 +122,36 @@ type supersedeTestConn struct {
 	areaCode             string
 	actorID              string
 	tenantID             string
+	assertedCaps         []string
+}
+
+func (c *supersedeTestConn) setAssertedCaps(raw string) {
+	if strings.TrimSpace(raw) == "" {
+		c.assertedCaps = nil
+		return
+	}
+	var asserted []map[string]string
+	if err := json.Unmarshal([]byte(raw), &asserted); err != nil {
+		c.assertedCaps = nil
+		return
+	}
+	caps := make([]string, 0, len(asserted))
+	for _, item := range asserted {
+		capability := strings.TrimSpace(item["cap"])
+		if capability != "" {
+			caps = append(caps, capability)
+		}
+	}
+	c.assertedCaps = caps
+}
+
+func (c *supersedeTestConn) hasAssertedCap(capability string) bool {
+	for _, asserted := range c.assertedCaps {
+		if asserted == capability {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *supersedeTestConn) Prepare(query string) (driver.Stmt, error) {

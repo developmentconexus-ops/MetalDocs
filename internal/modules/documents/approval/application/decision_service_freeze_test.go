@@ -58,6 +58,7 @@ type freezeDecisionConn struct {
 	actorID       string
 	tenantID      string
 	unresolvedComments int
+	assertedCaps  string
 
 	documentStatus string
 	pendingStatus  *string
@@ -95,11 +96,25 @@ func (r *freezeDecisionSingleValueRows) Next(dest []driver.Value) error {
 
 func (s *freezeDecisionStmt) Close() error  { return nil }
 func (s *freezeDecisionStmt) NumInput() int { return -1 }
-func (s *freezeDecisionStmt) Exec(_ []driver.Value) (driver.Result, error) {
+func (s *freezeDecisionStmt) Exec(args []driver.Value) (driver.Result, error) {
 	q := strings.ToLower(s.query)
-	if strings.Contains(q, "update documents") && strings.Contains(q, "set status") && strings.Contains(q, "'approved'") {
-		status := "approved"
-		s.conn.pendingStatus = &status
+	if strings.Contains(q, "set_config('metaldocs.asserted_caps'") && len(args) > 0 {
+		if raw, ok := args[0].(string); ok {
+			s.conn.assertedCaps = raw
+		}
+	}
+	if strings.Contains(q, "update documents") {
+		if !strings.Contains(s.conn.assertedCaps, `"cap":"document.edit"`) {
+			return nil, errors.New("ErrCapabilityNotAsserted: none of {document.edit} present in asserted_caps on documents")
+		}
+		if strings.Contains(q, "set status") && strings.Contains(q, "'approved'") {
+			status := "approved"
+			s.conn.pendingStatus = &status
+		}
+		if strings.Contains(q, "set status") && strings.Contains(q, "'draft'") {
+			status := "draft"
+			s.conn.pendingStatus = &status
+		}
 	}
 	return freezeDecisionNoopResult{}, nil
 }
@@ -118,7 +133,10 @@ func (s *freezeDecisionStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &freezeDecisionSingleValueRows{value: s.conn.authzGranted}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
-		return &freezeDecisionSingleValueRows{value: nil}, nil
+		if s.conn.assertedCaps == "" {
+			return &freezeDecisionSingleValueRows{value: nil}, nil
+		}
+		return &freezeDecisionSingleValueRows{value: s.conn.assertedCaps}, nil
 	}
 	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
 		return &freezeDecisionSingleValueRows{value: s.conn.tenantID}, nil
@@ -524,5 +542,61 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 	}
 	if freeze.calls != 0 {
 		t.Fatalf("freeze must not run when unresolved comments block approval, got %d calls", freeze.calls)
+	}
+}
+
+func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *testing.T) {
+	const (
+		instanceID = "inst-freeze-reject"
+		stageID    = "stage-freeze-reject"
+		actorID    = "approver-1"
+		authorID   = "author-1"
+	)
+	signedAt := time.Date(2026, 4, 23, 12, 50, 0, 0, time.UTC)
+	repo := &fakeDecisionRepo{
+		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
+		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-reject", WasReplay: false},
+	}
+	conn := &freezeDecisionConn{
+		actorID: actorID,
+		stageSignoffs: []signoffRow{{
+			id:                 "sig-reject",
+			approvalInstanceID: instanceID,
+			stageInstanceID:    stageID,
+			actorUserID:        actorID,
+			actorTenantID:      "tenant-1",
+			decision:           "reject",
+			comment:            "needs changes",
+			signedAt:           signedAt,
+			signatureMethod:    "password",
+			signaturePayload:   []byte(`{}`),
+			contentHash:        validContentHash,
+		}},
+	}
+	db := newFreezeDecisionTestDB(t, conn)
+	svc := &DecisionService{
+		repo:          repo,
+		emitter:       &MemoryEmitter{},
+		clock:         fixedClock{t: signedAt},
+		freezeInvoker: &fakeFreezeInvoker{},
+		pdfDispatcher: &fakePDFDispatchInvoker{},
+	}
+
+	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "reject",
+		Comment:          "needs changes",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "abc"},
+		ContentFormData:  map[string]any{"title": "Doc"},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff() error = %v", err)
+	}
+	if !result.InstanceRejected || conn.documentStatus != "draft" {
+		t.Fatalf("expected rejected document reset to draft, status=%q result=%+v", conn.documentStatus, result)
 	}
 }

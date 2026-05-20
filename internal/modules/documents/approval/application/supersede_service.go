@@ -8,6 +8,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // SupersedeService marks a published document as superseded by a newer revision.
@@ -55,6 +56,12 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, db *sql.DB, r
 		return SupersedeResult{}, fmt.Errorf("publishSuperseding: load document area: %w", err)
 	}
 	if err := authz.Require(ctx, tx, "doc.supersede", areaCode); err != nil {
+		_ = tx.Rollback()
+		return SupersedeResult{}, err
+	}
+	// Supersede mutates public.documents twice in the same transaction, so it
+	// must also satisfy the shared documents tripwire.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
 		_ = tx.Rollback()
 		return SupersedeResult{}, err
 	}

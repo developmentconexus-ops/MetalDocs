@@ -1,6 +1,8 @@
 package application
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -39,6 +41,18 @@ type Services struct {
 	clock      Clock
 }
 
+type ScheduledPublishJobInput struct {
+	TenantID                string
+	DocumentID              string
+	ExpectedRevisionVersion int
+	ScheduledEffectiveAt    time.Time
+	ScheduleGeneration      int64
+}
+
+type ScheduledPublishEnqueuer interface {
+	EnqueueScheduledPublishTx(ctx context.Context, tx *sql.Tx, input ScheduledPublishJobInput) error
+}
+
 // NewServices constructs a fully wired Services value.
 func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock) *Services {
 	return &Services{
@@ -53,6 +67,13 @@ func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock
 		RouteAdmin: &RouteAdminService{repo: repo, emitter: emitter, clock: clock},
 		clock:      clock,
 	}
+}
+
+func (s *Services) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueuer) *Services {
+	if s != nil && s.Publish != nil {
+		s.Publish = s.Publish.WithScheduledPublishEnqueuer(enqueuer)
+	}
+	return s
 }
 
 // ValidateEventPayload returns ErrFloatInPayload if any value in payload is a

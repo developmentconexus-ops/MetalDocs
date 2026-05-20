@@ -57,6 +57,14 @@ func TestSchedulePublishRequestValidate(t *testing.T) {
 		t.Fatalf("expected valid request, got error: %v", err)
 	}
 
+	validWithSupersededID := SchedulePublishRequest{
+		EffectiveFrom:        "2026-12-31T18:00:00Z",
+		SupersededDocumentID: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+	}
+	if err := validWithSupersededID.Validate(); err != nil {
+		t.Fatalf("expected valid request with superseded_document_id, got error: %v", err)
+	}
+
 	missing := SchedulePublishRequest{}
 	if err := missing.Validate(); err == nil {
 		t.Fatalf("expected error for missing effective_from")
@@ -70,6 +78,14 @@ func TestSchedulePublishRequestValidate(t *testing.T) {
 	nonUTC := SchedulePublishRequest{EffectiveFrom: "2026-12-31T18:00:00-03:00"}
 	if err := nonUTC.Validate(); err == nil {
 		t.Fatalf("expected error for non-UTC effective_from")
+	}
+
+	invalidSupersededID := SchedulePublishRequest{
+		EffectiveFrom:        "2026-12-31T18:00:00Z",
+		SupersededDocumentID: "not-a-uuid",
+	}
+	if err := invalidSupersededID.Validate(); err == nil {
+		t.Fatalf("expected error for malformed superseded_document_id")
 	}
 }
 

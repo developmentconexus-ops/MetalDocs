@@ -1295,49 +1295,6 @@ func TestSchedulePublish_EmitError(t *testing.T) {
 // 14. processRow / RunDuePublishes — error paths
 // ============================================================
 
-func TestRunDuePublishes_FetchError(t *testing.T) {
-	fetchErr := errors.New("fetch due failed")
-	repo := &fakeSchedulerRepo{fetchErr: fetchErr}
-	svc := &SchedulerService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
-	// Use scheduler conn that handles LevelReadCommitted BeginTx.
-	db := newSchedulerTestDB(t, nil)
-
-	_, err := svc.RunDuePublishes(context.Background(), db)
-	if !errors.Is(err, fetchErr) {
-		t.Errorf("want fetch error; got %v", err)
-	}
-}
-
-func TestRunDuePublishes_EmitError(t *testing.T) {
-	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-
-	rows := []repository.ScheduledPublishRow{
-		{
-			DocumentID:      "doc-sched-emit",
-			TenantID:        "tenant-1",
-			EffectiveFrom:   now.Add(-time.Hour),
-			RevisionVersion: 2,
-		},
-	}
-
-	repo := &fakeSchedulerRepo{rows: rows}
-	svc := &SchedulerService{repo: repo, emitter: &errorEmitter{}, clock: fixedClock{t: now}}
-	// UPDATE returns rowsAffected=1 (document matched).
-	db := newSchedulerTestDB(t, []int64{1})
-
-	result, err := svc.RunDuePublishes(context.Background(), db)
-	if err != nil {
-		t.Fatalf("top-level error should be nil (per-row errors collected); got %v", err)
-	}
-	// The emit failure → processRow returns err → collected in result.Errors.
-	if len(result.Errors) == 0 {
-		t.Error("expected per-row error from emit; got empty errors")
-	}
-	if result.Processed != 0 {
-		t.Errorf("expected Processed=0 on emit failure; got %d", result.Processed)
-	}
-}
-
 // ============================================================
 // 15. PublishSuperseding — emit error path
 // ============================================================
@@ -2455,34 +2412,6 @@ func newSchedulerBeginFailDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestRunDuePublishes_ProcessRowBeginError(t *testing.T) {
-	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-	rows := []repository.ScheduledPublishRow{
-		{
-			DocumentID:      "doc-sched-begin-fail",
-			TenantID:        "tenant-1",
-			EffectiveFrom:   now.Add(-time.Hour),
-			RevisionVersion: 2,
-		},
-	}
-
-	repo := &fakeSchedulerRepo{rows: rows}
-	svc := &SchedulerService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
-	db := newSchedulerBeginFailDB(t)
-
-	result, err := svc.RunDuePublishes(context.Background(), db)
-	// Top-level error should be nil — per-row error collected.
-	if err != nil {
-		t.Fatalf("top-level error should be nil; got %v", err)
-	}
-	if len(result.Errors) == 0 {
-		t.Error("expected per-row error from processRow begin failure")
-	}
-	if result.Processed != 0 {
-		t.Errorf("expected Processed=0; got %d", result.Processed)
-	}
-}
-
 // ============================================================
 // processRow — rowsAffected error
 // ============================================================
@@ -2545,30 +2474,6 @@ func newSchedulerRAFailDB(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestRunDuePublishes_ProcessRowRowsAffectedError(t *testing.T) {
-	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-	rows := []repository.ScheduledPublishRow{
-		{
-			DocumentID:      "doc-sched-ra-fail",
-			TenantID:        "tenant-1",
-			EffectiveFrom:   now.Add(-time.Hour),
-			RevisionVersion: 2,
-		},
-	}
-
-	repo := &fakeSchedulerRepo{rows: rows}
-	svc := &SchedulerService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
-	db := newSchedulerRAFailDB(t)
-
-	result, err := svc.RunDuePublishes(context.Background(), db)
-	if err != nil {
-		t.Fatalf("top-level error should be nil; got %v", err)
-	}
-	if len(result.Errors) == 0 {
-		t.Error("expected per-row error from rows affected failure")
-	}
-}
-
 // ============================================================
 // processRow — exec error path
 // ============================================================
@@ -2629,30 +2534,6 @@ func newSchedulerExecFailDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	return db
-}
-
-func TestRunDuePublishes_ProcessRowExecError(t *testing.T) {
-	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
-	rows := []repository.ScheduledPublishRow{
-		{
-			DocumentID:      "doc-sched-exec-fail",
-			TenantID:        "tenant-1",
-			EffectiveFrom:   now.Add(-time.Hour),
-			RevisionVersion: 2,
-		},
-	}
-
-	repo := &fakeSchedulerRepo{rows: rows}
-	svc := &SchedulerService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: now}}
-	db := newSchedulerExecFailDB(t)
-
-	result, err := svc.RunDuePublishes(context.Background(), db)
-	if err != nil {
-		t.Fatalf("top-level error should be nil; got %v", err)
-	}
-	if len(result.Errors) == 0 {
-		t.Error("expected per-row error from exec failure in processRow")
-	}
 }
 
 // ============================================================
@@ -3808,20 +3689,6 @@ func newSchedulerFetchCommitFailDB(t *testing.T) *sql.DB {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	return db
-}
-
-func TestRunDuePublishes_FetchTxCommitError(t *testing.T) {
-	repo := &fakeSchedulerRepo{rows: nil} // no rows — commit still fails
-	svc := &SchedulerService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}}
-	db := newSchedulerFetchCommitFailDB(t)
-
-	_, err := svc.RunDuePublishes(context.Background(), db)
-	if err == nil {
-		t.Fatal("expected fetch tx commit error; got nil")
-	}
-	if !strings.Contains(err.Error(), "commit") {
-		t.Errorf("error should mention commit; got %v", err)
-	}
 }
 
 // ============================================================

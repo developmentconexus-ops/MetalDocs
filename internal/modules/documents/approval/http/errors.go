@@ -37,6 +37,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, repository.ErrActorAlreadySigned):
 		statusCode = http.StatusConflict
 		code = "signoff.duplicate"
+	case errors.Is(err, repository.ErrInvalidScheduledSupersedeTarget):
+		statusCode = http.StatusConflict
+		code = "publish.invalid_supersede_target"
 	case errors.Is(err, repository.ErrInstanceCompleted):
 		statusCode = http.StatusConflict
 		code = "state.instance_completed"

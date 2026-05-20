@@ -1,6 +1,6 @@
 # Local Dev Startup
 
-**Last verified:** 2026-05-13
+**Last verified:** 2026-05-20
 
 ## TL;DR
 
@@ -31,14 +31,20 @@ PowerShell string assignment is literal — `<>` is safe.
 
 1. Loads all vars from `.env` (split on first `=` — safe for `<>`)
 2. Forces `APP_PORT=8081` (binary defaults to 8080 if this var is missing)
-3. Rebuilds on `-Build`, or auto-rebuilds when timestamp checks show a stale API or worker binary
+3. Rebuilds on `-Build`, or auto-rebuilds when timestamp checks show a stale API, jobs, or worker binary
 4. Replaces the current workspace API on `:8081` only when ownership is proven; otherwise fails loudly on an occupied port
-5. Starts the API after timestamp-based freshness checks
-6. Starts the worker too unless `-NoWorker` is passed
+5. Starts `metaldocs-jobs` after timestamp-based freshness checks unless `-NoJobs` is passed
+6. Starts the API after timestamp-based freshness checks
+7. Starts the worker too unless `-NoWorker` is passed
 
 Pass `-Build` to force rebuild:
 ```powershell
 .\scripts\start-api.ps1 -Build
+```
+
+Skip the dedicated jobs runtime when you intentionally want API-only startup:
+```powershell
+.\scripts\start-api.ps1 -NoJobs
 ```
 
 ## Script-truth policy
@@ -144,6 +150,29 @@ Required for PDF generation after document approval. Polls `messaging_outbox` us
 - `METALDOCS_DOCGEN_V2_SERVICE_TOKEN=dev-local-service-token-32chars!!`
 
 **If PDF not generated after signoff:** check worker log for `event_type=docgen_v2_pdf result=published`. If missing, first confirm whether `METALDOCS_FANOUT_URL` is configured at all; when it is unset, freeze is skipped. If it is configured, inspect worker/docgen-v2 connectivity because fanout failures can block approval.
+
+---
+
+## Jobs runtime (scheduled publish cutover)
+
+Required for scheduled publish execution after the River cutover. The API now owns only transactional enqueue; `metaldocs-jobs` owns the temporal queue worker that performs the publish at effective time.
+
+**Default startup:** `.\scripts\start-api.ps1` now starts jobs automatically unless `-NoJobs` is passed.
+
+**Start manually (separate terminal):**
+```powershell
+.\scripts\start-jobs.ps1
+.\scripts\start-jobs.ps1 -Build
+```
+
+**Verify running:** startup logs `MetalDocs Jobs running (queues=temporal)`.
+
+**Env vars:**
+- `METALDOCS_JOBS_ENABLED=true` by default; set false only when intentionally disabling the jobs host
+- `METALDOCS_JOBS_RIVER_SCHEMA` optional River schema override
+- `METALDOCS_JOBS_TEMPORAL_MAX_WORKERS` optional queue concurrency override
+
+**Runtime truth:** scheduled publish should no longer be hosted by the API runtime. If a schedule request succeeds but no future publish happens, inspect the `metaldocs-jobs` process first.
 
 ---
 

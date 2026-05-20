@@ -1,6 +1,6 @@
 # Cross-deps — `internal/modules/documents/approval`
 
-Generated: 2026-05-10  
+Generated: 2026-05-20  
 Module root: `internal/modules/documents/approval/`  
 Composition root: `apps/api/cmd/metaldocs-api/main.go`
 
@@ -28,13 +28,13 @@ External packages (outside `internal/modules/documents/approval/`) that import t
 
 | Importer package | File:line of import | Symbols used | Notes |
 |---|---|---|---|
-| `apps/api/cmd/metaldocs-api` | `main.go:24` | `NewServices`, `NewDecisionService`, `NewSQLEmitter`, `RealClock`, `PDFDispatchInvoker`, `FreezeInvoker`, `CancelInput`, `GovernanceEvent`, `SubmitRequest`, `RunDuePublishesResult` | Primary composition root; wires all approval services |
+| `apps/api/cmd/metaldocs-api` | `main.go:24` | `NewServices`, `NewDecisionService`, `NewSQLEmitter`, `RealClock`, `PDFDispatchInvoker`, `FreezeInvoker`, `CancelInput`, `GovernanceEvent`, `SubmitRequest`, `ScheduledPublishEnqueuer` | Primary HTTP composition root; wires approval services and the transactional River enqueue seam |
 | `apps/api/cmd/metaldocs-api` | `main.go:25` | `NewHandler`, `RegisterRoutes` | Registers approval HTTP routes on mux |
 | `apps/api/cmd/metaldocs-api` | `main.go:26` | `NewPostgresSignoffIdempStore` | Constructs signoff idempotency store |
 | `apps/api/cmd/metaldocs-api` | `main.go:27` | `NewPostgresApprovalRepository` | Constructs Postgres approval repo |
 | `internal/modules/documents` | `module.go:9` | `SubmitRequest`, `SubmitResult` (via `approvalapp`) | `documents.Deps.SubmitSvc` interface references approval types |
 | `internal/modules/documents/delivery/http` | `handler.go:15` | `SubmitRequest`, `SubmitResult` (via `approvalapp`) | Finalize handler calls `SubmitRevisionForReview` via interface |
-| `internal/modules/jobs/effective_date_publisher` | `job.go:8` | `SchedulerService`, `RunDuePublishesResult` | Background job triggers scheduled publishes |
+| `apps/jobs/cmd/metaldocs-jobs` | `main.go:14` | `NewServices`, `NewSQLEmitter`, `RealClock`, `NewWorkers` | Dedicated jobs runtime owns scheduled publish execution through River workers |
 | `internal/modules/jobs/stuck_instance_watchdog` | `job.go:10` | `CancelInstance`, `CancelInput`, `GovernanceEvent`, `Emitter` | Background job cancels stuck approval instances |
 | `internal/modules/iam` | `integration_test.go:16` | `repository` package — table fixture setup | IAM integration test inserts approval fixture rows to test RLS caps |
 
@@ -52,19 +52,23 @@ External packages (outside `internal/modules/documents/approval/`) that import t
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:330` | `approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)` → `signoffIdempStore` |
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:331` | `approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)` → `approvalHandler` |
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:332` | `approvalHandler.RegisterRoutes(mux)` |
-| `apps/api/cmd/metaldocs-api/main.go` | `main.go:344` | `effective_date_publisher.New(deps.SQLDB, approvalServices.Scheduler)` — scheduler job |
+| `apps/api/cmd/metaldocs-api/main.go` | `main.go:307` | `bootstrap.MigrateRiverSchema(ctx, deps.SQLDB, jobsCfg.RiverSchema)` — startup River schema sync for scheduled publish |
+| `apps/api/cmd/metaldocs-api/main.go` | `main.go:318` | `approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))` — transactional enqueue owned by API |
 | `apps/api/cmd/metaldocs-api/main.go` | `main.go:352` | `stuck_instance_watchdog.New(deps.SQLDB, approvalServices.Cancel, approvalEmitter)` — watchdog job |
+| `apps/jobs/cmd/metaldocs-jobs/main.go` | `main.go:29` | `bootstrap.BuildJobsDependencies(... approvaljobs.NewWorkers(...))` — dedicated jobs host for scheduled publish execution |
 
 ---
 
 ## 4. Configuration surface
 
-Env vars and Postgres GUC keys read by or in service of this module. No `os.Getenv` calls inside the module itself — all env reads are in `main.go`.
+Env vars and Postgres GUC keys read by or in service of this module. No `os.Getenv` calls inside the module itself — env reads for this boundary now live in composition/runtime config (`main.go` + `internal/platform/config/jobs.go`).
 
 | Name | Read at (file:line) | Required? | Default |
 |---|---|---|---|
 | `METALDOCS_FANOUT_URL` | `main.go:228` (configures `FreezeInvoker` passed into this module) | No | If unset, `noopFreezeInvoker` is passed; `slog.Warn` emitted; freeze step will fail at runtime |
-| `ENABLE_JOB_EFFECTIVE_DATE_PUBLISHER` | `main.go:340` | No | Job disabled if unset |
+| `METALDOCS_JOBS_ENABLED` | `internal/platform/config/jobs.go:27` | No | Defaults true; jobs runtime exits early only when explicitly disabled |
+| `METALDOCS_JOBS_RIVER_SCHEMA` | `internal/platform/config/jobs.go:21` | No | Empty string uses River default schema |
+| `METALDOCS_JOBS_TEMPORAL_MAX_WORKERS` | `internal/platform/config/jobs.go:31` | No | Defaults queue `temporal` to 10 workers |
 | `ENABLE_JOB_STUCK_INSTANCE_WATCHDOG` | `main.go:348` | No | Job disabled if unset |
 | Postgres GUC `metaldocs.tenant_id` | `application/authz_guc.go:12` | — | Set via `set_config` inside tx; not an env var |
 | Postgres GUC `metaldocs.actor_id` | `application/authz_guc.go:15` | — | Set via `set_config` inside tx; not an env var |
@@ -91,7 +95,7 @@ Env vars and Postgres GUC keys read by or in service of this module. No `os.Gete
 | `application/publish_service_test.go` | `publish_service.go` | unit |
 | `application/read_service_test.go` | `read_service.go` | unit |
 | `application/route_admin_service_test.go` | `route_admin_service.go` | unit |
-| `application/scheduler_service_test.go` | `scheduler_service.go` | unit |
+| `application/scheduler_test_helpers_test.go` | shared scheduler test rows helper | unit |
 | `application/submit_eligible_actors_test.go` | submit eligibility logic | integration (`//go:build integration`) |
 | `application/submit_service_test.go` | `submit_service.go` | unit |
 | `application/supersede_service_test.go` | `supersede_service.go` | unit |

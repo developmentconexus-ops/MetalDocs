@@ -16,6 +16,8 @@ type postgresApprovalRepository struct {
 	db *sql.DB
 }
 
+var ErrInvalidScheduledSupersedeTarget = errors.New("approval: invalid scheduled supersede target")
+
 // NewPostgresApprovalRepository constructs a production Postgres-backed ApprovalRepository.
 func NewPostgresApprovalRepository(db *sql.DB) ApprovalRepository {
 	return &postgresApprovalRepository{db: db}
@@ -231,14 +233,19 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx *sql.T
 	var completedAt sql.NullTime
 
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, document_id, route_id, route_version_snapshot,
-		       status, submitted_by, submitted_at, completed_at,
-		       content_hash_at_submit, idempotency_key
-		FROM approval_instances
-		WHERE id = $1 AND tenant_id = $2`,
+		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
+		       d.revision_version,
+		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
+		       ai.content_hash_at_submit, ai.idempotency_key
+		FROM approval_instances ai
+		JOIN documents d
+		  ON d.id = ai.document_id
+		 AND d.tenant_id = ai.tenant_id
+		WHERE ai.id = $1 AND ai.tenant_id = $2`,
 		id, tenantID,
 	).Scan(
 		&inst.ID, &inst.TenantID, &inst.DocumentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+		&inst.RevisionVersion,
 		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 	)
@@ -267,18 +274,23 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	var completedAt sql.NullTime
 
 	err := tx.QueryRowContext(ctx, `
-		SELECT id, tenant_id, document_id, route_id, route_version_snapshot,
-		       status, submitted_by, submitted_at, completed_at,
-		       content_hash_at_submit, idempotency_key
-		FROM approval_instances
-		WHERE document_id = $1
-		  AND tenant_id = $2
-		  AND status IN ('in_progress', 'approved')
-			ORDER BY submitted_at DESC
+		SELECT ai.id, ai.tenant_id, ai.document_id, ai.route_id, ai.route_version_snapshot,
+		       d.revision_version,
+		       ai.status, ai.submitted_by, ai.submitted_at, ai.completed_at,
+		       ai.content_hash_at_submit, ai.idempotency_key
+		FROM approval_instances ai
+		JOIN documents d
+		  ON d.id = ai.document_id
+		 AND d.tenant_id = ai.tenant_id
+		WHERE ai.document_id = $1
+		  AND ai.tenant_id = $2
+		  AND ai.status IN ('in_progress', 'approved')
+			ORDER BY ai.submitted_at DESC
 			LIMIT 1`,
 		docID, tenantID,
 	).Scan(
 		&inst.ID, &inst.TenantID, &inst.DocumentID, &inst.RouteID, &inst.RouteVersionSnapshot,
+		&inst.RevisionVersion,
 		&inst.Status, &inst.SubmittedBy, &inst.SubmittedAt, &completedAt,
 		&inst.ContentHashAtSubmit, &inst.IdempotencyKey,
 	)
@@ -298,6 +310,101 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 	}
 	inst.Stages = stages
 	return &inst, nil
+}
+
+func (r *postgresApprovalRepository) ValidateScheduledSupersedeTarget(ctx context.Context, tx *sql.Tx, tenantID, documentID, supersededDocumentID string) error {
+	var valid bool
+	err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			  FROM documents candidate
+			  JOIN documents target
+			    ON target.id = $2
+			   AND target.tenant_id = $1
+			 WHERE candidate.id = $3
+			   AND candidate.tenant_id = $1
+			   AND candidate.status = 'published'
+			   AND candidate.controlled_document_id = target.controlled_document_id
+		)`,
+		tenantID, documentID, supersededDocumentID,
+	).Scan(&valid)
+	if err != nil {
+		return MapPgError(err, MapHints{})
+	}
+	if !valid {
+		return ErrInvalidScheduledSupersedeTarget
+	}
+	return nil
+}
+
+func (r *postgresApprovalRepository) LoadCurrentPublishedHeadForDocument(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
+	var publishedDocumentID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT current_head.id
+		  FROM documents target
+		  JOIN documents current_head
+		    ON current_head.tenant_id = target.tenant_id
+		   AND current_head.controlled_document_id = target.controlled_document_id
+		   AND current_head.status = 'published'
+		 WHERE target.tenant_id = $1
+		   AND target.id = $2
+		 ORDER BY current_head.revision_number DESC
+		 LIMIT 1
+		 FOR UPDATE OF current_head`,
+		tenantID, documentID,
+	).Scan(&publishedDocumentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", MapPgError(err, MapHints{})
+	}
+	return publishedDocumentID, nil
+}
+
+func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Context, tx *sql.Tx, tenantID, controlledDocumentID string) (string, error) {
+	var documentID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id
+		  FROM documents
+		 WHERE tenant_id = $1
+		   AND controlled_document_id = $2
+		   AND status = 'published'
+		 ORDER BY revision_number DESC
+		 LIMIT 1
+		 FOR UPDATE`,
+		tenantID, controlledDocumentID,
+	).Scan(&documentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", MapPgError(err, MapHints{})
+	}
+	return documentID, nil
+}
+
+func (r *postgresApprovalRepository) MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error {
+	res, err := tx.ExecContext(ctx, `
+		UPDATE documents
+		   SET status           = 'superseded',
+		       revision_version = revision_version + 1
+		 WHERE id        = $1
+		   AND tenant_id = $2
+		   AND status    = 'published'`,
+		documentID, tenantID,
+	)
+	if err != nil {
+		return MapPgError(err, MapHints{})
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrScheduledSupersedeConflict
+	}
+	return nil
 }
 
 // loadStageInstances loads all stage instances for a given approval instance, ordered by stage_order.
@@ -483,34 +590,4 @@ func (r *postgresApprovalRepository) UpdateInstanceStatus(ctx context.Context, t
 		return ErrInstanceCompleted
 	}
 	return nil
-}
-
-// ListScheduledDue returns documents in 'scheduled' state with effective_from <= now,
-// using FOR UPDATE SKIP LOCKED so concurrent scheduler workers don't collide.
-// Caller MUST open the transaction with READ COMMITTED isolation.
-func (r *postgresApprovalRepository) ListScheduledDue(ctx context.Context, tx *sql.Tx, now time.Time, limit int) ([]ScheduledPublishRow, error) {
-	rows, err := tx.QueryContext(ctx, `
-		SELECT id, tenant_id, effective_from, revision_version
-		FROM documents
-		WHERE status = 'scheduled'
-		  AND effective_from <= $1
-		ORDER BY effective_from
-		FOR UPDATE SKIP LOCKED
-		LIMIT $2`,
-		now, limit,
-	)
-	if err != nil {
-		return nil, MapPgError(err, MapHints{})
-	}
-	defer rows.Close()
-
-	var out []ScheduledPublishRow
-	for rows.Next() {
-		var row ScheduledPublishRow
-		if err := rows.Scan(&row.DocumentID, &row.TenantID, &row.EffectiveFrom, &row.RevisionVersion); err != nil {
-			return nil, err
-		}
-		out = append(out, row)
-	}
-	return out, rows.Err()
 }

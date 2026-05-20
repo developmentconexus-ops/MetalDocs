@@ -144,16 +144,13 @@ test.describe.serial('scheduled_publish', () => {
     const advance = await request.post('/internal/test/advance-clock?seconds=700');
     expect(advance.ok()).toBeTruthy();
 
-    const tick = await request.post('/internal/test/trigger-scheduler-tick');
-    expect(tick.ok()).toBeTruthy();
-
     await expect
       .poll(
         async () => {
           await page.reload();
           return stateBadgeText(page);
         },
-        { timeout: 10_000 },
+        { timeout: 20_000 },
       )
       .toBe('Publicado');
 

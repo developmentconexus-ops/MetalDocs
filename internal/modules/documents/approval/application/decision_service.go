@@ -290,6 +290,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				_ = tx.Rollback()
 				return SignoffResult{}, fmt.Errorf("recordSignoff: complete instance: %w", err)
 			}
+			if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+				_ = tx.Rollback()
+				return SignoffResult{}, err
+			}
 			if s.freezeInvoker == nil {
 				_ = tx.Rollback()
 				return SignoffResult{}, fmt.Errorf("recordSignoff: freezeInvoker not configured")
@@ -349,6 +353,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		); err != nil {
 			_ = tx.Rollback()
 			return SignoffResult{}, fmt.Errorf("recordSignoff: set cancel GUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, err
 		}
 
 		// Transition document under_review -> draft so the author can edit and resubmit.
