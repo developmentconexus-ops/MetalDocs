@@ -1,6 +1,6 @@
-// Registry explorer will be rebuilt using TanStack Query in the Registry screen block.
+// Controlled-documents explorer will be rebuilt using TanStack Query.
 // This stub exists only so that imports in WorkspaceRoot don't break the build.
-export function useRegistryExplorer(_onRefresh?: () => Promise<void> | void) {
+export function useControlledDocumentsExplorer(_onRefresh?: () => Promise<void> | void) {
   return {
     documentProfiles: [] as unknown[],
     processAreas: [] as unknown[],

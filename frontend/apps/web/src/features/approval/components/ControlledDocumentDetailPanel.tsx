@@ -9,9 +9,9 @@ import { SignoffDialog } from './SignoffDialog';
 import { StateBadge } from './StateBadge';
 import { SupersedePublishDialog } from './SupersedePublishDialog';
 import { formatISODate } from '../../../lib/formatDate';
-import styles from './RegistryDetailPanel.module.css';
+import styles from './ControlledDocumentDetailPanel.module.css';
 
-interface RegistryDetailPanelProps {
+interface ControlledDocumentDetailPanelProps {
   documentId: string;
   approvalState: string;
   contentHash: string;
@@ -104,7 +104,7 @@ function toApprovalState(status: string): ApprovalState {
   return 'draft';
 }
 
-export function RegistryDetailPanel({
+export function ControlledDocumentDetailPanel({
   documentId,
   approvalState,
   contentHash,
@@ -115,7 +115,7 @@ export function RegistryDetailPanel({
   effectiveFrom,
   effectiveTo,
   publishedDocumentId,
-}: RegistryDetailPanelProps) {
+}: ControlledDocumentDetailPanelProps) {
   const [instance, setInstance] = useState<ApprovalInstance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -421,4 +421,3 @@ export function RegistryDetailPanel({
 }
 
 export { TRANSITION_POLICY };
-

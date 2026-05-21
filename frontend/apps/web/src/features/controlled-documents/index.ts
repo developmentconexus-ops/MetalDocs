@@ -1,1 +1,1 @@
-export { RegistryListPage } from './RegistryListPage';
+export { ControlledDocumentListPage } from './ControlledDocumentListPage';

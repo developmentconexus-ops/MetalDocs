@@ -1,9 +1,9 @@
-// TODO: This replaces RegistryExplorerView.tsx — switch routing in Phase 8 or 9
+// TODO: This replaces ControlledDocumentsExplorerView.tsx - switch routing in Phase 8 or 9
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fetchControlledDocuments } from './api/controlledDocuments';
 import type { ControlledDocument } from "./types";
-import { RegistryDetailPage } from "./RegistryDetailPage";
+import { ControlledDocumentDetailPage } from "./ControlledDocumentDetailPage";
 
 type Props = {
   basePath?: string;
@@ -26,7 +26,7 @@ function resolveDetailId(pathname: string, basePath: string) {
   return candidate || null;
 }
 
-export function RegistryListPage({ basePath = '/controlled-documents', onOpenDocumentEditor }: Props = {}) {
+export function ControlledDocumentListPage({ basePath = '/controlled-documents', onOpenDocumentEditor }: Props = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const normalizedBasePath = normalizeBasePath(basePath);
@@ -62,7 +62,7 @@ export function RegistryListPage({ basePath = '/controlled-documents', onOpenDoc
 
   if (detailId) {
     return (
-      <RegistryDetailPage
+      <ControlledDocumentDetailPage
         id={detailId}
         onBack={() => {
           navigate(normalizedBasePath);

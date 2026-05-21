@@ -387,7 +387,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -427,7 +427,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -523,7 +523,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -563,7 +563,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -681,7 +681,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -737,7 +737,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -777,7 +777,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -833,7 +833,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -873,7 +873,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -987,7 +987,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -1027,7 +1027,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegistryMutationResponse'
+                $ref: '#/components/schemas/ControlledDocumentMutationResponse'
         '400':
           description: Requisicao invalida
           content:
@@ -4325,7 +4325,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SubjectItem'
-    RegistryMutationResponse:
+    ControlledDocumentMutationResponse:
       type: object
       required: [code]
       properties:

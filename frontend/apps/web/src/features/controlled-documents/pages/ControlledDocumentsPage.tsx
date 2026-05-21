@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import { RegistryListPage } from "../RegistryListPage";
+import { ControlledDocumentListPage } from "../ControlledDocumentListPage";
 
 export function Component() {
   const navigate = useNavigate();
 
   return (
-    <RegistryListPage
+    <ControlledDocumentListPage
       onOpenDocumentEditor={(docId) => navigate(`/documents/${docId}/edit`)}
     />
   );

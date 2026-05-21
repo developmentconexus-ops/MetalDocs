@@ -4,11 +4,11 @@ import type { DocumentProfileGovernanceItem, DocumentProfileItem, DocumentProfil
 import { WorkspaceDataState } from "./WorkspaceDataState";
 import { WorkspaceViewFrame } from "./WorkspaceViewFrame";
 import { FilterDropdown, type SelectMenuOption } from "./ui/FilterDropdown";
-import styles from "./RegistryExplorer.module.css";
+import styles from "./ControlledDocumentsExplorer.module.css";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
-type RegistryExplorerProps = {
+type ControlledDocumentsExplorerProps = {
   loadState: LoadState;
   documentProfiles: DocumentProfileItem[];
   processAreas: ProcessAreaItem[];
@@ -34,10 +34,10 @@ type RegistryExplorerProps = {
   onActivateDocumentProfileSchema: (payload: { profileCode: string; version: number }) => void | Promise<void>;
 };
 
-export function RegistryExplorer(props: RegistryExplorerProps) {
+export function ControlledDocumentsExplorer(props: ControlledDocumentsExplorerProps) {
   const metadataTypeOptions = ["text", "number", "date", "boolean", "select"] as const;
   const selectedProfile = props.documentProfiles.find((item) => item.code === props.selectedProfileCode) ?? props.documentProfiles[0] ?? null;
-  const hasRegistryData = props.documentProfiles.length > 0;
+  const hasControlledDocumentsData = props.documentProfiles.length > 0;
   const [profileForm, setProfileForm] = useState({ code: "", familyCode: "", name: "", alias: "", description: "", reviewIntervalDays: 365 });
   const [schemaForm, setSchemaForm] = useState<{ version: number; isActive: boolean; metadataRules: MetadataFieldRuleItem[] }>({
     version: 1,
@@ -117,21 +117,21 @@ export function RegistryExplorer(props: RegistryExplorerProps) {
 
   return (
     <WorkspaceViewFrame
-      kicker="Registry explorer"
-      title="Registry documental"
+      kicker="Controlled documents explorer"
+      title="Documentos controlados"
       description="Leitura operacional do motor profile-first aplicado ao contexto Metal Nobre, com foco em governanca e rastreabilidade."
     >
       <WorkspaceDataState
         loadState={props.loadState}
-        isEmpty={!hasRegistryData}
-        emptyTitle="Registry sem perfis configurados"
+        isEmpty={!hasControlledDocumentsData}
+        emptyTitle="Sem perfis configurados"
         emptyDescription="Nao existem perfis documentais ativos para consulta neste ambiente."
-        loadingLabel="Atualizando registry documental"
+        loadingLabel="Atualizando documentos controlados"
         errorDescription="Nao foi possivel carregar perfis, schema e governanca agora."
         onRetry={props.onRefreshWorkspace}
       />
 
-      {props.loadState === "ready" && hasRegistryData && (
+      {props.loadState === "ready" && hasControlledDocumentsData && (
       <div className="catalog-grid">
         <section className="catalog-panel catalog-list-panel">
           <div className="catalog-panel-head">
@@ -140,10 +140,10 @@ export function RegistryExplorer(props: RegistryExplorerProps) {
               <h2>Catalogo configurado</h2>
             </div>
           </div>
-          <ul className={`catalog-mini-list ${styles["registry-list"]}`}>
+          <ul className={`catalog-mini-list ${styles["controlled-documents-list"]}`}>
             {props.documentProfiles.map((item) => (
               <li key={item.code}>
-                <button type="button" className={`${styles["registry-profile-button"]} ${selectedProfile?.code === item.code ? styles["is-active"] : ""}`} onClick={() => void props.onSelectProfile(item.code)}>
+                <button type="button" className={`${styles["controlled-documents-profile-button"]} ${selectedProfile?.code === item.code ? styles["is-active"] : ""}`} onClick={() => void props.onSelectProfile(item.code)}>
                   <span>{item.name}</span>
                   <small>{item.alias} / {item.code} / family {item.familyCode}</small>
                 </button>
@@ -189,9 +189,9 @@ export function RegistryExplorer(props: RegistryExplorerProps) {
                     value={schemaForm.version}
                     onChange={(event) => setSchemaForm((current) => ({ ...current, version: Number(event.target.value || 0) }))}
                   />
-                  <div className={styles["registry-schema-rules"]}>
+                  <div className={styles["controlled-documents-schema-rules"]}>
                     {schemaForm.metadataRules.map((rule, index) => (
-                      <div key={`${rule.name}-${index}`} className={styles["registry-schema-rule-row"]}>
+                      <div key={`${rule.name}-${index}`} className={styles["controlled-documents-schema-rule-row"]}>
                         <input
                           placeholder="nome_da_regra"
                           value={rule.name}
