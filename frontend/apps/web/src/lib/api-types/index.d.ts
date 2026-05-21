@@ -3821,7 +3821,7 @@ export interface components {
              * @enum {string}
              */
             documentType?: "po" | "it" | "rg";
-            /** @description Canonical document profile code resolved by the registry. */
+            /** @description Canonical document profile code resolved by controlled documents. */
             documentProfile?: string;
             /** @description Optional process taxonomy code, such as `marketplaces` or `quality`. */
             processArea?: string;

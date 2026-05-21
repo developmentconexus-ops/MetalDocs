@@ -41,14 +41,14 @@ import (
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
 	authapp "metaldocs/internal/modules/auth/application"
 	authdelivery "metaldocs/internal/modules/auth/delivery/http"
+	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
+	controlleddocumentsapp "metaldocs/internal/modules/controlleddocuments/application"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	controlleddocumentsinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
-	"metaldocs/internal/modules/registry"
-	registryapp "metaldocs/internal/modules/registry/application"
-	registrydomain "metaldocs/internal/modules/registry/domain"
-	registryinfra "metaldocs/internal/modules/registry/infrastructure"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
@@ -64,19 +64,19 @@ import (
 	"metaldocs/internal/platform/featureflags"
 	"metaldocs/internal/platform/formval"
 	"metaldocs/internal/platform/httpclient"
+	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
-	riverjobs "metaldocs/internal/platform/jobs/river"
 	"metaldocs/internal/platform/security"
 	e2etest "metaldocs/internal/test"
 )
 
 type registryControlledDocumentDuplicator struct {
-	svc *registryapp.RegistryService
+	svc *controlleddocumentsapp.RegistryService
 }
 
-func (a registryControlledDocumentDuplicator) DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*registrydomain.ControlledDocument, error) {
+func (a registryControlledDocumentDuplicator) DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	if a.svc == nil {
 		return nil, fmt.Errorf("registry service not configured")
 	}
@@ -89,7 +89,7 @@ func (a registryControlledDocumentDuplicator) DuplicateControlledDocument(ctx co
 		reason := "Duplicated from existing controlled document"
 		overrideReason = &reason
 	}
-	res, err := a.svc.Create(ctx, registryapp.CreateControlledDocumentCmd{
+	res, err := a.svc.Create(ctx, controlleddocumentsapp.CreateControlledDocumentCmd{
 		TenantID:                  tenantID,
 		ProfileCode:               source.ProfileCode,
 		ProcessAreaCode:           source.ProcessAreaCode,
@@ -204,13 +204,13 @@ func main() {
 	})
 	taxonomyModule.RegisterRoutes(mux)
 
-	registryModule := registry.New(registry.Dependencies{
+	controlledDocumentsModule := controlleddocuments.New(controlleddocuments.Dependencies{
 		DB:          deps.SQLDB,
 		Logger:      slog.Default(),
 		AuditWriter: deps.AuditWriter,
 	})
-	registryModule.RegisterRoutes(mux)
-	docRegistryDuplicator := registryControlledDocumentDuplicator{svc: registryModule.Service()}
+	controlledDocumentsModule.RegisterRoutes(mux)
+	docRegistryDuplicator := registryControlledDocumentDuplicator{svc: controlledDocumentsModule.Service()}
 
 	var membershipService *iamapp.AreaMembershipService
 	if deps.SQLDB != nil {
@@ -221,7 +221,7 @@ func main() {
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
-	cdRepo := registryinfra.NewPostgresControlledDocumentRepository(deps.SQLDB)
+	cdRepo := controlleddocumentsinfra.NewPostgresControlledDocumentRepository(deps.SQLDB)
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
@@ -338,9 +338,9 @@ func main() {
 
 	// Wire the documents-side adapter back into the registry service so atomic
 	// CD-create can clone the initial document inside the same tx as the CD
-	// insert. registryModule was constructed before docMod (because docMod
+	// insert. controlledDocumentsModule was constructed before docMod (because docMod
 	// needs RegistryDuplicator), hence the post-construction setter.
-	registryModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
+	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
 	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
 	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
@@ -559,7 +559,7 @@ func schedulerLeaderID() string {
 // cdRegistryAdapter bridges the registry ControlledDocumentRepository → resolvers.RegistryReader.
 type cdRegistryAdapter struct {
 	repo interface {
-		GetByID(ctx context.Context, tenantID, id string) (*registrydomain.ControlledDocument, error)
+		GetByID(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error)
 	}
 }
 

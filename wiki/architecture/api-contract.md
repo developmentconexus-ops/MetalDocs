@@ -8,9 +8,9 @@
 > **Key files:**
 > - `api/openapi/v1/openapi.yaml:1` — single source of truth; OpenAPI 3.0.3
 > - `redocly.yaml:1` — lint config (pre-existing rule suppressions documented inline)
-> - `internal/modules/registry/api/cfg.yaml:1` — registry codegen config (include-tags: registry)
-> - `internal/modules/registry/api/gen.go:1` — `//go:generate` invocation for registry
-> - `internal/modules/registry/api/api.gen.go:1` — generated; DO NOT EDIT
+> - `internal/modules/controlleddocuments/api/cfg.yaml:1` — controlled-documents codegen config (include-tags: controlled-documents)
+> - `internal/modules/controlleddocuments/api/gen.go:1` — `//go:generate` invocation for registry
+> - `internal/modules/controlleddocuments/api/api.gen.go:1` — generated; DO NOT EDIT
 > - `internal/modules/templates/api/cfg.yaml:1` — templates codegen config (include-tags: templates)
 > - `internal/modules/templates/api/gen.go:1` — `//go:generate` invocation for templates
 > - `internal/modules/templates/api/api.gen.go:1` — generated; DO NOT EDIT
@@ -18,7 +18,7 @@
 > - `internal/modules/documents/api/gen.go:1` — `//go:generate` invocation for documents (bootstrap only)
 > - `internal/modules/documents/api/api.gen.go:1` — generated; DO NOT EDIT
 > - `internal/modules/documents/approval/http/contracts/strictjson.go:23` — `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
-> - `internal/modules/registry/delivery/http/handler.go:72` — `ServerInterfaceWrapper` wiring pattern (registry)
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:72` — `ServerInterfaceWrapper` wiring pattern (registry)
 > - `internal/modules/templates/delivery/http/handler.go:32` — `ServerInterfaceWrapper` wiring pattern (templates)
 > - `migrations/0183_documents_name_not_empty.sql:27` — DB invariant floor for `documents.name`
 > - `.github/workflows/api-contract.yml:1` — CI drift guard (3 jobs)
@@ -53,7 +53,7 @@ The generated file provides:
 **Regenerate:**
 
 ```bash
-GOFLAGS=-mod=mod go generate ./internal/modules/registry/api/...
+GOFLAGS=-mod=mod go generate ./internal/modules/controlleddocuments/api/...
 GOFLAGS=-mod=mod go generate ./internal/modules/templates/api/...
 GOFLAGS=-mod=mod go generate ./internal/modules/documents/api/...
 ```
@@ -69,8 +69,8 @@ CI runs `go generate ./...` — see `api-contract.yml:27`.
 Handlers do **not** implement `StrictServerInterface` directly. The current pattern uses `ServerInterfaceWrapper`:
 
 ```go
-// internal/modules/registry/delivery/http/handler.go:72
-generated := registryapi.ServerInterfaceWrapper{
+// internal/modules/controlleddocuments/delivery/http/handler.go:72
+generated := controlleddocumentsapi.ServerInterfaceWrapper{
     Handler: h,
     ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
         httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -89,7 +89,7 @@ The handler struct (`*Handler`) implements `ServerInterface`; the wrapper handle
 oapi-codegen does **not** enforce:
 
 - **Unknown fields:** Use `contracts.Decode` from `internal/modules/documents/approval/http/contracts/strictjson.go:23`. It sets `decoder.DisallowUnknownFields()`. Call it instead of `json.NewDecoder(r.Body).Decode(...)` at handler boundaries.
-- **Required fields:** oapi-codegen generates pointer fields for optional and value fields for required, but does not produce 400 responses for missing required fields at runtime. Handlers must check explicitly (e.g., `missingAtomicCreateField` at `internal/modules/registry/delivery/http/routes.go:102`).
+- **Required fields:** oapi-codegen generates pointer fields for optional and value fields for required, but does not produce 400 responses for missing required fields at runtime. Handlers must check explicitly (e.g., `missingAtomicCreateField` at `internal/modules/controlleddocuments/delivery/http/routes.go:102`).
 
 ---
 
@@ -138,7 +138,7 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 
 | Module | Path prefix | Codegen status | Handler migration |
 |--------|------------|----------------|------------------|
-| `registry` | `/api/v1/controlled-documents` | Full (`include-tags: registry`) | Complete and wrapper-mounted |
+| `controlled-documents` | `/api/v1/controlled-documents` | Full (`include-tags: controlled-documents`) | Complete and wrapper-mounted |
 | `templates` | `/api/v1/templates` | Full (`include-tags: templates`) | Complete for generated core routes |
 | `documents` | `/api/v1/documents` | Bootstrap only (`include-tags: documents`) | Deferred — see below |
 | `approval` | `/api/v1/approval` | No spec coverage | Raw/runtime routes remain |
@@ -157,7 +157,7 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 | `documents` | `/api/v1/documents` | `Partial` | Mixed aligned+raw surface; includes one path signature mismatch (`{version}` vs `{versionNum}`) |
 | `approval` | `/api/v1/approval`, `/api/v1/documents/* approval routes` | `Raw` | Runtime routes are mounted but not yet represented in OpenAPI/codegen |
 | `templates` | `/api/v1/templates`, `/api/v1/signed` | `Partial` | Core generated routes aligned; several runtime routes still spec-missing |
-| `registry` | `/api/v1/controlled-documents` | `Wrapper-only` | Fully mounted through `ServerInterfaceWrapper` and aligned with spec/codegen |
+| `controlled-documents` | `/api/v1/controlled-documents` | `Wrapper-only` | Fully mounted through `ServerInterfaceWrapper` and aligned with spec/codegen |
 | `taxonomy` | `/api/v1/taxonomy` | `Raw` | Runtime routes present; no OpenAPI coverage yet |
 | `audit` | `/api/v1/audit` | `Partial` | Runtime path aligns with spec (`/audit/events` + `/api/v1` server prefix); operationId missing |
 | `iam` | `/api/v1/iam` | `Partial` | v1 admin routes aligned; area-membership routes are spec-missing |
@@ -168,7 +168,7 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 - [Documents route table](../modules/documents.md#api-route-truth-table-plan-8-baseline)
 - [Approval route table](../modules/approval.md#api-route-truth-table-plan-8-baseline)
 - [templates route table](../modules/templates.md#api-route-truth-table-plan-8-baseline)
-- [Registry route table](../modules/registry.md#api-route-truth-table-plan-8-baseline)
+- [Registry route table](../modules/controlled-documents.md#api-route-truth-table-plan-8-baseline)
 - [Taxonomy route table](../modules/taxonomy.md#api-route-truth-table-plan-8-baseline)
 - [Audit route table](../modules/audit.md#api-route-truth-table-plan-8-baseline)
 - [IAM route table](../modules/iam.md#api-route-truth-table-plan-8-baseline)
@@ -211,3 +211,5 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 - `wiki/backlog/contract-first-followups.md` - deferred handler migrations + documents spec/handler gap inventory
 - `wiki/references/oapi-codegen.md` - operational how-to (regenerate, vendor mode, add module)
 - `wiki/architecture/frontend-structure.md §7` - frontend API call patterns using generated types
+
+

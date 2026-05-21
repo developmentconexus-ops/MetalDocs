@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
@@ -48,6 +48,7 @@ type Service interface {
 	ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID, docID string) error
 	PresignAutosave(ctx context.Context, cmd application.PresignAutosaveCmd) (*application.PresignAutosaveResult, error)
 	CommitAutosave(ctx context.Context, cmd application.CommitAutosaveCmd) (*application.CommitResult, error)
+	SyncArtifactMetadata(ctx context.Context, cmd application.SyncArtifactMetadataCmd) (*application.CommitResult, error)
 	CreateCheckpoint(ctx context.Context, tenantID, docID, actorID, label string) (*domain.Checkpoint, error)
 	ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error)
 	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
@@ -113,6 +114,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/presign", h.presignAutosave)
 	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/commit", h.commitAutosave)
+	mux.HandleFunc("POST /api/v1/documents/{id}/artifact-metadata", h.syncArtifactMetadata)
 
 	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
@@ -149,6 +151,7 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 		"POST /api/v1/documents/{id}/autosave/commit",
 		rl.Limit(ratelimit.RouteAutosaveCommit, userFn, http.HandlerFunc(h.commitAutosave)),
 	)
+	mux.HandleFunc("POST /api/v1/documents/{id}/artifact-metadata", h.syncArtifactMetadata)
 
 	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
@@ -808,6 +811,44 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) syncArtifactMetadata(w http.ResponseWriter, r *http.Request) {
+	r = withAdminCtx(r)
+	docID := r.PathValue("id")
+	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		SessionID string `json:"session_id"`
+		PageCount *int   `json:"page_count"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+
+	res, err := h.svc.SyncArtifactMetadata(r.Context(), application.SyncArtifactMetadataCmd{
+		TenantID:    tenantID,
+		ActorUserID: userID,
+		DocumentID:  docID,
+		SessionID:   req.SessionID,
+		PageCount:   req.PageCount,
+	})
+	if err != nil {
+		status, msg := mapErr(err)
+		httpErr(w, status, msg)
+		return
+	}
+
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
+		"revision_id":       res.RevisionID,
+		"file_size_bytes":   res.FileSizeBytes,
+		"page_count":        res.PageCount,
+		"page_count_source": res.PageCountSource,
+	})
+}
+
 func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 	r = withAdminCtx(r)
 	docID := r.PathValue("id")
@@ -1212,11 +1253,11 @@ func mapErr(err error) (int, string) {
 		return http.StatusConflict, "misbound"
 	case errors.Is(err, domain.ErrInvalidStateTransition):
 		return http.StatusConflict, "invalid_state_transition"
-	case errors.Is(err, registrydomain.ErrCDNotFound):
+	case errors.Is(err, controlleddocumentsdomain.ErrCDNotFound):
 		return http.StatusNotFound, "controlled_document_not_found"
-	case errors.Is(err, registrydomain.ErrCDNotActive):
+	case errors.Is(err, controlleddocumentsdomain.ErrCDNotActive):
 		return http.StatusConflict, "controlled_document_not_active"
-	case errors.Is(err, registrydomain.ErrProfileHasNoDefaultTemplate):
+	case errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
 		return http.StatusConflict, "profile_has_no_default_template"
 	case strings.HasPrefix(err.Error(), "form_data_invalid"):
 		return http.StatusUnprocessableEntity, "form_data_invalid"

@@ -12,10 +12,10 @@ import (
 
 	"github.com/google/uuid"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	registrydomain "metaldocs/internal/modules/registry/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
@@ -49,6 +49,7 @@ type Repository interface {
 	PresignReserve(ctx context.Context, sessionID, userID, docID, baseRev, contentHash, storageKey string, expiresAt time.Time) (string, error)
 	GetPendingForCommit(ctx context.Context, pendingID string) (*PendingCommitMeta, error)
 	CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error)
+	SyncCurrentRevisionArtifactMetadata(ctx context.Context, tenantID, sessionID, userID, docID string, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error)
 	CreateCheckpoint(ctx context.Context, docID, actorUserID, label string) (*domain.Checkpoint, error)
 	ListCheckpoints(ctx context.Context, docID string) ([]domain.Checkpoint, error)
 	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
@@ -90,11 +91,11 @@ type Audit interface {
 
 // RegistryReader loads a ControlledDocument for validation at create time.
 type RegistryReader interface {
-	GetByID(ctx context.Context, tenantID, id string) (*registrydomain.ControlledDocument, error)
+	GetByID(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error)
 }
 
 type RegistryDuplicator interface {
-	DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*registrydomain.ControlledDocument, error)
+	DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error)
 }
 
 type ProfileDefaultTemplateReader interface {
@@ -213,7 +214,7 @@ type CreateDocumentResult struct {
 	SessionID         string
 }
 
-func buildDocumentForCreate(cmd CreateDocumentInput, cd *registrydomain.ControlledDocument, resolvedTemplateVersionID string) domain.Document {
+func buildDocumentForCreate(cmd CreateDocumentInput, cd *controlleddocumentsdomain.ControlledDocument, resolvedTemplateVersionID string) domain.Document {
 	return domain.Document{
 		TenantID:                cmd.TenantID,
 		TemplateVersionID:       resolvedTemplateVersionID,
@@ -250,7 +251,7 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		return nil, err
 	}
 	if !cd.IsActive() {
-		return nil, registrydomain.ErrCDNotActive
+		return nil, controlleddocumentsdomain.ErrCDNotActive
 	}
 
 	if err := s.caps.CanDo(ctx, cmd.ActorUserID, cmd.TenantID, iamdomain.CapDocumentCreate); err != nil {
@@ -262,26 +263,26 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		return nil, err
 	}
 
-	var overrideTemplate *registrydomain.TemplateVersionCandidate
+	var overrideTemplate *controlleddocumentsdomain.TemplateVersionCandidate
 	if cd.OverrideTemplateVersionID != nil {
 		overrideStatus := "published"
-		overrideTemplate = &registrydomain.TemplateVersionCandidate{
+		overrideTemplate = &controlleddocumentsdomain.TemplateVersionCandidate{
 			ID:          *cd.OverrideTemplateVersionID,
 			ProfileCode: cd.ProfileCode,
 			Status:      &overrideStatus,
 		}
 	}
 
-	var defaultTemplate *registrydomain.TemplateVersionCandidate
+	var defaultTemplate *controlleddocumentsdomain.TemplateVersionCandidate
 	if defaultTemplateID != nil {
-		defaultTemplate = &registrydomain.TemplateVersionCandidate{
+		defaultTemplate = &controlleddocumentsdomain.TemplateVersionCandidate{
 			ID:          *defaultTemplateID,
 			ProfileCode: cd.ProfileCode,
 			Status:      defaultTemplateStatus,
 		}
 	}
 
-	resolution, err := registrydomain.Resolve(registrydomain.TemplateResolutionInput{
+	resolution, err := controlleddocumentsdomain.Resolve(controlleddocumentsdomain.TemplateResolutionInput{
 		ProfileCode:      cd.ProfileCode,
 		OverrideTemplate: overrideTemplate,
 		DefaultTemplate:  defaultTemplate,
@@ -467,26 +468,26 @@ func (s *Service) resolveTemplateVersionID(ctx context.Context, tenantID, profil
 		return "", err
 	}
 
-	var overrideTemplate *registrydomain.TemplateVersionCandidate
+	var overrideTemplate *controlleddocumentsdomain.TemplateVersionCandidate
 	if templateVersionID != nil && strings.TrimSpace(*templateVersionID) != "" {
 		overrideStatus := "published"
-		overrideTemplate = &registrydomain.TemplateVersionCandidate{
+		overrideTemplate = &controlleddocumentsdomain.TemplateVersionCandidate{
 			ID:          strings.TrimSpace(*templateVersionID),
 			ProfileCode: profileCode,
 			Status:      &overrideStatus,
 		}
 	}
 
-	var defaultTemplate *registrydomain.TemplateVersionCandidate
+	var defaultTemplate *controlleddocumentsdomain.TemplateVersionCandidate
 	if defaultTemplateID != nil {
-		defaultTemplate = &registrydomain.TemplateVersionCandidate{
+		defaultTemplate = &controlleddocumentsdomain.TemplateVersionCandidate{
 			ID:          *defaultTemplateID,
 			ProfileCode: profileCode,
 			Status:      defaultTemplateStatus,
 		}
 	}
 
-	resolution, err := registrydomain.Resolve(registrydomain.TemplateResolutionInput{
+	resolution, err := controlleddocumentsdomain.Resolve(controlleddocumentsdomain.TemplateResolutionInput{
 		ProfileCode:      profileCode,
 		OverrideTemplate: overrideTemplate,
 		DefaultTemplate:  defaultTemplate,
@@ -706,6 +707,11 @@ type CommitAutosaveCmd struct {
 	PageCount                                                     *int
 }
 
+type SyncArtifactMetadataCmd struct {
+	TenantID, ActorUserID, DocumentID, SessionID string
+	PageCount                                    *int
+}
+
 func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*CommitResult, error) {
 	if cmd.PageCount != nil && *cmd.PageCount <= 0 {
 		return nil, domain.ErrInvalidPageCount
@@ -765,6 +771,50 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 		s.audit.Write(ctx, cmd.TenantID, cmd.ActorUserID, "document.autosaved", cmd.DocumentID, map[string]any{"revision_id": res.RevisionID, "revision_num": res.RevisionNum})
 	}
 	return res, nil
+}
+
+func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMetadataCmd) (*CommitResult, error) {
+	if cmd.PageCount != nil && *cmd.PageCount <= 0 {
+		return nil, domain.ErrInvalidPageCount
+	}
+
+	doc, err := s.repo.GetDocument(ctx, cmd.TenantID, cmd.DocumentID)
+	if err != nil {
+		return nil, err
+	}
+	if doc.Status != domain.DocStatusDraft {
+		return nil, domain.ErrInvalidStateTransition
+	}
+	if strings.TrimSpace(doc.CurrentRevisionID) == "" {
+		return nil, domain.ErrNotFound
+	}
+
+	revision, err := s.repo.GetRevision(ctx, cmd.DocumentID, doc.CurrentRevisionID)
+	if err != nil {
+		return nil, err
+	}
+
+	fileSizeBytes, err := s.presigner.SizeObject(ctx, revision.StorageKey)
+	if err != nil {
+		return nil, fmt.Errorf("size current revision object: %w", err)
+	}
+
+	var pageCountSource *string
+	if cmd.PageCount != nil {
+		source := "eigenpal_client"
+		pageCountSource = &source
+	}
+
+	return s.repo.SyncCurrentRevisionArtifactMetadata(
+		ctx,
+		cmd.TenantID,
+		cmd.SessionID,
+		cmd.ActorUserID,
+		cmd.DocumentID,
+		fileSizeBytes,
+		cmd.PageCount,
+		pageCountSource,
+	)
 }
 
 func (s *Service) AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, bool, error) {

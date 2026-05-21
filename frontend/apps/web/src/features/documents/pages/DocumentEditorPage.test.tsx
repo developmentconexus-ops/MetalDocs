@@ -11,6 +11,7 @@ const mockState = vi.hoisted(() => ({
   autosaveQueueSpy: vi.fn(),
   editorSaveNowSpy: vi.fn(),
   autosaveFlushSpy: vi.fn(),
+  sessionReleaseSpy: vi.fn(),
   autosaveStatus: 'idle',
   commentsLoadError: null as string | null,
   retryCommentsSpy: vi.fn(),
@@ -49,11 +50,19 @@ vi.mock('@metaldocs/editor-ui', () => ({
 }));
 
 vi.mock('../hooks/editor/useDocumentSession', () => ({
-  useDocumentSession: () => ({
-    state: { phase: 'writer', sessionID: 's1', lastAckRevisionID: 'r1' },
-    setLastAck: vi.fn(),
-    release: vi.fn().mockResolvedValue(undefined),
-  }),
+  useDocumentSession: () => {
+    const [state, setState] = React.useState<
+      | { phase: 'idle' }
+      | { phase: 'writer'; sessionID: string; lastAckRevisionID: string }
+    >({ phase: 'writer', sessionID: 's1', lastAckRevisionID: 'r1' });
+    return {
+      state,
+      setLastAck: vi.fn(),
+      release: mockState.sessionReleaseSpy.mockImplementation(async () => {
+        setState({ phase: 'idle' });
+      }),
+    };
+  },
 }));
 
 vi.mock('../hooks/editor/useDocumentAutosave', () => ({
@@ -90,7 +99,7 @@ vi.mock('../queries/useAreasQuery', () => ({
   }),
 }));
 
-vi.mock('../../registry/queries/useControlledDocumentDetailQuery', () => ({
+vi.mock('../../controlled-documents/queries/useControlledDocumentDetailQuery', () => ({
   useControlledDocumentDetailQuery: () => ({
     data: { visibility: { scope: 'restricted', areaCodes: ['RH'], userIds: [] } },
   }),
@@ -126,6 +135,7 @@ vi.mock('../api/documents', () => ({
   getDocument: vi.fn(),
   finalizeDocument: vi.fn().mockResolvedValue(undefined),
   getApprovalInstance: vi.fn().mockResolvedValue({ stages: [] }),
+  getDocumentRevisionHistory: vi.fn().mockResolvedValue({ items: [] }),
   renameDocument: vi.fn().mockResolvedValue(undefined),
   signedRevisionURL: vi.fn().mockReturnValue('/revisions/r1/signed-url'),
   syncArtifactMetadata: vi.fn().mockResolvedValue({
@@ -203,6 +213,8 @@ beforeEach(() => {
   mockState.editorSaveNowSpy.mockResolvedValue(null);
   mockState.autosaveFlushSpy.mockReset();
   mockState.autosaveFlushSpy.mockResolvedValue(true);
+  mockState.sessionReleaseSpy.mockReset();
+  mockState.sessionReleaseSpy.mockResolvedValue(undefined);
   mockState.autosaveStatus = 'idle';
   mockState.commentsLoadError = null;
   mockState.retryCommentsSpy.mockReset();
@@ -313,12 +325,21 @@ describe('DocumentEditorPage E9 rename rollback', () => {
 describe('DocumentEditorPage autosave wiring', () => {
   it('keeps submit transition inside modern flow without delegating legacy navigation side effects', async () => {
     const onDone = vi.fn();
-    vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      RevisionNumber: 0,
-      RevisionVersion: 0,
-      revision_number: 0,
-      revision_version: 0,
-    }) as never);
+    vi.mocked(api.getDocument)
+      .mockResolvedValueOnce(makeDoc('draft', {
+        RevisionNumber: 0,
+        RevisionVersion: 0,
+        revision_number: 0,
+        revision_version: 0,
+      }) as never)
+      .mockResolvedValueOnce(makeDoc('under_review', {
+        CurrentRevisionID: 'r2',
+        current_revision_id: 'r2',
+        RevisionNumber: 0,
+        RevisionVersion: 1,
+        revision_number: 0,
+        revision_version: 1,
+      }) as never);
     vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
 
     renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
@@ -330,7 +351,38 @@ describe('DocumentEditorPage autosave wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
 
     await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('readonly'),
+    );
+    expect(mockState.sessionReleaseSpy).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(api.getDocumentRevisionHistory)).toHaveBeenCalledWith('d1');
+    expect(vi.mocked(api.getApprovalInstance)).toHaveBeenCalledWith('d1');
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+  });
+
+  it('releases the writer session even when detail rehydration fails after finalize succeeds', async () => {
+    const onDone = vi.fn();
+    const toastSpy = vi.spyOn(toast, 'error');
+    vi.mocked(api.getDocument)
+      .mockResolvedValueOnce(makeDoc('draft') as never)
+      .mockRejectedValueOnce(new Error('detail refetch failed') as never);
+    vi.mocked(api.finalizeDocument).mockResolvedValue(undefined as never);
+
+    renderPage(<DocumentEditorPage documentID="d1" onDone={onDone} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Submeter para revis/i }));
+
+    await waitFor(() => expect(vi.mocked(api.finalizeDocument)).toHaveBeenCalledWith('d1', {}));
+    expect(mockState.sessionReleaseSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1));
+    expect(toastSpy).toHaveBeenCalledWith(
+      'Documento submetido para revisão. Recarregando dados atualizados do editor.',
+    );
+    expect(toastSpy).not.toHaveBeenCalledWith('Erro ao finalizar documento.');
   });
 
   it('queues the buffer provided by MetalDocsEditor without re-reading the editor ref', async () => {
@@ -596,3 +648,4 @@ describe('DocumentEditorPage load failure state', () => {
     expect(mockState.retryCommentsSpy).toHaveBeenCalledTimes(1);
   });
 });
+

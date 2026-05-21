@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	registrydomain "metaldocs/internal/modules/registry/domain"
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 )
 
 // CDDocumentInitializer adapts the documents Service to the registry-owned
@@ -37,7 +37,7 @@ func (i *CDDocumentInitializer) Exists(ctx context.Context, storageKey string) (
 // CloneTemplate threads the caller's tx into Service.cloneIntoTx so the
 // document, initial revision, editor session, snapshot columns and required
 // placeholder rows commit atomically with the CD row.
-func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx *sql.Tx, cd *registrydomain.ControlledDocument, req registrydomain.CloneTemplateRequest) (*registrydomain.DocumentRef, error) {
+func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx *sql.Tx, cd *controlleddocumentsdomain.ControlledDocument, req controlleddocumentsdomain.CloneTemplateRequest) (*controlleddocumentsdomain.DocumentRef, error) {
 	var formData json.RawMessage
 	if req.FormData != nil {
 		raw, err := json.Marshal(req.FormData)
@@ -61,5 +61,5 @@ func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx *sql.Tx, c
 	if err != nil {
 		return nil, err
 	}
-	return &registrydomain.DocumentRef{ID: docID, ContentHash: contentHash}, nil
+	return &controlleddocumentsdomain.DocumentRef{ID: docID, ContentHash: contentHash}, nil
 }
