@@ -69,6 +69,9 @@ Rules:
 - OpenAPI first
 - one generated package per module tag
 - generated wrapper routing for migrated modules
+- freeze check: generated module package exists for each touched generated public module (example: controlled-documents at `internal/modules/controlleddocuments/api/` with `package controlleddocumentsapi`)
+- freeze check: runtime is mounted via generated wrapper/`HandlerWithOptions` from the generated package for each touched generated public module; no raw public mux route ownership for canonical generated endpoints (example: `/api/v1/controlled-documents*`)
+- freeze check: runtime routes, OpenAPI operations, generated server interface, and frontend generated wrappers/types stay aligned for touched endpoints
 - no accidental new raw routes in fully migrated modules
 - no frontend cache/query work from hand-written response shapes when OpenAPI should own the type
 
@@ -109,6 +112,10 @@ Stop and report when:
 - a module appears to expose competing public ownership for the same behavior
 - frontend needs a hand-written type for a route that should be covered by OpenAPI
 - a backend route change changes frontend cache semantics without a TanStack invalidation plan
+- generated package/module identity contradicts canonical module ownership (for example legacy `registry` naming presented as canonical without explicit historical/migration label)
+- hard fail: a public module has generated backend package/artifacts but public runtime ownership remains raw-mounted instead of generated wrapper/`HandlerWithOptions`
+- runtime mounting pattern conflicts with freeze requirements (generated wrapper/`HandlerWithOptions` vs raw mux ownership for touched generated public routes)
+- runtime/spec/generated/frontend-wrapper alignment cannot be proven for touched endpoints
 
 ## Output expectations
 

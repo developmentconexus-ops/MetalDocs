@@ -38,7 +38,7 @@
 | Reviewer (role: `editor`/`approver`) | Accept or reject submitted draft; cannot review own authorship |
 | Approver (role: `approver`/`system_admin`) | Sign off; cannot approve own authorship or own review |
 | Publisher (role: `system_admin`) | Publish approved version; obsoletes prior published |
-| Downstream consumer (`documents`, `approval`, `search`, `controlled_documents` registry) | Snapshot `placeholder_schema`, read author identity, FK to `template_version_id` |
+| Downstream consumer (`documents`, `approval`, `search`, `controlled_documents` controlled-documents module) | Snapshot `placeholder_schema`, read author identity, FK to `template_version_id` |
 
 ---
 
@@ -67,7 +67,7 @@ C4Context
         System(approval, "approval", "Probes template author for SoD")
         System(iam, "iam", "Capabilities: template.view/create/edit/submit/approve/publish")
         System(audit, "audit (canonical)", "metaldocs.audit_events")
-        System(registry, "registry", "controlled_documents FK to template_version")
+        System(controlledDocuments, "controlled-documents", "controlled_documents FK to template_version")
         System(docgenv2, "docgen-v2", "Reads template DOCX bytes for render")
     }
     System_Ext(pg, "Postgres", "templates_* tables")
@@ -79,7 +79,7 @@ C4Context
     Rel(tpl, minio, "Presigned PUT/GET via objectstore Presigner")
     Rel(docs, tpl, "Go: template domain types (Placeholder, TemplateVersion)")
     Rel(approval, tpl, "Go: TemplateAuthorChecker (per iam T-003)")
-    Rel(registry, tpl, "DB FK: controlled_documents.template_version_id")
+    Rel(controlledDocuments, tpl, "DB FK: controlled_documents.template_version_id")
     Rel(docgenv2, pg, "Raw SQL: templates_template_version (no Go import)")
 ```
 
@@ -461,7 +461,7 @@ Top 3 (by severity, then blast-radius):
 - Approval coupling: `wiki/modules/approval.md` (SoD probing of template author identity ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â iam T-003)
 - Editor coupling: `wiki/modules/editor-ui-eigenpal.md`, `wiki/modules/editor-chrome.md`
 - Predecessor wiki stub: `wiki/modules/templates.md` (kebab dash) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â frontend-heavy; will be retired (see `backlog/templates-refactor.md#R-100`).
-- See also: [`modules/registry.md`](registry.md) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â registry holds a FK (`controlled_documents.template_version_id`) to published template versions; registry T-008 tracks the shared taxonomy audit-sink coupling that also affects this module
+- See also: [`modules/controlled-documents.md`](controlled-documents.md) — controlled-documents holds a FK (`controlled_documents.template_version_id`) to published template versions (legacy literal filename/module id: `registry`); registry T-008 tracks the shared taxonomy audit-sink coupling that also affects this module
 - Backlog: `wiki/backlog/templates-refactor.md`
 - Tech debt: `wiki/modules/templates-tech-debt.md`
 

@@ -1,5 +1,21 @@
 # Sync log - approval
 
+## 2026-05-21 - approval wrapper-mounted routing sync
+
+- **Context:** uncommitted Phase 3 backend-platform-freeze slice to move approval runtime mounting from raw per-route handler registration to generated `approvalapi.ServerInterfaceWrapper`.
+- **Mode:** lite patch
+- **Anchors moved:** none
+- **Public surface:** unchanged route set (16 operations); mount style changed.
+- **Routes/API:** `internal/modules/documents/approval/http/router.go` now mounts generated wrapper methods for every approval/doc-action route.
+- **Runtime flows:** unchanged handler/business behavior; existing adapter methods in `routes_generated.go` continue delegating to concrete handlers.
+- **Persistence:** none.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=2 Major=4 Minor=6; missing-ADR=10 (pre-existing).
+- **Tally gate:** pending.
+- **Patched files:** `internal/modules/documents/approval/http/router.go`; `wiki/modules/approval.md`; `wiki/modules/approval/_artifacts/sync-log.md`.
+
 ## 2026-05-20 - deep QA wiki relocation sync
 
 - **Context:** relocate the new documents+approval deep-QA companion artifacts from `docs/superpowers/` into a stable wiki reference folder with cleaner names.

@@ -32,7 +32,7 @@ Run against the composed `wiki/modules/taxonomy.md`, `taxonomy-tech-debt.md`, `b
    - `wiki/concepts/controlled-documents.md` ✓
    - `wiki/concepts/iso-segregation.md` ✓
    - `wiki/concepts/error-ux.md` ✓
-   - `wiki/modules/registry.md` ✓
+   - `wiki/modules/controlled-documents.md` ✓
    - `wiki/modules/documents.md` ✓
    - `wiki/modules/templates.md` ✓
    - `wiki/modules/audit.md` ✓
@@ -53,3 +53,4 @@ Run against the composed `wiki/modules/taxonomy.md`, `taxonomy-tech-debt.md`, `b
 
 ## Action items from self-review
 None. No fixes triggered. Tally re-run not needed.
+

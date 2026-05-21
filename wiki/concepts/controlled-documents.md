@@ -1,16 +1,16 @@
 # Concept: Controlled Documents
 
-> **Last verified:** 2026-05-07
+> **Last verified:** 2026-05-21
 > **Scope:** What a Controlled Document (CD) is, code generation, profile + area binding, sequence counters, atomic create endpoint, preview endpoint.
 > **Key files:**
-> - `internal/modules/registry/` — CD module (registry-owned; hosts atomic create handler)
+> - `internal/modules/controlleddocuments/` — controlled-documents module; hosts the atomic create handler
 > - `internal/platform/idempotency/` — generic `Store` + middleware; used by atomic create + revision endpoints
-> - `internal/modules/registry/infrastructure/repository.go` — per-(tenant, profile_code, process_area_code) counter and CD CRUD queries
-> - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — CD list
+> - `internal/modules/controlleddocuments/infrastructure/repository.go` — per-(tenant, profile_code, process_area_code) counter and CD CRUD queries
+> - `frontend/apps/web/src/features/controlled-documents/pages/ControlledDocumentsPage.tsx` — controlled-documents list
 
 ## What it is
 
-A **Controlled Document (CD)** is a unique catalog slot — a code-numbered identity in the controlled-document registry. It binds:
+A **Controlled Document (CD)** is a unique catalog slot — a code-numbered controlled-document identity. It binds:
 
 - A **profile** (Tipo Documental).
 - An **area**.

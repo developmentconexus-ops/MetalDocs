@@ -20,8 +20,8 @@
 - [editor-ui-eigenpal-tech-debt.md](editor-ui-eigenpal-tech-debt.md) - editor-ui-eigenpal tech-debt register
 - [iam.md](iam.md) - Arc42 + C4 IAM capabilities/roles/memberships module (Maturity: L2, Last verified: 2026-05-12)
 - [iam-tech-debt.md](iam-tech-debt.md) - IAM tech-debt register
-- [registry.md](registry.md) - Arc42 + C4 controlled-documents registry module (Maturity: L2, Last verified: 2026-05-12)
-- [registry-tech-debt.md](registry-tech-debt.md) - registry tech-debt register
+- [controlled-documents.md](controlled-documents.md) - Arc42 + C4 controlled-documents module (Maturity: L2, Last verified: 2026-05-12)
+- [controlled-documents-tech-debt.md](controlled-documents-tech-debt.md) - controlled-documents tech-debt register
 - [taxonomy.md](taxonomy.md) - Arc42 + C4 taxonomy module (Maturity: L3, Last verified: 2026-05-12)
 - [taxonomy-tech-debt.md](taxonomy-tech-debt.md) - taxonomy tech-debt register
 - [templates.md](templates.md) - Arc42 + C4 templates backend module (Maturity: L3, Last verified: 2026-05-12)

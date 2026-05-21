@@ -1,22 +1,23 @@
-# Architecture: Session-Bound Tenant Context
+﻿# Architecture: Session-Bound Tenant Context
 
-> **Last verified:** 2026-05-11
+> **Last verified:** 2026-05-21 (spec-review convergence sync)
+> **Freeze verification note (2026-05-21):** Terminology and ownership framing were re-checked during spec-review cleanup; runtime/source-of-truth claims in this doc were not expanded in this pass.
 > **Scope:** `internal/platform/tenant` package; how tenant identity flows from login through every request handler; `AllowDevTenantFallback` flag; IAM legacy fallback pattern.
-> **Out of scope:** per-tenant IAM role assignment (see `wiki/modules/iam.md §8.2`); row-level Postgres isolation via GUC/RLS (tracked per-module as tech debt).
+> **Out of scope:** per-tenant IAM role assignment (see `wiki/modules/iam.md   8.2`); row-level Postgres isolation via GUC/RLS (tracked per-module as tech debt).
 > **Key files:**
-> - `internal/platform/tenant/context.go:18` — `WithTenantID` (auth middleware injects here)
-> - `internal/platform/tenant/context.go:24` — `FromContext` (all handlers read from here)
-> - `internal/platform/tenant/context.go:14` — `ErrTenantMissing` (returned when context has no tenant)
-> - `internal/platform/tenant/const.go:4` — `DevTenantID` sentinel (`ffffffff-ffff-ffff-ffff-ffffffffffff`)
-> - `internal/modules/auth/application/service.go:172` — `resolveLoginTenant` (binds tenant at login time)
-> - `internal/modules/auth/application/service.go:37` — `AllowDevTenantFallback` config flag
-> - `internal/modules/auth/delivery/http/middleware.go:83-88` — injects `tenant.WithTenantID`; strips `X-Tenant-ID` header
-> - `internal/modules/auth/domain/model.go:26` — `Session.TenantID` (persisted in `auth_sessions`)
-> - `internal/modules/auth/domain/model.go:95` — `CurrentUser.TenantID`
-> - `internal/modules/auth/domain/errors.go:18` — `ErrTenantNotPermitted`
-> - `internal/modules/auth/domain/errors.go:21` — `ErrTenantClaimRequired`
-> - `migrations/0184_auth_sessions_tenant_id.sql` — adds `tenant_id` column to `auth_sessions`
-> - `migrations/0185_revoke_ambiguous_sessions.sql` — revokes pre-migration sessions without a tenant binding
+> - `internal/platform/tenant/context.go:18`     `WithTenantID` (auth middleware injects here)
+> - `internal/platform/tenant/context.go:24`     `FromContext` (all handlers read from here)
+> - `internal/platform/tenant/context.go:14`     `ErrTenantMissing` (returned when context has no tenant)
+> - `internal/platform/tenant/const.go:4`     `DevTenantID` sentinel (`ffffffff-ffff-ffff-ffff-ffffffffffff`)
+> - `internal/modules/auth/application/service.go:172`     `resolveLoginTenant` (binds tenant at login time)
+> - `internal/modules/auth/application/service.go:37`     `AllowDevTenantFallback` config flag
+> - `internal/modules/auth/delivery/http/middleware.go:83-88`     injects `tenant.WithTenantID`; strips `X-Tenant-ID` header
+> - `internal/modules/auth/domain/model.go:26`     `Session.TenantID` (persisted in `auth_sessions`)
+> - `internal/modules/auth/domain/model.go:95`     `CurrentUser.TenantID`
+> - `internal/modules/auth/domain/errors.go:18`     `ErrTenantNotPermitted`
+> - `internal/modules/auth/domain/errors.go:21`     `ErrTenantClaimRequired`
+> - `migrations/0184_auth_sessions_tenant_id.sql`     adds `tenant_id` column to `auth_sessions`
+> - `migrations/0185_revoke_ambiguous_sessions.sql`     revokes pre-migration sessions without a tenant binding
 
 ---
 
@@ -30,7 +31,7 @@ Plan 3 moves tenant binding to **login time**:
 2. That tenant ID is stored in `auth_sessions.tenant_id` (migration 0184).
 3. On every subsequent request, the auth middleware reads the session's `tenant_id` and injects it into the request context via `tenant.WithTenantID`.
 4. The middleware **strips** the `X-Tenant-ID` header so no downstream handler can read it.
-5. All handlers call `tenant.FromContext` — they get the session-verified tenant or an error.
+5. All handlers call `tenant.FromContext`     they get the session-verified tenant or an error.
 
 ---
 
@@ -54,7 +55,7 @@ Extracts the authenticated tenant ID. Returns `ErrTenantMissing` when:
 - The context has no tenant value (middleware was bypassed, or auth is disabled).
 - The stored value is empty or whitespace.
 
-**Handlers MUST treat `ErrTenantMissing` as an internal-server-error invariant violation**, not a 400 validation error — it means the auth middleware did not run or the session was corrupt.
+**Handlers MUST treat `ErrTenantMissing` as an internal-server-error invariant violation**, not a 400 validation error     it means the auth middleware did not run or the session was corrupt.
 
 ### 2.3 `ErrTenantMissing`
 
@@ -83,10 +84,10 @@ Rules (in order):
 | Condition | Result |
 |---|---|
 | `claimedTenantID` non-empty AND user has a role in that tenant | `claimedTenantID` accepted |
-| `claimedTenantID` non-empty but user has NO role there | `ErrTenantNotPermitted` → 403 `AUTH_TENANT_FORBIDDEN` |
+| `claimedTenantID` non-empty but user has NO role there | `ErrTenantNotPermitted`     403 `AUTH_TENANT_FORBIDDEN` |
 | `claimedTenantID` empty AND user has exactly 1 tenant | that tenant |
 | `claimedTenantID` empty AND user has 0 tenants AND `AllowDevTenantFallback=true` | `DevTenantID` |
-| `claimedTenantID` empty AND user has multiple tenants | `ErrTenantClaimRequired` → 403 `AUTH_TENANT_REQUIRED` |
+| `claimedTenantID` empty AND user has multiple tenants | `ErrTenantClaimRequired`     403 `AUTH_TENANT_REQUIRED` |
 
 The selected tenant ID is stored in `auth_sessions.tenant_id` (migration 0184). `GetUserTenants` reads `iam_user_roles` to determine which tenants a user has any role in (`domain/port.go:23`).
 
@@ -112,7 +113,7 @@ next.ServeHTTP(w, r2)
 
 Key points:
 - `WithTenantID` writes the session's tenant into the request context.
-- `r2.Header.Del("X-Tenant-ID")` strips the header so no downstream code can read it — even if it was present on the inbound request.
+- `r2.Header.Del("X-Tenant-ID")` strips the header so no downstream code can read it     even if it was present on the inbound request.
 - All three context writes happen in one block; if `ResolveSession` fails, none of them run.
 
 ---
@@ -131,7 +132,7 @@ if err != nil {
 }
 ```
 
-This fallback activates **only** when `tenant.FromContext` returns `ErrTenantMissing` — i.e., when auth middleware did not run (legacy-header mode where `LegacyHeaderEnabled=true` and `X-User-Id` header bypassed the auth middleware entirely). In normal production flows (auth enabled, no `LegacyHeaderEnabled`), `FromContext` always succeeds, and the header fallback is never reached.
+This fallback activates **only** when `tenant.FromContext` returns `ErrTenantMissing`     i.e., when auth middleware did not run (legacy-header mode where `LegacyHeaderEnabled=true` and `X-User-Id` header bypassed the auth middleware entirely). In normal production flows (auth enabled, no `LegacyHeaderEnabled`), `FromContext` always succeeds, and the header fallback is never reached.
 
 The fallback is preserved deliberately: removing it would break `LegacyHeaderEnabled` dev flows before that bypass is fully retired (see `wiki/modules/auth-tech-debt.md` T-001).
 
@@ -145,11 +146,11 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 |---|---|---|
 | IAM | `iam/delivery/http/middleware.go:77` | direct `tenant.FromContext` (with legacy fallback) |
 | IAM | `iam/delivery/http/admin_handler.go:109` | direct `tenant.FromContext` |
-| IAM | `iam/delivery/http/routes_memberships.go:146` | `tenantIDFromRequest` → `tenant.FromContext` |
-| registry | `registry/delivery/http/routes.go:488` | `tenantIDFromRequest` → `tenant.FromContext` |
-| registry | `registry/delivery/http/handler.go:50` | `injectTenant` middleware → `tenant.FromContext` |
-| templates | `templates/delivery/http/handler.go:83` | `tenantIDFromReq` → `tenant.FromContext` |
-| taxonomy | `taxonomy/delivery/http/routes_profiles.go:230` | `tenantIDFromRequest` → `tenant.FromContext` |
+| IAM | `iam/delivery/http/routes_memberships.go:146` | `tenantIDFromRequest`     `tenant.FromContext` |
+| controlled-documents | `internal/modules/controlleddocuments/delivery/http/routes.go:488` | `tenantIDFromRequest`     `tenant.FromContext` |
+| controlled-documents | `internal/modules/controlleddocuments/delivery/http/handler.go:50` | `injectTenant` middleware     `tenant.FromContext` |
+| templates | `templates/delivery/http/handler.go:83` | `tenantIDFromReq`     `tenant.FromContext` |
+| taxonomy | `taxonomy/delivery/http/routes_profiles.go:230` | `tenantIDFromRequest`     `tenant.FromContext` |
 | documents | `documents/delivery/http/handler.go` | `tenant.FromContext` |
 | documents/approval | `documents/approval/http/handler.go` | `tenant.FromContext` |
 | documents | `documents/http/fillin_handler.go` | `tenant.FromContext` |
@@ -169,10 +170,12 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 
 ## 8. Cross-links
 
-- `wiki/modules/auth.md` — full auth module doc; §6.1 login sequence, §6.2 resolve-session sequence, §8.7 config
-- `wiki/modules/iam.md §8.2` — tenant scoping in IAM tables
-- `wiki/modules/registry.md §8.7` — registry tenant scoping
-- `wiki/modules/taxonomy.md §8` — taxonomy tenant scoping (T-001 resolved)
-- `wiki/modules/templates-tech-debt.md#T-003` — templates header-trust (T-003 resolved)
-- `wiki/concepts/authz-tiers.md` — how tenant context feeds into tier-1 and tier-2 authz
-- `wiki/backlog/roadmap.md` — Plan 3 entry
+- `wiki/modules/auth.md`     full auth module doc;   6.1 login sequence,   6.2 resolve-session sequence,   8.7 config
+- `wiki/modules/iam.md   8.2`     tenant scoping in IAM tables
+- `wiki/modules/controlled-documents.md   8.7`     controlled-documents tenant scoping
+- `wiki/modules/taxonomy.md   8`     taxonomy tenant scoping (T-001 resolved)
+- `wiki/modules/templates-tech-debt.md#T-003`     templates header-trust (T-003 resolved)
+- `wiki/concepts/authz-tiers.md`     how tenant context feeds into tier-1 and tier-2 authz
+- `wiki/backlog/roadmap.md`     Plan 3 entry
+
+

@@ -9,7 +9,7 @@
 | metaldocs/internal/modules/iam/domain | present | internal/modules/documents\http\fillin_handler.go:16 |
 | metaldocs/internal/modules/iam/application | present | internal/modules/documents\delivery\http\handler.go:17 |
 | metaldocs/internal/modules/iam/authz | present | internal/modules/documents\http\fillin_handler.go:15 |
-| metaldocs/internal/modules/registry/domain | present | internal/modules/documents\application\create_document_snapshot_integration_test.go:15 |
+| metaldocs/internal/modules/controlleddocuments/domain | present | internal/modules/documents\application\create_document_snapshot_integration_test.go:15 |
 | metaldocs/internal/modules/templates/domain | present | internal/modules/documents\repository\fillin_repository_integration_test.go:14 |
 | metaldocs/internal/modules/render | present | internal/modules/documents\repository\resolver_readers.go:9 |
 | metaldocs/internal/modules/audit/domain | absent | absent |
@@ -169,3 +169,4 @@ Expected-path verification:
 | internal/modules/documents\repository\repository_pagination_test.go | unit | default classification |
 | internal/modules/documents\repository\repository_stats_test.go | unit | default classification |
 | internal/modules/documents\repository\snapshot_repository_test.go | unit | default classification |
+

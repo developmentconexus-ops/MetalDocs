@@ -18,7 +18,7 @@
 > - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` â€” tenant-scoped `RolesByUserID`
 > - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:34` â€” `UpsertUserAndAssignRole` (BEGIN-authz.Require-DELETE-INSERT); `ReplaceUserRoles` at `:76` â€” both now call `authz.Require(CapUserManage)` (Plan 5 closed T-004 partial)
 > - `internal/modules/iam/infrastructure/postgres/user_area_repository.go:52` â€” `Insert` (tier-2 `authz.Require(CapMembershipManage)`); `CloseActive` at `:84`; `GrantAtomic` at `:109` â€” all three write methods now have tier-2 enforcement (Plan 5 closed T-004 partial)
-> - `internal/modules/iam/domain/model.go:13` â€” single typed `Capability` namespace (20 consts including `CapRegistryObsolete` + `CapRegistrySupersede` added Plan 5; Plan 4 closed T-001)
+> - `internal/modules/iam/domain/model.go:13` â€” single typed `Capability` namespace (20 consts including `CapControlledDocumentObsolete` + `CapControlledDocumentSupersede` added Plan 5; Plan 4 closed T-001)
 > - `apps/api/cmd/metaldocs-api/permissions.go:54,196` â€” `(method,path)â†’Cap*` resolver
 > - `apps/api/internal/wiring/documents.go:24` â€” `NewCapabilityChecker` adapter (J2 fix)
 > - `migrations/0142b_role_capabilities_v2_enforce.sql:67-179` â€” original `enforce_capability_asserted()` function (approval tables only; superseded by 0188)
@@ -147,7 +147,7 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 
 | File | Exports |
 |---|---|
-| `domain/model.go` | `Role` type + 5 consts (`RoleApprover`, `RoleAuthor`, `RoleEditor`, `RoleSystemAdmin`, `RoleViewer`); `Capability` type + 20 typed consts (`CapDocument{View,Create,Edit,Submit,Signoff}`, `CapWorkflow{Review,Approve}`, `CapTemplate{View,Create,Edit,Submit,Approve,Publish}`, `CapRegistryCreate`, `CapRegistryObsolete`, `CapRegistrySupersede`, `CapTaxonomyManage`, `CapMembershipManage`, `CapRouteManage`, `CapUserManage`) â€” Plan 4 collapsed the dual namespace; Plan 5 added `CapRegistryObsolete`/`CapRegistrySupersede` |
+| `domain/model.go` | `Role` type + 5 consts (`RoleApprover`, `RoleAuthor`, `RoleEditor`, `RoleSystemAdmin`, `RoleViewer`); `Capability` type + 20 typed consts (`CapDocument{View,Create,Edit,Submit,Signoff}`, `CapWorkflow{Review,Approve}`, `CapTemplate{View,Create,Edit,Submit,Approve,Publish}`, `CapControlledDocumentCreate`, `CapControlledDocumentObsolete`, `CapControlledDocumentSupersede`, `CapTaxonomyManage`, `CapMembershipManage`, `CapRouteManage`, `CapUserManage`) â€” Plan 4 collapsed the dual namespace; Plan 5 added `CapControlledDocumentObsolete`/`CapControlledDocumentSupersede` |
 | `domain/context.go` | `WithAuthContext`, `UserIDFromContext`, `RolesFromContext` |
 | `domain/errors.go` | `ErrUserNotFound`, `ErrUserInactive` |
 | `domain/port.go` | `RoleProvider`, `RoleAdminRepository` interfaces (all methods tenant-scoped) |
@@ -341,7 +341,7 @@ RFC 9457 Problem envelope is **not used** in IAM responses (T-006).
 
 - Authentication: `auth` module owns it; IAM consumes `auth.domain.ManagedUser` only from `AdminHandler`.
 - Tier-1 (edge): `CapabilityService.CanDo`. Resolver: `apps/api/cmd/metaldocs-api/permissions.go`.
-- Tier-2 (in-tx): `authz.Require` â€” consumed BY `documents/**` (5 import sites), `registry` (changeStatus), `taxonomy` (FamilyRepository.Create/Update, ProfileRepository.Create/Update, AreaRepository.Create/Update), `templates` (CreateTemplate, SubmitForReview, Review, Approve, PublishTemplateVersion, ArchiveTemplate), AND NOW also by IAM itself (`role_admin_repository.go`, `user_area_repository.go`). See `_artifacts/03-deps.md` for full import table.
+- Tier-2 (in-tx): `authz.Require` â€” consumed BY `documents/**` (5 import sites), `controlled-documents` (changeStatus), `taxonomy` (FamilyRepository.Create/Update, ProfileRepository.Create/Update, AreaRepository.Create/Update), `templates` (CreateTemplate, SubmitForReview, Review, Approve, PublishTemplateVersion, ArchiveTemplate), AND NOW also by IAM itself (`role_admin_repository.go`, `user_area_repository.go`). See `_artifacts/03-deps.md` for full import table.
 - Tier-3 (DB enforcer): `enforce_capability_asserted` trigger on 12 tables (expanded by Plan 5, migration 0188). Reads `metaldocs.asserted_caps` GUC.
 - system_admin: bypasses tier-1 (`capability_service.go:33-45`) and tier-2 (`authz/authz.go:58`).
 
@@ -388,7 +388,7 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 | `document.create` via `CapabilityChecker` adapter | ADR 0007 â€” J2 amendment (2026-05-05) |
 | `tenant_id` per IAM table (Group B) | ADR 0007 references migration 0162; tenant-isolation rule is implicit. No standalone ADR. **missing-ADR** â†’ T-011 |
 | Collapse dual capability namespaces â€” typed `iamdomain.Capability` wins; `capabilities.go` deleted; DB reseeded to `document.*` | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
-| Delete `AuthorizationService` (third authz surface); Plan 5 wired tier-2 per module (IAM repos, registry, taxonomy, templates, documents) | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
+| Delete `AuthorizationService` (third authz surface); Plan 5 wired tier-2 per module (IAM repos, controlled-documents, taxonomy, templates, documents) | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
 | Delete `area_membership/` Go wrapper; canonical write surface is `UserAreaRepository.GrantAtomic`; SECURITY DEFINER SQL funcs stay for e2e seed | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
 
 ---
@@ -445,15 +445,14 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 - Architecture: [`architecture/api-design-system.md`](../architecture/api-design-system.md), [`architecture/api-contract.md`](../architecture/api-contract.md), [`architecture/tenant-context.md`](../architecture/tenant-context.md)
 - Modules: [`modules/approval.md`](approval.md) (tier-2 consumer), [`modules/documents.md`](documents.md) (tier-2 consumer), [`modules/templates.md`](templates.md) (predecessor frontend doc), [`modules/templates.md`](templates.md) (Arc42 backend doc â€” consumer of `template.*` capability namespace; T-001 closed Plan 4), [`modules/auth.md`](auth.md) (bidirectional dep: auth imports `iamdomain`; `iam.AdminHandler` imports `authdomain.ManagedUser/OnlineUser/UpdateUserParams`)
 - See also: [`modules/audit.md`](audit.md) â€” iam `AdminHandler.recordAudit` calls `audit.Writer.Record` for role/user admin ops; T-005 tracks the gap where `handleUserRoleUpsert` does not yet emit
-- See also: [`modules/registry.md Â§8.1`](registry.md#81-authentication--authorization) â€” registry now has tier-2 `authz.Require` for Create + changeStatus and tier-3 DB tripwire on `controlled_documents` + `cd_sequence_counters` (registry T-001/T-004 closed Plan 5)
+- See also: [`modules/controlled-documents.md Â§8.1`](controlled-documents.md#81-authentication--authorization) â€” controlled-documents now has tier-2 `authz.Require` for Create + changeStatus and tier-3 DB tripwire on `controlled_documents` + `cd_sequence_counters`
 - Backlog: [`backlog/iam-refactor.md`](../backlog/iam-refactor.md)
 - Tech debt: [`iam-tech-debt.md`](iam-tech-debt.md)
 - Source artifacts: [`iam/_artifacts/00-context.md`](iam/_artifacts/00-context.md) through [`05-industry.md`](iam/_artifacts/05-industry.md)
 
 ## Changelog
 
-- 2026-05-11 â€” Plan 5 (tier-2 authz.Require + Postgres tripwire expansion): `role_admin_repository.go` `UpsertUserAndAssignRole`/`ReplaceUserRoles` now call `authz.Require(CapUserManage)`; `user_area_repository.go` `Insert`/`CloseActive`/`GrantAtomic` call `authz.Require(CapMembershipManage)`. Import aliased to `iamdomain`. `domain/model.go` gained `CapRegistryObsolete`/`CapRegistrySupersede`. Migration 0188 attaches `trg_require_cap_asserted` to 10 new tables. Â§2 DB floor, Â§6.2/Â§6.3 tripwire-pairing, Â§8.1 tiers, Â§8.5 concurrency, Â§9, Â§11, Â§12 all updated.
+- 2026-05-11 â€” Plan 5 (tier-2 authz.Require + Postgres tripwire expansion): `role_admin_repository.go` `UpsertUserAndAssignRole`/`ReplaceUserRoles` now call `authz.Require(CapUserManage)`; `user_area_repository.go` `Insert`/`CloseActive`/`GrantAtomic` call `authz.Require(CapMembershipManage)`. Import aliased to `iamdomain`. `domain/model.go` gained `CapControlledDocumentObsolete`/`CapControlledDocumentSupersede`. Migration 0188 attaches `trg_require_cap_asserted` to 10 new tables. Â§2 DB floor, Â§6.2/Â§6.3 tripwire-pairing, Â§8.1 tiers, Â§8.5 concurrency, Â§9, Â§11, Â§12 all updated.
 - 2026-05-11 â€” Plan 4 (capability namespace collapse + IAM dual-surface consolidation): collapsed `capabilities.go` + `model.go` into single typed `Capability` namespace (18 consts); deleted `area_membership/`, `application/authorization.go`, `domain/role_capabilities.go`, `application/startup.go`; renamed `authz.ErrCapabilityDenied` â†’ `authz.ErrCapDenied`; Â§5.1 C4 updated; Â§5.2 file table pruned; Â§5.4 removed; Â§8.5/Â§8.6 updated; Â§9/Â§10/Â§11/Â§12 refreshed. Closed T-001/T-002/T-003/T-009/T-012.
 - 2026-05-11 â€” Plan 3 (module sweep): IAM middleware now calls `tenant.FromContext` as primary tenant source; legacy fallback to `X-Tenant-ID` header preserved under `legacyHeader` mode; `handleAdminOverview` + `tenantIDFromRequest` updated; Key files, Â§2, cross-links updated.
 - 2026-05-10 â€” initial publish; supersedes retired `iam-rbac.md` stub. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.
-

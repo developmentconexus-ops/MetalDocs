@@ -75,7 +75,7 @@
 - Cookie attributes: `HttpOnly`, `SameSite=Lax`, `Secure` from `Config.CookieSecure` (defaults to `APP_ENV != local`), `Path=/`, `MaxAge` from `SessionTTL`.
 - Auth is NOT under `oapi-codegen` â€” routes are registered via `mux.HandleFunc` (`delivery/http/handler.go:35-39`); no entry in `api/openapi/v1/openapi.yaml` for `/api/v1/auth/*`. Consistent with ADR 0012's partial-rollout scope.
 - Error envelope is legacy `{error:{code,message,details,trace_id}}` â€” does NOT yet match RFC 9457 Problem Details from `wiki/architecture/api-design-system.md` (T-003).
-- Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, registry, taxonomy, templates) but auth tables remain unguarded â€” per ADR 0007 amendment.
+- Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, controlled-documents, taxonomy, templates) but auth tables remain unguarded â€” per ADR 0007 amendment.
 - `LegacyHeaderEnabled` â€” when true, requests with `X-User-Id` header bypass session enforcement entirely (`middleware.go:58-61`); single-flag compromise vector (T-001).
 
 ---
@@ -511,4 +511,3 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 
 - 2026-05-11 â€” Plan 3 (session-bound tenant): `Session.TenantID` + `CurrentUser.TenantID` added; `ResolveSession` drops `tenantID` arg; `resolveLoginTenant` + `AllowDevTenantFallback`; new errors `ErrTenantNotPermitted`/`ErrTenantClaimRequired`; middleware now injects `tenant.WithTenantID` + strips `X-Tenant-ID` header; migrations 0184/0185; `SeedUserTenants` helper; Key files, Â§2, Â§5.2, Â§6.1, Â§6.2, Â§6.4, Â§8.7, Â§12 updated.
 - 2026-05-10 â€” initial publish; first auth module doc. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.
-

@@ -195,12 +195,12 @@ Test file counts by subpackage (excluded from tree rows):
 | internal/modules/documents/application/service.go:187 | type | CreateDocumentInput | type CreateDocumentInput struct { | (undocumented) |
 | internal/modules/documents/application/service.go:196 | type | CreateDocumentCmd | type CreateDocumentCmd = CreateDocumentInput | (undocumented) |
 | internal/modules/documents/application/service.go:198 | type | CreateDocumentResult | type CreateDocumentResult struct { | (undocumented) |
-| internal/modules/documents/application/service.go:204 | func | buildDocumentForCreate | func buildDocumentForCreate(cmd CreateDocumentInput, cd *registrydomain.ControlledDocument, resolvedTemplateVersionID string) domain.Document { | (undocumented) |
+| internal/modules/documents/application/service.go:204 | func | buildDocumentForCreate | func buildDocumentForCreate(cmd CreateDocumentInput, cd *controlleddocumentsdomain.ControlledDocument, resolvedTemplateVersionID string) domain.Document { | (undocumented) |
 | internal/modules/documents/application/service.go:23 | type | PendingCommitMeta | type PendingCommitMeta = repository.PendingCommitMeta | Type aliases so handlers depend only on application types. |
 | internal/modules/documents/application/service.go:24 | type | CommitResult | type CommitResult = repository.CommitResult | (undocumented) |
 | internal/modules/documents/application/service.go:25 | type | RestoreResult | type RestoreResult = repository.RestoreResult | (undocumented) |
-| internal/modules/documents/application/service.go:253 | var | overrideTemplate | var overrideTemplate *registrydomain.TemplateVersionCandidate | (undocumented) |
-| internal/modules/documents/application/service.go:263 | var | defaultTemplate | var defaultTemplate *registrydomain.TemplateVersionCandidate | (undocumented) |
+| internal/modules/documents/application/service.go:253 | var | overrideTemplate | var overrideTemplate *controlleddocumentsdomain.TemplateVersionCandidate | (undocumented) |
+| internal/modules/documents/application/service.go:263 | var | defaultTemplate | var defaultTemplate *controlleddocumentsdomain.TemplateVersionCandidate | (undocumented) |
 | internal/modules/documents/application/service.go:27 | type | Repository | type Repository interface { | (undocumented) |
 | internal/modules/documents/application/service.go:298 | var | snap | var snap domain.TemplateSnapshot | Resolve template snapshot pre-INSERT so snapshot columns are written |
 | internal/modules/documents/application/service.go:299 | var | phs | var phs []templatesdomain.Placeholder | (undocumented) |
@@ -208,8 +208,8 @@ Test file counts by subpackage (excluded from tree rows):
 | internal/modules/documents/application/service.go:308 | var | contentHash | var contentHash, finalKey string | (undocumented) |
 | internal/modules/documents/application/service.go:311 | var | err | var err error | (undocumented) |
 | internal/modules/documents/application/service.go:369 | type | cloneIntoTxInput | type cloneIntoTxInput struct { | cloneIntoTxInput is the internal payload for cloneIntoTx. It mirrors the |
-| internal/modules/documents/application/service.go:406 | var | overrideTemplate | var overrideTemplate *registrydomain.TemplateVersionCandidate | (undocumented) |
-| internal/modules/documents/application/service.go:416 | var | defaultTemplate | var defaultTemplate *registrydomain.TemplateVersionCandidate | (undocumented) |
+| internal/modules/documents/application/service.go:406 | var | overrideTemplate | var overrideTemplate *controlleddocumentsdomain.TemplateVersionCandidate | (undocumented) |
+| internal/modules/documents/application/service.go:416 | var | defaultTemplate | var defaultTemplate *controlleddocumentsdomain.TemplateVersionCandidate | (undocumented) |
 | internal/modules/documents/application/service.go:442 | var | snap | var snap domain.TemplateSnapshot | Resolve template snapshot for the same atomicity guarantees as |
 | internal/modules/documents/application/service.go:443 | var | phs | var phs []templatesdomain.Placeholder | (undocumented) |
 | internal/modules/documents/application/service.go:520 | type | DocumentStats | type DocumentStats struct { | (undocumented) |
@@ -398,3 +398,4 @@ OperationIDs from internal/modules/documents/api/api.gen.go:
 | 0010_grant_document_types_privileges.sql | INSERT | metaldocs.document_types, metaldocs.documents, ON |
 | 0011_init_document_access_policies.sql | CREATE | IF |
 | 0012_grant_document_access_policies_privileges.sql | INSERT | metaldocs.document_access_policies |
+

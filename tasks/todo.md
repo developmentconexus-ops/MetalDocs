@@ -66,12 +66,12 @@ Tasks
   - `frontend/apps/web/src/features/auth/useAuthSession.ts`
   - `frontend/apps/web/src/features/documents/useDocumentsWorkspace.ts`
   - `frontend/apps/web/src/features/documents/useDocumentDetail.ts`
-  - `frontend/apps/web/src/features/registry/useRegistryExplorer.ts`
+  - `frontend/apps/web/src/features/controlled-documents/useControlledDocumentsExplorer.ts`
   - `frontend/apps/web/src/features/notifications/useNotifications.ts`
 - [x] Move handlers out of `App.tsx` into those hooks (keep signatures stable; update call sites).
 - [x] Move big UI blocks out of `App.tsx` into feature components:
   - `frontend/apps/web/src/features/documents/DocumentsWorkspaceView.tsx`
-  - `frontend/apps/web/src/features/registry/RegistryExplorerView.tsx`
+  - `frontend/apps/web/src/features/controlled-documents/ControlledDocumentsExplorerView.tsx`
   - `frontend/apps/web/src/features/shell/WorkspaceShell.tsx`
 - [x] `App.tsx` becomes a thin shell deciding what to render based on store state.
 

@@ -1,3 +1,31 @@
+## 2026-05-21 - documents generated-wrapper mount sync
+
+- **Context:** uncommitted Phase 3 backend-platform-freeze slice to migrate documents module public route mounting to generated boundary ownership.
+- **Mode:** structural refresh
+- **Affected-surface scan:** `internal/modules/documents/module.go`; `internal/modules/documents/delivery/http/generated_adapter.go`; wrapper-mount tests in `internal/modules/documents/module_wrapper_test.go` and `internal/modules/documents/delivery/http/generated_adapter_test.go`.
+- **Routes/API:** documents module now mounts public routes through `documentsapi.HandlerWithOptions`/`ServerInterfaceWrapper` with generated adapter delegation to legacy handlers; placeholder-options route coverage restored under both normal and rate-limited registrations.
+- **Runtime flows:** unchanged business behavior; mount ownership shifted from manual generated-route listing to generated canonical router path.
+- **Persistence:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** pending.
+- **Patched files:** `internal/modules/documents/module.go`; `internal/modules/documents/delivery/http/generated_adapter.go`; `internal/modules/documents/module_wrapper_test.go`; `internal/modules/documents/delivery/http/generated_adapter_test.go`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
+## 2026-05-21 - artifact-metadata route retirement sync
+
+- **Context:** uncommitted backend/API cleanup after documents frontend and generated contract removed `syncDocumentArtifactMetadata`; runtime still exposed `POST /api/v1/documents/{id}/artifact-metadata`.
+- **Mode:** lite patch
+- **Affected-surface scan:** `internal/modules/documents/delivery/http/handler.go`, `internal/modules/documents/delivery/http/handler_test.go`, module wiki changelog.
+- **Routes/API:** removed orphaned public route mount for `POST /api/v1/documents/{id}/artifact-metadata`; no OpenAPI operation exists for this route.
+- **Runtime flows:** no change to autosave commit (`POST /autosave/commit`) or document detail metadata flow.
+- **Persistence:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** PASS preflight.
+- **Patched files:** `internal/modules/documents/delivery/http/handler.go`; `internal/modules/documents/delivery/http/handler_test.go`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-20 - deep QA wiki relocation sync
 
 - **Context:** relocate the new documents+approval deep-QA companion artifacts from `docs/superpowers/` into a stable wiki reference folder with cleaner names.

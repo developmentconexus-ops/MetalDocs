@@ -678,7 +678,7 @@ git commit -m "refactor(foundation): rename --vinho CSS vars to --brand througho
 
 **Files to DELETE:**
 - `frontend/apps/web/src/features/documents/state/documents.store.ts`
-- `frontend/apps/web/src/features/registry/state/` (entire directory)
+- `frontend/apps/web/src/features/controlled-documents/state/` (entire directory)
 - `frontend/apps/web/src/features/notifications/state/` (entire directory)
 - `frontend/apps/web/src/features/shell/pages/WorkspaceRoot.tsx`
 - `frontend/apps/web/src/features/shell/WorkspaceShell.tsx`
@@ -697,7 +697,7 @@ git commit -m "refactor(foundation): rename --vinho CSS vars to --brand througho
 
 ```bash
 rm -f frontend/apps/web/src/features/documents/state/documents.store.ts
-rm -rf frontend/apps/web/src/features/registry/state
+rm -rf frontend/apps/web/src/features/controlled-documents/state
 rm -rf frontend/apps/web/src/features/notifications/state
 rm -f frontend/apps/web/src/features/shell/pages/WorkspaceRoot.tsx
 rm -f frontend/apps/web/src/features/shell/WorkspaceShell.tsx
@@ -893,7 +893,7 @@ Apply this stub pattern to:
 - `frontend/apps/web/src/features/documents/pages/DocumentEditorRoutePage.tsx`
 - `frontend/apps/web/src/features/audit/pages/AuditPage.tsx`
 - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx`
-- `frontend/apps/web/src/features/registry/pages/RegistryExplorerPage.tsx` (if exists)
+- `frontend/apps/web/src/features/controlled-documents/pages/ControlledDocumentsExplorerPage.tsx` (if exists)
 - `frontend/apps/web/src/components/OperationsCenter.tsx` (replace with stub)
 - `frontend/apps/web/src/components/NotificationsPanel.tsx` (replace with stub)
 
@@ -1080,7 +1080,7 @@ import { iamRoutes } from '../features/iam/routes';
 import { notificationsRoutes } from '../features/notifications/routes';
 import { operationsRoutes } from '../features/operations/routes';
 import { passwordChangeRoutes } from '../features/password-change/routes';
-import { registryRoutes } from '../features/registry/routes';
+import { controlledDocumentsRoutes } from '../features/controlled-documents/routes';
 import { taxonomyRoutes } from '../features/taxonomy/routes';
 import { templatesRoutes } from '../features/templates/routes';
 

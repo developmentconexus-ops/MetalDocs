@@ -348,8 +348,8 @@ Top 3 (by severity, then by blast-radius):
 - Related ADRs: `wiki/decisions/0007-two-tier-authz.md`, `wiki/decisions/0012-contract-first-api.md`
 - Related concepts: `wiki/concepts/iso-segregation.md`, `wiki/concepts/error-ux.md`, `wiki/concepts/authz-tiers.md`
 - Consumer-side audit debt: `wiki/modules/auth-tech-debt.md#T-002`, `wiki/modules/iam-tech-debt.md` (T-005), `wiki/modules/documents-tech-debt.md#T-005`, `wiki/modules/documents-tech-debt.md#T-007`
-- Parallel-sink peer: `wiki/modules/taxonomy.md` â€” taxonomy's `DBGovernanceLogger` writes regulated events to `governance_events` instead of consuming `auditdomain.Writer`; taxonomy T-010 + Â§8.6 document this two-sink gap; registry reuses the same logger (`registry/module.go:31`) â€” see also registry T-008
-- See also: [`modules/registry.md Â§8.5`](registry.md#85-audit--governance) â€” registry's create path emits via the taxonomy governance-events sink (T-008: cross-module coupling); Obsolete/Supersede emit no audit event (registry T-002 Critical)
+- Parallel-sink peer: `wiki/modules/taxonomy.md` â€” taxonomy's `DBGovernanceLogger` writes regulated events to `governance_events` instead of consuming `auditdomain.Writer`; taxonomy T-010 + Â§8.6 document this two-sink gap; controlled-documents reuses the same logger (legacy literal code path: `registry/module.go:31`) â€” see also registry T-008
+- See also: [`modules/controlled-documents.md §8.5`](controlled-documents.md#85-audit--governance) — controlled-documents create path emits via the taxonomy governance-events sink (T-008: cross-module coupling); Obsolete/Supersede emit no audit event (legacy literal debt key: registry T-002 Critical)
 - Backlog: `wiki/backlog/audit-refactor.md`
 - Tech debt: `wiki/modules/audit-tech-debt.md`
 - Artifacts: `wiki/modules/audit/_artifacts/`
@@ -357,4 +357,3 @@ Top 3 (by severity, then by blast-radius):
 ## Changelog (this doc)
 
 - 2026-05-10 â€” initial publish (metaldocs-module-doc skill v1.2)
-
