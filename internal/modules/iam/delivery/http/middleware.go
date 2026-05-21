@@ -19,7 +19,19 @@ type ctxKeyResourceID struct{}
 
 var writeJSON = httpresponse.WriteJSON
 
-type PermissionResolver func(method, path string) (iamdomain.Capability, bool)
+// Visibility classifies a route's authorization expectation. The zero value
+// (VisibilityPermissionGuarded) is the fail-closed default: a rule that
+// forgets to set Visibility demands a capability rather than slipping through
+// as public.
+type Visibility int
+
+const (
+	VisibilityPermissionGuarded Visibility = iota
+	VisibilitySessionRequired
+	VisibilityPublic
+)
+
+type PermissionResolver func(method, path string) (iamdomain.Capability, Visibility)
 
 type Middleware struct {
 	caps         *iamapp.CapabilityService
@@ -59,8 +71,8 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		capability, guarded := m.resolver(r.Method, r.URL.Path)
-		if !guarded {
+		capability, visibility := m.resolver(r.Method, r.URL.Path)
+		if visibility != VisibilityPermissionGuarded {
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -9,246 +9,208 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// routeRule matches an HTTP request to a capability + visibility classification.
+// All non-empty fields are AND-ed; an empty field is ignored.
+//
+//	method     — exact HTTP method match (empty = any method)
+//	pathExact  — full path equality match
+//	pathPrefix — strings.HasPrefix
+//	pathSuffix — strings.HasSuffix
+//	contains   — strings.Contains
+//	notSuffix  — strings.HasSuffix that DISQUALIFIES the rule (used for negative guards)
+//
+// Rules are scanned in order; the first match wins. Any route not matched by
+// any rule falls through to VisibilitySessionRequired — never public.
+type routeRule struct {
+	method     string
+	pathExact  string
+	pathPrefix string
+	pathSuffix string
+	contains   string
+	notSuffix  string
+	capability iamdomain.Capability
+	visibility iamdelivery.Visibility
+}
+
+func (r routeRule) matches(method, path string) bool {
+	if r.method != "" && r.method != method {
+		return false
+	}
+	if r.pathExact != "" && r.pathExact != path {
+		return false
+	}
+	if r.pathPrefix != "" && !strings.HasPrefix(path, r.pathPrefix) {
+		return false
+	}
+	if r.pathSuffix != "" && !strings.HasSuffix(path, r.pathSuffix) {
+		return false
+	}
+	if r.contains != "" && !strings.Contains(path, r.contains) {
+		return false
+	}
+	if r.notSuffix != "" && strings.HasSuffix(path, r.notSuffix) {
+		return false
+	}
+	return true
+}
+
+// routeRules is the single authoritative table for route visibility +
+// capability. New routes MUST be added here; the unmatched default is
+// VisibilitySessionRequired, so a forgotten entry produces a 401 (loud), not a
+// silent public route (catastrophic).
+var routeRules = []routeRule{
+	// ---- Public (no session required) -----------------------------------
+	{method: http.MethodGet, pathPrefix: "/api/v1/health/", visibility: iamdelivery.VisibilityPublic},
+	{pathExact: "/healthz", visibility: iamdelivery.VisibilityPublic},
+	{method: http.MethodPost, pathExact: "/api/v1/auth/login", visibility: iamdelivery.VisibilityPublic},
+	{method: http.MethodPost, pathExact: "/api/v1/auth/refresh", visibility: iamdelivery.VisibilityPublic},
+	{method: http.MethodGet, pathExact: "/api/v1/feature-flags", visibility: iamdelivery.VisibilityPublic},
+
+	// ---- Session-required (authenticated, no specific capability) -------
+	{method: http.MethodGet, pathExact: "/api/v1/auth/me", visibility: iamdelivery.VisibilitySessionRequired},
+	{method: http.MethodPost, pathExact: "/api/v1/auth/change-password", visibility: iamdelivery.VisibilitySessionRequired},
+	{method: http.MethodPost, pathExact: "/api/v1/auth/logout", visibility: iamdelivery.VisibilitySessionRequired},
+
+	// ---- Permission-guarded ---------------------------------------------
+	// Metrics (H5 left intact per scope — separate finding).
+	{pathExact: "/api/v1/metrics", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Search / notifications.
+	{method: http.MethodGet, pathExact: "/api/v1/search/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/notifications", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/notifications/", pathSuffix: "/read", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Access policies.
+	{method: http.MethodGet, pathExact: "/api/v1/access-policies", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathExact: "/api/v1/access-policies", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Workflow.
+	{method: http.MethodPost, pathPrefix: "/api/v1/workflow/documents/", pathSuffix: "/transitions", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/workflow/documents/", pathSuffix: "/approvals", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// IAM users.
+	{method: http.MethodPost, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPatch, pathPrefix: "/api/v1/iam/users/", notSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/reset-password", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/unlock", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/iam/admin/overview", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Legacy taxonomy aliases.
+	{method: http.MethodGet, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	{method: http.MethodGet, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	{method: http.MethodGet, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Templates — GET first, then exact POST, then sub-route POST/PUTs.
+	{method: http.MethodGet, pathPrefix: "/api/v1/templates", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathExact: "/api/v1/templates", capability: iamdomain.CapTemplateCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/versions", capability: iamdomain.CapTemplateCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/templates", pathSuffix: "/draft", capability: iamdomain.CapTemplateEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/templates", pathSuffix: "/schema", capability: iamdomain.CapTemplateEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/publish", capability: iamdomain.CapTemplatePublish, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/docx-upload-url", capability: iamdomain.CapTemplateEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/schema-upload-url", capability: iamdomain.CapTemplateEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", contains: "/autosave/", capability: iamdomain.CapTemplateEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/submit", capability: iamdomain.CapTemplateSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/review", capability: iamdomain.CapTemplateReview, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/approve", capability: iamdomain.CapTemplateApprove, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/templates", pathSuffix: "/approval-config", capability: iamdomain.CapTemplateEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/templates", pathSuffix: "/archive", capability: iamdomain.Capability("template.archive"), visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Documents — order preserves the original switch semantics (more specific suffixes/contains first).
+	{method: http.MethodGet, pathPrefix: "/api/v1/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathExact: "/api/v1/documents", capability: iamdomain.CapDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/finalize", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/archive", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/session/force-release", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/session/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/autosave/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/artifact-metadata", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/checkpoints/", pathSuffix: "/restore", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/checkpoints", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/export/pdf", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/documents", contains: "/placeholders/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPatch, pathPrefix: "/api/v1/documents", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/submit", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/signoff", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/publish", capability: iamdomain.Capability("doc.publish"), visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/schedule-publish", capability: iamdomain.Capability("doc.publish"), visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/supersede", capability: iamdomain.Capability("doc.supersede"), visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/obsolete", capability: iamdomain.Capability("doc.obsolete"), visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/cancel", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/reconstruct", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Taxonomy profiles / areas / families.
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Controlled documents.
+	{method: http.MethodGet, pathPrefix: "/api/v1/controlled-documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathExact: "/api/v1/controlled-documents", capability: iamdomain.CapControlledDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/revisions", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/obsolete", capability: iamdomain.CapControlledDocumentObsolete, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/supersede", capability: iamdomain.CapControlledDocumentSupersede, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// IAM area memberships — any method.
+	{pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Signed-URL relay.
+	{method: http.MethodGet, pathExact: "/api/v1/signed", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Approval (legacy mount).
+	{method: http.MethodGet, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Audit.
+	{method: http.MethodGet, pathExact: "/api/v1/audit/events", capability: iamdomain.CapAuditRead, visibility: iamdelivery.VisibilityPermissionGuarded},
+}
+
 func newPermissionResolver() iamdelivery.PermissionResolver {
-	return func(method, path string) (iamdomain.Capability, bool) {
-		if path == "/api/v1/health/live" || path == "/api/v1/health/ready" {
-			return "", false
-		}
-		if strings.HasPrefix(path, "/api/v1/auth/") {
-			return "", false
-		}
-		if method == http.MethodGet && path == "/api/v1/feature-flags" {
-			return "", false
-		}
-
-		if path == "/api/v1/metrics" {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodGet && path == "/api/v1/search/documents" {
-			return iamdomain.CapDocumentView, true
-		}
-		if method == http.MethodGet && path == "/api/v1/notifications" {
-			return iamdomain.CapDocumentView, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/notifications/") && strings.HasSuffix(path, "/read") {
-			return iamdomain.CapDocumentView, true
-		}
-		if (method == http.MethodGet || method == http.MethodPut) && path == "/api/v1/access-policies" {
-			return iamdomain.CapMembershipManage, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/transitions") {
-			return iamdomain.CapDocumentSubmit, true
-		}
-		if method == http.MethodGet && strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/approvals") {
-			return iamdomain.CapDocumentView, true
-		}
-		if method == http.MethodPost && path == "/api/v1/iam/users" {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodGet && path == "/api/v1/iam/users" {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodPatch && strings.HasPrefix(path, "/api/v1/iam/users/") && !strings.HasSuffix(path, "/roles") {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/roles") {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodPut && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/roles") {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/reset-password") {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodPost && strings.HasPrefix(path, "/api/v1/iam/users/") && strings.HasSuffix(path, "/unlock") {
-			return iamdomain.CapUserManage, true
-		}
-		if method == http.MethodGet && path == "/api/v1/iam/admin/overview" {
-			return iamdomain.CapUserManage, true
-		}
-		if strings.HasPrefix(path, "/api/v1/document-profiles") {
-			switch method {
-			case http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapTaxonomyManage, true
+	return func(method, path string) (iamdomain.Capability, iamdelivery.Visibility) {
+		for _, rule := range routeRules {
+			if rule.matches(method, path) {
+				return rule.capability, rule.visibility
 			}
 		}
-		if strings.HasPrefix(path, "/api/v1/process-areas") {
-			switch method {
-			case http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapTaxonomyManage, true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/document-subjects") {
-			switch method {
-			case http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapTaxonomyManage, true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/templates") {
-			switch {
-			case method == http.MethodGet:
-				return iamdomain.CapTemplateView, true
-			case method == http.MethodPost && path == "/api/v1/templates":
-				return iamdomain.CapTemplateCreate, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/versions"):
-				return iamdomain.CapTemplateCreate, true
-			case method == http.MethodPut && strings.HasSuffix(path, "/draft"):
-				return iamdomain.CapTemplateEdit, true
-			case method == http.MethodPut && strings.HasSuffix(path, "/schema"):
-				return iamdomain.CapTemplateEdit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/publish"):
-				return iamdomain.CapTemplatePublish, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/docx-upload-url"):
-				return iamdomain.CapTemplateEdit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/schema-upload-url"):
-				return iamdomain.CapTemplateEdit, true
-			case method == http.MethodPost && strings.Contains(path, "/autosave/"):
-				return iamdomain.CapTemplateEdit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/submit"):
-				return iamdomain.CapTemplateSubmit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/review"):
-				return iamdomain.CapTemplateReview, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/approve"):
-				return iamdomain.CapTemplateApprove, true
-			case method == http.MethodPut && strings.HasSuffix(path, "/approval-config"):
-				return iamdomain.CapTemplateEdit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/archive"):
-				return iamdomain.Capability("template.archive"), true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/documents") {
-			switch {
-			case method == http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case method == http.MethodPost && path == "/api/v1/documents":
-				return iamdomain.CapDocumentCreate, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/finalize"):
-				return iamdomain.CapDocumentSignoff, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/archive"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPost && strings.Contains(path, "/session/force-release"):
-				return iamdomain.CapMembershipManage, true
-			case method == http.MethodPost && strings.Contains(path, "/session/"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPost && strings.Contains(path, "/autosave/"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/artifact-metadata"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPost && strings.Contains(path, "/checkpoints/") && strings.HasSuffix(path, "/restore"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPost && strings.Contains(path, "/checkpoints"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/export/pdf"):
-				return iamdomain.CapDocumentView, true
-			case method == http.MethodPut && strings.Contains(path, "/placeholders/"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPatch:
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/submit"):
-				return iamdomain.CapDocumentSubmit, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/signoff"):
-				return iamdomain.CapDocumentSignoff, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/publish"):
-				return iamdomain.Capability("doc.publish"), true
-			case method == http.MethodPost && strings.HasSuffix(path, "/schedule-publish"):
-				return iamdomain.Capability("doc.publish"), true
-			case method == http.MethodPost && strings.HasSuffix(path, "/supersede"):
-				return iamdomain.Capability("doc.supersede"), true
-			case method == http.MethodPost && strings.HasSuffix(path, "/obsolete"):
-				return iamdomain.Capability("doc.obsolete"), true
-			case method == http.MethodPost && strings.HasSuffix(path, "/cancel"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodGet && strings.HasSuffix(path, "/approval-instance"):
-				return iamdomain.CapDocumentView, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/reconstruct"):
-				return iamdomain.CapDocumentEdit, true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/taxonomy/profiles") {
-			switch method {
-			case http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapTaxonomyManage, true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/taxonomy/areas") {
-			switch method {
-			case http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapTaxonomyManage, true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/taxonomy/families") {
-			switch method {
-			case http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPatch, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapTaxonomyManage, true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/controlled-documents") {
-			switch {
-			case method == http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case method == http.MethodPost && path == "/api/v1/controlled-documents":
-				return iamdomain.CapControlledDocumentCreate, true
-			case method == http.MethodPost && strings.HasSuffix(path, "/revisions"):
-				return iamdomain.CapDocumentEdit, true
-			case method == http.MethodPut && strings.HasSuffix(path, "/obsolete"):
-				return iamdomain.CapControlledDocumentObsolete, true
-			case method == http.MethodPut && strings.HasSuffix(path, "/supersede"):
-				return iamdomain.CapControlledDocumentSupersede, true
-			}
-		}
-		if strings.HasPrefix(path, "/api/v1/iam/area-memberships") {
-			return iamdomain.CapMembershipManage, true
-		}
-		if method == http.MethodGet && path == "/api/v1/signed" {
-			return iamdomain.CapTemplateView, true
-		}
-		if strings.HasPrefix(path, "/api/v1/approval/") {
-			switch method {
-			case http.MethodGet:
-				return iamdomain.CapDocumentView, true
-			case http.MethodPost, http.MethodPut, http.MethodDelete:
-				return iamdomain.CapDocumentSubmit, true
-			}
-		}
-		if method == http.MethodGet && path == "/api/v1/audit/events" {
-			return iamdomain.CapAuditRead, true
-		}
-
-		return "", false
+		// Fail-closed default. Any route not enumerated above demands at
+		// least a session — never silently public.
+		return "", iamdelivery.VisibilitySessionRequired
 	}
 }
 
 func newPublicPathChecker(resolver iamdelivery.PermissionResolver) authdelivery.PublicPathChecker {
 	return func(method, path string) bool {
-		if requiresSessionButNoPermission(method, path) {
-			return false
-		}
-		_, guarded := resolver(method, path)
-		return !guarded
+		_, visibility := resolver(method, path)
+		return visibility == iamdelivery.VisibilityPublic
 	}
-}
-
-func requiresSessionButNoPermission(method, path string) bool {
-	if method == http.MethodGet && path == "/api/v1/auth/me" {
-		return true
-	}
-	if method == http.MethodPost && path == "/api/v1/auth/change-password" {
-		return true
-	}
-	if method == http.MethodPost && path == "/api/v1/auth/logout" {
-		return true
-	}
-	return false
 }
