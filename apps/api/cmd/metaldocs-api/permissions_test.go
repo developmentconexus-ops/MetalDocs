@@ -45,9 +45,14 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "v1 template archive", method: http.MethodPost, path: "/api/v1/templates/t1/archive", wantCap: iamdomain.Capability("template.archive"), wantGuard: true},
 		{name: "v1 doc submit", method: http.MethodPost, path: "/api/v1/documents/d1/submit", wantCap: iamdomain.CapDocumentSubmit, wantGuard: true},
 		{name: "v1 doc signoff", method: http.MethodPost, path: "/api/v1/documents/d1/signoff", wantCap: iamdomain.CapDocumentSignoff, wantGuard: true},
+		{name: "v1 doc publish", method: http.MethodPost, path: "/api/v1/documents/d1/publish", wantCap: iamdomain.Capability("doc.publish"), wantGuard: true},
+		{name: "v1 doc schedule publish", method: http.MethodPost, path: "/api/v1/documents/d1/schedule-publish", wantCap: iamdomain.Capability("doc.publish"), wantGuard: true},
+		{name: "v1 doc supersede", method: http.MethodPost, path: "/api/v1/documents/d1/supersede", wantCap: iamdomain.Capability("doc.supersede"), wantGuard: true},
+		{name: "v1 doc obsolete", method: http.MethodPost, path: "/api/v1/documents/d1/obsolete", wantCap: iamdomain.Capability("doc.obsolete"), wantGuard: true},
+		{name: "v1 doc artifact metadata", method: http.MethodPost, path: "/api/v1/documents/d1/artifact-metadata", wantCap: iamdomain.CapDocumentEdit, wantGuard: true},
 		{name: "v1 taxonomy families list", method: http.MethodGet, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapDocumentView, wantGuard: true},
 		{name: "v1 taxonomy families create", method: http.MethodPost, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapTaxonomyManage, wantGuard: true},
-		{name: "v1 controlled-documents create", method: http.MethodPost, path: "/api/v1/controlled-documents", wantCap: iamdomain.CapRegistryCreate, wantGuard: true},
+		{name: "v1 controlled-documents create", method: http.MethodPost, path: "/api/v1/controlled-documents", wantCap: iamdomain.CapControlledDocumentCreate, wantGuard: true},
 		{name: "v1 controlled-documents revisions create", method: http.MethodPost, path: "/api/v1/controlled-documents/cd-1/revisions", wantCap: iamdomain.CapDocumentEdit, wantGuard: true},
 		{name: "v1 controlled-documents preview-code", method: http.MethodGet, path: "/api/v1/controlled-documents/preview-code", wantCap: iamdomain.CapDocumentView, wantGuard: true},
 	}
@@ -102,6 +107,8 @@ func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 		{name: "feature flags stays public", method: http.MethodGet, path: "/api/v1/feature-flags", want: true},
 		{name: "auth me requires session", method: http.MethodGet, path: "/api/v1/auth/me", want: false},
 		{name: "documents list stays guarded", method: http.MethodGet, path: "/api/v1/documents", want: false},
+		{name: "publish stays guarded", method: http.MethodPost, path: "/api/v1/documents/d1/publish", want: false},
+		{name: "artifact metadata stays guarded", method: http.MethodPost, path: "/api/v1/documents/d1/artifact-metadata", want: false},
 	}
 
 	for _, tc := range testCases {
@@ -116,24 +123,24 @@ func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 	}
 }
 
-func TestPermissionResolver_RegistryObsolete_RequiresRegistryObsoleteCap(t *testing.T) {
+func TestPermissionResolver_ControlledDocumentObsolete_RequiresControlledDocumentObsoleteCap(t *testing.T) {
 	r := newPermissionResolver()
 	cap, ok := r(http.MethodPut, "/api/v1/controlled-documents/some-id/obsolete")
 	if !ok {
 		t.Fatal("PUT .../obsolete: resolver returned ok=false")
 	}
-	if cap != iamdomain.CapRegistryObsolete {
-		t.Fatalf("PUT .../obsolete: cap = %v, want CapRegistryObsolete", cap)
+	if cap != iamdomain.CapControlledDocumentObsolete {
+		t.Fatalf("PUT .../obsolete: cap = %v, want CapControlledDocumentObsolete", cap)
 	}
 }
 
-func TestPermissionResolver_RegistrySupersede_RequiresRegistrySupersedeCAP(t *testing.T) {
+func TestPermissionResolver_ControlledDocumentSupersede_RequiresControlledDocumentSupersedeCap(t *testing.T) {
 	r := newPermissionResolver()
 	cap, ok := r(http.MethodPut, "/api/v1/controlled-documents/some-id/supersede")
 	if !ok {
 		t.Fatal("PUT .../supersede: resolver returned ok=false")
 	}
-	if cap != iamdomain.CapRegistrySupersede {
-		t.Fatalf("PUT .../supersede: cap = %v, want CapRegistrySupersede", cap)
+	if cap != iamdomain.CapControlledDocumentSupersede {
+		t.Fatalf("PUT .../supersede: cap = %v, want CapControlledDocumentSupersede", cap)
 	}
 }

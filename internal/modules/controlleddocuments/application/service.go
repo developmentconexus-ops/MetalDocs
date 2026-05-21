@@ -35,7 +35,7 @@ type AreaReader interface {
 type ControlledDocument = controlleddocumentsdomain.ControlledDocument
 type CDFilter = controlleddocumentsdomain.CDFilter
 
-type RegistryService struct {
+type ControlledDocumentService struct {
 	db        *sql.DB
 	docs      controlleddocumentsdomain.ControlledDocumentRepository
 	seq       controlleddocumentsdomain.SequenceAllocator
@@ -75,9 +75,9 @@ type CreateResult struct {
 }
 
 var ErrTemplateArtifactMissing = errors.New("template artifact missing")
-var ErrTemplateArtifactInvariantUnconfigured = errors.New("registry: template artifact invariant not configured")
+var ErrTemplateArtifactInvariantUnconfigured = errors.New("controlled_documents: template artifact invariant not configured")
 
-func NewRegistryService(
+func NewControlledDocumentService(
 	db *sql.DB,
 	docs controlleddocumentsdomain.ControlledDocumentRepository,
 	seq controlleddocumentsdomain.SequenceAllocator,
@@ -86,11 +86,11 @@ func NewRegistryService(
 	areas AreaReader,
 	govLogger taxonomydomain.GovernanceLogger,
 	docInit controlleddocumentsdomain.DocumentInitializer,
-) *RegistryService {
+) *ControlledDocumentService {
 	if govLogger == nil {
-		panic("registry: governance logger must not be nil")
+		panic("controlled_documents: governance logger must not be nil")
 	}
-	svc := &RegistryService{
+	svc := &ControlledDocumentService{
 		db:        db,
 		docs:      docs,
 		seq:       seq,
@@ -111,15 +111,15 @@ func NewRegistryService(
 // registry module is constructed first (because documents needs a
 // RegistryDuplicator), then the documents module is built, then the
 // initializer adapter is injected back here.
-func (s *RegistryService) WithDocumentInitializer(d controlleddocumentsdomain.DocumentInitializer) *RegistryService {
+func (s *ControlledDocumentService) WithDocumentInitializer(d controlleddocumentsdomain.DocumentInitializer) *ControlledDocumentService {
 	if d == nil {
-		panic("registry: document initializer must not be nil")
+		panic("controlled_documents: document initializer must not be nil")
 	}
 	s.docInit = d
 	return s
 }
 
-func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocumentCmd) (*CreateResult, error) {
+func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateControlledDocumentCmd) (*CreateResult, error) {
 	profile, err := s.profiles.GetByCode(ctx, cmd.TenantID, cmd.ProfileCode)
 	if err != nil {
 		return nil, err
@@ -179,10 +179,10 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 			}()
 			createTx = tx
 			if err := setAuthzGUC(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
-				return nil, fmt.Errorf("registry: set authz context: %w", err)
+				return nil, fmt.Errorf("controlled_documents: set authz context: %w", err)
 			}
-			if err := authz.Require(ctx, createTx, string(iamdomain.CapRegistryCreate), "tenant"); err != nil {
-				return nil, fmt.Errorf("registry: authz check sequence allocation: %w", err)
+			if err := authz.Require(ctx, createTx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+				return nil, fmt.Errorf("controlled_documents: authz check sequence allocation: %w", err)
 			}
 		}
 	}
@@ -310,14 +310,14 @@ func (s *RegistryService) Create(ctx context.Context, cmd CreateControlledDocume
 	// Governance events are best-effort; document creation is already committed.
 	for _, event := range events {
 		if err := s.govLogger.Log(ctx, event); err != nil {
-			slog.Warn("registry governance event logging failed", "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
+			slog.Warn("controlled documents governance event logging failed", "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
 		}
 	}
 
 	return &CreateResult{ControlledDocument: doc, DocumentRef: docRef}, nil
 }
 
-func (s *RegistryService) ensureTemplateArtifact(ctx context.Context, cmd CreateControlledDocumentCmd) error {
+func (s *ControlledDocumentService) ensureTemplateArtifact(ctx context.Context, cmd CreateControlledDocumentCmd) error {
 	if s.docInit == nil {
 		return ErrTemplateArtifactInvariantUnconfigured
 	}
@@ -350,7 +350,7 @@ func setAuthzGUC(ctx context.Context, tx *sql.Tx, tenantID, actorID string) erro
 
 // PreviewCode returns the next auto-allocated CD code for (profile, area)
 // without consuming the sequence. Used by the wizard's preview endpoint.
-func (s *RegistryService) PreviewCode(ctx context.Context, tenantID, profileCode, areaCode string) (string, error) {
+func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, profileCode, areaCode string) (string, error) {
 	next, err := s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 	if err != nil {
 		return "", err
@@ -360,26 +360,26 @@ func (s *RegistryService) PreviewCode(ctx context.Context, tenantID, profileCode
 
 // PeekSeq returns the next sequence number that NextAndIncrement would
 // allocate for (profile, area). Used by handlers that need the raw integer.
-func (s *RegistryService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
 	return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 }
 
-func (s *RegistryService) Obsolete(ctx context.Context, tenantID, controlledDocumentID string) error {
-	return s.changeStatus(ctx, tenantID, controlledDocumentID, controlleddocumentsdomain.CDStatusObsolete, string(iamdomain.CapRegistryObsolete))
+func (s *ControlledDocumentService) Obsolete(ctx context.Context, tenantID, controlledDocumentID string) error {
+	return s.changeStatus(ctx, tenantID, controlledDocumentID, controlleddocumentsdomain.CDStatusObsolete, string(iamdomain.CapControlledDocumentObsolete))
 }
 
-func (s *RegistryService) Supersede(ctx context.Context, tenantID, controlledDocumentID string) error {
-	return s.changeStatus(ctx, tenantID, controlledDocumentID, controlleddocumentsdomain.CDStatusSuperseded, string(iamdomain.CapRegistrySupersede))
+func (s *ControlledDocumentService) Supersede(ctx context.Context, tenantID, controlledDocumentID string) error {
+	return s.changeStatus(ctx, tenantID, controlledDocumentID, controlleddocumentsdomain.CDStatusSuperseded, string(iamdomain.CapControlledDocumentSupersede))
 }
 
-func (s *RegistryService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error) {
+func (s *ControlledDocumentService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error) {
 	if actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx)); actorUserID != "" {
 		filter.ActorUserID = &actorUserID
 	}
 	return s.docs.List(ctx, tenantID, filter)
 }
 
-func (s *RegistryService) Get(ctx context.Context, tenantID, id string) (*ControlledDocument, error) {
+func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string) (*ControlledDocument, error) {
 	actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx))
 	canRead, err := s.docs.CanRead(ctx, tenantID, id, actorUserID)
 	if err != nil {
@@ -391,7 +391,7 @@ func (s *RegistryService) Get(ctx context.Context, tenantID, id string) (*Contro
 	return s.docs.GetByID(ctx, tenantID, id)
 }
 
-func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlledDocumentID string, next controlleddocumentsdomain.CDStatus, cap string) error {
+func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, controlledDocumentID string, next controlleddocumentsdomain.CDStatus, cap string) error {
 	doc, err := s.docs.GetByID(ctx, tenantID, controlledDocumentID)
 	if err != nil {
 		return err
@@ -407,7 +407,7 @@ func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlled
 	defer func() { _ = tx.Rollback() }()
 
 	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
-		return fmt.Errorf("registry: authz check changeStatus: %w", err)
+		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
 	}
 	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
 		return err
@@ -416,9 +416,9 @@ func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlled
 		return err
 	}
 
-	eventType := "registry.cd.obsoleted"
+	eventType := "controlled_documents.cd.obsoleted"
 	if next == controlleddocumentsdomain.CDStatusSuperseded {
-		eventType = "registry.cd.superseded"
+		eventType = "controlled_documents.cd.superseded"
 	}
 	payload, _ := json.Marshal(map[string]string{"status": string(next)})
 	actorID := ""
@@ -433,7 +433,7 @@ func (s *RegistryService) changeStatus(ctx context.Context, tenantID, controlled
 		ResourceID:   controlledDocumentID,
 		PayloadJSON:  payload,
 	}); err != nil {
-		slog.Warn("registry governance event logging failed", "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
+		slog.Warn("controlled documents governance event logging failed", "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
 	}
 	return nil
 }
@@ -448,7 +448,7 @@ type CreateRevisionCmd struct {
 
 // CreateRevision creates a new document revision for an existing controlled
 // document. It requires a DocumentInitializer to be wired (see WithDocumentInitializer).
-func (s *RegistryService) CreateRevision(ctx context.Context, cmd CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error) {
+func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error) {
 	cd, err := s.docs.GetByID(ctx, cmd.TenantID, cmd.CDID)
 	if err != nil {
 		return nil, err
@@ -457,7 +457,7 @@ func (s *RegistryService) CreateRevision(ctx context.Context, cmd CreateRevision
 		return nil, controlleddocumentsdomain.ErrCDNotActive
 	}
 	if s.docInit == nil {
-		return nil, errors.New("registry: document initializer not configured")
+		return nil, errors.New("controlled_documents: document initializer not configured")
 	}
 
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
@@ -473,14 +473,14 @@ func (s *RegistryService) CreateRevision(ctx context.Context, cmd CreateRevision
 
 	actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx))
 	if actorUserID == "" {
-		txErr = errors.New("registry: actor user id missing in context")
+		txErr = errors.New("controlled_documents: actor user id missing in context")
 		return nil, txErr
 	}
 	if txErr = setAuthzGUC(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {
-		return nil, fmt.Errorf("registry: set authz guc for create revision: %w", txErr)
+		return nil, fmt.Errorf("controlled_documents: set authz guc for create revision: %w", txErr)
 	}
-	if txErr = authz.Require(ctx, tx, string(iamdomain.CapRegistryCreate), "tenant"); txErr != nil {
-		return nil, fmt.Errorf("registry: authz check create revision: %w", txErr)
+	if txErr = authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); txErr != nil {
+		return nil, fmt.Errorf("controlled_documents: authz check create revision: %w", txErr)
 	}
 
 	ref, txErr := s.docInit.CloneTemplate(ctx, tx, cd, controlleddocumentsdomain.CloneTemplateRequest{

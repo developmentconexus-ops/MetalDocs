@@ -97,7 +97,7 @@ func (f fakeGovernanceLogger) Log(ctx context.Context, e taxonomydomain.Governan
 	return nil
 }
 
-type spyRegistryService struct {
+type spyControlledDocumentService struct {
 	gotCreate       application.CreateControlledDocumentCmd
 	gotListFilter   application.CDFilter
 	gotListTenantID string
@@ -115,7 +115,7 @@ type spyRegistryService struct {
 	peekResult      int
 }
 
-func (s *spyRegistryService) Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error) {
+func (s *spyControlledDocumentService) Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error) {
 	s.gotCreate = cmd
 	return &application.CreateResult{
 		ControlledDocument: &controlleddocumentsdomain.ControlledDocument{ID: "cd-1"},
@@ -123,13 +123,13 @@ func (s *spyRegistryService) Create(ctx context.Context, cmd application.CreateC
 	}, nil
 }
 
-func (s *spyRegistryService) List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error) {
+func (s *spyControlledDocumentService) List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error) {
 	s.gotListTenantID = tenantID
 	s.gotListFilter = filter
 	return s.listResult, nil
 }
 
-func (s *spyRegistryService) CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error) {
+func (s *spyControlledDocumentService) CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error) {
 	s.gotRevision = cmd
 	if s.revisionErr != nil {
 		return nil, s.revisionErr
@@ -143,7 +143,7 @@ func (s *spyRegistryService) CreateRevision(ctx context.Context, cmd application
 	}, nil
 }
 
-func (s *spyRegistryService) Get(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error) {
+func (s *spyControlledDocumentService) Get(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	s.gotGetID = id
 	if s.getErr != nil {
 		return nil, s.getErr
@@ -154,17 +154,17 @@ func (s *spyRegistryService) Get(ctx context.Context, tenantID, id string) (*con
 	return nil, controlleddocumentsdomain.ErrCDNotFound
 }
 
-func (s *spyRegistryService) Obsolete(ctx context.Context, tenantID, id string) error {
+func (s *spyControlledDocumentService) Obsolete(ctx context.Context, tenantID, id string) error {
 	s.gotObsoleteID = id
 	return nil
 }
 
-func (s *spyRegistryService) Supersede(ctx context.Context, tenantID, id string) error {
+func (s *spyControlledDocumentService) Supersede(ctx context.Context, tenantID, id string) error {
 	s.gotSupersedeID = id
 	return nil
 }
 
-func (s *spyRegistryService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+func (s *spyControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
 	s.gotPeekProfile = profileCode
 	s.gotPeekArea = areaCode
 	if s.peekResult != 0 {
@@ -186,7 +186,7 @@ func newSQLMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 }
 
 func newTestHandler(db *sql.DB) *Handler {
-	svc := application.NewRegistryService(
+	svc := application.NewControlledDocumentService(
 		nil,
 		fakeRegistryDocs{},
 		fakeSequenceAllocator{},
@@ -246,7 +246,7 @@ func sampleControlledDocument() controlleddocumentsdomain.ControlledDocument {
 // existing tests
 
 func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
-	svc := application.NewRegistryService(
+	svc := application.NewControlledDocumentService(
 		nil,
 		fakeRegistryDocs{},
 		fakeSequenceAllocator{},
@@ -339,7 +339,7 @@ func TestWriteDomainError_TemplateArtifactInvariantUnconfiguredIs500(t *testing.
 }
 
 func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
 		"visibility":{"scope":"restricted","areaCodes":["RH"],"userIds":[]},
 		"profileCode":"DC",
@@ -361,7 +361,7 @@ func TestAtomicCreate_MissingDocumentName_Returns400(t *testing.T) {
 }
 
 func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
 		"documentName":"Policy v1",
 		"visibility":{"scope":"restricted","areaCodes":["RH"],"userIds":[]},
@@ -385,7 +385,7 @@ func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
 }
 
 func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
-	spy := &spyRegistryService{}
+	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
 		"documentName":"Policy v1",
@@ -420,7 +420,7 @@ func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 }
 
 func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
-	spy := &spyRegistryService{
+	spy := &spyControlledDocumentService{
 		listResult: []controlleddocumentsdomain.ControlledDocument{sampleControlledDocument()},
 	}
 	handler := &Handler{svc: spy}
@@ -465,7 +465,7 @@ func TestListControlledDocuments_UsesGeneratedParams(t *testing.T) {
 }
 
 func TestListControlledDocuments_InvalidStatus_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents", nil)
 	rec := httptest.NewRecorder()
 	status := controlleddocumentsapi.ListControlledDocumentsParamsStatus("retired")
@@ -479,7 +479,7 @@ func TestListControlledDocuments_InvalidStatus_Returns400(t *testing.T) {
 
 func TestGetControlledDocument_UsesGeneratedResponse(t *testing.T) {
 	doc := sampleControlledDocument()
-	spy := &spyRegistryService{getResult: &doc}
+	spy := &spyControlledDocumentService{getResult: &doc}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/"+doc.ID, nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -503,7 +503,7 @@ func TestGetControlledDocument_UsesGeneratedResponse(t *testing.T) {
 }
 
 func TestGetControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/not-a-uuid", nil)
@@ -517,7 +517,7 @@ func TestGetControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
 }
 
 func TestPreviewControlledDocumentCode_UsesGeneratedParamsAndResponse(t *testing.T) {
-	spy := &spyRegistryService{peekResult: 7}
+	spy := &spyControlledDocumentService{peekResult: 7}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/preview-code", nil)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
@@ -544,7 +544,7 @@ func TestPreviewControlledDocumentCode_UsesGeneratedParamsAndResponse(t *testing
 }
 
 func TestCreateControlledDocumentRevision_UsesGeneratedBody(t *testing.T) {
-	spy := &spyRegistryService{}
+	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	cdID := "22222222-2222-2222-2222-222222222222"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(`{
@@ -572,7 +572,7 @@ func TestCreateControlledDocumentRevision_UsesGeneratedBody(t *testing.T) {
 }
 
 func TestCreateControlledDocumentRevision_UnknownField_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	cdID := "22222222-2222-2222-2222-222222222222"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(`{
 		"name":"Revision 2",
@@ -592,7 +592,7 @@ func TestCreateControlledDocumentRevision_UnknownField_Returns400(t *testing.T) 
 }
 
 func TestCreateControlledDocumentRevision_MissingName_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	cdID := "22222222-2222-2222-2222-222222222222"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(`{
 		"formData":{"field":"value"}
@@ -611,7 +611,7 @@ func TestCreateControlledDocumentRevision_MissingName_Returns400(t *testing.T) {
 }
 
 func TestCreateControlledDocumentRevision_ActiveSiblingConflict_Returns409(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{revisionErr: controlleddocumentsdomain.ErrActiveRevisionExists}}
+	handler := &Handler{svc: &spyControlledDocumentService{revisionErr: controlleddocumentsdomain.ErrActiveRevisionExists}}
 	cdID := "22222222-2222-2222-2222-222222222222"
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(`{
 		"name":"Revision 2"
@@ -630,7 +630,7 @@ func TestCreateControlledDocumentRevision_ActiveSiblingConflict_Returns409(t *te
 }
 
 func TestObsoleteControlledDocument_UsesGeneratedPathParam(t *testing.T) {
-	spy := &spyRegistryService{}
+	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	cdID := "99999999-9999-9999-9999-999999999999"
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/controlled-documents/"+cdID+"/obsolete", nil)
@@ -648,7 +648,7 @@ func TestObsoleteControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 }
 
 func TestObsoleteControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/controlled-documents/not-a-uuid/obsolete", nil)
@@ -662,7 +662,7 @@ func TestObsoleteControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
 }
 
 func TestSupersedeControlledDocument_UsesGeneratedPathParam(t *testing.T) {
-	spy := &spyRegistryService{}
+	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	cdID := "aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa"
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/controlled-documents/"+cdID+"/supersede", nil)
@@ -680,7 +680,7 @@ func TestSupersedeControlledDocument_UsesGeneratedPathParam(t *testing.T) {
 }
 
 func TestSupersedeControlledDocument_InvalidPathUUID_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/controlled-documents/not-a-uuid/supersede", nil)
@@ -1053,7 +1053,7 @@ func TestActiveDocument_NoneExist_Returns404(t *testing.T) {
 }
 
 func TestActiveDocument_InvalidPathUUID_Returns400(t *testing.T) {
-	handler := &Handler{svc: &spyRegistryService{}}
+	handler := &Handler{svc: &spyControlledDocumentService{}}
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/not-a-uuid/active-document", nil)

@@ -138,6 +138,8 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/autosave/"):
 				return iamdomain.CapDocumentEdit, true
+			case method == http.MethodPost && strings.HasSuffix(path, "/artifact-metadata"):
+				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/checkpoints/") && strings.HasSuffix(path, "/restore"):
 				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPost && strings.Contains(path, "/checkpoints"):
@@ -152,6 +154,14 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 				return iamdomain.CapDocumentSubmit, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/signoff"):
 				return iamdomain.CapDocumentSignoff, true
+			case method == http.MethodPost && strings.HasSuffix(path, "/publish"):
+				return iamdomain.Capability("doc.publish"), true
+			case method == http.MethodPost && strings.HasSuffix(path, "/schedule-publish"):
+				return iamdomain.Capability("doc.publish"), true
+			case method == http.MethodPost && strings.HasSuffix(path, "/supersede"):
+				return iamdomain.Capability("doc.supersede"), true
+			case method == http.MethodPost && strings.HasSuffix(path, "/obsolete"):
+				return iamdomain.Capability("doc.obsolete"), true
 			case method == http.MethodPost && strings.HasSuffix(path, "/cancel"):
 				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodGet && strings.HasSuffix(path, "/approval-instance"):
@@ -189,13 +199,13 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 			case method == http.MethodGet:
 				return iamdomain.CapDocumentView, true
 			case method == http.MethodPost && path == "/api/v1/controlled-documents":
-				return iamdomain.CapRegistryCreate, true
+				return iamdomain.CapControlledDocumentCreate, true
 			case method == http.MethodPost && strings.HasSuffix(path, "/revisions"):
 				return iamdomain.CapDocumentEdit, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/obsolete"):
-				return iamdomain.CapRegistryObsolete, true
+				return iamdomain.CapControlledDocumentObsolete, true
 			case method == http.MethodPut && strings.HasSuffix(path, "/supersede"):
-				return iamdomain.CapRegistrySupersede, true
+				return iamdomain.CapControlledDocumentSupersede, true
 			}
 		}
 		if strings.HasPrefix(path, "/api/v1/iam/area-memberships") {

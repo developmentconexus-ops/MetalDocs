@@ -73,12 +73,12 @@ import (
 )
 
 type registryControlledDocumentDuplicator struct {
-	svc *controlleddocumentsapp.RegistryService
+	svc *controlleddocumentsapp.ControlledDocumentService
 }
 
 func (a registryControlledDocumentDuplicator) DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	if a.svc == nil {
-		return nil, fmt.Errorf("registry service not configured")
+		return nil, fmt.Errorf("controlled document service not configured")
 	}
 	source, err := a.svc.Get(ctx, tenantID, controlledDocumentID)
 	if err != nil {
