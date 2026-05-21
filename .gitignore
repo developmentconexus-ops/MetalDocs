@@ -98,6 +98,9 @@ frontend/apps/web/design-source/uploads/
 docs/superpowers/plans/
 docs/superpowers/reviews/
 reviews/
+# Canonical wiki reviews (multi-session review tracker) are NOT ignored
+!wiki/reviews/
+!wiki/reviews/**
 
 # Local QA session artifacts (cookie jars, scratch tmp)
 qa-*.txt
