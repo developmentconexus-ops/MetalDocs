@@ -9,7 +9,7 @@
 
 ## Flow
 
-Foundation → Login → Library → Editor → Wizard → Templates → Registry → Dashboard → Approval Inbox → Signoff Detail
+Foundation → Login → Library → Editor → Wizard → Templates → Controlled Documents → Dashboard → Approval Inbox → Signoff Detail
 
 Each block gets its own detailed plan in `docs/superpowers/plans/`. Mark complete here when merged into `feature/screen-redesign`.
 
@@ -25,8 +25,8 @@ Each block gets its own detailed plan in `docs/superpowers/plans/`. Mark complet
 | **Editor** | Slim doc bar, mini toolbar, paper canvas, metadata sidebar | — | 🔲 Not started |
 | **Wizard** | 4-step stepper, profile/area/visibility/template pickers | — | ✅ Done (UI) — smoke verified 2026-05-07; deferred items in `wiki/backlog/novo-documento.md` |
 | **Templates** | 3-col card grid, mini doc preview, real API, tab filter, a11y TabBar, `tone="flat"` hero | — | ✅ Done (Phase 5) — list screen verified 2026-05-08; deferred items in `wiki/backlog/templates.md` |
-| **Registry** | Sequence counter grid, controlled documents table | — | 🔲 Not started |
-| **Dashboard** | Editorial layout (`DashboardEditorial`) — design updated zip v4 | — | ⏳ Waiting on Registry |
+| **Controlled Documents** | Sequence counter grid, controlled documents table | — | 🔲 Not started |
+| **Dashboard** | Editorial layout (`DashboardEditorial`) — design updated zip v4 | — | ⏳ Waiting on Controlled Documents |
 | **Approval Inbox** | Inbox with Foco/Linha-do-tempo views (`InboxStack`/`InboxTimeline`) — design updated zip v4 | — | ✅ Done (Phase 5) — inbox UI verified 2026-05-08; deferred items in `wiki/backlog/caixa-aprovacao.md` |
 | **Signoff Detail** | A4 diff view, approval flow panel, decision form | — | 🔲 Not started |
 | **Documento Publicado** | Published document full view (`PublicadoV5`) | — | 🔲 Not started |

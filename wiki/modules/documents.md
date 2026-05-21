@@ -2,13 +2,13 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-20 (scheduled publish River cutover) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-21 (documents generated-wrapper mount sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
 ## 1. Introduction & Goals
 
-`documents` is the controlled-document instance lifecycle module: it owns the `documents` table and its revision/checkpoint/comment/export/approval surfaces. A document is an instance filled from a template version, bound to a controlled-document entry, and moves through `draft â†’ under_review â†’ approved â†’ published â†’ superseded | obsolete`. The module sits between the registry module (which owns the controlled-document identity + numbering) and the approval sub-package (which materialises approval routes against a document revision).
+`documents` is the controlled-document instance lifecycle module: it owns the `documents` table and its revision/checkpoint/comment/export/approval surfaces. A document is an instance filled from a template version, bound to a controlled-document entry, and moves through `draft â†’ under_review â†’ approved â†’ published â†’ superseded | obsolete`. The module sits between the controlled-documents module (`internal/modules/controlleddocuments`) and the approval sub-package (which materialises approval routes against a document revision).
 
 ### 1.1 Requirements overview
 
@@ -45,7 +45,7 @@
 - Persistence: Postgres only; row-level multi-tenancy via `tenant_id` on every owned table (`wiki/architecture/persistence.md`).
 - Authz: two-tier per `wiki/decisions/0007-two-tier-authz.md`. Tripwire enforcer reads `metaldocs.asserted_caps` GUC.
 - DOCX editor: `@eigenpal/docx-js-editor` from `vendor/eigenpal/` (`wiki/decisions/0001-eigenpal-adoption.md`).
-- API contract: OpenAPI 3.0.3 via oapi-codegen (`wiki/decisions/0012-contract-first-api.md`) â€” **bootstrap only on this module**, handlers still mounted via stdlib `mux.HandleFunc`.
+- API contract: OpenAPI 3.0.3 via oapi-codegen (`wiki/decisions/0012-contract-first-api.md`) â€” spec-mounted via `documentsapi.HandlerWithOptions` + `ServerInterfaceWrapper` (see `internal/modules/documents/module.go:116-127`). Legacy `mux.HandleFunc` routes still exist for the small set of non-spec endpoints (fillin, view, reconstruct) and are wired beneath the generated boundary via `NewGeneratedServerAdapter`.
 - Error envelope target: RFC 9457 Problem Details â€” current code emits legacy `{error:{code,message,â€¦}}` (T-001, mid-migration).
 
 ---
@@ -58,7 +58,7 @@ C4Context
     Person(user, "Filler / Approver", "Web client (React)")
     System_Boundary(b1, "MetalDocs API") {
         System(docs, "documents", "Document instance lifecycle: list, create, edit, finalize, approve, publish")
-        System(registry, "registry", "Controlled-document identity + numbering")
+        System(controlledDocuments, "controlled-documents", "Controlled-document identity + numbering")
         System(templates, "templates", "Template versions consumed at draft create")
         System(iam, "iam", "Capabilities + actor identity")
         System(render, "render", "DOCX â†’ PDF rendering")
@@ -67,7 +67,7 @@ C4Context
     SystemDb(db, "Postgres", "documents, document_revisions, document_checkpoints, document_comments, document_exports, approval_*, governance_events, metaldocs.pdf_dispatch_outbox")
     System_Ext(objstore, "Object Store", "DOCX + PDF artifacts")
     Rel(user, docs, "HTTPS /api/v1/documents/*")
-    Rel(registry, docs, "Go: CreateDocumentTx port")
+    Rel(controlledDocuments, docs, "Go: CreateDocumentTx port")
     Rel(docs, templates, "Go: template version reads")
     Rel(docs, iam, "Go: CapabilityChecker / ErrCapabilityDenied")
     Rel(docs, render, "Go: resolver readers (PDF)")
@@ -98,7 +98,7 @@ Quality-managed documents. Each instance traces back to a template + a controlle
 - `internal/modules/iam/domain` (`fillin_handler.go:16`) â€” typed `iamdomain.Capability` consts; cross-refs `iam` T-001
 - `internal/modules/iam/application` (`handler.go:17`) â€” `ErrCapabilityDenied` sentinel; cross-refs `iam` T-009
 - `internal/modules/iam/authz` (`fillin_handler.go:15`)
-- `internal/modules/registry/domain`, `internal/modules/templates/domain`
+- `internal/modules/controlleddocuments/domain`, `internal/modules/templates/domain`
 - `internal/modules/render` (`resolver_readers.go:9`)
 - `internal/platform/idempotency` (`approval/infrastructure/postgres_signoff_idemp_store.go:9`)
 - `internal/platform/tenant`, `internal/platform/docgenv2`, `internal/platform/httpresponse` (`handler.go:20`), `internal/platform/ratelimit` (`module.go:13`), `internal/platform/servicebus` (`export_service.go:10`)
@@ -114,10 +114,10 @@ Quality-managed documents. Each instance traces back to a template + a controlle
 
 - **Clean-architecture layering** (delivery / application / domain / repository) â€” driver: project convention enforced by api-lint rule "ports live in application".
 - **Two-tier authz with a Postgres tripwire** â€” driver: `wiki/decisions/0007-two-tier-authz.md`. Tier-1 role gate at HTTP edge, tier-2 `authz.Require(ctx, tx, cap, area)` in transaction, GUC-driven trigger on `approval_instances` + `approval_signoffs`.
-- **Atomic CD+draft via a `CreateDocumentTx` port** â€” driver: `wiki/decisions/0011-cd-atomic-create.md`. Registry owns the call site; documents exposes only the port and the row writer.
+- **Atomic CD+draft via a `CreateDocumentTx` port** â€” driver: `wiki/decisions/0011-cd-atomic-create.md`. controlled-documents owns the call site; documents exposes only the port and the row writer.
 - **Placeholder snapshot pinned at submit** â€” driver: `wiki/concepts/placeholders.md`. `application.SnapshotService` populates `placeholder_schema_snapshot`; trigger `enforce_snapshot_on_submit_trg` (`migrations/0152_*.sql:47`) blocks `under_review` transitions with a null snapshot.
 - **Sub-package for approval mechanics** â€” driver: cohesion between document state transitions and the approval-instance + signoff lifecycle. Lives at `internal/modules/documents/approval/`; the top-level `internal/modules/approval/` path does **not** exist in workspace (resolved during Phase 3).
-- **Codegen bootstrap only** â€” driver: ADR 0012 + spec drift (T-002). `api.gen.go` is generated and committed but routes are still mounted via `mux.HandleFunc`.
+- **Spec-mounted via generated boundary** â€” driver: ADR 0012. `api.gen.go` is mounted in `RegisterRoutes` (`module.go:116-127`) using `documentsapi.HandlerWithOptions` + `NewGeneratedServerAdapter`, with an RFC 9457 `ErrorHandlerFunc` for wrapper-validation failures. Non-spec routes (fillin, view, reconstruct) fall through to the adapter's legacy mux beneath the generated wrapper.
 
 ---
 
@@ -134,10 +134,10 @@ C4Container
     Container(domain, "domain", "Go", "Document, Revision, Checkpoint, Snapshot, Comment, Export, CompositeHash, ValuesHash, errors, state machine")
     Container(repo, "repository", "Go + pgx", "Repository, FillinRepository, ExportRepository, SnapshotRepository, ResolverReaders, postgres_approval_repository, postgres_signoff_idemp_store")
     Container(jobs, "jobs", "Go", "OrphanPendingSweeper, SessionSweeper")
-    Container(api, "api/api.gen.go", "Generated", "oapi-codegen ServerInterface (bootstrap only â€” not mounted)")
+    Container(api, "api/api.gen.go", "Generated", "oapi-codegen ServerInterface + HandlerWithOptions â€” mounted in module.go RegisterRoutes")
     ContainerDb(db, "Postgres", "Postgres", "14 owned tables (see Â§3.2)")
     System_Ext(iam, "iam", "Capabilities")
-    System_Ext(registry, "registry", "CD identity")
+    System_Ext(controlledDocuments, "controlled-documents", "CD identity")
     System_Ext(templates, "templates", "Template versions")
     System_Ext(render, "render", "DOCXâ†’PDF")
     System_Ext(idemp, "platform/idempotency", "Signoff replay store")
@@ -148,7 +148,7 @@ C4Container
     Rel(repo, db, "SQL")
     Rel(jobs, repo, "sweeps")
     Rel(app, iam, "CapabilityChecker port adapter")
-    Rel(registry, app, "CreateDocumentTx port")
+    Rel(controlledDocuments, app, "CreateDocumentTx port")
     Rel(app, templates, "template version reads")
     Rel(app, render, "resolver readers (PDF)")
     Rel(app, idemp, "signoff idempotency")
@@ -162,7 +162,7 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 |---|---|---|---|
 | `internal/modules/documents/module.go:1` | `New`, `RegisterRoutes` | func | Module wiring entry |
 | `internal/modules/documents/application/ports.go` | `CapabilityChecker` | iface | Consumer port â€” iam adapter implements (`apps/api/internal/wiring/documents.go:24`) |
-| `internal/modules/documents/application/ports.go` | `CreateDocumentTx` | iface | Atomic CD+draft create port consumed by registry (ADR 0011) |
+| `internal/modules/documents/application/ports.go` | `CreateDocumentTx` | iface | Atomic CD+draft create port consumed by controlled-documents (ADR 0011) |
 | `internal/modules/documents/application/service.go:26` | `Repository` | iface | Application-layer repo contract |
 | `internal/modules/documents/application/service.go:81` | `Audit` | iface | Audit sink consumer port (adapter wired in main.go) |
 | `internal/modules/documents/application/service.go:564` | `Service.RenameDocument` | func | Validate + UPDATE + audit (T-005: not transactional) |
@@ -171,7 +171,7 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/application/freeze_service.go` | `FreezeService` | type | `{name}` token substitution at freeze |
 | `internal/modules/documents/application/fillin_service.go` | `FillinService` | type | Placeholder-value writes |
 | `internal/modules/documents/application/fillin_authz.go:9` | typed `iamdomain.Capability` consts | imports | Cross-ref iam T-001 |
-| `internal/modules/documents/application/cd_initializer.go` | `CDDocumentInitializer` | type | Registry-side hook for atomic CD create |
+| `internal/modules/documents/application/cd_initializer.go` | `CDDocumentInitializer` | type | controlled-documents-side hook for atomic CD create |
 | `internal/modules/documents/approval/application/submit_service.go:43` | `SubmitService.SubmitRevisionForReview` | func | Tier-2 `authz.Require(string(iamdomain.CapDocumentSubmit), areaCode)` at `:85` |
 | `internal/modules/documents/approval/application/decision_service.go` | `DecisionService` | type | Signoff approve/reject/publish/supersede/obsolete |
 | `internal/modules/documents/delivery/http/handler.go:76` | `NewHandlerWithSubmit` | func | Wires db + submitSvc for atomic finalize |
@@ -229,7 +229,7 @@ Spec gaps (missing `operationId`s on regulated paths) are enumerated in T-002 an
 | GET | `/api/v1/documents` | `internal/modules/documents/delivery/http/handler.go:83` | `h.listDocuments` | `/api/v1/documents` | `listDocuments` | `ListDocuments` | Aligned | Also re-registered at `handler.go:112` |
 | GET | `/api/v1/documents/stats` | `internal/modules/documents/delivery/http/handler.go:84` | `h.documentStats` | `/api/v1/documents/stats` | `documentStats` | `DocumentStats` | Aligned | Also re-registered at `handler.go:113` |
 | GET | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:86` | `h.getDocument` | `/api/v1/documents/{id}` | `getDocument` | `GetDocument` | Aligned | 200 response is now schema-backed by `DocumentDetailResponse`, including embedded JSON `FormDataJSON` |
-| PATCH | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:87` | `h.renameDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:116` |
+| PATCH | `/api/v1/documents/{id}` | `internal/modules/documents/delivery/http/handler.go:87` | `h.renameDocument` | `/api/v1/documents/{id}` | `renameDocument` | `RenameDocument` | Aligned | Also re-registered at `handler.go:116`; legacy wrapper sits beneath the generated boundary |
 | POST | `/api/v1/documents/{id}/finalize` | `internal/modules/documents/delivery/http/handler.go:88` | `h.finalizeDocument` | `/api/v1/documents/{id}/finalize` | â€” | `PostApiV2DocumentsIdFinalize` | Aligned | Also re-registered at `handler.go:117` |
 | POST | `/api/v1/documents/{id}/archive` | `internal/modules/documents/delivery/http/handler.go:89` | `h.archiveDocument` | `/api/v1/documents/{id}/archive` | â€” | `PostApiV2DocumentsIdArchive` | Aligned | Also re-registered at `handler.go:118` |
 | POST | `/api/v1/documents/{id}/duplicate` | `internal/modules/documents/delivery/http/handler.go:90` | `h.duplicateDocument` | â€” | â€” | â€” | Spec missing | Also re-registered at `handler.go:119` |
@@ -448,7 +448,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Two-tier authz (HTTP + in-tx + tripwire) | `wiki/decisions/0007-two-tier-authz.md` |
 | Fixed 7-token placeholder catalog + snapshot | `wiki/concepts/placeholders.md` (ADR 0008) |
 | Atomic CD+draft create via `CreateDocumentTx` port | `wiki/decisions/0011-cd-atomic-create.md` |
-| Contract-first OpenAPI via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (bootstrap only on this module) |
+| Contract-first OpenAPI via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (spec-mounted via generated boundary; non-spec routes wired beneath via legacy adapter) |
 | `{name}` single-brace token syntax | `wiki/concepts/token-syntax.md` (ADR 0003) |
 | Duplicate route registration (`handler.go:86/:115`) | `tech-debt: missing-ADR` (T-004) |
 | `audit.Write` outside SQL UPDATE tx in rename | `tech-debt: missing-ADR` (T-005) |
@@ -464,7 +464,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 |---|---|---|
 | Authz isolation (approval) | A user without `document.submit` calls `POST /finalize` | 403; `approval_instances` unchanged; tripwire would fire even if tier-2 bypassed |
 | Authz isolation (documents table) | A user with stale role token calls `PATCH /documents/{id}` | 403 from role gate; in-tx `authz.Require` + tripwire trigger on `documents` table (T-003 closed Plan 5) |
-| Atomic CD create | Crash mid-registry insert | Whole tx rolls back; `cd_sequence_counters` unchanged (ADR 0011) |
+| Atomic CD create | Crash mid-controlled-documents insert | Whole tx rolls back; `cd_sequence_counters` unchanged (ADR 0011) |
 | Audit completeness on rename | Crash between UPDATE and audit.Write | **T-005: row mutated, no audit row** â€” fails today |
 | Replay safety on finalize | Client retries finalize with the same `Idempotency-Key` and unchanged payload | Second call replays `201 { instanceId }` with `Idempotent-Replay: true`; mismatched payload under the same key is rejected by the shared idempotency store |
 | Snapshot guard on submit | Submit with null placeholder snapshot | DB trigger `enforce_snapshot_on_submit_trg` raises; 500 surfaces as mapped error |
@@ -518,13 +518,15 @@ Top 3 (by severity, then blast radius):
 - Iam cross-refs: `wiki/modules/iam-tech-debt.md` T-001 (namespaces), T-006 (RFC 9457), T-009 (`ErrCapabilityDenied`)
 - Auth cross-ref: [`wiki/modules/auth.md Â§8.8`](auth.md) â€” `authdomain.CurrentUserFromContext` is the IN-edge this module reads after middleware injection; Â§8.1 of auth.md covers the middleware that sets the context value
 - See also: [`modules/audit.md`](audit.md) â€” documents emits audit events via `documentsAuditAdapter` (`main.go:477-492`); T-005 (rename outside tx) and T-007 (latent consumer port) are the open gaps in the consumer-side register
-- See also: [`modules/registry.md`](registry.md) â€” registry owns the CD identity (`controlled_documents`); documents exposes the `CreateDocumentTx` port that registry calls inside the atomic create transaction (ADR 0011)
+- See also: [`modules/controlled-documents.md`](controlled-documents.md) â€” controlled-documents owns the CD identity (`controlled_documents`); documents exposes the `CreateDocumentTx` port that controlled-documents calls inside the atomic create transaction (ADR 0011)
 - See also: [`modules/taxonomy.md`](taxonomy.md) â€” documents reads `process_areas.name` live at document-create time for the `area_name_snapshot` column (`repository.go:94-101`); taxonomy Â§8.9 documents this cross-module data contract
 
 - Research artifacts: `wiki/modules/documents/_artifacts/00-context.md` â€¦ `06-selfreview.md`
 
 ## Changelog (this doc)
 
+- 2026-05-21 - Generated-wrapper mount sync: documents module route mounting now uses `documentsapi.HandlerWithOptions` + `ServerInterfaceWrapper` via a legacy-delegating adapter, replacing manual generated-route enumeration while preserving existing handler behavior and rate-limit wiring.
+- 2026-05-21 - Public route cleanup sync: retired the orphaned `POST /api/v1/documents/{id}/artifact-metadata` HTTP mount from documents handler routing. Artifact metadata remains sourced through autosave commit plus document detail current-head fields; no OpenAPI/frontend contract path exists for the retired endpoint.
 - 2026-05-20 - Deep QA execution sync: canonical `/documents/:id` runtime validation now points to the dedicated wiki reference set under `wiki/references/documents-approval-deep-qa/` (`runbook.md`, `fixtures.md`, `matrix.md`) so future sessions can reuse current startup truth, evidence standards, and fixture-state guidance instead of rediscovering them manually.
 - 2026-05-20 - Scheduled publish River cutover sync: scheduling a publish now increments `documents.schedule_generation`, enqueues exactly one River temporal job in the same transaction, and leaves future execution to the dedicated `metaldocs-jobs` runtime instead of the API host.
 - 2026-05-20 - Scheduled supersede lineage sync: a scheduled replacement now persists the previously published lineage head on `documents.superseded_document_id`; after cutover, the new revision becomes `published` and the recorded head is transitioned to `superseded` in the same lineage.
@@ -539,7 +541,7 @@ Top 3 (by severity, then blast radius):
 - 2026-05-19 - Editor sidebar identification layout sync: the editor sidebar now labels document identity as `Identificacao`, renders identity fields as stacked editorial labels (`Codigo`, `Tipo`, `Area responsavel`, `Visibilidade`), and removes the extra outer sidebar padding.
 - 2026-05-19 - Editor sidebar revision-title/density sync: `REV00` now uses the canonical initial governed title `Criacao do documento` when `revisionTitle` is omitted; later governed revisions still require `revisionTitle` at formal submission. The editor sidebar renders governed revision rows as code/title/date without inline workflow status, keeps draft approvers hidden, and collapses long governed histories without using technical `document_revisions`.
 - 2026-05-18 - Governed sidebar sync: `documents.revision_title` is now part of the runtime model and required on `POST /api/v1/documents/{id}/finalize`; the editor sidebar reads governed history from `GET /api/v1/documents/{id}/revision-history`, and that history is sourced from `documents` lineage by `controlled_document_id`, not from technical `document_revisions`.
-- 2026-05-18 - Approval/registry sidebar boundary sync: the editor consumes `GET /api/v1/documents/{id}/approval-instance` only for `under_review`, and visibility is resolved from the registry-controlled document contract instead of a documents-local duplicate field.
+- 2026-05-18 - Approval/controlled-documents sidebar boundary sync: the editor consumes `GET /api/v1/documents/{id}/approval-instance` only for `under_review`, and visibility is resolved from the controlled-documents contract instead of a documents-local duplicate field.
 - 2026-05-18 - Approval/review comments hardening sync: final approval now stops server-side with `approval.unresolved_comments` when active document comments remain unresolved; the signoff dialog maps that conflict inline and the editor keeps comment-load failures visible with a persistent retry banner instead of toast-only feedback.
 - 2026-05-20 - Canonical `/documents/:id` hardening sync: `DocumentPublishedPage` now distinguishes `approved` from `published` in runtime UI. Approved documents render `Publicar / Agendar` using the technical `GET /api/v1/controlled-documents/{id}/active-document` lookup for publish context, while `Iniciar revisão` is withheld until the document is actually `published`, preventing false-positive create-revision attempts against `ux_documents_cd_active`.
 - 2026-05-20 - Canonical published-detail sync: once a governed draft already exists for the same `controlled_document_id`, `/documents/{id}` now renders `Continuar revisÃ£o ativa` instead of offering another revision create. The page also replaced its placeholder version timeline with governed lineage from `GET /api/v1/documents/{id}/revision-history`, so the canonical surface now shows runtime `REV00/REV01` history instead of mock-era `v3.2` content.

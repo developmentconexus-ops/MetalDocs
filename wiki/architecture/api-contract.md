@@ -2,27 +2,27 @@
 
 > **Operational guide.** For the design system contract (error envelope, pagination, idempotency, two-tier authz, list filtering) see [`architecture/api-design-system.md`](api-design-system.md).
 
-> **Last verified:** 2026-05-15
-> **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, per-module migration status.
-> **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md §7`).
+> **Last verified:** 2026-05-21
+> **Scope:** OpenAPI spec location, backend codegen (oapi-codegen v2), frontend codegen (openapi-typescript v7), runtime enforcement gaps, CI drift guard, and freeze-law contract checks.
+> **Out of scope:** Auth/IAM mechanics (`modules/iam.md`), approval-specific request shapes (`modules/approval.md`), frontend API call patterns (`architecture/frontend-structure.md section 7`).
 > **Key files:**
-> - `api/openapi/v1/openapi.yaml:1` — single source of truth; OpenAPI 3.0.3
-> - `redocly.yaml:1` — lint config (pre-existing rule suppressions documented inline)
-> - `internal/modules/controlleddocuments/api/cfg.yaml:1` — controlled-documents codegen config (include-tags: controlled-documents)
-> - `internal/modules/controlleddocuments/api/gen.go:1` — `//go:generate` invocation for registry
-> - `internal/modules/controlleddocuments/api/api.gen.go:1` — generated; DO NOT EDIT
-> - `internal/modules/templates/api/cfg.yaml:1` — templates codegen config (include-tags: templates)
-> - `internal/modules/templates/api/gen.go:1` — `//go:generate` invocation for templates
-> - `internal/modules/templates/api/api.gen.go:1` — generated; DO NOT EDIT
-> - `internal/modules/documents/api/cfg.yaml:1` — documents codegen config (include-tags: documents)
-> - `internal/modules/documents/api/gen.go:1` — `//go:generate` invocation for documents (bootstrap only)
-> - `internal/modules/documents/api/api.gen.go:1` — generated; DO NOT EDIT
-> - `internal/modules/documents/approval/http/contracts/strictjson.go:23` — `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
-> - `internal/modules/controlleddocuments/delivery/http/handler.go:72` — `ServerInterfaceWrapper` wiring pattern (registry)
-> - `internal/modules/templates/delivery/http/handler.go:32` — `ServerInterfaceWrapper` wiring pattern (templates)
-> - `migrations/0183_documents_name_not_empty.sql:27` — DB invariant floor for `documents.name`
-> - `.github/workflows/api-contract.yml:1` — CI drift guard (3 jobs)
-> - `frontend/apps/web/package.json:13` — `gen:api` script (`openapi-typescript`)
+> - `api/openapi/v1/openapi.yaml:1` - single source of truth; OpenAPI 3.0.3
+> - `redocly.yaml:1` - lint config (pre-existing rule suppressions documented inline)
+> - `internal/modules/controlleddocuments/api/cfg.yaml:1` - controlled-documents codegen config (include-tags: controlled-documents)
+> - `internal/modules/controlleddocuments/api/gen.go:1` - `//go:generate` invocation for controlled-documents
+> - `internal/modules/controlleddocuments/api/api.gen.go:1` - generated; DO NOT EDIT
+> - `internal/modules/templates/api/cfg.yaml:1` - templates codegen config (include-tags: templates)
+> - `internal/modules/templates/api/gen.go:1` - `//go:generate` invocation for templates
+> - `internal/modules/templates/api/api.gen.go:1` - generated; DO NOT EDIT
+> - `internal/modules/documents/api/cfg.yaml:1` - documents codegen config (include-tags: documents)
+> - `internal/modules/documents/api/gen.go:1` - `//go:generate` invocation for documents
+> - `internal/modules/documents/api/api.gen.go:1` - generated; DO NOT EDIT
+> - `internal/modules/documents/approval/http/contracts/strictjson.go:23` - `Decode` helper; `DisallowUnknownFields` pattern used at handler boundaries
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:72` - `ServerInterfaceWrapper` wiring pattern (controlled-documents)
+> - `internal/modules/templates/delivery/http/handler.go:32` - `ServerInterfaceWrapper` wiring pattern (templates)
+> - `migrations/0183_documents_name_not_empty.sql:27` - DB invariant floor for `documents.name`
+> - `.github/workflows/api-contract.yml:1` - CI drift guard (3 jobs)
+> - `frontend/apps/web/package.json:13` - `gen:api` script (`openapi-typescript`)
 
 ---
 
@@ -34,21 +34,21 @@ New endpoints MUST be authored in the spec first. Handlers implement; spec gover
 
 ---
 
-## 2. Backend codegen — oapi-codegen v2
+## 2. Backend codegen - oapi-codegen v2
 
 Each migrated module has an `internal/modules/<x>/api/` directory with three files:
 
 | File | Purpose |
 |------|---------|
 | `cfg.yaml` | Codegen config: package name, output file, `include-tags` filter |
-| `gen.go` | Single-line `//go:generate` comment — no production code |
-| `api.gen.go` | Generated output — **never hand-edit** |
+| `gen.go` | Single-line `//go:generate` comment - no production code |
+| `api.gen.go` | Generated output - **never hand-edit** |
 
 The generated file provides:
 - Go request/response types for all operations in scope.
-- `ServerInterface` — one method per operation; handler struct must implement.
-- `ServerInterfaceWrapper` — stdlib `net/http` adapter that parses path/query params and calls `ServerInterface` methods.
-- `StrictServerInterface` (line ~1608 in registry gen) — higher-level variant where input/output are typed structs; handler returns `(ResponseObject, error)` instead of writing to `http.ResponseWriter`.
+- `ServerInterface` - one method per operation; handler struct must implement.
+- `ServerInterfaceWrapper` - stdlib `net/http` adapter that parses path/query params and calls `ServerInterface` methods.
+- `StrictServerInterface` (line ~1608 in controlled-documents gen) - higher-level variant where input/output are typed structs; handler returns `(ResponseObject, error)` instead of writing to `http.ResponseWriter`.
 
 **Regenerate:**
 
@@ -60,7 +60,7 @@ GOFLAGS=-mod=mod go generate ./internal/modules/documents/api/...
 
 Use `GOFLAGS=-mod=mod` when the project vendor directory is present; otherwise `go generate` will refuse to fetch the `oapi-codegen` binary dependency.
 
-CI runs `go generate ./...` — see `api-contract.yml:27`.
+CI runs `go generate ./...` - see `api-contract.yml:27`.
 
 ---
 
@@ -77,7 +77,7 @@ generated := controlleddocumentsapi.ServerInterfaceWrapper{
     },
 }
 mux.HandleFunc("GET /api/v1/controlled-documents", generated.ListControlledDocuments)
-// …
+// ...
 ```
 
 The handler struct (`*Handler`) implements `ServerInterface`; the wrapper handles route dispatch and param parsing.
@@ -108,7 +108,7 @@ This prevents silent data corruption even if a future handler regression bypasse
 
 ---
 
-## 6. Frontend codegen — openapi-typescript v7
+## 6. Frontend codegen - openapi-typescript v7
 
 ```bash
 # frontend/apps/web
@@ -116,7 +116,9 @@ pnpm gen:api
 # equivalent: openapi-typescript ../../../api/openapi/v1/openapi.yaml -o src/lib/api-types/index.d.ts
 ```
 
-Output: `frontend/apps/web/src/lib/api-types/index.d.ts` — **never hand-edit**. The `api` client in `lib/api/client.ts` is typed against these generated `paths`.
+Output: `frontend/apps/web/src/lib/api-types/index.d.ts` - **never hand-edit**. The `api` client in `lib/api/client.ts` is typed against these generated `paths`.
+Local rule: use `pnpm gen:api` in `frontend/apps/web`.
+CI rule: `frontend-codegen-drift` runs `npm run gen:api` in the same workspace and must produce equivalent output.
 
 ---
 
@@ -136,39 +138,36 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 
 ## 8. Historical route migration notes (superseded)
 
-| Module | Path prefix | Codegen status | Handler migration |
-|--------|------------|----------------|------------------|
-| `controlled-documents` | `/api/v1/controlled-documents` | Full (`include-tags: controlled-documents`) | Complete and wrapper-mounted |
-| `templates` | `/api/v1/templates` | Full (`include-tags: templates`) | Complete for generated core routes |
-| `documents` | `/api/v1/documents` | Bootstrap only (`include-tags: documents`) | Deferred — see below |
-| `approval` | `/api/v1/approval` | No spec coverage | Raw/runtime routes remain |
-| `taxonomy` | `/api/v1/taxonomy` | No spec coverage | Raw/runtime routes remain |
-| `iam` | `/api/v1/iam` | No spec coverage | Raw/runtime routes remain |
-| `platform` | `/api/v1/auth`, `/api/v1/feature-flags` | No spec coverage | Raw/runtime routes remain |
+Historical snapshot only (captured 2026-05-15). This section is non-governing and must not be used as current contract truth for planning or implementation.
 
-**Documents module note:** codegen bootstrap landed (commit `81e7ec23`) — `api.gen.go` is generated and up to date. Handler migration is blocked by spec-handler drift (missing spec ops for `renameDocument`, `duplicateDocument`, comments CRUD; orphaned spec ops with no handler). Details and migration template: `wiki/backlog/contract-first-followups.md`.
+| Snapshot topic | Historical note |
+|--------|------------------|
+| controlled-documents | Was documented as fully wrapper-mounted with generated routes |
+| templates | Was documented as generated core routes mounted with additional follow-up gaps |
+| documents | Was documented as bootstrap-generated with deferred handler migration follow-ups |
+| other modules | Historical migration posture changed over time; use runtime + spec + generated artifacts + route truth tables for current truth |
+
+**Documents module note:** codegen bootstrap landed (commit `81e7ec23`) - `api.gen.go` is generated and up to date. Handler migration is blocked by spec-handler drift (missing spec ops for `renameDocument`, `duplicateDocument`, comments CRUD; orphaned spec ops with no handler). Details and migration template: `wiki/backlog/contract-first-followups.md`.
 
 ---
 
-## 9. Module contract status
+## 9. Freeze-law contract truth
 
-| Module | Path prefix | Contract status | Notes |
-|--------|------------|-----------------|-------|
-| `documents` | `/api/v1/documents` | `Partial` | Mixed aligned+raw surface; includes one path signature mismatch (`{version}` vs `{versionNum}`) |
-| `approval` | `/api/v1/approval`, `/api/v1/documents/* approval routes` | `Raw` | Runtime routes are mounted but not yet represented in OpenAPI/codegen |
-| `templates` | `/api/v1/templates`, `/api/v1/signed` | `Partial` | Core generated routes aligned; several runtime routes still spec-missing |
-| `controlled-documents` | `/api/v1/controlled-documents` | `Wrapper-only` | Fully mounted through `ServerInterfaceWrapper` and aligned with spec/codegen |
-| `taxonomy` | `/api/v1/taxonomy` | `Raw` | Runtime routes present; no OpenAPI coverage yet |
-| `audit` | `/api/v1/audit` | `Partial` | Runtime path aligns with spec (`/audit/events` + `/api/v1` server prefix); operationId missing |
-| `iam` | `/api/v1/iam` | `Partial` | v1 admin routes aligned; area-membership routes are spec-missing |
-| `auth/platform` | `/api/v1/auth` | `Partial` | Auth runtime routes align with spec paths, but operationIds are missing |
+Treat current truth as a four-way alignment requirement for touched public endpoints:
+
+- runtime route registration and owner
+- OpenAPI canonical namespace/path/operation/tag ownership
+- generated backend package/interface + generated boundary mount (`ServerInterfaceWrapper`/`HandlerWithOptions`) for generated public modules
+- generated frontend wrappers/types and module wiki status used for planning
+
+If any of these conflict, stop and resolve the prerequisite before feature implementation.
 
 ### Route truth tables
 
 - [Documents route table](../modules/documents.md#api-route-truth-table-plan-8-baseline)
 - [Approval route table](../modules/approval.md#api-route-truth-table-plan-8-baseline)
 - [templates route table](../modules/templates.md#api-route-truth-table-plan-8-baseline)
-- [Registry route table](../modules/controlled-documents.md#api-route-truth-table-plan-8-baseline)
+- [Controlled-documents route table](../modules/controlled-documents.md#api-route-truth-table-plan-8-baseline)
 - [Taxonomy route table](../modules/taxonomy.md#api-route-truth-table-plan-8-baseline)
 - [Audit route table](../modules/audit.md#api-route-truth-table-plan-8-baseline)
 - [IAM route table](../modules/iam.md#api-route-truth-table-plan-8-baseline)
@@ -199,8 +198,8 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
    //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=cfg.yaml ../../../../api/openapi/v1/openapi.yaml
    ```
 5. Run `GOFLAGS=-mod=mod go generate ./internal/modules/<x>/api/...`.
-6. Implement `ServerInterface` on the handler struct; wire via `ServerInterfaceWrapper` (registry pattern at `handler.go:72`).
-7. Commit `api.gen.go` — CI drift check will verify it stays in sync.
+6. Implement `ServerInterface` on the handler struct; wire via `ServerInterfaceWrapper` (controlled-documents pattern at `handler.go:72`).
+7. Commit `api.gen.go` - CI drift check will verify it stays in sync.
 
 ---
 
@@ -210,6 +209,6 @@ Pre-existing lint rule violations (133 errors at time of introduction) are suppr
 - `wiki/decisions/0012-contract-first-api.md` - ADR: why spec-as-source-of-truth was adopted and root cause of the `documents.name` bug
 - `wiki/backlog/contract-first-followups.md` - deferred handler migrations + documents spec/handler gap inventory
 - `wiki/references/oapi-codegen.md` - operational how-to (regenerate, vendor mode, add module)
-- `wiki/architecture/frontend-structure.md §7` - frontend API call patterns using generated types
+- `wiki/architecture/frontend-structure.md section 7` - frontend API call patterns using generated types
 
 
