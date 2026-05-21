@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { RegistryListPage } from './RegistryListPage';
+import { ControlledDocumentListPage } from './ControlledDocumentListPage';
 
 vi.mock('./api/controlledDocuments', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./api/controlledDocuments')>();
@@ -12,13 +12,13 @@ vi.mock('./api/controlledDocuments', async (importOriginal) => {
   };
 });
 
-vi.mock('./RegistryDetailPage', () => ({
-  RegistryDetailPage: ({ id }: { id: string }) => <div data-testid="registry-detail-page">{id}</div>,
+vi.mock('./ControlledDocumentDetailPage', () => ({
+  ControlledDocumentDetailPage: ({ id }: { id: string }) => <div data-testid="registry-detail-page">{id}</div>,
 }));
 
 import * as api from './api/controlledDocuments';
 
-describe('RegistryListPage', () => {
+describe('ControlledDocumentListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -29,7 +29,7 @@ describe('RegistryListPage', () => {
     render(
       <MemoryRouter initialEntries={['/controlled-documents/750afeba-6e35-4dd4-8a74-2b51b9f9090c']}>
         <Routes>
-          <Route path="/controlled-documents/*" element={<RegistryListPage basePath="/controlled-documents" />} />
+          <Route path="/controlled-documents/*" element={<ControlledDocumentListPage basePath="/controlled-documents" />} />
         </Routes>
       </MemoryRouter>,
     );

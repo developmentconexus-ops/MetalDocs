@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as approvalApi from '../api/approvalApi';
 import { etagCache } from '../api/etagCache';
 import type { ApprovalInstance } from '../api/approvalTypes';
-import { RegistryDetailPanel } from './RegistryDetailPanel';
+import { ControlledDocumentDetailPanel } from './ControlledDocumentDetailPanel';
 
 vi.mock('../api/approvalApi');
 vi.mock('./SignoffDialog', () => ({
@@ -36,7 +36,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-describe('RegistryDetailPanel', () => {
+describe('ControlledDocumentDetailPanel', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     etagCache.clear();
@@ -53,7 +53,7 @@ describe('RegistryDetailPanel', () => {
     vi.mocked(approvalApi.getInstance).mockReturnValue(pending.promise);
 
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="draft"
         contentHash="abcdef1234567890"
@@ -66,7 +66,7 @@ describe('RegistryDetailPanel', () => {
 
   it('draft state shows "Submeter" button', async () => {
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="draft"
         contentHash="abcdef1234567890"
@@ -79,7 +79,7 @@ describe('RegistryDetailPanel', () => {
 
   it('under_review shows LockBadge + "Assinar" + disabled edit reason', async () => {
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="under_review"
         contentHash="abcdef1234567890"
@@ -98,7 +98,7 @@ describe('RegistryDetailPanel', () => {
 
   it('approved state shows "Publicar / Agendar" button', async () => {
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="approved"
         contentHash="abcdef1234567890"
@@ -111,7 +111,7 @@ describe('RegistryDetailPanel', () => {
 
   it('obsolete state shows read-only label', async () => {
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="obsolete"
         contentHash="abcdef1234567890"
@@ -124,7 +124,7 @@ describe('RegistryDetailPanel', () => {
 
   it('integrity panel shows truncated hash + copy button', async () => {
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="draft"
         contentHash="abcdef1234567890"
@@ -143,7 +143,7 @@ describe('RegistryDetailPanel', () => {
     vi.setSystemTime(new Date('2026-04-22T09:00:00.000Z'));
 
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="draft"
         contentHash="abcdef1234567890"
@@ -169,7 +169,7 @@ describe('RegistryDetailPanel', () => {
 
   it('embedded timeline renders when instance present', async () => {
     render(
-      <RegistryDetailPanel
+      <ControlledDocumentDetailPanel
         documentId="doc-1"
         approvalState="draft"
         contentHash="abcdef1234567890"

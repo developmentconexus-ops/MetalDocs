@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchActiveDocumentInstance, fetchControlledDocument, obsoleteControlledDocument, createRevision, type ActiveDocumentResponse } from './api/controlledDocuments';
 import { PublishedDownloadCell } from './PublishedDownloadCell';
 import type { ControlledDocument } from "./types";
-import { RegistryDetailPanel } from '../approval/components/RegistryDetailPanel';
+import { ControlledDocumentDetailPanel } from '../approval/components/ControlledDocumentDetailPanel';
 
 type Props = {
   id: string;
@@ -23,7 +23,7 @@ function StatusBadge({ status }: { status: ControlledDocument["status"] }) {
   );
 }
 
-export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) {
+export function ControlledDocumentDetailPage({ id, onBack, onOpenDocumentEditor }: Props) {
   const [doc, setDoc] = useState<ControlledDocument | null>(null);
   const [instance, setInstance] = useState<ActiveDocumentResponse | null>(null);
   const [error, setError] = useState("");
@@ -139,7 +139,7 @@ export function RegistryDetailPage({ id, onBack, onOpenDocumentEditor }: Props) 
       )}
       {instance?.documentId && (
         <div style={{ marginTop: 32 }}>
-          <RegistryDetailPanel
+          <ControlledDocumentDetailPanel
             documentId={instance.documentId}
             approvalState={instance.approvalState ?? 'draft'}
             contentHash={instance.contentHash ?? ''}

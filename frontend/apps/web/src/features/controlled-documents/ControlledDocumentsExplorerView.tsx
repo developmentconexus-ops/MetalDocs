@@ -1,4 +1,4 @@
-import { RegistryExplorer } from "../../components/RegistryExplorer";
+import { ControlledDocumentsExplorer } from "../../components/ControlledDocumentsExplorer";
 import type {
   DocumentProfileGovernanceItem,
   DocumentProfileItem,
@@ -8,7 +8,7 @@ import type {
   SubjectItem,
 } from "../../lib/types";
 
-type RegistryExplorerViewProps = {
+type ControlledDocumentsExplorerViewProps = {
   loadState: "idle" | "loading" | "ready" | "error";
   documentProfiles: DocumentProfileItem[];
   processAreas: ProcessAreaItem[];
@@ -34,6 +34,6 @@ type RegistryExplorerViewProps = {
   onActivateDocumentProfileSchema: (payload: { profileCode: string; version: number }) => void | Promise<void>;
 };
 
-export function RegistryExplorerView(props: RegistryExplorerViewProps) {
-  return <RegistryExplorer {...props} />;
+export function ControlledDocumentsExplorerView(props: ControlledDocumentsExplorerViewProps) {
+  return <ControlledDocumentsExplorer {...props} />;
 }

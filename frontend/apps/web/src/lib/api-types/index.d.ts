@@ -573,7 +573,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -641,7 +641,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -798,7 +798,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -863,7 +863,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -1078,7 +1078,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -1184,7 +1184,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -1252,7 +1252,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -1358,7 +1358,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -1426,7 +1426,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -1635,7 +1635,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -1703,7 +1703,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["RegistryMutationResponse"];
+                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
                     };
                 };
                 /** @description Requisicao invalida */
@@ -4336,7 +4336,7 @@ export interface components {
         ListSubjectsResponse: {
             items: components["schemas"]["SubjectItem"][];
         };
-        RegistryMutationResponse: {
+        ControlledDocumentMutationResponse: {
             code: string;
         };
         AuditEventItem: {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { RegistryDetailPage } from './RegistryDetailPage';
+import { ControlledDocumentDetailPage } from './ControlledDocumentDetailPage';
 
 vi.mock('./api/controlledDocuments', async (importOriginal) => {
   const orig = await importOriginal<typeof import('./api/controlledDocuments')>();
@@ -13,8 +13,8 @@ vi.mock('./api/controlledDocuments', async (importOriginal) => {
   };
 });
 
-vi.mock('../approval/components/RegistryDetailPanel', () => ({
-  RegistryDetailPanel: ({ documentId }: { documentId: string }) => (
+vi.mock('../approval/components/ControlledDocumentDetailPanel', () => ({
+  ControlledDocumentDetailPanel: ({ documentId }: { documentId: string }) => (
     <div data-testid="registry-detail-panel">{documentId}</div>
   ),
 }));
@@ -56,14 +56,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('RegistryDetailPage E10', () => {
+describe('ControlledDocumentDetailPage E10', () => {
   it('shows published banner when only published revision exists', async () => {
     vi.mocked(api.fetchControlledDocument).mockResolvedValue(makeControlledDoc() as never);
     vi.mocked(api.fetchActiveDocumentInstance).mockResolvedValue({
       publishedDocumentId: 'pub-1',
     });
 
-    render(<RegistryDetailPage id="cd-1" onBack={() => {}} />);
+    render(<ControlledDocumentDetailPage id="cd-1" onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Revisão publicada/i)).toBeTruthy();
@@ -87,7 +87,7 @@ describe('RegistryDetailPage E10', () => {
       publishedDocumentId: 'pub-1',
     });
 
-    render(<RegistryDetailPage id="cd-1" onBack={() => {}} />);
+    render(<ControlledDocumentDetailPage id="cd-1" onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('registry-detail-panel')).toBeTruthy();
@@ -102,7 +102,7 @@ describe('RegistryDetailPage E10', () => {
     vi.mocked(api.fetchControlledDocument).mockResolvedValue(makeControlledDoc() as never);
     vi.mocked(api.fetchActiveDocumentInstance).mockResolvedValue(null);
 
-    render(<RegistryDetailPage id="cd-1" onBack={() => {}} />);
+    render(<ControlledDocumentDetailPage id="cd-1" onBack={() => {}} />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Nova Revisão/i })).toBeTruthy();
