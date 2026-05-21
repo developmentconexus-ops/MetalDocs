@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const registryBackfillAdvisoryLock int64 = 903210421
+const controlledDocumentsBackfillAdvisoryLock int64 = 903210421
 
 func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logger) error {
 	if logger == nil {
@@ -16,15 +16,15 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 	}
 
 	var locked bool
-	if err := db.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, registryBackfillAdvisoryLock).Scan(&locked); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, controlledDocumentsBackfillAdvisoryLock).Scan(&locked); err != nil {
 		return fmt.Errorf("acquire backfill advisory lock: %w", err)
 	}
 	if !locked {
-		logger.Info("registry backfill skipped; advisory lock not acquired")
+		logger.Info("controlled-documents backfill skipped; advisory lock not acquired")
 		return nil
 	}
 	defer func() {
-		_, _ = db.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, registryBackfillAdvisoryLock)
+		_, _ = db.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, controlledDocumentsBackfillAdvisoryLock)
 	}()
 
 	rows, err := db.QueryContext(ctx, `
@@ -45,14 +45,14 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		var tenantID string
 		if err := rows.Scan(&docID, &tenantID); err != nil {
 			errorsCount++
-			logger.Error("registry backfill row scan failed", "event", "backfill", "error", err)
+			logger.Error("controlled-documents backfill row scan failed", "event", "backfill", "error", err)
 			continue
 		}
 
 		tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 		if err != nil {
 			errorsCount++
-			logger.Error("registry backfill begin tx failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+			logger.Error("controlled-documents backfill begin tx failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
 			continue
 		}
 
@@ -70,7 +70,7 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		).Scan(&controlledDocumentID); err != nil {
 			_ = tx.Rollback()
 			errorsCount++
-			logger.Error("registry backfill controlled_document upsert failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+			logger.Error("controlled-documents backfill controlled_document upsert failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
 			continue
 		}
 
@@ -86,7 +86,7 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		if err != nil {
 			_ = tx.Rollback()
 			errorsCount++
-			logger.Error("registry backfill document update failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+			logger.Error("controlled-documents backfill document update failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
 			continue
 		}
 		updatedRows, _ := res.RowsAffected()
@@ -94,7 +94,7 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		if err := tx.Commit(); err != nil {
 			_ = tx.Rollback()
 			errorsCount++
-			logger.Error("registry backfill commit failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+			logger.Error("controlled-documents backfill commit failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
 			continue
 		}
 
@@ -108,6 +108,6 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		return fmt.Errorf("iterate legacy documents: %w", err)
 	}
 
-	logger.Info("registry backfill completed", "event", "backfill", "processed", processed, "skipped", skipped, "errors", errorsCount)
+	logger.Info("controlled-documents backfill completed", "event", "backfill", "processed", processed, "skipped", skipped, "errors", errorsCount)
 	return nil
 }

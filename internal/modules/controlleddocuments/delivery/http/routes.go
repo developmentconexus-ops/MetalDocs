@@ -338,7 +338,7 @@ SELECT id::text
 			docID.String, tenantID,
 		).Scan(&approvalInstanceID)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			slog.Error("registry: active approval instance lookup failed",
+			slog.Error("controlled-documents: active approval instance lookup failed",
 				"controlledDocumentId", id.String(),
 				"documentId", docID.String,
 				"tenantId", tenantID,
@@ -498,8 +498,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, taxonomydomain.ErrAreaArchived):
 		httpresponse.WriteError(w, http.StatusConflict, "AREA_ARCHIVED", "process area is archived")
 	default:
-		slog.Error("registry request failed",
-			"route", "registry.writeDomainError",
+		slog.Error("controlled-documents request failed",
+			"route", "controlledDocuments.writeDomainError",
 			"error", err,
 		)
 		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")

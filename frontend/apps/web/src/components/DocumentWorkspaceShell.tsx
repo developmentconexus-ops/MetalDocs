@@ -3,7 +3,7 @@ import { buildProfileAccordions } from "../features/documents/adapters/catalogSu
 import type { DocumentProfileItem, ProcessAreaItem, SearchDocumentItem } from "../lib/types";
 import styles from "./DocumentWorkspaceShell.module.css";
 
-export type WorkspaceView = "operations" | "approvals" | "audit" | "library" | "my-docs" | "recent" | "create" | "content-builder" | "registry" | "notifications" | "admin" | "taxonomy-admin" | "templates" | "document-editor" | "controlled-documents" | "iam-memberships" | "approval-routes";
+export type WorkspaceView = "operations" | "approvals" | "audit" | "library" | "my-docs" | "recent" | "create" | "content-builder" | "notifications" | "admin" | "taxonomy-admin" | "templates" | "document-editor" | "controlled-documents" | "iam-memberships" | "approval-routes";
 
 type WorkspaceShellProps = {
   userDisplayName: string;
@@ -14,7 +14,7 @@ type WorkspaceShellProps = {
   notificationsPending: number;
   documentCount: number;
   reviewCount: number;
-  registryCount: number;
+  documentTypesCount: number;
   showAdmin: boolean;
   flushContent?: boolean;
   editMode?: boolean;
@@ -134,9 +134,9 @@ function sections(props: WorkspaceShellProps): NavSection[] {
           ),
         },
         {
-          key: "registry",
+          key: "taxonomy-admin",
           label: "Tipos documentais",
-          badge: String(props.registryCount),
+          badge: String(props.documentTypesCount),
           icon: (
             <svg viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.4">
               <circle cx="4.5" cy="4.5" r="1.5" />
@@ -248,8 +248,6 @@ function activeTitle(activeView: WorkspaceView): string {
       return "Novo Documento";
     case "content-builder":
       return "Editor de Conteudo";
-    case "registry":
-      return "Tipos Documentais";
     case "notifications":
       return "Notificacoes";
     case "admin":
