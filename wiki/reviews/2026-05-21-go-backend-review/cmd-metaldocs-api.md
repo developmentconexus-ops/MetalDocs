@@ -19,6 +19,10 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 - **Reviewer:** security-reviewer
 - **Issue:** Called with no environment gate. The handlers are not listed in `permissions.go`, so the resolver returns `guarded=false` and `newPublicPathChecker` treats them as fully public. If the binary ships to prod, test-only destructive endpoints are reachable unauthenticated.
 - **Recommend:** Gate behind `os.Getenv("METALDOCS_ENV") == "e2etest"` (or build tag). Add a startup assertion + a test that asserts the handlers are absent when the flag is unset.
+- **Status:** Fixed in `6eb31ec7` (2026-05-21).
+- **Resolution:** Defense-in-depth call-site gate added at [`apps/api/cmd/metaldocs-api/main.go:110-126`](../../../apps/api/cmd/metaldocs-api/main.go) (`e2eHandlersEnabled` + `mountE2EHandlersIfEnabled`). Used the existing `METALDOCS_E2E=1` convention rather than introducing a second env var — `internal/test/e2e_seed.go:81` already keys on the same flag (`grep -nR METALDOCS_E2E` returns 13 files; `METALDOCS_ENV` had zero usages outside the review doc). The call site at `main.go:370-372` now invokes `e2etest.RegisterE2EHandlers` only when the gate passes. `slog.Warn` on mount, `slog.Info` on skip — explicit operator signal in both directions.
+- **Verification:** [`apps/api/cmd/metaldocs-api/e2e_gate_test.go`](../../../apps/api/cmd/metaldocs-api/e2e_gate_test.go) — `TestE2EHandlersGate_EnvUnset_DoesNotRegister` builds a fresh mux, calls the gated registrar with `METALDOCS_E2E` unset (via `t.Setenv("METALDOCS_E2E", "")`), asserts the registrar callback is never invoked AND `mux.Handler(req)` returns an empty pattern for all five e2etest paths (`/seed`, `/reset`, `/governance-events`, `/advance-clock`, `/trigger-scheduler-tick`). Three companion tests cover `=1`, whitespace trimming, and truthy-lookalike values (`true`, `yes`, `0`, etc.) — only the literal `"1"` enables the gate. `go vet ./apps/api/cmd/metaldocs-api/... && go test -race -count=1 ./apps/api/cmd/metaldocs-api/...` — clean.
+- **Out of scope (deferred to C2):** the underlying structural risk — that any unenumerated route silently defaults to `(guarded=false)` — remains. The C1 gate prevents the specific e2etest exposure; C2's resolver-default flip + visibility enum is the durable fix.
 
 ### C2. Permission resolver defaults to fail-open
 - **File:** `permissions.go:228-230` (function default `return "", false`) + `permissions.go:233-240` (`newPublicPathChecker` reads `!guarded`)
@@ -159,7 +163,7 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 | Low      | 6     |
 | **Total** | **21** |
 
-**Verdict:** **BLOCK merge of any new prod deploy from this branch until C1-C4 are remediated.**
+**Verdict:** **BLOCK merge of any new prod deploy from this branch until C1-C4 are remediated.** (C1 fixed in `6eb31ec7`; C2-C4 outstanding.)
 
 - **C1 + C2** combine into the single highest-priority security thesis: *any new route on this codebase is silently public unless the operator remembers two separate places (route registration + resolver entry).* Fix C2 first — the structural reshape (M2) makes C1 a one-line `e2etest.IsEnabled()` check rather than a defensive scattering.
 - **C3 + C4** are correctness gaps in process lifetime — they will not corrupt data in steady state but they corrupt failure modes (crashes look clean, workers die invisibly).
