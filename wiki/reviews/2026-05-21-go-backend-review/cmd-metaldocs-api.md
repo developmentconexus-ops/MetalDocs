@@ -29,6 +29,9 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 - **Reviewer:** security-reviewer (corroborated by type-design-analyzer)
 - **Issue:** Any route registered on the mux but not enumerated in the resolver is silently treated as public. `RegisterRoutes` calls at `main.go:193-219, 337, 351, 354, 355` outnumber the resolver's matched paths; new routes added without a matching resolver entry bypass both auth and IAM middleware.
 - **Recommend:** Flip the default to session-required (`return "", true`) and add an explicit `Public` enum value for genuinely public paths. Force opt-out, not opt-in. See M2 for the structural reshape that makes this easy.
+- **Status:** Fixed in `66fe1ee3` (2026-05-21) — bundled with M2.
+- **Resolution:** [`apps/api/cmd/metaldocs-api/permissions.go`](../../../apps/api/cmd/metaldocs-api/permissions.go) — flat `if`/`switch` chain replaced with `[]routeRule` table. Resolver signature changed from `(Capability, bool)` to `(Capability, iamdelivery.Visibility)`. The unmatched-route default at `permissions.go:207` is now `VisibilitySessionRequired`, never `VisibilityPublic`. Public routes are explicitly enumerated in the routeRules sub-table (`/api/v1/health/*`, `/healthz`, `/api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/feature-flags`). [`internal/modules/iam/delivery/http/middleware.go:26-34`](../../../internal/modules/iam/delivery/http/middleware.go) defines the `Visibility` enum with `VisibilityPermissionGuarded` as `iota=0` — a rule that forgets to set Visibility demands a capability rather than slipping public (fail-closed at the type level). `Wrap` enforces capability only when `Visibility == VisibilityPermissionGuarded`. `newPublicPathChecker` at `permissions.go:211-216` now reads `Visibility == VisibilityPublic` instead of `!guarded`, eliminating the auth-vs-IAM divergence that M2 called out.
+- **Verification:** [`apps/api/cmd/metaldocs-api/permissions_test.go`](../../../apps/api/cmd/metaldocs-api/permissions_test.go) — `TestPermissionResolver` asserts `(Capability, Visibility)` for every matched route, including new C2 regression cases (unknown root path, unknown `/documents/{id}/<unmapped>` subpath, unknown `/templates/{id}/<unmapped>` subpath, `PATCH /iam/users/{id}/roles` fallthrough — all assert `VisibilitySessionRequired`, not Public). `TestPublicPathChecker_RespectsPublicAndPrivateBoundaries` adds "unknown route not public" cases. `TestRouteCoverage` walks a fixture list of every `RegisterRoutes` / `mux.Handle` family in `main.go` and fails if any registered path is not matched by some routeRule — structural guard so a future route registration without a corresponding routeRule entry fails CI loudly instead of silently demoting to the SessionRequired default. `go test -race -count=1 ./apps/api/cmd/metaldocs-api/... ./internal/modules/iam/... ./internal/modules/auth/...` — clean. Runtime smoke: API on `:8081`, `curl /api/v1/unknown-route-c2-test` → **HTTP 401** (was HTTP 200 silent pass-through pre-fix); `curl -X DELETE /api/v1/documents/d1/unmapped-action` → 401; `curl -X DELETE /api/v1/templates/t1/unmapped` → 401; `/api/v1/health/live` and `POST /api/v1/auth/login` still 200 (public sub-table intact).
 
 ### C3. Server-error shutdown path bypasses deferred cleanup
 - **File:** `main.go:451-458, 463-465`
@@ -92,6 +95,7 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 - **Reviewers:** go-reviewer, type-design-analyzer
 - **Issue:** The same `(Capability, bool)` tuple is read two different ways: `authMiddleware` consumes `!guarded` (visibility) while `iamMiddleware` consumes `Capability` (permission). A method falling through the `/api/v1/documents` switch (line 151) returns `CapDocumentEdit` to IAM but is treated as public by auth — invisible at the type level.
 - **Recommend:** Replace with a `[]routeRule{method, prefix, suffix, cap}` table driving matching from a loop, returning `(Capability, Visibility)` where `Visibility` is a typed enum (`Public | SessionRequired | PermissionGuarded`). Resolver collapses to ~20 lines, missing coverage becomes statically enumerable, and the auth-vs-IAM divergence is impossible.
+- **Status:** Fixed in `66fe1ee3` (2026-05-21) — bundled with C2 (see C2 Resolution + Verification above).
 
 ### M3. `documentsAuditAdapter` nil-receiver guards + hardcoded `TraceID: "trace-local"`
 - **File:** `main.go:485-545`
@@ -110,6 +114,7 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 - **Reviewer:** security-reviewer
 - **Issue:** A future POST sub-route that doesn't match any suffix falls through to the outer resolver default (`"", false`) — silent public exposure (see C2). Structural risk independent of any specific future route.
 - **Recommend:** Add an explicit `default` case in each block returning a safe fallback (`CapDocumentView` / `CapTemplateView`) instead of relying on the outer default.
+- **Status:** Fixed in `66fe1ee3` (2026-05-21) — moot by virtue of the C2/M2 reshape. The `if`/`switch` chain no longer exists; matching is driven by a single loop over `routeRules` and the unmatched-route default is now `VisibilitySessionRequired`. The `TestRouteCoverage` fixture walk additionally guards against any registered route falling through.
 
 ### M6. `METALDOCS_FANOUT_URL` / `METALDOCS_DOCGEN_V2_SERVICE_TOKEN` missing only warns
 - **File:** `main.go:228-238`
@@ -146,6 +151,7 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 - **File:** `permissions_test.go:75-94, 126-146`
 - **Reviewer:** go-reviewer
 - **Recommend:** Fold into the table at `TestPermissionResolver`. File already uses `t.Parallel()` correctly elsewhere.
+- **Status:** Fixed in `66fe1ee3` (2026-05-21) — folded into `TestPermissionResolver` table during the C2/M2 rewrite. Standalone `TestPermissionResolver_TaxonomyFamiliesPATCH_RequiresTaxonomyManage`, `TestPermissionResolver_TaxonomyAreasPATCH_RequiresTaxonomyManage`, `TestPermissionResolver_ControlledDocumentObsolete_RequiresControlledDocumentObsoleteCap`, and `TestPermissionResolver_ControlledDocumentSupersede_RequiresControlledDocumentSupersedeCap` are now table rows asserting `(Capability, Visibility)`.
 
 ### L6. `realClock` / `realUUIDGen` duplicate concepts already exported by `approvalapp`
 - **File:** `main.go:468, 481`
@@ -165,7 +171,7 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 | Low      | 6     |
 | **Total** | **21** |
 
-**Verdict:** **BLOCK merge of any new prod deploy from this branch until C1-C4 are remediated.** (C1 fixed in `6eb31ec7`; C2-C4 outstanding.)
+**Verdict:** **BLOCK merge of any new prod deploy from this branch until C1-C4 are remediated.** (C1 fixed in `6eb31ec7`; C2 fixed in `66fe1ee3` bundling M2/M5/L5; C3+C4 fixed 2026-05-21 — see in-line `Status:` markers; all four Criticals now resolved.)
 
 - **C1 + C2** combine into the single highest-priority security thesis: *any new route on this codebase is silently public unless the operator remembers two separate places (route registration + resolver entry).* Fix C2 first — the structural reshape (M2) makes C1 a one-line `e2etest.IsEnabled()` check rather than a defensive scattering.
 - **C3 + C4** are correctness gaps in process lifetime — they will not corrupt data in steady state but they corrupt failure modes (crashes look clean, workers die invisibly).
