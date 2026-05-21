@@ -453,16 +453,16 @@ BEGIN
       v_tenant_id     := NEW.tenant_id;
 
     WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'INSERT' THEN
-      v_required_caps := ARRAY['registry.create'];
+      v_required_caps := ARRAY['controlled_documents.create'];
       v_tenant_id     := NEW.tenant_id;
 
     WHEN TG_TABLE_NAME = 'controlled_documents' AND TG_OP = 'UPDATE' THEN
       -- Either lifecycle cap is acceptable.
-      v_required_caps := ARRAY['registry.obsolete', 'registry.supersede'];
+      v_required_caps := ARRAY['controlled_documents.obsolete', 'controlled_documents.supersede'];
       v_tenant_id     := NEW.tenant_id;
 
     WHEN TG_TABLE_NAME = 'cd_sequence_counters' THEN
-      v_required_caps := ARRAY['registry.create'];
+      v_required_caps := ARRAY['controlled_documents.create'];
       v_tenant_id     := NEW.tenant_id;
 
     WHEN TG_TABLE_NAME = 'document_profiles' THEN

@@ -16,7 +16,7 @@ import (
 
 type tenantContextKey struct{}
 
-type registryService interface {
+type controlledDocumentService interface {
 	Create(ctx context.Context, cmd application.CreateControlledDocumentCmd) (*application.CreateResult, error)
 	List(ctx context.Context, tenantID string, filter application.CDFilter) ([]controlleddocumentsdomain.ControlledDocument, error)
 	CreateRevision(ctx context.Context, cmd application.CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error)
@@ -27,13 +27,13 @@ type registryService interface {
 }
 
 type Handler struct {
-	svc           registryService
+	svc           controlledDocumentService
 	db            *sql.DB
 	idempCreate   *idempotency.Store
 	idempRevision *idempotency.Store
 }
 
-func NewHandler(svc *application.RegistryService, db *sql.DB) *Handler {
+func NewHandler(svc *application.ControlledDocumentService, db *sql.DB) *Handler {
 	return &Handler{
 		svc:           svc,
 		db:            db,

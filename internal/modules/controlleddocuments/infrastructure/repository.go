@@ -11,9 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
@@ -314,7 +314,7 @@ func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := authz.Require(ctx, tx, string(iamdomain.CapRegistryCreate), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
 		return fmt.Errorf("registry: authz check Create: %w", err)
 	}
 	if err := r.createWithQueryer(ctx, tx, doc); err != nil {
@@ -327,7 +327,7 @@ func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx 
 	if tx == nil {
 		return errors.New("nil transaction")
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapRegistryCreate), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
 		return fmt.Errorf("registry: authz check CreateTx: %w", err)
 	}
 	return r.createWithQueryer(ctx, tx, doc)
@@ -724,4 +724,3 @@ func nullStringPtr(v sql.NullString) *string {
 	value := v.String
 	return &value
 }
-

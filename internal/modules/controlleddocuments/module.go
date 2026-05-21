@@ -16,7 +16,7 @@ import (
 
 type Module struct {
 	Handler *dhttp.Handler
-	svc     *application.RegistryService
+	svc     *application.ControlledDocumentService
 }
 
 type Dependencies struct {
@@ -37,7 +37,7 @@ func New(deps Dependencies) *Module {
 	} else {
 		govLogger = taxonomyapp.NewDBGovernanceLogger(deps.DB)
 	}
-	svc := application.NewRegistryService(deps.DB, repo, seq, tplCheck, profiles, areas, govLogger, nil)
+	svc := application.NewControlledDocumentService(deps.DB, repo, seq, tplCheck, profiles, areas, govLogger, nil)
 	h := dhttp.NewHandler(svc, deps.DB)
 	return &Module{Handler: h, svc: svc}
 }
@@ -52,4 +52,4 @@ func (m *Module) RunLegacyMaintenance(ctx context.Context, db *sql.DB, logger *s
 	return application.BackfillLegacyDocuments(ctx, db, logger)
 }
 
-func (m *Module) Service() *application.RegistryService { return m.svc }
+func (m *Module) Service() *application.ControlledDocumentService { return m.svc }
