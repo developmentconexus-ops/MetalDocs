@@ -2680,40 +2680,6 @@ paths:
         '409': { description: misbound | session_inactive | stale_base }
         '410': { description: expired_upload | upload_missing }
         '422': { description: content_hash_mismatch }
-  /api/v1/documents/{id}/artifact-metadata:
-    post:
-      tags: [documents]
-      operationId: syncDocumentArtifactMetadata
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [session_id]
-              properties:
-                session_id: { type: string, format: uuid }
-                page_count: { type: integer, minimum: 1, nullable: true }
-      responses:
-        '200':
-          description: artifact metadata synced for current technical revision
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [revision_id]
-                properties:
-                  revision_id: { type: string, format: uuid }
-                  file_size_bytes: { type: integer, format: int64, minimum: 0, nullable: true }
-                  page_count: { type: integer, minimum: 1, nullable: true }
-                  page_count_source:
-                    type: string
-                    nullable: true
-                    enum: [eigenpal_client, server_renderer]
-        '403': { description: session_not_holder | document_not_owner }
-        '404': { description: document_not_found }
-        '409': { description: session_inactive | invalid_state_transition }
 
   /api/v1/documents/{id}/checkpoints:
     get:
@@ -2961,12 +2927,6 @@ paths:
       tags: [approval]
       operationId: scheduleDocumentPublish
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SchedulePublishRequest'
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/supersede:
     post:
@@ -5173,16 +5133,6 @@ components:
         revisionVersion: { type: integer, minimum: 1 }
         publishedDocumentId: { type: string, format: uuid }
         approvalInstanceId: { type: string, format: uuid }
-    SchedulePublishRequest:
-      type: object
-      required: [effective_from]
-      properties:
-        effective_from:
-          type: string
-          format: date-time
-        superseded_document_id:
-          type: string
-          format: uuid
     ApprovalInstanceByDocumentResponse:
       type: object
       required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag]
