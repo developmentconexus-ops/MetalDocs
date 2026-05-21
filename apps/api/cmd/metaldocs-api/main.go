@@ -106,6 +106,24 @@ func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx con
 	return res.ControlledDocument, nil
 }
 
+// e2eHandlersEnabled gates the test-only seed/reset/governance endpoints
+// behind an explicit env flag. Defense-in-depth: internal/test/e2e_seed.go
+// also early-returns on the same flag, but the call site must not register
+// these routes either — permissions.go does not enumerate /internal/test/*,
+// so any accidental mount is treated as fully public by newPublicPathChecker.
+func e2eHandlersEnabled() bool {
+	return strings.TrimSpace(os.Getenv("METALDOCS_E2E")) == "1"
+}
+
+func mountE2EHandlersIfEnabled(mux *http.ServeMux, register func(*http.ServeMux)) {
+	if !e2eHandlersEnabled() {
+		slog.Info("e2etest handlers not mounted", "reason", "METALDOCS_E2E != 1")
+		return
+	}
+	slog.Warn("e2etest handlers mounted — destructive endpoints reachable without auth", "env", "METALDOCS_E2E=1")
+	register(mux)
+}
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -352,7 +370,9 @@ func main() {
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
-	e2etest.RegisterE2EHandlers(mux, deps.SQLDB, nil)
+	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {
+		e2etest.RegisterE2EHandlers(m, deps.SQLDB, nil)
+	})
 
 	leaderID := schedulerLeaderID()
 	s := jobscheduler.New(deps.SQLDB, leaderID)
