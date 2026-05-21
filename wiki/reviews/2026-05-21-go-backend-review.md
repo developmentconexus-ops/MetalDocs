@@ -47,7 +47,7 @@
 
 | #  | Module                                          | Status  | Critical | High | Medium | Low | Reviewer | Date | Findings |
 |----|-------------------------------------------------|---------|----------|------|--------|-----|----------|------|----------|
-| 1  | `apps/api/cmd/metaldocs-api`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 1  | `apps/api/cmd/metaldocs-api`                    | Done    | 4        | 5    | 6      | 6   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer | 2026-05-21 | [cmd-metaldocs-api.md](2026-05-21-go-backend-review/cmd-metaldocs-api.md) |
 | 2  | `internal/platform/*`                           | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 3  | `internal/modules/auth`                         | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 4  | `internal/modules/iam`                          | Pending | -        | -    | -      | -   | -        | -    | -        |
