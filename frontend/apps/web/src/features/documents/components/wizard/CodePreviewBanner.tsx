@@ -1,4 +1,4 @@
-import { usePreviewCodeQuery } from '../../../registry/queries/usePreviewCodeQuery';
+import { usePreviewCodeQuery } from '../../../controlled-documents/queries/usePreviewCodeQuery';
 import styles from './CodePreviewBanner.module.css';
 
 export type CodePreviewBannerProps = {
@@ -35,3 +35,4 @@ export function CodePreviewBanner({
 }
 
 export default CodePreviewBanner;
+

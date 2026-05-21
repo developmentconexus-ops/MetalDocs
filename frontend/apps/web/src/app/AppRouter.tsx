@@ -9,7 +9,7 @@ import { iamRoutes } from '../features/iam/routes';
 import { notificationsRoutes } from '../features/notifications/routes';
 import { operationsRoutes } from '../features/operations/routes';
 import { passwordChangeRoutes } from '../features/password-change/routes';
-import { registryRoutes } from '../features/registry/routes';
+import { controlledDocumentsRoutes } from '../features/controlled-documents/routes';
 import { taxonomyRoutes } from '../features/taxonomy/routes';
 import { templatesRoutes } from '../features/templates/routes';
 
@@ -32,7 +32,7 @@ export const router = createBrowserRouter([
           ...operationsRoutes,
           ...documentsRoutes,
           ...templatesRoutes,
-          ...registryRoutes,
+          ...controlledDocumentsRoutes,
           ...taxonomyRoutes,
           ...iamRoutes,
           ...approvalRoutes,
@@ -46,3 +46,4 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+

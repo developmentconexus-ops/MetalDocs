@@ -22,6 +22,9 @@ export type PresignResult = { upload_url: string; pending_upload_id: string; exp
 type CommitDocumentAutosaveOperation = operations['commitDocumentAutosave'];
 export type CommitAutosaveRequest = CommitDocumentAutosaveOperation['requestBody']['content']['application/json'];
 export type CommitResult = CommitDocumentAutosaveOperation['responses'][200]['content']['application/json'];
+type SyncDocumentArtifactMetadataOperation = operations['syncDocumentArtifactMetadata'];
+export type SyncArtifactMetadataRequest = SyncDocumentArtifactMetadataOperation['requestBody']['content']['application/json'];
+export type SyncArtifactMetadataResult = SyncDocumentArtifactMetadataOperation['responses'][200]['content']['application/json'];
 export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; VersionNum: number; Label: string; CreatedAt: string; CreatedBy: string };
 export type FinalizeDocumentResult = { instanceId: string };
 export type FinalizeDocumentRequest = components['schemas']['FinalizeDocumentRequest'];
@@ -92,6 +95,13 @@ export async function presignAutosave(id: string, req: { session_id: string; bas
 // commit. Client does NOT forward a client-computed hash.
 export async function commitAutosave(id: string, req: CommitAutosaveRequest): Promise<CommitResult> {
   return apiFetch(`/api/v1/documents/${id}/autosave/commit`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+}
+
+export async function syncArtifactMetadata(id: string, req: SyncArtifactMetadataRequest): Promise<SyncArtifactMetadataResult> {
+  return apiFetch(`/api/v1/documents/${id}/artifact-metadata`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify(req),
   });

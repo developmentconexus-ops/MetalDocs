@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
-	registrydomain "metaldocs/internal/modules/registry/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
@@ -63,6 +63,10 @@ type fakeRepo struct {
 	commitFileSizeBytes int64
 	commitPageCount     *int
 	commitPageSource    *string
+	syncTenantID        string
+	syncFileSizeBytes   int64
+	syncPageCount       *int
+	syncPageSource      *string
 	revisionHistory     []domain.RevisionHistoryItem
 	revisionHistoryErr  error
 }
@@ -191,6 +195,20 @@ func (f *fakeRepo) CommitUpload(_ context.Context, tenantID, _, _, _, _, _ strin
 	}
 	if f.commitResult == nil {
 		f.commitResult = &application.CommitResult{RevisionID: "rev_1", RevisionNum: 1}
+	}
+	return f.commitResult, nil
+}
+
+func (f *fakeRepo) SyncCurrentRevisionArtifactMetadata(_ context.Context, tenantID, _, _, _ string, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*application.CommitResult, error) {
+	f.syncTenantID = tenantID
+	f.syncFileSizeBytes = fileSizeBytes
+	f.syncPageCount = pageCount
+	f.syncPageSource = pageCountSource
+	if f.commitErr != nil {
+		return nil, f.commitErr
+	}
+	if f.commitResult == nil {
+		f.commitResult = &application.CommitResult{RevisionID: "rev_1"}
 	}
 	return f.commitResult, nil
 }
@@ -372,11 +390,11 @@ func TestCreateDocument_OK(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		audit,
-		&fakeRegistryReader{cd: &registrydomain.ControlledDocument{
+		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
-			Status:          registrydomain.CDStatusActive,
+			Status:          controlleddocumentsdomain.CDStatusActive,
 		}},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_1"), status: strptr("published")},
@@ -410,11 +428,11 @@ func TestCreateDocument_InvalidFormData_Rejects(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: false, errs: []string{"invalid"}},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &registrydomain.ControlledDocument{
+		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
-			Status:          registrydomain.CDStatusActive,
+			Status:          controlleddocumentsdomain.CDStatusActive,
 		}},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_1"), status: strptr("published")},
@@ -579,6 +597,60 @@ func TestCommitAutosave_InvalidPageCount(t *testing.T) {
 	invalid := 0
 
 	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+		TenantID:   "tenant_1",
+		DocumentID: "doc_1",
+		PageCount:  &invalid,
+	})
+	if !errors.Is(err, domain.ErrInvalidPageCount) {
+		t.Fatalf("expected ErrInvalidPageCount, got %v", err)
+	}
+}
+
+func TestSyncArtifactMetadata_ForwardsArtifactMetadata(t *testing.T) {
+	repo := &fakeRepo{
+		docReturn: &domain.Document{
+			ID:                "doc_1",
+			Status:            domain.DocStatusDraft,
+			CurrentRevisionID: "rev_1",
+		},
+		revisionReturn: &domain.Revision{
+			ID:         "rev_1",
+			DocumentID: "doc_1",
+			StorageKey: "tenants/t/documents/d/revisions/rev_1.docx",
+		},
+		commitResult: &application.CommitResult{RevisionID: "rev_1"},
+	}
+	presigner := &fakePresigner{sizeReturn: 1304}
+	svc := application.New(repo, fakeDocgen{}, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	pageCount := 3
+
+	_, err := svc.SyncArtifactMetadata(context.Background(), application.SyncArtifactMetadataCmd{
+		TenantID:    "tenant_1",
+		ActorUserID: "user_1",
+		DocumentID:  "doc_1",
+		SessionID:   "sess_1",
+		PageCount:   &pageCount,
+	})
+	if err != nil {
+		t.Fatalf("SyncArtifactMetadata: %v", err)
+	}
+	if repo.syncFileSizeBytes != 1304 {
+		t.Fatalf("file size = %d, want 1304", repo.syncFileSizeBytes)
+	}
+	if repo.syncPageCount == nil || *repo.syncPageCount != 3 {
+		t.Fatalf("page count not forwarded: %#v", repo.syncPageCount)
+	}
+	if repo.syncPageSource == nil || *repo.syncPageSource != "eigenpal_client" {
+		t.Fatalf("page count source = %#v, want eigenpal_client", repo.syncPageSource)
+	}
+}
+
+func TestSyncArtifactMetadata_InvalidPageCount(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	invalid := 0
+
+	_, err := svc.SyncArtifactMetadata(context.Background(), application.SyncArtifactMetadataCmd{
 		TenantID:   "tenant_1",
 		DocumentID: "doc_1",
 		PageCount:  &invalid,

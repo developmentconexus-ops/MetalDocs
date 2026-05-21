@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"testing"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	docrepo "metaldocs/internal/modules/documents/repository"
-	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/docgenv2"
 	"metaldocs/internal/platform/tenant"
 	"metaldocs/tests/integration/testdb"
@@ -37,7 +37,7 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 
 	seedCreateDocumentSnapshotRows(t, ctx, db, tenantID, actorID, templateID, templateVersionID, controlledDocumentID)
 
-	cd := &registrydomain.ControlledDocument{
+	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              controlledDocumentID,
 		TenantID:        tenantID,
 		ProfileCode:     "po",
@@ -45,7 +45,7 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 		Code:            "PO-TEST-001",
 		Title:           "Snapshot Test Controlled Document",
 		OwnerUserID:     actorID,
-		Status:          registrydomain.CDStatusActive,
+		Status:          controlleddocumentsdomain.CDStatusActive,
 	}
 
 	snapshotSvc := application.NewSnapshotService(

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { NewDocumentWizardPage, buildVisibilityPayload } from './NewDocumentWizardPage';
 import { ApiError } from '../../../lib/api/problem';
+import { QK } from '../../../lib/queryKeys';
 import type { WizardState } from '../state/wizard.reducer';
 
 // ── Mock react-router-dom ─────────────────────────────────────────────────────
@@ -67,7 +68,7 @@ vi.mock('../queries/useBlankTemplateQuery', () => ({
   }),
 }));
 
-vi.mock('../../registry/queries/usePreviewCodeQuery', () => ({
+vi.mock('../../controlled-documents/queries/usePreviewCodeQuery', () => ({
   usePreviewCodeQuery: () => ({
     data: { code: 'PRC-TI-001' },
     isLoading: false,
@@ -145,7 +146,7 @@ vi.mock('../components/wizard/steps/StepConfirm', () => ({
 
 // ── Mock atomic API ───────────────────────────────────────────────────────────
 
-vi.mock('../../registry/api/controlledDocuments', () => ({
+vi.mock('../../controlled-documents/api/controlledDocuments', () => ({
   createControlledDocumentAtomic: vi.fn(),
 }));
 
@@ -155,7 +156,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-import * as cdApi from '../../registry/api/controlledDocuments';
+import * as cdApi from '../../controlled-documents/api/controlledDocuments';
 
 function makeSuccessResponse(documentId = 'doc-abc') {
   return {
@@ -166,6 +167,14 @@ function makeSuccessResponse(documentId = 'doc-abc') {
 
 function renderWizard() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <NewDocumentWizardPage />
+    </QueryClientProvider>,
+  );
+}
+
+function renderWizardWithClient(qc: QueryClient) {
   return render(
     <QueryClientProvider client={qc}>
       <NewDocumentWizardPage />
@@ -282,6 +291,24 @@ describe('NewDocumentWizardPage — submit guard via UI', () => {
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/documents/doc-xyz/edit');
+    });
+  });
+
+  it('invalidates the preview-code query after successful create', async () => {
+    vi.mocked(cdApi.createControlledDocumentAtomic).mockResolvedValue(
+      makeSuccessResponse('doc-xyz') as never,
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
+
+    renderWizardWithClient(qc);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Criar documento' }));
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: QK.controlledDocuments.preview('PRC', 'TI'),
+      });
     });
   });
 
@@ -409,3 +436,4 @@ describe('buildVisibilityPayload', () => {
     });
   });
 });
+

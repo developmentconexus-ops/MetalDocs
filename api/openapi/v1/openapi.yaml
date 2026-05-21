@@ -3294,7 +3294,7 @@ components:
           enum: [po, it, rg]
         documentProfile:
           type: string
-          description: Canonical document profile code resolved by the registry.
+          description: Canonical document profile code resolved by controlled documents.
         processArea:
           type: string
           description: Optional process taxonomy code, such as `marketplaces` or `quality`.
@@ -5252,3 +5252,4 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
+

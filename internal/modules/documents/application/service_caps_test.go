@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	registrydomain "metaldocs/internal/modules/registry/domain"
 )
 
 // capCheckerFunc is a function adapter for application.CapabilityChecker.
@@ -23,11 +23,11 @@ func TestCreateDocument_DeniesWhenCapabilityChecker_Denies(t *testing.T) {
 		return iamapp.ErrCapabilityDenied
 	})
 
-	cd := &registrydomain.ControlledDocument{
+	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              "cd_1",
 		ProfileCode:     "PROC",
 		ProcessAreaCode: "AREA-01",
-		Status:          registrydomain.CDStatusActive,
+		Status:          controlleddocumentsdomain.CDStatusActive,
 	}
 
 	svc := application.NewService(

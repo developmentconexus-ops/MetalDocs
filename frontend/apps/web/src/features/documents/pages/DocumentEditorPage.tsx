@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetalDocsEditor, type MetalDocsEditorRef } from '@metaldocs/editor-ui';
 import type { Comment } from '@metaldocs/editor-ui';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ApiError, resolveErrorMessage, apiFetch } from '../../../lib/api';
 import { QK } from '../../../lib/queryKeys';
 import { useDocumentSession } from '../hooks/editor/useDocumentSession';
 import { useDocumentAutosave } from '../hooks/editor/useDocumentAutosave';
 import { useDocumentComments } from '../hooks/editor/useDocumentComments';
-import { finalizeDocument, getApprovalInstance, renameDocument, signedRevisionURL, syncArtifactMetadata } from '../api/documents';
+import {
+  finalizeDocument,
+  getApprovalInstance,
+  getDocumentRevisionHistory,
+  renameDocument,
+  signedRevisionURL,
+  syncArtifactMetadata,
+} from '../api/documents';
 import type { DocumentDetail } from '../api/documents';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
@@ -23,7 +30,7 @@ import {
 import { CodeChip, StatusPill, type DocumentStatus } from '../../../components/ui';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
-import { useControlledDocumentDetailQuery } from '../../registry/queries/useControlledDocumentDetailQuery';
+import { useControlledDocumentDetailQuery } from '../../controlled-documents/queries/useControlledDocumentDetailQuery';
 import { buildVisibilityLabel, formatRevisionCode, hasSettledSidebarIdentity, resolveAreaLabel, resolveProfileLabel } from '../lib/documentDetailMeta';
 import styles from './styles/DocumentEditorPage.module.css';
 
@@ -39,6 +46,7 @@ const ARTIFACT_SYNC_MAX_ATTEMPTS = 8;
 const ARTIFACT_SYNC_RETRY_DELAY_MS = 400;
 
 export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPageProps): React.ReactElement {
+  const queryClient = useQueryClient();
   const docQuery = useDocumentDetailQuery(documentID);
   const [editorLoadError, setEditorLoadError] = useState<string | null>(null);
   const [documentName, setDocumentName] = useState('');
@@ -47,12 +55,26 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const [revisionTitleInput, setRevisionTitleInput] = useState('');
   const [revisionTitleError, setRevisionTitleError] = useState<string | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
+  const [submitStatusOverride, setSubmitStatusOverride] = useState<'under_review' | null>(null);
   const [artifactMetadata, setArtifactMetadata] = useState<ArtifactMetadata>({});
   const editorRef = useRef<MetalDocsEditorRef>(null);
   const skipInitialEditorChangeRef = useRef(false);
   const syncedArtifactRevisionRef = useRef<string | null>(null);
   const artifactSyncRetryTimeoutRef = useRef<number | null>(null);
-  const doc: EditorDocumentDetail | null = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
+  const baseDoc = (docQuery.data as EditorDocumentDetail | undefined) ?? null;
+  const doc: EditorDocumentDetail | null = useMemo(() => {
+    if (!baseDoc) {
+      return null;
+    }
+    if (!submitStatusOverride) {
+      return baseDoc;
+    }
+    return {
+      ...baseDoc,
+      Status: submitStatusOverride,
+      status: submitStatusOverride,
+    };
+  }, [baseDoc, submitStatusOverride]);
   const docStatus = doc?.Status ?? '';
   const session = useDocumentSession(documentID, { enabled: docStatus === 'draft' });
   const controlledDocumentId = doc?.ControlledDocumentID ?? '';
@@ -60,6 +82,16 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
   const areasQuery = useAreasQuery();
   const controlledDocumentQuery = useControlledDocumentDetailQuery(controlledDocumentId);
   const revisionHistoryQuery = useDocumentRevisionHistoryQuery(documentID);
+
+  useEffect(() => {
+    setSubmitStatusOverride(null);
+  }, [documentID]);
+
+  useEffect(() => {
+    if ((baseDoc?.Status ?? '') !== 'draft') {
+      setSubmitStatusOverride(null);
+    }
+  }, [baseDoc]);
 
   const fetchRevisionBuffer = useCallback(async (revisionID: string) => {
     if (!revisionID) {
@@ -251,12 +283,46 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
       }
       const trimmedRevisionTitle = revisionTitle?.trim();
       await finalizeDocument(documentID, trimmedRevisionTitle ? { revisionTitle: trimmedRevisionTitle } : {});
+      setSubmitStatusOverride('under_review');
+      queryClient.setQueryData(QK.documents.detail(documentID), (current: DocumentDetail | undefined) => {
+        if (!current) return current;
+        return {
+          ...current,
+          Status: 'under_review',
+          status: 'under_review',
+        } as DocumentDetail;
+      });
       setEditorDirty(false);
+      let rehydrationFailed = false;
+      try {
+        const detailResult = await docQuery.refetch();
+        if (detailResult.error) {
+          throw detailResult.error;
+        }
+        await Promise.allSettled([
+          queryClient.fetchQuery({
+            queryKey: QK.documents.revisionHistory(documentID),
+            queryFn: () => getDocumentRevisionHistory(documentID),
+          }),
+          queryClient.fetchQuery({
+            queryKey: QK.approval.instance(documentID),
+            queryFn: () => getApprovalInstance(documentID),
+          }),
+        ]);
+      } catch {
+        rehydrationFailed = true;
+        void queryClient.invalidateQueries({ queryKey: QK.documents.detail(documentID) });
+        void queryClient.invalidateQueries({ queryKey: QK.documents.revisionHistory(documentID) });
+        void queryClient.invalidateQueries({ queryKey: QK.approval.instance(documentID) });
+      }
       await session.release();
       setRevisionTitleDialogOpen(false);
       setRevisionTitleInput('');
       setRevisionTitleError(null);
       onDone();
+      if (rehydrationFailed) {
+        toast.error('Documento submetido para revisão. Recarregando dados atualizados do editor.');
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         toast.error(resolveErrorMessage(err.code, err.message));
@@ -548,4 +614,5 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     </div>
   );
 }
+
 

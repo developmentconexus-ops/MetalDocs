@@ -5,9 +5,9 @@
 > **Out of scope:** API behavior conventions such as RFC 9457, pagination, idempotency, and authz details (`architecture/api-design-system.md`); operational oapi-codegen usage (`references/oapi-codegen.md`); ADR rationale (`decisions/0012-contract-first-api.md`).
 > **Key files:**
 > - `api/openapi/v1/openapi.yaml:1` - single public HTTP contract
-> - `internal/modules/registry/api/cfg.yaml:1` - canonical per-module codegen config
-> - `internal/modules/registry/api/gen.go:1` - canonical `//go:generate` file
-> - `internal/modules/registry/delivery/http/handler.go:67` - canonical `ServerInterfaceWrapper` pattern
+> - `internal/modules/controlleddocuments/api/cfg.yaml:1` - canonical per-module codegen config
+> - `internal/modules/controlleddocuments/api/gen.go:1` - canonical `//go:generate` file
+> - `internal/modules/controlleddocuments/delivery/http/handler.go:67` - canonical `ServerInterfaceWrapper` pattern
 > - `wiki/architecture/api-contract.md:1` - contract-first architecture overview
 > - `wiki/architecture/api-design-system.md:1` - shared API behavior conventions
 
@@ -149,3 +149,4 @@ Read these alongside this document:
 - `wiki/decisions/0012-contract-first-api.md`
 - `wiki/backlog/roadmap.md`
 - `docs/superpowers/specs/2026-05-12-backend-api-governance-design.md`
+

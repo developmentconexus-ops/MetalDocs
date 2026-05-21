@@ -6,20 +6,20 @@ import (
 	"errors"
 	"testing"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	registrydomain "metaldocs/internal/modules/registry/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 type fakeRegistryReader struct {
-	cd  *registrydomain.ControlledDocument
+	cd  *controlleddocumentsdomain.ControlledDocument
 	err error
 }
 
-func (f *fakeRegistryReader) GetByID(_ context.Context, _, _ string) (*registrydomain.ControlledDocument, error) {
+func (f *fakeRegistryReader) GetByID(_ context.Context, _, _ string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -60,12 +60,12 @@ func strptr(v string) *string { return &v }
 
 func TestCreate_FromRegistry_Happy(t *testing.T) {
 	repo := &captureRepo{fakeRepo: &fakeRepo{createDocIDs: [3]string{"doc_1", "rev_1", "sess_1"}}}
-	cd := &registrydomain.ControlledDocument{
+	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              "cd_1",
 		TenantID:        "tenant_1",
 		ProfileCode:     "PROC",
 		ProcessAreaCode: "AREA-01",
-		Status:          registrydomain.CDStatusActive,
+		Status:          controlleddocumentsdomain.CDStatusActive,
 	}
 	svc := application.NewService(
 		repo,
@@ -118,11 +118,11 @@ func TestCreate_CD_NotActive(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &registrydomain.ControlledDocument{
+		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
-			Status:          registrydomain.CDStatusObsolete,
+			Status:          controlleddocumentsdomain.CDStatusObsolete,
 		}},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{},
@@ -135,7 +135,7 @@ func TestCreate_CD_NotActive(t *testing.T) {
 		Name:                 "Contract",
 		FormData:             json.RawMessage(`{"a":1}`),
 	})
-	if !errors.Is(err, registrydomain.ErrCDNotActive) {
+	if !errors.Is(err, controlleddocumentsdomain.ErrCDNotActive) {
 		t.Fatalf("expected ErrCDNotActive, got %v", err)
 	}
 }
@@ -149,11 +149,11 @@ func TestCreate_NoDefaultTemplate(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &registrydomain.ControlledDocument{
+		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
-			Status:          registrydomain.CDStatusActive,
+			Status:          controlleddocumentsdomain.CDStatusActive,
 		}},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{},
@@ -166,7 +166,7 @@ func TestCreate_NoDefaultTemplate(t *testing.T) {
 		Name:                 "Contract",
 		FormData:             json.RawMessage(`{"a":1}`),
 	})
-	if !errors.Is(err, registrydomain.ErrProfileHasNoDefaultTemplate) {
+	if !errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate) {
 		t.Fatalf("expected ErrProfileHasNoDefaultTemplate, got %v", err)
 	}
 }
@@ -180,11 +180,11 @@ func TestCreate_AuthzFail(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &registrydomain.ControlledDocument{
+		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
-			Status:          registrydomain.CDStatusActive,
+			Status:          controlleddocumentsdomain.CDStatusActive,
 		}},
 		&fakeAuthzChecker{err: iamapp.ErrCapabilityDenied},
 		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_default"), status: strptr("published")},

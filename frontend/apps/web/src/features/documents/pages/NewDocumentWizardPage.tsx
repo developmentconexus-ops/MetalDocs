@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useReducer } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { resolveQueryError } from '../../../lib/api';
+import { QK } from '../../../lib/queryKeys';
 import { useAuthStore } from '../../../store/auth.store';
-import { createControlledDocumentAtomic } from '../../registry/api/controlledDocuments';
+import { createControlledDocumentAtomic } from '../../controlled-documents/api/controlledDocuments';
 import type { components } from '../../../lib/api-types';
-import { usePreviewCodeQuery } from '../../registry/queries/usePreviewCodeQuery';
+import { usePreviewCodeQuery } from '../../controlled-documents/queries/usePreviewCodeQuery';
 import { useAreasQuery } from '../queries/useAreasQuery';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { useTemplatesByProfileQuery } from '../queries/useTemplatesByProfileQuery';
@@ -69,6 +70,7 @@ export function NewDocumentWizardPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
 
   const [state, dispatch] = useReducer(wizardReducer, undefined, () => initialStateFromUrl(searchParams));
 
@@ -168,6 +170,11 @@ export function NewDocumentWizardPage(): JSX.Element {
       dispatch({ type: 'submitStart' });
     },
     onSuccess: (result) => {
+      if (state.profileCode && state.areaCode) {
+        void queryClient.invalidateQueries({
+          queryKey: QK.controlledDocuments.preview(state.profileCode, state.areaCode),
+        });
+      }
       dispatch({ type: 'submitSuccess' });
       navigate(`/documents/${result.document.id}/edit`);
     },
@@ -320,3 +327,4 @@ export function NewDocumentWizardPage(): JSX.Element {
 }
 
 export default NewDocumentWizardPage;
+

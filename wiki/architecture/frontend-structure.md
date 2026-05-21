@@ -32,7 +32,7 @@
 
 The frontend is a **feature-sliced SPA**. Each business domain owns its UI, hooks, queries, state, types, and routes. The shell (`app/`) only wires them together. Cross-cutting infra lives in `lib/`. Visual primitives live in `components/ui/`.
 
-Domains today: `auth`, `documents`, `templates`, `taxonomy`, `iam`, `approval`, `registry`, `notifications`, `feature-flags`, `shell`, `shared`.
+Domains today: `auth`, `documents`, `templates`, `taxonomy`, `iam`, `approval`, `controlled-documents`, `notifications`, `feature-flags`, `shell`, `shared`.
 
 ---
 
@@ -247,6 +247,7 @@ Durable rules:
 - Query and mutation hooks live in `features/<domain>/queries/`.
 - Reusable queries should expose `queryOptions(...)` factories when the same query is used by hooks, prefetching, tests, or cache writes.
 - Mutations must explicitly update exact detail cache entries when the server response is authoritative and invalidate dependent lists, aggregates, inbox/activity, and audit queries.
+- Governed workflow states that can change without a local click, such as `under_review`, `scheduled`, or other server-driven transitions, must keep freshness policy in the query layer with targeted invalidation and selective `refetchInterval`. Do not implement background synchronization loops in page components with `useEffect`.
 - Optimistic updates are opt-in. Avoid them for approval, publication, archive, finalization, permission, signature, and audit-sensitive workflow state unless the rollback model is obvious and safe.
 - Use `.agents/skills/metaldocs-tanstack-query/templates/` when adding a new API/query/mutation surface. Templates are scaffolds, not mandatory boilerplate for tiny edits.
 
@@ -387,3 +388,4 @@ When implementing:
 - `wiki/architecture/api-contract.md` — OpenAPI spec, oapi-codegen backend codegen, frontend `gen:api` script, CI drift guard
 - `wiki/decisions/` — architecture decision records
 - `frontend/apps/web/design-source/README.md` — screen intake protocol (added with Block 0)
+

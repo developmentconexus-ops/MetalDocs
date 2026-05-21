@@ -3,29 +3,94 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import { Avatar } from '../../../components/ui/Avatar';
 import { CodeChip } from '../../../components/ui/CodeChip';
+import { resolveQueryError } from '../../../lib/api';
 import { DocumentHero } from '../components/DocumentHero';
 import { DocumentVersionTimeline } from '../components/DocumentVersionTimeline';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
+import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
+import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
+import { createRevision } from '../../controlled-documents/api/controlledDocuments';
+import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
 import { useAuthStore } from '../../../store/auth.store';
-import { formatPublishedAt, formatSignedAt, formatShortDate } from '../lib/documentDetailMeta';
+import { formatPublishedAt, formatRevisionCode, formatSignedAt, formatShortDate } from '../lib/documentDetailMeta';
 import styles from './DocumentPublishedPage.module.css';
 
-// TODO(backlog): Replace with real revision list from GET /api/v1/documents/:id/revisions
-// See wiki/backlog/documento-publicado.md
-const PLACEHOLDER_VERSIONS = [
-  { v: 'rev. 2.3', when: '18 mar 2025', author: 'A. Tavares', current: false,
-    summary: 'Ajustes de redação após feedback de Engenharia.' },
-  { v: 'rev. 2.4', when: '02 jul 2025', author: 'R. Souza', current: false,
-    summary: 'Revisão geral pós-auditoria interna. Novas etiquetas padronizadas para todas as plantas.' },
-  { v: 'v3.0', when: '14 nov 2025', author: 'R. Souza', current: false,
-    summary: 'Reestruturação completa do procedimento. Inclusão de seção para fontes energéticas múltiplas.' },
-  { v: 'v3.1', when: '08 jan 2026', author: 'C. Mendes', current: false,
-    summary: 'Correções de conformidade pós-treinamento. Atualização dos responsáveis por área.' },
-  { v: 'v3.2', when: '12 mar 2026', author: 'C. Mendes', current: true,
-    summary: 'Inclusão de procedimento para painéis CCM-04. Atualização da matriz de risco para fontes hidráulicas.' },
-];
+const ACTIVE_SIBLING_STATES = ['draft', 'under_review', 'approved', 'scheduled', 'rejected'] as const;
+type ActiveSiblingState = (typeof ACTIVE_SIBLING_STATES)[number];
 
+type DocumentStatusPresentation = {
+  badgeLabel: string;
+  subtitle: string | null;
+  ownerMeta: string;
+};
+
+type GovernedRevisionHistoryItem = {
+  documentId: string;
+  revisionNumber: number;
+  revisionTitle: string;
+  status: string;
+  createdAt: string;
+  isCurrent: boolean;
+};
+
+function getActiveSiblingCtaLabel(state: ActiveSiblingState): string {
+  if (state === 'draft') return 'Continuar rascunho';
+  if (state === 'under_review') return 'Acompanhar revis\u00e3o';
+  if (state === 'approved') return 'Publicar revis\u00e3o aprovada';
+  if (state === 'scheduled') return 'Ver publica\u00e7\u00e3o agendada';
+  return 'Retomar revis\u00e3o rejeitada';
+}
+
+function getActiveSiblingDestination(documentId: string, state: ActiveSiblingState): string {
+  if (state === 'draft' || state === 'rejected') {
+    return `/documents/${documentId}/edit`;
+  }
+  return `/documents/${documentId}`;
+}
+
+function getDocumentStatusPresentation(status: string, publishedAt: string): DocumentStatusPresentation {
+  const hasPublishedAt = publishedAt !== '—';
+
+  switch (status) {
+    case 'approved':
+      return {
+        badgeLabel: 'aprovado',
+        subtitle: hasPublishedAt ? `aprovado em ${publishedAt}` : 'Aprovado',
+        ownerMeta: hasPublishedAt ? `aprovado em ${publishedAt}` : 'aprovado',
+      };
+    case 'scheduled':
+      return {
+        badgeLabel: 'agendado',
+        subtitle: hasPublishedAt ? `aprovação concluída em ${publishedAt}` : 'Publicação agendada',
+        ownerMeta: hasPublishedAt ? `publicação agendada · aprovado em ${publishedAt}` : 'publicação agendada',
+      };
+    case 'published':
+      return {
+        badgeLabel: 'publicado',
+        subtitle: hasPublishedAt ? `publicado em ${publishedAt}` : 'Publicado',
+        ownerMeta: hasPublishedAt ? `publicado em ${publishedAt}` : 'publicado',
+      };
+    case 'superseded':
+      return {
+        badgeLabel: 'substituído',
+        subtitle: hasPublishedAt ? `publicado em ${publishedAt}` : 'Substituído por revisão posterior',
+        ownerMeta: hasPublishedAt ? `substituído · publicado em ${publishedAt}` : 'substituído por revisão posterior',
+      };
+    case 'obsolete':
+      return {
+        badgeLabel: 'obsoleto',
+        subtitle: hasPublishedAt ? `obsoleto após publicação em ${publishedAt}` : 'Documento obsoleto',
+        ownerMeta: hasPublishedAt ? `obsoleto · publicado em ${publishedAt}` : 'obsoleto',
+      };
+    default:
+      return {
+        badgeLabel: 'vigente',
+        subtitle: hasPublishedAt ? `publicado em ${publishedAt}` : null,
+        ownerMeta: hasPublishedAt ? `publicado em ${publishedAt}` : 'publicado',
+      };
+  }
+}
 // TODO(backlog): wire relationship model — GET /api/v1/documents/:id/relationships
 // See wiki/backlog/documento-publicado.md
 const PLACEHOLDER_RELATED = [
@@ -53,10 +118,25 @@ export function DocumentPublishedPage() {
   // without breaking the rules of hooks.
   const documentId = rawDocumentId ?? '';
 
-  const docQuery = useDocumentDetailQuery(documentId);
+  const scheduledLifecycleRefetchInterval = 5_000;
+  const docQuery = useDocumentDetailQuery(documentId, { pollScheduledLifecycle: true });
+  const shouldPollScheduledLifecycle = docQuery.data?.Status === 'scheduled';
   const approvalQuery = useApprovalInstanceQuery(documentId);
+  const controlledDocumentId = docQuery.data?.ControlledDocumentID ?? null;
+  const activeDocumentQuery = useControlledDocumentActiveDocumentQuery(controlledDocumentId, {
+    refetchInterval: shouldPollScheduledLifecycle ? scheduledLifecycleRefetchInterval : false,
+  });
+  const revisionHistoryQuery = useDocumentRevisionHistoryQuery(documentId, {
+    refetchInterval: shouldPollScheduledLifecycle ? scheduledLifecycleRefetchInterval : false,
+  });
+  const activeDocument = activeDocumentQuery.data ?? null;
 
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showRevisionForm, setShowRevisionForm] = useState(false);
+  const [revisionName, setRevisionName] = useState('');
+  const [revisionError, setRevisionError] = useState('');
+  const [isCreatingRevision, setIsCreatingRevision] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
 
   // ── Loading state ──────────────────────────────────────────────────────────
   if (docQuery.isLoading) {
@@ -94,13 +174,31 @@ export function DocumentPublishedPage() {
   const createdBy = (user?.userId && createdByRaw === user.userId)
     ? (user.displayName ?? createdByRaw)
     : createdByRaw;
-  const revisionVersion = doc.RevisionVersion;
-  const versionLabel    = revisionVersion != null ? `v${revisionVersion}` : '—';
+  const versionLabel = formatRevisionCode(doc.RevisionNumber);
 
-  // Published/approval-completion date comes from the approval instance completion timestamp.
+  // Approval completion is the only lifecycle timestamp currently exposed on
+  // the canonical document detail payload.
   const publishedAt = formatPublishedAt(approval?.completed_at ?? undefined);
   const sinceDateHint = approval?.completed_at ? formatShortDate(approval.completed_at) : '—';
-
+  const isApproved = status === 'approved';
+  const isPublished = status === 'published';
+  const statusPresentation = getDocumentStatusPresentation(status, publishedAt);
+  const activeSiblingDocumentId =
+    activeDocument?.documentId &&
+    activeDocument.documentId !== documentId &&
+    ACTIVE_SIBLING_STATES.includes(activeDocument.approvalState as ActiveSiblingState)
+      ? activeDocument.documentId
+      : null;
+  const activeSiblingStateCandidate = activeDocument?.approvalState as ActiveSiblingState | undefined;
+  const activeSiblingState =
+    activeSiblingDocumentId && activeSiblingStateCandidate && ACTIVE_SIBLING_STATES.includes(activeSiblingStateCandidate)
+      ? activeSiblingStateCandidate
+      : null;
+  const activeSiblingCtaLabel = activeSiblingState ? getActiveSiblingCtaLabel(activeSiblingState) : 'Iniciar revis\u00e3o';
+  const activeSiblingDestination =
+    activeSiblingDocumentId && activeSiblingState
+      ? getActiveSiblingDestination(activeSiblingDocumentId, activeSiblingState)
+      : null;
   // ObsoleteBanner
   const isObsolete = status === 'obsolete';
 
@@ -110,12 +208,45 @@ export function DocumentPublishedPage() {
   const canInitiateRevision =
     user != null &&
     user.roles.some((r) => ['admin', 'system_admin', 'editor', 'qms_admin', 'area_admin'].includes(r));
+  const canCreateRevision =
+    canInitiateRevision &&
+    isPublished &&
+    Boolean(doc.ControlledDocumentID) &&
+    activeSiblingDocumentId == null;
+  const canPublish = canInitiateRevision && isApproved && Boolean(activeDocument?.contentHash);
+  const publishContextNotice =
+    isApproved && !canInitiateRevision
+      ? 'Seu perfil atual não pode publicar esta revisão.'
+      : isApproved && activeDocumentQuery.isError
+        ? 'Não foi possível confirmar o contexto ativo de publicação. Atualize a página e tente novamente antes de publicar.'
+        : isApproved && !activeDocument?.contentHash
+          ? 'A publicação está bloqueada porque o contexto ativo desta revisão ainda não foi confirmado.'
+          : null;
 
   // Signoff stages from approval instance
   const signoffStages = approval?.stages ?? [];
   const stageCount = signoffStages.length;
   // Connector spans from first pin center to last pin center
   const connectorSide = stageCount > 1 ? `${(100 / (2 * stageCount)).toFixed(2)}%` : '50%';
+  const revisionHistoryItems = (revisionHistoryQuery.data?.items ?? []) as GovernedRevisionHistoryItem[];
+  const revisionTimeline = revisionHistoryItems.map((item) => ({
+    v: `REV${String(item.revisionNumber ?? 0).padStart(2, '0')}`,
+    when: formatShortDate(item.createdAt) || '—',
+    author: item.status || '—',
+    current: Boolean(item.isCurrent),
+    summary: item.revisionTitle?.trim() || 'Sem título governado registrado.',
+  }));
+
+  const currentPublishedHistoryItem =
+    status === 'scheduled' && activeDocument?.publishedDocumentId
+      ? revisionHistoryItems.find((item) => item.documentId === activeDocument.publishedDocumentId) ?? null
+      : null;
+  const currentVersionLabel = currentPublishedHistoryItem
+    ? formatRevisionCode(currentPublishedHistoryItem.revisionNumber)
+    : versionLabel;
+  const currentVersionHint = currentPublishedHistoryItem
+    ? '—'
+    : sinceDateHint;
 
   // Handlers
   const handleView = () => navigate(`/documents/${documentId}/edit`);
@@ -127,6 +258,57 @@ export function DocumentPublishedPage() {
         setTimeout(() => setLinkCopied(false), 2000);
       })
       .catch(() => {/* silent — no false-positive UI */});
+  };
+
+  const handleStartRevision = () => {
+    if (!canCreateRevision || isCreatingRevision) {
+      return;
+    }
+    setRevisionError('');
+    setRevisionName(docName ?? code);
+    setShowRevisionForm(true);
+  };
+
+  const handleContinueActiveRevision = () => {
+    if (!activeSiblingDestination) {
+      return;
+    }
+    navigate(activeSiblingDestination);
+  };
+
+  const handleCancelRevision = () => {
+    if (isCreatingRevision) {
+      return;
+    }
+    setShowRevisionForm(false);
+    setRevisionName('');
+    setRevisionError('');
+  };
+
+  const handlePublishSuccess = () => {
+    void docQuery.refetch();
+    void approvalQuery.refetch();
+    void activeDocumentQuery.refetch();
+  };
+
+  const handleCreateRevision = async () => {
+    if (!doc.ControlledDocumentID || !revisionName.trim()) {
+      return;
+    }
+    setIsCreatingRevision(true);
+    setRevisionError('');
+    try {
+      const response = await createRevision(
+        doc.ControlledDocumentID,
+        { name: revisionName.trim(), formData: {}, templateVersionId: doc.TemplateVersionID },
+        crypto.randomUUID(),
+      );
+      navigate(`/documents/${response.document.id}/edit`);
+    } catch (err) {
+      setRevisionError(resolveQueryError(err, 'Falha ao iniciar nova revisão.'));
+    } finally {
+      setIsCreatingRevision(false);
+    }
   };
 
   return (
@@ -167,14 +349,14 @@ export function DocumentPublishedPage() {
             <CodeChip className={styles.codeChip}>{code}</CodeChip>
             <span className={styles.vigenteBadge}>
               <span className={styles.vigenteDot} />
-              {versionLabel} · vigente
+              {versionLabel} · {statusPresentation.badgeLabel}
             </span>
             {/* TODO(backlog): resolve profile_code → human label once DocumentResponse includes profile_code */}
             <span className={styles.typeLabel}>—</span>
           </>
         }
         title={docName ?? code}
-        subtitle={publishedAt ? <span>publicado em {publishedAt}</span> : null}
+        subtitle={statusPresentation.subtitle ? <span>{statusPresentation.subtitle}</span> : null}
         actions={
           <div className={styles.heroActions}>
             <button className="btn btn-primary btn-lg" type="button" onClick={handleView}>
@@ -186,23 +368,116 @@ export function DocumentPublishedPage() {
               <Icon name="download" size={13} />
               Baixar PDF
             </button>
-            {/* TODO(backlog): wire POST /api/v1/controlled-documents/:cdId/revisions */}
+            {isApproved ? (
+              <button
+                className="btn"
+                type="button"
+                aria-disabled={!canPublish}
+                title={
+                  !canInitiateRevision
+                    ? 'Sem permissÃ£o para publicar'
+                    : !activeDocument?.contentHash
+                      ? 'Aguardando contexto ativo para publicar'
+                      : undefined
+                }
+                onClick={() => {
+                  if (canPublish) {
+                    setShowPublishDialog(true);
+                  }
+                }}
+              >
+                <Icon name="check" size={13} />
+                Publicar / Agendar
+              </button>
+            ) : (
             <button
               className="btn"
               type="button"
-              aria-disabled={!canInitiateRevision}
-              title={canInitiateRevision ? undefined : 'Sem permissão para iniciar revisão'}
+              aria-disabled={!canCreateRevision && !activeSiblingDocumentId}
+              title={
+                !canInitiateRevision
+                  ? 'Sem permissão para iniciar revisão'
+                  : activeSiblingDocumentId
+                    ? 'Já existe uma revisão ativa para este documento controlado'
+                  : !isPublished
+                    ? 'Documento controlado indisponível para iniciar revisão'
+                    : undefined
+              }
+              onClick={activeSiblingDocumentId ? handleContinueActiveRevision : handleStartRevision}
             >
               <Icon name="edit" size={13} />
-              Iniciar revisão
+              {activeSiblingCtaLabel}
             </button>
+            )}
             <button className="btn btn-ghost" type="button" onClick={handleCopyLink}>
               <Icon name={linkCopied ? 'check' : 'link'} size={13} />
               {linkCopied ? 'Link copiado!' : 'Copiar link'}
             </button>
+            {publishContextNotice ? (
+              <div className={styles.heroNotice} role="status" aria-live="polite">
+                <Icon name="shield" size={14} />
+                <span>{publishContextNotice}</span>
+              </div>
+            ) : null}
           </div>
         }
       />
+
+      {showRevisionForm && (
+        <div className={styles.revisionComposer} role="region" aria-label="Iniciar nova revisão">
+          <div className={styles.revisionComposerHeader}>
+            <div>
+              <div className={styles.revisionComposerKicker}>Nova revisão</div>
+              <h2 className={styles.revisionComposerTitle}>Criar novo draft de revisão</h2>
+            </div>
+            <CodeChip>{code}</CodeChip>
+          </div>
+          <p className={styles.revisionComposerBody}>
+            Defina o nome de trabalho do novo draft. O título governado da revisão será confirmado depois, no envio formal para aprovação.
+          </p>
+          <label className={styles.revisionComposerField} htmlFor="published-revision-name">
+            Nome do documento
+          </label>
+          <input
+            id="published-revision-name"
+            className={`input ${styles.revisionComposerInput}`}
+            type="text"
+            value={revisionName}
+            onChange={(event) => setRevisionName(event.target.value)}
+            placeholder={docName ?? code}
+            disabled={isCreatingRevision}
+          />
+          {revisionError && (
+            <p className={styles.revisionComposerError} role="alert">
+              {revisionError}
+            </p>
+          )}
+          <div className={styles.revisionComposerActions}>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => void handleCreateRevision()}
+              disabled={isCreatingRevision || revisionName.trim().length === 0}
+            >
+              {isCreatingRevision ? 'Criando...' : 'Gerar documento'}
+            </button>
+            <button className="btn" type="button" onClick={handleCancelRevision} disabled={isCreatingRevision}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPublishDialog && activeDocument?.contentHash ? (
+        <SupersedePublishDialog
+          documentId={documentId}
+          contentHash={activeDocument.contentHash}
+          revisionVersion={activeDocument.revisionVersion}
+          publishedDocumentId={activeDocument.publishedDocumentId ?? undefined}
+          onClose={() => setShowPublishDialog(false)}
+          onSuccess={handlePublishSuccess}
+        />
+      ) : null}
 
       {/* Content area */}
       <div className={styles.content}>
@@ -211,9 +486,9 @@ export function DocumentPublishedPage() {
         <div className={styles.kpiStrip}>
           <div className={styles.kpiCell}>
             <div className={styles.kpiLabel}>Versão atual</div>
-            <div className={styles.kpiValue}>{versionLabel}</div>
+            <div className={styles.kpiValue}>{currentVersionLabel}</div>
             <div className={styles.kpiHint}>
-              {sinceDateHint !== '—' ? `desde ${sinceDateHint}` : '—'}
+              {currentVersionHint !== '—' ? `desde ${currentVersionHint}` : '—'}
             </div>
           </div>
           {/* TODO(backlog): wire fanout coverage API */}
@@ -239,9 +514,7 @@ export function DocumentPublishedPage() {
                 <Avatar name={createdBy} size="sm" />
                 <div className={styles.ownerInfo}>
                   <div className={styles.ownerName}>{createdBy}</div>
-                  <div className={styles.ownerMeta}>
-                    {publishedAt ? `publicou em ${publishedAt}` : 'publicado'}
-                  </div>
+                  <div className={styles.ownerMeta}>{statusPresentation.ownerMeta}</div>
                 </div>
               </div>
               <div className={styles.factsGrid}>
@@ -327,16 +600,26 @@ export function DocumentPublishedPage() {
           )}
         </section>
 
-        {/* Section: Histórico de versões — TODO(backlog): wire GET /api/v1/documents/:id/revisions */}
+        {/* Section: Histórico de versões */}
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <div>
               <div className={styles.sectionKicker}>03 · Linhagem</div>
               <h2 className={styles.sectionTitle}>Histórico de versões</h2>
             </div>
-            <span className={styles.sectionAside}>passe o mouse para detalhar</span>
+            {revisionTimeline.length > 0 ? (
+              <span className={styles.sectionAside}>passe o mouse para detalhar</span>
+            ) : null}
           </div>
-          <DocumentVersionTimeline versions={PLACEHOLDER_VERSIONS} />
+          {revisionHistoryQuery.isLoading ? (
+            <div className={styles.signoffLoading} role="status" aria-live="polite">
+              Carregando linhagem governada…
+            </div>
+          ) : revisionTimeline.length > 0 ? (
+            <DocumentVersionTimeline versions={revisionTimeline} />
+          ) : (
+            <div className={styles.signoffEmpty}>Nenhuma revisão governada encontrada.</div>
+          )}
         </section>
 
         {/* Section: Documentos relacionados — TODO(backlog): wire relationship model */}
@@ -408,3 +691,4 @@ export function DocumentPublishedPage() {
     </div>
   );
 }
+

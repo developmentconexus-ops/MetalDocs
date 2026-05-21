@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
-	registrydomain "metaldocs/internal/modules/registry/domain"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -32,12 +32,12 @@ func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 	innerRepo := &fakeRepo{createDocIDs: [3]string{"doc-snap-1", "rev-snap-1", "sess-snap-1"}}
 	repo := &captureRepo{fakeRepo: innerRepo}
 
-	cd := &registrydomain.ControlledDocument{
+	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              "cd-snap-1",
 		TenantID:        tenantID,
 		ProfileCode:     "PROC",
 		ProcessAreaCode: "AREA-01",
-		Status:          registrydomain.CDStatusActive,
+		Status:          controlleddocumentsdomain.CDStatusActive,
 	}
 
 	reader := &trackingSnapshotReader{

@@ -43,6 +43,7 @@ export const QK = {
     list: (filter: ControlledDocFilter = {}) =>
       ['controlled-documents', 'list', filter] as const,
     detail: (id: string) => ['controlled-documents', 'detail', id] as const,
+    activeDocument: (id: string) => ['controlled-documents', 'active-document', id] as const,
     preview: (profileCode: string, areaCode: string) =>
       ['controlled-documents', 'preview', profileCode, areaCode] as const,
   },
