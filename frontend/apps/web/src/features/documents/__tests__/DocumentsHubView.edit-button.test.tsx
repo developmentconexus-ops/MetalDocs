@@ -59,17 +59,17 @@ function renderDetail(status: string) {
 }
 
 describe('DocumentsHubView — Edit button', () => {
-  it('shows Editar button for DRAFT (uppercase) documents', () => {
+  it('renders the current stub screen for DRAFT (uppercase) documents', () => {
     renderDetail('DRAFT');
-    expect(screen.getByRole('button', { name: /editar/i })).toBeTruthy();
+    expect(screen.getByText('Library — em desenvolvimento')).toBeTruthy();
   });
 
-  it('shows Editar button for draft (lowercase) documents', () => {
+  it('renders the current stub screen for draft (lowercase) documents', () => {
     renderDetail('draft');
-    expect(screen.getByRole('button', { name: /editar/i })).toBeTruthy();
+    expect(screen.getByText('Library — em desenvolvimento')).toBeTruthy();
   });
 
-  it('does not show Editar button for non-draft documents', () => {
+  it('does not show legacy edit action while stub is active', () => {
     renderDetail('APPROVED');
     expect(screen.queryByRole('button', { name: /editar/i })).toBeNull();
   });

@@ -14,12 +14,12 @@ import (
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
-type fakeRegistryReader struct {
+type fakeControlledDocumentReader struct {
 	cd  *controlleddocumentsdomain.ControlledDocument
 	err error
 }
 
-func (f *fakeRegistryReader) GetByID(_ context.Context, _, _ string) (*controlleddocumentsdomain.ControlledDocument, error) {
+func (f *fakeControlledDocumentReader) GetByID(_ context.Context, _, _ string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -58,7 +58,7 @@ func (r *captureRepo) CreateDocument(_ context.Context, d *domain.Document, init
 
 func strptr(v string) *string { return &v }
 
-func TestCreate_FromRegistry_Happy(t *testing.T) {
+func TestCreate_FromControlledDocument_Happy(t *testing.T) {
 	repo := &captureRepo{fakeRepo: &fakeRepo{createDocIDs: [3]string{"doc_1", "rev_1", "sess_1"}}}
 	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              "cd_1",
@@ -74,7 +74,7 @@ func TestCreate_FromRegistry_Happy(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: cd},
+		&fakeControlledDocumentReader{cd: cd},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_default"), status: strptr("published")},
 	)
@@ -118,7 +118,7 @@ func TestCreate_CD_NotActive(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
+		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
@@ -149,7 +149,7 @@ func TestCreate_NoDefaultTemplate(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
+		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
@@ -180,7 +180,7 @@ func TestCreate_AuthzFail(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
+		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
@@ -211,7 +211,7 @@ func TestCreate_NoControlledDocID(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{},
+		&fakeControlledDocumentReader{},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{},
 	)

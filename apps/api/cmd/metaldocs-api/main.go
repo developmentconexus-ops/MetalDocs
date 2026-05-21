@@ -221,7 +221,7 @@ func main() {
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
-	cdRepo := controlleddocumentsinfra.NewPostgresControlledDocumentRepository(deps.SQLDB)
+	controlledDocumentsRepo := controlleddocumentsinfra.NewPostgresControlledDocumentRepository(deps.SQLDB)
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
@@ -247,7 +247,7 @@ func main() {
 		revReader := docrepo.NewRevisionReader(deps.SQLDB)
 		wfReader := docrepo.NewWorkflowReader(deps.SQLDB)
 		ctxBuilder := docapp.NewDocumentContextBuilder(deps.SQLDB, revReader, wfReader,
-			controlledDocumentsReaderAdapter{cdRepo}, revReader)
+			controlledDocumentsReaderAdapter{controlledDocumentsRepo}, revReader)
 		resolverReg := resolvers.NewRegistry()
 		resolvers.RegisterBuiltins(resolverReg)
 		freezeSvc = docapp.NewFreezeService(
@@ -271,15 +271,15 @@ func main() {
 			docgenv2.NewTemplateReader(deps.SQLDB, deps.MinioClient, deps.MinioBucket),
 			docgenv2.NewTemplatesTemplateReader(deps.SQLDB),
 		),
-		FormVal:            formval.NewGojsonschema(),
-		Audit:              newDocumentsAuditAdapter(deps.AuditWriter),
-		ExportPresign:      docPresigner,
-		RegistryReader:     cdRepo,
-		RegistryDuplicator: controlledDocumentDuplicator,
-		Caps:               wiring.NewCapabilityChecker(capabilityService),
-		ProfileDefaults:    &profileDefaultsAdapter{profileRepo: profileRepo},
-		SnapshotReader:     docSnapshotReader,
-		SnapshotWriter:     docSnapshotWriter,
+		FormVal:                      formval.NewGojsonschema(),
+		Audit:                        newDocumentsAuditAdapter(deps.AuditWriter),
+		ExportPresign:                docPresigner,
+		ControlledDocumentReader:     controlledDocumentsRepo,
+		ControlledDocumentDuplicator: controlledDocumentDuplicator,
+		Caps:                         wiring.NewCapabilityChecker(capabilityService),
+		ProfileDefaults:              &profileDefaultsAdapter{profileRepo: profileRepo},
+		SnapshotReader:               docSnapshotReader,
+		SnapshotWriter:               docSnapshotWriter,
 	}
 	if deps.DocgenV2Client != nil {
 		docDeps.ExportDocgen = deps.DocgenV2Client
@@ -339,7 +339,7 @@ func main() {
 	// Wire the documents-side adapter back into the controlled-documents service so atomic
 	// CD-create can clone the initial document inside the same tx as the CD
 	// insert. controlledDocumentsModule was constructed before docMod (because docMod
-	// needs RegistryDuplicator), hence the post-construction setter.
+	// needs ControlledDocumentDuplicator), hence the post-construction setter.
 	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
 	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)

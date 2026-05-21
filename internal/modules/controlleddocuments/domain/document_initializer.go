@@ -22,7 +22,7 @@ type DocumentRef struct {
 	ContentHash string `json:"contentHash"`
 }
 
-// DocumentInitializer is the registry-owned port that the documents module
+// DocumentInitializer is the controlled-documents-owned port that the documents module
 // implements. It MUST run inside the caller-owned tx so the CD row and its
 // initial document rows commit atomically. S3 rendering is intentionally NOT
 // part of this contract: storage_key starts empty and the editor renders on

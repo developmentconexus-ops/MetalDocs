@@ -114,7 +114,6 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/presign", h.presignAutosave)
 	mux.HandleFunc("POST /api/v1/documents/{id}/autosave/commit", h.commitAutosave)
-	mux.HandleFunc("POST /api/v1/documents/{id}/artifact-metadata", h.syncArtifactMetadata)
 
 	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)
@@ -151,7 +150,6 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 		"POST /api/v1/documents/{id}/autosave/commit",
 		rl.Limit(ratelimit.RouteAutosaveCommit, userFn, http.HandlerFunc(h.commitAutosave)),
 	)
-	mux.HandleFunc("POST /api/v1/documents/{id}/artifact-metadata", h.syncArtifactMetadata)
 
 	mux.HandleFunc("GET /api/v1/documents/{id}/checkpoints", h.listCheckpoints)
 	mux.HandleFunc("POST /api/v1/documents/{id}/checkpoints", h.createCheckpoint)

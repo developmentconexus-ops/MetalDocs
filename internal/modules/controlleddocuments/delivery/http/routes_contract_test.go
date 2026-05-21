@@ -974,12 +974,12 @@ func TestPostControlledDocuments_MissingIdempotencyKey_400(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
-	var body map[string]string
+	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
 	if body["code"] != "IDEMPOTENCY_KEY_REQUIRED" {
-		t.Fatalf("code = %q, want IDEMPOTENCY_KEY_REQUIRED", body["code"])
+		t.Fatalf("code = %v, want IDEMPOTENCY_KEY_REQUIRED", body["code"])
 	}
 }
 

@@ -107,9 +107,9 @@ func NewControlledDocumentService(
 }
 
 // WithDocumentInitializer wires the DocumentInitializer adapter post-construction.
-// Used by the wiring layer to break the registry<->documents module cycle: the
-// registry module is constructed first (because documents needs a
-// RegistryDuplicator), then the documents module is built, then the
+// Used by the wiring layer to break the controlled-documents<->documents module cycle: the
+// controlled-documents module is constructed first (because documents needs a
+// ControlledDocumentDuplicator), then the documents module is built, then the
 // initializer adapter is injected back here.
 func (s *ControlledDocumentService) WithDocumentInitializer(d controlleddocumentsdomain.DocumentInitializer) *ControlledDocumentService {
 	if d == nil {

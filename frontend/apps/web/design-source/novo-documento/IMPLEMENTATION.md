@@ -404,7 +404,7 @@ Smoke steps:
 ## Phase 5 — Document (advisory)
 
 - [ ] `wiki/modules/documents.md` — bump `Last verified`, add wizard route + components
-- [ ] `wiki/modules/registry.md` — add wizard as new caller of `createControlledDocument`
+- [ ] `wiki/modules/controlled-documents.md` — add wizard as new caller of `createControlledDocument`
 - [ ] `wiki/backlog/novo-documento.md` — created with all deferred items from §1.6
 - [ ] `wiki/modules/iam-rbac.md:89` — fix stale visibility migration claim
 - [ ] `wiki/implementation/screen-redesign-tracker.md` — bump Wizard status to "Done (UI)"

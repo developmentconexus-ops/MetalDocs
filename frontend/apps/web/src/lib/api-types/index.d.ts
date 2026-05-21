@@ -3897,6 +3897,51 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        DocumentCreateResult: {
+            /** Format: uuid */
+            document_id: string;
+            /** Format: uuid */
+            initial_revision_id: string;
+            /** Format: uuid */
+            session_id: string;
+        };
+        DocumentSessionWriterResponse: {
+            /** @enum {string} */
+            mode: "writer";
+            /** Format: uuid */
+            session_id: string;
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: uuid */
+            last_ack_revision_id: string;
+        };
+        DocumentSessionReadonlyResponse: {
+            /** @enum {string} */
+            mode: "readonly";
+            held_by: string;
+            /** Format: date-time */
+            held_until: string;
+        };
+        DocumentAutosavePresignResponse: {
+            upload_url: string;
+            /** Format: uuid */
+            pending_upload_id: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        DocumentCheckpoint: {
+            /** Format: uuid */
+            ID: string;
+            /** Format: uuid */
+            DocumentID: string;
+            /** Format: uuid */
+            RevisionID: string;
+            VersionNum: number;
+            Label: string;
+            /** Format: date-time */
+            CreatedAt: string;
+            CreatedBy: string;
+        };
         DocumentSummary: {
             ID: string;
             TenantID: string;
@@ -6967,7 +7012,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentCreateResult"];
+                };
             };
         };
     };
@@ -7038,14 +7085,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentSessionReadonlyResponse"];
+                };
             };
             /** @description writer acquired */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentSessionWriterResponse"];
+                };
             };
         };
     };
@@ -7149,7 +7200,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentAutosavePresignResponse"];
+                };
             };
             /** @description session_inactive | session_not_holder | stale_base */
             409: {
@@ -7256,7 +7309,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentCheckpoint"][];
+                };
             };
         };
     };
@@ -7282,7 +7337,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["DocumentCheckpoint"];
+                };
             };
         };
     };

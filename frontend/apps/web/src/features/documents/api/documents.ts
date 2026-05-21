@@ -3,30 +3,18 @@
 // the client.
 
 import { apiFetch } from '../../../lib/api';
-import type { components, operations } from '../../../lib/api-types';
+import type { components, paths } from '../../../lib/api-types';
 
-export type DocumentRow = {
-  id: string;
-  name: string;
-  status: 'draft' | 'finalized' | 'archived';
-  template_version_id: string;
-  updated_at: string;
-  current_revision_id?: string;
-};
-
-export type CreateDocumentResult = { document_id: string; initial_revision_id: string; session_id: string };
-export type AcquireWriter = { mode: 'writer'; session_id: string; expires_at: string; last_ack_revision_id: string };
-export type AcquireReadonly = { mode: 'readonly'; held_by: string; held_until: string };
-export type AcquireResult = AcquireWriter | AcquireReadonly;
-export type PresignResult = { upload_url: string; pending_upload_id: string; expires_at: string };
-type CommitDocumentAutosaveOperation = operations['commitDocumentAutosave'];
-export type CommitAutosaveRequest = CommitDocumentAutosaveOperation['requestBody']['content']['application/json'];
-export type CommitResult = CommitDocumentAutosaveOperation['responses'][200]['content']['application/json'];
-type SyncDocumentArtifactMetadataOperation = operations['syncDocumentArtifactMetadata'];
-export type SyncArtifactMetadataRequest = SyncDocumentArtifactMetadataOperation['requestBody']['content']['application/json'];
-export type SyncArtifactMetadataResult = SyncDocumentArtifactMetadataOperation['responses'][200]['content']['application/json'];
-export type Checkpoint = { ID: string; DocumentID: string; RevisionID: string; VersionNum: number; Label: string; CreatedAt: string; CreatedBy: string };
-export type FinalizeDocumentResult = { instanceId: string };
+export type DocumentRow = components['schemas']['DocumentSummary'];
+export type DocumentListResponse = components['schemas']['DocumentListResponse'];
+export type AcquireWriter = components['schemas']['DocumentSessionWriterResponse'];
+export type AcquireReadonly = components['schemas']['DocumentSessionReadonlyResponse'];
+export type AcquireResult = paths['/api/v1/documents/{id}/session/acquire']['post']['responses'][200]['content']['application/json'] | paths['/api/v1/documents/{id}/session/acquire']['post']['responses'][201]['content']['application/json'];
+export type PresignResult = components['schemas']['DocumentAutosavePresignResponse'];
+export type CommitAutosaveRequest = paths['/api/v1/documents/{id}/autosave/commit']['post']['requestBody']['content']['application/json'];
+export type CommitResult = paths['/api/v1/documents/{id}/autosave/commit']['post']['responses'][200]['content']['application/json'];
+export type Checkpoint = components['schemas']['DocumentCheckpoint'];
+export type FinalizeDocumentResult = paths['/api/v1/documents/{id}/finalize']['post']['responses'][201]['content']['application/json'];
 export type FinalizeDocumentRequest = components['schemas']['FinalizeDocumentRequest'];
 export type DocumentDetail = components['schemas']['DocumentDetailResponse'];
 export type DocumentRevisionHistoryResponse = components['schemas']['DocumentRevisionHistoryResponse'];
@@ -36,7 +24,8 @@ export type DocumentCommentUpdateRequest = components['schemas']['DocumentCommen
 export type ApprovalInstanceResponse = components['schemas']['ApprovalInstanceByDocumentResponse'];
 
 export async function listDocuments(): Promise<DocumentRow[]> {
-  return apiFetch('/api/v1/documents');
+  const response = await apiFetch<DocumentListResponse>('/api/v1/documents');
+  return response.items;
 }
 export async function getDocument(id: string): Promise<DocumentDetail> {
   return apiFetch<DocumentDetail>(`/api/v1/documents/${id}`);
@@ -100,13 +89,6 @@ export async function commitAutosave(id: string, req: CommitAutosaveRequest): Pr
   });
 }
 
-export async function syncArtifactMetadata(id: string, req: SyncArtifactMetadataRequest): Promise<SyncArtifactMetadataResult> {
-  return apiFetch(`/api/v1/documents/${id}/artifact-metadata`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(req),
-  });
-}
-
 export async function listCheckpoints(id: string): Promise<Checkpoint[]> {
   return apiFetch(`/api/v1/documents/${id}/checkpoints`);
 }
@@ -117,12 +99,7 @@ export async function createCheckpoint(id: string, label: string): Promise<Check
   });
 }
 
-export type RestoreCheckpointResult = {
-  new_revision_id: string;
-  new_revision_num: number;
-  source_checkpoint_version_num: number;
-  idempotent: boolean;
-};
+export type RestoreCheckpointResult = paths['/api/v1/documents/{id}/checkpoints/{version}/restore']['post']['responses'][200]['content']['application/json'];
 export async function restoreCheckpoint(id: string, versionNum: number): Promise<RestoreCheckpointResult> {
   return apiFetch(`/api/v1/documents/${id}/checkpoints/${versionNum}/restore`, { method: 'POST' });
 }

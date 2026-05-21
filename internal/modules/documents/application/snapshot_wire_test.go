@@ -57,7 +57,7 @@ func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: cd},
+		&fakeControlledDocumentReader{cd: cd},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{id: strptr("tv-snap-1"), status: strptr("published")},
 		snapSvc,

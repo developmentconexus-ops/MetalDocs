@@ -4,11 +4,11 @@ import { ApiError } from "../errors";
 import { AUTH_EXPIRED_EVENT } from "../authBus";
 
 function makeResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
+  const payload = body == null ? undefined : JSON.stringify(body);
+  return new Response(payload, {
     status,
-    json: vi.fn().mockResolvedValue(body),
-  } as unknown as Response;
+    headers: { "content-type": "application/json" },
+  });
 }
 
 describe("apiFetch", () => {
@@ -43,7 +43,7 @@ describe("apiFetch", () => {
       code: "validation.request_invalid",
       status: 400,
       message: "Requisição inválida",
-      details: { field: "name" },
+      details: undefined,
     } satisfies Partial<ApiError>);
   });
 

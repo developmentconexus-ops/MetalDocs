@@ -8,9 +8,9 @@ import (
 )
 
 // TestCDDocumentInitializer_Interface is a compile-time check that
-// *CDDocumentInitializer satisfies the registry DocumentInitializer port.
+// *CDDocumentInitializer satisfies the controlled-document DocumentInitializer port.
 // Full integration coverage (real DB tx) lives in Phase 6's
-// integration_test.go for the registry atomic-create flow.
+// integration_test.go for the controlled-document atomic-create flow.
 func TestCDDocumentInitializer_Interface(t *testing.T) {
 	var _ controlleddocumentsdomain.DocumentInitializer = (*application.CDDocumentInitializer)(nil)
 }

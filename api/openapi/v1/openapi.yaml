@@ -2543,7 +2543,13 @@ paths:
       tags: [documents]
       operationId: duplicateDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '201': { description: created } }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentCreateResult'
 
   /api/v1/documents/stats:
     get:
@@ -2595,8 +2601,18 @@ paths:
       operationId: acquireDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '201': { description: writer acquired }
-        '200': { description: readonly (another user holds session) }
+        '201':
+          description: writer acquired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSessionWriterResponse'
+        '200':
+          description: readonly (another user holds session)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSessionReadonlyResponse'
   /api/v1/documents/{id}/session/heartbeat:
     post:
       tags: [documents]
@@ -2633,7 +2649,12 @@ paths:
                 base_revision_id: { type: string, format: uuid }
                 content_hash: { type: string, minLength: 64, maxLength: 64 }
       responses:
-        '200': { description: presigned url }
+        '200':
+          description: presigned url
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentAutosavePresignResponse'
         '409': { description: session_inactive | session_not_holder | stale_base }
   /api/v1/documents/{id}/autosave/commit:
     post:
@@ -2686,7 +2707,15 @@ paths:
       tags: [documents]
       operationId: listDocumentCheckpoints
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DocumentCheckpoint'
     post:
       tags: [documents]
       operationId: createDocumentCheckpoint
@@ -2695,7 +2724,13 @@ paths:
         content:
           application/json:
             schema: { type: object, properties: { label: { type: string } } }
-      responses: { '201': { description: created } }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentCheckpoint'
 
   /api/v1/documents/{id}/checkpoints/{version}/restore:
     post:
@@ -3444,6 +3479,82 @@ components:
         total:
           type: integer
           format: int64
+    DocumentCreateResult:
+      type: object
+      required: [document_id, initial_revision_id, session_id]
+      properties:
+        document_id:
+          type: string
+          format: uuid
+        initial_revision_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+    DocumentSessionWriterResponse:
+      type: object
+      required: [mode, session_id, expires_at, last_ack_revision_id]
+      properties:
+        mode:
+          type: string
+          enum: [writer]
+        session_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+        last_ack_revision_id:
+          type: string
+          format: uuid
+    DocumentSessionReadonlyResponse:
+      type: object
+      required: [mode, held_by, held_until]
+      properties:
+        mode:
+          type: string
+          enum: [readonly]
+        held_by:
+          type: string
+        held_until:
+          type: string
+          format: date-time
+    DocumentAutosavePresignResponse:
+      type: object
+      required: [upload_url, pending_upload_id, expires_at]
+      properties:
+        upload_url:
+          type: string
+        pending_upload_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+    DocumentCheckpoint:
+      type: object
+      required: [ID, DocumentID, RevisionID, VersionNum, Label, CreatedAt, CreatedBy]
+      properties:
+        ID:
+          type: string
+          format: uuid
+        DocumentID:
+          type: string
+          format: uuid
+        RevisionID:
+          type: string
+          format: uuid
+        VersionNum:
+          type: integer
+          minimum: 1
+        Label:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        CreatedBy:
+          type: string
     DocumentSummary:
       type: object
       required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, Code]

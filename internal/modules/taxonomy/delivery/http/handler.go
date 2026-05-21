@@ -49,26 +49,10 @@ func NewHandler(profiles *application.ProfileService, areas *application.AreaSer
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	generated := taxonomyapi.ServerInterfaceWrapper{
-		Handler: h,
+	taxonomyapi.HandlerWithOptions(h, taxonomyapi.StdHTTPServerOptions{
+		BaseRouter: mux,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		},
-	}
-	mux.HandleFunc("GET /api/v1/taxonomy/profiles", generated.ListTaxonomyProfiles)
-	mux.HandleFunc("POST /api/v1/taxonomy/profiles", generated.CreateTaxonomyProfile)
-	mux.HandleFunc("GET /api/v1/taxonomy/profiles/{code}", generated.GetTaxonomyProfile)
-	mux.HandleFunc("PATCH /api/v1/taxonomy/profiles/{code}", generated.UpdateTaxonomyProfile)
-	mux.HandleFunc("DELETE /api/v1/taxonomy/profiles/{code}", generated.ArchiveTaxonomyProfile)
-	mux.HandleFunc("PUT /api/v1/taxonomy/profiles/{code}/default-template", generated.SetTaxonomyProfileDefaultTemplate)
-	mux.HandleFunc("GET /api/v1/taxonomy/areas", generated.ListTaxonomyAreas)
-	mux.HandleFunc("POST /api/v1/taxonomy/areas", generated.CreateTaxonomyArea)
-	mux.HandleFunc("GET /api/v1/taxonomy/areas/{code}", generated.GetTaxonomyArea)
-	mux.HandleFunc("PUT /api/v1/taxonomy/areas/{code}", generated.UpdateTaxonomyArea)
-	mux.HandleFunc("DELETE /api/v1/taxonomy/areas/{code}", generated.ArchiveTaxonomyArea)
-	mux.HandleFunc("GET /api/v1/taxonomy/families", generated.ListTaxonomyFamilies)
-	mux.HandleFunc("POST /api/v1/taxonomy/families", generated.CreateTaxonomyFamily)
-	mux.HandleFunc("GET /api/v1/taxonomy/families/{code}", generated.GetTaxonomyFamily)
-	mux.HandleFunc("PATCH /api/v1/taxonomy/families/{code}", generated.UpdateTaxonomyFamily)
-	mux.HandleFunc("DELETE /api/v1/taxonomy/families/{code}", generated.DeactivateTaxonomyFamily)
+	})
 }

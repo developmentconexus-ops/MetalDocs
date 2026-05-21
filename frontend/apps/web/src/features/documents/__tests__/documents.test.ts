@@ -17,13 +17,34 @@ describe('documents with apiFetch', () => {
   it('listDocuments returns array on 200', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValue(
       new Response(
-        JSON.stringify([{ id: '1', name: 'Doc', status: 'draft', template_version_id: 'tv1', updated_at: '2026-01-01' }]),
+        JSON.stringify({
+          items: [
+            {
+              ID: '1',
+              TenantID: 'tenant-1',
+              TemplateVersionID: 'tv1',
+              Name: 'Doc',
+              Status: 'draft',
+              FormDataJSON: {},
+              CurrentRevisionID: 'rev-1',
+              RevisionVersion: 1,
+              ActiveSessionID: '',
+              CreatedAt: '2026-01-01T00:00:00Z',
+              UpdatedAt: '2026-01-01T00:00:00Z',
+              CreatedBy: 'user-1',
+              Code: 'DOC-1',
+            },
+          ],
+          page: 1,
+          pageSize: 20,
+          total: 1,
+        }),
         { status: 200 },
       ),
     );
     const docs = await listDocuments();
     expect(docs).toHaveLength(1);
-    expect(docs[0].id).toBe('1');
+    expect(docs[0].ID).toBe('1');
   });
 
   it('finalizeDocument throws ApiError on 404 with parsed code', async () => {

@@ -5,10 +5,13 @@ import * as approvalApi from '../api/approvalApi';
 import { RouteAdminPage } from './RouteAdminPage';
 
 vi.mock('../api/approvalApi');
+vi.mock('../../taxonomy/api/taxonomy', () => ({
+  fetchAreas: vi.fn().mockResolvedValue([{ code: 'AREA-01', name: 'Área 01' }]),
+}));
 
 describe('RouteAdminPage', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
   it('list render - shows route name and stage count', async () => {
@@ -124,7 +127,7 @@ describe('RouteAdminPage', () => {
     expect(screen.getByRole('dialog', { name: 'Confirmar desativação' })).toBeTruthy();
   });
 
-  it('m_of_n validation - m greater than members count shows error', async () => {
+  it('m_of_n validation - invalid M shows error', async () => {
     vi.mocked(approvalApi.listRoutes).mockResolvedValue({ total: 0, routes: [] });
     vi.mocked(approvalApi.createRoute).mockResolvedValue({ route_id: 'route-new' });
 
@@ -135,19 +138,18 @@ describe('RouteAdminPage', () => {
     fireEvent.change(screen.getByLabelText('Nome da rota'), { target: { value: 'Nova rota' } });
     fireEvent.change(screen.getByLabelText('Código do perfil'), { target: { value: 'JUR' } });
     fireEvent.change(screen.getByLabelText('Nome da etapa 1'), { target: { value: 'Jurídico' } });
-    fireEvent.change(screen.getByLabelText('Membros da etapa 1'), { target: { value: 'ana,beto' } });
+    fireEvent.change(screen.getByLabelText('Role requerida da etapa 1'), { target: { value: 'approver' } });
+    await screen.findByRole('option', { name: 'Área 01 (AREA-01)' });
+    fireEvent.change(screen.getByLabelText('Área da etapa 1'), { target: { value: 'AREA-01' } });
     fireEvent.change(screen.getByLabelText('Quórum da etapa 1'), { target: { value: 'm_of_n' } });
-    fireEvent.change(screen.getByLabelText('M da etapa 1'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('M da etapa 1'), { target: { value: '0' } });
 
     const saveButton = screen.getByRole('button', { name: 'Salvar rota' });
     fireEvent.submit(saveButton.closest('form')!);
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Na etapa "Jurídico", M não pode ser maior que o número de membros.'),
-      ).toBeTruthy();
+      expect(screen.getByText('Na etapa "Jurídico", informe um valor de M válido.')).toBeTruthy();
     });
     expect(vi.mocked(approvalApi.createRoute)).not.toHaveBeenCalled();
   });
 });
-

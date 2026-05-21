@@ -87,7 +87,9 @@ func RegisterE2EHandlers(mux *http.ServeMux, db *sql.DB, runSchedulerTick func(c
 	mux.HandleFunc("POST /internal/test/reset", h.reset)
 	mux.HandleFunc("GET /internal/test/governance-events", h.governanceEvents)
 	mux.HandleFunc("POST /internal/test/advance-clock", h.advanceClock)
-	mux.HandleFunc("POST /internal/test/trigger-scheduler-tick", h.triggerSchedulerTick)
+	if runSchedulerTick != nil {
+		mux.HandleFunc("POST /internal/test/trigger-scheduler-tick", h.triggerSchedulerTick)
+	}
 }
 
 func (h *seedHandler) seed(w http.ResponseWriter, r *http.Request) {
