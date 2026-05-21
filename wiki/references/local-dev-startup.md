@@ -176,6 +176,19 @@ Required for scheduled publish execution after the River cutover. The API now ow
 
 ---
 
+## Deep QA companion
+
+For deep QA on the modern `documents + approval` flow, use:
+
+- `wiki/references/documents-approval-deep-qa/README.md`
+- `wiki/references/documents-approval-deep-qa/runbook.md`
+- `wiki/references/documents-approval-deep-qa/fixtures.md`
+- `wiki/references/documents-approval-deep-qa/matrix.md`
+
+This startup guide remains the startup truth. The deep QA runbook owns the session workflow, evidence recipes, and fixture guidance.
+
+---
+
 ## Common mistakes
 
 | Mistake | Symptom | Fix |

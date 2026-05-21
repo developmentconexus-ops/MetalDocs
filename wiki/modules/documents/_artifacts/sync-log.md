@@ -1,3 +1,19 @@
+## 2026-05-20 - deep QA wiki relocation sync
+
+- **Context:** relocate the new documents+approval deep-QA companion artifacts from `docs/superpowers/` into a stable wiki reference folder with cleaner names.
+- **Mode:** lite patch
+- **Anchors moved:** deep-QA reference paths now point to `wiki/references/documents-approval-deep-qa/`
+- **Public surface:** none
+- **Routes/API:** none
+- **Runtime flows:** none
+- **Persistence:** none
+- **Dependencies:** documents module wiki now points to the wiki-owned deep-QA reference set (`runbook.md`, `fixtures.md`, `matrix.md`)
+- **T-NNN touched:** none
+- **R-NNN touched:** none
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8
+- **Tally gate:** pending
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`; `wiki/references/local-dev-startup.md`; `wiki/references/README.md`; `wiki/references/documents-approval-deep-qa/*`
+
 ## 2026-05-20 - scheduled publish River cutover sync
 
 - **Context:** current uncommitted scheduled publish River migration and dedicated `metaldocs-jobs` runtime cutover.

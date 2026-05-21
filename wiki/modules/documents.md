@@ -525,6 +525,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-20 - Deep QA execution sync: canonical `/documents/:id` runtime validation now points to the dedicated wiki reference set under `wiki/references/documents-approval-deep-qa/` (`runbook.md`, `fixtures.md`, `matrix.md`) so future sessions can reuse current startup truth, evidence standards, and fixture-state guidance instead of rediscovering them manually.
 - 2026-05-20 - Scheduled publish River cutover sync: scheduling a publish now increments `documents.schedule_generation`, enqueues exactly one River temporal job in the same transaction, and leaves future execution to the dedicated `metaldocs-jobs` runtime instead of the API host.
 - 2026-05-20 - Scheduled supersede lineage sync: a scheduled replacement now persists the previously published lineage head on `documents.superseded_document_id`; after cutover, the new revision becomes `published` and the recorded head is transitioned to `superseded` in the same lineage.
 - 2026-05-20 - Revision-title lifecycle sync: modern revision creation from `/documents/:id` now treats the composer field as the draft working document name only; the governed `documents.revision_title` remains born at finalize / submit-for-review, preserving a single source of truth on the governed lineage row instead of duplicating title capture during draft creation.
