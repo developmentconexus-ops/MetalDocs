@@ -5,11 +5,11 @@
 > **Out of scope:** IAM admin flows (B1/A8), route-stage editing (A7/E8), multi-tenant isolation (B5/B6), Playwright e2e automation (see `references/how-to-run-tests.md`).
 > **Audience:** QA engineers, release approvers, on-call engineers validating a hot-fix deploy.
 > **Key files:**
-> - `frontend/apps/web/src/features/approval/components/RegistryDetailPanel.tsx:314` — "Submeter para revisão" button label
+> - `frontend/apps/web/src/features/approval/components/ControlledDocumentDetailPanel.tsx:315` — "Submeter para revisão" button label
 > - `frontend/apps/web/src/features/documents/hooks/v2/useDocumentPdfStatus.ts:12-13` — POLL_INTERVAL_MS=3000, TIMEOUT_MS=60000 (E11)
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx:181` — isEditable gate: `session.state.phase === 'writer' && docStatus === 'draft'` (E1)
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:154` — auth gate: early return with "Aguardando autenticação" when `currentUser?.userId` is falsy (E12; `RegistryCreateDialog` deleted)
-> - `frontend/apps/web/src/features/registry/RegistryDetailPage.tsx:170` — "Nova Revisão" button (E10)
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:197` — auth gate: early return with "Aguardando autenticação" when `currentUser?.userId` is falsy (E12; old create dialog deleted)
+> - `frontend/apps/web/src/features/controlled-documents/ControlledDocumentDetailPage.tsx:170` — "Nova Revisão" button (E10)
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx:98` — area filter first option "Todas as áreas", options from taxonomy (E7)
 > - `internal/modules/documents/repository/repository.go:206,233,892-910` — `archived_at IS NULL` filter (C1)
 
@@ -163,7 +163,7 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 - [ ] Profile: `DC`. Area: `RH`. Title: `Descrição de Cargo — Analista Fiscal`.
 - [ ] Confirm.
 - [ ] **Expected:** new CD with code `DC-RH-001` (or next in sequence).
-- [ ] **E12 regression:** navigate to `/documents/new` immediately after page load (before auth fully resolves) → proceed to Step 4 and click "Criar documento" before `currentUser` resolves → toast should fire with **"Aguardando autenticação. Tente novamente em alguns segundos."** and no POST fired. (`NewDocumentWizardPage.tsx:154`; `RegistryCreateDialog` was deleted by feat/cd-atomic-create)
+- [ ] **E12 regression:** navigate to `/documents/new` immediately after page load (before auth fully resolves) → proceed to Step 4 and click "Criar documento" before `currentUser` resolves → toast should fire with **"Aguardando autenticação. Tente novamente em alguns segundos."** and no POST fired. (`NewDocumentWizardPage.tsx:197`; `old create dialog` was deleted by feat/cd-atomic-create)
 
 ### C2. Generate working version
 
@@ -278,7 +278,7 @@ See `wiki/workflows/user-onboarding.md:229-253` for the canonical SQL and pitfal
 > Smoke the revision flow. Reuse the CD from Routine C.
 
 - [ ] On CD `DC-RH-001` (already approved) → **Nova Revisão**.
-- [ ] **E10 regression:** "Nova Revisão" button must appear even when a published version exists and no active draft is in progress. (`RegistryDetailPage.tsx:174`)
+- [ ] **E10 regression:** "Nova Revisão" button must appear even when a published version exists and no active draft is in progress. (`ControlledDocumentDetailPage.tsx:170`)
 - [ ] **Expected:** new version `v2 draft` cloned from v1.
 - [ ] Edit a difference (1 paragraph).
 - [ ] Submit → Approve → Freeze → Fanout (Routines D + E).

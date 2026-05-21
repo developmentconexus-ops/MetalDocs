@@ -33,6 +33,7 @@ Choose the simplest pattern that matches the data:
 | State transition mutation | `useMutation`; prefer server response + invalidation over optimistic cache mutation |
 | High-frequency editor/autosave | dedicated hook; avoid broad invalidation loops |
 | Near-real-time inbox/activity | short `staleTime` or explicit `refetchInterval`, documented in the hook |
+| Governed transitional detail | detail/history/context queries with query-layer polling only while the governed state is transient (`under_review`, `scheduled`, etc.); stop polling when the state stabilizes |
 
 Do not put server-derived data in Zustand or component `useEffect` fetches.
 
@@ -100,6 +101,7 @@ Guidelines:
 - feature flags/permissions that only change on login: `staleTime: Infinity`, not `"static"`, so manual invalidation still works
 - never set `staleTime: "static"` unless manual invalidation must be ignored
 - add `refetchInterval` only for true live-ish surfaces and document why
+- if a governed document or approval state can flip on the server without user interaction, keep that synchronization in the query hook via `refetchInterval` or equivalent query options, not in page-level `useEffect` timers
 
 ### 6. Mutations: update exact cache, invalidate dependents
 

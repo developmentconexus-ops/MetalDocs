@@ -127,6 +127,7 @@ Current curated-baseline table owned by `documents`. See the owning module wiki 
 | `pdf_generated_at` | `timestamp with time zone` | yes | Baseline column. |
 | `reconstruction_attempts` | `jsonb` | no | Baseline column. |
 | `controlled_document_id` | `uuid` | yes | Baseline column. |
+| `superseded_document_id` | `uuid` | yes | Post-baseline scheduled-supersede pointer: when a future replacement is scheduled, this stores the currently published lineage head that must still be the cutover target at publish time. |
 | `revision_title` | `text` | yes | Post-baseline governed revision label stored on the document lineage row; nullable for legacy rows and drafts not yet finalized. |
 | `profile_code_snapshot` | `text` | yes | Baseline column. |
 | `process_area_code_snapshot` | `text` | yes | Baseline column. |

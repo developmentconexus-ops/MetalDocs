@@ -5,7 +5,7 @@
 
 ## A
 
-**ActiveDocumentResponse** - TypeScript interface returned by `GET /api/v2/controlled-documents/{id}/active-document`. All fields optional; `publishedDocumentId` may be the only populated field when the CD has only a published version (no active draft). Previously typed as `ActiveDocumentInstance` (deprecated alias retained). See `modules/registry.md`.
+**ActiveDocumentResponse** - TypeScript interface returned by `GET /api/v1/controlled-documents/{id}/active-document`. All fields optional; `publishedDocumentId` may be the only populated field when the CD has only a published version (no active draft). See `modules/controlled-documents.md`.
 
 **ADR** - Architecture Decision Record. Short doc capturing a decision + reasoning. Lives in `wiki/decisions/`.
 
@@ -69,7 +69,7 @@
 
 **ProseMirror** - Rich-text editor framework eigenpal is built on. We rarely interact with it directly - eigenpal abstracts it.
 
-**PublishedDownloadCell** - React component (`frontend/apps/web/src/features/registry/PublishedDownloadCell.tsx`) that polls `pdf_status` for a published document and renders `PDFCell`. Shown on the registry detail page when a CD has only a published revision.
+**PublishedDownloadCell** - React component (`frontend/apps/web/src/features/controlled-documents/PublishedDownloadCell.tsx`) that polls `pdf_status` for a published document and renders `PDFCell`. Shown on the controlled-document detail page when a CD has only a published revision.
 
 **Profile / Document Profile** - Type of controlled document (e.g., "Quality Manual", "SOP"). Tenant-scoped. Belongs to a DocumentFamily via `family_code` FK. Binds to a default template version + sequence counter for code generation. Archived via `archived_at` (not `is_active`). See `modules/taxonomy.md`.
 

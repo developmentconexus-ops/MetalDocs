@@ -4,7 +4,7 @@
 
 - Stub: `wiki/modules/taxonomy.md` (Last verified 2026-05-02 — STALE)
 - Sibling shipped Arc42 docs: `iam.md`, `auth.md`, `documents.md`, `templates.md`, `approval.md`, `audit.md`, `registry.md`
-- `wiki/modules/registry.md` cross-refs taxonomy as the source of profiles + areas; CD code derives from `{profile_code}-{area_code}-{seq}`.
+- `wiki/modules/controlled-documents.md` cross-refs taxonomy as the source of profiles + areas; CD code derives from `{profile_code}-{area_code}-{seq}`.
 
 ## Boundary vs registry (confirmed)
 
@@ -59,3 +59,4 @@ None blocking the doc. All concerns above are candidates for `taxonomy-tech-debt
 ## Skip log (gates intentionally bypassed)
 
 None.
+

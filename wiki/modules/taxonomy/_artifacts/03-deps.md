@@ -101,7 +101,7 @@ The two `os.Getenv` calls in `application/immutability_test.go:21,23` (`DATABASE
 ### 6. Cross-module data contracts
 
 #### `document_profiles.code`
-Used as part of the CD code prefix via `registrydomain.AutoCode(profileCode, areaCode, seq)`.
+Used as part of the CD code prefix via `controlleddocumentsdomain.AutoCode(profileCode, areaCode, seq)`.
 
 - `internal/modules/registry/domain/controlled_document.go:48` — `AutoCode` function definition: `fmt.Sprintf("%s-%s-%03d", strings.ToUpper(profileCode), strings.ToUpper(areaCode), seq)`
 - `internal/modules/registry/application/service.go:168,182` — call sites passing `cmd.ProfileCode` into `AutoCode`
@@ -137,3 +137,4 @@ FK to `document_families.code`; surfaced in profile reads.
 ---
 
 **Summary: 3 OUT edges · 10 IN edges · 9 DI touchpoints · 0 config keys**
+

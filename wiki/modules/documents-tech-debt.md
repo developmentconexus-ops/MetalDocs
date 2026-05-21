@@ -102,7 +102,7 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 
 ### T-012 · Editor sidebar depended on mock governed revision / visibility / approver data — CLOSED 2026-05-18
 - **Severity:** major (closed)
-- **Surface (resolved):** `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx`, `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`, `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/features/registry/api/controlledDocuments.ts`
+- **Surface (resolved):** `frontend/apps/web/src/features/documents/components/EditorMetaSidebar.tsx`, `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`, `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/features/controlled-documents/api/controlledDocuments.ts`
 - **Observation (original):** The editor sidebar shipped mock metadata, revision history, and approver rows. That violated runtime truth and blurred the boundary between governed `documents` lineage and technical `document_revisions`.
 - **Evidence:** `GET /api/v1/documents/{id}/revision-history`, `GET /api/v1/documents/{id}/approval-instance`, `GET /api/v1/controlled-documents/{id}`; focused frontend/backend tests added on 2026-05-18. Runtime debug on 2026-05-19 added migration `0205` so persisted `documents.revision_number` is zero-based and matches `REV00`/`REV01` labels directly, fixed approval-instance read transactions, and prevented readonly `under_review` editor loads from acquiring writer sessions.
 - **Linked backlog row:** `wiki/backlog/editor.md`
@@ -117,3 +117,4 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - Cross-deps missing in §5/§8: 0 / 25 (all 14 OUT + 11 IN edges from `_artifacts/03-deps.md` appear in §3.2 or §5).
 - State transitions missing in §6: 0 / 5 (draft → under_review → approved → published → superseded/obsolete + rejected branch all tabled).
 - Decisions without ADR link: 4 / 9 (T-004, T-005, T-007, T-009 flagged missing-ADR; T-008 closed by Plan 4).
+

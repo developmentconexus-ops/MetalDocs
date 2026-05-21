@@ -10,7 +10,7 @@
 > - `frontend/apps/web/src/features/taxonomy/ProfileEditDialog.tsx` — perfil editor + template binding
 > - `frontend/apps/web/src/features/templates/TemplatesListPage.tsx` — Templates list
 > - `frontend/apps/web/src/features/templates/pages/TemplateEditorPage.tsx` — eigenpal author (renamed from `TemplateAuthorPage` 2026-05-10)
-> - `frontend/apps/web/src/features/registry/RegistryListPage.tsx` — Documentos Controlados list
+> - `frontend/apps/web/src/features/controlled-documents/pages/ControlledDocumentsPage.tsx` — Documentos Controlados list
 > - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx` — 4-step novo-documento wizard at `/documents/new` (profile → area/title/visibility → template → confirm + create)
 > - `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx` — eigenpal fill-in editor
 > - `frontend/apps/web/src/features/approval/pages/InboxPage.tsx` — Caixa de Entrada de Aprovação
@@ -118,8 +118,8 @@ The 7 fixed tokens (memorize): `{doc_code}`, `{doc_title}`, `{revision_number}`,
 
 ### Step 5 — User registers a Controlled Document (the catalog slot)
 
-**Who:** Document author (any user with `registry:create` capability for the target area).
-**Where:** Sidebar → **Documentos Controlados** (Registry).
+**Who:** Document author (any user with `controlled_documents.create` capability for the target area).
+**Where:** Sidebar → **Documentos Controlados**.
 **What you do:**
 
 1. Click **Novo Documento Controlado**.

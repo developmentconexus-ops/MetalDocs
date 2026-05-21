@@ -103,7 +103,7 @@ The eigenpal `applyVariables` API (browser-side substitution) is intentionally n
 - [decisions/0008-placeholder-fixed-catalog.md](../decisions/0008-placeholder-fixed-catalog.md) — fixed catalog ADR
 - [decisions/0003-token-syntax-migration.md](../decisions/0003-token-syntax-migration.md) — token syntax migration ADR
 - [modules/templates.md §8.8](../modules/templates.md) — backend enforcement: `ValidatePlaceholders` rejects non-catalog names at schema save; resolver registry wiring gap (T-008)
-- [modules/registry.md](../modules/registry.md) — owns the `controlled_documents` catalog; `{doc_code}` resolver source is the CD's `AutoCode` (`{PROFILE}-{AREA}-{NNN}`)
+- [modules/controlled-documents.md](../modules/controlled-documents.md) — owns the `controlled_documents` catalog; `{doc_code}` resolver source is the controlled document's `AutoCode` (`{PROFILE}-{AREA}-{NNN}`)
 
 ## Composition system (deprecated 2026-04-27)
 

@@ -83,7 +83,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-009 · No OpenAPI spec; raw `http.ServeMux` instead of oapi-codegen
 - **Severity:** major
-- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:51-68` (raw `mux.HandleFunc` for 16 routes); `api/openapi/v1/openapi.yaml` (no `/api/v1/taxonomy/*` paths — verified by grep); contrast `internal/modules/registry/delivery/http/routes.go` (also raw mux but routes documented in stub) and documents/templates modules which ship `*.gen.go` from oapi-codegen
+- **Surface:** `internal/modules/taxonomy/delivery/http/handler.go:51-68` (raw `mux.HandleFunc` for 16 routes); `api/openapi/v1/openapi.yaml` (no `/api/v1/taxonomy/*` paths — verified by grep); contrast `internal/modules/controlleddocuments/delivery/http/handler.go` (wrapper-mounted generated surface) and documents/templates modules which ship `*.gen.go` from oapi-codegen
 - **Observation:** All 16 routes are mounted on raw `net/http.ServeMux` with no operationId, no request/response schemas in the OpenAPI spec, no generated stubs. ADR 0012 (`wiki/decisions/0012-contract-first-api.md`) commits the project to contract-first; taxonomy was never migrated. Frontend client codegen (`lib/api/openapi.gen.ts` consumers) cannot bind taxonomy methods — feature code in `frontend/apps/web/src/features/taxonomy/*` hand-rolls each call. Trigger fired: documented contract not followed with measurable consumer impact (Major).
 - **Evidence:** `_artifacts/01-surface.md` (handler.go route list, no spec anchors); `_artifacts/03-deps.md` §1 (no codegen-related imports); `_artifacts/05-industry.md` IP-005 "not applicable".
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-009`
@@ -91,9 +91,9 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-010 · `DBGovernanceLogger` is a module-local parallel audit sink — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** major (closed)
-- **Surface:** `internal/modules/taxonomy/application/governance.go` (DBGovernanceLogger writes to `governance_events`); `internal/modules/audit/` (parallel `audit.Writer` writing to `metaldocs.audit_events`); `internal/modules/registry/module.go:31` (registry imports + reuses `taxonomyapp.NewDBGovernanceLogger`)
-- **Observation:** Taxonomy ships its own audit sink (`governance_events` table) instead of consuming `auditdomain.Writer`. Registry re-exports the taxonomy logger rather than wiring its own audit writer. Result: regulated mutation events live in two sinks with no shared schema, no shared `actor_id` resolution, no shared retention story. Auditor query for "all regulated actions in time T" must JOIN/UNION across both. Same gap surfaced in audit T-007 (cross-module). Trigger fired: duplicated write surfaces with divergent semantics for the same use case (Major).
-- **Evidence:** `_artifacts/03-deps.md` §2 (registry imports `taxonomyapp.NewDBGovernanceLogger`); `_artifacts/03-deps.md` §1 (`internal/audit` ABSENT from taxonomy OUT-edges).
+- **Surface:** `internal/modules/taxonomy/application/governance.go` (DBGovernanceLogger writes to `governance_events`); `internal/modules/audit/` (parallel `audit.Writer` writing to `metaldocs.audit_events`); `internal/modules/controlleddocuments/module.go:31` (controlled-documents imports + reuses `taxonomyapp.NewDBGovernanceLogger`)
+- **Observation:** Taxonomy ships its own audit sink (`governance_events` table) instead of consuming `auditdomain.Writer`. Controlled-documents re-exports the taxonomy logger rather than wiring its own audit writer. Result: regulated mutation events live in two sinks with no shared schema, no shared `actor_id` resolution, no shared retention story. Auditor query for "all regulated actions in time T" must JOIN/UNION across both. Same gap surfaced in audit T-007 (cross-module). Trigger fired: duplicated write surfaces with divergent semantics for the same use case (Major).
+- **Evidence:** `_artifacts/03-deps.md` §2 (controlled-documents imports `taxonomyapp.NewDBGovernanceLogger`); `_artifacts/03-deps.md` §1 (`internal/audit` ABSENT from taxonomy OUT-edges).
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-010`
 - **Linked ADR:** missing-ADR
 

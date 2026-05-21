@@ -18,7 +18,7 @@
 - **Severity:** major
 - **Surface:** `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:111`
 - **Observation:** atomic create path is documented, but full route truth linkage remains split across module docs.
-- **Evidence:** dependencies on registry/documents APIs.
+- **Evidence:** dependencies on controlled-documents/documents APIs (legacy literal module id: `registry`).
 - **Linked backlog row:** `R-002`
 - **Linked ADR:** missing-ADR
 

@@ -1,6 +1,6 @@
-# System Overview
+﻿# System Overview
 
-> **Last verified:** 2026-05-17
+> **Last verified:** 2026-05-21 (post-freeze terminology sync in module topology section)
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -39,18 +39,18 @@ Modules:
 - `taxonomy` - profiles, areas, departments, subjects
 - `iam` - users, roles, capabilities, area memberships
 - `auth` - authn (token validation)
-- `approval` (under documents) - routes, signoffs
+- `approval` - approval routes and signoffs (separate module boundary; integrated with documents flows)
 - `render/fanout` + `render/resolvers` - substitution + DOCX/PDF generation
-- `registry` - controlled-document codes, sequence counters
+- `controlled-documents` - controlled-document codes, sequence counters (module path remains `internal/modules/controlleddocuments`)
 - `jobs/*` - background jobs (effective-date publisher, idempotency janitor, scheduler, watchdog)
-- `platform/httpclient` - `NewInternalClient()` — tuned `*http.Client` for intra-cluster service fanout; `Timeout: 60s`, `ResponseHeaderTimeout: 10s`, `MaxIdleConnsPerHost: 20`, `ForceAttemptHTTP2: true`. No retry logic embedded; retry is owned by `PDFOutboxWorker`. See `internal/platform/httpclient/internal_client.go:12-30` and `wiki/decisions/0009-pdf-dispatch-outbox.md`.
+- `platform/httpclient` - `NewInternalClient()`     tuned `*http.Client` for intra-cluster service fanout; `Timeout: 60s`, `ResponseHeaderTimeout: 10s`, `MaxIdleConnsPerHost: 20`, `ForceAttemptHTTP2: true`. No retry logic embedded; retry is owned by `PDFOutboxWorker`. See `internal/platform/httpclient/internal_client.go:12-30` and `wiki/decisions/0009-pdf-dispatch-outbox.md`.
 - `search` - cross-module document search index; `infrastructure/v2documents/reader.go` queries `public.documents LEFT JOIN controlled_documents` to populate `DocumentCode`/`DocumentSequence` (fixed 2026-04-27: was reading `d.code` which is always empty for v2 docs; now reads `COALESCE(cd.code, '')` from the join)
 
 ## Frontend topology
 
 `frontend/apps/web/src/`:
-- `App.tsx` - root, routing
-- `routing/workspaceRoutes.ts` - route table
+- `app/AppRouter.tsx` - route tree composition
+- `app/RootProviders.tsx` - app-level provider tree
 - `features/` - one folder per feature area
   - `templates/` - template list, creation wizard, and template editor routes (`/templates`, `/templates/new`, `/templates/{id}/versions/{n}`)
   - `documents/` - document library, create wizard, published/detail views, distribution, and editor routes (`/documents/*`)
@@ -63,7 +63,7 @@ Modules:
   - `documents/runtime/` - schema runtime adapters
 - `components/` - shared UI
 - `editor-adapters/` - eigenpal integration glue
-- `api/` - fetch wrappers per domain
+- `lib/api/` - shared API client/fetch wrappers
 
 Shared packages:
 - `packages/editor-ui/` - `MetalDocsEditor` wrapper around eigenpal
@@ -76,12 +76,12 @@ Shared packages:
 3. Author submits -> `POST /templates/{id}/versions/{v}/submit` -> status=in_review
 4. Reviewer approves -> `POST /approve` -> status=approved
 5. **Document creation:** end user picks a controlled doc -> wizard creates the `documents` row. `application.SnapshotService`, wired via `documents.Dependencies.SnapshotReader`/`SnapshotWriter`, populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`.
-6. For catalog-only templates, `composition_config_snapshot` stores `{}`. (composition deprecated 2026-04-27 — see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27 — column still written as `{}` for back-compat)
+6. For catalog-only templates, `composition_config_snapshot` stores `{}`. (composition deprecated 2026-04-27     see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27     column still written as `{}` for back-compat)
 7. Submit -> `POST /documents/{id}/submit` -> `under_review`. Migration `0152`'s `enforce_snapshot_on_submit_trg` trigger requires all six snapshot columns to be non-NULL before draft -> under_review.
 8. Approves -> `POST /documents/{id}/approve` -> triggers `freeze`:
    - Use the creation-time snapshots as the immutable render inputs
    - Go calls docgen-v2 `POST /render/fanout` with `X-Service-Token`; docgen-v2 validates the token
-   - Go sends `tenant_id`, `revision_id`, `body_docx_s3_key`, `placeholder_values`, `composition_config` (always empty — deprecated 2026-04-27 — see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27), and `resolved_values`
+   - Go sends `tenant_id`, `revision_id`, `body_docx_s3_key`, `placeholder_values`, `composition_config` (always empty     deprecated 2026-04-27     see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27), and `resolved_values`
    - docgen-v2 computes the final DOCX S3 key internally as `tenants/{tenant_id}/revisions/{revision_id}/frozen.docx`
    - docgen-v2 runs eigenpal `processTemplateDetailed` for token substitution
    - docgen-v2 returns `content_hash`, `final_docx_s3_key`, and `unreplaced_vars`
@@ -93,3 +93,4 @@ Shared packages:
 - Per-module deep dives: `modules/*.md`
 - Workflow walkthroughs: `workflows/*.md`
 - DB schema: `architecture/data-model.md` (TBD)
+

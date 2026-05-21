@@ -14,6 +14,10 @@ Also load:
 - `.agents/skills/metaldocs-tanstack-query/SKILL.md` when API calls, query hooks, query keys, cache invalidation, optimistic updates, generated frontend API types, polling, prefetching, or freshness policy are involved.
 - `.agents/skills/metaldocs-screen-implementation/SKILL.md` when implementing a designed screen from `frontend/apps/web/design-source/<slug>/`.
 
+Canonical frontend rule to keep in mind while working:
+
+- Server-driven workflow transitions that can change without a local click, such as scheduler cutover or approval progression, must keep freshness policy in the TanStack Query layer with targeted invalidation and selective `refetchInterval`. Do not add page-level timer loops in components for server-state synchronization.
+
 Required sources:
 
 1. `wiki/architecture/frontend-structure.md`
