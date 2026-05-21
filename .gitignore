@@ -98,3 +98,13 @@ frontend/apps/web/design-source/uploads/
 docs/superpowers/plans/
 docs/superpowers/reviews/
 reviews/
+
+# Local QA session artifacts (cookie jars, scratch tmp)
+qa-*.txt
+qa-session.tmp
+
+# Additional build artifacts
+metaldocs-jobs.exe
+
+# Loose debug logs
+debug.log
