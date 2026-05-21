@@ -7,4 +7,4 @@ generate:
 output: api.gen.go
 output-options:
   include-tags:
-    - registry
+    - controlled-documents
