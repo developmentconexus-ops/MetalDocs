@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -341,9 +342,32 @@ func main() {
 	}
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
 	pdfOutboxWorker := fanout.NewPDFOutboxWorker(pdfOutboxRepo, deps.Publisher, slog.Default())
+	var workerWG sync.WaitGroup
+	workerWG.Add(1)
 	go func() {
-		if err := pdfOutboxWorker.Run(ctx); err != nil {
-			slog.Error("pdf outbox worker exited", "err", err)
+		defer workerWG.Done()
+		// Restart loop with capped exponential backoff. The worker normally only
+		// exits when ctx is cancelled; any non-nil return is treated as a crash
+		// and the loop re-runs after a backoff so document approval doesn't
+		// keep succeeding while PDF delivery silently stops.
+		backoff := time.Second
+		for ctx.Err() == nil {
+			err := pdfOutboxWorker.Run(ctx)
+			if err == nil {
+				return
+			}
+			slog.Error("pdf outbox worker exited; restarting", "err", err, "backoff", backoff)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(backoff):
+			}
+			if backoff < time.Minute {
+				backoff *= 2
+				if backoff > time.Minute {
+					backoff = time.Minute
+				}
+			}
 		}
 	}()
 	approvalServices.Decision = approvalapp.NewDecisionService(
@@ -468,21 +492,54 @@ func main() {
 		serverErr <- server.ListenAndServe()
 	}()
 
+	exitCode := shutdownServer(ctx, stop, server, serverErr, &schedulerWG, &workerWG)
+	if exitCode != 0 {
+		// os.Exit skips deferred functions, including deps.Cleanup. Invoke
+		// cleanup explicitly so DB / object-store handles are released on
+		// the error path too. closeDB swallows close-on-closed, so calling
+		// twice is safe.
+		deps.Cleanup()
+		os.Exit(exitCode)
+	}
+}
+
+// shutdownServer waits for either a server-listen error or ctx cancellation,
+// then runs the same graceful-teardown sequence on both paths: server.Shutdown,
+// stop signal handler, scheduler join, worker join. Returns a non-zero exit
+// code only if a real failure occurred (genuine ListenAndServe error or a
+// Shutdown that didn't drain cleanly).
+func shutdownServer(
+	ctx context.Context,
+	stop context.CancelFunc,
+	server *http.Server,
+	serverErr <-chan error,
+	schedulerWG, workerWG *sync.WaitGroup,
+) int {
+	exitCode := 0
 	select {
 	case err := <-serverErr:
-		if err != nil && err != http.ErrServerClosed {
-			stop()
-			schedulerWG.Wait()
-			log.Fatalf("server failed: %v", err)
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server failed", "err", err)
+			exitCode = 1
 		}
 	case <-ctx.Done():
 	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer shutdownCancel()
-	_ = server.Shutdown(shutdownCtx)
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("graceful shutdown incomplete", "err", err)
+		if exitCode == 0 {
+			exitCode = 1
+		}
+	} else {
+		slog.Info("graceful shutdown complete")
+	}
 	stop()
 	schedulerWG.Wait()
+	workerWG.Wait()
+	slog.Info("scheduler stopped")
+	return exitCode
 }
 
 type realClock struct{}

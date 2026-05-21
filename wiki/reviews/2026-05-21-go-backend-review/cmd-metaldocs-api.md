@@ -35,12 +35,14 @@ Findings consolidated across reviewers. Where multiple reviewers flagged the sam
 - **Reviewer:** go-reviewer
 - **Issue:** `log.Fatalf` inside the `case err := <-serverErr` arm exits the process via `os.Exit(1)` after the `select`, skipping the deferred `stop()`, `shutdownCancel()`, and `defer deps.Cleanup()` at line 139. The scheduler `WaitGroup` is also leaked. Additionally `_ = server.Shutdown(shutdownCtx)` at line 463 discards the shutdown error — graceful-drain failures during deploy go invisible.
 - **Recommend:** Move the fatal path into a post-select shutdown sequence that runs the same teardown as the `ctx.Done` arm. Use `errors.Is(err, http.ErrServerClosed)` instead of direct equality. Log shutdown error: `if err := server.Shutdown(shutdownCtx); err != nil { slog.Error("graceful shutdown incomplete", "err", err) }`.
+- **Status:** FIXED 2026-05-21 — `shutdownServer` helper extracted; both arms run the same teardown (Shutdown + stop + schedulerWG.Wait + workerWG.Wait); explicit `deps.Cleanup()` before `os.Exit` on the error path. Smoke confirmed `INFO graceful shutdown complete` + `INFO scheduler stopped` on Ctrl-C. Unit tests in `main_test.go`.
 
 ### C4. `pdfOutboxWorker` goroutine fails silently, no restart, no shutdown coord
 - **File:** `main.go:326-330`
 - **Reviewers:** silent-failure-hunter (Critical), go-reviewer (High — no WaitGroup)
 - **Issue:** Goroutine logs `err` and exits permanently. Document approval at the API layer continues to succeed while PDF delivery silently stops for the rest of the process lifetime. Worker is also not joined at shutdown — outbox can be half-flushed if process exits mid-write.
 - **Recommend:** Add a restart loop with exponential backoff OR expose worker liveness to the health handler so `/api/v1/health/ready` degrades when the worker is down. Add a dedicated `WaitGroup` (matching the scheduler pattern at lines 392-397) and join it before exit.
+- **Status:** FIXED 2026-05-21 — `workerWG` mirror of the scheduler pattern + capped-exponential-backoff restart loop (1s → 60s) bounded by `ctx`. Worker now joined at shutdown via `workerWG.Wait()` inside `shutdownServer`. Health-endpoint readiness exposure deferred (separate follow-up).
 
 ---
 
