@@ -1302,1049 +1302,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents:
-    post:
-      summary: Cria documento e primeira versao
-      parameters:
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateDocumentRequest'
-      responses:
-        '201':
-          description: Documento criado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentCreatedResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-    get:
-      summary: Lista documentos
-      parameters:
-      responses:
-        '200':
-          description: Lista de documentos
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListDocumentsResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}:
-    get:
-      summary: Busca um documento por id
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Documento encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentListItem'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/versions:
-    post:
-      summary: Cria nova versao do documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AddVersionRequest'
-      responses:
-        '201':
-          description: Nova versao criada
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VersionListItem'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '409':
-          description: Versionamento nao permitido
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-    get:
-      summary: Lista versoes de um documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Lista de versoes
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListVersionsResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/versions/diff:
-    get:
-      summary: Compara duas versoes do documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-        - name: fromVersion
-          in: query
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-        - name: toVersion
-          in: query
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-      responses:
-        '200':
-          description: Diff entre versoes
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VersionDiffResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou versao nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/attachments:
-    post:
-      summary: Faz upload de um anexo para o documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file:
-                  type: string
-                  format: binary
-      responses:
-        '201':
-          description: Anexo criado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AttachmentItem'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-    get:
-      summary: Lista anexos de um documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Lista de anexos
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListAttachmentsResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/attachments/{attachmentId}/download-url:
-    get:
-      summary: Gera URL temporaria para download do anexo
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-        - name: attachmentId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: URL temporaria de download
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AttachmentDownloadURLResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou anexo nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/content/native:
-    get:
-      summary: Obtem conteudo nativo estruturado do documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Conteudo nativo do documento
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentContentNativeResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou versao nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-    post:
-      summary: Salva conteudo nativo governado do documento
-      description: Salva o conteudo nativo atual usando `draftToken` para controle de concorrencia. `draftToken` e opcional apenas para callers legados do native save fora do governed canvas pilot; clients do governed canvas devem envia-lo. Sucesso retorna um refreshed token/token atualizado, e `409 Conflict` cobre token estale ou conflito de edicao.
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        description: "`draftToken` e opcional apenas para callers legados do native save fora do governed canvas pilot. Clients do governed canvas devem inclui-lo sempre."
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DocumentContentSaveRequest'
-      responses:
-        '201':
-          description: Conteudo salvo e PDF gerado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentContentSaveResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '409':
-          description: Conflict por draft token expirado ou conflito de edicao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado ou template nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/content/browser:
-    post:
-      operationId: saveDocumentBrowserContent
-      summary: Salva conteudo HTML do browser editor
-      description: Salva o body HTML atual do draft usando `draftToken` para controle de concorrencia no browser editor.
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DocumentBrowserContentSaveRequest'
-      responses:
-        '201':
-          description: Conteudo HTML salvo no draft atual
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentBrowserContentSaveResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '409':
-          description: Conflict por draft token expirado ou conflito de edicao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/content/pdf:
-    get:
-      summary: Obtem URL assinada do PDF do documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: URL assinada do PDF
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentContentPdfResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou PDF nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/content/render-pdf:
-    post:
-      summary: Forca re-render do PDF do documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: PDF re-renderizado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentContentPdfResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/template/docx:
-    get:
-      deprecated: true
-      summary: "[DEPRECATED] Template DOCX rendering removed â€” use content builder"
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '501':
-          description: Template rendering removed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/content/upload:
-    post:
-      summary: Faz upload de DOCX preenchido para o documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file:
-                  type: string
-                  format: binary
-                contentMode:
-                  type: string
-                  enum: [docx_upload]
-      responses:
-        '200':
-          description: DOCX importado e PDF gerado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentContentUploadResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '413':
-          description: Arquivo muito grande
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '415':
-          description: Tipo de arquivo nao suportado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/content/docx:
-    get:
-      summary: Obtem URL assinada do DOCX original
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: URL assinada do DOCX
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentContentDocxResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou DOCX nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/content:
-    put:
-      summary: Replace the current draft content values for a document
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '204':
-          description: Conteudo do rascunho substituido
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/export/docx:
-    post:
-      summary: Generate a DOCX from the active schema runtime payload
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: DOCX gerado a partir do payload de runtime
-          content:
-            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
-              schema:
-                type: string
-                format: binary
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/editor-bundle:
-    get:
-      summary: Carrega bundle para o editor de documentos
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Bundle do editor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentEditorBundleResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/browser-editor-bundle:
-    get:
-      operationId: getDocumentBrowserEditorBundle
-      summary: Carrega bundle para o browser editor de documentos
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Bundle do browser editor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentBrowserEditorBundleResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '400':
-          description: Requisicao invalida ou template armazenado incompativel com browser editor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado ou template nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/load:
-    get:
-      summary: Carrega conteudo MDDM para edicao (draft ativo do usuario ou fallback released)
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Conteudo MDDM carregado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentMDDMLoadResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/submit-for-approval:
-    post:
-      summary: Transiciona draft MDDM para pending_approval
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-        - name: draft_id
-          in: query
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Draft submetido para aprovacao
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '422':
-          description: Draft em estado invalido para transicao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/template-assignment:
-    put:
-      summary: Atribui um override de template ao lineage do documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DocumentTemplateAssignmentRequest'
-      responses:
-        '200':
-          description: Override de template persistido para o documento
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentTemplateAssignmentResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou template nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/collaboration/presence:
-    get:
-      summary: Lista presencas colaborativas ativas no documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Presencas colaborativas ativas
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ListDocumentCollaborationPresenceResponse'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-    post:
-      summary: Atualiza heartbeat de presenca colaborativa para o usuario atual
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/HeartbeatDocumentCollaborationPresenceRequest'
-      responses:
-        '202':
-          description: Heartbeat recebido
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MutationAcceptedResponse'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-  /documents/{documentId}/collaboration/lock:
-    get:
-      summary: Retorna lock de edicao ativo do documento
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '200':
-          description: Lock ativo
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentEditLock'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou lock nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-    post:
-      summary: Adquire lock de edicao para o usuario atual
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AcquireDocumentEditLockRequest'
-      responses:
-        '201':
-          description: Lock adquirido
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentEditLock'
-        '400':
-          description: Requisicao invalida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '409':
-          description: Documento com lock ativo por outro editor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-    delete:
-      summary: Libera lock de edicao do usuario atual
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      responses:
-        '204':
-          description: Lock liberado
-        '401':
-          description: Nao autenticado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '403':
-          description: Sem permissao
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '404':
-          description: Documento ou lock nao encontrado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
-        '409':
-          description: Lock ativo pertence a outro editor
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
   /attachments/{attachmentId}/content:
     get:
       summary: Download de anexo via URL assinada temporaria
@@ -3236,7 +2193,7 @@ paths:
   /api/v1/controlled-documents:
     get:
       summary: List controlled documents
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: listControlledDocuments
       parameters:
         - name: profileCode
@@ -3281,7 +2238,7 @@ paths:
         '403': { description: forbidden }
     post:
       summary: Atomically create controlled document and initial revision
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: atomicCreateControlledDocument
       parameters:
         - name: Idempotency-Key
@@ -3314,7 +2271,7 @@ paths:
   /api/v1/controlled-documents/preview-code:
     get:
       summary: Preview the next auto-generated document code without allocating it
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: previewControlledDocumentCode
       parameters:
         - name: profileCode
@@ -3338,7 +2295,7 @@ paths:
   /api/v1/controlled-documents/{id}:
     get:
       summary: Get controlled document by ID
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: getControlledDocument
       parameters:
         - name: id
@@ -3358,7 +2315,7 @@ paths:
   /api/v1/controlled-documents/{id}/revisions:
     post:
       summary: Create a new revision for a controlled document
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: createControlledDocumentRevision
       parameters:
         - name: id
@@ -3390,7 +2347,7 @@ paths:
   /api/v1/controlled-documents/{id}/active-document:
     get:
       summary: Get the active document instance for a controlled document
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: getActiveDocument
       parameters:
         - name: id
@@ -3410,7 +2367,7 @@ paths:
   /api/v1/controlled-documents/{id}/obsolete:
     put:
       summary: Mark controlled document as obsolete
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: obsoleteControlledDocument
       parameters:
         - name: id
@@ -3426,7 +2383,7 @@ paths:
   /api/v1/controlled-documents/{id}/supersede:
     put:
       summary: Mark controlled document as superseded
-      tags: [registry]
+      tags: [controlled-documents]
       operationId: supersedeControlledDocument
       parameters:
         - name: id
@@ -3723,6 +2680,40 @@ paths:
         '409': { description: misbound | session_inactive | stale_base }
         '410': { description: expired_upload | upload_missing }
         '422': { description: content_hash_mismatch }
+  /api/v1/documents/{id}/artifact-metadata:
+    post:
+      tags: [documents]
+      operationId: syncDocumentArtifactMetadata
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id]
+              properties:
+                session_id: { type: string, format: uuid }
+                page_count: { type: integer, minimum: 1, nullable: true }
+      responses:
+        '200':
+          description: artifact metadata synced for current technical revision
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revision_id]
+                properties:
+                  revision_id: { type: string, format: uuid }
+                  file_size_bytes: { type: integer, format: int64, minimum: 0, nullable: true }
+                  page_count: { type: integer, minimum: 1, nullable: true }
+                  page_count_source:
+                    type: string
+                    nullable: true
+                    enum: [eigenpal_client, server_renderer]
+        '403': { description: session_not_holder | document_not_owner }
+        '404': { description: document_not_found }
+        '409': { description: session_inactive | invalid_state_transition }
 
   /api/v1/documents/{id}/checkpoints:
     get:
@@ -3970,6 +2961,12 @@ paths:
       tags: [approval]
       operationId: scheduleDocumentPublish
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchedulePublishRequest'
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/supersede:
     post:
@@ -6176,6 +5173,16 @@ components:
         revisionVersion: { type: integer, minimum: 1 }
         publishedDocumentId: { type: string, format: uuid }
         approvalInstanceId: { type: string, format: uuid }
+    SchedulePublishRequest:
+      type: object
+      required: [effective_from]
+      properties:
+        effective_from:
+          type: string
+          format: date-time
+        superseded_document_id:
+          type: string
+          format: uuid
     ApprovalInstanceByDocumentResponse:
       type: object
       required: [id, document_id, route_id, tenant_id, status, submitted_by, submitted_at, stages, etag]
