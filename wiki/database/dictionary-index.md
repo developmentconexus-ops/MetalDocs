@@ -1,6 +1,6 @@
 # Database Dictionary Index
 
-> **Last verified:** 2026-05-15
+> **Last verified:** 2026-05-21 (controlled-documents/platform rename — registry classification retired)
 > **Source:** `db/baseline/0001_current_schema.sql`
 
 | Table | Schema | Owner | Page |
@@ -36,7 +36,7 @@
 | `iam_groups` | `metaldocs` | iam | `wiki/database/tables/iam_groups.md` |
 | `iam_user_roles` | `metaldocs` | iam | `wiki/database/tables/iam_user_roles.md` |
 | `iam_users` | `metaldocs` | iam | `wiki/database/tables/iam_users.md` |
-| `idempotency_keys` | `metaldocs` | registry | `wiki/database/tables/idempotency_keys.md` |
+| `idempotency_keys` | `metaldocs` | platform/idempotency | `wiki/database/tables/idempotency_keys.md` |
 | `job_leases` | `metaldocs` | platform/workers | `wiki/database/tables/job_leases.md` |
 | `mddm_shadow_diff_events` | `metaldocs` | documents | `wiki/database/tables/mddm_shadow_diff_events.md` |
 | `notifications` | `metaldocs` | platform/workers | `wiki/database/tables/notifications.md` |
@@ -52,10 +52,10 @@
 | `approval_signoffs` | `public` | approval | `wiki/database/tables/approval_signoffs.md` |
 | `approval_stage_instances` | `public` | approval | `wiki/database/tables/approval_stage_instances.md` |
 | `autosave_pending_uploads` | `public` | documents | `wiki/database/tables/autosave_pending_uploads.md` |
-| `cd_sequence_counters` | `public` | registry | `wiki/database/tables/cd_sequence_counters.md` |
-| `controlled_document_area_grants` | `public` | registry | `wiki/database/tables/controlled_document_area_grants.md` |
-| `controlled_document_user_grants` | `public` | registry | `wiki/database/tables/controlled_document_user_grants.md` |
-| `controlled_documents` | `public` | registry | `wiki/database/tables/controlled_documents.md` |
+| `cd_sequence_counters` | `public` | controlled-documents | `wiki/database/tables/cd_sequence_counters.md` |
+| `controlled_document_area_grants` | `public` | controlled-documents | `wiki/database/tables/controlled_document_area_grants.md` |
+| `controlled_document_user_grants` | `public` | controlled-documents | `wiki/database/tables/controlled_document_user_grants.md` |
+| `controlled_documents` | `public` | controlled-documents | `wiki/database/tables/controlled_documents.md` |
 | `document_checkpoints` | `public` | documents | `wiki/database/tables/document_checkpoints.md` |
 | `document_comments` | `public` | documents | `wiki/database/tables/document_comments.md` |
 | `document_exports` | `public` | documents | `wiki/database/tables/document_exports.md` |

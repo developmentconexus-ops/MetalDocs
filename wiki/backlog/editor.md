@@ -26,7 +26,7 @@
 
 This supersedes the older "sidebar deferred" assumptions recorded later in this file.
 
-- `Código`, `Perfil`, `Área`, and `Visibilidade` now render from real runtime data composed from document detail, taxonomy lookups, and controlled-document visibility from the registry contract.
+- `Código`, `Perfil`, `Área`, and `Visibilidade` now render from real runtime data composed from document detail, taxonomy lookups, and controlled-document visibility from the controlled-documents contract.
 - Governed history now comes from `GET /api/v1/documents/{id}/revision-history` and formats business revisions as `REV00`, `REV01`, and so on.
 - The history source is `documents` lineage by `controlled_document_id`; `document_revisions` remains technical/autosave-only and must not appear as business history.
 - The approval chain now comes from `GET /api/v1/documents/{id}/approval-instance` and is rendered only when the document is `under_review`.
@@ -233,7 +233,7 @@ Evidence used:
 
 ## Integration Audit (2026-05-18 Sidebar)
 
-Scope: right `EditorMetaSidebar` on `/documents/:documentID/edit`, with emphasis on replacing mock rows using real `documents`, `registry`, `taxonomy`, and `approval` truth without leaking draft-incorrect workflow semantics into the editor.
+Scope: right `EditorMetaSidebar` on `/documents/:documentID/edit`, with emphasis on replacing mock rows using real `documents`, `controlled-documents`, `taxonomy`, and `approval` truth without leaking draft-incorrect workflow semantics into the editor.
 
 Evidence used:
 
@@ -241,7 +241,7 @@ Evidence used:
 - Editor screen wiring: `frontend/apps/web/src/features/documents/pages/DocumentEditorPage.tsx`
 - Documents detail contract/runtime: `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/lib/api-types/index.d.ts` (`DocumentDetailResponse`), `wiki/modules/documents.md`
 - Taxonomy lookup surfaces: `frontend/apps/web/src/features/taxonomy/api/taxonomy.ts`, `frontend/apps/web/src/features/taxonomy/queries/useProfilesQuery.ts`, `frontend/apps/web/src/features/documents/queries/useAreasQuery.ts`
-- Registry/controlled-document truth: `frontend/apps/web/src/features/registry/api/controlledDocuments.ts`, `frontend/apps/web/src/features/registry/types.ts`, `frontend/apps/web/src/lib/api-types/index.d.ts` (`ControlledDocumentVisibility`, controlled-document schema), `wiki/modules/registry.md`
+- controlled-documents truth: `frontend/apps/web/src/features/controlled-documents/api/controlledDocuments.ts`, `frontend/apps/web/src/features/controlled-documents/types.ts`, `frontend/apps/web/src/lib/api-types/index.d.ts` (`ControlledDocumentVisibility`, controlled-document schema), `wiki/modules/controlled-documents.md`
 - Approval-instance runtime + contract truth: `internal/modules/documents/approval/http/doc_approval_handler.go`, `internal/modules/documents/approval/http/get_instance_handler.go`, `internal/modules/documents/approval/http/contracts/instance_read.go`, `frontend/apps/web/src/features/documents/api/documents.ts`, `frontend/apps/web/src/lib/api-types/index.d.ts`
 
 | Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
@@ -251,8 +251,8 @@ Evidence used:
 | `Código` row | `DocumentDetailResponse.Code` | `GET /api/v1/documents/{id}` already returns `Code` | Sidebar already receives `code` prop from `DocumentEditorPage` | implemented and aligned | Keep |
 | `Perfil` display | `DocumentDetailResponse.ProfileCodeSnapshot` + taxonomy profiles list | Runtime already returns the profile code snapshot; taxonomy API can resolve code -> human name | Sidebar is still mock-only | screen-local integration fix | Resolve `ProfileCodeSnapshot` through `useProfilesQuery()` and render the real name with code fallback; do not invent a backend extension first |
 | `Área` display | `DocumentDetailResponse.ProcessAreaCodeSnapshot` + taxonomy areas list | Runtime already returns the process-area code snapshot; taxonomy API can resolve code -> human name | Sidebar is still mock-only | screen-local integration fix | Resolve `ProcessAreaCodeSnapshot` through `useAreasQuery()` and render the real name with code fallback |
-| `Visibilidade` row | `DocumentDetailResponse.ControlledDocumentID` + `GET /api/v1/controlled-documents/{id}` | Registry contract already has `visibility`; controlled-document identity is already present on document detail | Registry frontend wrapper is legacy-manual and omits `visibility` from `ControlledDocument`; sidebar is mock-only | implemented but legacy-wired | Normalize registry wrapper/types to generated contract, then show real visibility from the controlled document instead of adding a new documents field |
-| `Vigência atual` row in draft editor | design + documents/registry module semantics | Controlled Document owns identity; document revisions own approval/publish lifecycle. For a draft editor, the draft under edit is not necessarily the currently effective published version. Current editor/detail contracts do not expose a truthful "effective version + effective date" pair for this row | Mock row incorrectly suggests the draft itself is already the current effective version | defer | Remove or hide this row in draft-focused first implementation; only reintroduce after product semantics for "current effective version from inside draft editor" are explicitly defined |
+| `Visibilidade` row | `DocumentDetailResponse.ControlledDocumentID` + `GET /api/v1/controlled-documents/{id}` | Controlled-documents contract already has `visibility`; controlled-document identity is already present on document detail | Controlled-documents frontend wrapper is legacy-manual and omits `visibility` from `ControlledDocument`; sidebar is mock-only | implemented but legacy-wired | Normalize controlled-documents wrapper/types to generated contract, then show real visibility from the controlled document instead of adding a new documents field |
+| `Vigência atual` row in draft editor | design + documents/controlled-documents module semantics | Controlled Document owns identity; document revisions own approval/publish lifecycle. For a draft editor, the draft under edit is not necessarily the currently effective published version. Current editor/detail contracts do not expose a truthful "effective version + effective date" pair for this row | Mock row incorrectly suggests the draft itself is already the current effective version | defer | Remove or hide this row in draft-focused first implementation; only reintroduce after product semantics for "current effective version from inside draft editor" are explicitly defined |
 | `Próx. revisão` row | profile governance + effective-version semantics | Taxonomy profile exposes `reviewIntervalDays`, but computing the next review date also needs the effective approval/publish anchor for the currently valid revision. That anchor is not available on the editor detail contract | Mock row invents a due date | missing backend capability | Do not derive from draft timestamps. Add only after a truthful effective-date field/source exists |
 | `Revisões` timeline | sidebar design + module wiki | No runtime list endpoint currently exposes revision lineage for this editor sidebar. `signedRevisionURL` exists for a specific revision file, but not the historical list needed for `TimelineRail` | Sidebar uses hardcoded revisions | missing backend capability | Keep deferred until a real revisions-list route or equivalent runtime surface exists |
 | `Próximos aprovadores` section semantics | approval lifecycle + user requirement | Active approval instance only exists while a document is in review. Draft documents should not show approvers as if a route were already active | Current mock section shows approvers even in draft | screen-local integration fix | Render this section only when the document is `under_review` and an active approval instance exists; hide it in `draft`, `rejected`, `approved`, `published`, `obsolete`, etc. |
@@ -263,7 +263,7 @@ Evidence used:
 
 - Sidebar shell stays as-is.
 - Real profile and area labels can be wired now from document snapshot codes + taxonomy queries.
-- Real visibility can be wired from the controlled document after local registry wrapper/type cleanup.
+- Real visibility can be wired from the controlled document after local controlled-documents wrapper/type cleanup.
 - Draft-incorrect workflow sections should be hidden instead of mocked.
 
 ### Prerequisites
@@ -280,3 +280,4 @@ Evidence used:
 
 - Browser E2E on `/documents/:documentID/edit` covering draft sidebar truth, finalize `revisionTitle`, under-review approval chain, and governed history ordering.
 - Runtime/API spot-check that `revision-history` is sourced from governed `documents` lineage and not from technical `document_revisions`.
+

@@ -1,30 +1,34 @@
 package approvalhttp
 
-import "net/http"
+import (
+	"net/http"
+
+	approvalapi "metaldocs/internal/modules/documents/approval/api"
+)
 
 // RegisterRoutes wires all approval routes onto mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// Mutators — documents
-	mux.HandleFunc("POST /api/v1/documents/{id}/submit", h.SubmitHandler)
-	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs", h.SignoffHandler)
-	mux.HandleFunc("POST /api/v1/documents/{id}/publish", h.PublishHandler)
-	mux.HandleFunc("POST /api/v1/documents/{id}/schedule-publish", h.SchedulePublishHandler)
-	mux.HandleFunc("POST /api/v1/documents/{id}/supersede", h.SupersedeHandler)
-	mux.HandleFunc("POST /api/v1/documents/{id}/obsolete", h.ObsoleteHandler)
-	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/cancel", h.CancelHandler)
+	wrapper := approvalapi.ServerInterfaceWrapper{
+		Handler: h,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			WriteError(w, err)
+		},
+	}
 
-	// Read
-	mux.HandleFunc("GET /api/v1/approval/instances/{instance_id}", h.GetInstanceHandler)
-	mux.HandleFunc("GET /api/v1/documents/{id}/approval-instance", h.GetInstanceByDocumentHandler)
-	mux.HandleFunc("GET /api/v1/approval/inbox", h.InboxHandler)
-
-	// Doc-centric mutation shims
-	mux.HandleFunc("POST /api/v1/documents/{id}/signoff", h.SignoffByDocumentHandler)
-	mux.HandleFunc("POST /api/v1/documents/{id}/cancel", h.CancelByDocumentHandler)
-
-	// Route admin
-	mux.HandleFunc("POST /api/v1/approval/routes", h.CreateRouteHandler)
-	mux.HandleFunc("PUT /api/v1/approval/routes/{id}", h.UpdateRouteHandler)
-	mux.HandleFunc("DELETE /api/v1/approval/routes/{id}", h.DeactivateRouteHandler)
-	mux.HandleFunc("GET /api/v1/approval/routes", h.ListRoutesHandler)
+	mux.HandleFunc("GET /api/v1/approval/inbox", wrapper.ListApprovalInbox)
+	mux.HandleFunc("GET /api/v1/approval/instances/{instance_id}", wrapper.GetApprovalInstance)
+	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/cancel", wrapper.CancelApprovalInstance)
+	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoff)
+	mux.HandleFunc("GET /api/v1/approval/routes", wrapper.ListApprovalRoutes)
+	mux.HandleFunc("POST /api/v1/approval/routes", wrapper.CreateApprovalRoute)
+	mux.HandleFunc("DELETE /api/v1/approval/routes/{id}", wrapper.DeactivateApprovalRoute)
+	mux.HandleFunc("PUT /api/v1/approval/routes/{id}", wrapper.UpdateApprovalRoute)
+	mux.HandleFunc("GET /api/v1/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/cancel", wrapper.CancelDocumentApproval)
+	mux.HandleFunc("POST /api/v1/documents/{id}/obsolete", wrapper.ObsoleteDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/publish", wrapper.PublishDocument)
+	mux.HandleFunc("POST /api/v1/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublish)
+	mux.HandleFunc("POST /api/v1/documents/{id}/signoff", wrapper.RecordDocumentSignoff)
+	mux.HandleFunc("POST /api/v1/documents/{id}/submit", wrapper.SubmitDocumentForApproval)
+	mux.HandleFunc("POST /api/v1/documents/{id}/supersede", wrapper.SupersedeDocument)
 }

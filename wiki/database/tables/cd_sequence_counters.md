@@ -2,10 +2,10 @@
 
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `public`
-> **Owner:** registry
+> **Owner:** controlled-documents
 
 ## Purpose
-Current curated-baseline table owned by `registry`. See the owning module wiki and runtime repositories for business behavior.
+Current curated-baseline table owned by the `controlled-documents` module. See the owning module wiki and runtime repositories for business behavior.
 
 ## Columns
 

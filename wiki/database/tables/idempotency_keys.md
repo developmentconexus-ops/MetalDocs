@@ -2,10 +2,10 @@
 
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `metaldocs`
-> **Owner:** registry
+> **Owner:** platform/idempotency
 
 ## Purpose
-Current curated-baseline table owned by `registry`. See the owning module wiki and runtime repositories for business behavior.
+Current curated-baseline table owned by the platform idempotency layer (`internal/platform/idempotency`). See the owning module wiki and runtime repositories for business behavior.
 
 ## Columns
 

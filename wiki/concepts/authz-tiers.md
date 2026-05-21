@@ -8,7 +8,7 @@
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require`
 > - `internal/modules/iam/authz/context.go:13` — `ErrActorContextMissing` / `ErrTenantContextMissing` typed errors; `MustActorID` at :21, `MustTenantID` at :34
 > - `migrations/0188_tripwire_extend.sql:18` — extended `enforce_capability_asserted()` function covering 12 tables (Plan 5); trigger attachment at lines :186–233
-> - `internal/modules/iam/domain/model.go:15` — `Capability` typed consts (20 total including `CapRegistryObsolete`/`CapRegistrySupersede` added Plan 5)
+> - `internal/modules/iam/domain/model.go:15` — `Capability` typed consts (20 total including `CapControlledDocumentObsolete`/`CapControlledDocumentSupersede` added during Plan 5 follow-up cleanup)
 > See ADR `wiki/decisions/0007-two-tier-authz.md` for the decision rationale.
 
 MetalDocs has **two authorization tiers**.
@@ -42,7 +42,7 @@ MetalDocs has **two authorization tiers**.
 |---|---|---|
 | documents | `CreateDocumentTx`, `UpdateDocumentName`, `UpdateDocumentStatus`, `MarkArchived`, `Unarchive` | `public.documents` (INSERT + UPDATE) |
 | approval | `submit_service` (doc.submit), `signoff_service` (doc.signoff) | `approval_instances`, `approval_signoffs` |
-| registry | `Create`, `CreateTx` (registry.create); `changeStatus` (registry.obsolete\|supersede) | `controlled_documents`, `cd_sequence_counters` |
+| controlled-documents | `Create`, `CreateTx` (`controlled_documents.create`); `changeStatus` (`controlled_documents.obsolete`\|`controlled_documents.supersede`) | `controlled_documents`, `cd_sequence_counters` |
 | taxonomy | `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update` | `document_profiles`, `document_process_areas`, `document_families` |
 | templates | `CreateTemplate`, `SubmitForReview`, `Review`, `Approve`, `PublishTemplateVersion`, `ArchiveTemplate` | `templates_template`, `templates_template_version` |
 | iam | `UpsertUserAndAssignRole`, `ReplaceUserRoles` (user.manage); `Insert`, `CloseActive`, `GrantAtomic` (membership.manage) | `iam_user_roles`, `user_process_areas` |

@@ -34,7 +34,7 @@ The 4-step wizard replaces the old `DocumentCreatePage` single-step flow. It cre
 
 `POST /api/v1/controlled-documents` (`Idempotency-Key` required) Ã¢â‚¬â€ inserts the CD row, increments the per-(profile, area) sequence counter, and clones the template into the first draft document revision, all within a single DB transaction. Returns the CD with server-resolved code (e.g. `DC-RH-001`) plus the new document ID.
 
-The blank-template path is a real runtime path, not fake frontend data: the wizard resolves `GET /api/v1/templates/system/blank`, uses the returned `templateId` and `templateVersionId`, and submits that version ID through the same Registry-owned atomic create endpoint.
+The blank-template path is a real runtime path, not fake frontend data: the wizard resolves `GET /api/v1/templates/system/blank`, uses the returned `templateId` and `templateVersionId`, and submits that version ID through the same controlled-documents-owned atomic create endpoint.
 
 All wizard form state lives in a single `useReducer(wizardReducer)` call inside `NewDocumentWizardPage`. Step is mirrored to `?step=1..4` in the URL (with `replace: true`) so the browser back button works.
 

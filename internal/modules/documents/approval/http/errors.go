@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	approvalapi "metaldocs/internal/modules/documents/approval/api"
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
@@ -89,8 +90,28 @@ func MapErrorToResponse(err error) *problem.Problem {
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError
 		var typeErr *json.UnmarshalTypeError
+		var invalidParamErr *approvalapi.InvalidParamFormatError
+		var unmarshalParamErr *approvalapi.UnmarshalingParamError
+		var requiredParamErr *approvalapi.RequiredParamError
+		var requiredHeaderErr *approvalapi.RequiredHeaderError
+		var tooManyValuesErr *approvalapi.TooManyValuesForParamError
 
 		switch {
+		case errors.As(err, &invalidParamErr):
+			statusCode = http.StatusBadRequest
+			code = "validation.param_format"
+		case errors.As(err, &unmarshalParamErr):
+			statusCode = http.StatusBadRequest
+			code = "validation.param_unmarshal"
+		case errors.As(err, &requiredParamErr):
+			statusCode = http.StatusBadRequest
+			code = "validation.param_required"
+		case errors.As(err, &requiredHeaderErr):
+			statusCode = http.StatusBadRequest
+			code = "validation.header_required"
+		case errors.As(err, &tooManyValuesErr):
+			statusCode = http.StatusBadRequest
+			code = "validation.param_too_many_values"
 		case errors.As(err, &capabilityDenied):
 			statusCode = http.StatusForbidden
 			code = "authz.capability_denied"
