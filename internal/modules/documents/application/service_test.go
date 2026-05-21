@@ -390,7 +390,7 @@ func TestCreateDocument_OK(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		audit,
-		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
+		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",
@@ -428,7 +428,7 @@ func TestCreateDocument_InvalidFormData_Rejects(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: false, errs: []string{"invalid"}},
 		&noopAudit{},
-		&fakeRegistryReader{cd: &controlleddocumentsdomain.ControlledDocument{
+		&fakeControlledDocumentReader{cd: &controlleddocumentsdomain.ControlledDocument{
 			ID:              "cd_1",
 			ProfileCode:     "PROC",
 			ProcessAreaCode: "AREA-01",

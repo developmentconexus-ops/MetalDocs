@@ -33,6 +33,10 @@ export function useDocumentPdfStatus(documentID: string, enabled: boolean): Docu
         if (cancelled) return;
         setData({ status: v.pdf_status, url: v.pdf_url });
         if (v.pdf_status === 'ready' || v.pdf_status === 'failed') return;
+        if (Date.now() - startedAt.current > TIMEOUT_MS) {
+          setData({ status: 'failed' });
+          return;
+        }
       } catch {
         if (Date.now() - startedAt.current > TIMEOUT_MS) {
           if (!cancelled) setData({ status: 'failed' });

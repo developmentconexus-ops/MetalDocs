@@ -216,6 +216,87 @@
   flex-wrap: wrap;
 }
 
+.heroNotice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  max-width: 28rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--r-2);
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.revisionComposer {
+  margin: 1.25rem auto 0;
+  width: min(73.75rem, calc(100% - (2 * var(--sp-9))));
+  padding: 1.25rem 1.375rem;
+  border: 1px solid rgba(118, 39, 56, 0.14);
+  border-radius: 1.25rem;
+  background: rgba(255, 251, 250, 0.94);
+  box-shadow: 0 18px 40px rgba(80, 34, 44, 0.08);
+}
+
+.revisionComposerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.revisionComposerKicker {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(82, 28, 38, 0.62);
+}
+
+.revisionComposerTitle {
+  margin: 0.375rem 0 0;
+  font-size: 1.375rem;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.revisionComposerBody {
+  margin: 0.875rem 0 0;
+  max-width: 45rem;
+  color: rgba(41, 24, 28, 0.72);
+  line-height: 1.5;
+}
+
+.revisionComposerField {
+  display: block;
+  margin-top: 1rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(82, 28, 38, 0.72);
+}
+
+.revisionComposerInput {
+  margin-top: 0.5rem;
+  width: min(32.5rem, 100%);
+}
+
+.revisionComposerError {
+  margin: 0.625rem 0 0;
+  color: #b42318;
+  font-size: 0.8125rem;
+}
+
+.revisionComposerActions {
+  display: flex;
+  gap: 0.625rem;
+  margin-top: 1rem;
+}
+
 /* ─── Content area ───────────────────────────────────────────────────────── */
 
 .content {
@@ -781,6 +862,10 @@
     padding: var(--sp-6) var(--sp-6) 4rem;
   }
 
+  .revisionComposer {
+    width: min(73.75rem, calc(100% - (2 * var(--sp-6))));
+  }
+
 }
 
 @media (max-width: 768px) {
@@ -790,6 +875,17 @@
 
   .content {
     padding: var(--sp-5) var(--sp-4) 3rem;
+  }
+
+  .revisionComposer {
+    width: calc(100% - (2 * var(--sp-4)));
+    padding: 1rem;
+  }
+
+  .revisionComposerHeader,
+  .revisionComposerActions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   /* Desktop already uses 2 columns; mobile keeps the same grid since only 2 cells render. */

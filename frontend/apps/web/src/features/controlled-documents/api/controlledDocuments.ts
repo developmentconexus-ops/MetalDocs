@@ -86,14 +86,11 @@ export async function supersedeControlledDocument(id: string): Promise<void> {
 
 export type ActiveDocumentResponse = components["schemas"]["ActiveDocumentResponse"];
 
-/** @deprecated use ActiveDocumentResponse */
-export type ActiveDocumentInstance = ActiveDocumentResponse;
-
 export async function fetchActiveDocumentInstance(
   controlledDocumentId: string,
-): Promise<ActiveDocumentResponse | null> {
+): Promise<components["schemas"]["ActiveDocumentResponse"] | null> {
   try {
-    return await apiFetch<ActiveDocumentResponse>(
+    return await apiFetch<components["schemas"]["ActiveDocumentResponse"]>(
       `${BASE}/${encodeURIComponent(controlledDocumentId)}/active-document`,
     );
   } catch (err) {

@@ -1,7 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TemplateEditorPage } from '../pages/TemplateEditorPage';
 import type { TemplateSchemas } from '../api/templates';
 
 let detectedVariables: string[] = [];
@@ -15,6 +14,7 @@ const baseSchemas: TemplateSchemas = {
 };
 
 vi.mock('@eigenpal/docx-js-editor/styles.css', () => ({}));
+vi.mock('prosemirror-view/style/prosemirror.css', () => ({}));
 vi.mock('@eigenpal/docx-js-editor/core', () => ({ createEmptyDocument: () => ({ type: 'empty-doc' }) }));
 vi.mock('@eigenpal/docx-js-editor/react', () => ({
   DocxEditor: React.forwardRef(({ onChange }: { onChange?: () => void }, ref) => {
@@ -52,7 +52,12 @@ vi.mock('../api/catalog', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
-function renderPage() {
+let TemplateEditorPage: (typeof import('../pages/TemplateEditorPage'))['TemplateEditorPage'] | null = null;
+
+async function renderPage() {
+  if (!TemplateEditorPage) {
+    ({ TemplateEditorPage } = await import('../pages/TemplateEditorPage'));
+  }
   return render(<TemplateEditorPage templateId="tpl-1" versionNum={1} />);
 }
 
@@ -78,7 +83,7 @@ describe.skip('TemplateEditorPage placeholder catalog', () => {
   });
 
   it('renders the 7 catalog entries', async () => {
-    renderPage();
+    await renderPage();
     await waitFor(() => expect(screen.getByTestId('catalog-doc_code')).toBeInTheDocument());
     expect(screen.getByTestId('catalog-doc_title')).toBeInTheDocument();
     expect(screen.getByTestId('catalog-revision_number')).toBeInTheDocument();
@@ -88,13 +93,13 @@ describe.skip('TemplateEditorPage placeholder catalog', () => {
     expect(screen.getByTestId('catalog-controlled_by_area')).toBeInTheDocument();
   });
 
-  it('does not render "+ Add manually" button', () => {
-    renderPage();
+  it('does not render "+ Add manually" button', async () => {
+    await renderPage();
     expect(screen.queryByRole('button', { name: '+ Add manually' })).toBeNull();
   });
 
   it('marks detected catalog tokens as detected in the panel', async () => {
-    renderPage();
+    await renderPage();
     detectedVariables = ['doc_code', 'author'];
     await triggerEditorChange();
     await waitFor(() => {
@@ -105,7 +110,7 @@ describe.skip('TemplateEditorPage placeholder catalog', () => {
   });
 
   it('saves catalog tokens to schema with computed type and resolverKey', async () => {
-    renderPage();
+    await renderPage();
     detectedVariables = ['doc_code', 'author'];
     await triggerEditorChange();
     await act(async () => { vi.advanceTimersByTime(400); await Promise.resolve(); });
@@ -121,7 +126,7 @@ describe.skip('TemplateEditorPage placeholder catalog', () => {
   });
 
   it('ignores non-catalog tokens silently', async () => {
-    renderPage();
+    await renderPage();
     detectedVariables = ['customer_name', 'doc_code'];
     await triggerEditorChange();
     await act(async () => { vi.advanceTimersByTime(400); await Promise.resolve(); });

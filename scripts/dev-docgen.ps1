@@ -4,7 +4,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $root ".env.docgen-v2"
 
 if (-not (Test-Path $envFile)) {
-    Write-Error "[dev-docgen] Missing $envFile — copy from .env.docgen-v2.example and fill in values."
+    Write-Error "[dev-docgen] Missing $envFile - copy from .env.docgen-v2.example and fill in values."
     exit 1
 }
 

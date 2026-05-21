@@ -941,6 +941,97 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	return res, tx.Commit()
 }
 
+func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, tenantID, sessionID, userID, docID string, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	authzGUCStmt := `
+		SELECT
+			set_config('metaldocs.tenant_id', $1, true),
+			set_config('metaldocs.actor_id', $2, true)
+	`
+	if err := r.setAuthzGUC(ctx, tx, authzGUCStmt, tenantID, userID); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+		return nil, fmt.Errorf("sync artifact metadata: authz check: %w", err)
+	}
+
+	var currentRevisionID, activeSessionID, status string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT coalesce(current_revision_id::text,''), coalesce(active_session_id::text,''), status
+		   FROM documents
+		  WHERE id = $1 AND tenant_id = $2
+		  FOR UPDATE`,
+		docID, tenantID,
+	).Scan(&currentRevisionID, &activeSessionID, &status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	if status != string(domain.DocStatusDraft) {
+		return nil, domain.ErrInvalidStateTransition
+	}
+	if activeSessionID == "" {
+		return nil, domain.ErrSessionInactive
+	}
+	if activeSessionID != sessionID {
+		return nil, domain.ErrSessionNotHolder
+	}
+
+	var sessUser, sessStatus string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT user_id::text, status
+		   FROM editor_sessions
+		  WHERE id = $1
+		  FOR UPDATE`,
+		sessionID,
+	).Scan(&sessUser, &sessStatus); err != nil {
+		return nil, err
+	}
+	if sessStatus != string(domain.SessionActive) {
+		return nil, domain.ErrSessionInactive
+	}
+	if sessUser != userID {
+		return nil, domain.ErrSessionNotHolder
+	}
+
+	var committedFileSize sql.NullInt64
+	var committedPageCount sql.NullInt64
+	var committedPageCountSource sql.NullString
+	if err := tx.QueryRowContext(ctx,
+		`UPDATE document_revisions
+		    SET file_size_bytes = $1,
+		        page_count = $2,
+		        page_count_source = $3
+		  WHERE id = $4
+		    AND document_id = $5
+		RETURNING file_size_bytes, page_count, page_count_source`,
+		fileSizeBytes, pageCount, pageCountSource, currentRevisionID, docID,
+	).Scan(&committedFileSize, &committedPageCount, &committedPageCountSource); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+
+	res := &CommitResult{RevisionID: currentRevisionID}
+	if committedFileSize.Valid {
+		res.FileSizeBytes = &committedFileSize.Int64
+	}
+	if committedPageCount.Valid {
+		pc := int(committedPageCount.Int64)
+		res.PageCount = &pc
+	}
+	if committedPageCountSource.Valid {
+		res.PageCountSource = &committedPageCountSource.String
+	}
+	return res, tx.Commit()
+}
+
 func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Time) (int, error) {
 	res, err := r.db.ExecContext(ctx,
 		`DELETE FROM autosave_pending_uploads WHERE expires_at < $1 AND consumed_at IS NULL`,

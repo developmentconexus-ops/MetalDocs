@@ -138,12 +138,6 @@ vi.mock('../api/documents', () => ({
   getDocumentRevisionHistory: vi.fn().mockResolvedValue({ items: [] }),
   renameDocument: vi.fn().mockResolvedValue(undefined),
   signedRevisionURL: vi.fn().mockReturnValue('/revisions/r1/signed-url'),
-  syncArtifactMetadata: vi.fn().mockResolvedValue({
-    revision_id: 'r1',
-    file_size_bytes: 1304,
-    page_count: 3,
-    page_count_source: 'eigenpal_client',
-  }),
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -408,24 +402,17 @@ describe('DocumentEditorPage autosave wiring', () => {
     expect(mockState.autosaveQueueSpy).toHaveBeenCalledWith(emittedBuffer, { foo: 'bar' }, 3);
   });
 
-  it('syncs missing artifact metadata on first draft load without waiting for content edits', async () => {
+  it('renders server-provided artifact metadata on first draft load', async () => {
     vi.mocked(api.getDocument).mockResolvedValue(makeDoc('draft', {
-      currentRevisionFileSizeBytes: null,
-      currentRevisionPageCount: null,
-      currentRevisionPageCountSource: null,
+      currentRevisionFileSizeBytes: 1304,
+      currentRevisionPageCount: 3,
+      currentRevisionPageCountSource: 'eigenpal_client',
     }) as never);
 
     renderPage(<DocumentEditorPage documentID="d1" onDone={() => {}} />);
 
     await waitFor(() =>
       expect(screen.getByTestId('editor').getAttribute('data-mode')).toBe('document-edit'),
-    );
-
-    await waitFor(() =>
-      expect(vi.mocked(api.syncArtifactMetadata)).toHaveBeenCalledWith('d1', {
-        session_id: 's1',
-        page_count: null,
-      }),
     );
     await waitFor(() =>
       expect(screen.getByText('3 paginas · 1,3 KB')).toBeTruthy(),

@@ -59,7 +59,7 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 		docgenv2.NewTemplatesTemplateReader(db),
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: cd},
+		&fakeControlledDocumentReader{cd: cd},
 		&fakeAuthzChecker{},
 		&fakeProfileDefaultTemplateReader{id: strptr(templateVersionID), status: strptr("published")},
 		snapshotSvc,

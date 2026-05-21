@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"strings"
 
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
 	"metaldocs/internal/modules/controlleddocuments/application"
@@ -69,21 +70,46 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		return tenantIDFromContext(ctx), authn.UserIDFromContext(ctx)
 	}
 
-	generated := controlleddocumentsapi.ServerInterfaceWrapper{
-		Handler: h,
-		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
-		},
+	middleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && r.URL.Path == "/api/v1/controlled-documents" {
+				injectTenant(idempotency.Require(h.idempCreate, actorOf)(next)).ServeHTTP(w, r)
+				return
+			}
+			if r.Method == http.MethodPost &&
+				len(r.URL.Path) > len("/api/v1/controlled-documents/") &&
+				r.URL.Path[:len("/api/v1/controlled-documents/")] == "/api/v1/controlled-documents/" &&
+				len(r.URL.Path) >= len("/revisions") &&
+				r.URL.Path[len(r.URL.Path)-len("/revisions"):] == "/revisions" {
+				injectTenant(idempotency.Require(h.idempRevision, actorOf)(next)).ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 
-	mux.Handle("POST /api/v1/controlled-documents",
-		injectTenant(idempotency.Require(h.idempCreate, actorOf)(http.HandlerFunc(generated.AtomicCreateControlledDocument))))
-	mux.Handle("POST /api/v1/controlled-documents/{id}/revisions",
-		injectTenant(idempotency.Require(h.idempRevision, actorOf)(http.HandlerFunc(generated.CreateControlledDocumentRevision))))
-	mux.HandleFunc("GET /api/v1/controlled-documents/preview-code", generated.PreviewControlledDocumentCode)
-	mux.HandleFunc("GET /api/v1/controlled-documents", generated.ListControlledDocuments)
-	mux.HandleFunc("GET /api/v1/controlled-documents/{id}", generated.GetControlledDocument)
-	mux.HandleFunc("GET /api/v1/controlled-documents/{id}/active-document", generated.GetActiveDocument)
-	mux.HandleFunc("PUT /api/v1/controlled-documents/{id}/obsolete", generated.ObsoleteControlledDocument)
-	mux.HandleFunc("PUT /api/v1/controlled-documents/{id}/supersede", generated.SupersedeControlledDocument)
+	controlleddocumentsapi.HandlerWithOptions(h, controlleddocumentsapi.StdHTTPServerOptions{
+		BaseRouter: mux,
+		Middlewares: []controlleddocumentsapi.MiddlewareFunc{
+			middleware,
+		},
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			if requiresIdempotencyKey(r) && strings.Contains(err.Error(), "Idempotency-Key is required") {
+				httpresponse.WriteError(w, http.StatusBadRequest, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key header is required")
+				return
+			}
+			httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		},
+	})
+}
+
+func requiresIdempotencyKey(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	if r.URL.Path == "/api/v1/controlled-documents" {
+		return true
+	}
+	return strings.HasPrefix(r.URL.Path, "/api/v1/controlled-documents/") &&
+		strings.HasSuffix(r.URL.Path, "/revisions")
 }

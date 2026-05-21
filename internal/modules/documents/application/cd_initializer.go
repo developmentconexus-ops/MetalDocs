@@ -9,8 +9,8 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 )
 
-// CDDocumentInitializer adapts the documents Service to the registry-owned
-// DocumentInitializer port. It lets the registry atomic-create flow seed
+// CDDocumentInitializer adapts the documents Service to the controlled-document
+// DocumentInitializer port. It lets the controlled-document atomic-create flow seed
 // initial document rows inside the same tx as the CD insert.
 type CDDocumentInitializer struct {
 	svc *Service

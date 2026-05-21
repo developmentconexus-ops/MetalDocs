@@ -37,7 +37,7 @@ func TestCreateDocument_DeniesWhenCapabilityChecker_Denies(t *testing.T) {
 		fakeTplReader{},
 		fakeFormVal{valid: true},
 		&noopAudit{},
-		&fakeRegistryReader{cd: cd},
+		&fakeControlledDocumentReader{cd: cd},
 		denying,
 		&fakeProfileDefaultTemplateReader{id: strptr("tpl_ver_1"), status: strptr("published")},
 	)

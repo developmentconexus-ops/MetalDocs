@@ -89,12 +89,12 @@ type Audit interface {
 	WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error
 }
 
-// RegistryReader loads a ControlledDocument for validation at create time.
-type RegistryReader interface {
+// ControlledDocumentReader loads a ControlledDocument for validation at create time.
+type ControlledDocumentReader interface {
 	GetByID(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error)
 }
 
-type RegistryDuplicator interface {
+type ControlledDocumentDuplicator interface {
 	DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error)
 }
 
@@ -104,18 +104,18 @@ type ProfileDefaultTemplateReader interface {
 }
 
 type Service struct {
-	repo               Repository
-	docgen             DocgenRenderer
-	presigner          Presigner
-	tpl                TemplateReader
-	fv                 FormValidator
-	audit              Audit
-	registry           RegistryReader
-	registryDuplicator RegistryDuplicator
-	caps               CapabilityChecker
-	profileTemplates   ProfileDefaultTemplateReader
-	snapshotSvc        *SnapshotService
-	db                 *sql.DB
+	repo                         Repository
+	docgen                       DocgenRenderer
+	presigner                    Presigner
+	tpl                          TemplateReader
+	fv                           FormValidator
+	audit                        Audit
+	controlledDocumentReader     ControlledDocumentReader
+	controlledDocumentDuplicator ControlledDocumentDuplicator
+	caps                         CapabilityChecker
+	profileTemplates             ProfileDefaultTemplateReader
+	snapshotSvc                  *SnapshotService
+	db                           *sql.DB
 }
 
 func (s *Service) WithDB(db *sql.DB) *Service {
@@ -141,20 +141,20 @@ func NewService(
 	t TemplateReader,
 	fv FormValidator,
 	a Audit,
-	reg RegistryReader,
+	controlledDocumentReader ControlledDocumentReader,
 	caps CapabilityChecker,
 	profileTemplates ProfileDefaultTemplateReader,
 ) *Service {
 	return &Service{
-		repo:             r,
-		docgen:           d,
-		presigner:        p,
-		tpl:              t,
-		fv:               fv,
-		audit:            a,
-		registry:         reg,
-		caps:             caps,
-		profileTemplates: profileTemplates,
+		repo:                     r,
+		docgen:                   d,
+		presigner:                p,
+		tpl:                      t,
+		fv:                       fv,
+		audit:                    a,
+		controlledDocumentReader: controlledDocumentReader,
+		caps:                     caps,
+		profileTemplates:         profileTemplates,
 	}
 }
 
@@ -167,33 +167,33 @@ func NewServiceWithSnapshot(
 	t TemplateReader,
 	fv FormValidator,
 	a Audit,
-	reg RegistryReader,
+	controlledDocumentReader ControlledDocumentReader,
 	caps CapabilityChecker,
 	profileTemplates ProfileDefaultTemplateReader,
 	snap *SnapshotService,
 ) *Service {
 	return &Service{
-		repo:             r,
-		docgen:           d,
-		presigner:        p,
-		tpl:              t,
-		fv:               fv,
-		audit:            a,
-		registry:         reg,
-		caps:             caps,
-		profileTemplates: profileTemplates,
-		snapshotSvc:      snap,
+		repo:                     r,
+		docgen:                   d,
+		presigner:                p,
+		tpl:                      t,
+		fv:                       fv,
+		audit:                    a,
+		controlledDocumentReader: controlledDocumentReader,
+		caps:                     caps,
+		profileTemplates:         profileTemplates,
+		snapshotSvc:              snap,
 	}
 }
 
-func (s *Service) WithRegistryDuplicator(d RegistryDuplicator) *Service {
-	s.registryDuplicator = d
+func (s *Service) WithControlledDocumentDuplicator(d ControlledDocumentDuplicator) *Service {
+	s.controlledDocumentDuplicator = d
 	return s
 }
 
 var ErrControlledDocumentRequired = errors.New("controlled_document_id is required")
-var errRegistryReaderNotConfigured = errors.New("registry reader not configured")
-var errRegistryDuplicatorNotConfigured = errors.New("registry duplicator not configured")
+var errControlledDocumentReaderNotConfigured = errors.New("controlled document reader not configured")
+var errControlledDocumentDuplicatorNotConfigured = errors.New("controlled document duplicator not configured")
 var errCapabilityCheckerNotConfigured = errors.New("capability checker not configured")
 var errProfileTemplateReaderNotConfigured = errors.New("profile default template reader not configured")
 
@@ -236,8 +236,8 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 	if strings.TrimSpace(cmd.ControlledDocumentID) == "" {
 		return nil, ErrControlledDocumentRequired
 	}
-	if s.registry == nil {
-		return nil, errRegistryReaderNotConfigured
+	if s.controlledDocumentReader == nil {
+		return nil, errControlledDocumentReaderNotConfigured
 	}
 	if s.caps == nil {
 		return nil, errCapabilityCheckerNotConfigured
@@ -246,7 +246,7 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		return nil, errProfileTemplateReaderNotConfigured
 	}
 
-	cd, err := s.registry.GetByID(ctx, cmd.TenantID, cmd.ControlledDocumentID)
+	cd, err := s.controlledDocumentReader.GetByID(ctx, cmd.TenantID, cmd.ControlledDocumentID)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +378,7 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 
 // cloneIntoTxInput is the internal payload for cloneIntoTx. It mirrors the
 // fields buildDocumentForCreate consumes plus the override-template hint the
-// registry atomic-create path may carry.
+// controlled-document atomic-create path may carry.
 type cloneIntoTxInput struct {
 	TenantID                  string
 	ControlledDocumentID      string
@@ -392,7 +392,7 @@ type cloneIntoTxInput struct {
 }
 
 // cloneIntoTx performs the DB-only portion of CreateDocument inside a
-// caller-owned tx so callers (e.g. registry atomic-create) can compose the CD
+// caller-owned tx so callers (e.g. controlled-document atomic-create) can compose the CD
 // insert and the document insert in a single transaction.
 //
 // Differences from CreateDocument:
@@ -522,8 +522,8 @@ func (s *Service) GetDocument(ctx context.Context, tenantID, id string) (*domain
 }
 
 func (s *Service) DuplicateDocument(ctx context.Context, tenantID, userID, docID string) (*CreateDocumentResult, error) {
-	if s.registryDuplicator == nil {
-		return nil, errRegistryDuplicatorNotConfigured
+	if s.controlledDocumentDuplicator == nil {
+		return nil, errControlledDocumentDuplicatorNotConfigured
 	}
 	doc, err := s.repo.GetDocument(ctx, tenantID, docID)
 	if err != nil {
@@ -532,7 +532,7 @@ func (s *Service) DuplicateDocument(ctx context.Context, tenantID, userID, docID
 	if doc.ControlledDocumentID == nil || strings.TrimSpace(*doc.ControlledDocumentID) == "" {
 		return nil, ErrControlledDocumentRequired
 	}
-	cd, err := s.registryDuplicator.DuplicateControlledDocument(ctx, tenantID, *doc.ControlledDocumentID, userID)
+	cd, err := s.controlledDocumentDuplicator.DuplicateControlledDocument(ctx, tenantID, *doc.ControlledDocumentID, userID)
 	if err != nil {
 		return nil, err
 	}
