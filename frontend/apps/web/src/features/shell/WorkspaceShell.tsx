@@ -10,7 +10,7 @@ type WorkspaceShellProps = {
   notificationsPending: number;
   documentCount: number;
   reviewCount: number;
-  registryCount: number;
+  documentTypesCount: number;
   showAdmin: boolean;
   documentProfiles: DocumentProfileItem[];
   processAreas: ProcessAreaItem[];
@@ -37,7 +37,7 @@ export function WorkspaceShell(props: WorkspaceShellProps) {
       notificationsPending={props.notificationsPending}
       documentCount={props.documentCount}
       reviewCount={props.reviewCount}
-      registryCount={props.registryCount}
+      documentTypesCount={props.documentTypesCount}
       showAdmin={props.showAdmin}
       documentProfiles={props.documentProfiles}
       processAreas={props.processAreas}

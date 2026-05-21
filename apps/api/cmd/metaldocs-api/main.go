@@ -72,11 +72,11 @@ import (
 	e2etest "metaldocs/internal/test"
 )
 
-type registryControlledDocumentDuplicator struct {
+type controlledDocumentDuplicatorAdapter struct {
 	svc *controlleddocumentsapp.ControlledDocumentService
 }
 
-func (a registryControlledDocumentDuplicator) DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error) {
+func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	if a.svc == nil {
 		return nil, fmt.Errorf("controlled document service not configured")
 	}
@@ -210,7 +210,7 @@ func main() {
 		AuditWriter: deps.AuditWriter,
 	})
 	controlledDocumentsModule.RegisterRoutes(mux)
-	docRegistryDuplicator := registryControlledDocumentDuplicator{svc: controlledDocumentsModule.Service()}
+	controlledDocumentDuplicator := controlledDocumentDuplicatorAdapter{svc: controlledDocumentsModule.Service()}
 
 	var membershipService *iamapp.AreaMembershipService
 	if deps.SQLDB != nil {
@@ -247,7 +247,7 @@ func main() {
 		revReader := docrepo.NewRevisionReader(deps.SQLDB)
 		wfReader := docrepo.NewWorkflowReader(deps.SQLDB)
 		ctxBuilder := docapp.NewDocumentContextBuilder(deps.SQLDB, revReader, wfReader,
-			cdRegistryAdapter{cdRepo}, revReader)
+			controlledDocumentsReaderAdapter{cdRepo}, revReader)
 		resolverReg := resolvers.NewRegistry()
 		resolvers.RegisterBuiltins(resolverReg)
 		freezeSvc = docapp.NewFreezeService(
@@ -275,7 +275,7 @@ func main() {
 		Audit:              newDocumentsAuditAdapter(deps.AuditWriter),
 		ExportPresign:      docPresigner,
 		RegistryReader:     cdRepo,
-		RegistryDuplicator: docRegistryDuplicator,
+		RegistryDuplicator: controlledDocumentDuplicator,
 		Caps:               wiring.NewCapabilityChecker(capabilityService),
 		ProfileDefaults:    &profileDefaultsAdapter{profileRepo: profileRepo},
 		SnapshotReader:     docSnapshotReader,
@@ -336,7 +336,7 @@ func main() {
 	docMod := documents.New(docDeps)
 	docMod.RegisterRoutes(mux)
 
-	// Wire the documents-side adapter back into the registry service so atomic
+	// Wire the documents-side adapter back into the controlled-documents service so atomic
 	// CD-create can clone the initial document inside the same tx as the CD
 	// insert. controlledDocumentsModule was constructed before docMod (because docMod
 	// needs RegistryDuplicator), hence the post-construction setter.
@@ -556,14 +556,15 @@ func schedulerLeaderID() string {
 	return fmt.Sprintf("%s:%d", hostname, os.Getpid())
 }
 
-// cdRegistryAdapter bridges the registry ControlledDocumentRepository → resolvers.RegistryReader.
-type cdRegistryAdapter struct {
+// controlledDocumentsReaderAdapter bridges the controlled-document repository
+// to resolvers.RegistryReader.
+type controlledDocumentsReaderAdapter struct {
 	repo interface {
 		GetByID(ctx context.Context, tenantID, id string) (*controlleddocumentsdomain.ControlledDocument, error)
 	}
 }
 
-func (a cdRegistryAdapter) GetControlledDocument(ctx context.Context, tenantID, controlledDocumentID string) (resolvers.ControlledDocumentInfo, error) {
+func (a controlledDocumentsReaderAdapter) GetControlledDocument(ctx context.Context, tenantID, controlledDocumentID string) (resolvers.ControlledDocumentInfo, error) {
 	cd, err := a.repo.GetByID(ctx, tenantID, controlledDocumentID)
 	if err != nil {
 		return resolvers.ControlledDocumentInfo{}, err
