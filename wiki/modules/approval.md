@@ -510,6 +510,7 @@ Top 3 (by severity, then by blast-radius):
 
 ## Changelog (this doc)
 
+- 2026-05-20 - Deep QA execution sync: worker-owned scheduled publish validation now relies on the dedicated wiki reference set under `wiki/references/documents-approval-deep-qa/` (`runbook.md`, `fixtures.md`, `matrix.md`) so future sessions can separate enqueue proof, jobs-host execution proof, and post-cutover canonical UI truth without relying on session memory.
 - 2026-05-20 - Scheduled supersede runtime hardening sync: `POST /api/v1/documents/{id}/schedule-publish` now runs end-to-end against runtime without `content_hash` in the request body, persists `documents.superseded_document_id`, and publishes the scheduled revision only after the recorded published head is superseded at cutover.
 - 2026-05-20 - Scheduled publish River cutover sync: `POST /api/v1/documents/{id}/schedule-publish` now enqueues exactly one River `scheduled_publish_cutover` job inside the approval transaction, and `metaldocs-jobs` owns the future publish. The job payload carries `schedule_generation` so stale schedule requests no-op instead of re-publishing after reschedule/cancel drift.
 - 2026-05-20 - Schedule publish contract hardening sync: `POST /api/v1/documents/{id}/schedule-publish` now resolves the active approval instance by document scope before calling application service, and propagates `If-Match` revision precondition into schedule-publish OCC (`ErrStaleRevision` on mismatch) instead of silently discarding it.
