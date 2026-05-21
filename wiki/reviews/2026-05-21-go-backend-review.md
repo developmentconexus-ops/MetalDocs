@@ -48,7 +48,9 @@
 | #  | Module                                          | Status  | Critical | High | Medium | Low | Reviewer | Date | Findings |
 |----|-------------------------------------------------|---------|----------|------|--------|-----|----------|------|----------|
 | 1  | `apps/api/cmd/metaldocs-api`                    | Done    | 4        | 5    | 6      | 6   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer | 2026-05-21 | [cmd-metaldocs-api.md](2026-05-21-go-backend-review/cmd-metaldocs-api.md) |
-| 2  | `internal/platform/*`                           | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 2a | `platform/{authn,security,idempotency,ratelimit,tenant,problem,httpresponse}` | Done | 5 | 11 | 11 | 8 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-21 | [platform-2a-security.md](2026-05-21-go-backend-review/platform-2a-security.md) |
+| 2b | `platform/{db,migrate,bootstrap,objectstore,storage,messaging,servicebus,jobs,worker}` | Pending | - | - | - | - | - | - | - |
+| 2c | `platform/{config,observability,cache,featureflags,formval,httpclient,pagination,docgenv2,render}` | Pending | - | - | - | - | - | - | - |
 | 3  | `internal/modules/auth`                         | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 4  | `internal/modules/iam`                          | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 5  | `internal/modules/documents`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -64,4 +66,4 @@
 ## Notes
 
 - Module order revised from initial plan: `approval` module does not exist in repo. Added `render`, `search`, `jobs` (real modules under `internal/modules/`).
-- Platform packages reviewed as a single batch (#2) because they share orchestration concerns; if any one balloons in findings, split into its own row.
+- Platform row split into #2a/#2b/#2c on 2026-05-21 — 25 packages / ~5200 LoC too big for a single agent pass. Grouped by concern: security boundary (#2a), data + infra (#2b), support + observability (#2c).
