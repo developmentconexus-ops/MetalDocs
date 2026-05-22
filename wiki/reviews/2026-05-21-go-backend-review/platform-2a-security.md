@@ -216,6 +216,8 @@ Two coupled defects:
 
 **Recommend:** Define `type SignedURL struct { URL string; ExpiresAt time.Time }` returned by `BuildDownloadURL`, with `(s SignedURL) IsExpired(now time.Time) bool`. Add `now func() time.Time` field on `AttachmentSigner` defaulted to `time.Now`. Pattern already present in `security.RateLimiter` at [ratelimit.go:26](../../../internal/platform/security/ratelimit.go) — reuse it.
 
+**FIXED** in `90cee6f8`
+
 ---
 
 ### H7 — CORS middleware lets non-preflight cross-origin requests with disallowed Origin reach handler `[s,g,t]`
