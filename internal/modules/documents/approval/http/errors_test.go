@@ -26,7 +26,7 @@ func TestMapErrorToResponse(t *testing.T) {
 		name       string
 		err        error
 		wantStatus int
-		wantCode   string
+		wantCode   problem.Code
 		wantTitle  string
 	}{
 		{

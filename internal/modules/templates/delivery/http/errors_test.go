@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/problem"
 )
 
 func TestMapErr(t *testing.T) {
@@ -15,7 +16,7 @@ func TestMapErr(t *testing.T) {
 		name       string
 		err        error
 		wantStatus int
-		wantCode   string
+		wantCode   problem.Code
 	}{
 		{name: "not found", err: domain.ErrNotFound, wantStatus: http.StatusNotFound, wantCode: "not_found"},
 		{name: "key conflict", err: domain.ErrKeyConflict, wantStatus: http.StatusConflict, wantCode: "key_conflict"},

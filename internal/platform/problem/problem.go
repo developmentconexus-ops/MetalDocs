@@ -15,19 +15,23 @@ type Problem struct {
 	Status   int          `json:"status"`
 	Detail   string       `json:"detail,omitempty"`
 	Instance string       `json:"instance,omitempty"`
-	Code     string       `json:"code"`
+	Code     Code         `json:"code"`
 	Errors   []FieldError `json:"errors,omitempty"`
 }
 
 // FieldError describes a validation error on a specific input field.
 type FieldError struct {
 	Field   string `json:"field"`
-	Code    string `json:"code"`
+	Code    Code   `json:"code"`
 	Message string `json:"message"`
 }
 
 // New creates a Problem with required fields.
-func New(status int, code, title string) *Problem {
+// Panics if status is outside the valid HTTP range [100, 599].
+func New(status int, code Code, title string) *Problem {
+	if status < 100 || status > 599 {
+		panic(fmt.Sprintf("problem.New: invalid HTTP status %d", status))
+	}
 	return &Problem{
 		Title:  title,
 		Status: status,
@@ -48,7 +52,7 @@ func (p *Problem) WithInstance(instance string) *Problem {
 }
 
 // WithFieldError appends a field error and returns the same Problem.
-func (p *Problem) WithFieldError(field, code, message string) *Problem {
+func (p *Problem) WithFieldError(field string, code Code, message string) *Problem {
 	p.Errors = append(p.Errors, FieldError{Field: field, Code: code, Message: message})
 	return p
 }
