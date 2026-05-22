@@ -13,6 +13,17 @@ import (
 	"metaldocs/internal/platform/ratelimit"
 )
 
+func mustConfig(t *testing.T, q map[ratelimit.RouteKey]int, sweep, idle time.Duration) ratelimit.Config {
+	t.Helper()
+	cfg, err := ratelimit.NewConfig(q)
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
+	}
+	cfg.SweepInterval = sweep
+	cfg.IdleThreshold = idle
+	return cfg
+}
+
 // TestSweep_EvictsIdleEntries proves that limiter entries idle longer than
 // the configured IdleThreshold are dropped by the sweeper, so 10_000 unique
 // identities collapse back to baseline after one window — driven against a
@@ -25,11 +36,12 @@ func TestSweep_EvictsIdleEntries(t *testing.T) {
 	clock := t0
 	now := func() time.Time { return clock }
 
-	mw := ratelimit.New(ctx, ratelimit.Config{
-		Quotas:        map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 60},
-		SweepInterval: time.Hour, // background sweeper effectively off for this test
-		IdleThreshold: time.Minute,
-	}).WithClock(now)
+	cfg := mustConfig(t,
+		map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 60},
+		time.Hour, // background sweeper effectively off for this test
+		time.Minute,
+	)
+	mw := ratelimit.New(ctx, cfg).WithClock(now)
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })
 	h := mw.Limit(ratelimit.RouteExportPDF, func(r *http.Request) string { return r.Header.Get("x-user") }, next)
 
@@ -63,11 +75,12 @@ func TestSweeper_ExitsOnContextCancel(t *testing.T) {
 	before := runtime.NumGoroutine()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	mw := ratelimit.New(ctx, ratelimit.Config{
-		Quotas:        map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 60},
-		SweepInterval: 10 * time.Millisecond,
-		IdleThreshold: 20 * time.Millisecond,
-	})
+	cfg := mustConfig(t,
+		map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 60},
+		10*time.Millisecond,
+		20*time.Millisecond,
+	)
+	mw := ratelimit.New(ctx, cfg)
 
 	deadline := time.Now().Add(200 * time.Millisecond)
 	for time.Now().Before(deadline) {
@@ -113,11 +126,12 @@ func TestLimit_LimiterReusedAcrossRequests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	mw := ratelimit.New(ctx, ratelimit.Config{
-		Quotas:        map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 1},
-		SweepInterval: time.Hour,
-		IdleThreshold: time.Hour,
-	})
+	cfg := mustConfig(t,
+		map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 1},
+		time.Hour,
+		time.Hour,
+	)
+	mw := ratelimit.New(ctx, cfg)
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })
 	h := mw.Limit(ratelimit.RouteExportPDF, func(r *http.Request) string { return "u1" }, next)
 
@@ -143,11 +157,12 @@ func TestLimit_RaceUnderConcurrentFirstHit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	mw := ratelimit.New(ctx, ratelimit.Config{
-		Quotas:        map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 1000},
-		SweepInterval: time.Hour,
-		IdleThreshold: time.Hour,
-	})
+	cfg := mustConfig(t,
+		map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 1000},
+		time.Hour,
+		time.Hour,
+	)
+	mw := ratelimit.New(ctx, cfg)
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })
 	h := mw.Limit(ratelimit.RouteExportPDF, func(r *http.Request) string { return r.Header.Get("x-user") }, next)
 
