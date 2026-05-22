@@ -220,13 +220,25 @@ Two coupled defects:
 
 ---
 
-### H7 — CORS middleware lets non-preflight cross-origin requests with disallowed Origin reach handler `[s,g,t]`
+### H7 — CORS middleware lets non-preflight cross-origin requests with disallowed Origin reach handler `[s,g,t]` — **FIXED** in `6a0d62a7` (folds L4)
 
 **File:** [internal/platform/security/cors.go:57-64](../../../internal/platform/security/cors.go)
 
 Preflight rejects with 403 (correct). Non-preflight with disallowed `Origin` falls through to `next.ServeHTTP` with no CORS headers set. Browsers suppress the response, but non-browser clients (curl, scripts, server-to-server) receive and act on it — and side effects on the server were already committed. CORS is not the only gate (`OriginProtection` covers cookied mutators), but a publicly mutable endpoint with no session would bypass both layers.
 
 **Recommend:** Reject non-preflight requests with `Origin` set and not allowlisted: return 403 with `problem.Write(problem.CodeForbidden, "cross-origin request blocked")`. Also normalize allowlist + incoming `Origin` to lowercase (RFC 6454 — see L4) so case-mismatched config doesn't silently mis-match. Reuse `normalizeOrigin` from `origin_protection.go:124` instead of re-implementing.
+
+**Fix verification (`6a0d62a7`):**
+- [`CORS.Wrap`](../../../internal/platform/security/cors.go) now rejects any request with a non-empty `Origin` that fails the allowlist via `problem.Write(w, problem.New(http.StatusForbidden, problem.CodeForbiddenOrigin, "cross-origin request blocked"))` — applies to GET, POST, OPTIONS, and every other method. No-Origin requests still pass through unchanged.
+- New catalog constant [`problem.CodeForbiddenOrigin = "FORBIDDEN_ORIGIN"`](../../../internal/platform/problem/codes.go) — distinct from `CodeForbiddenCapability` / `CodeForbiddenArea` so CORS rejections are greppable in logs.
+- Allowlist + incoming `Origin` both run through `normalizeOrigin` from [`origin_protection.go`](../../../internal/platform/security/origin_protection.go) (RFC 6454 scheme/host case-fold) — folds L4. `https://App.Example.Com` configuration now matches browser-sent `https://app.example.com`.
+- Tests in [`tests/unit/cors_middleware_test.go`](../../../tests/unit/cors_middleware_test.go):
+  - `TestCORSDeniesUnknownOriginGET` — disallowed GET returns 403 + `application/problem+json`, handler never invoked.
+  - `TestCORSDeniesUnknownOriginPOSTBeforeHandler` — disallowed POST returns 403 before reaching handler, proving no server-side side effects commit.
+  - `TestCORSAllowlistCaseInsensitive` — case-mismatched allowlist matches and echoes normalized origin.
+  - `TestCORSPassesThroughNoOriginHeader` — no-Origin GET reaches handler with no CORS headers.
+  - `TestCORSDeniesUnknownOriginPreflight` (existing) still passes — preflight 403 behavior unchanged.
+- Verification: `go vet ./internal/platform/security/...` + `go test -race -count=1 ./internal/platform/security/... ./tests/unit/...` green.
 
 ---
 
@@ -437,7 +449,7 @@ No `Content-Type: application/json` assertion before decode. Mildly relaxes the 
 
 ---
 
-### L4 — CORS allowlist match is case-sensitive on the host portion `[s]`
+### L4 — CORS allowlist match is case-sensitive on the host portion `[s]` — **FIXED** in `6a0d62a7` (folded with H7)
 
 **File:** [internal/platform/security/cors.go:95-101](../../../internal/platform/security/cors.go); origin already lowercases scheme/host at [origin_protection.go:124-133](../../../internal/platform/security/origin_protection.go) (`normalizeOrigin`) — not used here.
 
