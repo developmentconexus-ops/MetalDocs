@@ -53,6 +53,9 @@ func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 	if secret == "" {
 		return AttachmentsConfig{}, fmt.Errorf("METALDOCS_ATTACHMENTS_SIGNING_SECRET is required for provider %s", provider)
 	}
+	if len(secret) < 32 {
+		return AttachmentsConfig{}, fmt.Errorf("METALDOCS_ATTACHMENTS_SIGNING_SECRET must be at least 32 bytes, got %d", len(secret))
+	}
 
 	ttlSeconds := 300
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_ATTACHMENTS_DOWNLOAD_TTL_SECONDS")); raw != "" {
