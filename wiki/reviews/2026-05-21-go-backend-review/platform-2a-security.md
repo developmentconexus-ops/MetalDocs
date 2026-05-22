@@ -224,6 +224,8 @@ All fields public; `Problem{Status: 0}` is constructible and would cause `w.Writ
 
 **Recommend:** `type Code string` in `codes.go`; change catalog constants to that type; change `Problem.Code` and `FieldError.Code` to `Code`. Make `Problem` struct fields unexported and keep `New`/`WithDetail`/`WithFieldError` builders as the only construction path. `httpresponse.WriteError` signature also updates to take `problem.Code`. Existing callers using catalog constants compile unchanged; magic-string callers fail to compile (intended).
 
+**FIXED** in `e1daeeb3` — `type Code string` introduced; all catalog constants typed; `Problem.Code` and `FieldError.Code` use `Code`; `problem.New` panics on status outside [100, 599]; `httpresponse.WriteError` takes `problem.Code`; all callers migrated to catalog constants or module-local `problem.Code` constants. Struct fields kept exported (unexport deferred — breaks JSON unmarshaling in existing consumers).
+
 ---
 
 ### H10 — `ratelimit.Config.Quotas` is a public mutable map with no validation; zero value panics `[t]`

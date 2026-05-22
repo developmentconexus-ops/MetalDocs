@@ -1277,6 +1277,6 @@ func mapErr(err error) (int, string) {
 	}
 }
 
-func httpErr(w http.ResponseWriter, code int, msg string) {
-	_ = problem.Write(w, problem.New(code, msg, msg))
+func httpErr(w http.ResponseWriter, status int, msg string) {
+	_ = problem.Write(w, problem.New(status, problem.Code(msg), msg))
 }
