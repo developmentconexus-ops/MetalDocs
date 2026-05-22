@@ -1,5 +1,7 @@
 package ratelimit
 
+import "time"
+
 // Per-route quotas from spec §Rate limits. Values are requests-per-minute
 // per user. Routes not listed here are unlimited.
 //
@@ -16,6 +18,11 @@ const (
 
 type Config struct {
     Quotas map[RouteKey]int // req/min
+
+    // Optional sweeper schedule. Zero values fall back to 1m sweep and 2m
+    // idle threshold; tests use small values to exercise eviction quickly.
+    SweepInterval time.Duration
+    IdleThreshold time.Duration
 }
 
 func DefaultConfig() Config {

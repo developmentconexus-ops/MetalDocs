@@ -162,7 +162,9 @@ func TestRegisterRoutes_WrapperForwardsRepresentativeRoutes(t *testing.T) {
 func TestRegisterRoutesWithRateLimit_WrapperForwardingStillWorks(t *testing.T) {
 	mod := newWrapperTestModule()
 	mux := http.NewServeMux()
-	rl := ratelimit.New(ratelimit.DefaultConfig())
+	rlCtx, rlCancel := context.WithCancel(context.Background())
+	t.Cleanup(rlCancel)
+	rl := ratelimit.New(rlCtx, ratelimit.DefaultConfig())
 	docID := "11111111-1111-4111-8111-111111111111"
 	mod.RegisterRoutesWithRateLimit(mux, rl, func(r *http.Request) string {
 		return iamdomain.UserIDFromContext(r.Context())
