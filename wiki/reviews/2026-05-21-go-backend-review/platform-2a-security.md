@@ -31,7 +31,7 @@ A finding flagged by multiple agents indicates higher signal; severity normalize
 
 ---
 
-### C2 — `security.RateLimiter.byIdentity` map grows unbounded → in-process memory DoS `[s,g,sf,t]`
+### C2 — `security.RateLimiter.byIdentity` map grows unbounded → in-process memory DoS `[s,g,sf,t]` — **FIXED** in `2f8f6dcc`
 
 **File:** [internal/platform/security/ratelimit.go:28-37,70-88](../../../internal/platform/security/ratelimit.go)
 
@@ -40,6 +40,21 @@ A finding flagged by multiple agents indicates higher signal; severity normalize
 The parallel `ratelimit.Middleware.limiters sync.Map` at [internal/platform/ratelimit/middleware.go:36](../../../internal/platform/ratelimit/middleware.go) has the identical structural defect for per-user/per-route `*rate.Limiter` entries.
 
 **Recommend:** Inside the existing locked section in `allow()`, sweep entries whose `windowStart + window < now` before the lock releases. For the sync.Map limiter, add a `time.Ticker`-driven background sweeper started by the constructor; record last-access time on each entry and evict after `2 × window`. Bound either implementation with a hard max-entries LRU as defense-in-depth.
+
+**Fix verification:**
+- `security.RateLimiter.allow()` now calls `sweepExpiredLocked(now)` on every admission inside the existing mutex — entries with `windowStart + window < now` are dropped before the decision; a single `slog.Warn` per eviction batch carries count + post-sweep map size.
+- Hard cap `defaultMaxRateLimitEntries = 100_000` (override via `WithMaxEntries`) — on overflow new identities are **fail-closed** denied with 429 + `Retry-After` and a `slog.Warn`; existing identities inside the cap continue to be evaluated.
+- `ratelimit.Middleware` wraps each `*rate.Limiter` in `limiterEntry { lim *rate.Limiter; lastAccess atomic.Int64 }`. `New(ctx, cfg)` starts a `time.NewTicker(SweepInterval)` background goroutine that evicts entries idle longer than `IdleThreshold` (default `2 × time.Minute`) and exits on `<-ctx.Done()`. `sync.WaitGroup` exposes `Wait()` so callers can prove no goroutine leak.
+- Eager-allocation defect (review M5) fixed: `m.limiters.Load` first, only build + `LoadOrStore` on miss. Race-safe: 64 concurrent goroutines across 4 keys → exactly 4 surviving entries (`TestLimit_RaceUnderConcurrentFirstHit`).
+- Tests:
+  - [`TestSweep_EvictsIdleEntries`](../../../internal/platform/ratelimit/eviction_test.go) — 10_000 unique identities collapse to 0 after deterministic-clock sweep.
+  - [`TestSweeper_ExitsOnContextCancel`](../../../internal/platform/ratelimit/eviction_test.go) — `runtime.NumGoroutine()` returns to baseline within 1s of `cancel()`.
+  - [`TestLimit_LimiterReusedAcrossRequests`](../../../internal/platform/ratelimit/eviction_test.go) — quota=1, second hit on same key returns 429 (limiter persisted, not freshly allocated).
+  - [`TestLimit_RaceUnderConcurrentFirstHit`](../../../internal/platform/ratelimit/eviction_test.go) — exactly N entries survive across N distinct keys under 64-goroutine contention.
+  - [`TestRateLimiterSweepsExpiredWindowEntries`](../../../tests/unit/rate_limit_eviction_test.go) — 2_000 identities (10_000 in deterministic-clock fast path) → 1 after window elapse + subsequent admission triggers sweep.
+  - [`TestRateLimiterFailsClosedOnMapOverflow`](../../../tests/unit/rate_limit_eviction_test.go) — capacity=8, 9th distinct identity returns 429 with `Retry-After`; existing identity still admitted.
+- Verification: `go vet`, `go test -race ./internal/platform/...`, `go test -race -run TestRateLimit -count 100 ./tests/unit/...` all green.
+- Route-to-limiter mapping documented in [`wiki/architecture/rate-limiting.md`](../../architecture/rate-limiting.md). The two limiters are intentionally **not** merged in this task — flagged for a future refactor.
 
 ---
 
