@@ -1,6 +1,6 @@
 # Architecture: Rate Limiting
 
-> **Last verified:** 2026-05-21 (commit `2f8f6dcc`)
+> **Last verified:** 2026-05-22 (commit H2 fix)
 > **Scope:** the two parallel rate-limiter implementations currently live in the API, what each one keys on, which routes each one protects, and the bounded-memory contract both honor (review finding **C2**).
 > **Out of scope:** circuit-breakers on downstream calls, infrastructure-layer (CDN / WAF) limiting, per-tenant quota enforcement, billing-driven throttling. Merging the two limiters is intentionally **deferred** to a separate refactor — see "Known duplication" below.
 > **Key files:**
@@ -21,7 +21,7 @@ MetalDocs ships two distinct rate-limit middlewares. They are **not** redundant 
 | Limiter | Scope | Keyed on | Algorithm | Quota source |
 |---|---|---|---|---|
 | `security.RateLimiter` (`Wrap`) | **Global envelope** — every non-health request | `user:<UserID>` if authenticated, else `ip:<ClientIP>` (CIDR-aware, see `wiki/architecture/trusted-proxy.md`) | Fixed window (`WindowSeconds` + `MaxRequests`) | `METALDOCS_RATELIMIT_*` env (`config.LoadRateLimitConfig`) |
-| `ratelimit.Middleware` (`Limit`) | **Per-route**, only on a small set of expensive write paths | Caller-supplied `userExtractor(*http.Request) string` (currently the authenticated user ID) | Token bucket (`golang.org/x/time/rate`) — quota req/min, burst = quota | `ratelimit.Config.Quotas` keyed by `RouteKey` (`DefaultConfig`) |
+| `ratelimit.Middleware` (`Limit`) | **Per-route**, only on a small set of expensive write paths | `userExtractor(*http.Request) string` → `user:<id>` if set, else `ip:<ClientIP>` via trusted-proxy resolution (same CIDR config as global limiter — H2 fix) | Token bucket (`golang.org/x/time/rate`) — quota req/min, burst = quota | `ratelimit.Config.Quotas` keyed by `RouteKey` (`DefaultConfig`) |
 
 The global limiter is the cheap blanket guard against abusive clients. The per-route limiter is the targeted guard on operations that are individually expensive (storage uploads, PDF rendering) where a small number of legitimate-looking calls can still be damaging.
 
@@ -87,6 +87,19 @@ Both limiters historically kept an unbounded per-identity map and would never ev
 - The sweeper goroutine exits on `<-ctx.Done()`. A `sync.WaitGroup` exposes `Wait()` so callers (and tests) can prove no goroutine leak.
 - Defaults: `SweepInterval = time.Minute`, `IdleThreshold = 2 * time.Minute`. Override via `Config.SweepInterval` / `Config.IdleThreshold`.
 - Race-safe first-hit: `m.limiters.Load` first, only `LoadOrStore` on miss — fixes the eager `rate.NewLimiter` allocation defect (review **M5**).
+- Hard cap: `Config.MaxEntries` (default `100_000`). New keys past cap denied fail-closed 429; atomic counter keeps cardinality consistent with sweep decrement. Mirrors `security.RateLimiter` contract.
+
+#### IP-fallback contract (H2 fix)
+
+`Limit` no longer bypasses when `userExtractor` returns `""`. Identity resolution:
+
+1. `userExtractor(r) != ""` → key `<route>:user:<id>`
+2. `userExtractor(r) == ""` → log `DebugContext` + resolve `security.ClientIP(r, Config.TrustedProxyCIDRs)` → key `<route>:ip:<addr>`
+3. ClientIP invalid (unparseable RemoteAddr, no XFF) → fail-closed `429`
+
+`Config.TrustedProxyCIDRs` is the **single source of truth** — same env var `METALDOCS_TRUSTED_PROXY_CIDRS` loaded via `config.LoadTrustedProxyCIDRs()` as the global limiter. Set at startup, passed into `ratelimit.Config` before constructing the middleware. When empty (default): XFF headers ignored, fallback keys on parsed `RemoteAddr`.
+
+The `user:` / `ip:` literal prefixes namespace the two keyspaces to prevent a user id that happens to look like an IP from colliding with the IP bucket.
 
 ### 3.3 Regression tests
 
@@ -98,6 +111,10 @@ Both limiters historically kept an unbounded per-identity map and would never ev
 | [`TestSweeper_ExitsOnContextCancel`](../../internal/platform/ratelimit/eviction_test.go) | Per-route limiter: sweeper goroutine returns within 1s of `cancel()`, `runtime.NumGoroutine()` returns to baseline. |
 | [`TestLimit_LimiterReusedAcrossRequests`](../../internal/platform/ratelimit/eviction_test.go) | Per-route limiter: quota=1, second request on the same key is 429 (proves limiter persisted, not freshly allocated). |
 | [`TestLimit_RaceUnderConcurrentFirstHit`](../../internal/platform/ratelimit/eviction_test.go) | Per-route limiter: 64 goroutines racing 4 distinct keys yield exactly 4 surviving entries. |
+| [`TestIPFallback_MisorderedRoute_TwoXFFBucketedSeparately`](../../tests/unit/ratelimit_ip_fallback_test.go) | H2 fix: misordered route (no IAM), trusted proxy → two distinct XFF clients bucket separately. |
+| [`TestIPFallback_UntrustedProxy_BucketsByRemoteAddr`](../../tests/unit/ratelimit_ip_fallback_test.go) | H2 fix: untrusted proxy → XFF ignored, forged header cannot split buckets; RemoteAddr used. |
+| [`TestIPFallback_UnparseableIP_FailClosed`](../../tests/unit/ratelimit_ip_fallback_test.go) | H2 fix: unparseable RemoteAddr + no XFF → 429 fail-closed (was fail-open). |
+| [`TestIPFallback_CapEnforced_FailClosed`](../../tests/unit/ratelimit_ip_fallback_test.go) | H2 fix: IP keys respect MaxEntries cap; overflow denied 429, not bypassed. |
 
 Verification commands:
 

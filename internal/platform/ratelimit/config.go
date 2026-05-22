@@ -1,6 +1,9 @@
 package ratelimit
 
-import "time"
+import (
+    "net/netip"
+    "time"
+)
 
 // Per-route quotas from spec §Rate limits. Values are requests-per-minute
 // per user. Routes not listed here are unlimited.
@@ -23,6 +26,17 @@ type Config struct {
     // idle threshold; tests use small values to exercise eviction quickly.
     SweepInterval time.Duration
     IdleThreshold time.Duration
+
+    // MaxEntries caps the limiter map. Zero falls back to
+    // defaultMaxLimiterEntries. New keys past the cap fail-closed (429),
+    // matching the global limiter's contract from C2.
+    MaxEntries int
+
+    // TrustedProxyCIDRs is the single source of truth for upstream proxies
+    // trusted to set X-Forwarded-For. Loaded once at startup from
+    // METALDOCS_TRUSTED_PROXY_CIDRS via config.LoadTrustedProxyCIDRs.
+    // Drives the IP-fallback path when userExtractor returns "" (H2).
+    TrustedProxyCIDRs []netip.Prefix
 }
 
 func DefaultConfig() Config {
