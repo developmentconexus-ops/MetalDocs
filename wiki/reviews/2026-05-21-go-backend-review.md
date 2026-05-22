@@ -53,7 +53,10 @@
 | 2c | `platform/{config,observability,cache,featureflags,formval,httpclient,pagination,docgenv2,render}` | Done | 1 | 14 | 25 | 18 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [platform-2c-support-observability.md](2026-05-21-go-backend-review/platform-2c-support-observability.md) |
 | 3  | `internal/modules/auth`                         | Done    | 8        | 18   | 22     | 11  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [auth-3.md](2026-05-21-go-backend-review/auth-3.md) |
 | 4  | `internal/modules/iam`                          | Done    | 8        | 15   | 18     | 11  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [iam-4.md](2026-05-21-go-backend-review/iam-4.md) |
-| 5  | `internal/modules/documents`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 5a | `documents/{domain,application,repository}` (~9K LoC) | Done    | 9  | 12   | 18     | 10  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5a.md](2026-05-21-go-backend-review/documents-5a.md) |
+| 5b | `documents/{delivery,http,jobs}` (~4K LoC)      | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 5c | `documents/approval/{domain,application}` (~13K LoC) | Pending | - | -    | -      | -   | -        | -    | -        |
+| 5d | `documents/approval/{http,repository,infrastructure,jobs}` (~7K LoC) | Pending | - | - | - | - | - | - | - |
 | 6  | `internal/modules/controlleddocuments`          | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 7  | `internal/modules/taxonomy`                     | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 8  | `internal/modules/templates`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -67,6 +70,7 @@
 
 - Module order revised from initial plan: `approval` module does not exist in repo. Added `render`, `search`, `jobs` (real modules under `internal/modules/`).
 - Platform row split into #2a/#2b/#2c on 2026-05-21 — 25 packages / ~5200 LoC too big for a single agent pass. Grouped by concern: security boundary (#2a), data + infra (#2b), support + observability (#2c).
+- Documents row split into #5a/#5b/#5c/#5d on 2026-05-22 — ~33K LoC hand-written (largest module). #5a = core domain+application+repository; #5b = delivery+http+jobs; #5c = approval business logic; #5d = approval delivery+infra.
 
 ## Critical Backlog (G3 handoff)
 
@@ -125,3 +129,17 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 4-C8 | `delivery/http/middleware.go:97-99` nil caps silently skips capability check | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog |
 | 4-C2 | `infrastructure/postgres/role_admin_repository.go:113-121` ReplaceUserRoles last-role-wins silent privilege escalation | Critical | leandrotca | TBC | `fix/iam-4-replace-roles-c2` | Backlog (land third) |
 | 4-C5 | `infrastructure/postgres/user_area_repository.go:103` CloseActive no RowsAffected → silent revoke no-op | Critical | leandrotca | TBC | `fix/iam-4-area-repo-c5-h4` | Backlog (land fourth) |
+
+### Module #5a (9 Criticals, 3 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 5a-C1 | `repository/repository.go:1381,1405` MarkArchived/Unarchive no RowsAffected → silent success on cross-tenant docID | Critical | leandrotca | TBC | `fix/docs-5a-rows-affected-c1-c2` | Backlog (land first) |
+| 5a-C2 | `repository/snapshot_repository.go:46,103,113,148,159` 5 write methods no RowsAffected → silent freeze/docx/pdf loss | Critical | leandrotca | TBC | `fix/docs-5a-rows-affected-c1-c2` | Backlog |
+| 5a-C9 | `domain/values_hash.go:18` json.Marshal discarded → hash incorrect → freeze idempotency broken | Critical | leandrotca | TBC | `fix/docs-5a-values-hash-c9` | Backlog (land second) |
+| 5a-C3 | `repository/repository.go:1054,1083` CreateCheckpoint/ListCheckpoints no tenant_id → IDOR | Critical | leandrotca | TBC | `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` | Backlog (land third; requires migration C7 first) |
+| 5a-C4 | `repository/repository.go:1176` RestoreCheckpoint no tenant_id → cross-tenant restore | Critical | leandrotca | TBC | `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` | Backlog |
+| 5a-C5 | `repository/repository.go:777` GetPendingForCommit bare pendingID no tenant scope | Critical | leandrotca | TBC | `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` | Backlog |
+| 5a-C6 | `repository/repository.go:592` HeartbeatSession no tenant_id → cross-tenant session keepalive | Critical | leandrotca | TBC | `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` | Backlog |
+| 5a-C7 | `editor_sessions` schema missing tenant_id column (migration required) | Critical | leandrotca | TBC | `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` | Backlog |
+| 5a-C8 | `repository/repository.go:1147` GetRevision no tenant_id scope | Critical | leandrotca | TBC | `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` | Backlog |
