@@ -82,13 +82,23 @@ The DDL's `CHECK (status IN ('in_flight','completed','failed'))` and the comment
 
 ---
 
-### C5 — `authn.UserIDFromContext` returns `""` silently on missing key → cross-tenant list exposure `[sf]`
+### C5 — `authn.UserIDFromContext` returns `""` silently on missing key → cross-tenant list exposure `[sf]` — **FIXED** in `d2242313`
 
 **File:** [internal/platform/authn/context.go:11-13](../../../internal/platform/authn/context.go); downstream callsite [internal/modules/controlleddocuments/application/service.go:375-379](../../../internal/modules/controlleddocuments/application/service.go)
 
 `UserIDFromContext` returns a bare `string`. The controlled-documents `List` service treats empty actor as "no visibility filter" and the repository skips the per-user `WHERE` clause entirely — returning every document in the tenant when the context is missing the IAM key (middleware misordering, new route without IAM middleware attached, future refactor regression). The `Get` path fails closed by accident (empty string matches no rows); `List` fails open.
 
 **Recommend:** Change signature to `UserIDFromContext(ctx) (string, bool)` (matches `iamdomain.UserIDFromContext` and `authdomain.CurrentUserFromContext`). At the only `List` callsite, `if !ok { return nil, errInternal("actor user id missing") }`. The mutation path at `service.go:474-477` already enforces this pattern — apply the same discipline to read paths. This is the most surgical fix; long-term, the `authn.RolesFromContext` re-export should also be deleted (see M6) and callers should consume `iamdomain` directly.
+
+**Fix verification (`d2242313`):**
+- [`authn.UserIDFromContext`](../../../internal/platform/authn/context.go) now returns `(string, bool)`; both it and `RolesFromContext` carry `// Deprecated:` comments pointing callers to direct `iamdomain` consumption (M6 follow-up).
+- New sentinel [`controlleddocuments.ErrActorMissing`](../../../internal/modules/controlleddocuments/application/service.go); read paths (`List`, `Get`) and `CreateRevision` fail-close with it. HTTP layer maps it to `500 INTERNAL_ERROR` with `slog.Error` in [`writeDomainError`](../../../internal/modules/controlleddocuments/delivery/http/routes.go) — misconfigured middleware now surfaces as an alertable server error rather than a silent cross-tenant disclosure.
+- Callsite policy audit (committed in body): IAM membership grant/revoke + taxonomy archive/setDefault paths now fail-close. Deliberately-tolerated empty actors remain in three documented spots: controlled-documents idempotency scoping ([`handler.go actorOf`](../../../internal/modules/controlleddocuments/delivery/http/handler.go)), IAM admin label fallback ([`admin_handler.go authenticatedActor`](../../../internal/modules/iam/delivery/http/admin_handler.go) → `"system"`), and search policy bypass for background callers ([`service.go shouldBypassPolicy`](../../../internal/modules/search/application/service.go)).
+- Tests:
+  - [`internal/platform/authn/context_test.go`](../../../internal/platform/authn/context_test.go) (NEW) — empty/nil ctx → `("", false)`; populated ctx → `(id, true)`; whitespace-only id treated absent; surrounding whitespace trimmed.
+  - [`TestList_MissingActorContextReturnsErrActorMissing`](../../../internal/modules/controlleddocuments/application/service_test.go), `TestList_AppliesActorFilterWhenContextPresent`, `TestGet_MissingActorContextReturnsErrActorMissing`, `TestCreateRevision_MissingActorContextReturnsErrActorMissing`.
+  - [`TestWriteDomainError_ActorMissingIs500`](../../../internal/modules/controlleddocuments/delivery/http/routes_contract_test.go) and `TestAtomicCreate_MissingAuthContext_Returns500NotFullTenant` — proves the HTTP contract: missing IAM context returns `500 INTERNAL_ERROR`, not `200` with full-tenant payload.
+- Verification: `go vet ./internal/...`, `go test ./internal/platform/authn/... ./internal/modules/controlleddocuments/...` all green.
 
 ---
 
