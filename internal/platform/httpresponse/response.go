@@ -13,7 +13,7 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-func WriteError(w http.ResponseWriter, status int, code, message string) {
+func WriteError(w http.ResponseWriter, status int, code problem.Code, message string) {
 	_ = problem.Write(w, problem.New(status, code, message))
 }
 

@@ -34,7 +34,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	generated := templatesapi.ServerInterfaceWrapper{
 		Handler: h,
 		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeErr(w, http.StatusBadRequest, "invalid_request", err.Error())
+			writeErr(w, http.StatusBadRequest, codeTplInvalidRequest, err.Error())
 		},
 	}
 
@@ -104,12 +104,12 @@ func userIDFromReq(r *http.Request) string {
 	return iamdomain.UserIDFromContext(r.Context())
 }
 
-func writeErr(w http.ResponseWriter, status int, code, message string) {
+func writeErr(w http.ResponseWriter, status int, code problem.Code, message string) {
 	_ = problem.Write(w, problem.New(status, code, message))
 }
 
-var friendlyMsg = map[string]string{
-	"upload_missing": "DOCX file not yet uploaded. Please upload the template file before submitting for review.",
+var friendlyMsg = map[problem.Code]string{
+	codeTplUploadMissing: "DOCX file not yet uploaded. Please upload the template file before submitting for review.",
 }
 
 func writeMappedErr(w http.ResponseWriter, err error) {
@@ -119,7 +119,7 @@ func writeMappedErr(w http.ResponseWriter, err error) {
 		msg = err.Error()
 	}
 	if msg == "" {
-		msg = code
+		msg = string(code)
 	}
 	writeErr(w, status, code, msg)
 }

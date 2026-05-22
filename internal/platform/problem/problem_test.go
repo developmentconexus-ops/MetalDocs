@@ -85,7 +85,7 @@ func TestProblem_MarshalJSON_IncludesAllFields(t *testing.T) {
 				t.Fatalf("unmarshal failed: %v", err)
 			}
 
-			if m["type"] != tt.p.Type || m["title"] != tt.p.Title || m["detail"] != tt.p.Detail || m["instance"] != tt.p.Instance || m["code"] != tt.p.Code {
+			if m["type"] != tt.p.Type || m["title"] != tt.p.Title || m["detail"] != tt.p.Detail || m["instance"] != tt.p.Instance || m["code"] != string(tt.p.Code) {
 				t.Fatalf("unexpected scalar values: %#v", m)
 			}
 			if m["status"] != float64(tt.p.Status) {
@@ -100,7 +100,7 @@ func TestProblem_MarshalJSON_IncludesAllFields(t *testing.T) {
 			if !ok {
 				t.Fatalf("unexpected error item type: %#v", rawErrors[0])
 			}
-			if err0["field"] != tt.p.Errors[0].Field || err0["code"] != tt.p.Errors[0].Code || err0["message"] != tt.p.Errors[0].Message {
+			if err0["field"] != tt.p.Errors[0].Field || err0["code"] != string(tt.p.Errors[0].Code) || err0["message"] != tt.p.Errors[0].Message {
 				t.Fatalf("unexpected error item values: %#v", err0)
 			}
 		})
@@ -214,5 +214,27 @@ func TestProblem_Write_HeaderSetBeforeStatus(t *testing.T) {
 
 	if _, ok := rr.HeaderMap["Content-Type"]; !ok {
 		t.Fatalf("content-type not present in header map")
+	}
+}
+
+func TestProblem_New_PanicsOnInvalidStatus(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+	}{
+		{"below range", 99},
+		{"above range", 600},
+		{"zero", 0},
+		{"negative", -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Fatalf("expected panic for status %d", tt.status)
+				}
+			}()
+			New(tt.status, CodeInternalError, "test")
+		})
 	}
 }
