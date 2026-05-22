@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -33,7 +34,12 @@ func CacheTTL() time.Duration {
 }
 
 func LoadRuntimeConfig() (authapp.Config, error) {
-	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	rawAppEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if !Enabled() && rawAppEnv != "local" {
+		return authapp.Config{}, errors.New("METALDOCS_AUTH_ENABLED=false only permitted when APP_ENV=local")
+	}
+
+	appEnv := rawAppEnv
 	if appEnv == "" {
 		appEnv = "local"
 	}
