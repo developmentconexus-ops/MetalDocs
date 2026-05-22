@@ -51,7 +51,7 @@
 | 2a | `platform/{authn,security,idempotency,ratelimit,tenant,problem,httpresponse}` | Done | 5 | 11 | 11 | 8 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-21 | [platform-2a-security.md](2026-05-21-go-backend-review/platform-2a-security.md) |
 | 2b | `platform/{db,migrate,bootstrap,objectstore,storage,messaging,servicebus,jobs,worker}` | Done | 10 | 24 | 16 | 8 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [platform-2b-data-infra.md](2026-05-21-go-backend-review/platform-2b-data-infra.md) |
 | 2c | `platform/{config,observability,cache,featureflags,formval,httpclient,pagination,docgenv2,render}` | Done | 1 | 14 | 25 | 18 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [platform-2c-support-observability.md](2026-05-21-go-backend-review/platform-2c-support-observability.md) |
-| 3  | `internal/modules/auth`                         | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 3  | `internal/modules/auth`                         | Done    | 8        | 18   | 22     | 11  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [auth-3.md](2026-05-21-go-backend-review/auth-3.md) |
 | 4  | `internal/modules/iam`                          | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 5  | `internal/modules/documents`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 6  | `internal/modules/controlleddocuments`          | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -99,3 +99,16 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | ID | File:line | Severity | Owner | ETA | Fix branch | Status |
 |----|-----------|----------|-------|-----|-----------|--------|
 | 2c-C1 | `internal/platform/pagination/cursor.go:37-43` HMAC-less cursor, anchor tamperable | Critical | leandrotca | TBC | `fix/cursor-2c-c1` | Backlog (cascades H7, H8, H9, M26, M27, L15, L16 — coordinated cursor rewrite) |
+
+### Module #3 (8 Criticals, 4 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|-----------|--------|
+| 3-C2 | `internal/modules/auth/delivery/http/middleware.go:59` `X-User-Id` legacy header → full auth bypass | Critical | leandrotca | TBC | `fix/auth-3-c2` | Backlog (land first) |
+| 3-C1 | `internal/modules/auth/application/service.go:147` swallowed `RecordFailedLogin` → unbounded brute-force | Critical | leandrotca | TBC | `fix/auth-3-c1-c3-c6` | Backlog |
+| 3-C3 | `internal/modules/auth/infrastructure/postgres/repository.go:163` + `service.go:140-148` lockout TOCTOU | Critical | leandrotca | TBC | `fix/auth-3-c1-c3-c6` | Backlog |
+| 3-C6 | `application/service.go:534-538` + `Config.SessionSecret` empty-secret HMAC | Critical | leandrotca | TBC | `fix/auth-3-c1-c3-c6` | Backlog |
+| 3-C4 | `infrastructure/postgres/repository.go:120-131` `RevokeSession`/`TouchSession` no `RowsAffected` | Critical | leandrotca | TBC | `fix/auth-3-c4-c5-c8` | Backlog |
+| 3-C5 | `auth_sessions` schema missing `tenant_id` (verify migration before fix) | Critical | leandrotca | TBC | `fix/auth-3-c4-c5-c8` | Backlog (verify) |
+| 3-C8 | `infrastructure/postgres/repository.go:77,380,396,411` `err == sql.ErrNoRows` direct equality | Critical | leandrotca | TBC | `fix/auth-3-c4-c5-c8` | Backlog |
+| 3-C7 | `domain/model.go:14` `PasswordHash string` vs plaintext indistinguishable | Critical | leandrotca | TBC | `fix/auth-3-c7-types` | Backlog (cascades H12, H13, H15, M15, M16) |
