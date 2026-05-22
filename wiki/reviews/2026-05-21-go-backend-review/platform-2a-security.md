@@ -155,13 +155,23 @@ Empty user → `next.ServeHTTP`, no rate limit, no log. The inline comment ("IAM
 
 ---
 
-### H3 — `responseRecorder` does not implement `http.Flusher` → streaming endpoints silently buffer or panic `[g]`
+### H3 — `responseRecorder` does not implement `http.Flusher` → streaming endpoints silently buffer or panic `[g]` — **FIXED** in `0dc6801a`
 
 **File:** [internal/platform/idempotency/middleware.go:101-116](../../../internal/platform/idempotency/middleware.go)
 
 The wrapper exposes only `WriteHeader` and `Write`. Any wrapped handler that does `w.(http.Flusher).Flush()` fails its type assertion (panic with `http.ResponseWriter` typed nil receiver) or silently buffers (when written through to a non-stdlib writer). Idempotency-protected endpoints cannot be streaming-safe.
 
 **Recommend:** Either implement `Flush()` (delegating to the wrapped `ResponseWriter` if it is a Flusher) and document that flushes are still captured into the body buffer — or refuse to wrap streaming handlers with an explicit `Content-Type: text/event-stream` opt-out at middleware entry. Make the contract explicit; today it is implicit.
+
+**Fix verification (`0dc6801a`):**
+- Strategy 1 (explicit refusal) chosen. Audit of `internal/modules/*/delivery/http/` confirmed no current SSE / chunked / Flusher usage, so no existing routes need an opt-out today; the contract is in place for future streaming routes.
+- [`idempotency.WithStreamingOptOut(matcher)`](../../../internal/platform/idempotency/middleware.go) functional option on `Require`: when `matcher(r)` returns true, the middleware calls `next.ServeHTTP(w, r)` directly — no header check, no replay buffering, no wrapping. Opted-out routes get NO idempotency protection (documented in the option's godoc).
+- [`responseRecorder.Flush`](../../../internal/platform/idempotency/middleware.go) now exists and **fails closed**: it panics with `"idempotency: handler called Flush() on a wrapped ResponseWriter; … Use idempotency.WithStreamingOptOut(matcher) to skip wrapping for this route."`. The existing middleware-level `recover` logs the panic context (`idempotency: handler panicked`) and re-panics so the stdlib server returns 500. No silent buffering, no opaque interface-conversion error.
+- Tests in [`middleware_streaming_test.go`](../../../internal/platform/idempotency/middleware_streaming_test.go):
+  - [`TestMiddleware_StreamingHandler_WithoutOptOut_FailsClosed`](../../../internal/platform/idempotency/middleware_streaming_test.go) — a handler that calls `Flush()` without opt-out panics with a message containing both `idempotency:` and `WithStreamingOptOut`.
+  - [`TestMiddleware_StreamingHandler_WithOptOut_PassesThroughUnwrapped`](../../../internal/platform/idempotency/middleware_streaming_test.go) — opted-out route reaches the raw `httptest.ResponseRecorder` (a real Flusher), streams two SSE chunks successfully, no `Idempotency-Key` header required.
+  - [`TestMiddleware_OptOutFalse_StillEnforcesIdempotency`](../../../internal/platform/idempotency/middleware_streaming_test.go) — matcher returning false leaves the standard contract intact: missing header still yields 400.
+- `go vet` clean, `go test -race -count=1 ./internal/platform/idempotency/...` passes.
 
 ---
 
