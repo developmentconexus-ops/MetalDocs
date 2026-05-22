@@ -14,13 +14,20 @@ A finding flagged by multiple agents indicates higher signal; severity normalize
 
 ## Critical
 
-### C1 — `X-Forwarded-Proto` trusted unconditionally → CSRF origin check bypass `[s,g,sf]`
+### C1 — `X-Forwarded-Proto` trusted unconditionally → CSRF origin check bypass `[s,g,sf]` — **FIXED** in `def24e4a`
 
 **File:** [internal/platform/security/origin_protection.go:100](../../../internal/platform/security/origin_protection.go) (`sameOrigin`)
 
 `sameOrigin` overwrites the request scheme with the raw `X-Forwarded-Proto` header value before allowlist comparison. Any directly reachable client can set `X-Forwarded-Proto: https` and craft an `Origin: https://allowed-host` that matches the canonical form — bypassing CSRF protection on every mutating method that carries a session cookie.
 
 **Recommend:** Add a `TrustedProxyCIDRs` field on `OriginProtectionConfig`; only read `X-Forwarded-Proto` when `r.RemoteAddr` parses to an IP inside that list. Default empty (no header trust) so misconfiguration fails closed. Same TrustedProxy concept also needed by `security/ratelimit.go:96` (`requestIdentity` fallback to `r.RemoteAddr` — see H4). Reuse `auth/application/service.go:542 remoteIP` resolution logic.
+
+**Fix verification (`def24e4a`):**
+- `OriginProtectionConfig.TrustedProxyCIDRs []netip.Prefix` populated from `METALDOCS_TRUSTED_PROXY_CIDRS` via [`config.LoadTrustedProxyCIDRs()`](../../../internal/platform/config/trusted_proxy.go); empty default fails closed (no header trust).
+- [`OriginProtection.sameOrigin`](../../../internal/platform/security/origin_protection.go) now seeds scheme from `r.TLS`; `X-Forwarded-Proto` is only consulted when [`security.IsTrustedRemote(r, cidrs)`](../../../internal/platform/security/proxy.go) returns true.
+- Regression test [`TestOriginProtectionBlocksSpoofedXForwardedProtoFromUntrustedSource`](../../../tests/unit/origin_protection_test.go) asserts a 203.0.113.7 attacker sending `X-Forwarded-Proto: https` against an `Origin: https://internal-host:8080` cookied POST is rejected with 403.
+- Companion test [`TestOriginProtectionHonorsXForwardedProtoFromTrustedProxy`](../../../tests/unit/origin_protection_test.go) proves the legitimate reverse-proxy path (RemoteAddr inside trusted CIDR) still resolves https and passes.
+- Contract documented in [`wiki/architecture/trusted-proxy.md`](../../architecture/trusted-proxy.md).
 
 ---
 
@@ -102,13 +109,22 @@ The wrapper exposes only `WriteHeader` and `Write`. Any wrapped handler that doe
 
 ---
 
-### H4 — `security.RateLimiter` falls back to `r.RemoteAddr` for unauthenticated identity → behind a proxy, every anon caller shares one bucket `[s]`
+### H4 — `security.RateLimiter` falls back to `r.RemoteAddr` for unauthenticated identity → behind a proxy, every anon caller shares one bucket `[s]` — **FIXED** in `def24e4a`
 
 **File:** [internal/platform/security/ratelimit.go:96-107](../../../internal/platform/security/ratelimit.go) (`requestIdentity`)
 
 `r.RemoteAddr` is the upstream proxy IP in any deployment with a reverse proxy or load balancer. All pre-login traffic collapses into a single bucket and either rate-limits everyone together or (more likely) blows past the threshold immediately for legitimate users. This is the same trust-the-proxy problem as C1 — fix together.
 
 **Recommend:** Share the trusted-proxy CIDR config from C1; on a trusted upstream, extract the leftmost `X-Forwarded-For` value (re-use `auth/application/service.go:542` `remoteIP`). When the upstream is untrusted, keep `RemoteAddr`. Document the chosen mode in `wiki/architecture/` or a dedicated security note.
+
+**Fix verification (`def24e4a`):**
+- `RateLimitConfig.TrustedProxyCIDRs` plumbed through [`config.LoadTrustedProxyCIDRs()`](../../../internal/platform/config/trusted_proxy.go) — same env var (`METALDOCS_TRUSTED_PROXY_CIDRS`) and fail-closed default as C1, single source of truth.
+- [`RateLimiter.requestIdentity`](../../../internal/platform/security/ratelimit.go) now resolves IP via [`security.ClientIP(req, cidrs)`](../../../internal/platform/security/proxy.go): leftmost `X-Forwarded-For` when the upstream is trusted, parsed `r.RemoteAddr` otherwise.
+- Auth audit logging at [`Service.remoteIP`](../../../internal/modules/auth/application/service.go) consolidated onto the same helper — three independent IP-resolution paths collapsed to one.
+- Regression test [`TestRateLimiterIsolatesAnonByXFFWhenBehindTrustedProxy`](../../../tests/unit/rate_limit_middleware_test.go) proves two distinct upstream clients (XFF `198.51.100.7` vs `198.51.100.8`) behind the same trusted proxy (`10.0.0.5`) are bucketed separately.
+- Companion test [`TestRateLimiterIgnoresXFFFromUntrustedSource`](../../../tests/unit/rate_limit_middleware_test.go) proves a directly-reachable client cannot forge `X-Forwarded-For` to evade rate limiting — same RemoteAddr is throttled regardless of XFF.
+- Helper invariants covered by [`tests/unit/trusted_proxy_test.go`](../../../tests/unit/trusted_proxy_test.go): trusted match, untrusted rejection, empty CIDRs fail-closed, IPv6 prefix support, multi-hop XFF leftmost selection, malformed config rejection.
+- Contract documented in [`wiki/architecture/trusted-proxy.md`](../../architecture/trusted-proxy.md).
 
 ---
 
