@@ -212,6 +212,8 @@ Preflight rejects with 403 (correct). Non-preflight with disallowed `Origin` fal
 
 **Recommend:** In `LoadRuntimeConfig`, `if !cfg.Enabled() && strings.ToLower(os.Getenv("APP_ENV")) != "local" { return cfg, errors.New("METALDOCS_AUTH_ENABLED=false only permitted when APP_ENV=local") }`. Fail-fast at startup so the failure is visible from logs, not from incident retro.
 
+**FIXED** in `d49730bf` — guard added in `LoadRuntimeConfig`; reads raw `APP_ENV` before defaulting so unset is treated as non-local; 6 unit tests cover all required cases; `go vet` + `go test -race` pass.
+
 ---
 
 ### H9 — `problem.Problem` / `FieldError` accept zero-value construction; `Code` typed as plain `string` `[t]`
