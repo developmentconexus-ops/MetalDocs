@@ -50,7 +50,7 @@
 | 1  | `apps/api/cmd/metaldocs-api`                    | Done    | 4        | 5    | 6      | 6   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer | 2026-05-21 | [cmd-metaldocs-api.md](2026-05-21-go-backend-review/cmd-metaldocs-api.md) |
 | 2a | `platform/{authn,security,idempotency,ratelimit,tenant,problem,httpresponse}` | Done | 5 | 11 | 11 | 8 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-21 | [platform-2a-security.md](2026-05-21-go-backend-review/platform-2a-security.md) |
 | 2b | `platform/{db,migrate,bootstrap,objectstore,storage,messaging,servicebus,jobs,worker}` | Done | 10 | 24 | 16 | 8 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [platform-2b-data-infra.md](2026-05-21-go-backend-review/platform-2b-data-infra.md) |
-| 2c | `platform/{config,observability,cache,featureflags,formval,httpclient,pagination,docgenv2,render}` | Pending | - | - | - | - | - | - | - |
+| 2c | `platform/{config,observability,cache,featureflags,formval,httpclient,pagination,docgenv2,render}` | Done | 1 | 14 | 25 | 18 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [platform-2c-support-observability.md](2026-05-21-go-backend-review/platform-2c-support-observability.md) |
 | 3  | `internal/modules/auth`                         | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 4  | `internal/modules/iam`                          | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 5  | `internal/modules/documents`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -93,3 +93,9 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 2b-C3 | `internal/platform/config/docgen_v2.go:20-32` SSRF | Critical | leandrotca | TBC | `fix/docgen-2b-c3-c4` | Backlog |
 | 2b-C4 | `internal/platform/config/docgen_v2.go:24` empty token | Critical | leandrotca | TBC | `fix/docgen-2b-c3-c4` | Backlog |
 | 2b-C10 | `internal/platform/messaging/events.go:7-18` typed boundary | Critical | leandrotca | TBC | `fix/messaging-2b-c10` | Backlog (cascades H14, H15, H19) |
+
+### Module #2c (1 Critical, 1 fix branch reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|-----------|--------|
+| 2c-C1 | `internal/platform/pagination/cursor.go:37-43` HMAC-less cursor, anchor tamperable | Critical | leandrotca | TBC | `fix/cursor-2c-c1` | Backlog (cascades H7, H8, H9, M26, M27, L15, L16 — coordinated cursor rewrite) |
