@@ -41,6 +41,25 @@ func RequestHash(r *http.Request) (string, error) {
 	return hex.EncodeToString(sum.Sum(nil)), nil
 }
 
+// Option configures Require.
+type Option func(*config)
+
+type config struct {
+	streamingOptOut func(*http.Request) bool
+}
+
+// WithStreamingOptOut skips idempotency wrapping when matcher returns true.
+//
+// Idempotency buffers the full response for replay, which is incompatible
+// with streaming responses (SSE, chunked, long-lived). Routes that need
+// streaming must opt out — there is no way to both buffer-for-replay and
+// stream incrementally. Opted-out routes get NO idempotency protection;
+// callers must not send Idempotency-Key for them, or accept that retries
+// can duplicate work.
+func WithStreamingOptOut(matcher func(*http.Request) bool) Option {
+	return func(c *config) { c.streamingOptOut = matcher }
+}
+
 // Require returns middleware that enforces the Idempotency-Key header using
 // the two-phase BeginReplay / CompleteReplay / FailReplay protocol.
 //
@@ -49,9 +68,23 @@ func RequestHash(r *http.Request) (string, error) {
 // On a winning claim, the handler runs inside the lifetime of the claim's
 // transaction; CompleteReplay records the response on a 2xx, FailReplay
 // releases the slot on a panic or non-2xx so the next retry can re-execute.
-func Require(store *Store, actorFromCtx func(context.Context) (string, string)) func(http.Handler) http.Handler {
+//
+// Streaming contract: the response is buffered for replay storage, so
+// wrapped handlers MUST NOT use http.Flusher. Any call to Flush() on the
+// wrapped writer panics with a clear directive to use WithStreamingOptOut.
+// This fails closed rather than silently buffering or panicking with an
+// opaque interface-conversion error.
+func Require(store *Store, actorFromCtx func(context.Context) (string, string), opts ...Option) func(http.Handler) http.Handler {
+	cfg := config{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if cfg.streamingOptOut != nil && cfg.streamingOptOut(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
 			key := r.Header.Get("Idempotency-Key")
 			if key == "" {
 				writeErrJSON(w, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key header required")
@@ -152,6 +185,18 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 	}
 	r.body.Write(b)
 	return r.ResponseWriter.Write(b)
+}
+
+// Flush fails closed. Idempotency buffers the entire response body for
+// replay storage, which is fundamentally incompatible with incremental
+// streaming. Rather than silently buffering (breaking SSE) or letting an
+// opaque "interface conversion" panic surface, we panic with an explicit
+// directive: streaming routes must use WithStreamingOptOut to skip
+// idempotency wrapping entirely.
+func (r *responseRecorder) Flush() {
+	panic("idempotency: handler called Flush() on a wrapped ResponseWriter; " +
+		"streaming responses are incompatible with idempotency replay buffering. " +
+		"Use idempotency.WithStreamingOptOut(matcher) to skip wrapping for this route.")
 }
 
 func writeErrJSON(w http.ResponseWriter, status int, code, msg string) {
