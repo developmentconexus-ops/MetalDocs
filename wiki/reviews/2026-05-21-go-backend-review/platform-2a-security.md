@@ -58,7 +58,7 @@ The parallel `ratelimit.Middleware.limiters sync.Map` at [internal/platform/rate
 
 ---
 
-### C3 — Idempotency store has no locking → concurrent same-key requests both execute the handler `[db]`
+### C3 — Idempotency store has no locking → concurrent same-key requests both execute the handler `[db]` — **FIXED** in `12cae0f9`
 
 **File:** [internal/platform/idempotency/postgres_store.go:42-52](../../../internal/platform/idempotency/postgres_store.go) (`CheckReplay`), [internal/platform/idempotency/middleware.go:48-93](../../../internal/platform/idempotency/middleware.go) (`Require`)
 
@@ -70,15 +70,34 @@ The parallel `ratelimit.Middleware.limiters sync.Map` at [internal/platform/rate
 
 Status column already supports this — see C4. After handler completes, `UPDATE ... SET status='completed', response_status=..., response_body=...` instead of UPSERT.
 
+**Fix verification (`12cae0f9`):**
+- New transactional API in [`internal/platform/idempotency/postgres_store.go`](../../../internal/platform/idempotency/postgres_store.go): `BeginReplay(ctx, tenantID, actorID, key, payloadHash) (*ReplayHandle, *Replay, error)` opens a tx, attempts `INSERT ... status='in_flight' ... ON CONFLICT DO NOTHING RETURNING tenant_id::text`. Winner holds the row-level lock for the lifetime of the handler; loser blocks on `SELECT ... FOR UPDATE` until the winner commits (then sees the cached `Replay`) or rolls back (then re-claims the slot via recursion).
+- `CompleteReplay(handle, status, body)` commits the tx with `UPDATE ... SET status='completed', response_status=$, response_body=$ WHERE status='in_flight'` — fails closed when zero rows match (M2 belt).
+- `FailReplay(handle, cause)` rolls back the slot by deleting the `in_flight` row so retries are not pinned to a crashed attempt.
+- [`idempotency.Require`](../../../internal/platform/idempotency/middleware.go) rewritten to use Begin/Complete/Fail. Deferred `FailReplay` releases the slot on panic or non-2xx; `released` flag guarantees exactly one of Complete/Fail runs per request.
+- [`documents/delivery/http.Handler.finalizeDocument`](../../../internal/modules/documents/delivery/http/handler.go) — the second racy callsite called out in the finding — also migrated to the same Begin/Complete/Fail protocol.
+- Concurrency regression tests under [`internal/platform/idempotency/two_phase_test.go`](../../../internal/platform/idempotency/two_phase_test.go) and [`middleware_concurrency_test.go`](../../../internal/platform/idempotency/middleware_concurrency_test.go):
+  - `TestBeginReplay_ConcurrentSameKeySameHash` — two goroutines, single Postgres-serialized handler execution proven by an `atomic.Int32` counter == 1.
+  - `TestMiddleware_ConcurrentSameKey_HandlerExecutesOnce` — same proof at HTTP layer with the real `Require` middleware; both clients observe identical 201 + body.
+  - `TestBeginReplay_ConcurrentSameKeyDifferentHash` — winner persists, loser observes `ErrConflict`.
+  - `TestMiddleware_HandlerPanic_FreesSlot` — panic propagates, deferred `FailReplay` releases slot, retry executes.
+  - `TestMiddleware_NonSuccess_DoesNotCacheResponse` — 5xx never persisted; retry runs handler again.
+- Tests require a real Postgres (skip when `DATABASE_URL` / `METALDOCS_DATABASE_URL` unset); local `go vet ./internal/platform/idempotency/... ./internal/modules/documents/delivery/http/... ./internal/modules/jobs/idempotency_janitor/...` and `go test -race -count=1` all green.
+
 ---
 
-### C4 — Idempotency schema defines `in_flight` / `failed` states but Go code never writes them `[db]`
+### C4 — Idempotency schema defines `in_flight` / `failed` states but Go code never writes them `[db]` — **FIXED** in `12cae0f9`
 
 **File:** [migrations/0147_idempotency_keys.sql:14,20](../../../migrations/0147_idempotency_keys.sql), [internal/platform/idempotency/postgres_store.go](../../../internal/platform/idempotency/postgres_store.go) (whole file)
 
 The DDL's `CHECK (status IN ('in_flight','completed','failed'))` and the comment ("janitor sweep") show the original design intended a two-phase write. The Go code only ever writes `'completed'`. The states that would have implemented C3's locking strategy are dead schema.
 
 **Recommend:** Implement the missing states as the fix for C3 (insert `in_flight` first, transition to `completed`/`failed`). If the design has been abandoned, strip `'in_flight'` and `'failed'` from the `CHECK` constraint and update the janitor comment — divergence between schema and code is itself a hazard.
+
+**Fix verification (`12cae0f9`):**
+- `BeginReplay` now writes `'in_flight'` rows on every winning claim; `CompleteReplay` transitions to `'completed'`; `FailReplay` deletes (chose delete over `'failed'` so retry traffic does not have to grind through a `failed`-clearing recurse path on the hot path — the row simply disappears, identical to a rolled-back tx). The `'failed'` state remains in the CHECK constraint for forward-compat / manual ops triage and is handled gracefully by `BeginReplay`'s switch (deletes + retries).
+- Migration [`migrations/0203_idempotency_two_phase.sql`](../../../migrations/0203_idempotency_two_phase.sql) relaxes `response_status` / `response_body` to NULL-able (the `in_flight` row has no response yet), adds a `CHECK (status <> 'completed' OR response_status IS NOT NULL AND response_body IS NOT NULL)` belt so a row marked completed must carry a response, adds an M9 belt `CHECK (response_status BETWEEN 100 AND 599)`, and creates a partial index `idx_idempotency_keys_in_flight_expires ON (expires_at) WHERE status='in_flight'` for the janitor's orphan sweep (see M10).
+- The three states are now visible in production traffic — `'in_flight'` while a handler runs, `'completed'` after `CompleteReplay`, and never `'failed'` from the platform middleware path (FailReplay deletes); reserved for manual ops use.
 
 ---
 
@@ -239,13 +258,19 @@ Any importer can mutate `cfg.Quotas[RouteExportPDF] = 0`. Middleware then comput
 
 ---
 
-### M2 — Idempotency `RecordReplay` UPSERT overwrites stored `payload_hash` on conflict `[g,s,db]`
+### M2 — Idempotency `RecordReplay` UPSERT overwrites stored `payload_hash` on conflict `[g,s,db]` — **FIXED** in `12cae0f9`
 
 **File:** [internal/platform/idempotency/postgres_store.go:67-82](../../../internal/platform/idempotency/postgres_store.go)
 
 `ON CONFLICT DO UPDATE SET payload_hash = EXCLUDED.payload_hash`. After C3's locking is in place this race shrinks, but the UPDATE still allows a successful completed entry's authoritative hash to be replaced by a later concurrent first-request — `CheckReplay` then accepts a different request body under the same key without `ErrConflict` ever firing.
 
 **Recommend:** Once the `in_flight` two-phase write from C3/C4 is implemented, the second writer hits an existing `in_flight` row and waits — the UPDATE shouldn't run at all. As a belt: `ON CONFLICT (...) DO UPDATE SET ... WHERE idempotency_keys.status <> 'completed'` so completed rows become immutable.
+
+**Fix verification (`12cae0f9`):**
+- Primary fix (C3): the two-phase API never reaches the racy UPSERT path. The winner inserts `in_flight`; the loser blocks on `FOR UPDATE` and reads the completed row directly — no overwrite is possible.
+- Belt: `CompleteReplay` is `UPDATE ... WHERE status = 'in_flight'` with `n != 1` returning an error, so a completed row cannot be silently transitioned again.
+- Belt for the legacy `RecordReplay` path still used by `documents/approval/infrastructure.PostgresSignoffIdempStore`: `ON CONFLICT ... DO UPDATE SET ... WHERE metaldocs.idempotency_keys.status <> 'completed'` — a completed row's authoritative hash and body are now immutable from the UPSERT path.
+- `TestCompleteReplay_DoubleCallFails` proves a second `CompleteReplay` on the same handle (post-commit) returns error rather than overwriting.
 
 ---
 
@@ -319,13 +344,19 @@ A row with `response_status = 0` (corrupt data, manual edit, future bug) causes 
 
 ---
 
-### M10 — Janitor sweeps `'completed'` only; `'in_flight'` / `'failed'` rows leak `[db]`
+### M10 — Janitor sweeps `'completed'` only; `'in_flight'` / `'failed'` rows leak `[db]` — **FIXED** in `12cae0f9`
 
 **File:** [internal/modules/jobs/idempotency_janitor/job.go:22-27](../../../internal/modules/jobs/idempotency_janitor/job.go)
 
 After C3/C4 lands, `in_flight` rows from crashed handlers must be reaped. Without it, the table grows; with C3's `FOR UPDATE` semantics, a wedged row could block legitimate retries indefinitely.
 
 **Recommend:** Drop the `status = 'completed'` filter from the `WHERE` clause once C3 is implemented — keep only `WHERE expires_at < now()`. Add a separate query for `in_flight` rows where `expires_at < now() - interval '5 min'` with explicit `slog.Warn` (these are orphans from crashes; visibility matters).
+
+**Fix verification (`12cae0f9`):**
+- [`idempotency_janitor/job.go`](../../../internal/modules/jobs/idempotency_janitor/job.go) deletes by `ctid` from `WHERE expires_at < now()` — status filter removed; `in_flight`, `completed`, and `failed` are all reclaimed once past TTL.
+- Second pass counts rows where `status = 'in_flight' AND expires_at < now() - make_interval(mins => $1)` (default 5 minutes via `OrphanGraceMinutes` const) and emits `slog.WarnContext` with `orphans`, `grace_minutes`, and an actionable `hint` for ops correlation with handler panic logs.
+- Partial index `idx_idempotency_keys_in_flight_expires ON (expires_at) WHERE status='in_flight'` from migration `0203` keeps the orphan-count query cheap as the table grows.
+- BeginReplay's loser path proactively reclaims an expired `in_flight` row inline (no need to wait for the next janitor tick), so a crashed-handler key never wedges retries longer than its TTL.
 
 ---
 
