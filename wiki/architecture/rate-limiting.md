@@ -1,6 +1,6 @@
 # Architecture: Rate Limiting
 
-> **Last verified:** 2026-05-21 (commit `<SHA-PENDING>`)
+> **Last verified:** 2026-05-21 (commit `2f8f6dcc`)
 > **Scope:** the two parallel rate-limiter implementations currently live in the API, what each one keys on, which routes each one protects, and the bounded-memory contract both honor (review finding **C2**).
 > **Out of scope:** circuit-breakers on downstream calls, infrastructure-layer (CDN / WAF) limiting, per-tenant quota enforcement, billing-driven throttling. Merging the two limiters is intentionally **deferred** to a separate refactor — see "Known duplication" below.
 > **Key files:**
