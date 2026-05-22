@@ -6,6 +6,7 @@ import (
   "strings"
 
   "metaldocs/internal/platform/config"
+  "metaldocs/internal/platform/problem"
 )
 
 type CORS struct {
@@ -27,7 +28,11 @@ func NewCORS(cfg config.CORSConfig) *CORS {
       allowAll = true
       continue
     }
-    origins[origin] = struct{}{}
+    normalized := normalizeOrigin(origin)
+    if normalized == "" {
+      continue
+    }
+    origins[normalized] = struct{}{}
   }
 
   return &CORS{
@@ -48,18 +53,15 @@ func (c *CORS) Wrap(next http.Handler) http.Handler {
   }
 
   return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-    origin := strings.TrimSpace(req.Header.Get("Origin"))
-    if origin == "" {
+    rawOrigin := strings.TrimSpace(req.Header.Get("Origin"))
+    if rawOrigin == "" {
       next.ServeHTTP(w, req)
       return
     }
 
-    if !c.isAllowedOrigin(origin) {
-      if req.Method == http.MethodOptions {
-        w.WriteHeader(http.StatusForbidden)
-        return
-      }
-      next.ServeHTTP(w, req)
+    origin := normalizeOrigin(rawOrigin)
+    if origin == "" || !c.isAllowedOrigin(origin) {
+      _ = problem.Write(w, problem.New(http.StatusForbidden, problem.CodeForbiddenOrigin, "cross-origin request blocked"))
       return
     }
 
