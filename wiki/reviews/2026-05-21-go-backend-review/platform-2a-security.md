@@ -141,6 +141,18 @@ Empty user → `next.ServeHTTP`, no rate limit, no log. The inline comment ("IAM
 
 **Recommend:** Fall back to IP-keyed limiting using the trusted-proxy resolution from C1 instead of bypassing. If the route is intentionally anonymous-allowed, IP is the right key; if not, the IAM middleware will already block — but the failure mode must be fail-closed, not fail-quiet. Add `slog.DebugContext` so the bypass condition is observable in tests.
 
+**FIXED** in `73a769aa`
+
+- [`internal/platform/ratelimit/middleware.go`](../../../internal/platform/ratelimit/middleware.go): `Limit` no longer bypasses on empty user id. New `bucketKey` helper resolves identity — user id first, then `security.ClientIP(r, m.trustedCIDRs)` via the same trusted-proxy CIDRs used by `security.RateLimiter` (single source of truth: `METALDOCS_TRUSTED_PROXY_CIDRS`). Keys namespaced as `<route>:user:<id>` and `<route>:ip:<addr>` to prevent collision. No parseable IP → fail-closed 429. `slog.DebugContext` emitted on fallback path.
+- [`internal/platform/ratelimit/config.go`](../../../internal/platform/ratelimit/config.go): `Config` gains `TrustedProxyCIDRs []netip.Prefix` and `MaxEntries int`. IP keys respect same eviction/cap contract as user keys (sweep decrements atomic counter; overflow denied fail-closed).
+- [`internal/platform/ratelimit/middleware.go` — `loadOrInsert`](../../../internal/platform/ratelimit/middleware.go): atomic size counter enforces `MaxEntries` cap on both user and IP keyspaces; fail-closed 429 on overflow.
+- Regression tests: [`tests/unit/ratelimit_ip_fallback_test.go`](../../../tests/unit/ratelimit_ip_fallback_test.go)
+  - `TestIPFallback_MisorderedRoute_TwoXFFBucketedSeparately` — trusted proxy, two XFF clients → separate buckets
+  - `TestIPFallback_UntrustedProxy_BucketsByRemoteAddr` — untrusted proxy → XFF ignored, single RemoteAddr bucket
+  - `TestIPFallback_UnparseableIP_FailClosed` — no parseable IP → 429, not bypass
+  - `TestIPFallback_CapEnforced_FailClosed` — IP keys respect MaxEntries cap
+- Wiki: [`wiki/architecture/rate-limiting.md`](../../architecture/rate-limiting.md) updated with IP-fallback contract, cap contract, and new test table entries.
+
 ---
 
 ### H3 — `responseRecorder` does not implement `http.Flusher` → streaming endpoints silently buffer or panic `[g]`

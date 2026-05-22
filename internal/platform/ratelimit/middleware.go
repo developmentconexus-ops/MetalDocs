@@ -5,17 +5,21 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"metaldocs/internal/platform/security"
 )
 
 const (
-	defaultSweepInterval = time.Minute
-	defaultIdleThreshold = 2 * time.Minute
+	defaultSweepInterval     = time.Minute
+	defaultIdleThreshold     = 2 * time.Minute
+	defaultMaxLimiterEntries = 100_000
 )
 
 type limiterEntry struct {
@@ -27,9 +31,12 @@ type Middleware struct {
 	cfg           Config
 	sweepInterval time.Duration
 	idleThreshold time.Duration
+	maxEntries    int
+	trustedCIDRs  []netip.Prefix
 	now           func() time.Time
 	logger        *slog.Logger
-	limiters      sync.Map // key: "<route_key>:<user_id>" → *limiterEntry
+	limiters      sync.Map     // key: "<route_key>:user:<user_id>" or "<route_key>:ip:<addr>" → *limiterEntry
+	size          atomic.Int64 // limiter cardinality for fail-closed cap enforcement
 	wg            sync.WaitGroup
 }
 
@@ -46,10 +53,16 @@ func New(ctx context.Context, cfg Config) *Middleware {
 	if idle <= 0 {
 		idle = defaultIdleThreshold
 	}
+	maxN := cfg.MaxEntries
+	if maxN <= 0 {
+		maxN = defaultMaxLimiterEntries
+	}
 	m := &Middleware{
 		cfg:           cfg,
 		sweepInterval: sweep,
 		idleThreshold: idle,
+		maxEntries:    maxN,
+		trustedCIDRs:  cfg.TrustedProxyCIDRs,
 		now:           time.Now,
 		logger:        slog.Default(),
 	}
@@ -67,6 +80,15 @@ func (m *Middleware) Wait() { m.wg.Wait() }
 func (m *Middleware) WithClock(now func() time.Time) *Middleware {
 	if now != nil {
 		m.now = now
+	}
+	return m
+}
+
+// WithLogger replaces the slog.Logger used for sweep / fallback / overflow
+// records. Intended for tests that want to assert log content.
+func (m *Middleware) WithLogger(l *slog.Logger) *Middleware {
+	if l != nil {
+		m.logger = l
 	}
 	return m
 }
@@ -107,11 +129,13 @@ func (m *Middleware) sweep() {
 		e, ok := v.(*limiterEntry)
 		if !ok {
 			m.limiters.Delete(k)
+			m.size.Add(-1)
 			evicted++
 			return true
 		}
 		if e.lastAccess.Load() < cutoff {
 			m.limiters.Delete(k)
+			m.size.Add(-1)
 			evicted++
 		} else {
 			remaining++
@@ -128,7 +152,10 @@ func (m *Middleware) sweep() {
 
 // Limit returns an http.Handler wrapper that enforces the quota for the
 // given route. userExtractor pulls the subject id out of request ctx (the
-// IAM middleware sets it before this middleware runs).
+// IAM middleware sets it before this middleware runs). When the user id is
+// empty (route misordered or intentionally anonymous), the limiter falls
+// back to an IP key resolved via the trusted-proxy CIDRs from Config —
+// never bypasses (H2 fix).
 func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) string, next http.Handler) http.Handler {
 	quota, ok := m.cfg.Quotas[key]
 	if !ok {
@@ -142,26 +169,30 @@ func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) strin
 	}
 	interval := time.Minute / time.Duration(quota)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user := userExtractor(r)
-		if user == "" {
-			// No user id → bypass; IAM middleware should have rejected already.
-			next.ServeHTTP(w, r)
+		lk, ok := m.bucketKey(r, key, userExtractor)
+		if !ok {
+			// Neither a user id nor a parseable client IP. Prior behavior
+			// was a silent bypass (H2 fail-open). Now fail-closed.
+			m.logger.WarnContext(r.Context(), "ratelimit: no identity and no parseable IP, fail-closed",
+				"route", string(key),
+				"remote_addr", r.RemoteAddr,
+			)
+			writeRateLimitError(w, quota, 60)
 			return
 		}
-		lk := string(key) + ":" + user
 		nowNS := m.now().UnixNano()
 
-		// Load-first, only allocate a new rate.Limiter on miss. Prior
-		// implementation eagerly allocated a limiter for every request,
-		// throwing it away when the key already existed.
-		var entry *limiterEntry
-		if v, ok := m.limiters.Load(lk); ok {
-			entry = v.(*limiterEntry)
-		} else {
-			fresh := &limiterEntry{lim: rate.NewLimiter(rate.Every(interval), quota)}
-			fresh.lastAccess.Store(nowNS)
-			actual, _ := m.limiters.LoadOrStore(lk, fresh)
-			entry = actual.(*limiterEntry)
+		entry, ok := m.loadOrInsert(lk, interval, quota, nowNS)
+		if !ok {
+			// Limiter map cap reached. Mirrors security.RateLimiter
+			// fail-closed cap contract from C2.
+			m.logger.WarnContext(r.Context(), "ratelimit: limiter map full, denying new key",
+				"route", string(key),
+				"key", lk,
+				"max_entries", m.maxEntries,
+			)
+			writeRateLimitError(w, quota, 60)
+			return
 		}
 		entry.lastAccess.Store(nowNS)
 
@@ -177,6 +208,49 @@ func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) strin
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// bucketKey resolves the limiter key for r. Preference: authenticated user
+// id from userExtractor → trusted-proxy-resolved client IP. Returns
+// (key, true) on success; ("", false) when both paths fail — caller must
+// fail-closed. The literal "user:" / "ip:" prefixes namespace the two
+// keyspaces so a user id matching an IP string cannot collide with the IP
+// bucket.
+func (m *Middleware) bucketKey(r *http.Request, key RouteKey, userExtractor func(*http.Request) string) (string, bool) {
+	if user := userExtractor(r); user != "" {
+		return string(key) + ":user:" + user, true
+	}
+	m.logger.DebugContext(r.Context(), "ratelimit: empty user id, falling back to IP key",
+		"route", string(key),
+		"remote_addr", r.RemoteAddr,
+	)
+	addr := security.ClientIP(r, m.trustedCIDRs)
+	if !addr.IsValid() {
+		return "", false
+	}
+	return string(key) + ":ip:" + addr.String(), true
+}
+
+// loadOrInsert returns the limiter entry for lk, allocating one on miss while
+// enforcing the maxEntries cap. Returns (entry, true) on success;
+// (nil, false) when inserting would exceed the cap (caller must fail-closed).
+func (m *Middleware) loadOrInsert(lk string, interval time.Duration, quota int, nowNS int64) (*limiterEntry, bool) {
+	if v, ok := m.limiters.Load(lk); ok {
+		return v.(*limiterEntry), true
+	}
+	fresh := &limiterEntry{lim: rate.NewLimiter(rate.Every(interval), quota)}
+	fresh.lastAccess.Store(nowNS)
+	actual, loaded := m.limiters.LoadOrStore(lk, fresh)
+	if loaded {
+		return actual.(*limiterEntry), true
+	}
+	if n := m.size.Add(1); n > int64(m.maxEntries) {
+		// Lost the cap race — roll back the insert.
+		m.limiters.Delete(lk)
+		m.size.Add(-1)
+		return nil, false
+	}
+	return fresh, true
 }
 
 func writeRateLimitError(w http.ResponseWriter, quota, retryAfterSec int) {
