@@ -52,7 +52,7 @@
 | 2b | `platform/{db,migrate,bootstrap,objectstore,storage,messaging,servicebus,jobs,worker}` | Done | 10 | 24 | 16 | 8 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [platform-2b-data-infra.md](2026-05-21-go-backend-review/platform-2b-data-infra.md) |
 | 2c | `platform/{config,observability,cache,featureflags,formval,httpclient,pagination,docgenv2,render}` | Done | 1 | 14 | 25 | 18 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [platform-2c-support-observability.md](2026-05-21-go-backend-review/platform-2c-support-observability.md) |
 | 3  | `internal/modules/auth`                         | Done    | 8        | 18   | 22     | 11  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [auth-3.md](2026-05-21-go-backend-review/auth-3.md) |
-| 4  | `internal/modules/iam`                          | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 4  | `internal/modules/iam`                          | Done    | 8        | 15   | 18     | 11  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [iam-4.md](2026-05-21-go-backend-review/iam-4.md) |
 | 5  | `internal/modules/documents`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 6  | `internal/modules/controlleddocuments`          | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 7  | `internal/modules/taxonomy`                     | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -112,3 +112,16 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 3-C5 | `auth_sessions` schema missing `tenant_id` (verify migration before fix) | Critical | leandrotca | TBC | `fix/auth-3-c4-c5-c8` | Backlog (verify) |
 | 3-C8 | `infrastructure/postgres/repository.go:77,380,396,411` `err == sql.ErrNoRows` direct equality | Critical | leandrotca | TBC | `fix/auth-3-c4-c5-c8` | Backlog |
 | 3-C7 | `domain/model.go:14` `PasswordHash string` vs plaintext indistinguishable | Critical | leandrotca | TBC | `fix/auth-3-c7-types` | Backlog (cascades H12, H13, H15, M15, M16) |
+
+### Module #4 (8 Criticals, 6 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 4-C6 | `infrastructure/postgres/role_provider.go:20-28` checkUserSQL no tenant_id → cross-tenant auth bypass | Critical | leandrotca | TBC | `fix/iam-4-role-provider-c6-h5` | Backlog (land first) |
+| 4-C1 | `delivery/http/middleware.go:68,81-82` legacy X-User-Id delete+re-read on same canonical header | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog (land second) |
+| 4-C3 | `delivery/http/middleware.go:70-73` nil resolver fail-open → all routes pass unauthenticated | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog |
+| 4-C4 | `delivery/http/middleware.go:74-78` VisibilitySessionRequired no session check | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog |
+| 4-C7 | `delivery/http/middleware.go:91-95` tenant_id fallback to client header then DevTenantID | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog |
+| 4-C8 | `delivery/http/middleware.go:97-99` nil caps silently skips capability check | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog |
+| 4-C2 | `infrastructure/postgres/role_admin_repository.go:113-121` ReplaceUserRoles last-role-wins silent privilege escalation | Critical | leandrotca | TBC | `fix/iam-4-replace-roles-c2` | Backlog (land third) |
+| 4-C5 | `infrastructure/postgres/user_area_repository.go:103` CloseActive no RowsAffected → silent revoke no-op | Critical | leandrotca | TBC | `fix/iam-4-area-repo-c5-h4` | Backlog (land fourth) |
