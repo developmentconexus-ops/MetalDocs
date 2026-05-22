@@ -2,6 +2,7 @@ package security
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -14,8 +15,16 @@ import (
 	"metaldocs/internal/platform/config"
 )
 
+// defaultMaxRateLimitEntries caps the in-memory identity map to bound memory
+// against rotating-IP DoS. Sweep evicts entries whose window has expired on
+// every allow() call; if the map still hits the cap (sustained attack with
+// distinct identities inside one window), new identities are denied
+// fail-closed instead of inflating the map until OOM.
+const defaultMaxRateLimitEntries = 100_000
+
 type windowCounter struct {
 	windowStart time.Time
+	lastSeen    time.Time
 	count       int
 }
 
@@ -23,7 +32,9 @@ type RateLimiter struct {
 	enabled           bool
 	window            time.Duration
 	maxRequests       int
+	maxEntries        int
 	now               func() time.Time
+	logger            *slog.Logger
 	mu                sync.Mutex
 	byIdentity        map[string]windowCounter
 	trustedProxyCIDRs []netip.Prefix
@@ -34,10 +45,44 @@ func NewRateLimiter(cfg config.RateLimitConfig) *RateLimiter {
 		enabled:           cfg.Enabled,
 		window:            time.Duration(cfg.WindowSeconds) * time.Second,
 		maxRequests:       cfg.MaxRequests,
+		maxEntries:        defaultMaxRateLimitEntries,
 		now:               time.Now,
+		logger:            slog.Default(),
 		byIdentity:        map[string]windowCounter{},
 		trustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}
+}
+
+// WithMaxEntries overrides the in-memory identity cap. Intended for tests
+// that exercise the fail-closed overflow path with small maps.
+func (r *RateLimiter) WithMaxEntries(n int) *RateLimiter {
+	if n > 0 {
+		r.maxEntries = n
+	}
+	return r
+}
+
+// WithClock injects a deterministic time source. Intended for tests.
+func (r *RateLimiter) WithClock(now func() time.Time) *RateLimiter {
+	if now != nil {
+		r.now = now
+	}
+	return r
+}
+
+// WithLogger replaces the slog.Logger used for eviction / overflow warnings.
+func (r *RateLimiter) WithLogger(l *slog.Logger) *RateLimiter {
+	if l != nil {
+		r.logger = l
+	}
+	return r
+}
+
+// Size returns the current identity-map size. Intended for tests.
+func (r *RateLimiter) Size() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.byIdentity)
 }
 
 func (r *RateLimiter) Wrap(next http.Handler) http.Handler {
@@ -69,10 +114,29 @@ func (r *RateLimiter) allow(identity string) (bool, string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.sweepExpiredLocked(now)
+
 	current, ok := r.byIdentity[identity]
-	if !ok || now.Sub(current.windowStart) >= r.window {
+	if !ok {
+		if len(r.byIdentity) >= r.maxEntries {
+			r.logger.Warn("ratelimit: identity map full, denying new identity",
+				"map_size", len(r.byIdentity),
+				"max_entries", r.maxEntries,
+			)
+			return false, strconvSecondsCeil(r.window)
+		}
 		r.byIdentity[identity] = windowCounter{
 			windowStart: now,
+			lastSeen:    now,
+			count:       1,
+		}
+		return true, "0"
+	}
+
+	if now.Sub(current.windowStart) >= r.window {
+		r.byIdentity[identity] = windowCounter{
+			windowStart: now,
+			lastSeen:    now,
 			count:       1,
 		}
 		return true, "0"
@@ -87,8 +151,27 @@ func (r *RateLimiter) allow(identity string) (bool, string) {
 	}
 
 	current.count++
+	current.lastSeen = now
 	r.byIdentity[identity] = current
 	return true, "0"
+}
+
+// sweepExpiredLocked evicts entries whose window has elapsed. Caller must hold r.mu.
+// Per-call sweep is O(n) but n is bounded by maxEntries (~100k); acceptable cost.
+func (r *RateLimiter) sweepExpiredLocked(now time.Time) {
+	evicted := 0
+	for k, v := range r.byIdentity {
+		if now.Sub(v.windowStart) >= r.window {
+			delete(r.byIdentity, k)
+			evicted++
+		}
+	}
+	if evicted > 0 {
+		r.logger.Warn("ratelimit: swept expired identities",
+			"evicted", evicted,
+			"remaining", len(r.byIdentity),
+		)
+	}
 }
 
 func shouldSkipRateLimit(path string) bool {

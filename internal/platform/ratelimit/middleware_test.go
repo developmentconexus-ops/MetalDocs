@@ -1,6 +1,7 @@
 package ratelimit_test
 
 import (
+    "context"
     "net/http"
     "net/http/httptest"
     "strconv"
@@ -10,7 +11,9 @@ import (
 )
 
 func TestLimit_BurstThenRejects(t *testing.T) {
-    mw := ratelimit.New(ratelimit.Config{Quotas: map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 3}})
+    ctx, cancel := context.WithCancel(context.Background())
+    t.Cleanup(cancel)
+    mw := ratelimit.New(ctx, ratelimit.Config{Quotas: map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 3}})
     next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })
     h := mw.Limit(ratelimit.RouteExportPDF, func(r *http.Request) string { return "u1" }, next)
 
@@ -34,7 +37,9 @@ func TestLimit_BurstThenRejects(t *testing.T) {
 }
 
 func TestLimit_PerUserIsolation(t *testing.T) {
-    mw := ratelimit.New(ratelimit.Config{Quotas: map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 1}})
+    ctx, cancel := context.WithCancel(context.Background())
+    t.Cleanup(cancel)
+    mw := ratelimit.New(ctx, ratelimit.Config{Quotas: map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 1}})
     next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })
     h := mw.Limit(ratelimit.RouteExportPDF, func(r *http.Request) string { return r.Header.Get("x-user") }, next)
 
