@@ -198,6 +198,7 @@ func main() {
 		Enabled:           authCfg.OriginProtection,
 		SessionCookieName: authCfg.SessionCookieName,
 		TrustedOrigins:    authCfg.TrustedOrigins,
+		TrustedProxyCIDRs: authCfg.TrustedProxyCIDRs,
 	})
 
 	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider)

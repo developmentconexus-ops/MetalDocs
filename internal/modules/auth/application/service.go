@@ -10,13 +10,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/security"
 	"metaldocs/internal/platform/tenant"
 
 	"golang.org/x/crypto/bcrypt"
@@ -44,6 +45,12 @@ type Config struct {
 	BootstrapAdminPassword string
 	BootstrapAdminName     string
 	CookieSecure           bool
+	// TrustedProxyCIDRs is the same allowlist consulted by the rate limiter
+	// and origin-protection middleware. When the request's RemoteAddr falls
+	// inside one of these prefixes, the leftmost X-Forwarded-For entry is
+	// recorded as the session IP; otherwise RemoteAddr is used. Empty (default)
+	// = upstream not trusted.
+	TrustedProxyCIDRs []netip.Prefix
 }
 
 type Service struct {
@@ -160,7 +167,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		UserID:     identity.UserID,
 		CreatedAt:  now,
 		ExpiresAt:  now.Add(s.cfg.SessionTTL),
-		IPAddress:  remoteIP(r),
+		IPAddress:  s.remoteIP(r),
 		UserAgent:  truncate(strings.TrimSpace(r.UserAgent()), 512),
 		LastSeenAt: now,
 	}
@@ -535,19 +542,12 @@ func hashToken(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func remoteIP(r *http.Request) string {
+func (s *Service) remoteIP(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	if forwarded := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); forwarded != "" {
-		parts := strings.Split(forwarded, ",")
-		if len(parts) > 0 {
-			return truncate(strings.TrimSpace(parts[0]), 128)
-		}
-	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err == nil {
-		return truncate(host, 128)
+	if addr := security.ClientIP(r, s.cfg.TrustedProxyCIDRs); addr.IsValid() {
+		return truncate(addr.String(), 128)
 	}
 	return truncate(strings.TrimSpace(r.RemoteAddr), 128)
 }
