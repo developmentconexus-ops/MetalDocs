@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"regexp"
 )
@@ -40,11 +41,14 @@ func RequestHash(r *http.Request) (string, error) {
 	return hex.EncodeToString(sum.Sum(nil)), nil
 }
 
-// Require returns middleware that enforces the Idempotency-Key header.
-// actorFromCtx extracts (tenantID, actorID) from the request context.
+// Require returns middleware that enforces the Idempotency-Key header using
+// the two-phase BeginReplay / CompleteReplay / FailReplay protocol.
+//
 // On a replay hit, the stored response is written and the handler is not called.
 // On conflict (same key, different body hash), 422 is returned.
-// On miss, the handler is called and a 2xx response is recorded.
+// On a winning claim, the handler runs inside the lifetime of the claim's
+// transaction; CompleteReplay records the response on a 2xx, FailReplay
+// releases the slot on a panic or non-2xx so the next retry can re-execute.
 func Require(store *Store, actorFromCtx func(context.Context) (string, string)) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -66,12 +70,14 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string)) 
 				return
 			}
 
-			replay, err := store.CheckReplay(r.Context(), tenantID, actorID, key, hash)
+			handle, replay, err := store.BeginReplay(r.Context(), tenantID, actorID, key, hash)
 			if errors.Is(err, ErrConflict) {
 				writeErrJSON(w, 422, "IDEMPOTENCY_KEY_CONFLICT", "key reused with different payload")
 				return
 			}
 			if err != nil {
+				slog.ErrorContext(r.Context(), "idempotency: begin failed",
+					"key", key, "tenant", tenantID, "err", err)
 				writeErrJSON(w, 500, "INTERNAL", "idempotency check failed")
 				return
 			}
@@ -82,12 +88,44 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string)) 
 				return
 			}
 
+			// Winner path: handle owns the slot. The deferred FailReplay
+			// releases the slot on panic or non-2xx; CompleteReplay below
+			// commits on 2xx and flips `released` so the defer is a no-op.
+			released := false
+			defer func() {
+				if !released {
+					if rerr := store.FailReplay(handle, nil); rerr != nil {
+						slog.ErrorContext(r.Context(), "idempotency: fail-release error",
+							"key", key, "tenant", tenantID, "err", rerr)
+					}
+				}
+			}()
+
 			rec := &responseRecorder{ResponseWriter: w}
-			next.ServeHTTP(rec, r)
+			func() {
+				defer func() {
+					if p := recover(); p != nil {
+						slog.ErrorContext(r.Context(), "idempotency: handler panicked",
+							"key", key, "tenant", tenantID, "panic", p)
+						panic(p)
+					}
+				}()
+				next.ServeHTTP(rec, r)
+			}()
 
 			if rec.status >= 200 && rec.status < 300 {
-				_ = store.RecordReplay(r.Context(), tenantID, actorID, key, hash, rec.status, rec.body.Bytes())
+				if err := store.CompleteReplay(handle, rec.status, rec.body.Bytes()); err != nil {
+					// Response already shipped; surface the persistence loss
+					// loudly so alerting can catch silent idempotency collapse
+					// (H1).
+					slog.ErrorContext(r.Context(), "idempotency: record failed — retry may duplicate",
+						"key", key, "tenant", tenantID, "status", rec.status, "err", err)
+				}
+				released = true
+				return
 			}
+			// Non-2xx: deliberately fall through so the deferred FailReplay
+			// releases the slot.
 		})
 	}
 }

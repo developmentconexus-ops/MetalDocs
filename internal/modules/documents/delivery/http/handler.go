@@ -68,8 +68,9 @@ type approvalSubmitter interface {
 }
 
 type finalizeIdempotencyStore interface {
-	CheckReplay(ctx context.Context, tenantID, actorID, key, payloadHash string) (*idempotency.Replay, error)
-	RecordReplay(ctx context.Context, tenantID, actorID, key, payloadHash string, status int, body []byte) error
+	BeginReplay(ctx context.Context, tenantID, actorID, key, payloadHash string) (*idempotency.ReplayHandle, *idempotency.Replay, error)
+	CompleteReplay(handle *idempotency.ReplayHandle, status int, body []byte) error
+	FailReplay(handle *idempotency.ReplayHandle, cause error) error
 }
 
 type Handler struct {
@@ -462,13 +463,16 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	if idempStore == nil && h.db != nil {
 		idempStore = idempotency.New(h.db, "POST /api/v1/documents/{id}/finalize")
 	}
+	var idempHandle *idempotency.ReplayHandle
+	idempReleased := false
 	if idempStore != nil {
-		replay, err := idempStore.CheckReplay(r.Context(), tenantForReplay, actorForReplay, idempotencyKey, payloadHash)
+		handle, replay, err := idempStore.BeginReplay(r.Context(), tenantForReplay, actorForReplay, idempotencyKey, payloadHash)
 		if errors.Is(err, idempotency.ErrConflict) {
 			httpErr(w, http.StatusUnprocessableEntity, "IDEMPOTENCY_KEY_REUSED")
 			return
 		}
 		if err != nil {
+			log.Printf("documents finalize idempotency begin error: %v", err)
 			httpErr(w, http.StatusInternalServerError, "internal_error")
 			return
 		}
@@ -479,6 +483,14 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write(replay.Body)
 			return
 		}
+		idempHandle = handle
+		defer func() {
+			if idempHandle != nil && !idempReleased {
+				if rerr := idempStore.FailReplay(idempHandle, nil); rerr != nil {
+					log.Printf("documents finalize idempotency fail-release error: %v", rerr)
+				}
+			}
+		}()
 	}
 
 	r = withAdminCtx(r)
@@ -567,11 +579,12 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respBody := map[string]string{"instanceId": result.InstanceID}
-	if idempStore != nil {
+	if idempStore != nil && idempHandle != nil {
 		body, _ := json.Marshal(respBody)
-		if err := idempStore.RecordReplay(r.Context(), tenantID, actorID, idempotencyKey, payloadHash, http.StatusCreated, body); err != nil {
-			log.Printf("documents finalize idempotency record error: %v", err)
+		if err := idempStore.CompleteReplay(idempHandle, http.StatusCreated, body); err != nil {
+			log.Printf("documents finalize idempotency complete error: %v", err)
 		}
+		idempReleased = true
 	}
 	httpresponse.WriteJSON(w, http.StatusCreated, respBody)
 }

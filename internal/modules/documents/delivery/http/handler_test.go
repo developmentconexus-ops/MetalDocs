@@ -263,11 +263,18 @@ type fakeFinalizeIdempotencyStore struct {
 	replay *idempotency.Replay
 }
 
-func (f *fakeFinalizeIdempotencyStore) CheckReplay(_ context.Context, _, _, _, _ string) (*idempotency.Replay, error) {
-	return f.replay, nil
+func (f *fakeFinalizeIdempotencyStore) BeginReplay(_ context.Context, _, _, _, _ string) (*idempotency.ReplayHandle, *idempotency.Replay, error) {
+	if f.replay != nil {
+		return nil, f.replay, nil
+	}
+	return &idempotency.ReplayHandle{}, nil, nil
 }
 
-func (f *fakeFinalizeIdempotencyStore) RecordReplay(_ context.Context, _, _, _, _ string, _ int, _ []byte) error {
+func (f *fakeFinalizeIdempotencyStore) CompleteReplay(_ *idempotency.ReplayHandle, _ int, _ []byte) error {
+	return nil
+}
+
+func (f *fakeFinalizeIdempotencyStore) FailReplay(_ *idempotency.ReplayHandle, _ error) error {
 	return nil
 }
 
