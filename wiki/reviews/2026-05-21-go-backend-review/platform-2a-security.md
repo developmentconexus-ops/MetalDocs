@@ -202,6 +202,8 @@ The wrapper exposes only `WriteHeader` and `Write`. Any wrapped handler that doe
 
 **Recommend:** In `LoadAttachmentsConfig`, `if len(secret) < 32 { return cfg, fmt.Errorf("METALDOCS_ATTACHMENTS_SIGNING_SECRET must be at least 32 bytes") }`. Add the same guard inside `NewAttachmentSigner` (`panic` on short input) so the invariant holds even when the signer is constructed outside the config loader (tests, future sub-service).
 
+**FIXED** on `fix/h5-attachment-secret-length`. `LoadAttachmentsConfig` returns error for `len(secret) < 32`; `NewAttachmentSigner` panics (`MinAttachmentSecretLength = 32`). Unit tests cover 31-byte rejection, 32-byte acceptance, and both panic paths. Wiki: [`wiki/architecture/attachment-signing.md`](../../architecture/attachment-signing.md).
+
 ---
 
 ### H6 — `AttachmentSigner.Sign` returns bare `string`; `time.Now` not injected `[g,t]`
