@@ -123,7 +123,7 @@ The DDL's `CHECK (status IN ('in_flight','completed','failed'))` and the comment
 
 ## High
 
-### H1 — Idempotency `RecordReplay` write error silently swallowed → broken idempotency on transient DB error `[g,sf,db]`
+### H1 — Idempotency `RecordReplay` write error silently swallowed → broken idempotency on transient DB error `[g,sf,db]` — **FIXED** in `12cae0f9` (incidental, via C3)
 
 **File:** [internal/platform/idempotency/middleware.go:89](../../../internal/platform/idempotency/middleware.go)
 
