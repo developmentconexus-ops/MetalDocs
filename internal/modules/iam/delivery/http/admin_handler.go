@@ -507,7 +507,11 @@ func parseRoles(items []string) ([]iamdomain.Role, bool) {
 }
 
 func authenticatedActor(r *http.Request) string {
-	if userID := strings.TrimSpace(authn.UserIDFromContext(r.Context())); userID != "" {
+	// Policy: tolerated fallback. Used as a label-only field on a path where
+	// no authenticated actor existing legitimately maps to "system" (e.g.
+	// bootstrap admin routes). Audit-bearing IAM mutations fail-closed in
+	// routes_memberships.go.
+	if userID, ok := authn.UserIDFromContext(r.Context()); ok {
 		return userID
 	}
 	return "system"
