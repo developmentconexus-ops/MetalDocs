@@ -14,7 +14,15 @@ type AttachmentSigner struct {
 	secret []byte
 }
 
+// MinAttachmentSecretLength is the minimum HMAC-SHA256 key length per
+// NIST SP 800-107 / FIPS 198-1: keys MUST be at least the hash output
+// size (32 bytes for SHA-256) to preserve the full security strength.
+const MinAttachmentSecretLength = 32
+
 func NewAttachmentSigner(secret string) *AttachmentSigner {
+	if len(secret) < MinAttachmentSecretLength {
+		panic(fmt.Sprintf("security: attachment signing secret must be at least %d bytes, got %d", MinAttachmentSecretLength, len(secret)))
+	}
 	return &AttachmentSigner{secret: []byte(secret)}
 }
 
