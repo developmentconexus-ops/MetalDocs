@@ -2,8 +2,8 @@ package security
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,21 +20,23 @@ type windowCounter struct {
 }
 
 type RateLimiter struct {
-	enabled     bool
-	window      time.Duration
-	maxRequests int
-	now         func() time.Time
-	mu          sync.Mutex
-	byIdentity  map[string]windowCounter
+	enabled           bool
+	window            time.Duration
+	maxRequests       int
+	now               func() time.Time
+	mu                sync.Mutex
+	byIdentity        map[string]windowCounter
+	trustedProxyCIDRs []netip.Prefix
 }
 
 func NewRateLimiter(cfg config.RateLimitConfig) *RateLimiter {
 	return &RateLimiter{
-		enabled:     cfg.Enabled,
-		window:      time.Duration(cfg.WindowSeconds) * time.Second,
-		maxRequests: cfg.MaxRequests,
-		now:         time.Now,
-		byIdentity:  map[string]windowCounter{},
+		enabled:           cfg.Enabled,
+		window:            time.Duration(cfg.WindowSeconds) * time.Second,
+		maxRequests:       cfg.MaxRequests,
+		now:               time.Now,
+		byIdentity:        map[string]windowCounter{},
+		trustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}
 }
 
@@ -49,7 +51,7 @@ func (r *RateLimiter) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		identity := requestIdentity(req)
+		identity := r.requestIdentity(req)
 		allowed, retryAfter := r.allow(identity)
 		if !allowed {
 			w.Header().Set("Retry-After", retryAfter)
@@ -93,16 +95,15 @@ func shouldSkipRateLimit(path string) bool {
 	return path == "/api/v1/health/live" || path == "/api/v1/health/ready"
 }
 
-func requestIdentity(r *http.Request) string {
-	if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
+func (r *RateLimiter) requestIdentity(req *http.Request) string {
+	if currentUser, ok := authdomain.CurrentUserFromContext(req.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
 		return "user:" + strings.TrimSpace(currentUser.UserID)
 	}
-	if userID := strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())); userID != "" {
+	if userID := strings.TrimSpace(iamdomain.UserIDFromContext(req.Context())); userID != "" {
 		return "user:" + userID
 	}
-	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
-	if err == nil && host != "" {
-		return "ip:" + host
+	if addr := ClientIP(req, r.trustedProxyCIDRs); addr.IsValid() {
+		return "ip:" + addr.String()
 	}
 	return "ip:unknown"
 }

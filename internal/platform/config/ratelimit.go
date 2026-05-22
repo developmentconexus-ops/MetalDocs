@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -11,6 +12,10 @@ type RateLimitConfig struct {
 	Enabled       bool
 	WindowSeconds int
 	MaxRequests   int
+	// TrustedProxyCIDRs governs whether X-Forwarded-For may be honored when
+	// keying the rate-limit bucket for unauthenticated traffic. Empty means
+	// no upstream is trusted, and RemoteAddr is the only IP source.
+	TrustedProxyCIDRs []netip.Prefix
 }
 
 func LoadRateLimitConfig() (RateLimitConfig, error) {
@@ -34,9 +39,15 @@ func LoadRateLimitConfig() (RateLimitConfig, error) {
 		maxReq = n
 	}
 
+	trustedProxyCIDRs, err := LoadTrustedProxyCIDRs()
+	if err != nil {
+		return RateLimitConfig{}, err
+	}
+
 	return RateLimitConfig{
-		Enabled:       enabled,
-		WindowSeconds: window,
-		MaxRequests:   maxReq,
+		Enabled:           enabled,
+		WindowSeconds:     window,
+		MaxRequests:       maxReq,
+		TrustedProxyCIDRs: trustedProxyCIDRs,
 	}, nil
 }

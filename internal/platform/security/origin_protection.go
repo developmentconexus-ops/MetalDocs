@@ -2,6 +2,7 @@ package security
 
 import (
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 )
@@ -10,12 +11,18 @@ type OriginProtectionConfig struct {
 	Enabled           bool
 	SessionCookieName string
 	TrustedOrigins    []string
+	// TrustedProxyCIDRs lists upstream CIDRs whose X-Forwarded-Proto header
+	// may be honored when computing the same-origin comparison scheme.
+	// Empty (default) means no upstream is trusted — directly reachable
+	// clients can never spoof the request scheme via a forwarded header.
+	TrustedProxyCIDRs []netip.Prefix
 }
 
 type OriginProtection struct {
-	enabled        bool
-	cookieName     string
-	trustedOrigins map[string]struct{}
+	enabled           bool
+	cookieName        string
+	trustedOrigins    map[string]struct{}
+	trustedProxyCIDRs []netip.Prefix
 }
 
 func NewOriginProtection(cfg OriginProtectionConfig) *OriginProtection {
@@ -28,9 +35,10 @@ func NewOriginProtection(cfg OriginProtectionConfig) *OriginProtection {
 	}
 
 	return &OriginProtection{
-		enabled:        cfg.Enabled,
-		cookieName:     strings.TrimSpace(cfg.SessionCookieName),
-		trustedOrigins: trusted,
+		enabled:           cfg.Enabled,
+		cookieName:        strings.TrimSpace(cfg.SessionCookieName),
+		trustedOrigins:    trusted,
+		trustedProxyCIDRs: cfg.TrustedProxyCIDRs,
 	}
 }
 
@@ -85,22 +93,30 @@ func requiresOriginProtection(r *http.Request) bool {
 }
 
 func (p *OriginProtection) isAllowedOrigin(r *http.Request, origin string) bool {
-	if origin == sameOrigin(r) {
+	if origin == p.sameOrigin(r) {
 		return true
 	}
 	_, ok := p.trustedOrigins[origin]
 	return ok
 }
 
-func sameOrigin(r *http.Request) string {
+// sameOrigin reconstructs the canonical Origin string for r. The request
+// scheme is taken from r.TLS by default; X-Forwarded-Proto is honored only
+// when the immediate upstream is in TrustedProxyCIDRs. This prevents a
+// directly reachable client from spoofing https:// via a forged header to
+// satisfy the trusted-origins allowlist.
+func (p *OriginProtection) sameOrigin(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
 	scheme := "http"
-	if forwardedProto := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwardedProto != "" {
-		scheme = strings.ToLower(forwardedProto)
-	} else if r.TLS != nil {
+	if r.TLS != nil {
 		scheme = "https"
+	}
+	if IsTrustedRemote(r, p.trustedProxyCIDRs) {
+		if forwardedProto := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")); forwardedProto != "" {
+			scheme = strings.ToLower(forwardedProto)
+		}
 	}
 	host := strings.TrimSpace(r.Host)
 	if host == "" {

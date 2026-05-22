@@ -9,6 +9,7 @@ import (
 
 	authapp "metaldocs/internal/modules/auth/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/config"
 )
 
 func Enabled() bool {
@@ -97,6 +98,11 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		bootstrapName = "Administrator"
 	}
 
+	trustedProxyCIDRs, err := config.LoadTrustedProxyCIDRs()
+	if err != nil {
+		return authapp.Config{}, err
+	}
+
 	cfg := authapp.Config{
 		SessionCookieName:      sessionCookieName,
 		SessionTTL:             time.Duration(sessionTTLHours) * time.Hour,
@@ -114,6 +120,7 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		CookieSecure:           parseBoolEnv("METALDOCS_AUTH_COOKIE_SECURE", appEnv != "local"),
 		TrustedOrigins:         splitCSV(os.Getenv("METALDOCS_AUTH_TRUSTED_ORIGINS")),
 		OriginProtection:       parseBoolEnv("METALDOCS_AUTH_ORIGIN_PROTECTION_ENABLED", Enabled()),
+		TrustedProxyCIDRs:      trustedProxyCIDRs,
 	}
 
 	if cfg.BootstrapAdminEnabled && strings.TrimSpace(cfg.BootstrapAdminPassword) == "" {
