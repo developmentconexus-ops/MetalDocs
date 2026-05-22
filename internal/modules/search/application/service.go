@@ -166,14 +166,21 @@ func (s *Service) policiesForDocument(ctx context.Context, doc domain.Document) 
 }
 
 func shouldBypassPolicy(ctx context.Context) bool {
-	return authn.UserIDFromContext(ctx) == "" && len(authn.RolesFromContext(ctx)) == 0
+	// Policy: explicit bypass. Internal background callers (no IAM context
+	// installed) deliberately skip access-policy enforcement here; HTTP
+	// entrypoints are gated upstream by IAM middleware.
+	_, hasUser := authn.UserIDFromContext(ctx)
+	return !hasUser && len(authn.RolesFromContext(ctx)) == 0
 }
 
 func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
 	if len(items) == 0 {
 		return true
 	}
-	userID := authn.UserIDFromContext(ctx)
+	// Empty userID is tolerated: only role-keyed policies can still match;
+	// user-keyed policies require an authenticated principal and naturally
+	// miss when none is present.
+	userID, _ := authn.UserIDFromContext(ctx)
 	roles := authn.RolesFromContext(ctx)
 	rolesSet := map[string]struct{}{}
 	for _, role := range roles {

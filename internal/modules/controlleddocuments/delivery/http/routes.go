@@ -72,6 +72,12 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		formData = *req.FormData
 	}
 
+	actorUserID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		h.writeDomainError(w, application.ErrActorMissing)
+		return
+	}
+
 	res, err := h.svc.Create(r.Context(), application.CreateControlledDocumentCmd{
 		TenantID:                  tenantID,
 		ProfileCode:               strings.TrimSpace(req.ProfileCode),
@@ -79,7 +85,7 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		DepartmentCode:            req.DepartmentCode,
 		Title:                     strings.TrimSpace(req.Title),
 		OwnerUserID:               strings.TrimSpace(req.OwnerUserId),
-		ActorUserID:               authn.UserIDFromContext(r.Context()),
+		ActorUserID:               actorUserID,
 		ManualCode:                req.ManualCode,
 		ManualCodeReason:          req.ManualCodeReason,
 		OverrideTemplateVersionID: overrideTemplateVersionID,
@@ -485,6 +491,12 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		httpresponse.WriteError(w, http.StatusConflict, "template.artifact_missing", "template artifact missing")
 	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
 		httpresponse.WriteError(w, http.StatusInternalServerError, "template.artifact_invariant_unconfigured", "template artifact invariant not configured")
+	case errors.Is(err, application.ErrActorMissing):
+		slog.Error("controlled-documents request missing authenticated actor",
+			"route", "controlledDocuments.writeDomainError",
+			"error", err,
+		)
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 	case errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
 		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_NO_DEFAULT_TEMPLATE", "profile has no default template")
 	case errors.Is(err, controlleddocumentsdomain.ErrDefaultObsolete):

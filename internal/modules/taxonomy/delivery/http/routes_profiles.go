@@ -170,12 +170,17 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorUserID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 	if err := h.profiles.SetDefaultTemplate(
 		r.Context(),
 		tenantID,
 		r.PathValue("code"),
 		req.TemplateVersionID,
-		authn.UserIDFromContext(r.Context()),
+		actorUserID,
 	); err != nil {
 		h.writeProfileError(w, err)
 		return
@@ -192,11 +197,16 @@ func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorUserID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 	if err := h.profiles.Archive(
 		r.Context(),
 		tenantID,
 		r.PathValue("code"),
-		authn.UserIDFromContext(r.Context()),
+		actorUserID,
 	); err != nil {
 		h.writeProfileError(w, err)
 		return

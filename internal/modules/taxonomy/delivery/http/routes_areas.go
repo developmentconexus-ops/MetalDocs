@@ -123,11 +123,16 @@ func (h *Handler) archiveArea(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorUserID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
 	if err := h.areas.Archive(
 		r.Context(),
 		tenantID,
 		r.PathValue("code"),
-		authn.UserIDFromContext(r.Context()),
+		actorUserID,
 	); err != nil {
 		h.writeAreaError(w, err)
 		return

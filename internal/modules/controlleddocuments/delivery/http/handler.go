@@ -67,7 +67,11 @@ func tenantIDFromContext(ctx context.Context) string {
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	actorOf := func(ctx context.Context) (string, string) {
-		return tenantIDFromContext(ctx), authn.UserIDFromContext(ctx)
+		// Idempotency scoping is best-effort here: a missing actor
+		// produces a broader-but-still-safe key. The mutation handler
+		// itself fail-closes on missing actor (see writeDomainError).
+		userID, _ := authn.UserIDFromContext(ctx)
+		return tenantIDFromContext(ctx), userID
 	}
 
 	middleware := func(next http.Handler) http.Handler {

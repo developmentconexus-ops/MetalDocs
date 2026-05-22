@@ -18,6 +18,7 @@ import (
 	controlleddocumentsapi "metaldocs/internal/modules/controlleddocuments/api"
 	"metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -261,7 +262,9 @@ func TestRegistryHandler_ErrorEnvelopeContract(t *testing.T) {
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents/99999999-9999-9999-9999-999999999999", nil)
-	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin})
+	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -315,6 +318,50 @@ func TestWriteDomainError_TemplateArtifactMissingIs409(t *testing.T) {
 	}
 	if body.Code != "template.artifact_missing" {
 		t.Fatalf("code = %q, want %q", body.Code, "template.artifact_missing")
+	}
+}
+
+func TestWriteDomainError_ActorMissingIs500(t *testing.T) {
+	handler := &Handler{}
+	rec := httptest.NewRecorder()
+
+	handler.writeDomainError(rec, application.ErrActorMissing)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
+	}
+	if body.Code != "INTERNAL_ERROR" {
+		t.Fatalf("code = %q, want INTERNAL_ERROR", body.Code)
+	}
+}
+
+func TestAtomicCreate_MissingAuthContext_Returns500NotFullTenant(t *testing.T) {
+	spy := &spyControlledDocumentService{}
+	handler := &Handler{svc: spy}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
+		"documentName":"Policy v1",
+		"visibility":{"scope":"company","areaCodes":[],"userIds":[]},
+		"profileCode":"DC",
+		"processAreaCode":"RH",
+		"title":"Policy",
+		"ownerUserId":"user-1"
+	}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+
+	handler.AtomicCreateControlledDocument(rec, req, controlleddocumentsapi.AtomicCreateControlledDocumentParams{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if spy.gotCreate.ActorUserID != "" {
+		t.Fatalf("service Create must not be invoked when actor missing; got ActorUserID=%q", spy.gotCreate.ActorUserID)
 	}
 }
 
@@ -397,7 +444,9 @@ func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 		"templateVersionId":"11111111-1111-1111-1111-111111111111",
 		"formData":{"summary":"hello","count":2}
 	}`))
-	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin})
+	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
 	handler.AtomicCreateControlledDocument(rec, req, controlleddocumentsapi.AtomicCreateControlledDocumentParams{})

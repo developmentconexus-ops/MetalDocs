@@ -77,6 +77,12 @@ type CreateResult struct {
 var ErrTemplateArtifactMissing = errors.New("template artifact missing")
 var ErrTemplateArtifactInvariantUnconfigured = errors.New("controlled_documents: template artifact invariant not configured")
 
+// ErrActorMissing signals the request context lacked an authenticated
+// principal where the service requires one. Both read and mutation paths
+// fail-closed on this — see C5 in
+// wiki/reviews/2026-05-21-go-backend-review/platform-2a-security.md.
+var ErrActorMissing = errors.New("controlled_documents: actor user id missing in context")
+
 func NewControlledDocumentService(
 	db *sql.DB,
 	docs controlleddocumentsdomain.ControlledDocumentRepository,
@@ -373,14 +379,19 @@ func (s *ControlledDocumentService) Supersede(ctx context.Context, tenantID, con
 }
 
 func (s *ControlledDocumentService) List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error) {
-	if actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx)); actorUserID != "" {
-		filter.ActorUserID = &actorUserID
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return nil, ErrActorMissing
 	}
+	filter.ActorUserID = &actorUserID
 	return s.docs.List(ctx, tenantID, filter)
 }
 
 func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string) (*ControlledDocument, error) {
-	actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx))
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return nil, ErrActorMissing
+	}
 	canRead, err := s.docs.CanRead(ctx, tenantID, id, actorUserID)
 	if err != nil {
 		return nil, err
@@ -471,9 +482,9 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 		}
 	}()
 
-	actorUserID := strings.TrimSpace(authn.UserIDFromContext(ctx))
-	if actorUserID == "" {
-		txErr = errors.New("controlled_documents: actor user id missing in context")
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		txErr = ErrActorMissing
 		return nil, txErr
 	}
 	if txErr = setAuthzGUC(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {

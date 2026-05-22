@@ -663,16 +663,72 @@ func TestControlledDocumentService_PreviewCode_ReturnsFormatted(t *testing.T) {
 	}
 }
 
-func TestList_DoesNotInjectEmptyActorFilter(t *testing.T) {
+func TestList_MissingActorContextReturnsErrActorMissing(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
 
 	_, err := svc.List(context.Background(), "tenant-a", controlleddocumentsdomain.CDFilter{})
+	if !errors.Is(err, ErrActorMissing) {
+		t.Fatalf("List: expected ErrActorMissing, got %v", err)
+	}
+	if repo.lastListFilter.ActorUserID != nil {
+		t.Fatalf("ActorUserID must not be set when actor missing, got %v", *repo.lastListFilter.ActorUserID)
+	}
+}
+
+func TestList_AppliesActorFilterWhenContextPresent(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+
+	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
+	_, err := svc.List(ctx, "tenant-a", controlleddocumentsdomain.CDFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if repo.lastListFilter.ActorUserID != nil {
-		t.Fatalf("ActorUserID = %v, want nil", *repo.lastListFilter.ActorUserID)
+	if repo.lastListFilter.ActorUserID == nil || *repo.lastListFilter.ActorUserID != "actor-1" {
+		t.Fatalf("ActorUserID = %v, want pointer to \"actor-1\"", repo.lastListFilter.ActorUserID)
+	}
+}
+
+func TestGet_MissingActorContextReturnsErrActorMissing(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
+
+	_, err := svc.Get(context.Background(), "tenant-a", "cd-1")
+	if !errors.Is(err, ErrActorMissing) {
+		t.Fatalf("Get: expected ErrActorMissing, got %v", err)
+	}
+}
+
+func TestCreateRevision_MissingActorContextReturnsErrActorMissing(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	mock.ExpectBegin()
+	mock.ExpectRollback()
+
+	repo := newFakeControlledDocumentRepository()
+	repo.created = &controlleddocumentsdomain.ControlledDocument{
+		ID:              "cd-1",
+		TenantID:        "tenant-a",
+		ProfileCode:     "pop",
+		ProcessAreaCode: "general",
+		Code:            "POP-GENERAL-014",
+		Status:          controlleddocumentsdomain.CDStatusActive,
+		OwnerUserID:     "owner-1",
+	}
+	svc := NewControlledDocumentService(db, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, &fakeDocumentInitializer{})
+
+	_, err = svc.CreateRevision(context.Background(), CreateRevisionCmd{
+		TenantID:          "tenant-a",
+		CDID:              "cd-1",
+		Name:              "E2E Approval Flow",
+		TemplateVersionID: stringPtr("template-1"),
+	})
+	if !errors.Is(err, ErrActorMissing) {
+		t.Fatalf("CreateRevision: expected ErrActorMissing, got %v", err)
 	}
 }
 

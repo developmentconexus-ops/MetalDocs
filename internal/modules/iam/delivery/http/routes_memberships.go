@@ -83,7 +83,11 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	grantedBy := authn.UserIDFromContext(r.Context())
+	grantedBy, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		return
+	}
 	err = h.svc.Grant(
 		r.Context(),
 		strings.TrimSpace(req.UserID),
@@ -117,7 +121,11 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId and areaCode are required"))
 		return
 	}
-	revokedBy := authn.UserIDFromContext(r.Context())
+	revokedBy, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
+		return
+	}
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
