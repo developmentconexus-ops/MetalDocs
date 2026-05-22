@@ -11,6 +11,13 @@ import (
 // different payload hash, indicating a caller bug or replay attack.
 var ErrConflict = errors.New("idempotency: key reused with different payload")
 
+// maxBodyBytes is the maximum response body size that the store will persist.
+// Matches the CHECK constraint added in migration 0204. Responses larger than
+// this are refused by CompleteReplay and RecordReplay with an explicit error;
+// callers should log the rejection and proceed — idempotency is lost for that
+// request, but the handler result was still delivered to the client.
+const maxBodyBytes = 64 * 1024
+
 // Replay holds the cached response for a previously completed request.
 type Replay struct {
 	Status int
@@ -56,6 +63,9 @@ func New(db *sql.DB, routeTemplate string) *Store {
 // the winner's transaction commits (CompleteReplay → cache hit) or rolls back
 // (FailReplay → loser re-tries the claim).
 func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payloadHash string) (*ReplayHandle, *Replay, error) {
+	if actorID == "" {
+		return nil, nil, errors.New("idempotency: actorID must not be empty")
+	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("idempotency: begin tx: %w", err)
@@ -195,6 +205,11 @@ func (s *Store) CompleteReplay(handle *ReplayHandle, status int, body []byte) er
 		handle.closed = true
 		return fmt.Errorf("idempotency: refusing to record invalid status %d", status)
 	}
+	if len(body) > maxBodyBytes {
+		_ = handle.tx.Rollback()
+		handle.closed = true
+		return fmt.Errorf("idempotency: response body %d bytes exceeds %d-byte cap; idempotency not recorded", len(body), maxBodyBytes)
+	}
 	handle.closed = true
 	res, err := handle.tx.Exec(`
 		UPDATE metaldocs.idempotency_keys
@@ -299,6 +314,9 @@ func (s *Store) CheckReplay(ctx context.Context, tenantID, actorID, key, payload
 func (s *Store) RecordReplay(ctx context.Context, tenantID, actorID, key, payloadHash string, status int, body []byte) error {
 	if status < 100 || status > 599 {
 		return fmt.Errorf("idempotency: refusing to record invalid status %d", status)
+	}
+	if len(body) > maxBodyBytes {
+		return fmt.Errorf("idempotency: response body %d bytes exceeds %d-byte cap; idempotency not recorded", len(body), maxBodyBytes)
 	}
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO metaldocs.idempotency_keys
