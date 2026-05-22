@@ -157,13 +157,14 @@ func (m *Middleware) sweep() {
 // back to an IP key resolved via the trusted-proxy CIDRs from Config —
 // never bypasses (H2 fix).
 func (m *Middleware) Limit(key RouteKey, userExtractor func(*http.Request) string, next http.Handler) http.Handler {
-	quota, ok := m.cfg.Quotas[key]
+	quota, ok := m.cfg.QuotaFor(key)
 	if !ok {
 		return next // no quota configured
 	}
 	if quota <= 0 {
-		// Defense-in-depth against zero / negative quota (would panic
-		// inside rate.Every on integer divide).
+		// Defense-in-depth: NewConfig validates >= 1, but guard here so a
+		// zero injected via reflection or test helpers degrades to no-limit
+		// instead of panicking on integer divide.
 		m.logger.Error("ratelimit: invalid quota, degrading to no-limit", "route", string(key), "quota", quota)
 		return next
 	}

@@ -15,10 +15,11 @@ var noUser = func(r *http.Request) string { return "" }
 
 func mustRatelimitConfig(t *testing.T, quota int, cidrs []netip.Prefix) ratelimit.Config {
 	t.Helper()
-	cfg := ratelimit.Config{
-		Quotas: map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: quota},
-		TrustedProxyCIDRs: cidrs,
+	cfg, err := ratelimit.NewConfig(map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: quota})
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
 	}
+	cfg.TrustedProxyCIDRs = cidrs
 	return cfg
 }
 
@@ -138,10 +139,11 @@ func TestIPFallback_CapEnforced_FailClosed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 
-	cfg := ratelimit.Config{
-		Quotas:     map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 60},
-		MaxEntries: 2,
+	cfg, err := ratelimit.NewConfig(map[ratelimit.RouteKey]int{ratelimit.RouteExportPDF: 60})
+	if err != nil {
+		t.Fatalf("NewConfig: %v", err)
 	}
+	cfg.MaxEntries = 2
 	mw := ratelimit.New(ctx, cfg)
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(204) })
 	h := mw.Limit(ratelimit.RouteExportPDF, noUser, next)
