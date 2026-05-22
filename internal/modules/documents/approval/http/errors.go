@@ -21,71 +21,112 @@ import (
 
 const internalErrorMessage = "internal error"
 
+// Module-local typed codes for the approval domain (dot-notation taxonomy).
+const (
+	approvalCodeInternalUnknown          problem.Code = "internal.unknown"
+	approvalCodeConflictStaleRevision    problem.Code = "conflict.stale_revision"
+	approvalCodeNotFoundInstance         problem.Code = "not_found.instance"
+	approvalCodeConflictDuplicate        problem.Code = "conflict.duplicate_submission"
+	approvalCodeSignoffDuplicate         problem.Code = "signoff.duplicate"
+	approvalCodePublishInvalidSupersede  problem.Code = "publish.invalid_supersede_target"
+	approvalCodeStateInstanceCompleted   problem.Code = "state.instance_completed"
+	approvalCodeRouteInUse               problem.Code = "route.in_use"
+	approvalCodeRouteDuplicateProfile    problem.Code = "route.duplicate_profile"
+	approvalCodeSignoffNotEligible       problem.Code = "signoff.not_eligible"
+	approvalCodeSodSubmitterCannotSign   problem.Code = "sod.submitter_cannot_sign"
+	approvalCodeSodCrossStageDuplicate   problem.Code = "sod.cross_stage_duplicate"
+	approvalCodeFreezeEffDateMissing     problem.Code = "freeze.effective_date_missing"
+	approvalCodePreconditionIfMatch      problem.Code = "precondition.if_match_required"
+	approvalCodeValidationIfMatchBad     problem.Code = "validation.if_match_malformed"
+	approvalCodeIdempotencyRequired      problem.Code = "idempotency.key_required"
+	approvalCodePreconditionHashMismatch problem.Code = "precondition.content_hash_mismatch"
+	approvalCodeAuthnSignatureInvalid    problem.Code = "authn.signature_invalid"
+	approvalCodeInternalDBPrivilege      problem.Code = "internal.db_privilege_missing"
+	approvalCodeInternalDBUnknown        problem.Code = "internal.db_unknown"
+	approvalCodeValidationParamFormat    problem.Code = "validation.param_format"
+	approvalCodeValidationParamUnmarshal problem.Code = "validation.param_unmarshal"
+	approvalCodeValidationParamRequired  problem.Code = "validation.param_required"
+	approvalCodeValidationHeaderRequired problem.Code = "validation.header_required"
+	approvalCodeValidationParamTooMany   problem.Code = "validation.param_too_many_values"
+	approvalCodeAuthzCapDenied           problem.Code = "authz.capability_denied"
+	approvalCodeApprovalUnresolved       problem.Code = "approval.unresolved_comments"
+	approvalCodeValidationReasonRequired problem.Code = "validation.reason_required"
+	approvalCodeNotFoundRoute            problem.Code = "not_found.route"
+	approvalCodeTimeout                  problem.Code = "timeout"
+	approvalCodeValidationJSONDecode     problem.Code = "validation.json_decode"
+	approvalCodeValidationJSONTypeError  problem.Code = "validation.json_type_error"
+	approvalCodeValidationEmptyBody      problem.Code = "validation.empty_body"
+	approvalCodeValidationContentType    problem.Code = "validation.content_type"
+	approvalCodeValidationBodyTooLarge   problem.Code = "validation.body_too_large"
+	approvalCodeValidationDuplicateKey   problem.Code = "validation.duplicate_key"
+	approvalCodeValidationRequestInvalid problem.Code = "validation.request_invalid"
+)
+
 func MapErrorToResponse(err error) *problem.Problem {
 	statusCode := http.StatusInternalServerError
-	code := "internal.unknown"
+	code := approvalCodeInternalUnknown
 
 	switch {
 	case errors.Is(err, repository.ErrStaleRevision):
 		statusCode = http.StatusConflict
-		code = "conflict.stale_revision"
+		code = approvalCodeConflictStaleRevision
 	case errors.Is(err, repository.ErrNoActiveInstance):
 		statusCode = http.StatusNotFound
-		code = "not_found.instance"
+		code = approvalCodeNotFoundInstance
 	case errors.Is(err, repository.ErrDuplicateSubmission):
 		statusCode = http.StatusConflict
-		code = "conflict.duplicate_submission"
+		code = approvalCodeConflictDuplicate
 	case errors.Is(err, repository.ErrActorAlreadySigned):
 		statusCode = http.StatusConflict
-		code = "signoff.duplicate"
+		code = approvalCodeSignoffDuplicate
 	case errors.Is(err, repository.ErrInvalidScheduledSupersedeTarget):
 		statusCode = http.StatusConflict
-		code = "publish.invalid_supersede_target"
+		code = approvalCodePublishInvalidSupersede
 	case errors.Is(err, repository.ErrInstanceCompleted):
 		statusCode = http.StatusConflict
-		code = "state.instance_completed"
+		code = approvalCodeStateInstanceCompleted
 	case errors.Is(err, repository.ErrRouteInUse):
 		statusCode = http.StatusConflict
-		code = "route.in_use"
+		code = approvalCodeRouteInUse
 	case errors.Is(err, repository.ErrDuplicateRouteProfile):
 		statusCode = http.StatusConflict
-		code = "route.duplicate_profile"
+		code = approvalCodeRouteDuplicateProfile
 	case errors.Is(err, domain.ErrActorNotEligible):
 		statusCode = http.StatusForbidden
-		code = "signoff.not_eligible"
+		code = approvalCodeSignoffNotEligible
 	case errors.Is(err, domain.ErrAuthorCannotSign):
 		statusCode = http.StatusForbidden
-		code = "sod.submitter_cannot_sign"
+		code = approvalCodeSodSubmitterCannotSign
 	case errors.Is(err, domain.ErrActorAlreadySigned):
 		statusCode = http.StatusForbidden
-		code = "sod.cross_stage_duplicate"
+		code = approvalCodeSodCrossStageDuplicate
 	case errors.Is(err, v2dom.ErrEffectiveDateMissing):
 		statusCode = http.StatusUnprocessableEntity
-		code = "freeze.effective_date_missing"
+		code = approvalCodeFreezeEffDateMissing
 	case errors.Is(err, ErrIfMatchRequired):
 		statusCode = http.StatusPreconditionRequired
-		code = "precondition.if_match_required"
+		code = approvalCodePreconditionIfMatch
 	case errors.Is(err, ErrIfMatchMalformed):
 		statusCode = http.StatusBadRequest
-		code = "validation.if_match_malformed"
+		code = approvalCodeValidationIfMatchBad
 	case errors.Is(err, ErrIdempotencyRequired):
 		statusCode = http.StatusBadRequest
-		code = "idempotency.key_required"
+		code = approvalCodeIdempotencyRequired
 	case errors.Is(err, ErrContentHashMismatch):
 		statusCode = http.StatusPreconditionFailed
-		code = "precondition.content_hash_mismatch"
+		code = approvalCodePreconditionHashMismatch
 	case errors.Is(err, approvalsignature.ErrInvalidCredentials):
 		statusCode = http.StatusUnauthorized
-		code = "authn.signature_invalid"
+		code = approvalCodeAuthnSignatureInvalid
 	case errors.Is(err, repository.ErrInsufficientPrivilege):
 		statusCode = http.StatusInternalServerError
-		code = "internal.db_privilege_missing"
+		code = approvalCodeInternalDBPrivilege
 	case errors.Is(err, repository.ErrUnknownDB):
 		statusCode = http.StatusInternalServerError
-		code = "internal.db_unknown"
+		code = approvalCodeInternalDBUnknown
 	case errors.Is(err, domain.ErrNoActiveStage):
 		statusCode = http.StatusConflict
-		code = "state.instance_completed"
+		code = approvalCodeStateInstanceCompleted
 	default:
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError
@@ -99,61 +140,61 @@ func MapErrorToResponse(err error) *problem.Problem {
 		switch {
 		case errors.As(err, &invalidParamErr):
 			statusCode = http.StatusBadRequest
-			code = "validation.param_format"
+			code = approvalCodeValidationParamFormat
 		case errors.As(err, &unmarshalParamErr):
 			statusCode = http.StatusBadRequest
-			code = "validation.param_unmarshal"
+			code = approvalCodeValidationParamUnmarshal
 		case errors.As(err, &requiredParamErr):
 			statusCode = http.StatusBadRequest
-			code = "validation.param_required"
+			code = approvalCodeValidationParamRequired
 		case errors.As(err, &requiredHeaderErr):
 			statusCode = http.StatusBadRequest
-			code = "validation.header_required"
+			code = approvalCodeValidationHeaderRequired
 		case errors.As(err, &tooManyValuesErr):
 			statusCode = http.StatusBadRequest
-			code = "validation.param_too_many_values"
+			code = approvalCodeValidationParamTooMany
 		case errors.As(err, &capabilityDenied):
 			statusCode = http.StatusForbidden
-			code = "authz.capability_denied"
+			code = approvalCodeAuthzCapDenied
 		case errors.Is(err, application.ErrApprovalBlockedByUnresolvedComments):
 			statusCode = http.StatusConflict
-			code = "approval.unresolved_comments"
+			code = approvalCodeApprovalUnresolved
 		case errors.Is(err, application.ErrReasonRequired):
 			statusCode = http.StatusBadRequest
-			code = "validation.reason_required"
+			code = approvalCodeValidationReasonRequired
 		case errors.Is(err, application.ErrRouteNotFound):
 			statusCode = http.StatusNotFound
-			code = "not_found.route"
+			code = approvalCodeNotFoundRoute
 		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 			statusCode = http.StatusGatewayTimeout
-			code = "timeout"
+			code = approvalCodeTimeout
 		case errors.As(err, &syntaxErr):
 			statusCode = http.StatusBadRequest
-			code = "validation.json_decode"
+			code = approvalCodeValidationJSONDecode
 		case errors.Is(err, io.ErrUnexpectedEOF):
 			statusCode = http.StatusBadRequest
-			code = "validation.json_decode"
+			code = approvalCodeValidationJSONDecode
 		case errors.As(err, &typeErr):
 			statusCode = http.StatusBadRequest
-			code = "validation.json_type_error"
+			code = approvalCodeValidationJSONTypeError
 		case errors.Is(err, io.EOF):
 			statusCode = http.StatusBadRequest
-			code = "validation.empty_body"
+			code = approvalCodeValidationEmptyBody
 		case errors.Is(err, contracts.ErrContentType):
 			statusCode = http.StatusUnsupportedMediaType
-			code = "validation.content_type"
+			code = approvalCodeValidationContentType
 		case errors.Is(err, contracts.ErrBodyTooLarge):
 			statusCode = http.StatusRequestEntityTooLarge
-			code = "validation.body_too_large"
+			code = approvalCodeValidationBodyTooLarge
 		case errors.Is(err, contracts.ErrEmptyBody):
 			statusCode = http.StatusBadRequest
-			code = "validation.empty_body"
+			code = approvalCodeValidationEmptyBody
 		case errors.Is(err, contracts.ErrDuplicateKey):
 			statusCode = http.StatusBadRequest
-			code = "validation.duplicate_key"
+			code = approvalCodeValidationDuplicateKey
 		case looksLikeValidationError(err):
 			statusCode = http.StatusBadRequest
-			code = "validation.request_invalid"
+			code = approvalCodeValidationRequestInvalid
 		}
 	}
 
@@ -163,14 +204,14 @@ func MapErrorToResponse(err error) *problem.Problem {
 func WriteError(w http.ResponseWriter, err error) {
 	prob := MapErrorToResponse(err)
 	if writeErr := problem.Write(w, prob); writeErr != nil {
-		WriteJSON(w, http.StatusInternalServerError, problem.New(http.StatusInternalServerError, "internal.unknown", internalErrorMessage))
+		WriteJSON(w, http.StatusInternalServerError, problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage))
 	}
 }
 
 func WriteJSON(w http.ResponseWriter, status int, body any) {
 	payload, err := json.Marshal(body)
 	if err != nil {
-		fallback := problem.New(http.StatusInternalServerError, "internal.unknown", internalErrorMessage)
+		fallback := problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage)
 		payload, _ = json.Marshal(fallback)
 		status = http.StatusInternalServerError
 	}
