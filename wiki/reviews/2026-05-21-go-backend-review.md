@@ -54,7 +54,7 @@
 | 3  | `internal/modules/auth`                         | Done    | 8        | 18   | 22     | 11  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [auth-3.md](2026-05-21-go-backend-review/auth-3.md) |
 | 4  | `internal/modules/iam`                          | Done    | 8        | 15   | 18     | 11  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [iam-4.md](2026-05-21-go-backend-review/iam-4.md) |
 | 5a | `documents/{domain,application,repository}` (~9K LoC) | Done    | 9  | 12   | 18     | 10  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5a.md](2026-05-21-go-backend-review/documents-5a.md) |
-| 5b | `documents/{delivery,http,jobs}` (~4K LoC)      | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 5b | `documents/{delivery,http,jobs}` (~4K LoC)      | Done    | 6        | 19   | 22     | 12  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5b.md](2026-05-21-go-backend-review/documents-5b.md) |
 | 5c | `documents/approval/{domain,application}` (~13K LoC) | Pending | - | -    | -      | -   | -        | -    | -        |
 | 5d | `documents/approval/{http,repository,infrastructure,jobs}` (~7K LoC) | Pending | - | - | - | - | - | - | - |
 | 6  | `internal/modules/controlleddocuments`          | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -129,6 +129,17 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 4-C8 | `delivery/http/middleware.go:97-99` nil caps silently skips capability check | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog |
 | 4-C2 | `infrastructure/postgres/role_admin_repository.go:113-121` ReplaceUserRoles last-role-wins silent privilege escalation | Critical | leandrotca | TBC | `fix/iam-4-replace-roles-c2` | Backlog (land third) |
 | 4-C5 | `infrastructure/postgres/user_area_repository.go:103` CloseActive no RowsAffected → silent revoke no-op | Critical | leandrotca | TBC | `fix/iam-4-area-repo-c5-h4` | Backlog (land fourth) |
+
+### Module #5b (6 Criticals, 4 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 5b-C3 | `delivery/http/handler.go:1165,1187` X-User-Roles header trusted → privilege escalation | Critical | leandrotca | TBC | `fix/docs-5b-header-roles-c3` | Backlog (land first) |
+| 5b-C4 | `http/pdf_webhook_handler.go:83` tenant_id from body → cross-tenant PDF overwrite | Critical | leandrotca | TBC | `fix/docs-5b-webhook-tenant-c4` | Backlog (land second) |
+| 5b-C1 | `delivery/http/handler.go:559-564` content-hash DB error silently discarded | Critical | leandrotca | TBC | `fix/docs-5b-finalize-c1-c2` | Backlog |
+| 5b-C2 | `delivery/http/handler.go:618-622` err.Error() in JSON response → info leak + JSON injection | Critical | leandrotca | TBC | `fix/docs-5b-finalize-c1-c2` | Backlog |
+| 5b-C5 | `repository/repository.go:1035` unbounded DELETE in DeleteExpiredPending | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
+| 5b-C6 | `repository/repository.go:667` unbounded UPDATE in ExpireStaleSessions | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
 
 ### Module #5a (9 Criticals, 3 fix branches reserved 2026-05-22)
 
