@@ -141,7 +141,7 @@ Empty user → `next.ServeHTTP`, no rate limit, no log. The inline comment ("IAM
 
 **Recommend:** Fall back to IP-keyed limiting using the trusted-proxy resolution from C1 instead of bypassing. If the route is intentionally anonymous-allowed, IP is the right key; if not, the IAM middleware will already block — but the failure mode must be fail-closed, not fail-quiet. Add `slog.DebugContext` so the bypass condition is observable in tests.
 
-**FIXED** in `<COMMIT_SHA_PLACEHOLDER>` — see below for sha after commit.
+**FIXED** in `73a769aa`
 
 - [`internal/platform/ratelimit/middleware.go`](../../../internal/platform/ratelimit/middleware.go): `Limit` no longer bypasses on empty user id. New `bucketKey` helper resolves identity — user id first, then `security.ClientIP(r, m.trustedCIDRs)` via the same trusted-proxy CIDRs used by `security.RateLimiter` (single source of truth: `METALDOCS_TRUSTED_PROXY_CIDRS`). Keys namespaced as `<route>:user:<id>` and `<route>:ip:<addr>` to prevent collision. No parseable IP → fail-closed 429. `slog.DebugContext` emitted on fallback path.
 - [`internal/platform/ratelimit/config.go`](../../../internal/platform/ratelimit/config.go): `Config` gains `TrustedProxyCIDRs []netip.Prefix` and `MaxEntries int`. IP keys respect same eviction/cap contract as user keys (sweep decrements atomic counter; overflow denied fail-closed).
