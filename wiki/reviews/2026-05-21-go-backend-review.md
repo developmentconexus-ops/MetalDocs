@@ -59,7 +59,7 @@
 | 5d | `documents/approval/{http,repository,infrastructure,jobs}` (~7K LoC) | Done | 11 | 20 | 15 | 11 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5d.md](2026-05-21-go-backend-review/documents-5d.md) |
 | 6  | `internal/modules/controlleddocuments`          | Done    | 9        | 13   | 16     | 9   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [controlleddocuments-6.md](2026-05-21-go-backend-review/controlleddocuments-6.md) |
 | 7  | `internal/modules/taxonomy`                     | Done    | 5        | 14   | 13     | 8   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [taxonomy-7.md](2026-05-21-go-backend-review/taxonomy-7.md) |
-| 8  | `internal/modules/templates`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 8  | `internal/modules/templates`                    | Done    | 9        | 16   | 13     | 7   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [templates-8.md](2026-05-21-go-backend-review/templates-8.md) |
 | 9  | `internal/modules/audit`                        | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 10 | `internal/modules/render`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 11 | `internal/modules/search`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -173,6 +173,20 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 5b-C2 | `delivery/http/handler.go:618-622` err.Error() in JSON response → info leak + JSON injection | Critical | leandrotca | TBC | `fix/docs-5b-finalize-c1-c2` | Backlog |
 | 5b-C5 | `repository/repository.go:1035` unbounded DELETE in DeleteExpiredPending | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
 | 5b-C6 | `repository/repository.go:667` unbounded UPDATE in ExpireStaleSessions | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
+
+### Module #8 (9 Criticals, 6 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 8-C1 | `delivery/http/routes_lifecycle.go:225` X-Actor-Roles header fallback → role bypass in Review/Approve | Critical | leandrotca | TBC | `fix/templates-8-actor-roles-c1` | Backlog (land first) |
+| 8-C2 | `application/lifecycle.go:58` SubmitForReview authz.Require without setAuthzGUC → RLS unset | Critical | leandrotca | TBC | `fix/templates-8-authz-guc-c2-c3` | Backlog (land second) |
+| 8-C3 | `application/lifecycle.go:498` updateVersionWithAuthz authz.Require without setAuthzGUC | Critical | leandrotca | TBC | `fix/templates-8-authz-guc-c2-c3` | Backlog |
+| 8-C4 | `repository/postgres.go:236` GetVersionByID no tenant_id → cross-tenant IDOR | Critical | leandrotca | TBC | `fix/templates-8-tenant-isolation-c4-c5-c6-c7` | Backlog (land third) |
+| 8-C5 | `repository/postgres.go:217` GetVersion no tenant_id predicate in SQL | Critical | leandrotca | TBC | `fix/templates-8-tenant-isolation-c4-c5-c6-c7` | Backlog |
+| 8-C6 | `repository/postgres.go:447` GetApprovalConfig no tenant_id → cross-tenant config read | Critical | leandrotca | TBC | `fix/templates-8-tenant-isolation-c4-c5-c6-c7` | Backlog |
+| 8-C7 | `repository/postgres.go:518` ListAudit no tenant_id → cross-tenant audit log read | Critical | leandrotca | TBC | `fix/templates-8-tenant-isolation-c4-c5-c6-c7` | Backlog |
+| 8-C8 | `repository/postgres.go:495` json.Marshal audit Details discarded → corrupted audit record | Critical | leandrotca | TBC | `fix/templates-8-audit-integrity-c8-c9` | Backlog (land fourth) |
+| 8-C9 | `repository/postgres.go:514` AppendAuditTx ignores tx → ghost audit entries on rollback | Critical | leandrotca | TBC | `fix/templates-8-audit-integrity-c8-c9` | Backlog |
 
 ### Module #7 (5 Criticals, 5 fix branches reserved 2026-05-22)
 
