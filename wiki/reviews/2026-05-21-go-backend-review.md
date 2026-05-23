@@ -64,7 +64,7 @@
 | 10 | `internal/modules/render`                       | Done    | 0        | 7    | 12     | 8   | go-reviewer, silent-failure-hunter | 2026-05-22 | [render-10.md](2026-05-21-go-backend-review/render-10.md) |
 | 11 | `internal/modules/search`                       | Done    | 5        | 4    | 6      | 3   | go-reviewer | 2026-05-22 | [search-11.md](2026-05-21-go-backend-review/search-11.md) |
 | 12 | `internal/modules/jobs`                         | Done    | 1        | 4    | 10     | 6   | go-reviewer | 2026-05-22 | [jobs-12.md](2026-05-21-go-backend-review/jobs-12.md) |
-| 13 | Shared infra (`internal/test`, `objectstore`, `docgenv2`, fanout) | Pending | - | - | - | - | - | - | - |
+| 13 | Shared infra (`internal/test`, `internal/testsupport`) | Done | 0 | 0 | 4 | 5 | direct-read | 2026-05-22 | [shared-infra-13.md](2026-05-21-go-backend-review/shared-infra-13.md) |
 
 ## Notes
 
