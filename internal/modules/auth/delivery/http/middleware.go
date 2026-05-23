@@ -56,11 +56,6 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if m.cfg.LegacyHeaderEnabled && strings.TrimSpace(r.Header.Get("X-User-Id")) != "" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		cookie, err := r.Cookie(m.cfg.SessionCookieName)
 		if err != nil || strings.TrimSpace(cookie.Value) == "" {
 			_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
