@@ -56,7 +56,7 @@
 | 5a | `documents/{domain,application,repository}` (~9K LoC) | Done    | 9  | 12   | 18     | 10  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5a.md](2026-05-21-go-backend-review/documents-5a.md) |
 | 5b | `documents/{delivery,http,jobs}` (~4K LoC)      | Done    | 6        | 19   | 22     | 12  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5b.md](2026-05-21-go-backend-review/documents-5b.md) |
 | 5c | `documents/approval/{domain,application}` (~13K LoC) | Done    | 12 | 20   | 21     | 13  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5c.md](2026-05-21-go-backend-review/documents-5c.md) |
-| 5d | `documents/approval/{http,repository,infrastructure,jobs}` (~7K LoC) | Pending | - | - | - | - | - | - | - |
+| 5d | `documents/approval/{http,repository,infrastructure,jobs}` (~7K LoC) | Done | 11 | 20 | 15 | 11 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5d.md](2026-05-21-go-backend-review/documents-5d.md) |
 | 6  | `internal/modules/controlleddocuments`          | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 7  | `internal/modules/taxonomy`                     | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 8  | `internal/modules/templates`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -129,6 +129,22 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 4-C8 | `delivery/http/middleware.go:97-99` nil caps silently skips capability check | Critical | leandrotca | TBC | `fix/iam-4-middleware-c1-c3-c4-c7-c8` | Backlog |
 | 4-C2 | `infrastructure/postgres/role_admin_repository.go:113-121` ReplaceUserRoles last-role-wins silent privilege escalation | Critical | leandrotca | TBC | `fix/iam-4-replace-roles-c2` | Backlog (land third) |
 | 4-C5 | `infrastructure/postgres/user_area_repository.go:103` CloseActive no RowsAffected → silent revoke no-op | Critical | leandrotca | TBC | `fix/iam-4-area-repo-c5-h4` | Backlog (land fourth) |
+
+### Module #5d (11 Criticals, 6 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 5d-C1 | `http/route_admin_handler.go:165` no authz + raw SQL in ListRoutesHandler | Critical | leandrotca | TBC | `fix/approval-5d-list-routes-c1` | Backlog (land first) |
+| 5d-C3 | `http/doc_approval_handler.go:97` idempotency replay before eligibility check | Critical | leandrotca | TBC | `fix/approval-5d-replay-eligibility-c3` | Backlog (land second) |
+| 5d-C8 | `repository/postgres_approval_repository.go:504` loadSignoffsForInstance no tenant predicate | Critical | leandrotca | TBC | `fix/approval-5d-tenant-isolation-c8-c9` | Backlog |
+| 5d-C9 | `repository/postgres_approval_repository.go:421` loadStageInstances no tenant predicate | Critical | leandrotca | TBC | `fix/approval-5d-tenant-isolation-c8-c9` | Backlog |
+| 5d-C7 | `http/publish_handler.go:47` + `signoff_handler.go:35` parseIfMatch discarded | Critical | leandrotca | TBC | `fix/approval-5d-occ-c7` | Backlog |
+| 5d-C11 | `http/contracts/signoff.go:6` Decision bare string, Validate skippable | Critical | leandrotca | TBC | `fix/approval-5d-occ-c7` | Backlog |
+| 5d-C2 | `repository/postgres_approval_repository.go:441` skipReason never scanned | Critical | leandrotca | TBC | `fix/approval-5d-repo-c2-c10` | Backlog |
+| 5d-C4 | `http/supersede_handler.go:53` raw SQL + TOCTOU in SupersedeHandler | Critical | leandrotca | TBC | `fix/approval-5d-repo-c2-c10` | Backlog |
+| 5d-C10 | `repository/postgres_approval_repository.go:134` InsertSignoff wrong ON CONFLICT target | Critical | leandrotca | TBC | `fix/approval-5d-repo-c2-c10` | Backlog |
+| 5d-C5 | `http/errors.go:214` WriteJSON fallback marshal error discarded | Critical | leandrotca | TBC | `fix/approval-5d-writejson-c5-c6` | Backlog |
+| 5d-C6 | `http/publish_handler.go:50` readSvc nil-check missing → panic | Critical | leandrotca | TBC | `fix/approval-5d-writejson-c5-c6` | Backlog |
 
 ### Module #5c (12 Criticals, 6 fix branches reserved 2026-05-22)
 
