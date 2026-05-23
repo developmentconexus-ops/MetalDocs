@@ -57,7 +57,7 @@
 | 5b | `documents/{delivery,http,jobs}` (~4K LoC)      | Done    | 6        | 19   | 22     | 12  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5b.md](2026-05-21-go-backend-review/documents-5b.md) |
 | 5c | `documents/approval/{domain,application}` (~13K LoC) | Done    | 12 | 20   | 21     | 13  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5c.md](2026-05-21-go-backend-review/documents-5c.md) |
 | 5d | `documents/approval/{http,repository,infrastructure,jobs}` (~7K LoC) | Done | 11 | 20 | 15 | 11 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5d.md](2026-05-21-go-backend-review/documents-5d.md) |
-| 6  | `internal/modules/controlleddocuments`          | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 6  | `internal/modules/controlleddocuments`          | Done    | 9        | 13   | 16     | 9   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [controlleddocuments-6.md](2026-05-21-go-backend-review/controlleddocuments-6.md) |
 | 7  | `internal/modules/taxonomy`                     | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 8  | `internal/modules/templates`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 9  | `internal/modules/audit`                        | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -173,6 +173,20 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 5b-C2 | `delivery/http/handler.go:618-622` err.Error() in JSON response → info leak + JSON injection | Critical | leandrotca | TBC | `fix/docs-5b-finalize-c1-c2` | Backlog |
 | 5b-C5 | `repository/repository.go:1035` unbounded DELETE in DeleteExpiredPending | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
 | 5b-C6 | `repository/repository.go:667` unbounded UPDATE in ExpireStaleSessions | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
+
+### Module #6 (9 Criticals, 6 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 6-C1 | `delivery/http/routes.go:245` GetActiveDocument no visibility/authz gate → IDOR | Critical | leandrotca | TBC | `fix/cddocs-6-authz-idor-c1-c2-c3` | Backlog (land first) |
+| 6-C2 | `application/service.go:405-449` changeStatus GetByID without CanRead → restricted docs unprotected | Critical | leandrotca | TBC | `fix/cddocs-6-authz-idor-c1-c2-c3` | Backlog |
+| 6-C3 | `application/service.go:357-364` PreviewCode/PeekSeq no authz → sequence counters enumerable | Critical | leandrotca | TBC | `fix/cddocs-6-authz-idor-c1-c2-c3` | Backlog |
+| 6-C4 | `application/service.go:420` changeStatus missing setAuthzGUC → RLS context unset | Critical | leandrotca | TBC | `fix/cddocs-6-authz-guc-c4` | Backlog (land second) |
+| 6-C5 | `application/service.go:405-429` TOCTOU race in changeStatus: GetByID outside transaction | Critical | leandrotca | TBC | `fix/cddocs-6-toctou-c5` | Backlog (land third) |
+| 6-C6 | `application/service.go:165,253,434` json.Marshal errors discarded → nil governance event payloads | Critical | leandrotca | TBC | `fix/cddocs-6-audit-trail-c6` | Backlog |
+| 6-C7 | `infrastructure/repository.go:549` GetTemplateVersionState no tenant_id → cross-tenant leakage | Critical | leandrotca | TBC | `fix/cddocs-6-tenant-isolation-c7` | Backlog (may need migration) |
+| 6-C8 | `application/migration.go:30-35` unbounded backfill SELECT → full-table scan, autovacuum contention | Critical | leandrotca | TBC | `fix/cddocs-6-migration-c8-c9` | Backlog |
+| 6-C9 | `application/migration.go:61-68` ON CONFLICT re-link + skipped counter inverted → silent re-link | Critical | leandrotca | TBC | `fix/cddocs-6-migration-c8-c9` | Backlog |
 
 ### Module #5a (9 Criticals, 3 fix branches reserved 2026-05-22)
 
