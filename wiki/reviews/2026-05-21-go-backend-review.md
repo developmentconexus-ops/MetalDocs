@@ -62,8 +62,8 @@
 | 8  | `internal/modules/templates`                    | Done    | 9        | 16   | 13     | 7   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [templates-8.md](2026-05-21-go-backend-review/templates-8.md) |
 | 9  | `internal/modules/audit`                        | Done    | 3        | 5    | 7      | 4   | go-reviewer, security-reviewer, silent-failure-hunter | 2026-05-22 | [audit-9.md](2026-05-21-go-backend-review/audit-9.md) |
 | 10 | `internal/modules/render`                       | Done    | 0        | 7    | 12     | 8   | go-reviewer, silent-failure-hunter | 2026-05-22 | [render-10.md](2026-05-21-go-backend-review/render-10.md) |
-| 11 | `internal/modules/search`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
-| 12 | `internal/modules/jobs`                         | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 11 | `internal/modules/search`                       | Done    | 5        | 4    | 6      | 3   | go-reviewer | 2026-05-22 | [search-11.md](2026-05-21-go-backend-review/search-11.md) |
+| 12 | `internal/modules/jobs`                         | Done    | 1        | 4    | 10     | 6   | go-reviewer | 2026-05-22 | [jobs-12.md](2026-05-21-go-backend-review/jobs-12.md) |
 | 13 | Shared infra (`internal/test`, `objectstore`, `docgenv2`, fanout) | Pending | - | - | - | - | - | - | - |
 
 ## Notes
@@ -173,6 +173,22 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 5b-C2 | `delivery/http/handler.go:618-622` err.Error() in JSON response → info leak + JSON injection | Critical | leandrotca | TBC | `fix/docs-5b-finalize-c1-c2` | Backlog |
 | 5b-C5 | `repository/repository.go:1035` unbounded DELETE in DeleteExpiredPending | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
 | 5b-C6 | `repository/repository.go:667` unbounded UPDATE in ExpireStaleSessions | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
+
+### Module #12 (1 Critical, 2 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 12-C1 | `scheduler/lease_reaper.go:50` hardcoded `tenant_id = 'system'` in governance_events INSERT — FK/consumer compatibility unverified | Critical | leandrotca | TBC | `fix/jobs-12-reaper-c1` | Backlog (land first) |
+
+### Module #11 (5 Criticals, 2 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 11-C1 | `delivery/http/handler.go:47` no authn gate → unauthenticated read of full document corpus | Critical | leandrotca | TBC | `fix/search-11-authz-c1-c2-c3` | Backlog (land first) |
+| 11-C2 | `application/service.go:168` absence of IAM context bypasses policy enforcement | Critical | leandrotca | TBC | `fix/search-11-authz-c1-c2-c3` | Backlog |
+| 11-C3 | `infrastructure/v2documents/reader.go:20` ListDocuments no tenant_id filter → cross-tenant IDOR | Critical | leandrotca | TBC | `fix/search-11-authz-c1-c2-c3` | Backlog |
+| 11-C4 | `domain/port.go:6` Reader.ListDocuments interface has no tenant parameter | Critical | leandrotca | TBC | `fix/search-11-authz-c1-c2-c3` | Backlog |
+| 11-C5 | `infrastructure/v2documents/reader.go:20` no LIMIT → unbounded full-table scan per request | Critical | leandrotca | TBC | `fix/search-11-unbounded-c5` | Backlog (land second) |
 
 ### Module #9 (3 Criticals, 1 fix branch reserved 2026-05-22)
 
