@@ -61,7 +61,7 @@
 | 7  | `internal/modules/taxonomy`                     | Done    | 5        | 14   | 13     | 8   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [taxonomy-7.md](2026-05-21-go-backend-review/taxonomy-7.md) |
 | 8  | `internal/modules/templates`                    | Done    | 9        | 16   | 13     | 7   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [templates-8.md](2026-05-21-go-backend-review/templates-8.md) |
 | 9  | `internal/modules/audit`                        | Done    | 3        | 5    | 7      | 4   | go-reviewer, security-reviewer, silent-failure-hunter | 2026-05-22 | [audit-9.md](2026-05-21-go-backend-review/audit-9.md) |
-| 10 | `internal/modules/render`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 10 | `internal/modules/render`                       | Done    | 0        | 7    | 12     | 8   | go-reviewer, silent-failure-hunter | 2026-05-22 | [render-10.md](2026-05-21-go-backend-review/render-10.md) |
 | 11 | `internal/modules/search`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 12 | `internal/modules/jobs`                         | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 13 | Shared infra (`internal/test`, `objectstore`, `docgenv2`, fanout) | Pending | - | - | - | - | - | - | - |
