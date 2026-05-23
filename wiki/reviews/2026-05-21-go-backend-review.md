@@ -58,7 +58,7 @@
 | 5c | `documents/approval/{domain,application}` (~13K LoC) | Done    | 12 | 20   | 21     | 13  | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5c.md](2026-05-21-go-backend-review/documents-5c.md) |
 | 5d | `documents/approval/{http,repository,infrastructure,jobs}` (~7K LoC) | Done | 11 | 20 | 15 | 11 | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [documents-5d.md](2026-05-21-go-backend-review/documents-5d.md) |
 | 6  | `internal/modules/controlleddocuments`          | Done    | 9        | 13   | 16     | 9   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [controlleddocuments-6.md](2026-05-21-go-backend-review/controlleddocuments-6.md) |
-| 7  | `internal/modules/taxonomy`                     | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 7  | `internal/modules/taxonomy`                     | Done    | 5        | 14   | 13     | 8   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [taxonomy-7.md](2026-05-21-go-backend-review/taxonomy-7.md) |
 | 8  | `internal/modules/templates`                    | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 9  | `internal/modules/audit`                        | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 10 | `internal/modules/render`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -173,6 +173,16 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 5b-C2 | `delivery/http/handler.go:618-622` err.Error() in JSON response → info leak + JSON injection | Critical | leandrotca | TBC | `fix/docs-5b-finalize-c1-c2` | Backlog |
 | 5b-C5 | `repository/repository.go:1035` unbounded DELETE in DeleteExpiredPending | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
 | 5b-C6 | `repository/repository.go:667` unbounded UPDATE in ExpireStaleSessions | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
+
+### Module #7 (5 Criticals, 5 fix branches reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 7-C1 | `delivery/http/routes_*.go` — 6 read handlers (list/get areas, profiles, families) no authz.Require gate | Critical | leandrotca | TBC | `fix/taxonomy-7-authz-reads-c1` | Backlog (land first) |
+| 7-C2 | `infrastructure/repository.go` + `family_repository.go` — all repo read methods missing setAuthzGUC → RLS unset for SELECTs | Critical | leandrotca | TBC | `fix/taxonomy-7-authz-reads-c1` | Backlog (same branch as C1) |
+| 7-C3 | `infrastructure/template_version_checker.go:13` — no tenant_id predicate → cross-tenant IDOR on template version lookup | Critical | leandrotca | TBC | `fix/taxonomy-7-tenant-isolation-c3` | Backlog (land second) |
+| 7-C4 | `infrastructure/family_repository.go:48` — FamilyUpdate lost-update race: GetByCode outside transaction, no FOR UPDATE | Critical | leandrotca | TBC | `fix/taxonomy-7-toctou-c4-c5` | Backlog (land third) |
+| 7-C5 | `application/area_service.go:67` + `profile_service.go:77,115` — SetParent/SetDefaultTemplate/Archive read-then-write races, no FOR UPDATE | Critical | leandrotca | TBC | `fix/taxonomy-7-toctou-c4-c5` | Backlog |
 
 ### Module #6 (9 Criticals, 6 fix branches reserved 2026-05-22)
 
