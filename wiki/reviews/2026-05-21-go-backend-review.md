@@ -60,7 +60,7 @@
 | 6  | `internal/modules/controlleddocuments`          | Done    | 9        | 13   | 16     | 9   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [controlleddocuments-6.md](2026-05-21-go-backend-review/controlleddocuments-6.md) |
 | 7  | `internal/modules/taxonomy`                     | Done    | 5        | 14   | 13     | 8   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [taxonomy-7.md](2026-05-21-go-backend-review/taxonomy-7.md) |
 | 8  | `internal/modules/templates`                    | Done    | 9        | 16   | 13     | 7   | go-reviewer, security-reviewer, silent-failure-hunter, type-design-analyzer, database-reviewer | 2026-05-22 | [templates-8.md](2026-05-21-go-backend-review/templates-8.md) |
-| 9  | `internal/modules/audit`                        | Pending | -        | -    | -      | -   | -        | -    | -        |
+| 9  | `internal/modules/audit`                        | Done    | 3        | 5    | 7      | 4   | go-reviewer, security-reviewer, silent-failure-hunter | 2026-05-22 | [audit-9.md](2026-05-21-go-backend-review/audit-9.md) |
 | 10 | `internal/modules/render`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 11 | `internal/modules/search`                       | Pending | -        | -    | -      | -   | -        | -    | -        |
 | 12 | `internal/modules/jobs`                         | Pending | -        | -    | -      | -   | -        | -    | -        |
@@ -173,6 +173,14 @@ Per plan §6 G3: each Critical needs owner + ETA + reserved fix-branch before cu
 | 5b-C2 | `delivery/http/handler.go:618-622` err.Error() in JSON response → info leak + JSON injection | Critical | leandrotca | TBC | `fix/docs-5b-finalize-c1-c2` | Backlog |
 | 5b-C5 | `repository/repository.go:1035` unbounded DELETE in DeleteExpiredPending | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
 | 5b-C6 | `repository/repository.go:667` unbounded UPDATE in ExpireStaleSessions | Critical | leandrotca | TBC | `fix/docs-5b-sweeper-unbounded-c5-c6` | Backlog |
+
+### Module #9 (3 Criticals, 1 fix branch reserved 2026-05-22)
+
+| ID | File:line | Severity | Owner | ETA | Fix branch | Status |
+|----|-----------|----------|-------|-----|------------|--------|
+| 9-C1 | `delivery/http/handler.go:39` no auth/authz gate → unauthenticated read of full audit log | Critical | leandrotca | TBC | `fix/audit-9-authz-idor-c1-c2-c3` | Backlog (land first) |
+| 9-C2 | `delivery/http/handler.go:55` TenantID never extracted from context → cross-tenant IDOR | Critical | leandrotca | TBC | `fix/audit-9-authz-idor-c1-c2-c3` | Backlog |
+| 9-C3 | `application/service.go:22-27` TenantID dropped in normalization → zeroed before DB | Critical | leandrotca | TBC | `fix/audit-9-authz-idor-c1-c2-c3` | Backlog |
 
 ### Module #8 (9 Criticals, 6 fix branches reserved 2026-05-22)
 
