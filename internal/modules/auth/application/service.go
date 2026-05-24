@@ -500,12 +500,12 @@ func (s *Service) validatePassword(password string) error {
 	return nil
 }
 
-func (s *Service) hashPassword(password string) (string, error) {
+func (s *Service) hashPassword(password string) (authdomain.PasswordHash, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", fmt.Errorf("hash password: %w", err)
 	}
-	return string(hash), nil
+	return authdomain.PasswordHash(string(hash)), nil
 }
 
 func (s *Service) newSessionToken() (string, string, error) {
