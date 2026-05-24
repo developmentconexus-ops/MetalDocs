@@ -21,7 +21,7 @@ func TestPasswordChangePreservesSessionAndClearsMustChangePassword(t *testing.T)
 	cfg := authapp.Config{
 		SessionCookieName:      "metaldocs_session",
 		SessionTTL:             time.Hour,
-		SessionSecret:          "local-test-secret",
+		SessionSecret:          "0123456789abcdef0123456789abcdef",
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      5 * time.Minute,
