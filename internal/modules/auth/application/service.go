@@ -32,8 +32,8 @@ type Config struct {
 	PasswordMinLength      int
 	LoginMaxFailedAttempts int
 	LoginLockDuration      time.Duration
-	LegacyHeaderEnabled      bool
-	OriginProtection         bool
+	LegacyHeaderEnabled    bool
+	OriginProtection       bool
 	// AllowDevTenantFallback allows login to succeed for users with no IAM roles
 	// by returning DevTenantID. Set true only in dev/test; defaults false (prod-safe).
 	AllowDevTenantFallback bool
@@ -72,8 +72,11 @@ type beginTxRepository interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
-func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) *Service {
-	return &Service{repo: repo, roleProvider: roleProvider, roleAdmin: roleAdmin, cfg: cfg}
+func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) (*Service, error) {
+	if len(cfg.SessionSecret) < 32 {
+		return nil, fmt.Errorf("new auth service: session secret must be at least 32 characters")
+	}
+	return &Service{repo: repo, roleProvider: roleProvider, roleAdmin: roleAdmin, cfg: cfg}, nil
 }
 
 func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
@@ -138,13 +141,9 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
 	}
 	if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(password)) != nil {
-		attempts := identity.FailedLoginAttempts + 1
-		var lockedUntil *time.Time
-		if attempts >= s.cfg.LoginMaxFailedAttempts {
-			lock := time.Now().UTC().Add(s.cfg.LoginLockDuration)
-			lockedUntil = &lock
+		if _, _, err := s.repo.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds())); err != nil {
+			return authdomain.AuthenticatedSession{}, fmt.Errorf("record failed login: %w", err)
 		}
-		_ = s.repo.RecordFailedLogin(ctx, identity.UserID, attempts, lockedUntil)
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
 	}
 

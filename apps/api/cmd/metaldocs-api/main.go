@@ -167,7 +167,10 @@ func main() {
 		}
 	}
 
-	authService := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, authCfg)
+	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, authCfg)
+	if err != nil {
+		log.Fatalf("new auth service: %v", err)
+	}
 	if err := authService.BootstrapLocalAdmin(ctx); err != nil {
 		log.Fatalf("bootstrap local admin: %v", err)
 	}

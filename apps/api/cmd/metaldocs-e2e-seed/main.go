@@ -55,7 +55,10 @@ func main() {
 	}
 	defer deps.Cleanup()
 
-	authService := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, authCfg)
+	authService, err := authapp.NewService(deps.AuthRepo, deps.RoleProvider, deps.RoleAdminRepo, authCfg)
+	if err != nil {
+		log.Fatalf("new auth service: %v", err)
+	}
 	iamAdmin := iamapp.NewAdminService(deps.RoleAdminRepo, nil)
 	seed := loadSeedConfig()
 
