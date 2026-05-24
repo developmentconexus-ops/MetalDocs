@@ -28,15 +28,15 @@ func NewPDFDispatcher(pub messaging.Publisher) *PDFDispatcher {
 
 func (d *PDFDispatcher) Dispatch(ctx context.Context, in DispatchInput) error {
 	return d.pub.Publish(ctx, messaging.Event{
-		EventID:        uuid.NewString(),
-		EventType:      "docgen_v2_pdf",
-		AggregateType:  "document_revision",
-		AggregateID:    in.RevisionID,
-		IdempotencyKey: "docgen_v2_pdf:" + in.RevisionID,
-		Payload: map[string]any{
-			"tenant_id":         in.TenantID,
-			"revision_id":       in.RevisionID,
-			"final_docx_s3_key": in.FinalDocxS3Key,
+		EventID:        messaging.EventID(uuid.NewString()),
+		EventType:      messaging.EventTypePDFConvert,
+		AggregateType:  messaging.AggregateType("document_revision"),
+		AggregateID:    messaging.AggregateID(in.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + in.RevisionID),
+		Payload: messaging.PDFConvertPayload{
+			TenantID:       in.TenantID,
+			RevisionID:     in.RevisionID,
+			FinalDocxS3Key: in.FinalDocxS3Key,
 		},
 	})
 }

@@ -14,8 +14,43 @@ type PDFConverter interface {
 	ConvertPDF(ctx context.Context, req servicebus.ConvertPDFRequest) (servicebus.ConvertPDFResult, error)
 }
 
+type TenantID string
+type DocumentID string
+type StorageKey string
+
+type PDFWriteRequest struct {
+	TenantID    TenantID
+	DocumentID  DocumentID
+	StorageKey  StorageKey
+	PDFHash     []byte
+	GeneratedAt time.Time
+}
+
 type PDFPersister interface {
+	WritePDF(ctx context.Context, req PDFWriteRequest) error
+}
+
+type StringPDFPersister interface {
 	WritePDF(ctx context.Context, tenant, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error
+}
+
+type SnapshotPDFPersister struct {
+	persister StringPDFPersister
+}
+
+func NewSnapshotPDFPersister(persister StringPDFPersister) SnapshotPDFPersister {
+	return SnapshotPDFPersister{persister: persister}
+}
+
+func (p SnapshotPDFPersister) WritePDF(ctx context.Context, req PDFWriteRequest) error {
+	return p.persister.WritePDF(
+		ctx,
+		string(req.TenantID),
+		string(req.DocumentID),
+		string(req.StorageKey),
+		req.PDFHash,
+		req.GeneratedAt,
+	)
 }
 
 type PDFJobRunner struct {
@@ -31,17 +66,19 @@ func NewPDFJobRunner(converter PDFConverter, persister PDFPersister) *PDFJobRunn
 }
 
 func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error {
-	tenantID, _ := event.Payload["tenant_id"].(string)
-	revisionID, _ := event.Payload["revision_id"].(string)
-	if tenantID == "" || revisionID == "" {
+	payload, err := messaging.PDFConvertPayloadFrom(event)
+	if err != nil {
+		return fmt.Errorf("pdf job runner: %w", err)
+	}
+	if payload.TenantID == "" || payload.RevisionID == "" {
 		return fmt.Errorf("pdf job runner: missing payload fields")
 	}
-	docxKey, _ := event.Payload["final_docx_s3_key"].(string)
+	docxKey := payload.FinalDocxS3Key
 	if docxKey == "" {
-		docxKey = fmt.Sprintf("tenants/%s/revisions/%s/frozen.docx", tenantID, revisionID)
+		docxKey = fmt.Sprintf("tenants/%s/revisions/%s/frozen.docx", payload.TenantID, payload.RevisionID)
 	}
 
-	outputKey := fmt.Sprintf("tenants/%s/revisions/%s/final.pdf", tenantID, revisionID)
+	outputKey := fmt.Sprintf("tenants/%s/revisions/%s/final.pdf", payload.TenantID, payload.RevisionID)
 	result, err := r.converter.ConvertPDF(ctx, servicebus.ConvertPDFRequest{
 		DocxKey:   docxKey,
 		OutputKey: outputKey,
@@ -55,7 +92,13 @@ func (r *PDFJobRunner) Handle(ctx context.Context, event messaging.Event) error 
 		return fmt.Errorf("pdf job runner: decode content hash: %w", err)
 	}
 
-	if err := r.persister.WritePDF(ctx, tenantID, revisionID, result.OutputKey, hashBytes, time.Now().UTC()); err != nil {
+	if err := r.persister.WritePDF(ctx, PDFWriteRequest{
+		TenantID:    TenantID(payload.TenantID),
+		DocumentID:  DocumentID(payload.RevisionID),
+		StorageKey:  StorageKey(result.OutputKey),
+		PDFHash:     hashBytes,
+		GeneratedAt: time.Now().UTC(),
+	}); err != nil {
 		return fmt.Errorf("pdf job runner: persist pdf: %w", err)
 	}
 	return nil

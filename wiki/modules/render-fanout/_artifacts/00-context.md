@@ -1,6 +1,6 @@
 # render-fanout - context
 
-Last verified: 2026-05-13
+Last verified: 2026-05-24
 
 - Current doc promoted from stub to governed module page.
 - Core code surface:
