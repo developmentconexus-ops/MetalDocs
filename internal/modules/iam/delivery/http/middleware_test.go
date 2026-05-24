@@ -6,12 +6,20 @@ import (
 	"testing"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 func TestMiddlewareStripsUserIDHeader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
 	req.Header.Set("X-User-ID", "attacker")
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "real-user", []iamdomain.Role{iamdomain.RoleSystemAdmin}))
+
+	ctx := iamdomain.WithAuthContext(req.Context(), "real-user", []iamdomain.Role{iamdomain.RoleSystemAdmin})
+	ctx = tenant.WithTenantID(ctx, tenant.DevTenantID)
+	req = req.WithContext(ctx)
+
+	resolver := func(method, path string) (iamdomain.Capability, Visibility) {
+		return iamdomain.Capability(""), VisibilitySessionRequired
+	}
 
 	called := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +32,7 @@ func TestMiddlewareStripsUserIDHeader(t *testing.T) {
 		}
 	})
 
-	NewMiddleware(nil, nil, true).Wrap(next).ServeHTTP(httptest.NewRecorder(), req)
+	NewMiddleware(nil, nil, true).WithPermissionResolver(resolver).Wrap(next).ServeHTTP(httptest.NewRecorder(), req)
 
 	if !called {
 		t.Fatal("next handler was not called")
