@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -74,7 +75,7 @@ WHERE session_id = $1
 		&session.UserAgent,
 		&session.LastSeenAt,
 	); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return authdomain.Session{}, authdomain.ErrSessionNotFound
 		}
 		return authdomain.Session{}, fmt.Errorf("select auth session: %w", err)
@@ -110,9 +111,16 @@ UPDATE metaldocs.auth_sessions
 SET last_seen_at = $2
 WHERE session_id = $1
 `
-	_, err := r.db.ExecContext(ctx, q, sessionID, seenAt)
+	res, err := r.db.ExecContext(ctx, q, sessionID, seenAt)
 	if err != nil {
 		return fmt.Errorf("touch auth session: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("touch auth session rows affected: %w", err)
+	}
+	if n == 0 {
+		return authdomain.ErrSessionNotFound
 	}
 	return nil
 }
@@ -123,9 +131,16 @@ UPDATE metaldocs.auth_sessions
 SET revoked_at = $2
 WHERE session_id = $1
 `
-	_, err := r.db.ExecContext(ctx, q, sessionID, revokedAt)
+	res, err := r.db.ExecContext(ctx, q, sessionID, revokedAt)
 	if err != nil {
 		return fmt.Errorf("revoke auth session: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("revoke auth session rows affected: %w", err)
+	}
+	if n == 0 {
+		return authdomain.ErrSessionNotFound
 	}
 	return nil
 }
@@ -385,7 +400,7 @@ func (r *Repository) loadIdentity(ctx context.Context, query string, arg string)
 		&identity.CreatedAt,
 		&identity.UpdatedAt,
 	); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return authdomain.Identity{}, authdomain.ErrIdentityNotFound
 		}
 		return authdomain.Identity{}, fmt.Errorf("load auth identity: %w", err)
@@ -401,7 +416,7 @@ SELECT user_id
 FROM metaldocs.auth_identities
 WHERE lower(username) = lower($1)
 `, username).Scan(&otherUserID)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("check username uniqueness: %w", err)
 		}
 		if err == nil && otherUserID != strings.TrimSpace(userID) {
@@ -416,7 +431,7 @@ SELECT user_id
 FROM metaldocs.auth_identities
 WHERE lower(email) = lower($1)
 `, email).Scan(&otherUserID)
-		if err != nil && err != sql.ErrNoRows {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("check email uniqueness: %w", err)
 		}
 		if err == nil && otherUserID != strings.TrimSpace(userID) {
