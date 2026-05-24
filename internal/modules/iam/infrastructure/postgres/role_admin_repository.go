@@ -74,9 +74,7 @@ VALUES ($1, $2::uuid, $3, NOW(), $4)
 	return nil
 }
 
-// ReplaceUserRoles writes the user+role assignment. The schema constraint
-// UNIQUE(tenant_id, user_id) means at most ONE role row per user per tenant.
-// If the input slice has multiple roles, only the last one is written.
+// ReplaceUserRoles writes the user+role assignments.
 func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -110,21 +108,29 @@ DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
 		return fmt.Errorf("delete prior iam roles: %w", err)
 	}
 
-	var lastRole string
+	roleCodes := make([]string, 0, len(roles))
+	seen := map[string]struct{}{}
 	for _, role := range roles {
 		if code := strings.TrimSpace(string(role)); code != "" {
-			lastRole = code
+			if _, ok := seen[code]; ok {
+				continue
+			}
+			seen[code] = struct{}{}
+			roleCodes = append(roleCodes, code)
 		}
 	}
-	if lastRole == "" {
+	if len(roleCodes) == 0 {
 		return nil
 	}
 
-	if _, err := tx.ExecContext(ctx, `
+	for _, roleCode := range roleCodes {
+		if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)
 VALUES ($1, $2::uuid, $3, NOW(), $4)
-`, userID, tenantID, lastRole, assignedBy); err != nil {
-		return fmt.Errorf("insert iam role: %w", err)
+ON CONFLICT (user_id, role_code) DO NOTHING
+`, userID, tenantID, roleCode, assignedBy); err != nil {
+			return fmt.Errorf("insert iam role: %w", err)
+		}
 	}
 	return nil
 }
