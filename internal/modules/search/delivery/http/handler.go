@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	searchapp "metaldocs/internal/modules/search/application"
 	searchdomain "metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/httpresponse"
+	"metaldocs/internal/platform/tenant"
 )
 
 type Handler struct {
@@ -50,6 +52,16 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())) == "" {
+		writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))
+		return
+	}
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))
+		return
+	}
+
 	limit := 0
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		n, err := strconv.Atoi(raw)
@@ -72,6 +84,7 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 	}
 
 	items, err := h.service.SearchDocuments(r.Context(), searchdomain.Query{
+		TenantID:        tenantID,
 		Text:            r.URL.Query().Get("q"),
 		DocumentType:    r.URL.Query().Get("documentType"),
 		DocumentProfile: r.URL.Query().Get("documentProfile"),
