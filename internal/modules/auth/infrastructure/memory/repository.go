@@ -90,7 +90,7 @@ func (r *Repository) RevokeSession(_ context.Context, sessionID string, revokedA
 
 	session, ok := r.sessions[sessionID]
 	if !ok {
-		return nil
+		return authdomain.ErrSessionNotFound
 	}
 	session.RevokedAt = &revokedAt
 	r.sessions[sessionID] = session

@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"sync"
 	"testing"
@@ -86,6 +87,38 @@ func TestCreateAndFindSession_PreservesRoundTrip(t *testing.T) {
 	}
 	if found.UserID != "test-user-id" {
 		t.Errorf("UserID mismatch: got %q, want %q", found.UserID, "test-user-id")
+	}
+}
+
+func TestSessionMutations_UnknownSessionReturnsNotFound(t *testing.T) {
+	repo := NewRepository()
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "touch",
+			run: func() error {
+				return repo.TouchSession(ctx, "missing-session", now)
+			},
+		},
+		{
+			name: "revoke",
+			run: func() error {
+				return repo.RevokeSession(ctx, "missing-session", now)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.run(); !errors.Is(err, authdomain.ErrSessionNotFound) {
+				t.Fatalf("expected ErrSessionNotFound, got %v", err)
+			}
+		})
 	}
 }
 
