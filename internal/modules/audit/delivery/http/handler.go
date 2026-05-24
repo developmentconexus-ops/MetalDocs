@@ -2,6 +2,7 @@ package httpdelivery
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,8 +10,10 @@ import (
 
 	"metaldocs/internal/modules/audit/application"
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/tenant"
 )
 
 type Handler struct {
@@ -42,6 +45,11 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tenantID, ok := auditTenantFromRequest(w, r)
+	if !ok {
+		return
+	}
+
 	limit := 50
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
@@ -55,9 +63,14 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	items, err := h.service.ListEvents(r.Context(), domain.ListEventsQuery{
 		ResourceType: strings.TrimSpace(r.URL.Query().Get("resourceType")),
 		ResourceID:   strings.TrimSpace(r.URL.Query().Get("resourceId")),
+		TenantID:     tenantID,
 		Limit:        limit,
 	})
 	if err != nil {
+		if errors.Is(err, application.ErrTenantRequired) {
+			_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Tenant claim required"))
+			return
+		}
 		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events"))
 		return
 	}
@@ -83,4 +96,17 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
 		"items": responseItems,
 	})
+}
+
+func auditTenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if _, ok := authn.UserIDFromContext(r.Context()); !ok {
+		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		return "", false
+	}
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Tenant claim required"))
+		return "", false
+	}
+	return tenantID, true
 }

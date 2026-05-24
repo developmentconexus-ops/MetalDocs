@@ -2,10 +2,13 @@ package application
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"metaldocs/internal/modules/audit/domain"
 )
+
+var ErrTenantRequired = errors.New("audit: tenant id is required")
 
 type Service struct {
 	reader domain.Reader
@@ -23,7 +26,11 @@ func (s *Service) ListEvents(ctx context.Context, query domain.ListEventsQuery) 
 	normalized := domain.ListEventsQuery{
 		ResourceType: strings.TrimSpace(query.ResourceType),
 		ResourceID:   strings.TrimSpace(query.ResourceID),
+		TenantID:     strings.TrimSpace(query.TenantID),
 		Limit:        query.Limit,
+	}
+	if normalized.TenantID == "" {
+		return nil, ErrTenantRequired
 	}
 	if normalized.Limit <= 0 {
 		normalized.Limit = 50
