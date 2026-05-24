@@ -6,12 +6,15 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+type PasswordHash string
+type PlainPassword string
+
 type Identity struct {
 	UserID              string
 	Username            string
 	Email               string
 	DisplayName         string
-	PasswordHash        string
+	PasswordHash        PasswordHash
 	PasswordAlgo        string
 	MustChangePassword  bool
 	LastLoginAt         *time.Time
@@ -36,10 +39,10 @@ type Session struct {
 }
 
 type OnlineUser struct {
-	UserID     string
-	Username   string
+	UserID      string
+	Username    string
 	DisplayName string
-	LastSeenAt time.Time
+	LastSeenAt  time.Time
 }
 
 type ManagedUser struct {
@@ -62,7 +65,7 @@ type CreateUserParams struct {
 	Username           string
 	Email              string
 	DisplayName        string
-	PasswordHash       string
+	PasswordHash       PasswordHash
 	PasswordAlgo       string
 	MustChangePassword bool
 	IsActive           bool
@@ -75,7 +78,7 @@ type UpdateUserParams struct {
 	DisplayName        *string
 	Email              *string
 	IsActive           *bool
-	NewPasswordHash    *string
+	NewPasswordHash    *PasswordHash
 	MustChangePassword *bool
 	ResetLockState     bool
 }
@@ -85,7 +88,7 @@ type BootstrapAdminParams struct {
 	Username           string
 	Email              string
 	DisplayName        string
-	PasswordHash       string
+	PasswordHash       PasswordHash
 	PasswordAlgo       string
 	MustChangePassword bool
 }

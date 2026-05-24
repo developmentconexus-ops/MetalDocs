@@ -341,7 +341,7 @@ SET email = COALESCE($2, email),
     locked_until = CASE WHEN $3 IS NOT NULL OR $5 THEN NULL ELSE locked_until END,
     updated_at = NOW()
 WHERE user_id = $1
-`, params.UserID, nullableText(params.Email), nullableText(params.NewPasswordHash), nullableBool(params.MustChangePassword), params.ResetLockState); err != nil {
+`, params.UserID, nullableText(params.Email), nullablePasswordHash(params.NewPasswordHash), nullableBool(params.MustChangePassword), params.ResetLockState); err != nil {
 			return fmt.Errorf("update auth identity: %w", err)
 		}
 	}
@@ -446,6 +446,13 @@ func nullableText(value *string) any {
 		return nil
 	}
 	return strings.TrimSpace(*value)
+}
+
+func nullablePasswordHash(value *authdomain.PasswordHash) any {
+	if value == nil {
+		return nil
+	}
+	return strings.TrimSpace(string(*value))
 }
 
 func nullableBool(value *bool) any {

@@ -76,13 +76,13 @@ func newMockRoleAdminRepository() *mockRoleAdminRepository {
 
 const testSessionSecret = "0123456789abcdef0123456789abcdef"
 
-func mustHashPassword(t *testing.T, password string) string {
+func mustHashPassword(t *testing.T, password string) authdomain.PasswordHash {
 	t.Helper()
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		t.Fatalf("GenerateFromPassword: %v", err)
 	}
-	return string(hash)
+	return authdomain.PasswordHash(string(hash))
 }
 
 func mustNewService(t *testing.T, repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) *Service {
