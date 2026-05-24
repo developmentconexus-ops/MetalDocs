@@ -15,8 +15,8 @@ func TestListDocumentsFiltersByTenantID(t *testing.T) {
 	}
 	defer db.Close()
 
-	mock.ExpectQuery(regexp.QuoteMeta("WHERE d.tenant_id = $1")).
-		WithArgs("tenant-1").
+	mock.ExpectQuery(regexp.QuoteMeta("LIMIT $2")).
+		WithArgs("tenant-1", 20).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id",
 			"name",
@@ -29,7 +29,7 @@ func TestListDocumentsFiltersByTenantID(t *testing.T) {
 			"created_at",
 		}))
 
-	_, err = NewReader(db).ListDocuments(context.Background(), "tenant-1")
+	_, err = NewReader(db).ListDocuments(context.Background(), "tenant-1", 20)
 	if err != nil {
 		t.Fatalf("ListDocuments: %v", err)
 	}

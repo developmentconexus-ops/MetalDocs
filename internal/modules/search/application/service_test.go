@@ -13,12 +13,14 @@ import (
 type stubReader struct {
 	called       bool
 	listTenantID string
+	listLimit    int
 	docs         []domain.Document
 }
 
-func (r *stubReader) ListDocuments(_ context.Context, tenantID string) ([]domain.Document, error) {
+func (r *stubReader) ListDocuments(_ context.Context, tenantID string, limit int) ([]domain.Document, error) {
 	r.called = true
 	r.listTenantID = tenantID
+	r.listLimit = limit
 	return r.docs, nil
 }
 
@@ -50,6 +52,23 @@ func TestSearchDocumentsPassesTenantIDToReader(t *testing.T) {
 	}
 	if reader.listTenantID != "tenant-1" {
 		t.Fatalf("tenant id = %q, want tenant-1", reader.listTenantID)
+	}
+	if reader.listLimit != defaultLimit {
+		t.Fatalf("limit = %d, want %d", reader.listLimit, defaultLimit)
+	}
+}
+
+func TestSearchDocumentsPassesCappedLimitToReader(t *testing.T) {
+	reader := &stubReader{}
+	svc := NewService(reader)
+	ctx := iamdomain.WithAuthContext(context.Background(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
+
+	_, err := svc.SearchDocuments(ctx, domain.Query{TenantID: "tenant-1", Limit: maxLimit + 1})
+	if err != nil {
+		t.Fatalf("SearchDocuments: %v", err)
+	}
+	if reader.listLimit != maxLimit {
+		t.Fatalf("limit = %d, want %d", reader.listLimit, maxLimit)
 	}
 }
 
