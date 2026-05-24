@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -71,30 +70,46 @@ ORDER BY occurred_at ASC
 		var event messaging.Event
 		var occurredAt time.Time
 		var payloadJSON []byte
+		var eventID string
+		var eventType string
+		var aggregateType string
+		var aggregateID string
+		var idempotencyKey string
+		var traceID string
 		if err := rows.Scan(
-			&event.EventID,
-			&event.EventType,
-			&event.AggregateType,
-			&event.AggregateID,
+			&eventID,
+			&eventType,
+			&aggregateType,
+			&aggregateID,
 			&occurredAt,
 			&event.Version,
 			&event.AttemptCount,
-			&event.IdempotencyKey,
+			&idempotencyKey,
 			&event.Producer,
-			&event.TraceID,
+			&traceID,
 			&payloadJSON,
 		); err != nil {
 			return nil, fmt.Errorf("scan outbox event: %w", err)
 		}
+		event.EventID = messaging.EventID(eventID)
+		event.EventType = messaging.EventType(eventType)
+		event.AggregateType = messaging.AggregateType(aggregateType)
+		event.AggregateID = messaging.AggregateID(aggregateID)
+		event.IdempotencyKey = messaging.IdempotencyKey(idempotencyKey)
+		event.TraceID = messaging.TraceID(traceID)
 		event.OccurredAtRFC3339 = occurredAt.UTC().Format(time.RFC3339)
 		if len(payloadJSON) > 0 {
-			var payload map[string]any
-			if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+			payload, err := messaging.DecodePayload(event.EventType, payloadJSON)
+			if err != nil {
 				return nil, fmt.Errorf("unmarshal outbox payload: %w", err)
 			}
 			event.Payload = payload
 		} else {
-			event.Payload = map[string]any{}
+			payload, err := messaging.DecodePayload(event.EventType, []byte("{}"))
+			if err != nil {
+				return nil, fmt.Errorf("unmarshal outbox payload: %w", err)
+			}
+			event.Payload = payload
 		}
 		events = append(events, event)
 	}
@@ -108,7 +123,7 @@ ORDER BY occurred_at ASC
 	return events, nil
 }
 
-func (c *Consumer) MarkPublished(ctx context.Context, eventIDs []string) error {
+func (c *Consumer) MarkPublished(ctx context.Context, eventIDs []messaging.EventID) error {
 	if len(eventIDs) == 0 {
 		return nil
 	}
@@ -116,7 +131,7 @@ func (c *Consumer) MarkPublished(ctx context.Context, eventIDs []string) error {
 	args := make([]any, 0, len(eventIDs)+1)
 	for idx, eventID := range eventIDs {
 		placeholders = append(placeholders, fmt.Sprintf("$%d", idx+1))
-		args = append(args, strings.TrimSpace(eventID))
+		args = append(args, strings.TrimSpace(string(eventID)))
 	}
 	q := fmt.Sprintf(`
 UPDATE metaldocs.outbox_events
@@ -133,7 +148,7 @@ WHERE event_id IN (%s)
 }
 
 func (c *Consumer) MarkFailed(ctx context.Context, failure messaging.FailedEvent) error {
-	if strings.TrimSpace(failure.EventID) == "" {
+	if strings.TrimSpace(string(failure.EventID)) == "" {
 		return fmt.Errorf("event id is required")
 	}
 
@@ -154,7 +169,7 @@ SET published_at = NULL,
     dead_lettered_at = $4
 WHERE event_id = $1
 `
-	if _, err := c.db.ExecContext(ctx, q, strings.TrimSpace(failure.EventID), strings.TrimSpace(failure.LastError), nextAttempt, deadLettered); err != nil {
+	if _, err := c.db.ExecContext(ctx, q, strings.TrimSpace(string(failure.EventID)), strings.TrimSpace(failure.LastError), nextAttempt, deadLettered); err != nil {
 		return fmt.Errorf("mark outbox event failed: %w", err)
 	}
 	return nil

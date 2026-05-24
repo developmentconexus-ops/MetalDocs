@@ -1,6 +1,6 @@
 # Refactor Backlog - render-fanout
 
-**Last verified:** 2026-05-13
+**Last verified:** 2026-05-24
 
 | id | title | debt_id | effort | impact | blocked_by | owner | status | pr |
 |---|---|---|---|---|---|---|---|---|
