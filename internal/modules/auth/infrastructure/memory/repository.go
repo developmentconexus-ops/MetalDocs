@@ -127,19 +127,22 @@ func (r *Repository) RecordSuccessfulLogin(_ context.Context, userID string, log
 	return nil
 }
 
-func (r *Repository) RecordFailedLogin(_ context.Context, userID string, failedAttempts int, lockedUntil *time.Time) error {
+func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAttempts int, lockDurationSeconds int) (int, *time.Time, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	identity, ok := r.users[userID]
 	if !ok {
-		return authdomain.ErrIdentityNotFound
+		return 0, nil, authdomain.ErrIdentityNotFound
 	}
-	identity.FailedLoginAttempts = failedAttempts
-	identity.LockedUntil = lockedUntil
+	identity.FailedLoginAttempts++
+	if identity.FailedLoginAttempts >= maxAttempts {
+		lockedUntil := time.Now().UTC().Add(time.Duration(lockDurationSeconds) * time.Second)
+		identity.LockedUntil = &lockedUntil
+	}
 	identity.UpdatedAt = time.Now().UTC()
 	r.users[userID] = identity
-	return nil
+	return identity.FailedLoginAttempts, identity.LockedUntil, nil
 }
 
 func (r *Repository) CreateUser(_ context.Context, params authdomain.CreateUserParams) error {
@@ -233,10 +236,10 @@ func (r *Repository) ListOnlineUsers(_ context.Context, activeSince time.Time) (
 			continue
 		}
 		out = append(out, authdomain.OnlineUser{
-			UserID:     identity.UserID,
-			Username:   identity.Username,
+			UserID:      identity.UserID,
+			Username:    identity.Username,
 			DisplayName: identity.DisplayName,
-			LastSeenAt: lastSeenAt,
+			LastSeenAt:  lastSeenAt,
 		})
 	}
 	return out, nil

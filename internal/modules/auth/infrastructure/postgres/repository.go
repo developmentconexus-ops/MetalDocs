@@ -160,19 +160,27 @@ WHERE user_id = $1
 	return nil
 }
 
-func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, failedAttempts int, lockedUntil *time.Time) error {
+func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int) (int, *time.Time, error) {
 	const q = `
 UPDATE metaldocs.auth_identities
-SET failed_login_attempts = $2,
-    locked_until = $3,
+SET failed_login_attempts = failed_login_attempts + 1,
+    locked_until = CASE WHEN failed_login_attempts + 1 >= $2
+                        THEN NOW() + ($3 * INTERVAL '1 second')
+                        ELSE locked_until END,
     updated_at = NOW()
 WHERE user_id = $1
+RETURNING failed_login_attempts, locked_until
 `
-	_, err := r.db.ExecContext(ctx, q, userID, failedAttempts, lockedUntil)
-	if err != nil {
-		return fmt.Errorf("update failed login: %w", err)
+	var attempts int
+	var lockedUntil sql.NullTime
+	if err := r.db.QueryRowContext(ctx, q, userID, maxAttempts, lockDurationSeconds).Scan(&attempts, &lockedUntil); err != nil {
+		return 0, nil, fmt.Errorf("update failed login: %w", err)
 	}
-	return nil
+	if !lockedUntil.Valid {
+		return attempts, nil, nil
+	}
+	locked := lockedUntil.Time.UTC()
+	return attempts, &locked, nil
 }
 
 func (r *Repository) CreateUser(ctx context.Context, params authdomain.CreateUserParams) error {
