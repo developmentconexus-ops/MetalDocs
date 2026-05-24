@@ -1,6 +1,7 @@
 package pagination
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -27,33 +28,50 @@ const (
 	DefaultLimit  = 20
 	MaxLimit      = 100
 	CursorVersion = 1
+
+	MinSigningSecretLength = sha256.Size
 )
 
 var (
-	ErrInvalidCursor = errors.New("invalid cursor")
+	ErrInvalidCursor  = errors.New("invalid cursor")
 	ErrCursorMismatch = errors.New("cursor mismatch")
 )
 
-func Encode(c Cursor) (string, error) {
+func Encode(c Cursor, signingSecret string) (string, error) {
+	if len(signingSecret) < MinSigningSecretLength {
+		return "", fmt.Errorf("%w: signing secret must be at least %d bytes", ErrInvalidCursor, MinSigningSecretLength)
+	}
 	b, err := json.Marshal(c)
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
+	signed := append(append([]byte(nil), b...), signCursor(b, signingSecret)...)
+	return base64.RawURLEncoding.EncodeToString(signed), nil
 }
 
-func Decode(s string) (Cursor, error) {
+func Decode(s string, signingSecret string) (Cursor, error) {
 	if s == "" {
 		return Cursor{}, ErrInvalidCursor
+	}
+	if len(signingSecret) < MinSigningSecretLength {
+		return Cursor{}, fmt.Errorf("%w: signing secret must be at least %d bytes", ErrInvalidCursor, MinSigningSecretLength)
 	}
 
 	b, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return Cursor{}, fmt.Errorf("%w: %v", ErrInvalidCursor, err)
 	}
+	if len(b) <= sha256.Size {
+		return Cursor{}, fmt.Errorf("%w: missing signature", ErrInvalidCursor)
+	}
+	payload := b[:len(b)-sha256.Size]
+	signature := b[len(b)-sha256.Size:]
+	if !hmac.Equal(signature, signCursor(payload, signingSecret)) {
+		return Cursor{}, fmt.Errorf("%w: signature mismatch", ErrInvalidCursor)
+	}
 
 	var c Cursor
-	if err := json.Unmarshal(b, &c); err != nil {
+	if err := json.Unmarshal(payload, &c); err != nil {
 		return Cursor{}, fmt.Errorf("%w: %v", ErrInvalidCursor, err)
 	}
 	if c.V != CursorVersion {
@@ -69,6 +87,12 @@ func Decode(s string) (Cursor, error) {
 	}
 
 	return c, nil
+}
+
+func signCursor(payload []byte, signingSecret string) []byte {
+	mac := hmac.New(sha256.New, []byte(signingSecret))
+	_, _ = mac.Write(payload)
+	return mac.Sum(nil)
 }
 
 func ValidateMatch(c Cursor, currentSort []SortField, currentFilterHash string) error {
