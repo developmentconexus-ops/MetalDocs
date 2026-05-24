@@ -24,7 +24,7 @@ func (r *UserAreaRepository) ListActive(ctx context.Context, userID, tenantID st
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
 FROM user_process_areas
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND effective_from <= $3
   AND (effective_to IS NULL OR effective_to > $3)
 ORDER BY area_code ASC, effective_from DESC
@@ -96,12 +96,20 @@ func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, 
 UPDATE user_process_areas
 SET effective_to = $4
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND area_code = $3
   AND effective_to IS NULL
 `
-	if _, err := tx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo); err != nil {
+	result, err := tx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo)
+	if err != nil {
 		return fmt.Errorf("close active user process area: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("close active user process area rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("close active user process area: no rows updated")
 	}
 	return tx.Commit()
 }
@@ -123,7 +131,7 @@ func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, new
 UPDATE user_process_areas
 SET effective_to = $5
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND area_code = $3
   AND effective_from = $4
   AND effective_to IS NULL
@@ -179,7 +187,7 @@ func (r *UserAreaRepository) GetActiveByUserAndArea(ctx context.Context, userID,
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
 FROM user_process_areas
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND area_code = $3
   AND effective_from <= $4
   AND (effective_to IS NULL OR effective_to > $4)
