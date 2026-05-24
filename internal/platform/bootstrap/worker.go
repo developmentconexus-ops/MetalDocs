@@ -30,7 +30,11 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 		return WorkerDependencies{}, fmt.Errorf("open postgres: %w", err)
 	}
 
-	docgenV2Cfg := config.LoadDocgenV2Config()
+	docgenV2Cfg, err := config.LoadDocgenV2Config()
+	if err != nil {
+		_ = closeDB(db)
+		return WorkerDependencies{}, fmt.Errorf("load docgen-v2 config: %w", err)
+	}
 	var docgenV2Client *servicebus.DocgenV2Client
 	if docgenV2Cfg.Enabled {
 		docgenV2Client = servicebus.NewDocgenV2Client(
