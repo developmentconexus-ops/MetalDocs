@@ -130,7 +130,7 @@ func TestUpsertUserAndAssignRole_WrapsAuthzError(t *testing.T) {
 	}
 }
 
-func TestReplaceUserRoles_DeleteThenInsert_OnlyLastSurvives(t *testing.T) {
+func TestReplaceUserRoles_DeleteThenInsert_PersistsAllRoles(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
@@ -174,14 +174,22 @@ SELECT EXISTS (
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`)).
 		WithArgs(testTenant, "alice").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)`)).
-		WithArgs("alice", testTenant, "approver", "admin").
+	roleInsert := regexp.QuoteMeta(`
+INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)
+VALUES ($1, $2::uuid, $3, NOW(), $4)
+ON CONFLICT (user_id, role_code) DO NOTHING
+`)
+	mock.ExpectExec(roleInsert).
+		WithArgs("alice", testTenant, "editor", "admin").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(roleInsert).
+		WithArgs("alice", testTenant, "system_admin", "admin").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	repo := postgres.NewRoleAdminRepository(db)
 	if err := repo.ReplaceUserRoles(context.Background(), "alice", "Alice", testTenant,
-		[]iamdomain.Role{"author", "approver"}, "admin"); err != nil {
+		[]iamdomain.Role{iamdomain.RoleEditor, "", " ", iamdomain.RoleSystemAdmin, iamdomain.RoleEditor, " system_admin "}, "admin"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

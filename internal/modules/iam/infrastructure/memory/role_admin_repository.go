@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"metaldocs/internal/modules/iam/domain"
@@ -58,7 +59,11 @@ func (r *RoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displa
 	rec.displayName = displayName
 	rec.roles = map[domain.Role]bool{}
 	for _, role := range roles {
-		rec.roles[role] = true
+		code := strings.TrimSpace(string(role))
+		if code == "" {
+			continue
+		}
+		rec.roles[domain.Role(code)] = true
 	}
 	r.users[userID] = rec
 	return nil
