@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"metaldocs/internal/modules/iam/domain"
@@ -18,19 +19,16 @@ func NewRoleProvider(db *sql.DB) *RoleProvider {
 
 func (p *RoleProvider) RolesByUserID(ctx context.Context, userID, tenantID string) ([]domain.Role, error) {
 	const checkUserSQL = `
-SELECT is_active
+SELECT 1
 FROM metaldocs.iam_users
-WHERE user_id = $1
+WHERE user_id = $1 AND tenant_id = $2::uuid AND deactivated_at IS NULL
 `
-	var isActive bool
-	if err := p.db.QueryRowContext(ctx, checkUserSQL, userID).Scan(&isActive); err != nil {
-		if err == sql.ErrNoRows {
+	var exists int
+	if err := p.db.QueryRowContext(ctx, checkUserSQL, userID, tenantID).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("check iam user: %w", err)
-	}
-	if !isActive {
-		return nil, domain.ErrUserInactive
 	}
 
 	const rolesSQL = `
