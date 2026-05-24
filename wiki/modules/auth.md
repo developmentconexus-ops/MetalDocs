@@ -2,11 +2,11 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-12 | **Owner:** unassigned | **Status:** active (legacy envelope; no audit-trail emission yet) | **Maturity:** L2
+**Last verified:** 2026-05-24 | **Owner:** unassigned | **Status:** active (legacy envelope; no audit-trail emission yet) | **Maturity:** L2
 
 > **Key files:**
-> - `internal/modules/auth/application/service.go:48` â€” `Service` (single struct holding all use cases)
-> - `internal/modules/auth/application/service.go:103` â€” `Authenticate` (login; calls `resolveLoginTenant` to bind tenant at login)
+> - `internal/modules/auth/application/service.go:75` â€” `NewService` (rejects `SessionSecret` shorter than 32 bytes)
+> - `internal/modules/auth/application/service.go:126` â€” `Authenticate` (login; calls `resolveLoginTenant` to bind tenant at login)
 > - `internal/modules/auth/application/service.go:172` â€” `resolveLoginTenant` (binds tenant from session; uses `AllowDevTenantFallback`)
 > - `internal/modules/auth/application/service.go:196` â€” `ResolveSession` (no longer takes `tenantID`; reads from stored session)
 > - `internal/modules/auth/application/service.go:470` â€” `newSessionToken` (HMAC-SHA256 + SHA-256 hash)
@@ -44,6 +44,7 @@
 - **Cookie-based session authn** â€” driver: web client uses HttpOnly session cookie; source: `internal/modules/auth/delivery/http/handler.go:61`.
 - **Per-account brute-force lockout** â€” driver: regulated-app baseline; source: `application/service.go:117-126` + `Config.LoginMaxFailedAttempts/LoginLockDuration`.
 - **Bcrypt password storage** â€” driver: industry baseline for new deployments; source: `application/service.go:431` (`bcrypt.DefaultCost`).
+- **Session secret length guard** â€” driver: avoid forgeable HMACs from empty/short keys; source: `application/service.go:75` (`NewService` rejects `SessionSecret` shorter than 32 bytes).
 - **Single source of truth for "current user"** â€” driver: downstream consumers (documents, templates, observability) read `authdomain.CurrentUserFromContext`; source: artifact 03 Â§2 (10 importers).
 - **First-boot admin bootstrap** â€” driver: empty-DB onboarding; source: `application/service.go:56` `BootstrapLocalAdmin`, gated by `BootstrapAdminEnabled`.
 
@@ -134,6 +135,7 @@ Quality-managed app. Every controlled-document mutation must trace to a known ac
 - **Cookie-based opaque session token over JWT** â€” driver: server-side revocation requirement (`Revoke*Session*` methods); JWT cannot be invalidated mid-TTL without an extra deny list. Stored shape: random 32-byte token + HMAC sig in cookie; only SHA-256 hash persisted server-side, so DB compromise does not leak usable tokens.
 - **Single `Service` struct, no use-case split** â€” driver: small surface (15 methods); each method is independently testable through the `Repository` port. Trade-off accepted: `Service` mixes session, identity, and admin ops; if it grew it would need decomposition.
 - **Per-account lockout, no IP-based throttle** â€” driver: regulated identity baseline; gap acknowledged for distributed brute-force (T-005).
+- **Failed-login counter increments atomically in the repository** â€” driver: avoid TOCTOU under concurrent bad-password attempts; source: `infrastructure/postgres/repository.go:163-183` and `infrastructure/memory/repository.go:130-145`.
 - **Session secret is one process-wide HMAC key** â€” driver: simplicity; rotation invalidates all sessions (no key-id in cookie, no rolling window). Captured as latent â€” see T-010.
 - **Identity is tenant-global; roles are tenant-scoped** â€” driver: a single human may be a member of multiple tenants under the same `user_id`; IAM enforces per-tenant role assignment. Trade-off: no row-level tenant isolation on `auth_identities`/`auth_sessions` (T-008).
 - **Admin user-creation goes through auth.Service.CreateUser, not iam directly** â€” driver: password hashing + identity row owned by auth; role assignment delegated to injected `RoleAdminRepository`. Two distinct DB transactions (T-004).
@@ -167,7 +169,7 @@ Full table in `_artifacts/01-surface.md` (98 exported symbols). Grouping:
 
 | File | Exports |
 |---|---|
-| `application/service.go` | `Config` (adds `AllowDevTenantFallback`), `Service`, `NewService`, `BootstrapLocalAdmin`, `Authenticate` (calls `resolveLoginTenant`), `ResolveSession` (no longer takes `tenantID` arg), `Logout`, `ChangePassword`, `ChangePasswordForUser`, `ListUsers`, `ListOnlineUsers`, `CreateUser`, `UpdateUser`, `AdminResetPassword`, `UnlockUser`, `SessionCookie`, `SessionCookieName`, `ExpiredSessionCookie`, `CurrentUser` |
+| `application/service.go` | `Config` (adds `AllowDevTenantFallback`), `Service`, `NewService` (validates `SessionSecret` length), `BootstrapLocalAdmin`, `Authenticate` (calls `resolveLoginTenant`), `ResolveSession` (no longer takes `tenantID` arg), `Logout`, `ChangePassword`, `ChangePasswordForUser`, `ListUsers`, `ListOnlineUsers`, `CreateUser`, `UpdateUser`, `AdminResetPassword`, `UnlockUser`, `SessionCookie`, `SessionCookieName`, `ExpiredSessionCookie`, `CurrentUser` |
 | `delivery/http/handler.go` | `Handler`, `NewHandler`, `RegisterRoutes` |
 | `delivery/http/middleware.go` | `PublicPathChecker`, `Middleware`, `NewMiddleware`, `WithPublicPathChecker`, `Wrap` |
 | `domain/model.go` | `Identity`, `Session`, `OnlineUser`, `ManagedUser`, `CreateUserParams`, `UpdateUserParams`, `BootstrapAdminParams`, `CurrentUser`, `AuthenticatedSession` |
@@ -225,7 +227,7 @@ sequenceDiagram
     alt row found
         S->>S: bcrypt.CompareHashAndPassword
         alt mismatch
-            S->>R: RecordFailedLogin (UPDATE failed_login_attempts, locked_until)
+            S->>R: RecordFailedLogin (atomic UPDATE/RETURNING failed_login_attempts, locked_until)
             S-->>H: ErrInvalidCredentials
             H-->>C: 401 legacy envelope + ExpiredSessionCookie
         else match

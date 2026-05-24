@@ -11,9 +11,9 @@ import (
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/auth/infrastructure/memory"
 	authpostgres "metaldocs/internal/modules/auth/infrastructure/postgres"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/tenant"
 
@@ -74,6 +74,8 @@ func newMockRoleAdminRepository() *mockRoleAdminRepository {
 	}
 }
 
+const testSessionSecret = "0123456789abcdef0123456789abcdef"
+
 func mustHashPassword(t *testing.T, password string) string {
 	t.Helper()
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -81,6 +83,27 @@ func mustHashPassword(t *testing.T, password string) string {
 		t.Fatalf("GenerateFromPassword: %v", err)
 	}
 	return string(hash)
+}
+
+func mustNewService(t *testing.T, repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) *Service {
+	t.Helper()
+	svc, err := NewService(repo, roleProvider, roleAdmin, cfg)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	return svc
+}
+
+func TestNewService_RejectsShortSessionSecret(t *testing.T) {
+	svc, err := NewService(memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
+		SessionSecret: "too-short",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if svc != nil {
+		t.Fatalf("expected nil service, got %#v", svc)
+	}
 }
 
 // TestAuthenticate_DevFallback_NoTenantClaim verifies that when a user has no
@@ -115,10 +138,10 @@ func TestAuthenticate_DevFallback_NoTenantClaim(t *testing.T) {
 	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
 
 	// Service with AllowDevTenantFallback=true
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -171,10 +194,10 @@ func TestResolveSession_ReadsTenantFromSession(t *testing.T) {
 	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
 
 	// Service with AllowDevTenantFallback=true so user can login without X-Tenant-ID
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -235,10 +258,10 @@ func TestAuthenticate_InvalidCredentials(t *testing.T) {
 		t.Fatalf("CreateUser: %v", err)
 	}
 
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -276,10 +299,10 @@ func TestAuthenticate_TenantClaimRequired(t *testing.T) {
 	}
 	repo.SeedUserTenants(userID, []string{"tenant-a", "tenant-b"})
 
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -316,10 +339,10 @@ func TestAuthenticate_TenantNotPermitted(t *testing.T) {
 	}
 	repo.SeedUserTenants(userID, []string{"tenant-a"})
 
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -409,11 +432,11 @@ SELECT EXISTS (
 	repo := authpostgres.NewRepository(db)
 	roleProvider := newMockRoleProvider()
 	roleAdmin := iampostgres.NewRoleAdminRepository(db)
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		SessionTTL:             24 * time.Hour,
 		SessionCookieName:      "session",
 		CookieSecure:           false,
