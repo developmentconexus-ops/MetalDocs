@@ -1,4 +1,4 @@
-//go:build !production
+//go:build integration && !production
 
 package test
 
@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -232,7 +233,8 @@ func (h *seedHandler) reset(w http.ResponseWriter, r *http.Request) {
 			if isUndefinedTable(execErr) || isUndefinedColumn(execErr) {
 				continue
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": execErr.Error()})
+			log.Printf("e2e reset failed: tenant=%s err=%v", tenantID, execErr)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "reset failed"})
 			return
 		}
 	}
@@ -717,10 +719,10 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 
 func isUndefinedTable(err error) bool {
 	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
+	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UndefinedTable
 }
 
 func isUndefinedColumn(err error) bool {
 	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "42703"
+	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UndefinedColumn
 }
