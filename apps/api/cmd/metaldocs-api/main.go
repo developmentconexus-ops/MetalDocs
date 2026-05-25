@@ -260,7 +260,7 @@ func main() {
 	}
 	serviceToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCGEN_V2_SERVICE_TOKEN"))
 	if fanoutURL != "" && serviceToken == "" {
-		slog.Warn("METALDOCS_DOCGEN_V2_SERVICE_TOKEN not set; fanout requests will be rejected with 401")
+		log.Fatalf("METALDOCS_DOCGEN_V2_SERVICE_TOKEN is required when METALDOCS_FANOUT_URL is set")
 	}
 	var fanoutCli *fanout.Client
 	var freezeSvc *docapp.FreezeService
@@ -571,13 +571,13 @@ type documentsAuditAdapter struct {
 }
 
 func newDocumentsAuditAdapter(writer auditdomain.Writer) *documentsAuditAdapter {
+	if writer == nil {
+		panic("documents audit writer is nil")
+	}
 	return &documentsAuditAdapter{writer: writer}
 }
 
 func (a *documentsAuditAdapter) WriteTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, action, docID string, meta any) error {
-	if a == nil || a.writer == nil {
-		return nil
-	}
 	payload := map[string]any{"tenant_id": tenantID}
 	if meta != nil {
 		payload["meta"] = meta
@@ -594,16 +594,12 @@ func (a *documentsAuditAdapter) WriteTx(ctx context.Context, tx *sql.Tx, tenantI
 		ResourceType: "document",
 		ResourceID:   docID,
 		PayloadJSON:  string(raw),
-		TraceID:      "trace-local",
+		TraceID:      traceIDFromContext(ctx),
 		TenantID:     tenantID,
 	})
 }
 
 func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, action, docID string, meta any) {
-	if a == nil || a.writer == nil {
-		return
-	}
-
 	payload := map[string]any{"tenant_id": tenantID}
 	if meta != nil {
 		payload["meta"] = meta
@@ -621,11 +617,27 @@ func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, ac
 		ResourceType: "document",
 		ResourceID:   docID,
 		PayloadJSON:  string(raw),
-		TraceID:      "trace-local",
+		TraceID:      traceIDFromContext(ctx),
 		TenantID:     tenantID,
 	}); err != nil {
 		log.Printf("documents audit write failed: %v", err)
 	}
+}
+
+func traceIDFromContext(ctx context.Context) string {
+	if traceID, ok := ctx.Value("trace_id").(string); ok {
+		traceID = strings.TrimSpace(traceID)
+		if traceID != "" {
+			return traceID
+		}
+	}
+	if traceID, ok := ctx.Value("X-Trace-Id").(string); ok {
+		traceID = strings.TrimSpace(traceID)
+		if traceID != "" {
+			return traceID
+		}
+	}
+	return uuid.NewString()
 }
 
 func jobEnabled(envName string) bool {

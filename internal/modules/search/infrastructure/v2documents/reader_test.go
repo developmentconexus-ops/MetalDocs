@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	searchdomain "metaldocs/internal/modules/search/domain"
 )
 
 func TestListDocumentsFiltersByTenantID(t *testing.T) {
@@ -15,8 +16,8 @@ func TestListDocumentsFiltersByTenantID(t *testing.T) {
 	}
 	defer db.Close()
 
-	mock.ExpectQuery(regexp.QuoteMeta("LIMIT $2")).
-		WithArgs("tenant-1", 20).
+	mock.ExpectQuery(regexp.QuoteMeta("LIMIT $6")).
+		WithArgs("tenant-1", "", "", "", "", 20).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id",
 			"name",
@@ -29,7 +30,7 @@ func TestListDocumentsFiltersByTenantID(t *testing.T) {
 			"created_at",
 		}))
 
-	_, err = NewReader(db).ListDocuments(context.Background(), "tenant-1", 20)
+	_, err = NewReader(db).ListDocuments(context.Background(), searchdomain.Query{TenantID: "tenant-1"}, 20)
 	if err != nil {
 		t.Fatalf("ListDocuments: %v", err)
 	}
