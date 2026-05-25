@@ -568,7 +568,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 			&s.Status, &openedAt, &completedAt, &skipReason,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("loadStageInstances: scan: %w", err)
 		}
 
 		if quorumMSnapshot.Valid {
@@ -650,7 +650,7 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 		if err := rows.Scan(&id, &instID, &stageID, &actorUserID, &actorTenantID,
 			&decision, &comment, &signedAt, &signatureMethod, &sigPayload,
 			&contentHash, &displayName); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("loadSignoffsForInstance: scan: %w", err)
 		}
 		sig, err := domain.NewSignoff(domain.SignoffParams{
 			ID:                       id,

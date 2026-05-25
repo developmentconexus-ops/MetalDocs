@@ -1,11 +1,33 @@
 package contracts
 
+type InstanceStatus string
+
+const (
+	InstanceStatusInProgress InstanceStatus = "in_progress"
+	InstanceStatusApproved   InstanceStatus = "approved"
+	InstanceStatusRejected   InstanceStatus = "rejected"
+	InstanceStatusCancelled  InstanceStatus = "cancelled"
+)
+
+type SignoffDecision string
+
+const (
+	SignoffDecisionApprove SignoffDecision = "approve"
+	SignoffDecisionReject  SignoffDecision = "reject"
+)
+
+type SignatureMethod string
+
+const (
+	SignatureMethodPasswordReauth SignatureMethod = "password_reauth"
+)
+
 type InstanceResponse struct {
 	ID          string          `json:"id"`
 	DocumentID  string          `json:"document_id"`
 	RouteID     string          `json:"route_id"`
 	TenantID    string          `json:"tenant_id"`
-	Status      string          `json:"status"`
+	Status      InstanceStatus  `json:"status"`
 	SubmittedBy string          `json:"submitted_by"`
 	SubmittedAt string          `json:"submitted_at"`
 	CompletedAt *string         `json:"completed_at,omitempty"`
@@ -23,19 +45,19 @@ type StageInstance struct {
 }
 
 type StageActor struct {
-	UserID      string  `json:"user_id"`
-	DisplayName string  `json:"display_name"`
-	Status      string  `json:"status"`
-	Decision    *string `json:"decision,omitempty"`
+	UserID      string           `json:"user_id"`
+	DisplayName string           `json:"display_name"`
+	Status      string           `json:"status"`
+	Decision    *SignoffDecision `json:"decision,omitempty"`
 }
 
 type SignoffRecord struct {
-	ID              string `json:"id"`
-	ActorUserID     string `json:"actor_user_id"`
-	Decision        string `json:"decision"`
-	Reason          string `json:"reason,omitempty"`
-	SignatureMethod string `json:"signature_method"`
-	SignedAt        string `json:"signed_at"`
+	ID              string          `json:"id"`
+	ActorUserID     string          `json:"actor_user_id"`
+	Decision        SignoffDecision `json:"decision"`
+	Reason          string          `json:"reason,omitempty"`
+	SignatureMethod SignatureMethod `json:"signature_method"`
+	SignedAt        string          `json:"signed_at"`
 }
 
 type InboxItem struct {

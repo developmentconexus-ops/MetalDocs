@@ -229,8 +229,8 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 			RequiredRole:       stage.RequiredRole,
 			RequiredCapability: stage.RequiredCapability,
 			AreaCode:           stage.AreaCode,
-			QuorumKind:         stage.Quorum,
-			DriftPolicy:        stage.DriftPolicy,
+			QuorumKind:         contracts.QuorumKind(stage.Quorum),
+			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
 		})
 	}
 
