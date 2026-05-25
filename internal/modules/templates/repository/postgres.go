@@ -24,6 +24,14 @@ func isInvalidUUID(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "22P02"
 }
 
+func rowsAffected(res sql.Result) (int64, error) {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 type Repository struct {
 	db    *sql.DB
 	audit auditdomain.Writer
@@ -154,7 +162,10 @@ WHERE id = $1 AND tenant_id = $2`
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, err := rowsAffected(res)
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return domain.ErrNotFound
 	}
@@ -256,7 +267,7 @@ WHERE v.id = $1 AND t.tenant_id = $2::uuid`
 	return v, nil
 }
 
-func (r *Repository) UpdateVersion(ctx context.Context, v *domain.TemplateVersion) error {
+func (r *Repository) UpdateVersion(ctx context.Context, tenantID string, v *domain.TemplateVersion) error {
 	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
 	if err != nil {
 		return err
@@ -280,17 +291,25 @@ SET
 	published_at = $14,
 	obsoleted_at = $15,
 	lock_version = $16
-WHERE id = $1`
+WHERE id = $1
+  AND EXISTS (
+    SELECT 1 FROM templates_template t
+    WHERE t.id = templates_template_version.template_id
+      AND t.tenant_id = $17::uuid
+  )`
 	res, err := r.db.ExecContext(ctx, q,
 		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
-		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion,
+		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, tenantID,
 	)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, err := rowsAffected(res)
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return domain.ErrNotFound
 	}
@@ -340,14 +359,17 @@ WHERE id = $1 AND tenant_id = $2`
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, err := rowsAffected(res)
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return domain.ErrNotFound
 	}
 	return nil
 }
 
-func (r *Repository) UpdateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error {
+func (r *Repository) UpdateVersionTx(ctx context.Context, tx *sql.Tx, tenantID string, v *domain.TemplateVersion) error {
 	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
 	if err != nil {
 		return err
@@ -371,29 +393,37 @@ SET
 	published_at = $14,
 	obsoleted_at = $15,
 	lock_version = $16
-WHERE id = $1`
+WHERE id = $1
+  AND EXISTS (
+    SELECT 1 FROM templates_template t
+    WHERE t.id = templates_template_version.template_id
+      AND t.tenant_id = $17::uuid
+  )`
 	res, err := tx.ExecContext(ctx, q,
 		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
-		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion,
+		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, tenantID,
 	)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, err := rowsAffected(res)
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return domain.ErrNotFound
 	}
 	return nil
 }
 
-func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return updateVersionDraftCAS(ctx, r.db, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return updateVersionDraftCAS(ctx, r.db, tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
-func (r *Repository) UpdateVersionDraftCASTx(ctx context.Context, tx *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return updateVersionDraftCAS(ctx, tx, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+func (r *Repository) UpdateVersionDraftCASTx(ctx context.Context, tx *sql.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return updateVersionDraftCAS(ctx, tx, tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
 type draftCASExecutor interface {
@@ -401,7 +431,7 @@ type draftCASExecutor interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
-func updateVersionDraftCAS(ctx context.Context, db draftCASExecutor, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+func updateVersionDraftCAS(ctx context.Context, db draftCASExecutor, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	const q = `
 UPDATE templates_template_version
 SET
@@ -409,18 +439,33 @@ SET
 	content_hash = $4,
 	lock_version = lock_version + 1
 WHERE id = $1
+  AND EXISTS (
+    SELECT 1 FROM templates_template t
+    WHERE t.id = templates_template_version.template_id
+      AND t.tenant_id = $5::uuid
+  )
   AND lock_version = $2`
-	res, err := db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+	res, err := db.ExecContext(ctx, q, versionID, expectedLockVersion, docxStorageKey, docxContentHash, tenantID)
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, err := rowsAffected(res)
+	if err != nil {
+		return err
+	}
 	if n > 0 {
 		return nil
 	}
 
 	var exists bool
-	if err := db.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM templates_template_version WHERE id = $1)", versionID).Scan(&exists); err != nil {
+	if err := db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM templates_template_version v
+  JOIN templates_template t ON t.id = v.template_id
+  WHERE v.id = $1
+    AND t.tenant_id = $2::uuid
+)`, versionID, tenantID).Scan(&exists); err != nil {
 		return err
 	}
 	if !exists {

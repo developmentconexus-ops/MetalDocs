@@ -31,6 +31,18 @@ type readService interface {
 	CountPendingForActor(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string) (int, error)
 }
 
+type cancelService interface {
+	CancelInstance(ctx context.Context, db *sql.DB, req application.CancelInput) (application.CancelResult, error)
+}
+
+type obsoleteService interface {
+	MarkObsolete(ctx context.Context, db *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error)
+}
+
+type supersedeService interface {
+	PublishSuperseding(ctx context.Context, db *sql.DB, req application.SupersedeRequest) (application.SupersedeResult, error)
+}
+
 type routeAdminService interface {
 	Create(ctx context.Context, db *sql.DB, in application.CreateRouteInput) (application.CreateRouteResult, error)
 	Update(ctx context.Context, db *sql.DB, in application.UpdateRouteInput) (application.UpdateRouteResult, error)
@@ -57,14 +69,17 @@ type signoffIdempStore interface {
 }
 
 type Handler struct {
-	services    *application.Services
-	db          *sql.DB
-	submitSvc   submitService
-	decisionSvc decisionService
-	readSvc     readService
-	routeAdmin  routeAdminService
-	routeRepo   routeListRepository
-	idempStore  signoffIdempStore
+	services     *application.Services
+	db           *sql.DB
+	submitSvc    submitService
+	decisionSvc  decisionService
+	readSvc      readService
+	cancelSvc    cancelService
+	obsoleteSvc  obsoleteService
+	supersedeSvc supersedeService
+	routeAdmin   routeAdminService
+	routeRepo    routeListRepository
+	idempStore   signoffIdempStore
 }
 
 func NewHandler(services *application.Services, db *sql.DB, idempStore signoffIdempStore) *Handler {
@@ -77,12 +92,19 @@ func NewHandler(services *application.Services, db *sql.DB, idempStore signoffId
 		h.submitSvc = services.Submit
 		h.decisionSvc = services.Decision
 		h.readSvc = services.Read
+		h.cancelSvc = services.Cancel
+		h.obsoleteSvc = services.Obsolete
+		h.supersedeSvc = services.Supersede
 		h.routeAdmin = services.RouteAdmin
 	}
 	if db != nil {
 		h.routeRepo = repository.NewPostgresApprovalRepository(db)
 	}
 	return h
+}
+
+func instanceETag(revisionVersion int) string {
+	return "\"v" + strconv.Itoa(revisionVersion) + "\""
 }
 
 func actorIDFromRequest(r *http.Request) string {

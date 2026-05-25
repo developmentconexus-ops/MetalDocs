@@ -28,9 +28,25 @@ type GovernanceLogger interface {
 	Log(ctx context.Context, e GovernanceEvent) error
 }
 
+type GovernanceEventType string
+
+const (
+	GovernanceEventTypeProfileCreated               GovernanceEventType = "profile.created"
+	GovernanceEventTypeProfileUpdated               GovernanceEventType = "profile.updated"
+	GovernanceEventTypeProfileDefaultTemplateChange GovernanceEventType = "profile.default_template_change"
+	GovernanceEventTypeProfileArchived              GovernanceEventType = "profile.archived"
+	GovernanceEventTypeAreaCreated                  GovernanceEventType = "area.created"
+	GovernanceEventTypeAreaUpdated                  GovernanceEventType = "area.updated"
+	GovernanceEventTypeAreaParentChanged            GovernanceEventType = "area.parent_changed"
+	GovernanceEventTypeAreaArchived                 GovernanceEventType = "area.archived"
+	GovernanceEventTypeFamilyCreated                GovernanceEventType = "family.created"
+	GovernanceEventTypeFamilyUpdated                GovernanceEventType = "family.updated"
+	GovernanceEventTypeFamilyDeactivated            GovernanceEventType = "family.deactivated"
+)
+
 type GovernanceEvent struct {
 	TenantID     string
-	EventType    string
+	EventType    GovernanceEventType
 	ActorUserID  string
 	ResourceType string
 	ResourceID   string

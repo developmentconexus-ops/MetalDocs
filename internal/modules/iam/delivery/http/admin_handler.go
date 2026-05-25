@@ -158,10 +158,10 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	onlineOut := make([]map[string]any, 0, len(onlineUsers))
 	for _, item := range onlineUsers {
 		onlineOut = append(onlineOut, map[string]any{
-			"userId":     item.UserID,
-			"username":   item.Username,
+			"userId":      item.UserID,
+			"username":    item.Username,
 			"displayName": item.DisplayName,
-			"lastSeenAt": item.LastSeenAt.UTC().Format(time.RFC3339),
+			"lastSeenAt":  item.LastSeenAt.UTC().Format(time.RFC3339),
 		})
 	}
 	eventOut := make([]map[string]any, 0, len(recentEvents))
@@ -337,9 +337,7 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	switch role {
-	case iamdomain.RoleSystemAdmin, iamdomain.RoleApprover, iamdomain.RoleAuthor, iamdomain.RoleEditor, iamdomain.RoleViewer:
-	default:
+	if !iamdomain.IsValidRole(role) {
 		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role"))
 		return
 	}
@@ -490,9 +488,7 @@ func parseRoles(items []string) ([]iamdomain.Role, bool) {
 	seen := map[iamdomain.Role]bool{}
 	for _, item := range items {
 		role := iamdomain.Role(strings.ToLower(strings.TrimSpace(item)))
-		switch role {
-		case iamdomain.RoleSystemAdmin, iamdomain.RoleApprover, iamdomain.RoleAuthor, iamdomain.RoleEditor, iamdomain.RoleViewer:
-		default:
+		if !iamdomain.IsValidRole(role) {
 			return nil, false
 		}
 		if !seen[role] {

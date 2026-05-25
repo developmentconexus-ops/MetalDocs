@@ -239,7 +239,7 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrProfileCodeImmutable):
 		httpresponse.WriteError(w, http.StatusBadRequest, codeTaxProfileCodeImmutable, "profile code is immutable")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, pgErr.Message)
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "request violates data constraints")
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileAlreadyExists, "profile code already exists")
 	case errors.As(err, &pgErr) && pgErr.Code == "23503":

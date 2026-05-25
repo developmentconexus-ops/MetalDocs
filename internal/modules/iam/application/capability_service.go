@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 var ErrCapabilityDenied = errors.New("capability denied")
@@ -29,6 +31,10 @@ func NewCapabilityService(db *sql.DB) *CapabilityService {
 //
 // Returns ErrCapabilityDenied otherwise.
 func (s *CapabilityService) CanDo(ctx context.Context, userID, tenantID, capability string) error {
+	if !iamdomain.IsValidCapability(iamdomain.Capability(capability)) {
+		return fmt.Errorf("check capability: %w", ErrCapabilityDenied)
+	}
+
 	const query = `
 SELECT EXISTS (
   SELECT 1
@@ -39,9 +45,11 @@ SELECT EXISTS (
   UNION ALL
   SELECT 1
     FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
     JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
    WHERE gm.user_id = $1
      AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
      AND gr.role = 'system_admin'
   UNION ALL
   SELECT 1
@@ -53,10 +61,12 @@ SELECT EXISTS (
   UNION ALL
   SELECT 1
     FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
     JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
     JOIN metaldocs.role_capabilities rc ON rc.role = gr.role
    WHERE gm.user_id = $1
      AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
      AND rc.capability = $3
 )`
 

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -8,6 +9,13 @@ import (
 
 type PasswordHash string
 type PlainPassword string
+type UserID string
+type SessionID string
+type TenantID string
+
+func (id UserID) String() string    { return string(id) }
+func (id SessionID) String() string { return string(id) }
+func (id TenantID) String() string  { return string(id) }
 
 type Identity struct {
 	UserID              string
@@ -24,6 +32,14 @@ type Identity struct {
 	Roles               []iamdomain.Role
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+
+func NewIdentity(userID UserID, username string) Identity {
+	return Identity{
+		UserID:   strings.TrimSpace(userID.String()),
+		Username: strings.TrimSpace(username),
+		IsActive: true,
+	}
 }
 
 type Session struct {
@@ -71,6 +87,17 @@ type CreateUserParams struct {
 	IsActive           bool
 	Roles              []iamdomain.Role
 	CreatedBy          string
+}
+
+type CreateUserInput struct {
+	UserID      UserID
+	Username    string
+	Email       string
+	DisplayName string
+	Password    PlainPassword
+	TenantID    TenantID
+	Roles       []iamdomain.Role
+	CreatedBy   string
 }
 
 type UpdateUserParams struct {

@@ -164,7 +164,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, domain.ErrNoActiveStage
 	}
 	// Ensure the requested StageInstanceID matches the active stage.
-	if req.StageInstanceID != "" && activeStage.ID != req.StageInstanceID {
+	if req.StageInstanceID == "" || activeStage.ID != req.StageInstanceID {
 		_ = tx.Rollback()
 		return SignoffResult{}, repository.ErrStageNotActive
 	}
@@ -206,7 +206,13 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 
 	var actorDisplayName sql.NullString
-	if err := tx.QueryRowContext(ctx, `SELECT display_name FROM metaldocs.iam_users WHERE user_id = $1`, req.ActorUserID).Scan(&actorDisplayName); err != nil && err != sql.ErrNoRows {
+	if err := tx.QueryRowContext(ctx, `
+		SELECT display_name
+		  FROM metaldocs.iam_users
+		 WHERE user_id = $1
+		   AND tenant_id = $2::uuid`,
+		req.ActorUserID, req.TenantID,
+	).Scan(&actorDisplayName); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: lookup actor display name: %w", err)
 	}
@@ -249,7 +255,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 
 	// Step 9: collect all signoffs for the active stage to evaluate quorum.
-	allStageSignoffs, err := s.loadStageSignoffs(ctx, tx, activeStage.ID)
+	allStageSignoffs, err := s.loadStageSignoffs(ctx, tx, req.TenantID, activeStage.ID)
 	if err != nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: load stage signoffs: %w", err)
@@ -257,16 +263,29 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 
 	// Step 10: evaluate quorum.
 	approvals, rejections := splitSignoffs(allStageSignoffs)
-	effectiveDenominator := domain.ComputeEffectiveDenominator(*activeStage, activeStage.EligibleActorIDs)
-	if effectiveDenominator == 0 {
+	currentEligible := activeStage.EligibleActorIDs
+	if activeStage.OnEligibilityDriftSnapshot != domain.DriftKeepSnapshot {
+		currentEligible, err = resolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
+		if err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: resolve current eligible actors: %w", err)
+		}
+	}
+	drift := domain.ApplyEligibilityDrift(*activeStage, currentEligible)
+	effectiveDenominator := drift.EffectiveDenominator
+	skipLegacyQuorumFallback := false
+	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
 		// Fallback: treat every eligible actor as in scope.
 		effectiveDenominator = len(activeStage.EligibleActorIDs)
 	}
-	if effectiveDenominator == 0 {
+	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
 		// No eligible actors configured — default denominator of 1 to allow any_1_of.
 		effectiveDenominator = 1
 	}
-	outcome := domain.EvaluateQuorum(*activeStage, approvals, rejections, effectiveDenominator)
+	outcome := drift.ForcedOutcome
+	if outcome == domain.QuorumPending {
+		outcome = domain.EvaluateQuorum(*activeStage, approvals, rejections, effectiveDenominator)
+	}
 
 	var result SignoffResult
 	var shouldDispatchPDF bool
@@ -504,15 +523,22 @@ func (s *DecisionService) loadPriorSignoffs(ctx context.Context, tx *sql.Tx, ten
 }
 
 // loadStageSignoffs fetches all signoffs for a single stage instance.
-func (s *DecisionService) loadStageSignoffs(ctx context.Context, tx *sql.Tx, stageInstanceID string) ([]domain.Signoff, error) {
+func (s *DecisionService) loadStageSignoffs(ctx context.Context, tx *sql.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error) {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, approval_instance_id, stage_instance_id,
-		       actor_user_id, actor_tenant_id, decision,
-		       comment, signed_at, signature_method, signature_payload, content_hash
-		FROM approval_signoffs
-		WHERE stage_instance_id = $1
-		ORDER BY signed_at ASC`,
-		stageInstanceID,
+		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
+		       s.actor_user_id, s.actor_tenant_id, s.decision,
+		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash
+		  FROM approval_signoffs s
+		  JOIN approval_stage_instances asi
+		    ON asi.id = s.stage_instance_id
+		  JOIN approval_instances ai
+		    ON ai.id = asi.approval_instance_id
+		   AND ai.id = s.approval_instance_id
+		 WHERE s.stage_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND s.actor_tenant_id = ai.tenant_id
+		 ORDER BY s.signed_at ASC`,
+		stageInstanceID, tenantID,
 	)
 	if err != nil {
 		return nil, err

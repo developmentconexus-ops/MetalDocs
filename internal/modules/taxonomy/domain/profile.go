@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -26,7 +27,47 @@ var (
 	ErrProfileArchived         = errors.New("profile is archived")
 	ErrTemplateNotPublished    = errors.New("template version is not published")
 	ErrTemplateProfileMismatch = errors.New("template version belongs to different profile")
+	ErrProfileCodeRequired     = errors.New("profile code must not be empty")
+	ErrProfileTenantRequired   = errors.New("profile tenant must not be empty")
+	ErrProfileFamilyRequired   = errors.New("profile family must not be empty")
+	ErrProfileNameRequired     = errors.New("profile name must not be empty")
 )
+
+func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
+	profile := DocumentProfile{
+		Code:                     strings.TrimSpace(input.Code),
+		TenantID:                 strings.TrimSpace(input.TenantID),
+		FamilyCode:               strings.TrimSpace(input.FamilyCode),
+		Name:                     strings.TrimSpace(input.Name),
+		Description:              strings.TrimSpace(input.Description),
+		Alias:                    strings.TrimSpace(input.Alias),
+		ReviewIntervalDays:       input.ReviewIntervalDays,
+		DefaultTemplateVersionID: trimOptionalString(input.DefaultTemplateVersionID),
+		OwnerUserID:              trimOptionalString(input.OwnerUserID),
+		EditableByRole:           strings.TrimSpace(input.EditableByRole),
+		ArchivedAt:               input.ArchivedAt,
+		CreatedAt:                input.CreatedAt,
+	}
+	if profile.Code == "" {
+		return nil, ErrProfileCodeRequired
+	}
+	if profile.TenantID == "" {
+		return nil, ErrProfileTenantRequired
+	}
+	if profile.FamilyCode == "" {
+		return nil, ErrProfileFamilyRequired
+	}
+	if profile.Name == "" {
+		return nil, ErrProfileNameRequired
+	}
+	if profile.Alias == "" {
+		profile.Alias = profile.Code
+		if len(profile.Alias) > 24 {
+			profile.Alias = profile.Alias[:24]
+		}
+	}
+	return &profile, nil
+}
 
 func (p *DocumentProfile) IsActive() bool {
 	return p.ArchivedAt == nil

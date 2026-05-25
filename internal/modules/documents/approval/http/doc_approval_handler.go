@@ -42,7 +42,7 @@ func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Re
 		WriteError(w, err)
 		return
 	}
-	w.Header().Set("ETag", "\"v1\"")
+	w.Header().Set("ETag", resp.ETag)
 	WriteJSON(w, http.StatusOK, resp)
 }
 
@@ -170,6 +170,11 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
+	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if h.readSvc == nil {
 		WriteError(w, errors.New("read service not configured"))
 		return
@@ -195,10 +200,10 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := cancelInstance(h, r.Context(), h.db, application.CancelInput{
+	result, err := h.cancelInstance(r.Context(), h.db, application.CancelInput{
 		TenantID:                tenantID,
 		InstanceID:              inst.ID,
-		ExpectedRevisionVersion: 0,
+		ExpectedRevisionVersion: expectedRevisionVersion,
 		ActorUserID:             actorID,
 		Reason:                  body.Reason,
 	})

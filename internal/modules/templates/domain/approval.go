@@ -8,20 +8,29 @@ type ApprovalConfig struct {
 
 func (c ApprovalConfig) HasReviewer() bool { return c.ReviewerRole != nil && *c.ReviewerRole != "" }
 
+type SegregationRole string
+
+const (
+	SegregationRoleReviewer SegregationRole = "reviewer"
+	SegregationRoleApprover SegregationRole = "approver"
+)
+
 // CheckSegregation enforces ISO segregation of duties.
 // role = "reviewer" | "approver"
 // Rules:
-//   role="reviewer": actorID != authorID
-//   role="approver": actorID != authorID AND (reviewerID == nil OR actorID != *reviewerID)
+//
+//	role="reviewer": actorID != authorID
+//	role="approver": actorID != authorID AND (reviewerID == nil OR actorID != *reviewerID)
+//
 // Returns ErrISOSegregationViolation on conflict.
-func CheckSegregation(role string, actorID, authorID string, reviewerID *string) error {
+func CheckSegregation(role SegregationRole, actorID, authorID string, reviewerID *string) error {
 	switch role {
-	case "reviewer":
+	case SegregationRoleReviewer:
 		if actorID == authorID {
 			return ErrISOSegregationViolation
 		}
 		return nil
-	case "approver":
+	case SegregationRoleApprover:
 		if actorID == authorID {
 			return ErrISOSegregationViolation
 		}

@@ -60,15 +60,16 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	if err != nil {
 		return CancelResult{}, fmt.Errorf("cancel: begin tx: %w", err)
 	}
+	rollback := func() { _ = tx.Rollback() }
 
 	if system {
 		if err := authz.BypassSystem(ctx, tx); err != nil {
-			tx.Rollback()
+			rollback()
 			return CancelResult{}, fmt.Errorf("cancel: system authz bypass: %w", err)
 		}
 	} else {
 		if err = setAuthzGUC(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-			tx.Rollback()
+			rollback()
 			return CancelResult{}, fmt.Errorf("cancel: %w", err)
 		}
 	}
@@ -76,15 +77,15 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	// Load instance to get document ID and verify not already terminal.
 	inst, err := s.repo.LoadInstance(ctx, tx, in.TenantID, in.InstanceID)
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: load instance: %w", err)
 	}
 	if inst == nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, repository.ErrNoActiveInstance
 	}
 	if inst.Status != domain.InstanceInProgress {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, repository.ErrInstanceCompleted
 	}
 
@@ -98,7 +99,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 		docID, in.TenantID,
 	).Scan(&areaCode)
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: fetch area_code: %w", err)
 	}
 
@@ -106,7 +107,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	if !system {
 		ctx = authz.WithCapCache(ctx)
 		if err := authz.Require(ctx, tx, "workflow.instance.cancel", areaCode); err != nil {
-			tx.Rollback()
+			rollback()
 			return CancelResult{}, err
 		}
 	}
@@ -116,7 +117,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 		`SELECT set_config('metaldocs.cancel_in_progress', $1, true)`,
 		in.InstanceID,
 	); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: set cancel GUC: %w", err)
 	}
 
@@ -124,19 +125,22 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	now := s.clock.Now()
 	if err = s.repo.UpdateInstanceStatus(ctx, tx, in.TenantID, in.InstanceID,
 		domain.InstanceCancelled, domain.InstanceInProgress, &now); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: update instance status: %w", err)
 	}
 
 	// Cancel all active and pending stage instances.
 	if _, err = tx.ExecContext(ctx, `
-		UPDATE approval_stage_instances
+		UPDATE approval_stage_instances asi
 		   SET status = 'cancelled'
-		 WHERE approval_instance_id = $1
-		   AND status IN ('active','pending')`,
-		in.InstanceID,
+		  FROM approval_instances ai
+		 WHERE asi.approval_instance_id = ai.id
+		   AND asi.approval_instance_id = $1
+		   AND ai.tenant_id = $2
+		   AND asi.status IN ('active','pending')`,
+		in.InstanceID, in.TenantID,
 	); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: cancel stages: %w", err)
 	}
 
@@ -152,24 +156,28 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 		docID, in.TenantID, in.ExpectedRevisionVersion,
 	)
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: revert doc to draft: %w", err)
 	}
 	rows, err := res.RowsAffected()
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: rows affected: %w", err)
 	}
 	if rows == 0 {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, repository.ErrStaleRevision
 	}
 
 	// Emit governance event.
-	payload, _ := json.Marshal(map[string]any{
+	payload, err := json.Marshal(map[string]any{
 		"instance_id": in.InstanceID,
 		"reason":      in.Reason,
 	})
+	if err != nil {
+		rollback()
+		return CancelResult{}, fmt.Errorf("cancel: marshal event payload: %w", err)
+	}
 	if err = s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
 		EventType:    "approval.instance_cancelled",
@@ -180,7 +188,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 		PayloadJSON:  payload,
 		OccurredAt:   now,
 	}); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: emit event: %w", err)
 	}
 

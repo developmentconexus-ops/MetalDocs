@@ -121,11 +121,11 @@ func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Temp
 	return r.UpdateTemplate(context.Background(), t)
 }
 
-func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, v *domain.TemplateVersion) error {
-	return r.UpdateVersion(context.Background(), v)
+func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, tenantID string, v *domain.TemplateVersion) error {
+	return r.UpdateVersion(context.Background(), tenantID, v)
 }
 
-func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) error {
+func (r *fakeRepo) UpdateVersion(_ context.Context, _ string, v *domain.TemplateVersion) error {
 	if _, ok := r.versions[v.ID]; !ok {
 		return domain.ErrNotFound
 	}
@@ -133,7 +133,7 @@ func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) e
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, _ string, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	v, ok := r.versions[versionID]
 	if !ok {
 		return domain.ErrNotFound
@@ -148,8 +148,8 @@ func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, ex
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return r.UpdateVersionDraftCAS(context.Background(), versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return r.UpdateVersionDraftCAS(context.Background(), tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
@@ -249,6 +249,15 @@ func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeM
 	return mux
 }
 
+func TestNew_PanicsWithoutAuthz(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected New to panic when authz is nil")
+		}
+	}()
+	_ = tmplhttp.New(application.New(newFakeRepo(), fakePresigner{}, fakeClock{}, &fakeUUID{}), nil)
+}
+
 func createBody(key string) []byte {
 	req := map[string]any{
 		"key":         key,
@@ -262,8 +271,9 @@ func createBody(key string) []byte {
 func withHeaders(req *http.Request) {
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Idempotency-Key", "11111111-1111-1111-1111-111111111111")
-	*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant-a"))
-	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))
+	ctx := tenant.WithTenantID(req.Context(), "tenant-a")
+	ctx = iamdomain.WithAuthContext(ctx, "user-a", []iamdomain.Role{})
+	*req = *req.WithContext(ctx)
 }
 
 func TestCreateTemplate_Happy(t *testing.T) {
