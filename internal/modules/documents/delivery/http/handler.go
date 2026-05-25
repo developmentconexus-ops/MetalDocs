@@ -1162,15 +1162,11 @@ func withAdminCtx(r *http.Request) *http.Request {
 		return r
 	}
 
-	roles := rolesFromHeader(r.Header.Get("X-User-Roles"))
+	roles := iamdomain.RolesFromContext(r.Context())
 	if len(roles) == 0 {
 		return r
 	}
-	ctxRoles := make([]iamdomain.Role, 0, len(roles))
-	for _, role := range roles {
-		ctxRoles = append(ctxRoles, iamdomain.Role(role))
-	}
-	ctx := iamdomain.WithAuthContext(r.Context(), userID, ctxRoles)
+	ctx := iamdomain.WithAuthContext(r.Context(), userID, roles)
 	return r.WithContext(ctx)
 }
 
@@ -1184,32 +1180,12 @@ func hasAnyRole(r *http.Request, want ...string) bool {
 }
 
 func hasRole(r *http.Request, want string) bool {
-	for _, role := range rolesFromHeader(r.Header.Get("X-User-Roles")) {
-		if role == want {
-			return true
-		}
-	}
 	for _, role := range iamdomain.RolesFromContext(r.Context()) {
 		if string(role) == want {
 			return true
 		}
 	}
 	return false
-}
-
-func rolesFromHeader(header string) []string {
-	if strings.TrimSpace(header) == "" {
-		return nil
-	}
-	parts := strings.Split(header, ",")
-	roles := make([]string, 0, len(parts))
-	for _, part := range parts {
-		role := strings.ToLower(strings.TrimSpace(part))
-		if role != "" {
-			roles = append(roles, role)
-		}
-	}
-	return roles
 }
 
 func tenantIDFromReq(r *http.Request) (string, error) {
