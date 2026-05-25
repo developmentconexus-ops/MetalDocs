@@ -162,6 +162,8 @@ func appendAssertedCap(ctx context.Context, tx *sql.Tx, capability, areaCode str
 	if _, exists := asserted.set[compoundKey]; exists {
 		return nil
 	}
+	// Safe to mutate asserted without cache.mu: database/sql guarantees *sql.Tx
+	// is not safe for concurrent use, so only one goroutine owns this tx at a time.
 	asserted.items = append(asserted.items, map[string]string{"cap": capability, "area": areaCode})
 	asserted.set[compoundKey] = struct{}{}
 

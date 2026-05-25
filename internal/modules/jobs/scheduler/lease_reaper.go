@@ -6,7 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"strings"
+
+	"github.com/lib/pq"
 
 	"metaldocs/internal/platform/tenant"
 )
@@ -69,7 +70,6 @@ RETURNING job_name, leader_id, lease_epoch
 			return err
 		}
 		if len(jobNames) > 0 {
-			sep := "\x1f"
 			if _, err := tx.ExecContext(ctx, `
 INSERT INTO governance_events
 	(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, occurred_at)
@@ -85,11 +85,8 @@ SELECT
 	'expired_lease_reclaimed',
 	u.payload_json::jsonb,
 	now()
-FROM unnest(
-	string_to_array($1, $4),
-	string_to_array($2, $4)
-) AS u(job_name, payload_json)
-`, strings.Join(jobNames, sep), strings.Join(payloads, sep), tenantID, sep); err != nil {
+FROM unnest($1::text[], $2::text[]) AS u(job_name, payload_json)
+`, pq.Array(jobNames), pq.Array(payloads), tenantID); err != nil {
 				return err
 			}
 		}

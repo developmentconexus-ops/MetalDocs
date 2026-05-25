@@ -279,14 +279,18 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		effectiveDenominator = len(activeStage.EligibleActorIDs)
 	}
 	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
-		_ = tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			slog.Error("recordSignoff: rollback failed on empty eligible pool", "err", rbErr)
+		}
 		return SignoffResult{}, domain.ErrEmptyEligiblePool
 	}
 	outcome := drift.ForcedOutcome
 	if outcome == domain.QuorumPending {
 		outcome = domain.EvaluateQuorum(*activeStage, approvals, rejections, effectiveDenominator)
 		if outcome == domain.QuorumError {
-			_ = tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				slog.Error("recordSignoff: rollback failed on quorum error", "err", rbErr)
+			}
 			return SignoffResult{}, domain.ErrEmptyEligiblePool
 		}
 	}
