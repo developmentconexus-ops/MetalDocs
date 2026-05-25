@@ -190,7 +190,7 @@ func main() {
 	if deps.SQLDB != nil {
 		capabilityService = iamapp.NewCapabilityService(deps.SQLDB)
 	}
-	cachedProvider := iamapp.NewCachedRoleProvider(deps.RoleProvider, authn.CacheTTL())
+	cachedProvider := iamapp.NewCachedRoleProvider(ctx, deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route
 	// visibility. It is shared with the auth middleware so that fully public
 	// routes (no session required) and the IAM permission layer stay in sync
@@ -627,19 +627,9 @@ func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, ac
 	}
 }
 
-func traceIDFromContext(ctx context.Context) string {
-	if traceID, ok := ctx.Value("trace_id").(string); ok {
-		traceID = strings.TrimSpace(traceID)
-		if traceID != "" {
-			return traceID
-		}
-	}
-	if traceID, ok := ctx.Value("X-Trace-Id").(string); ok {
-		traceID = strings.TrimSpace(traceID)
-		if traceID != "" {
-			return traceID
-		}
-	}
+func traceIDFromContext(_ context.Context) string {
+	// Observability middleware stores the trace ID in the slog logger context, not in the
+	// Go context value chain. Generating a fresh UUID per audit event is correct here.
 	return uuid.NewString()
 }
 

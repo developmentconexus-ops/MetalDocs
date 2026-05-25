@@ -279,11 +279,12 @@ SELECT
     COALESCE((SELECT count(*)::float8 FROM pg_stat_activity WHERE state = 'active'), 0),
     COALESCE(current_setting('max_connections')::float8, 1)
 `).Scan(&active, &maxConn)
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err != nil {
+		s.mu.Lock()
+		cur := s.inPressure
+		s.mu.Unlock()
 		s.logger.Debug("scheduler_pressure_probe_failed", "error", err)
-		return s.inPressure
+		return cur
 	}
 
 	if maxConn <= 0 {
@@ -291,13 +292,17 @@ SELECT
 	}
 	ratio := active / maxConn
 
+	// Update shared state under lock; log outside the lock to avoid lock-order issues
+	// with the logger's internal synchronization.
+	var logEnter, logExit bool
+	s.mu.Lock()
 	if ratio > 0.70 {
 		s.pressureCount++
 		s.quietCount = 0
 		if !s.inPressure && s.pressureCount >= 3 {
 			s.inPressure = true
 			s.pressureCount = 0
-			s.logger.Warn("scheduler_backpressure_enter", "ratio", ratio)
+			logEnter = true
 		}
 	} else if ratio < 0.60 {
 		s.quietCount++
@@ -305,14 +310,21 @@ SELECT
 		if s.inPressure && s.quietCount >= 3 {
 			s.inPressure = false
 			s.quietCount = 0
-			s.logger.Info("scheduler_backpressure_exit", "ratio", ratio)
+			logExit = true
 		}
 	} else {
 		s.pressureCount = 0
 		s.quietCount = 0
 	}
+	cur := s.inPressure
+	s.mu.Unlock()
 
-	return s.inPressure
+	if logEnter {
+		s.logger.Warn("scheduler_backpressure_enter", "ratio", ratio)
+	} else if logExit {
+		s.logger.Info("scheduler_backpressure_exit", "ratio", ratio)
+	}
+	return cur
 }
 
 func (s *Scheduler) acquireLease(ctx context.Context, job string) (bool, int64, error) {

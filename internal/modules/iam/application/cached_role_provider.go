@@ -22,7 +22,7 @@ type CachedRoleProvider struct {
 	items map[string]cacheEntry
 }
 
-func NewCachedRoleProvider(base domain.RoleProvider, ttl time.Duration) *CachedRoleProvider {
+func NewCachedRoleProvider(ctx context.Context, base domain.RoleProvider, ttl time.Duration) *CachedRoleProvider {
 	if ttl <= 0 {
 		ttl = 30 * time.Second
 	}
@@ -34,15 +34,20 @@ func NewCachedRoleProvider(base domain.RoleProvider, ttl time.Duration) *CachedR
 	go func() {
 		ticker := time.NewTicker(ttl)
 		defer ticker.Stop()
-		for now := range ticker.C {
-			cutoff := now.UTC()
-			provider.mu.Lock()
-			for key, entry := range provider.items {
-				if !cutoff.Before(entry.expiresAt) {
-					delete(provider.items, key)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-ticker.C:
+				cutoff := now.UTC()
+				provider.mu.Lock()
+				for key, entry := range provider.items {
+					if !cutoff.Before(entry.expiresAt) {
+						delete(provider.items, key)
+					}
 				}
+				provider.mu.Unlock()
 			}
-			provider.mu.Unlock()
 		}
 	}()
 	return provider
