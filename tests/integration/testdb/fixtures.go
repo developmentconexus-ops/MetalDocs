@@ -60,11 +60,11 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	var sessID string
 	if err := db.QueryRowContext(ctx,
 		`INSERT INTO `+Qualified(schema, "editor_sessions")+
-			` (document_id, user_id, expires_at, last_acknowledged_revision_id, status)
-		 VALUES ($1::uuid, $2::uuid, now() + interval '1 hour',
+			` (tenant_id, document_id, user_id, expires_at, last_acknowledged_revision_id, status)
+		 VALUES ($1::uuid, $2::uuid, $3::uuid, now() + interval '1 hour',
 		         '00000000-0000-0000-0000-000000000000', 'active')
 		 RETURNING id::text`,
-		docID, userID,
+		tenantID, docID, userID,
 	).Scan(&sessID); err != nil {
 		t.Fatalf("InsertDraftDocument: insert session: %v", err)
 	}
@@ -94,8 +94,8 @@ func InsertDraftDocument(t *testing.T, db *sql.DB, schema, tenantID string) (doc
 	// Update session ack.
 	if _, err := db.ExecContext(ctx,
 		`UPDATE `+Qualified(schema, "editor_sessions")+
-			` SET last_acknowledged_revision_id=$1::uuid WHERE id=$2::uuid`,
-		revID, sessID,
+			` SET last_acknowledged_revision_id=$1::uuid WHERE id=$2::uuid AND tenant_id=$3::uuid`,
+		revID, sessID, tenantID,
 	); err != nil {
 		t.Fatalf("InsertDraftDocument: update session ack: %v", err)
 	}

@@ -1,6 +1,6 @@
 # public.editor_sessions
 
-> **Source:** `db/baseline/0001_current_schema.sql`
+> **Source:** `db/baseline/0001_current_schema.sql` + `db/migrations/0211_editor_sessions_tenant_id.sql`
 > **Schema:** `public`
 > **Owner:** documents
 
@@ -12,6 +12,7 @@ Current curated-baseline table owned by `documents`. See the owning module wiki 
 | Column | Type | Nullable | Meaning |
 |---|---|---|---|
 | `id` | `uuid` | no | Baseline column. |
+| `tenant_id` | `uuid` | no | Tenant scope for editor session operations; added by forward migration `0211_editor_sessions_tenant_id.sql`. |
 | `document_id` | `uuid` | no | Baseline column. |
 | `user_id` | `text` | no | Baseline column. |
 | `acquired_at` | `timestamp with time zone` | no | Baseline column. |
@@ -25,6 +26,7 @@ Current curated-baseline table owned by `documents`. See the owning module wiki 
 ```sql
 CREATE TABLE public.editor_sessions (
 id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
     document_id uuid NOT NULL,
     user_id text NOT NULL,
     acquired_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -47,3 +49,5 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 ## Notes and Debt
 
 Retained in `public` because current runtime/baseline truth still uses it. Do not move schemas without an approved migration plan.
+
+Forward migration `0211_editor_sessions_tenant_id.sql` adds and backfills `tenant_id` from `public.documents` so session keepalive/release/force-release paths can filter by tenant directly.
