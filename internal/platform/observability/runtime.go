@@ -52,9 +52,9 @@ func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[strin
 	return 200, map[string]any{
 		"status": "ready",
 		"checks": p.applyDependencyChecks(ctx, []map[string]any{
-			{"name": "repository", "status": "up", "mode": p.repositoryMode},
-			{"name": "storage", "status": "up", "provider": p.storageProvider},
-			{"name": "auth", "status": "up", "enabled": p.authEnabled},
+			{"name": "repository", "status": "up"},
+			{"name": "storage", "status": "up"},
+			{"name": "auth", "status": "up"},
 		}, nil, nil),
 	}
 }
@@ -104,9 +104,9 @@ func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[str
 	defer cancel()
 
 	checks := []map[string]any{
-		{"name": "repository", "status": "up", "mode": p.repositoryMode},
-		{"name": "storage", "status": "up", "provider": p.storageProvider},
-		{"name": "auth", "status": "up", "enabled": p.authEnabled},
+		{"name": "repository", "status": "up"},
+		{"name": "storage", "status": "up"},
+		{"name": "auth", "status": "up"},
 	}
 	status := "ready"
 	code := 200

@@ -61,7 +61,8 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
 
-		route := normalizeRoute(r.URL.Path)
+		path := r.URL.EscapedPath()
+		route := normalizeRoute(path)
 		method := r.Method
 		elapsedMs := time.Since(start).Milliseconds()
 		if elapsedMs < 0 {
@@ -86,13 +87,13 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 		if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
 			userID = currentUser.UserID
 		}
-		documentID, profileCode := extractRouteContext(r.URL.Path)
+		documentID, profileCode := extractRouteContext(path)
 
 		o.logger.Info("http_request",
 			"trace_id", traceID,
 			"user_id", userID,
 			"method", method,
-			"path", r.URL.Path,
+			"path", path,
 			"route", route,
 			"status", sw.status,
 			"duration_ms", durationMs,
@@ -173,6 +174,9 @@ func normalizeRoute(path string) string {
 		parts := strings.Split(path, "/")
 		if len(parts) > 4 {
 			parts[4] = "{documentId}"
+			if len(parts) > 5 && parts[5] == "versions" {
+				return "/api/v1/documents/{documentId}/versions"
+			}
 			return strings.Join(parts, "/")
 		}
 	}
@@ -182,9 +186,6 @@ func normalizeRoute(path string) string {
 			parts[4] = "{profileCode}"
 			return strings.Join(parts, "/")
 		}
-	}
-	if strings.HasPrefix(path, "/api/v1/documents/") && strings.HasSuffix(path, "/versions") {
-		return "/api/v1/documents/{documentId}/versions"
 	}
 	if strings.HasPrefix(path, "/api/v1/workflow/documents/") && strings.HasSuffix(path, "/transitions") {
 		return "/api/v1/workflow/documents/{documentId}/transitions"
