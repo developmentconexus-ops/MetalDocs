@@ -213,17 +213,18 @@ INSERT INTO templates_template_version (
 	return err
 }
 
-func (r *Repository) GetVersion(ctx context.Context, templateID string, n int) (*domain.TemplateVersion, error) {
+func (r *Repository) GetVersion(ctx context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error) {
 	const q = `
 SELECT
-	id::text, template_id::text, version_number, status, docx_storage_key, content_hash,
-	metadata_schema, placeholder_schema, author_id,
-	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
-	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
-FROM templates_template_version
-WHERE template_id = $1 AND version_number = $2`
+	v.id::text, v.template_id::text, v.version_number, v.status, v.docx_storage_key, v.content_hash,
+	v.metadata_schema, v.placeholder_schema, v.author_id,
+	v.pending_reviewer_role, v.pending_approver_role, v.reviewer_id, v.approver_id,
+	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at
+FROM templates_template_version v
+JOIN templates_template t ON t.id = v.template_id
+WHERE v.template_id = $1 AND v.version_number = $2 AND t.tenant_id = $3::uuid`
 
-	v, err := scanTemplateVersion(r.db.QueryRowContext(ctx, q, templateID, n))
+	v, err := scanTemplateVersion(r.db.QueryRowContext(ctx, q, templateID, n, tenantID))
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -233,17 +234,18 @@ WHERE template_id = $1 AND version_number = $2`
 	return v, nil
 }
 
-func (r *Repository) GetVersionByID(ctx context.Context, id string) (*domain.TemplateVersion, error) {
+func (r *Repository) GetVersionByID(ctx context.Context, tenantID, id string) (*domain.TemplateVersion, error) {
 	const q = `
 SELECT
-	id::text, template_id::text, version_number, status, docx_storage_key, content_hash,
-	metadata_schema, placeholder_schema, author_id,
-	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
-	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
-FROM templates_template_version
-WHERE id = $1`
+	v.id::text, v.template_id::text, v.version_number, v.status, v.docx_storage_key, v.content_hash,
+	v.metadata_schema, v.placeholder_schema, v.author_id,
+	v.pending_reviewer_role, v.pending_approver_role, v.reviewer_id, v.approver_id,
+	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at
+FROM templates_template_version v
+JOIN templates_template t ON t.id = v.template_id
+WHERE v.id = $1 AND t.tenant_id = $2::uuid`
 
-	v, err := scanTemplateVersion(r.db.QueryRowContext(ctx, q, id))
+	v, err := scanTemplateVersion(r.db.QueryRowContext(ctx, q, id, tenantID))
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -444,16 +446,17 @@ WHERE template_id = $1 AND status = 'published' AND id <> $2`
 	return err
 }
 
-func (r *Repository) GetApprovalConfig(ctx context.Context, templateID string) (*domain.ApprovalConfig, error) {
+func (r *Repository) GetApprovalConfig(ctx context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
 	const q = `
 SELECT template_id::text, reviewer_role, approver_role
 FROM templates_approval_config
-WHERE template_id = $1`
+WHERE template_id = $1
+  AND template_id IN (SELECT id FROM templates_template WHERE tenant_id = $2::uuid)`
 	var (
 		cfg      domain.ApprovalConfig
 		reviewer sql.NullString
 	)
-	err := r.db.QueryRowContext(ctx, q, templateID).Scan(&cfg.TemplateID, &reviewer, &cfg.ApproverRole)
+	err := r.db.QueryRowContext(ctx, q, templateID, tenantID).Scan(&cfg.TemplateID, &reviewer, &cfg.ApproverRole)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
@@ -515,14 +518,15 @@ func (r *Repository) AppendAuditTx(ctx context.Context, _ *sql.Tx, entry *domain
 	return r.AppendAudit(ctx, entry)
 }
 
-func (r *Repository) ListAudit(ctx context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
+func (r *Repository) ListAudit(ctx context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
 	const q = `
 SELECT tenant_id, template_id::text, version_id::text, actor_id, action, details, occurred_at
 FROM templates_audit_log
 WHERE template_id = $1
+  AND tenant_id = $2::uuid
 ORDER BY occurred_at DESC
-LIMIT $2 OFFSET $3`
-	rows, err := r.db.QueryContext(ctx, q, templateID, limit, offset)
+LIMIT $3 OFFSET $4`
+	rows, err := r.db.QueryContext(ctx, q, templateID, tenantID, limit, offset)
 	if isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
