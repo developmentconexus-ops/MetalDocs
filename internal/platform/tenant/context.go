@@ -16,6 +16,9 @@ var ErrTenantMissing = errors.New("tenant: not present in context")
 // WithTenantID returns a child context carrying the supplied tenant id. The
 // auth middleware is the only production caller.
 func WithTenantID(ctx context.Context, tenantID string) context.Context {
+	if strings.TrimSpace(tenantID) == "" {
+		panic("WithTenantID: empty tenantID")
+	}
 	return context.WithValue(ctx, ctxKey{}, tenantID)
 }
 

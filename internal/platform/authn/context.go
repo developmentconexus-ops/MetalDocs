@@ -27,17 +27,6 @@ func UserIDFromContext(ctx context.Context) (string, bool) {
 //
 // Deprecated: see M6 — callers should consume iamdomain.RolesFromContext
 // directly to preserve the iamdomain.Role enum.
-func RolesFromContext(ctx context.Context) []string {
-	roles := iamdomain.RolesFromContext(ctx)
-	if len(roles) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(roles))
-	for _, role := range roles {
-		normalized := strings.ToLower(strings.TrimSpace(string(role)))
-		if normalized != "" {
-			out = append(out, normalized)
-		}
-	}
-	return out
+func RolesFromContext(ctx context.Context) []iamdomain.Role {
+	return iamdomain.RolesFromContext(ctx)
 }

@@ -200,7 +200,7 @@ func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
 	roles := authn.RolesFromContext(ctx)
 	rolesSet := map[string]struct{}{}
 	for _, role := range roles {
-		rolesSet[strings.ToLower(strings.TrimSpace(role))] = struct{}{}
+		rolesSet[strings.ToLower(strings.TrimSpace(string(role)))] = struct{}{}
 	}
 
 	for _, item := range items {

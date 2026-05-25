@@ -29,10 +29,16 @@ const (
 	bcryptCost         = 12
 )
 
+type Secret string
+
+func (s Secret) Value() string { return string(s) }
+
+func (s Secret) String() string { return "***" }
+
 type Config struct {
 	SessionCookieName      string
 	SessionTTL             time.Duration
-	SessionSecret          string
+	SessionSecret          Secret
 	PasswordMinLength      int
 	LoginMaxFailedAttempts int
 	LoginLockDuration      time.Duration
@@ -46,7 +52,7 @@ type Config struct {
 	BootstrapAdminUserID   string
 	BootstrapAdminUsername string
 	BootstrapAdminEmail    string
-	BootstrapAdminPassword string
+	BootstrapAdminPassword Secret
 	BootstrapAdminName     string
 	CookieSecure           bool
 	// TrustedProxyCIDRs is the same allowlist consulted by the rate limiter
@@ -58,8 +64,11 @@ type Config struct {
 }
 
 func (c Config) redacted() Config {
+	if c.SessionSecret != "" {
+		c.SessionSecret = Secret("***")
+	}
 	if c.BootstrapAdminPassword != "" {
-		c.BootstrapAdminPassword = "[REDACTED]"
+		c.BootstrapAdminPassword = Secret("***")
 	}
 	return c
 }
@@ -97,7 +106,7 @@ type beginTxRepository interface {
 }
 
 func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) (*Service, error) {
-	if len(cfg.SessionSecret) < 32 {
+	if len(cfg.SessionSecret.Value()) < 32 {
 		return nil, fmt.Errorf("new auth service: session secret must be at least 32 characters")
 	}
 	return &Service{
@@ -126,7 +135,7 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		return nil
 	}
 
-	bootstrapPassword := s.cfg.BootstrapAdminPassword
+	bootstrapPassword := s.cfg.BootstrapAdminPassword.Value()
 	passwordHash, err := s.hashPassword(bootstrapPassword)
 	s.cfg.BootstrapAdminPassword = ""
 	if err != nil {
@@ -593,7 +602,7 @@ func (s *Service) tokenHashFromCookieValue(raw string) (string, error) {
 }
 
 func (s *Service) signToken(token string) string {
-	mac := hmac.New(sha256.New, []byte(s.cfg.SessionSecret))
+	mac := hmac.New(sha256.New, []byte(s.cfg.SessionSecret.Value()))
 	_, _ = mac.Write([]byte(token))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

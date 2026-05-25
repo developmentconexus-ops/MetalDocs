@@ -24,6 +24,13 @@ type Replay struct {
 	Body   []byte
 }
 
+func (r Replay) Validate() error {
+	if r.Status < 100 || r.Status > 599 {
+		return fmt.Errorf("idempotency: corrupt response_status %d", r.Status)
+	}
+	return nil
+}
+
 // ReplayHandle is the transaction-scoped token returned by BeginReplay when
 // the calling goroutine wins the race to insert an `in_flight` row for the
 // (tenant, actor, route, key) tuple. The transaction holds a row-level lock
@@ -43,6 +50,8 @@ type Store struct {
 	db            *sql.DB
 	routeTemplate string
 }
+
+// TODO(phase11): add a tenant_id FK in the idempotency_keys schema once the DB migration is scheduled; current tenant isolation is enforced by application scoping and the composite PK.
 
 // New returns a Store for the given route template.
 func New(db *sql.DB, routeTemplate string) *Store {
@@ -132,13 +141,13 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 			_ = tx.Rollback()
 			return nil, nil, fmt.Errorf("idempotency: completed row missing response_status")
 		}
-		st := int(respStatus.Int64)
-		if st < 100 || st > 599 {
+		replay := Replay{Status: int(respStatus.Int64), Body: respBody}
+		if err := replay.Validate(); err != nil {
 			_ = tx.Rollback()
-			return nil, nil, fmt.Errorf("idempotency: corrupt response_status %d", st)
+			return nil, nil, err
 		}
 		_ = tx.Commit()
-		return nil, &Replay{Status: st, Body: respBody}, nil
+		return nil, &replay, nil
 
 	case "in_flight":
 		// Reached only if the prior writer crashed without rolling back and
@@ -309,6 +318,9 @@ func (s *Store) CheckReplay(ctx context.Context, tenantID, actorID, key, payload
 // not yet migrated to BeginReplay/CompleteReplay. The ON CONFLICT clause now
 // refuses to overwrite a row already marked completed (M2 belt-and-suspenders)
 // so a stale concurrent writer cannot stomp a good payload_hash.
+// Rewriting the payload for rows still transitioning from `in_flight`/`failed`
+// to `completed` is safe because the idempotency contract is keyed by the same
+// tenant/actor/route/key/payload-hash tuple.
 //
 // Deprecated: use BeginReplay/CompleteReplay/FailReplay for race-free behavior.
 func (s *Store) RecordReplay(ctx context.Context, tenantID, actorID, key, payloadHash string, status int, body []byte) error {

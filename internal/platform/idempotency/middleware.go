@@ -15,6 +15,8 @@ import (
 
 var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
+const maxIdempotencyRequestBodyBytes int64 = 1 << 20
+
 // IsValidKey reports whether an idempotency key matches the required UUID shape.
 func IsValidKey(key string) bool {
 	return uuidRE.MatchString(key)
@@ -97,8 +99,14 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 
 			tenantID, actorID := actorFromCtx(r.Context())
 
+			r.Body = http.MaxBytesReader(w, r.Body, maxIdempotencyRequestBodyBytes)
 			hash, err := RequestHash(r)
 			if err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					writeErrJSON(w, http.StatusRequestEntityTooLarge, "REQUEST_BODY_TOO_LARGE", "request body exceeds 1 MiB limit")
+					return
+				}
 				writeErrJSON(w, 400, "BAD_REQUEST", "cannot read body")
 				return
 			}

@@ -238,14 +238,14 @@ func TestSessionCookiesUseStrictSameSite(t *testing.T) {
 func TestConfig_RedactsBootstrapPassword(t *testing.T) {
 	cfg := Config{SessionSecret: testSessionSecret, BootstrapAdminPassword: "secret"}
 	rendered := cfg.String()
-	if strings.Contains(rendered, "secret") || !strings.Contains(rendered, "[REDACTED]") {
+	if strings.Contains(rendered, "secret") || !strings.Contains(rendered, "***") {
 		t.Fatalf("String() did not redact password: %s", rendered)
 	}
 	raw, err := json.Marshal(cfg)
 	if err != nil {
 		t.Fatalf("MarshalJSON: %v", err)
 	}
-	if strings.Contains(string(raw), "secret") || !strings.Contains(string(raw), "[REDACTED]") {
+	if strings.Contains(string(raw), "secret") || !strings.Contains(string(raw), "***") {
 		t.Fatalf("MarshalJSON did not redact password: %s", raw)
 	}
 }
