@@ -3,7 +3,9 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"metaldocs/internal/modules/audit/domain"
@@ -24,7 +26,11 @@ func (w *Writer) Record(ctx context.Context, event domain.Event) error {
 	if err != nil {
 		return fmt.Errorf("begin audit hash-chain tx: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+			slog.Error("audit rollback failed", "error", rollbackErr)
+		}
+	}()
 
 	if err := w.RecordTx(ctx, tx, event); err != nil {
 		return err

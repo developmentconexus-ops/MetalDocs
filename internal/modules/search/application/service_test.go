@@ -17,9 +17,9 @@ type stubReader struct {
 	docs         []domain.Document
 }
 
-func (r *stubReader) ListDocuments(_ context.Context, tenantID string, limit int) ([]domain.Document, error) {
+func (r *stubReader) ListDocuments(_ context.Context, query domain.Query, limit int) ([]domain.Document, error) {
 	r.called = true
-	r.listTenantID = tenantID
+	r.listTenantID = query.TenantID
 	r.listLimit = limit
 	return r.docs, nil
 }

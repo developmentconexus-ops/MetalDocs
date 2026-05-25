@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	searchdomain "metaldocs/internal/modules/search/domain"
 )
@@ -16,7 +17,7 @@ func NewReader(db *sql.DB) *Reader {
 	return &Reader{db: db}
 }
 
-func (r *Reader) ListDocuments(ctx context.Context, tenantID string, limit int) ([]searchdomain.Document, error) {
+func (r *Reader) ListDocuments(ctx context.Context, query searchdomain.Query, limit int) ([]searchdomain.Document, error) {
 	const q = `
 SELECT
 	d.id,
@@ -32,10 +33,23 @@ FROM public.documents d
 LEFT JOIN controlled_documents cd ON cd.id = d.controlled_document_id
 WHERE d.tenant_id = $1
   AND d.archived_at IS NULL
+  AND ($2 = '' OR UPPER(COALESCE(d.status, '')) = $2)
+  AND ($3 = '' OR LOWER(COALESCE(d.profile_code_snapshot, '')) = $3)
+  AND ($4 = '' OR LOWER(COALESCE(d.process_area_code_snapshot, '')) = $4)
+  AND ($5 = '' OR d.created_by::text = $5)
 ORDER BY d.created_at DESC
-LIMIT $2
+LIMIT $6
 `
-	rows, err := r.db.QueryContext(ctx, q, tenantID, limit)
+	rows, err := r.db.QueryContext(
+		ctx,
+		q,
+		query.TenantID,
+		strings.ToUpper(strings.TrimSpace(query.Status)),
+		strings.ToLower(strings.TrimSpace(query.DocumentType)),
+		strings.ToLower(strings.TrimSpace(query.ProcessArea)),
+		strings.TrimSpace(query.OwnerID),
+		limit,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("v2 list documents: %w", err)
 	}

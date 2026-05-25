@@ -2,9 +2,12 @@ package httpdelivery
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	searchapp "metaldocs/internal/modules/search/application"
@@ -12,6 +15,8 @@ import (
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/tenant"
 )
+
+var traceIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 type Handler struct {
 	service *searchapp.Service
@@ -145,10 +150,10 @@ type apiError struct {
 }
 
 func requestTraceID(r *http.Request) string {
-	if traceID := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceID != "" {
+	if traceID := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceID != "" && traceIDPattern.MatchString(traceID) {
 		return traceID
 	}
-	return "trace-local"
+	return uuid.NewString()
 }
 
 func writeAPIError(w http.ResponseWriter, status int, code, message, traceID string) {
