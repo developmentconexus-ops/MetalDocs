@@ -88,9 +88,9 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	profile := &domain.DocumentProfile{
-		Code:                     code,
+		Code:                     domain.ProfileCode(code),
 		TenantID:                 tenantID,
-		FamilyCode:               strings.TrimSpace(req.FamilyCode),
+		FamilyCode:               domain.FamilyCode(strings.TrimSpace(req.FamilyCode)),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
 		Alias:                    alias,
@@ -118,7 +118,7 @@ func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := h.profiles.Get(r.Context(), tenantID, r.PathValue("code"))
+	profile, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code")))
 	if err != nil {
 		h.writeProfileError(w, err)
 		return
@@ -147,9 +147,9 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	profile := &domain.DocumentProfile{
-		Code:                     updateCode,
+		Code:                     domain.ProfileCode(updateCode),
 		TenantID:                 tenantID,
-		FamilyCode:               strings.TrimSpace(req.FamilyCode),
+		FamilyCode:               domain.FamilyCode(strings.TrimSpace(req.FamilyCode)),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
 		Alias:                    updateAlias,
@@ -189,7 +189,7 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 	if err := h.profiles.SetDefaultTemplate(
 		r.Context(),
 		tenantID,
-		r.PathValue("code"),
+		domain.ProfileCode(r.PathValue("code")),
 		req.TemplateVersionID,
 		actorUserID,
 	); err != nil {
@@ -216,7 +216,7 @@ func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
 	if err := h.profiles.Archive(
 		r.Context(),
 		tenantID,
-		r.PathValue("code"),
+		domain.ProfileCode(r.PathValue("code")),
 		actorUserID,
 	); err != nil {
 		h.writeProfileError(w, err)

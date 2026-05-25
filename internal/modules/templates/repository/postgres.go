@@ -27,9 +27,21 @@ func isInvalidUUID(err error) bool {
 func rowsAffected(res sql.Result) (int64, error) {
 	n, err := res.RowsAffected()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("rows affected: %w", err)
 	}
 	return n, nil
+}
+
+func wrapRepositoryErr(op string, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, domain.ErrNotFound) ||
+		errors.Is(err, domain.ErrKeyConflict) ||
+		errors.Is(err, domain.ErrStaleLockVersion) {
+		return err
+	}
+	return fmt.Errorf("templates repository %s: %w", op, err)
 }
 
 type Repository struct {
@@ -479,8 +491,14 @@ func (r *Repository) ObsoletePreviousPublished(ctx context.Context, templateID, 
 UPDATE templates_template_version
 SET status = 'obsolete', obsoleted_at = now()
 WHERE template_id = $1 AND status = 'published' AND id <> $2`
-	_, err := r.db.ExecContext(ctx, q, templateID, keepVersionID)
-	return err
+	res, err := r.db.ExecContext(ctx, q, templateID, keepVersionID)
+	if err != nil {
+		return fmt.Errorf("templates repository obsolete previous published: %w", err)
+	}
+	if _, err := rowsAffected(res); err != nil {
+		return fmt.Errorf("templates repository obsolete previous published: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx *sql.Tx, templateID, keepVersionID string) error {
@@ -488,8 +506,14 @@ func (r *Repository) ObsoletePreviousPublishedTx(ctx context.Context, tx *sql.Tx
 UPDATE templates_template_version
 SET status = 'obsolete', obsoleted_at = now()
 WHERE template_id = $1 AND status = 'published' AND id <> $2`
-	_, err := tx.ExecContext(ctx, q, templateID, keepVersionID)
-	return err
+	res, err := tx.ExecContext(ctx, q, templateID, keepVersionID)
+	if err != nil {
+		return fmt.Errorf("templates repository obsolete previous published tx: %w", err)
+	}
+	if _, err := rowsAffected(res); err != nil {
+		return fmt.Errorf("templates repository obsolete previous published tx: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) GetApprovalConfig(ctx context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
@@ -522,8 +546,14 @@ VALUES ($1, $2, $3)
 ON CONFLICT (template_id) DO UPDATE
 SET reviewer_role = EXCLUDED.reviewer_role,
     approver_role = EXCLUDED.approver_role`
-	_, err := r.db.ExecContext(ctx, q, c.TemplateID, c.ReviewerRole, c.ApproverRole)
-	return err
+	res, err := r.db.ExecContext(ctx, q, c.TemplateID, c.ReviewerRole, c.ApproverRole)
+	if err != nil {
+		return fmt.Errorf("templates repository upsert approval config: %w", err)
+	}
+	if _, err := rowsAffected(res); err != nil {
+		return fmt.Errorf("templates repository upsert approval config: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) UpsertApprovalConfigTx(ctx context.Context, tx *sql.Tx, c *domain.ApprovalConfig) error {
@@ -533,8 +563,14 @@ VALUES ($1, $2, $3)
 ON CONFLICT (template_id) DO UPDATE
 SET reviewer_role = EXCLUDED.reviewer_role,
     approver_role = EXCLUDED.approver_role`
-	_, err := tx.ExecContext(ctx, q, c.TemplateID, c.ReviewerRole, c.ApproverRole)
-	return err
+	res, err := tx.ExecContext(ctx, q, c.TemplateID, c.ReviewerRole, c.ApproverRole)
+	if err != nil {
+		return fmt.Errorf("templates repository upsert approval config tx: %w", err)
+	}
+	if _, err := rowsAffected(res); err != nil {
+		return fmt.Errorf("templates repository upsert approval config tx: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) error {

@@ -34,7 +34,7 @@ func (r *ProfileRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error
 	return taxonomyTx{tx: tx}, nil
 }
 
-func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID, code string) (*domain.DocumentProfile, error) {
+func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin get profile tx: %w", err)
@@ -42,7 +42,7 @@ func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID, code string
 	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query profile %q: %w", code, err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get profile: %w", err)
@@ -151,7 +151,7 @@ func (r *ProfileRepository) Create(ctx context.Context, p *domain.DocumentProfil
 	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx); err != nil {
-		return err
+		return fmt.Errorf("insert profile %q: %w", p.Code, err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Create profile: %w", err)
@@ -224,16 +224,19 @@ WHERE tenant_id = $10 AND code = $11`
 		p.Code,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("update profile %q: %w", p.Code, err)
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("profile update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrProfileNotFound
 	}
 	return tx.Commit()
 }
 
-func (r *ProfileRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID, code string) (*domain.DocumentProfile, error) {
+func (r *ProfileRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
 		return nil, fmt.Errorf("invalid taxonomy tx type %T", tx)
@@ -256,7 +259,7 @@ FOR UPDATE`
 		return nil, domain.ErrProfileNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query profile for update %q: %w", code, err)
 	}
 	profile.DefaultTemplateVersionID = nullStringPtr(defaultTemplateVersionID)
 	profile.OwnerUserID = nullStringPtr(ownerUserID)
@@ -288,9 +291,12 @@ SET family_code = $1,
 WHERE tenant_id = $10 AND code = $11`
 	result, err := sqlTx.tx.ExecContext(ctx, q, p.FamilyCode, p.Name, p.Description, p.Alias, p.ReviewIntervalDays, stringPtrToNull(p.DefaultTemplateVersionID), stringPtrToNull(p.OwnerUserID), p.EditableByRole, p.ArchivedAt, p.TenantID, p.Code)
 	if err != nil {
-		return err
+		return fmt.Errorf("update profile tx %q: %w", p.Code, err)
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("profile tx update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrProfileNotFound
 	}
@@ -313,7 +319,7 @@ func (r *AreaRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error) {
 	return taxonomyTx{tx: tx}, nil
 }
 
-func (r *AreaRepository) GetByCode(ctx context.Context, tenantID, code string) (*domain.ProcessArea, error) {
+func (r *AreaRepository) GetByCode(ctx context.Context, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin get area tx: %w", err)
@@ -321,7 +327,7 @@ func (r *AreaRepository) GetByCode(ctx context.Context, tenantID, code string) (
 	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query area %q: %w", code, err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get area: %w", err)
@@ -353,7 +359,7 @@ WHERE tenant_id = $1 AND code = $2`
 	if err != nil {
 		return nil, err
 	}
-	area.ParentCode = nullStringPtr(parentCode)
+	area.ParentCode = nullAreaCodePtr(parentCode)
 	area.OwnerUserID = nullStringPtr(ownerUserID)
 	area.DefaultApproverRole = nullStringPtr(defaultApproverRole)
 	return &area, nil
@@ -407,7 +413,7 @@ WHERE tenant_id = $1`
 		); err != nil {
 			return nil, err
 		}
-		area.ParentCode = nullStringPtr(parentCode)
+		area.ParentCode = nullAreaCodePtr(parentCode)
 		area.OwnerUserID = nullStringPtr(ownerUserID)
 		area.DefaultApproverRole = nullStringPtr(defaultApproverRole)
 		out = append(out, area)
@@ -426,7 +432,7 @@ func (r *AreaRepository) Create(ctx context.Context, a *domain.ProcessArea) erro
 	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx); err != nil {
-		return err
+		return fmt.Errorf("insert area %q: %w", a.Code, err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Create area: %w", err)
@@ -444,7 +450,7 @@ VALUES
 		a.TenantID,
 		a.Name,
 		a.Description,
-		stringPtrToNull(a.ParentCode),
+		areaCodePtrToNull(a.ParentCode),
 		stringPtrToNull(a.OwnerUserID),
 		stringPtrToNull(a.DefaultApproverRole),
 		a.ArchivedAt,
@@ -482,7 +488,7 @@ WHERE tenant_id = $7 AND code = $8`
 		q,
 		a.Name,
 		a.Description,
-		stringPtrToNull(a.ParentCode),
+		areaCodePtrToNull(a.ParentCode),
 		stringPtrToNull(a.OwnerUserID),
 		stringPtrToNull(a.DefaultApproverRole),
 		a.ArchivedAt,
@@ -490,16 +496,19 @@ WHERE tenant_id = $7 AND code = $8`
 		a.Code,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("update area %q: %w", a.Code, err)
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("area update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrAreaNotFound
 	}
 	return tx.Commit()
 }
 
-func (r *AreaRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID, code string) (*domain.ProcessArea, error) {
+func (r *AreaRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
 		return nil, fmt.Errorf("invalid taxonomy tx type %T", tx)
@@ -520,15 +529,15 @@ FOR UPDATE`
 		return nil, domain.ErrAreaNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query area for update %q: %w", code, err)
 	}
-	area.ParentCode = nullStringPtr(parentCode)
+	area.ParentCode = nullAreaCodePtr(parentCode)
 	area.OwnerUserID = nullStringPtr(ownerUserID)
 	area.DefaultApproverRole = nullStringPtr(defaultApproverRole)
 	return &area, nil
 }
 
-func (r *AreaRepository) ListAncestorsTx(ctx context.Context, tx domain.FamilyTx, tenantID, code string) ([]string, error) {
+func (r *AreaRepository) ListAncestorsTx(ctx context.Context, tx domain.FamilyTx, tenantID string, code domain.AreaCode) ([]domain.AreaCode, error) {
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
 		return nil, fmt.Errorf("invalid taxonomy tx type %T", tx)
@@ -551,14 +560,14 @@ WITH RECURSIVE ancestors AS (
 SELECT code FROM ancestors`
 	rows, err := sqlTx.tx.QueryContext(ctx, q, tenantID, code)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query area ancestors tx %q: %w", code, err)
 	}
 	defer rows.Close()
-	ancestors := make([]string, 0)
+	ancestors := make([]domain.AreaCode, 0)
 	for rows.Next() {
-		var ancestorCode string
+		var ancestorCode domain.AreaCode
 		if err := rows.Scan(&ancestorCode); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan area ancestor tx %q: %w", code, err)
 		}
 		ancestors = append(ancestors, ancestorCode)
 	}
@@ -585,18 +594,21 @@ SET name = $1,
     default_approver_role = $5,
     archived_at = $6
 WHERE tenant_id = $7 AND code = $8`
-	result, err := sqlTx.tx.ExecContext(ctx, q, a.Name, a.Description, stringPtrToNull(a.ParentCode), stringPtrToNull(a.OwnerUserID), stringPtrToNull(a.DefaultApproverRole), a.ArchivedAt, a.TenantID, a.Code)
+	result, err := sqlTx.tx.ExecContext(ctx, q, a.Name, a.Description, areaCodePtrToNull(a.ParentCode), stringPtrToNull(a.OwnerUserID), stringPtrToNull(a.DefaultApproverRole), a.ArchivedAt, a.TenantID, a.Code)
 	if err != nil {
-		return err
+		return fmt.Errorf("update area tx %q: %w", a.Code, err)
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("area tx update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrAreaNotFound
 	}
 	return nil
 }
 
-func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID, code string) ([]string, error) {
+func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID string, code domain.AreaCode) ([]domain.AreaCode, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin list area ancestors tx: %w", err)
@@ -604,7 +616,7 @@ func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID, code strin
 	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query area ancestors %q: %w", code, err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List area ancestors: %w", err)
@@ -633,11 +645,11 @@ SELECT code FROM ancestors`
 	}
 	defer rows.Close()
 
-	ancestors := make([]string, 0)
+	ancestors := make([]domain.AreaCode, 0)
 	for rows.Next() {
-		var ancestorCode string
+		var ancestorCode domain.AreaCode
 		if err := rows.Scan(&ancestorCode); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan area ancestor %q: %w", code, err)
 		}
 		ancestors = append(ancestors, ancestorCode)
 	}
@@ -659,5 +671,20 @@ func nullStringPtr(v sql.NullString) *string {
 		return nil
 	}
 	value := v.String
+	return &value
+}
+
+func areaCodePtrToNull(v *domain.AreaCode) sql.NullString {
+	if v == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: string(*v), Valid: true}
+}
+
+func nullAreaCodePtr(v sql.NullString) *domain.AreaCode {
+	if !v.Valid {
+		return nil
+	}
+	value := domain.AreaCode(v.String)
 	return &value
 }

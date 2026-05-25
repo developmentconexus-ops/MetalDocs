@@ -316,7 +316,7 @@ func (f *fakeControlledDocumentRepository) Create(_ context.Context, doc *contro
 	return nil
 }
 
-func (f *fakeControlledDocumentRepository) CreateTx(_ context.Context, _ *sql.Tx, doc *controlleddocumentsdomain.ControlledDocument) error {
+func (f *fakeControlledDocumentRepository) CreateTx(_ context.Context, _ controlleddocumentsdomain.DBTX, doc *controlleddocumentsdomain.ControlledDocument) error {
 	copy := *doc
 	f.created = &copy
 	return nil
@@ -326,7 +326,7 @@ func (f *fakeControlledDocumentRepository) UpdateStatus(_ context.Context, _, _ 
 	return nil
 }
 
-func (f *fakeControlledDocumentRepository) UpdateStatusTx(_ context.Context, _ *sql.Tx, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
+func (f *fakeControlledDocumentRepository) UpdateStatusTx(_ context.Context, _ controlleddocumentsdomain.DBTX, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
 	return nil
 }
 
@@ -334,7 +334,7 @@ type fakeSequenceAllocator struct {
 	next int
 }
 
-func (f *fakeSequenceAllocator) NextAndIncrement(_ context.Context, _ controlleddocumentsdomain.DBExecutor, _, _, _ string) (int, error) {
+func (f *fakeSequenceAllocator) NextAndIncrement(_ context.Context, _ controlleddocumentsdomain.DBTX, _, _, _ string) (int, error) {
 	v := f.next
 	f.next++
 	return v, nil
@@ -374,7 +374,7 @@ type fakeProfileReader struct {
 
 func (f *fakeProfileReader) GetByCode(_ context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
 	if f.item == nil {
-		return &taxonomydomain.DocumentProfile{Code: code, TenantID: tenantID}, nil
+		return &taxonomydomain.DocumentProfile{Code: taxonomydomain.ProfileCode(code), TenantID: tenantID}, nil
 	}
 	copy := *f.item
 	return &copy, nil
@@ -386,7 +386,7 @@ type fakeAreaReader struct {
 
 func (f *fakeAreaReader) GetByCode(_ context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error) {
 	if f.item == nil {
-		return &taxonomydomain.ProcessArea{Code: code, TenantID: tenantID}, nil
+		return &taxonomydomain.ProcessArea{Code: taxonomydomain.AreaCode(code), TenantID: tenantID}, nil
 	}
 	copy := *f.item
 	return &copy, nil

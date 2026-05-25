@@ -48,7 +48,7 @@ func (f fakeRegistryDocs) Create(ctx context.Context, doc *controlleddocumentsdo
 	return nil
 }
 
-func (f fakeRegistryDocs) CreateTx(ctx context.Context, tx *sql.Tx, doc *controlleddocumentsdomain.ControlledDocument) error {
+func (f fakeRegistryDocs) CreateTx(ctx context.Context, tx controlleddocumentsdomain.DBTX, doc *controlleddocumentsdomain.ControlledDocument) error {
 	return nil
 }
 
@@ -56,13 +56,13 @@ func (f fakeRegistryDocs) UpdateStatus(ctx context.Context, tenantID, id string,
 	return nil
 }
 
-func (f fakeRegistryDocs) UpdateStatusTx(_ context.Context, _ *sql.Tx, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
+func (f fakeRegistryDocs) UpdateStatusTx(_ context.Context, _ controlleddocumentsdomain.DBTX, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
 	return nil
 }
 
 type fakeSequenceAllocator struct{}
 
-func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx controlleddocumentsdomain.DBExecutor, tenantID, profileCode, areaCode string) (int, error) {
+func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx controlleddocumentsdomain.DBTX, tenantID, profileCode, areaCode string) (int, error) {
 	return 1, nil
 }
 
@@ -83,13 +83,13 @@ func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, tenant
 type fakeProfileReader struct{}
 
 func (f fakeProfileReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
-	return &taxonomydomain.DocumentProfile{Code: code, TenantID: tenantID}, nil
+	return &taxonomydomain.DocumentProfile{Code: taxonomydomain.ProfileCode(code), TenantID: tenantID}, nil
 }
 
 type fakeAreaReader struct{}
 
 func (f fakeAreaReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error) {
-	return &taxonomydomain.ProcessArea{Code: code, TenantID: tenantID}, nil
+	return &taxonomydomain.ProcessArea{Code: taxonomydomain.AreaCode(code), TenantID: tenantID}, nil
 }
 
 type fakeGovernanceLogger struct{}

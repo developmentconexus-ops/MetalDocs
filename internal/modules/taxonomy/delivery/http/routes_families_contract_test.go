@@ -19,7 +19,7 @@ type fakeFamilyService struct {
 func (f fakeFamilyService) List(_ context.Context, includeInactive bool) ([]domain.DocumentFamily, error) {
 	return nil, nil
 }
-func (f fakeFamilyService) Get(_ context.Context, code string) (*domain.DocumentFamily, error) {
+func (f fakeFamilyService) Get(_ context.Context, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	return nil, domain.ErrFamilyNotFound
 }
 func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily) error {
@@ -28,7 +28,7 @@ func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily)
 func (f fakeFamilyService) Update(_ context.Context, fam *domain.DocumentFamily) (*domain.DocumentFamily, error) {
 	return fam, nil
 }
-func (f fakeFamilyService) Deactivate(_ context.Context, code string) error { return nil }
+func (f fakeFamilyService) Deactivate(_ context.Context, code domain.FamilyCode) error { return nil }
 
 func TestFamiliesHandler_GetMissing_Returns404(t *testing.T) {
 	handler := &Handler{families: fakeFamilyService{}}

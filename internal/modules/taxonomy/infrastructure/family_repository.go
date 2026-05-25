@@ -26,7 +26,7 @@ func NewFamilyRepository(db *sql.DB) *FamilyRepository {
 	return &FamilyRepository{db: db}
 }
 
-func (r *FamilyRepository) GetByCode(ctx context.Context, code string) (*domain.DocumentFamily, error) {
+func (r *FamilyRepository) GetByCode(ctx context.Context, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin get family tx: %w", err)
@@ -34,7 +34,7 @@ func (r *FamilyRepository) GetByCode(ctx context.Context, code string) (*domain.
 	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query family %q: %w", code, err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get family: %w", err)
@@ -108,7 +108,7 @@ func (r *FamilyRepository) Create(ctx context.Context, f *domain.DocumentFamily)
 	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx); err != nil {
-		return err
+		return fmt.Errorf("insert family %q: %w", f.Code, err)
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return fmt.Errorf("taxonomy: authz check Create family: %w", err)
@@ -141,16 +141,19 @@ SET name = $1, description = $2, is_active = $3
 WHERE code = $4`
 	result, err := tx.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.Code)
 	if err != nil {
-		return err
+		return fmt.Errorf("update family %q: %w", f.Code, err)
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("family update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrFamilyNotFound
 	}
 	return tx.Commit()
 }
 
-func (r *FamilyRepository) HasActiveProfiles(ctx context.Context, tenantID, familyCode string) (bool, error) {
+func (r *FamilyRepository) HasActiveProfiles(ctx context.Context, tenantID string, familyCode domain.FamilyCode) (bool, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, fmt.Errorf("begin has active profiles tx: %w", err)
@@ -182,7 +185,7 @@ func (r *FamilyRepository) BeginTx(ctx context.Context) (domain.FamilyTx, error)
 	return familyTx{tx: tx}, nil
 }
 
-func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, code string) (*domain.DocumentFamily, error) {
+func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.FamilyTx, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	sqlTx, ok := tx.(familyTx)
 	if !ok {
 		return nil, fmt.Errorf("invalid family tx type %T", tx)
@@ -201,12 +204,12 @@ FOR UPDATE`
 		return nil, domain.ErrFamilyNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query family for update %q: %w", code, err)
 	}
 	return &f, nil
 }
 
-func (r *FamilyRepository) HasActiveProfilesTx(ctx context.Context, tx domain.FamilyTx, tenantID, familyCode string) (bool, error) {
+func (r *FamilyRepository) HasActiveProfilesTx(ctx context.Context, tx domain.FamilyTx, tenantID string, familyCode domain.FamilyCode) (bool, error) {
 	sqlTx, ok := tx.(familyTx)
 	if !ok {
 		return false, fmt.Errorf("invalid family tx type %T", tx)
@@ -224,7 +227,10 @@ SELECT EXISTS(
 )`
 	var exists bool
 	err := sqlTx.tx.QueryRowContext(ctx, q, tenantID, familyCode).Scan(&exists)
-	return exists, err
+	if err != nil {
+		return false, fmt.Errorf("query active profiles for family %q: %w", familyCode, err)
+	}
+	return exists, nil
 }
 
 func (r *FamilyRepository) UpdateTx(ctx context.Context, tx domain.FamilyTx, f *domain.DocumentFamily) error {
@@ -244,9 +250,12 @@ SET name = $1, description = $2, is_active = $3
 WHERE code = $4`
 	result, err := sqlTx.tx.ExecContext(ctx, q, f.Name, f.Description, f.IsActive, f.Code)
 	if err != nil {
-		return err
+		return fmt.Errorf("update family tx %q: %w", f.Code, err)
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("family tx update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrFamilyNotFound
 	}

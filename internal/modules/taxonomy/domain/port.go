@@ -3,8 +3,8 @@ package domain
 import "context"
 
 type ProfileRepository interface {
-	GetByCode(ctx context.Context, tenantID, code string) (*DocumentProfile, error)
-	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID, code string) (*DocumentProfile, error)
+	GetByCode(ctx context.Context, tenantID string, code ProfileCode) (*DocumentProfile, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID string, code ProfileCode) (*DocumentProfile, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]DocumentProfile, error)
 	Create(ctx context.Context, p *DocumentProfile) error
 	Update(ctx context.Context, p *DocumentProfile) error
@@ -13,13 +13,13 @@ type ProfileRepository interface {
 }
 
 type AreaRepository interface {
-	GetByCode(ctx context.Context, tenantID, code string) (*ProcessArea, error)
-	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID, code string) (*ProcessArea, error)
+	GetByCode(ctx context.Context, tenantID string, code AreaCode) (*ProcessArea, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID string, code AreaCode) (*ProcessArea, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]ProcessArea, error)
 	Create(ctx context.Context, a *ProcessArea) error
 	Update(ctx context.Context, a *ProcessArea) error
-	ListAncestors(ctx context.Context, tenantID, code string) ([]string, error)
-	ListAncestorsTx(ctx context.Context, tx FamilyTx, tenantID, code string) ([]string, error)
+	ListAncestors(ctx context.Context, tenantID string, code AreaCode) ([]AreaCode, error)
+	ListAncestorsTx(ctx context.Context, tx FamilyTx, tenantID string, code AreaCode) ([]AreaCode, error)
 	UpdateTx(ctx context.Context, tx FamilyTx, a *ProcessArea) error
 	BeginTx(ctx context.Context) (FamilyTx, error)
 }
@@ -60,13 +60,13 @@ type FamilyTx interface {
 }
 
 type FamilyRepository interface {
-	GetByCode(ctx context.Context, code string) (*DocumentFamily, error)
+	GetByCode(ctx context.Context, code FamilyCode) (*DocumentFamily, error)
 	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)
 	Create(ctx context.Context, f *DocumentFamily) error
 	Update(ctx context.Context, f *DocumentFamily) error
-	HasActiveProfiles(ctx context.Context, tenantID, familyCode string) (bool, error)
+	HasActiveProfiles(ctx context.Context, tenantID string, familyCode FamilyCode) (bool, error)
 	BeginTx(ctx context.Context) (FamilyTx, error)
-	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, code string) (*DocumentFamily, error)
-	HasActiveProfilesTx(ctx context.Context, tx FamilyTx, tenantID, familyCode string) (bool, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, code FamilyCode) (*DocumentFamily, error)
+	HasActiveProfilesTx(ctx context.Context, tx FamilyTx, tenantID string, familyCode FamilyCode) (bool, error)
 	UpdateTx(ctx context.Context, tx FamilyTx, f *DocumentFamily) error
 }

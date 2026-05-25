@@ -22,7 +22,7 @@ func (f fakeProfileService) List(ctx context.Context, tenantID string, includeAr
 	return nil, nil
 }
 
-func (f fakeProfileService) Get(ctx context.Context, tenantID, code string) (*domain.DocumentProfile, error) {
+func (f fakeProfileService) Get(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
 	return nil, domain.ErrProfileNotFound
 }
 
@@ -34,11 +34,11 @@ func (f fakeProfileService) Update(ctx context.Context, p *domain.DocumentProfil
 	return nil
 }
 
-func (f fakeProfileService) SetDefaultTemplate(ctx context.Context, tenantID, profileCode, templateVersionID, actorID string) error {
+func (f fakeProfileService) SetDefaultTemplate(ctx context.Context, tenantID string, profileCode domain.ProfileCode, templateVersionID, actorID string) error {
 	return nil
 }
 
-func (f fakeProfileService) Archive(ctx context.Context, tenantID, profileCode, actorID string) error {
+func (f fakeProfileService) Archive(ctx context.Context, tenantID string, profileCode domain.ProfileCode, actorID string) error {
 	return nil
 }
 

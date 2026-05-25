@@ -46,7 +46,7 @@ func TestAreaServiceSetParentValid(t *testing.T) {
 	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})
 
 	service := NewAreaService(repo, &fakeGovernanceLogger{})
-	err := service.SetParent(context.Background(), "tenant-a", "child", strPtr("root"), "user-1")
+	err := service.SetParent(context.Background(), "tenant-a", "child", areaCodePtr("root"), "user-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,10 +61,10 @@ func TestAreaServiceSetParentFailsWhenCycleDetected(t *testing.T) {
 	repo := newFakeAreaRepository()
 	repo.put(&domain.ProcessArea{Code: "parent", TenantID: "tenant-a"})
 	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})
-	repo.ancestorsByCode["parent"] = []string{"child"}
+	repo.ancestorsByCode["parent"] = []domain.AreaCode{"child"}
 
 	service := NewAreaService(repo, &fakeGovernanceLogger{})
-	err := service.SetParent(context.Background(), "tenant-a", "child", strPtr("parent"), "user-1")
+	err := service.SetParent(context.Background(), "tenant-a", "child", areaCodePtr("parent"), "user-1")
 	if !errors.Is(err, domain.ErrAreaParentCycle) {
 		t.Fatalf("expected ErrAreaParentCycle, got %v", err)
 	}
@@ -103,18 +103,18 @@ func TestAreaServiceArchiveFailsWhenAlreadyArchived(t *testing.T) {
 
 type fakeAreaRepository struct {
 	byKey           map[string]*domain.ProcessArea
-	ancestorsByCode map[string][]string
+	ancestorsByCode map[string][]domain.AreaCode
 }
 
 func newFakeAreaRepository() *fakeAreaRepository {
 	return &fakeAreaRepository{
 		byKey:           map[string]*domain.ProcessArea{},
-		ancestorsByCode: map[string][]string{},
+		ancestorsByCode: map[string][]domain.AreaCode{},
 	}
 }
 
-func (r *fakeAreaRepository) GetByCode(_ context.Context, tenantID, code string) (*domain.ProcessArea, error) {
-	item, ok := r.byKey[tenantID+"|"+code]
+func (r *fakeAreaRepository) GetByCode(_ context.Context, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
+	item, ok := r.byKey[tenantID+"|"+string(code)]
 	if !ok {
 		return nil, domain.ErrAreaNotFound
 	}
@@ -136,20 +136,20 @@ func (r *fakeAreaRepository) Update(_ context.Context, a *domain.ProcessArea) er
 	return nil
 }
 
-func (r *fakeAreaRepository) ListAncestors(_ context.Context, _ string, code string) ([]string, error) {
-	return r.ancestorsByCode[code], nil
+func (r *fakeAreaRepository) ListAncestors(_ context.Context, _ string, code domain.AreaCode) ([]domain.AreaCode, error) {
+	return r.ancestorsByCode[string(code)], nil
 }
 
 func (r *fakeAreaRepository) BeginTx(_ context.Context) (domain.FamilyTx, error) {
 	return fakeTx{}, nil
 }
 
-func (r *fakeAreaRepository) GetByCodeForUpdate(ctx context.Context, _ domain.FamilyTx, tenantID, code string) (*domain.ProcessArea, error) {
+func (r *fakeAreaRepository) GetByCodeForUpdate(ctx context.Context, _ domain.FamilyTx, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
 	return r.GetByCode(ctx, tenantID, code)
 }
 
-func (r *fakeAreaRepository) ListAncestorsTx(_ context.Context, _ domain.FamilyTx, _ string, code string) ([]string, error) {
-	return r.ancestorsByCode[code], nil
+func (r *fakeAreaRepository) ListAncestorsTx(_ context.Context, _ domain.FamilyTx, _ string, code domain.AreaCode) ([]domain.AreaCode, error) {
+	return r.ancestorsByCode[string(code)], nil
 }
 
 func (r *fakeAreaRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, a *domain.ProcessArea) error {
@@ -159,13 +159,14 @@ func (r *fakeAreaRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, a *d
 
 func (r *fakeAreaRepository) put(a *domain.ProcessArea) {
 	copy := *a
-	r.byKey[a.TenantID+"|"+a.Code] = &copy
+	r.byKey[a.TenantID+"|"+string(a.Code)] = &copy
 }
 
 func (r *fakeAreaRepository) get(tenantID, code string) *domain.ProcessArea {
 	return r.byKey[tenantID+"|"+code]
 }
 
-func strPtr(v string) *string {
-	return &v
+func areaCodePtr(v string) *domain.AreaCode {
+	code := domain.AreaCode(v)
+	return &code
 }

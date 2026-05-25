@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-21 (generated boundary mount + freeze workflow sync) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-05-25 (backend medium quality-bar sync) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:25` - module wiring (`New`, dependencies)
@@ -154,6 +154,8 @@ Full list in `_artifacts/01-surface.md` (89 exported symbols). Anchors below:
 | `domain/controlled_document.go:13-15` | `CDStatusActive/Obsolete/Superseded` | const | Status enum |
 | `domain/controlled_document.go:48` | `AutoCode` | func | Format `{profile}-{area}-{NNN}` |
 | `domain/document_initializer.go:30` | `DocumentInitializer` | iface | Cross-module port (documents implements) |
+| `domain/document_initializer.go:20` | `NewCloneTemplateRequest` | func | Validates clone-template requests before crossing the documents port |
+| `domain/document_initializer.go:38` | `NewDocumentRef` | func | Validates document handles returned by the documents port |
 | `domain/sequence.go:13` | `SequenceAllocator` | iface | Counter port |
 | `domain/resolution.go:30` | `Resolve` | func | Template-version resolution (default vs override) |
 | `infrastructure/repository.go:137` | `CreateTx` | method | Insert in caller-owned tx |
@@ -361,7 +363,7 @@ Create path emits governance events post-commit via `s.govLogger.Log(...)` (`ser
 
 ### 8.6 Concurrency / Transactions
 
-The controlled-documents service owns the transaction (`Create` on the module service struct; legacy literal identifier noted in Historical Literal Key Notes). Sequence allocator and repository accept the caller's `*sql.Tx` (`infrastructure/repository.go:137`, `:239`). Cross-module `DocumentInitializer.CloneTemplate` runs inside the same tx          atomic CD + first revision per ADR 0011.
+The controlled-documents service owns the transaction (`Create` on the module service struct; legacy literal identifier noted in Historical Literal Key Notes). Sequence allocator and repository transaction-oriented methods accept the module-level `domain.DBTX` abstraction (`ExecContext` / `QueryContext` / `QueryRowContext`) while runtime authz still asserts against the concrete caller-owned `*sql.Tx`. Cross-module `DocumentInitializer.CloneTemplate` runs inside the same tx          atomic CD + first revision per ADR 0011.
 
 ### 8.7 Tenant scoping
 
@@ -465,6 +467,7 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-05-25 - Backend quality-bar sync: repository transaction ports now use the module-level `domain.DBTX` interface instead of exposing `*sql.Tx` in repository contracts; clone-template/document-ref constructors validate invalid zero-value port payloads; application/repository error paths wrap underlying errors with operation context and governance warnings use `slog.WarnContext` with tenant/actor fields.
 - 2026-05-21 - Runtime mount canonicalization: controlled-documents now mounts public routes through `controlleddocumentsapi.HandlerWithOptions`; idempotency remains route-scoped to the two POST operations, and missing `Idempotency-Key` is normalized to `IDEMPOTENCY_KEY_REQUIRED`.
 - 2026-05-20 - Create-revision conflict sync: `POST /api/v1/controlled-documents/{id}/revisions` now preserves the database-owned single-active-sibling invariant (`ux_documents_cd_active`) but translates that collision to `409 ACTIVE_REVISION_ALREADY_EXISTS` instead of surfacing a generic internal error when a second active revision is attempted concurrently.
 - 2026-05-20 - Active-document approval-instance hardening: `GET /api/v1/controlled-documents/{id}/active-document` now treats `documents.status` as the only source of truth for `approvalState`, enriches `approvalInstanceId` only when the active lineage row is actually `under_review`, and returns `500 INTERNAL_ERROR` if that secondary lookup fails instead of silently omitting review context.
@@ -477,6 +480,5 @@ Top 3 (by severity, then blast-radius):
 
 - 2026-05-11 - Plan 3 sweep: all `X-Tenant-ID` header reads replaced with `tenant.FromContext`; `injectTenant` middleware documented; section 5.3 T-006 note updated; section 6.2 sequence + tripwire note updated; section 8.7 tenant-scoping paragraph added; Key files updated.
 - 2026-05-11 - initial Arc42 + C4 publish; supersedes 2026-05-07 stub.
-
 
 

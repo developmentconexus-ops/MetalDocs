@@ -18,9 +18,12 @@ type UpdateSchemasCmd struct {
 }
 
 func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*domain.TemplateVersion, error) {
+	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+		return nil, wrapAppErr("templates update schemas: get template", err)
+	}
 	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
-		return nil, err
+		return nil, wrapAppErr("templates update schemas: get version", err)
 	}
 	if version.Status != domain.VersionStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
@@ -30,6 +33,15 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 	}
 
 	if err := ValidatePlaceholders(cmd.PlaceholderSchema); err != nil {
+		return nil, err
+	}
+	metadata, err := domain.NewMetadataSchema(
+		cmd.MetadataSchema.DocCodePattern,
+		cmd.MetadataSchema.RetentionDays,
+		cloneStringSlice(cmd.MetadataSchema.DistributionDefault),
+		cloneStringSlice(cmd.MetadataSchema.RequiredMetadata),
+	)
+	if err != nil {
 		return nil, err
 	}
 	if s.resolvers != nil {
@@ -52,23 +64,19 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 		}
 	}
 
-	version.MetadataSchema = cloneMetadataSchema(cmd.MetadataSchema)
+	version.MetadataSchema = metadata
 	version.PlaceholderSchema = clonePlaceholders(cmd.PlaceholderSchema)
 
 	if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
-		return nil, err
+		return nil, wrapAppErr("templates update schemas: update version", err)
 	}
 
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditSaved,
-		Details:    map[string]any{"kind": "schema"},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditSaved, map[string]any{"kind": "schema"}, s.clock.Now())
+	if err != nil {
 		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
+		return nil, wrapAppErr("templates update schemas: append audit", err)
 	}
 
 	return version, nil
@@ -133,6 +141,9 @@ func ValidatePlaceholders(phs []domain.Placeholder) error {
 		}
 		if p.Computed && (p.ResolverKey == nil || *p.ResolverKey == "") {
 			return fmt.Errorf("placeholder[%s] computed requires resolver_key: %w", p.ID, domain.ErrInvalidConstraint)
+		}
+		if p.VisibleIf != nil && !p.VisibleIf.Op.Valid() {
+			return fmt.Errorf("placeholder[%s] visibility op %q: %w", p.ID, p.VisibleIf.Op, domain.ErrInvalidConstraint)
 		}
 	}
 	if err := DetectVisibilityCycle(phs); err != nil {

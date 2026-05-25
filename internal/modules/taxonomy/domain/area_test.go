@@ -40,7 +40,7 @@ func TestProcessAreaArchiveReturnsErrorWhenAlreadyArchived(t *testing.T) {
 }
 
 func TestNewProcessArea_NormalizesAndValidates(t *testing.T) {
-	parent := " ROOT "
+	parent := AreaCode(" ROOT ")
 	owner := " owner-1 "
 	role := " manager "
 	area, err := NewProcessArea(ProcessArea{

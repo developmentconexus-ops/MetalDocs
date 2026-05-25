@@ -20,7 +20,7 @@ func (f fakeAreaService) List(ctx context.Context, tenantID string, includeArchi
 	return nil, nil
 }
 
-func (f fakeAreaService) Get(ctx context.Context, tenantID, code string) (*domain.ProcessArea, error) {
+func (f fakeAreaService) Get(ctx context.Context, tenantID string, code domain.AreaCode) (*domain.ProcessArea, error) {
 	return nil, domain.ErrAreaNotFound
 }
 
@@ -32,7 +32,7 @@ func (f fakeAreaService) Update(ctx context.Context, a *domain.ProcessArea) erro
 	return nil
 }
 
-func (f fakeAreaService) Archive(ctx context.Context, tenantID, areaCode, actorID string) error {
+func (f fakeAreaService) Archive(ctx context.Context, tenantID string, areaCode domain.AreaCode, actorID string) error {
 	return nil
 }
 

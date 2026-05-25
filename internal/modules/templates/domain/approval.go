@@ -6,6 +6,17 @@ type ApprovalConfig struct {
 	ApproverRole string
 }
 
+func NewApprovalConfig(templateID, approverRole string, reviewerRole *string) (ApprovalConfig, error) {
+	if templateID == "" || approverRole == "" {
+		return ApprovalConfig{}, ErrInvalidApprovalConfig
+	}
+	return ApprovalConfig{
+		TemplateID:   templateID,
+		ApproverRole: approverRole,
+		ReviewerRole: reviewerRole,
+	}, nil
+}
+
 func (c ApprovalConfig) HasReviewer() bool { return c.ReviewerRole != nil && *c.ReviewerRole != "" }
 
 type SegregationRole string

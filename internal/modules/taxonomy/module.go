@@ -1,7 +1,9 @@
 package taxonomy
 
 import (
+	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
@@ -32,6 +34,7 @@ func New(deps Dependencies) *Module {
 	if deps.AuditWriter != nil {
 		govLogger = application.NewAuditGovernanceAdapter(deps.AuditWriter)
 	} else {
+		slog.WarnContext(context.Background(), "taxonomy audit writer missing; using legacy DB governance logger")
 		govLogger = application.NewDBGovernanceLogger(deps.DB)
 	}
 

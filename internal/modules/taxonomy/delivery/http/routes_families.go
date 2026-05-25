@@ -48,7 +48,7 @@ func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := &domain.DocumentFamily{
-		Code:        req.Code,
+		Code:        domain.FamilyCode(req.Code),
 		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
 	}
@@ -60,7 +60,7 @@ func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getFamily(w http.ResponseWriter, r *http.Request) {
-	f, err := h.families.Get(r.Context(), r.PathValue("code"))
+	f, err := h.families.Get(r.Context(), domain.FamilyCode(r.PathValue("code")))
 	if err != nil {
 		h.writeFamilyError(w, err)
 		return
@@ -75,7 +75,7 @@ func (h *Handler) updateFamily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := &domain.DocumentFamily{
-		Code:        r.PathValue("code"),
+		Code:        domain.FamilyCode(r.PathValue("code")),
 		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
 	}
@@ -88,7 +88,7 @@ func (h *Handler) updateFamily(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deactivateFamily(w http.ResponseWriter, r *http.Request) {
-	if err := h.families.Deactivate(r.Context(), r.PathValue("code")); err != nil {
+	if err := h.families.Deactivate(r.Context(), domain.FamilyCode(r.PathValue("code"))); err != nil {
 		h.writeFamilyError(w, err)
 		return
 	}

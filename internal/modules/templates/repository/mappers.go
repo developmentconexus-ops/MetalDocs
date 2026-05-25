@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"metaldocs/internal/modules/templates/domain"
 )
@@ -81,10 +82,10 @@ func scanTemplateVersion(row rowScanner) (*domain.TemplateVersion, error) {
 		v.ObsoletedAt = &obsoletedAt.Time
 	}
 	if err := json.Unmarshal(metadataJSON, &v.MetadataSchema); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("templates repository scan version metadata schema: %w", err)
 	}
 	if err := json.Unmarshal(placeholderJSON, &v.PlaceholderSchema); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("templates repository scan version placeholder schema: %w", err)
 	}
 	return &v, nil
 }
@@ -92,11 +93,11 @@ func scanTemplateVersion(row rowScanner) (*domain.TemplateVersion, error) {
 func marshalVersionSchemas(v *domain.TemplateVersion) (metadataJSON, placeholderJSON []byte, err error) {
 	metadataJSON, err = json.Marshal(v.MetadataSchema)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("templates repository marshal version metadata schema: %w", err)
 	}
 	placeholderJSON, err = json.Marshal(v.PlaceholderSchema)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("templates repository marshal version placeholder schema: %w", err)
 	}
 	return metadataJSON, placeholderJSON, nil
 }
@@ -105,9 +106,16 @@ func marshalAuditDetails(details map[string]any) ([]byte, error) {
 	if details == nil {
 		return []byte("{}"), nil
 	}
-	return json.Marshal(details)
+	raw, err := json.Marshal(details)
+	if err != nil {
+		return nil, fmt.Errorf("templates repository marshal audit details: %w", err)
+	}
+	return raw, nil
 }
 
 func unmarshalAuditDetails(raw []byte, details *map[string]any) error {
-	return json.Unmarshal(raw, details)
+	if err := json.Unmarshal(raw, details); err != nil {
+		return fmt.Errorf("templates repository unmarshal audit details: %w", err)
+	}
+	return nil
 }

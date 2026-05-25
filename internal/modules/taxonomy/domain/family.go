@@ -7,11 +7,11 @@ import (
 )
 
 type DocumentFamily struct {
-	Code        string    `json:"code"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	IsActive    bool      `json:"isActive"`
-	CreatedAt   time.Time `json:"createdAt"`
+	Code        FamilyCode `json:"code"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	IsActive    bool       `json:"isActive"`
+	CreatedAt   time.Time  `json:"createdAt"`
 }
 
 var (
@@ -22,9 +22,11 @@ var (
 	ErrFamilyNameRequired    = errors.New("family name must not be empty")
 )
 
+type FamilyCode string
+
 func NewDocumentFamily(input DocumentFamily) (*DocumentFamily, error) {
 	family := DocumentFamily{
-		Code:        strings.TrimSpace(input.Code),
+		Code:        FamilyCode(strings.TrimSpace(string(input.Code))),
 		Name:        strings.TrimSpace(input.Name),
 		Description: strings.TrimSpace(input.Description),
 		IsActive:    true,

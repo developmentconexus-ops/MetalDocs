@@ -78,7 +78,7 @@ LIMIT $6
 		); err != nil {
 			return nil, fmt.Errorf("v2 scan document: %w", err)
 		}
-		doc.Status = searchdomain.DocStatus(status)
+		doc.Status = status
 		doc.DocumentProfile = profile
 		doc.DocumentType = doc.DocumentProfile
 		out = append(out, doc)

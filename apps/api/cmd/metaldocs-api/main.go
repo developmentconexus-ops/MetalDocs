@@ -664,12 +664,12 @@ func (a controlledDocumentsReaderAdapter) GetControlledDocument(ctx context.Cont
 // profileDefaultsAdapter bridges taxonomy ProfileRepository → documents module ProfileDefaultTemplateReader.
 type profileDefaultsAdapter struct {
 	profileRepo interface {
-		GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)
+		GetByCode(ctx context.Context, tenantID string, code taxonomydomain.ProfileCode) (*taxonomydomain.DocumentProfile, error)
 	}
 }
 
 func (a *profileDefaultsAdapter) GetDefaultTemplateVersionID(ctx context.Context, tenantID, profileCode string) (*string, *string, error) {
-	profile, err := a.profileRepo.GetByCode(ctx, tenantID, profileCode)
+	profile, err := a.profileRepo.GetByCode(ctx, tenantID, taxonomydomain.ProfileCode(profileCode))
 	if err != nil {
 		return nil, nil, err
 	}

@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"metaldocs/internal/modules/taxonomy/domain"
 )
@@ -34,7 +35,10 @@ func (l *DBGovernanceLogger) Log(ctx context.Context, e domain.GovernanceEvent) 
 		nullString(e.Reason),
 		payload,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("taxonomy: insert governance event: %w", err)
+	}
+	return nil
 }
 
 func nullString(v string) sql.NullString {

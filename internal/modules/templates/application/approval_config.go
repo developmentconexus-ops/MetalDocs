@@ -16,7 +16,7 @@ type UpsertApprovalConfigCmd struct {
 func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalConfigCmd) (*domain.ApprovalConfig, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
-		return nil, err
+		return nil, wrapAppErr("templates approval config: get template", err)
 	}
 	if template.TenantID != cmd.TenantID {
 		return nil, domain.ErrNotFound
@@ -43,30 +43,33 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		return nil, domain.ErrInvalidApprovalConfig
 	}
 
-	config := &domain.ApprovalConfig{
-		TemplateID:   cmd.TemplateID,
-		ReviewerRole: cmd.ReviewerRole,
-		ApproverRole: cmd.ApproverRole,
-	}
-
-	if err := s.repo.UpsertApprovalConfig(ctx, config); err != nil {
+	config, err := domain.NewApprovalConfig(cmd.TemplateID, cmd.ApproverRole, cmd.ReviewerRole)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  nil,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditApprovalConfigUpdated,
-		Details: map[string]any{
+	if err := s.repo.UpsertApprovalConfig(ctx, &config); err != nil {
+		return nil, wrapAppErr("templates approval config: upsert", err)
+	}
+
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		nil,
+		domain.AuditApprovalConfigUpdated,
+		map[string]any{
 			"reviewer_role": cmd.ReviewerRole,
 			"approver_role": cmd.ApproverRole,
 		},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+		s.clock.Now(),
+	)
+	if err != nil {
 		return nil, err
 	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
+		return nil, wrapAppErr("templates approval config: append audit", err)
+	}
 
-	return config, nil
+	return &config, nil
 }

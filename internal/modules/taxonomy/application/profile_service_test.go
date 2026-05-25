@@ -144,8 +144,8 @@ func newFakeProfileRepository() *fakeProfileRepository {
 	return &fakeProfileRepository{byKey: map[string]*domain.DocumentProfile{}}
 }
 
-func (r *fakeProfileRepository) GetByCode(_ context.Context, tenantID, code string) (*domain.DocumentProfile, error) {
-	item, ok := r.byKey[tenantID+"|"+code]
+func (r *fakeProfileRepository) GetByCode(_ context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
+	item, ok := r.byKey[tenantID+"|"+string(code)]
 	if !ok {
 		return nil, domain.ErrProfileNotFound
 	}
@@ -171,7 +171,7 @@ func (r *fakeProfileRepository) BeginTx(_ context.Context) (domain.FamilyTx, err
 	return fakeTx{}, nil
 }
 
-func (r *fakeProfileRepository) GetByCodeForUpdate(ctx context.Context, _ domain.FamilyTx, tenantID, code string) (*domain.DocumentProfile, error) {
+func (r *fakeProfileRepository) GetByCodeForUpdate(ctx context.Context, _ domain.FamilyTx, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
 	return r.GetByCode(ctx, tenantID, code)
 }
 
@@ -182,7 +182,7 @@ func (r *fakeProfileRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, p
 
 func (r *fakeProfileRepository) put(p *domain.DocumentProfile) {
 	copy := *p
-	r.byKey[p.TenantID+"|"+p.Code] = &copy
+	r.byKey[p.TenantID+"|"+string(p.Code)] = &copy
 }
 
 func (r *fakeProfileRepository) get(tenantID, code string) *domain.DocumentProfile {

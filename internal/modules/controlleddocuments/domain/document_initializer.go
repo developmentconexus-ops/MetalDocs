@@ -3,6 +3,17 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"strings"
+)
+
+var (
+	// ErrCloneTemplateNameRequired indicates a clone request was built without
+	// the document name required by the downstream documents module.
+	ErrCloneTemplateNameRequired = errors.New("clone template request name must not be empty")
+	// ErrDocumentRefIDRequired indicates a document reference was built without
+	// its durable document identifier.
+	ErrDocumentRefIDRequired = errors.New("document ref id must not be empty")
 )
 
 // CloneTemplateRequest carries the user-supplied bits of an atomic CD-create
@@ -14,12 +25,42 @@ type CloneTemplateRequest struct {
 	FormData          map[string]any
 }
 
+// NewCloneTemplateRequest validates and normalizes the request sent through the
+// DocumentInitializer port.
+func NewCloneTemplateRequest(templateVersionID *string, name string, formData map[string]any) (CloneTemplateRequest, error) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return CloneTemplateRequest{}, ErrCloneTemplateNameRequired
+	}
+	if formData == nil {
+		formData = map[string]any{}
+	}
+	return CloneTemplateRequest{
+		TemplateVersionID: trimOptionalString(templateVersionID),
+		Name:              trimmedName,
+		FormData:          formData,
+	}, nil
+}
+
 // DocumentRef is the minimal handle the registry returns to callers after a
 // successful atomic create. The registry stores no document state itself —
 // downstream code uses this to redirect to the editor or to enrich responses.
 type DocumentRef struct {
 	ID          string `json:"id"`
 	ContentHash string `json:"contentHash"`
+}
+
+// NewDocumentRef validates and normalizes the minimal document handle returned
+// by the documents module.
+func NewDocumentRef(id, contentHash string) (*DocumentRef, error) {
+	trimmedID := strings.TrimSpace(id)
+	if trimmedID == "" {
+		return nil, ErrDocumentRefIDRequired
+	}
+	return &DocumentRef{
+		ID:          trimmedID,
+		ContentHash: strings.TrimSpace(contentHash),
+	}, nil
 }
 
 // DocumentInitializer is the controlled-documents-owned port that the documents module
