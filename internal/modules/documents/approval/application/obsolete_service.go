@@ -112,8 +112,9 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, db *sql.DB, req Mark
 		   SET status       = 'cancelled',
 		       completed_at = now()
 		 WHERE document_id = $1
+		   AND tenant_id = $2
 		   AND status         = 'in_progress'`,
-		req.DocumentID,
+		req.DocumentID, req.TenantID,
 	)
 	if err != nil {
 		_ = tx.Rollback()
