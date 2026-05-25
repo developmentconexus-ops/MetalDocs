@@ -51,6 +51,16 @@ func (r *FillInRepository) SeedDefaults(ctx context.Context, tenantID, revisionI
 	if len(phs) == 0 {
 		return nil
 	}
+	hasRequired := false
+	for _, p := range phs {
+		if p.Required {
+			hasRequired = true
+			break
+		}
+	}
+	if !hasRequired {
+		return nil
+	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

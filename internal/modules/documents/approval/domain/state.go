@@ -1,6 +1,10 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+
+	documentsdomain "metaldocs/internal/modules/documents/domain"
+)
 
 // ErrLegacyStateRejected returned when legacy state string (finalized, archived) parsed.
 var ErrLegacyStateRejected = errors.New("legacy document state is not valid in the Spec 2 approval graph")
@@ -42,6 +46,16 @@ func StateFromString(s string) (DocState, error) {
 	default:
 		return "", errors.New("unknown document state: " + s)
 	}
+}
+
+// DocumentStatusToDocState converts the documents module status type into the
+// approval state graph. Legacy or unknown document statuses return false.
+func DocumentStatusToDocState(s documentsdomain.DocumentStatus) (DocState, bool) {
+	state, err := StateFromString(string(s))
+	if err != nil {
+		return "", false
+	}
+	return state, true
 }
 
 // legalTransitions encodes the full Spec 2 directed graph.

@@ -9,6 +9,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 
 	"metaldocs/internal/modules/documents/repository"
+	templatesdomain "metaldocs/internal/modules/templates/domain"
 )
 
 type recordingDBTX struct {
@@ -91,5 +92,28 @@ func TestUpsertValue_FallsBackToDB(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestSeedDefaults_NoRequiredPlaceholdersDoesNotBeginTx(t *testing.T) {
+	ctx := context.Background()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := repository.NewFillInRepository(db)
+	err = repo.SeedDefaults(ctx,
+		"00000000-0000-0000-0000-000000000001",
+		"00000000-0000-0000-0000-000000000002",
+		[]templatesdomain.Placeholder{{ID: "optional"}},
+	)
+	if err != nil {
+		t.Fatalf("SeedDefaults: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unexpected DB call: %v", err)
 	}
 }

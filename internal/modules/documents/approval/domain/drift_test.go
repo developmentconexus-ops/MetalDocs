@@ -82,3 +82,17 @@ func TestDriftKeepSnapshotIgnoresCurrent(t *testing.T) {
 		t.Errorf("want pending; got %s", r.ForcedOutcome)
 	}
 }
+
+func TestDriftUnknownPolicyFallsBackToSnapshotDenominator(t *testing.T) {
+	st := driftStage([]string{"a", "b", "c"}, DriftPolicy("surprise"))
+	r := ApplyEligibilityDrift(st, []string{"a"})
+	if r.EffectiveDenominator != 3 {
+		t.Errorf("unknown policy: want snapshot denominator 3; got %d", r.EffectiveDenominator)
+	}
+	if r.ForcedOutcome != QuorumPending {
+		t.Errorf("unknown policy: want pending; got %s", r.ForcedOutcome)
+	}
+	if r.Reason != "unknown_drift_policy:surprise" {
+		t.Errorf("unknown policy reason = %q", r.Reason)
+	}
+}
