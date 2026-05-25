@@ -76,7 +76,7 @@ func (f fakeSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, prof
 
 type fakeTemplateChecker struct{}
 
-func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error) {
+func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error) {
 	return nil, "", nil
 }
 
