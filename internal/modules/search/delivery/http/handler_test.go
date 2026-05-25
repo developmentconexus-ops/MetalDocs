@@ -17,7 +17,7 @@ type handlerStubReader struct {
 	listTenantID string
 }
 
-func (r *handlerStubReader) ListDocuments(_ context.Context, tenantID string) ([]searchdomain.Document, error) {
+func (r *handlerStubReader) ListDocuments(_ context.Context, tenantID string, _ int) ([]searchdomain.Document, error) {
 	r.called = true
 	r.listTenantID = tenantID
 	return nil, nil
