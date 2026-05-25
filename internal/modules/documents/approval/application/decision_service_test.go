@@ -29,6 +29,7 @@ type fakeDecisionRepo struct {
 	loadInstanceErr    error
 	insertSignoffRes   repository.SignoffInsertResult
 	insertSignoffErr   error
+	insertedSignoff    *domain.Signoff
 	updateStageErr     error
 	updateInstanceErr  error
 	instanceStatusTo   domain.InstanceStatus
@@ -39,7 +40,8 @@ func (r *fakeDecisionRepo) LoadInstance(_ context.Context, _ *sql.Tx, _, _ strin
 	return r.instance, r.loadInstanceErr
 }
 
-func (r *fakeDecisionRepo) InsertSignoff(_ context.Context, _ *sql.Tx, _ domain.Signoff) (repository.SignoffInsertResult, error) {
+func (r *fakeDecisionRepo) InsertSignoff(_ context.Context, _ *sql.Tx, s domain.Signoff) (repository.SignoffInsertResult, error) {
+	r.insertedSignoff = &s
 	return r.insertSignoffRes, r.insertSignoffErr
 }
 
@@ -81,14 +83,15 @@ type signoffRow struct {
 }
 
 type decisionTestConn struct {
-	stageSignoffs []signoffRow // rows returned by loadStageSignoffs
-	authzGranted  bool
-	authzSet      bool
-	areaCode      string
-	actorID       string
-	tenantID      string
+	stageSignoffs      []signoffRow // rows returned by loadStageSignoffs
+	authzGranted       bool
+	authzSet           bool
+	areaCode           string
+	formDataJSON       string
+	actorID            string
+	tenantID           string
 	unresolvedComments int
-	execQueries   []string // SQL passed to Exec calls, for assertion
+	execQueries        []string // SQL passed to Exec calls, for assertion
 }
 
 type decisionNoopResult struct{}
@@ -161,6 +164,9 @@ func (s *decisionTestStmt) Exec(_ []driver.Value) (driver.Result, error) {
 }
 func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &decisionSingleValueRows{value: []byte(s.conn.formDataJSON)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: s.conn.areaCode}, nil
 	}
@@ -226,6 +232,9 @@ func newDecisionTestDB(t *testing.T, conn *decisionTestConn) *sql.DB {
 	t.Helper()
 	if conn.areaCode == "" {
 		conn.areaCode = "QA"
+	}
+	if conn.formDataJSON == "" {
+		conn.formDataJSON = `{"title":"Doc"}`
 	}
 	if conn.actorID == "" {
 		conn.actorID = "user-1"
@@ -436,6 +445,60 @@ func TestRecordSignoff_ApprovePath_QuorumNotYetMet(t *testing.T) {
 	}
 	if result.InstanceApproved {
 		t.Error("expected InstanceApproved=false")
+	}
+}
+
+func TestRecordSignoff_ContentHashUsesPersistedDocumentFormData(t *testing.T) {
+	const (
+		instanceID = "inst-db-hash"
+		stageID    = "stage-db-hash"
+		actorID    = "approver-db-hash"
+		authorID   = "author-db-hash"
+	)
+
+	inst := buildTwoApproverInstance(instanceID, stageID, authorID, []string{actorID, "approver-2"})
+	conn := &decisionTestConn{
+		authzGranted: true,
+		areaCode:     "QA",
+		actorID:      actorID,
+		formDataJSON: `{"title":"Persisted"}`,
+	}
+	repo := &fakeDecisionRepo{instance: inst}
+	svc := &DecisionService{
+		repo:          repo,
+		emitter:       &MemoryEmitter{},
+		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		freezeInvoker: &fakeFreezeInvoker{},
+		pdfDispatcher: &fakePDFDispatchInvoker{},
+	}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignaturePayload: map[string]any{},
+		ContentFormData:  map[string]any{"title": "Caller supplied"},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff: unexpected error: %v", err)
+	}
+	if repo.insertedSignoff == nil {
+		t.Fatal("expected inserted signoff")
+	}
+	wantHash, err := ComputeContentHash(ContentHashInput{
+		TenantID:       "tenant-1",
+		DocumentID:     instanceID,
+		RevisionNumber: 0,
+		FormData:       map[string]any{"title": "Persisted"},
+	})
+	if err != nil {
+		t.Fatalf("ComputeContentHash: %v", err)
+	}
+	if repo.insertedSignoff.ContentHash() != wantHash {
+		t.Errorf("ContentHash() = %q; want persisted DB hash %q", repo.insertedSignoff.ContentHash(), wantHash)
 	}
 }
 
