@@ -40,12 +40,17 @@ WHERE d.tenant_id = $1
 ORDER BY d.created_at DESC
 LIMIT $6
 `
+	// DocumentType and DocumentProfile both map to profile_code_snapshot; prefer whichever is set.
+	profileFilter := strings.ToLower(strings.TrimSpace(query.DocumentType))
+	if profileFilter == "" {
+		profileFilter = strings.ToLower(strings.TrimSpace(query.DocumentProfile))
+	}
 	rows, err := r.db.QueryContext(
 		ctx,
 		q,
 		query.TenantID,
-		strings.ToUpper(strings.TrimSpace(query.Status)),
-		strings.ToLower(strings.TrimSpace(query.DocumentType)),
+		strings.ToUpper(strings.TrimSpace(string(query.Status))),
+		profileFilter,
 		strings.ToLower(strings.TrimSpace(query.ProcessArea)),
 		strings.TrimSpace(query.OwnerID),
 		limit,
@@ -58,11 +63,13 @@ LIMIT $6
 	var out []searchdomain.Document
 	for rows.Next() {
 		var doc searchdomain.Document
+		var status string
+		var profile string
 		if err := rows.Scan(
 			&doc.ID,
 			&doc.Title,
-			&doc.Status,
-			&doc.DocumentProfile,
+			&status,
+			&profile,
 			&doc.ProcessArea,
 			&doc.OwnerID,
 			&doc.DocumentCode,
@@ -71,6 +78,8 @@ LIMIT $6
 		); err != nil {
 			return nil, fmt.Errorf("v2 scan document: %w", err)
 		}
+		doc.Status = searchdomain.DocStatus(status)
+		doc.DocumentProfile = profile
 		doc.DocumentType = doc.DocumentProfile
 		out = append(out, doc)
 	}
