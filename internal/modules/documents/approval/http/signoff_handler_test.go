@@ -13,7 +13,6 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
-	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -284,14 +283,22 @@ func docSignoffTestMux(h *Handler) *http.ServeMux {
 // TestSignoffByDocumentHandler_ReplayAfterClose verifies that replaying the same
 // Idempotency-Key after the approval instance is already closed returns 200 with
 // was_replay:true instead of 404/500.
-func TestSignoffByDocumentHandler_ReplayAfterClose(t *testing.T) {
+func TestSignoffByDocumentHandler_ReplayAfterEligibility(t *testing.T) {
 	store := &fakeIdempStore{entries: map[string]string{
 		"tenant-1:actor-1:idem-replay": "approved",
 	}}
 	h := &Handler{
 		decisionSvc: &fakeDecisionService{},
-		readSvc:     &fakeReadService{err: repository.ErrNoActiveInstance},
-		idempStore:  store,
+		readSvc: &fakeReadService{inst: &domain.Instance{
+			ID:       "inst-1",
+			TenantID: "tenant-1",
+			Stages: []domain.StageInstance{{
+				ID:               "stage-1",
+				Status:           domain.StageActive,
+				EligibleActorIDs: []string{"actor-1"},
+			}},
+		}},
+		idempStore: store,
 	}
 	mux := docSignoffTestMux(h)
 
@@ -317,5 +324,39 @@ func TestSignoffByDocumentHandler_ReplayAfterClose(t *testing.T) {
 	}
 	if out.Outcome != "approved" {
 		t.Fatalf("outcome = %q, want %q", out.Outcome, "approved")
+	}
+}
+
+func TestSignoffByDocumentHandler_ReplayRequiresCurrentEligibility(t *testing.T) {
+	store := &fakeIdempStore{entries: map[string]string{
+		"tenant-1:actor-1:idem-replay": "approved",
+	}}
+	h := &Handler{
+		decisionSvc: &fakeDecisionService{},
+		readSvc: &fakeReadService{inst: &domain.Instance{
+			ID:       "inst-1",
+			TenantID: "tenant-1",
+			Stages: []domain.StageInstance{{
+				ID:               "stage-1",
+				Status:           domain.StageActive,
+				EligibleActorIDs: []string{"actor-2"},
+			}},
+		}},
+		idempStore: store,
+	}
+	mux := docSignoffTestMux(h)
+
+	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Idempotency-Key", "idem-replay")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusForbidden, rr.Body.String())
 	}
 }

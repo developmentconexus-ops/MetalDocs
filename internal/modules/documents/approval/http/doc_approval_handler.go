@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
 )
@@ -92,20 +93,6 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Check idempotency store before loading active instance so replays after
-	// instance close return was_replay:true instead of 404/500.
-	if h.idempStore != nil {
-		found, outcome, err := h.idempStore.CheckReplay(r.Context(), tenantID, actorID, idempKey)
-		if err != nil {
-			WriteError(w, err)
-			return
-		}
-		if found {
-			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{WasReplay: true, Outcome: outcome})
-			return
-		}
-	}
-
 	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
@@ -120,6 +107,22 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	if activeStage == nil {
 		WriteError(w, repository.ErrInstanceCompleted)
 		return
+	}
+	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
+		WriteError(w, err)
+		return
+	}
+
+	if h.idempStore != nil {
+		found, outcome, err := h.idempStore.CheckReplay(r.Context(), tenantID, actorID, idempKey)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		if found {
+			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{WasReplay: true, Outcome: outcome})
+			return
+		}
 	}
 
 	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
