@@ -93,7 +93,7 @@
   - internal/modules/documents/domain/model.go - (undocumented)
   - internal/modules/documents/domain/snapshot.go - (undocumented)
   - internal/modules/documents/domain/state.go - CanTransitionDocument returns true iff a document can move from cur to next.
-  - internal/modules/documents/domain/values_hash.go - (undocumented)
+  - internal/modules/documents/domain/values_hash.go - ComputeValuesHash produces deterministic placeholder-values hashes and returns JSON marshal errors.
 - internal/modules/documents/http/
   - internal/modules/documents/http/fillin_handler.go - (undocumented)
   - internal/modules/documents/http/pdf_webhook_handler.go - PDFWriter persists PDF-completion columns on documents.
@@ -398,4 +398,3 @@ OperationIDs from internal/modules/documents/api/api.gen.go:
 | 0010_grant_document_types_privileges.sql | INSERT | metaldocs.document_types, metaldocs.documents, ON |
 | 0011_init_document_access_policies.sql | CREATE | IF |
 | 0012_grant_document_access_policies_privileges.sql | INSERT | metaldocs.document_access_policies |
-
