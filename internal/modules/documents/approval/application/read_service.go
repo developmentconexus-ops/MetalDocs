@@ -179,7 +179,17 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 		return nil, fmt.Errorf("list inbox: marshal actor: %w", err)
 	}
 
-	rows, err := db.QueryContext(ctx, `
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list inbox: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("list inbox: %w", err)
+	}
+
+	rows, err := tx.QueryContext(ctx, `
 		SELECT
 			ai.id,
 			ai.document_id,
@@ -200,6 +210,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 				FROM approval_signoffs s
 				WHERE s.approval_instance_id = ai.id
 				  AND s.stage_instance_id = asi.id
+				  AND s.actor_tenant_id = ai.tenant_id
 				  AND s.decision = 'approve'
 			), 0) AS signed
 		FROM approval_instances ai
@@ -219,7 +230,6 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 	if err != nil {
 		return nil, fmt.Errorf("list inbox: query: %w", err)
 	}
-	defer rows.Close()
 
 	var items []InboxView
 	for rows.Next() {
@@ -230,12 +240,20 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 			&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 			&v.StageLabel, &required, &signed,
 		); err != nil {
+			rows.Close()
 			return nil, fmt.Errorf("list inbox: scan: %w", err)
 		}
 		v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
 		items = append(items, v)
 	}
-	return items, rows.Err()
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list inbox: rows: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("list inbox: commit: %w", err)
+	}
+	return items, nil
 }
 
 // CountPendingForActor returns the total number of pending approval instances
@@ -246,8 +264,18 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, db *sql.DB, tena
 		return 0, fmt.Errorf("count pending: marshal actor: %w", err)
 	}
 
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("count pending: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return 0, fmt.Errorf("count pending: %w", err)
+	}
+
 	var total int
-	err = db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT COUNT(DISTINCT ai.id)
 		FROM approval_instances ai
 		JOIN approval_stage_instances asi
@@ -261,6 +289,9 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, db *sql.DB, tena
 	).Scan(&total)
 	if err != nil {
 		return 0, fmt.Errorf("count pending: query: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("count pending: commit: %w", err)
 	}
 	return total, nil
 }
