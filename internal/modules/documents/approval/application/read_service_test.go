@@ -50,9 +50,17 @@ func TestListInboxItems_PopulatesTitleAndQuorumProgress(t *testing.T) {
 		"user-1", submittedAt, "Stage 1", 2, 1,
 	)
 
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
+		WithArgs("actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT[\s\S]+FROM approval_instances ai`).
 		WithArgs("tenant-1", sqlmock.AnyArg(), "finance", 25, 0).
 		WillReturnRows(rows)
+	mock.ExpectCommit()
 
 	svc := &ReadService{}
 	items, err := svc.ListInboxItems(context.Background(), db, "tenant-1", "actor-1", "finance", 25, 0)
@@ -92,12 +100,20 @@ func TestListInboxItems_FiltersByActor(t *testing.T) {
 	defer db.Close()
 
 	// We assert the actorID is JSON-marshalled into the eligible_actor_ids @> filter arg ($2).
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
+		WithArgs("actor-xyz").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`asi\.eligible_actor_ids @> \$2::jsonb`).
 		WithArgs("tenant-1", []byte(`["actor-xyz"]`), "", 25, 0).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "document_id", "doc_title", "area_code",
 			"submitted_by", "submitted_at", "stage_label", "required", "signed",
 		}))
+	mock.ExpectCommit()
 
 	svc := &ReadService{}
 	if _, err := svc.ListInboxItems(context.Background(), db, "tenant-1", "actor-xyz", "", 0, 0); err != nil {
@@ -116,9 +132,17 @@ func TestCountPendingForActor_ReturnsTotal(t *testing.T) {
 	}
 	defer db.Close()
 
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
+		WithArgs("actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT COUNT\(DISTINCT ai\.id\)`).
 		WithArgs("tenant-1", sqlmock.AnyArg(), "").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(7))
+	mock.ExpectCommit()
 
 	svc := &ReadService{}
 	total, err := svc.CountPendingForActor(context.Background(), db, "tenant-1", "actor-1", "")
