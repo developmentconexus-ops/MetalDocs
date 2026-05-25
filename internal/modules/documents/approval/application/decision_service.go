@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -160,15 +161,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 
 	// Step 5b: eligibility check — actor must be in the eligible_actor_ids snapshot (J1).
 	if err := domain.CheckEligibility(req.ActorUserID, activeStage.EligibleActorIDs); err != nil {
-		_ = s.emitter.Emit(ctx, tx, GovernanceEvent{
+		event := GovernanceEvent{
 			TenantID:     req.TenantID,
 			EventType:    "signoff.rejected",
 			ActorUserID:  req.ActorUserID,
 			ResourceType: "approval_instance",
 			ResourceID:   req.InstanceID,
 			Reason:       "not_eligible",
-		})
+			OccurredAt:   s.clock.Now(),
+		}
 		_ = tx.Rollback()
+		if emitErr := s.emitEligibilityRejection(ctx, db, req.TenantID, req.ActorUserID, event); emitErr != nil {
+			return SignoffResult{}, fmt.Errorf("recordSignoff: emit eligibility rejection: %w", emitErr)
+		}
 		return SignoffResult{}, err
 	}
 
@@ -421,9 +426,30 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		// Client fails fast; retry owned by PDFOutboxWorker (wiki/decisions/0009-pdf-dispatch-outbox.md).
 		dispatchCtx, dispatchCancel := context.WithTimeout(ctx, 45*time.Second)
 		defer dispatchCancel()
-		_ = s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID)
+		if err := s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID); err != nil {
+			slog.ErrorContext(dispatchCtx, "pdf dispatch failed", "tenantID", pdfTenantID, "revisionID", pdfRevisionID, "err", err)
+		}
 	}
 	return result, nil
+}
+
+func (s *DecisionService) emitEligibilityRejection(ctx context.Context, db *sql.DB, tenantID, actorID string, event GovernanceEvent) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
+	if err := s.emitter.Emit(ctx, tx, event); err != nil {
+		return fmt.Errorf("emit event: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
 }
 
 // loadPriorSignoffs fetches all signoffs for the instance EXCEPT the active stage,

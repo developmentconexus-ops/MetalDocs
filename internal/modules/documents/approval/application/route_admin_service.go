@@ -109,12 +109,16 @@ func (s *RouteAdminService) Create(ctx context.Context, db *sql.DB, in CreateRou
 		return CreateRouteResult{}, err
 	}
 
-	payload, _ := json.Marshal(map[string]any{
+	payload, err := json.Marshal(map[string]any{
 		"route_id":      routeID,
 		"profile_code":  in.ProfileCode,
 		"stage_count":   len(in.Stages),
 		"initial_state": "active",
 	})
+	if err != nil {
+		_ = tx.Rollback()
+		return CreateRouteResult{}, fmt.Errorf("route_admin: marshal event payload: %w", err)
+	}
 	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
 		EventType:    "route.config.created",
@@ -199,11 +203,15 @@ func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRou
 		return UpdateRouteResult{}, err
 	}
 
-	payload, _ := json.Marshal(map[string]any{
+	payload, err := json.Marshal(map[string]any{
 		"route_id":    in.RouteID,
 		"new_version": newVersion,
 		"stage_count": len(in.Stages),
 	})
+	if err != nil {
+		_ = tx.Rollback()
+		return UpdateRouteResult{}, fmt.Errorf("route_admin: marshal event payload: %w", err)
+	}
 	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
 		EventType:    "route.config.updated",
@@ -260,10 +268,14 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 		return DeactivateRouteResult{}, fmt.Errorf("route_admin: deactivate route: %w", mapped)
 	}
 
-	payload, _ := json.Marshal(map[string]any{
+	payload, err := json.Marshal(map[string]any{
 		"route_id": in.RouteID,
 		"active":   false,
 	})
+	if err != nil {
+		_ = tx.Rollback()
+		return DeactivateRouteResult{}, fmt.Errorf("route_admin: marshal event payload: %w", err)
+	}
 	if err := s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
 		EventType:    "route.config.deactivated",
