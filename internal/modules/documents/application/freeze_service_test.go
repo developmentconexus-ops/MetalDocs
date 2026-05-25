@@ -191,7 +191,10 @@ func TestFreezeService_Freeze_ValidatesResolvesHashesAndFinalizes(t *testing.T) 
 	if finalize.calls != 1 {
 		t.Fatalf("expected one finalize call, got %d", finalize.calls)
 	}
-	wantHash := v2dom.ComputeValuesHash(map[string]any{"p_user": "user-value", "p_comp": "DOC-001"})
+	wantHash, err := v2dom.ComputeValuesHash(map[string]any{"p_user": "user-value", "p_comp": "DOC-001"})
+	if err != nil {
+		t.Fatalf("ComputeValuesHash: %v", err)
+	}
 	if bytesToHex(finalize.hash) != wantHash {
 		t.Fatalf("hash mismatch: got %s want %s", bytesToHex(finalize.hash), wantHash)
 	}
