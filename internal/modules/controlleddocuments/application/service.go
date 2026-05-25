@@ -450,6 +450,9 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+		return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
+	}
 	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
 		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
 	}
