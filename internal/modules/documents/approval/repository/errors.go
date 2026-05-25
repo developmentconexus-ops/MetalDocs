@@ -43,8 +43,7 @@ func MapPgError(err error, hints MapHints) error {
 			"ux_approval_instances_active_document_id",
 			"approval_instances_document_id_idempotency_key_key":
 			return ErrDuplicateSubmission
-		case "approval_signoffs_approval_instance_id_actor_user_id_key",
-			"approval_signoffs_stage_instance_id_actor_user_id_key":
+		case "approval_signoffs_stage_instance_id_actor_user_id_key":
 			return ErrActorAlreadySigned
 		case "approval_routes_tenant_profile_key":
 			return ErrDuplicateRouteProfile
@@ -52,7 +51,7 @@ func MapPgError(err error, hints MapHints) error {
 			if hints.UniqueConstraint != "" && pgErr.ConstraintName == hints.UniqueConstraint {
 				return ErrDuplicateSubmission
 			}
-			return ErrActorAlreadySigned
+			return fmt.Errorf("%w: unique constraint %q", ErrUnknownDB, pgErr.ConstraintName)
 		}
 	case "23503": // foreign_key_violation
 		return ErrFKViolation

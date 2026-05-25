@@ -42,8 +42,13 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
+	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
 		WriteError(w, err)
+		return
+	}
+	if h.readSvc == nil {
+		WriteError(w, errors.New("read service not configured"))
 		return
 	}
 
@@ -54,9 +59,10 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := publishApproved(h, r.Context(), h.db, application.PublishRequest{
-		TenantID:    tenantID,
-		InstanceID:  inst.ID,
-		PublishedBy: actorID,
+		TenantID:                tenantID,
+		InstanceID:              inst.ID,
+		PublishedBy:             actorID,
+		ExpectedRevisionVersion: expectedRevisionVersion,
 	})
 	if err != nil {
 		WriteError(w, err)

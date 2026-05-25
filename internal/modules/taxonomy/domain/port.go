@@ -4,17 +4,24 @@ import "context"
 
 type ProfileRepository interface {
 	GetByCode(ctx context.Context, tenantID, code string) (*DocumentProfile, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID, code string) (*DocumentProfile, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]DocumentProfile, error)
 	Create(ctx context.Context, p *DocumentProfile) error
 	Update(ctx context.Context, p *DocumentProfile) error
+	UpdateTx(ctx context.Context, tx FamilyTx, p *DocumentProfile) error
+	BeginTx(ctx context.Context) (FamilyTx, error)
 }
 
 type AreaRepository interface {
 	GetByCode(ctx context.Context, tenantID, code string) (*ProcessArea, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID, code string) (*ProcessArea, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]ProcessArea, error)
 	Create(ctx context.Context, a *ProcessArea) error
 	Update(ctx context.Context, a *ProcessArea) error
 	ListAncestors(ctx context.Context, tenantID, code string) ([]string, error)
+	ListAncestorsTx(ctx context.Context, tx FamilyTx, tenantID, code string) ([]string, error)
+	UpdateTx(ctx context.Context, tx FamilyTx, a *ProcessArea) error
+	BeginTx(ctx context.Context) (FamilyTx, error)
 }
 
 type GovernanceLogger interface {

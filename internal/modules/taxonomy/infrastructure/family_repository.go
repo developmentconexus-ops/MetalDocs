@@ -27,13 +27,26 @@ func NewFamilyRepository(db *sql.DB) *FamilyRepository {
 }
 
 func (r *FamilyRepository) GetByCode(ctx context.Context, code string) (*domain.DocumentFamily, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin get family tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check Get family: %w", err)
+	}
+
 	const q = `
 SELECT code, name, description, is_active, created_at
 FROM metaldocs.document_families
 WHERE code = $1`
 
 	var f domain.DocumentFamily
-	err := r.db.QueryRowContext(ctx, q, code).Scan(
+	err = tx.QueryRowContext(ctx, q, code).Scan(
 		&f.Code, &f.Name, &f.Description, &f.IsActive, &f.CreatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -46,6 +59,19 @@ WHERE code = $1`
 }
 
 func (r *FamilyRepository) List(ctx context.Context, includeInactive bool) ([]domain.DocumentFamily, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin list families tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check List families: %w", err)
+	}
+
 	q := `
 SELECT code, name, description, is_active, created_at
 FROM metaldocs.document_families`
@@ -54,7 +80,7 @@ FROM metaldocs.document_families`
 	}
 	q += " ORDER BY code ASC"
 
-	rows, err := r.db.QueryContext(ctx, q)
+	rows, err := tx.QueryContext(ctx, q)
 	if err != nil {
 		return nil, err
 	}
@@ -125,13 +151,26 @@ WHERE code = $4`
 }
 
 func (r *FamilyRepository) HasActiveProfiles(ctx context.Context, tenantID, familyCode string) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("begin has active profiles tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return false, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return false, fmt.Errorf("taxonomy: authz check HasActiveProfiles: %w", err)
+	}
+
 	const q = `
 SELECT EXISTS(
   SELECT 1 FROM metaldocs.document_profiles
   WHERE tenant_id = $1 AND family_code = $2 AND archived_at IS NULL
 )`
 	var exists bool
-	err := r.db.QueryRowContext(ctx, q, tenantID, familyCode).Scan(&exists)
+	err = tx.QueryRowContext(ctx, q, tenantID, familyCode).Scan(&exists)
 	return exists, err
 }
 
@@ -171,6 +210,12 @@ func (r *FamilyRepository) HasActiveProfilesTx(ctx context.Context, tx domain.Fa
 	sqlTx, ok := tx.(familyTx)
 	if !ok {
 		return false, fmt.Errorf("invalid family tx type %T", tx)
+	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return false, err
+	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return false, fmt.Errorf("taxonomy: authz check HasActiveProfilesTx: %w", err)
 	}
 	const q = `
 SELECT EXISTS(

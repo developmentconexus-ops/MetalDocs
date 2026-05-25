@@ -109,6 +109,23 @@ func (r *fakeAreaRepository) ListAncestors(_ context.Context, _ string, code str
 	return r.ancestorsByCode[code], nil
 }
 
+func (r *fakeAreaRepository) BeginTx(_ context.Context) (domain.FamilyTx, error) {
+	return fakeTx{}, nil
+}
+
+func (r *fakeAreaRepository) GetByCodeForUpdate(ctx context.Context, _ domain.FamilyTx, tenantID, code string) (*domain.ProcessArea, error) {
+	return r.GetByCode(ctx, tenantID, code)
+}
+
+func (r *fakeAreaRepository) ListAncestorsTx(_ context.Context, _ domain.FamilyTx, _ string, code string) ([]string, error) {
+	return r.ancestorsByCode[code], nil
+}
+
+func (r *fakeAreaRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, a *domain.ProcessArea) error {
+	r.put(a)
+	return nil
+}
+
 func (r *fakeAreaRepository) put(a *domain.ProcessArea) {
 	copy := *a
 	r.byKey[a.TenantID+"|"+a.Code] = &copy

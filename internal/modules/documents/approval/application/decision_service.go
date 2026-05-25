@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,16 +68,17 @@ func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionSer
 
 // SignoffRequest carries all inputs for RecordSignoff.
 type SignoffRequest struct {
-	TenantID         string
-	InstanceID       string
-	StageInstanceID  string
-	ActorUserID      string
-	Decision         string // "approve" or "reject"
-	Comment          string
-	SignatureMethod  string
-	SignaturePayload map[string]any
-	ContentFormData  map[string]any // current document content for hash
-	Capabilities     []string
+	TenantID                string
+	InstanceID              string
+	StageInstanceID         string
+	ActorUserID             string
+	Decision                string // "approve" or "reject"
+	Comment                 string
+	SignatureMethod         string
+	SignaturePayload        map[string]any
+	ContentFormData         map[string]any // current document content for hash
+	ExpectedRevisionVersion int
+	Capabilities            []string
 }
 
 // SignoffResult is returned by RecordSignoff.
@@ -94,18 +96,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, err
 	}
 
-	// Step 2: compute content hash.
-	contentHash, err := ComputeContentHash(ContentHashInput{
-		TenantID:       req.TenantID,
-		DocumentID:     req.InstanceID, // keyed on instance for signoff hashing
-		RevisionNumber: 0,              // signoff hash does not embed revision
-		FormData:       req.ContentFormData,
-	})
-	if err != nil {
-		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
-	}
-
-	// Step 3: begin transaction.
+	// Step 2: begin transaction.
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return SignoffResult{}, fmt.Errorf("recordSignoff: begin tx: %w", err)
@@ -129,6 +120,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		_ = tx.Rollback()
 		return SignoffResult{}, repository.ErrNoActiveInstance
 	}
+	if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
+		_ = tx.Rollback()
+		return SignoffResult{}, repository.ErrStaleRevision
+	}
 
 	// Reject if instance is already terminal.
 	if instance.Status != domain.InstanceInProgress {
@@ -146,6 +141,22 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, err
 	}
 
+	formData, err := loadCurrentDocumentFormData(ctx, tx, req.TenantID, instance.DocumentID)
+	if err != nil {
+		_ = tx.Rollback()
+		return SignoffResult{}, fmt.Errorf("recordSignoff: load document form data: %w", err)
+	}
+	contentHash, err := ComputeContentHash(ContentHashInput{
+		TenantID:       req.TenantID,
+		DocumentID:     req.InstanceID, // keyed on instance for signoff hashing
+		RevisionNumber: 0,              // signoff hash does not embed revision
+		FormData:       formData,
+	})
+	if err != nil {
+		_ = tx.Rollback()
+		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
+	}
+
 	// Step 5: identify active stage.
 	activeStage := instance.Active()
 	if activeStage == nil {
@@ -160,15 +171,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 
 	// Step 5b: eligibility check — actor must be in the eligible_actor_ids snapshot (J1).
 	if err := domain.CheckEligibility(req.ActorUserID, activeStage.EligibleActorIDs); err != nil {
-		_ = s.emitter.Emit(ctx, tx, GovernanceEvent{
+		event := GovernanceEvent{
 			TenantID:     req.TenantID,
 			EventType:    "signoff.rejected",
 			ActorUserID:  req.ActorUserID,
 			ResourceType: "approval_instance",
 			ResourceID:   req.InstanceID,
 			Reason:       "not_eligible",
-		})
+			OccurredAt:   s.clock.Now(),
+		}
 		_ = tx.Rollback()
+		if emitErr := s.emitEligibilityRejection(ctx, db, req.TenantID, req.ActorUserID, event); emitErr != nil {
+			return SignoffResult{}, fmt.Errorf("recordSignoff: emit eligibility rejection: %w", emitErr)
+		}
 		return SignoffResult{}, err
 	}
 
@@ -306,7 +321,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				return SignoffResult{}, fmt.Errorf("recordSignoff: freeze: %w", err)
 			}
 			// Transition document under_review → approved.
-			if _, err := tx.ExecContext(ctx, `
+			res, err := tx.ExecContext(ctx, `
 				UPDATE documents
 				   SET status           = 'approved',
 				       revision_version = revision_version + 1
@@ -314,9 +329,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				   AND tenant_id = $2
 				   AND status    = 'under_review'`,
 				instance.DocumentID, req.TenantID,
-			); err != nil {
+			)
+			if err != nil {
 				_ = tx.Rollback()
 				return SignoffResult{}, fmt.Errorf("recordSignoff: approve document: %w", err)
+			}
+			rows, err := res.RowsAffected()
+			if err != nil {
+				_ = tx.Rollback()
+				return SignoffResult{}, fmt.Errorf("recordSignoff: approve document rows affected: %w", err)
+			}
+			if rows == 0 {
+				_ = tx.Rollback()
+				return SignoffResult{}, repository.ErrStaleRevision
 			}
 			result.InstanceApproved = true
 			shouldDispatchPDF = true
@@ -360,7 +385,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		}
 
 		// Transition document under_review -> draft so the author can edit and resubmit.
-		if _, err := tx.ExecContext(ctx, `
+		res, err := tx.ExecContext(ctx, `
         UPDATE documents
            SET status           = 'draft',
                revision_version = revision_version + 1
@@ -368,9 +393,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
            AND tenant_id = $2
            AND status    = 'under_review'`,
 			instance.DocumentID, req.TenantID,
-		); err != nil {
+		)
+		if err != nil {
 			_ = tx.Rollback()
 			return SignoffResult{}, fmt.Errorf("recordSignoff: reject document: %w", err)
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: reject document rows affected: %w", err)
+		}
+		if rows == 0 {
+			_ = tx.Rollback()
+			return SignoffResult{}, repository.ErrStaleRevision
 		}
 
 	default:
@@ -421,9 +456,30 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		// Client fails fast; retry owned by PDFOutboxWorker (wiki/decisions/0009-pdf-dispatch-outbox.md).
 		dispatchCtx, dispatchCancel := context.WithTimeout(ctx, 45*time.Second)
 		defer dispatchCancel()
-		_ = s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID)
+		if err := s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID); err != nil {
+			slog.ErrorContext(dispatchCtx, "pdf dispatch failed", "tenantID", pdfTenantID, "revisionID", pdfRevisionID, "err", err)
+		}
 	}
 	return result, nil
+}
+
+func (s *DecisionService) emitEligibilityRejection(ctx context.Context, db *sql.DB, tenantID, actorID string, event GovernanceEvent) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
+	if err := s.emitter.Emit(ctx, tx, event); err != nil {
+		return fmt.Errorf("emit event: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
 }
 
 // loadPriorSignoffs fetches all signoffs for the instance EXCEPT the active stage,
@@ -550,4 +606,30 @@ func hasUnresolvedComments(ctx context.Context, tx *sql.Tx, tenantID, documentID
 		return false, err
 	}
 	return unresolvedCount > 0, nil
+}
+
+func loadCurrentDocumentFormData(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (map[string]any, error) {
+	var raw []byte
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(form_data_json, '{}'::jsonb)
+		  FROM documents
+		 WHERE id = $1
+		   AND tenant_id = $2
+		 FOR UPDATE`,
+		documentID, tenantID,
+	).Scan(&raw)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return map[string]any{}, nil
+	}
+	var formData map[string]any
+	if err := json.Unmarshal(raw, &formData); err != nil {
+		return nil, fmt.Errorf("unmarshal form_data_json: %w", err)
+	}
+	if formData == nil {
+		return map[string]any{}, nil
+	}
+	return formData, nil
 }
