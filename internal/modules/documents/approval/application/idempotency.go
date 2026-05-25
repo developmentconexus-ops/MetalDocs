@@ -3,6 +3,7 @@ package application
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"time"
 )
 
@@ -22,7 +23,7 @@ type IdempotencyInput struct {
 // intentional re-sign after stage reopen (different second window).
 //
 // Server clock only — never trust client timestamp.
-func ComputeIdempotencyKey(input IdempotencyInput) string {
+func ComputeIdempotencyKey(input IdempotencyInput) (string, error) {
 	// Defense-in-depth: normalize timestamp regardless of caller.
 	ts := input.Timestamp.UTC().Truncate(time.Second)
 
@@ -35,7 +36,10 @@ func ComputeIdempotencyKey(input IdempotencyInput) string {
 	}
 
 	// Use canonicalize for deterministic key ordering.
-	b, _ := canonicalize(m)
+	b, err := canonicalize(m)
+	if err != nil {
+		return "", fmt.Errorf("idempotency: canonicalize: %w", err)
+	}
 	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
+	return hex.EncodeToString(sum[:]), nil
 }
