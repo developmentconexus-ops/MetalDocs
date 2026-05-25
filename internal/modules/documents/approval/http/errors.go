@@ -212,7 +212,10 @@ func WriteJSON(w http.ResponseWriter, status int, body any) {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		fallback := problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage)
-		payload, _ = json.Marshal(fallback)
+		payload, err = json.Marshal(fallback)
+		if err != nil {
+			payload = []byte(`{"status":500,"title":"internal error"}`)
+		}
 		status = http.StatusInternalServerError
 	}
 
