@@ -23,13 +23,13 @@ func (h *Handler) InboxHandler(w http.ResponseWriter, r *http.Request) {
 
 	limit, err := parseInboxLimit(r.URL.Query().Get("limit"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
 
 	offset, err := parseInboxOffset(r.URL.Query().Get("offset"))
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
 

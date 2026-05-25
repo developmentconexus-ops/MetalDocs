@@ -206,13 +206,6 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantTitle:  contracts.ErrEmptyBody.Error(),
 		},
 		{
-			name:       "contracts duplicate key",
-			err:        contracts.ErrDuplicateKey,
-			wantStatus: http.StatusBadRequest,
-			wantCode:   "validation.duplicate_key",
-			wantTitle:  contracts.ErrDuplicateKey.Error(),
-		},
-		{
 			name:       "if-match required",
 			err:        ErrIfMatchRequired,
 			wantStatus: http.StatusPreconditionRequired,
@@ -249,7 +242,7 @@ func TestMapErrorToResponse(t *testing.T) {
 		},
 		{
 			name:       "generic validation error",
-			err:        errors.New("route_id is required"),
+			err:        NewValidationError("route_id is required"),
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "validation.request_invalid",
 			wantTitle:  "route_id is required",
