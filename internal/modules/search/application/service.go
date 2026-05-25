@@ -33,30 +33,35 @@ func NewService(reader domain.Reader) *Service {
 }
 
 func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain.Document, error) {
-	tenantID := strings.TrimSpace(q.TenantID)
-	if tenantID == "" {
-		return nil, ErrTenantRequired
+	normalized, err := domain.NewQuery(q)
+	if err != nil {
+		if errors.Is(err, domain.ErrQueryTenantEmpty) {
+			return nil, ErrTenantRequired
+		}
+		return nil, err
 	}
 	limit := effectiveLimit(q.Limit)
 
-	q.TenantID = tenantID
-	docs, err := s.reader.ListDocuments(ctx, q, limit)
+	normalized.Limit = q.Limit
+	docs, err := s.reader.ListDocuments(ctx, normalized, limit)
 	if err != nil {
 		return nil, err
 	}
+	// TODO(search): push filtering into the DB reader so tenant-sized result sets
+	// do not require a full in-memory scan before authz and limit trimming.
 
-	text := strings.ToLower(strings.TrimSpace(q.Text))
-	documentType := strings.ToLower(strings.TrimSpace(q.DocumentType))
-	documentProfile := strings.ToLower(strings.TrimSpace(q.DocumentProfile))
-	documentFamily := strings.ToLower(strings.TrimSpace(q.DocumentFamily))
-	processArea := strings.ToLower(strings.TrimSpace(q.ProcessArea))
-	subject := strings.ToLower(strings.TrimSpace(q.Subject))
-	ownerID := strings.TrimSpace(q.OwnerID)
-	businessUnit := strings.TrimSpace(q.BusinessUnit)
-	department := strings.TrimSpace(q.Department)
-	classification := strings.ToUpper(strings.TrimSpace(q.Classification))
-	status := strings.ToUpper(strings.TrimSpace(q.Status))
-	tag := strings.ToLower(strings.TrimSpace(q.Tag))
+	text := strings.ToLower(strings.TrimSpace(normalized.Text))
+	documentType := strings.ToLower(strings.TrimSpace(normalized.DocumentType))
+	documentProfile := strings.ToLower(strings.TrimSpace(normalized.DocumentProfile))
+	documentFamily := strings.ToLower(strings.TrimSpace(normalized.DocumentFamily))
+	processArea := strings.ToLower(strings.TrimSpace(normalized.ProcessArea))
+	subject := strings.ToLower(strings.TrimSpace(normalized.Subject))
+	ownerID := strings.TrimSpace(normalized.OwnerID)
+	businessUnit := strings.TrimSpace(normalized.BusinessUnit)
+	department := strings.TrimSpace(normalized.Department)
+	classification := strings.ToUpper(strings.TrimSpace(string(normalized.Classification)))
+	status := strings.ToUpper(strings.TrimSpace(string(normalized.Status)))
+	tag := strings.ToLower(strings.TrimSpace(normalized.Tag))
 
 	filtered := make([]domain.Document, 0, len(docs))
 	for _, doc := range docs {
@@ -94,22 +99,22 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 		if department != "" && doc.Department != department {
 			continue
 		}
-		if classification != "" && strings.ToUpper(doc.Classification) != classification {
+		if classification != "" && strings.ToUpper(string(doc.Classification)) != classification {
 			continue
 		}
-		if status != "" && strings.ToUpper(doc.Status) != status {
+		if status != "" && strings.ToUpper(string(doc.Status)) != status {
 			continue
 		}
 		if tag != "" && !hasTag(doc.Tags, tag) {
 			continue
 		}
-		if q.ExpiryBefore != nil {
-			if doc.ExpiryAt == nil || doc.ExpiryAt.After(q.ExpiryBefore.UTC()) {
+		if normalized.ExpiryBefore != nil {
+			if doc.ExpiryAt == nil || doc.ExpiryAt.After(normalized.ExpiryBefore.UTC()) {
 				continue
 			}
 		}
-		if q.ExpiryAfter != nil {
-			if doc.ExpiryAt == nil || doc.ExpiryAt.Before(q.ExpiryAfter.UTC()) {
+		if normalized.ExpiryAfter != nil {
+			if doc.ExpiryAt == nil || doc.ExpiryAt.Before(normalized.ExpiryAfter.UTC()) {
 				continue
 			}
 		}
