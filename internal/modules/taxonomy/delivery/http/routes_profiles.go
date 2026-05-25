@@ -88,9 +88,9 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	profile := &domain.DocumentProfile{
-		Code:                     code,
+		Code:                     domain.ProfileCode(code),
 		TenantID:                 tenantID,
-		FamilyCode:               strings.TrimSpace(req.FamilyCode),
+		FamilyCode:               domain.FamilyCode(strings.TrimSpace(req.FamilyCode)),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
 		Alias:                    alias,
@@ -147,9 +147,9 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	profile := &domain.DocumentProfile{
-		Code:                     updateCode,
+		Code:                     domain.ProfileCode(updateCode),
 		TenantID:                 tenantID,
-		FamilyCode:               strings.TrimSpace(req.FamilyCode),
+		FamilyCode:               domain.FamilyCode(strings.TrimSpace(req.FamilyCode)),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
 		Alias:                    updateAlias,

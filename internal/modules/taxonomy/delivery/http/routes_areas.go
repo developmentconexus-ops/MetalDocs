@@ -53,7 +53,7 @@ func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {
 	}
 
 	area := &domain.ProcessArea{
-		Code:                strings.TrimSpace(req.Code),
+		Code:                domain.AreaCode(strings.TrimSpace(req.Code)),
 		TenantID:            tenantID,
 		Name:                strings.TrimSpace(req.Name),
 		Description:         strings.TrimSpace(req.Description),
@@ -101,7 +101,7 @@ func (h *Handler) updateArea(w http.ResponseWriter, r *http.Request) {
 	}
 
 	area := &domain.ProcessArea{
-		Code:                r.PathValue("code"),
+		Code:                domain.AreaCode(r.PathValue("code")),
 		TenantID:            tenantID,
 		Name:                strings.TrimSpace(req.Name),
 		Description:         strings.TrimSpace(req.Description),

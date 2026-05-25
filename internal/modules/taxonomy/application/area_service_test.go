@@ -159,7 +159,7 @@ func (r *fakeAreaRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, a *d
 
 func (r *fakeAreaRepository) put(a *domain.ProcessArea) {
 	copy := *a
-	r.byKey[a.TenantID+"|"+a.Code] = &copy
+	r.byKey[a.TenantID+"|"+string(a.Code)] = &copy
 }
 
 func (r *fakeAreaRepository) get(tenantID, code string) *domain.ProcessArea {

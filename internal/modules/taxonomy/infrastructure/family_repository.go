@@ -143,7 +143,10 @@ WHERE code = $4`
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("family update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrFamilyNotFound
 	}
@@ -246,7 +249,10 @@ WHERE code = $4`
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("family tx update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrFamilyNotFound
 	}

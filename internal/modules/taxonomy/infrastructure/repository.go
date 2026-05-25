@@ -226,7 +226,10 @@ WHERE tenant_id = $10 AND code = $11`
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("profile update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrProfileNotFound
 	}
@@ -290,7 +293,10 @@ WHERE tenant_id = $10 AND code = $11`
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("profile tx update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrProfileNotFound
 	}
@@ -492,7 +498,10 @@ WHERE tenant_id = $7 AND code = $8`
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("area update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrAreaNotFound
 	}
@@ -589,7 +598,10 @@ WHERE tenant_id = $7 AND code = $8`
 	if err != nil {
 		return err
 	}
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("area tx update rows affected: %w", err)
+	}
 	if rowsAffected == 0 {
 		return domain.ErrAreaNotFound
 	}

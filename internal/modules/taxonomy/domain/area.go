@@ -7,7 +7,7 @@ import (
 )
 
 type ProcessArea struct {
-	Code                string     `json:"code"`
+	Code                AreaCode   `json:"code"`
 	TenantID            string     `json:"tenantId"`
 	Name                string     `json:"name"`
 	Description         string     `json:"description"`
@@ -19,18 +19,18 @@ type ProcessArea struct {
 }
 
 var (
-	ErrAreaNotFound      = errors.New("process area not found")
-	ErrAreaArchived      = errors.New("process area is archived")
-	ErrAreaParentCycle   = errors.New("area parent assignment creates cycle")
-	ErrAreaCodeImmutable = errors.New("area code is immutable")
-	ErrAreaCodeRequired  = errors.New("area code must not be empty")
+	ErrAreaNotFound       = errors.New("process area not found")
+	ErrAreaArchived       = errors.New("process area is archived")
+	ErrAreaParentCycle    = errors.New("area parent assignment creates cycle")
+	ErrAreaCodeImmutable  = errors.New("area code is immutable")
+	ErrAreaCodeRequired   = errors.New("area code must not be empty")
 	ErrAreaTenantRequired = errors.New("area tenant must not be empty")
-	ErrAreaNameRequired  = errors.New("area name must not be empty")
+	ErrAreaNameRequired   = errors.New("area name must not be empty")
 )
 
 func NewProcessArea(input ProcessArea) (*ProcessArea, error) {
 	area := ProcessArea{
-		Code:                strings.TrimSpace(input.Code),
+		Code:                AreaCode(strings.TrimSpace(string(input.Code))),
 		TenantID:            strings.TrimSpace(input.TenantID),
 		Name:                strings.TrimSpace(input.Name),
 		Description:         strings.TrimSpace(input.Description),
@@ -40,7 +40,7 @@ func NewProcessArea(input ProcessArea) (*ProcessArea, error) {
 		ArchivedAt:          input.ArchivedAt,
 		CreatedAt:           input.CreatedAt,
 	}
-	if area.Code == "" {
+	if strings.TrimSpace(string(area.Code)) == "" {
 		return nil, ErrAreaCodeRequired
 	}
 	if area.TenantID == "" {
