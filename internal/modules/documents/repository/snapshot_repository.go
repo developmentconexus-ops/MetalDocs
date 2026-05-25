@@ -176,6 +176,19 @@ func (r *SnapshotRepository) WritePDF(ctx context.Context, tenant, docID, s3Key 
 	return requireRowsAffected(result, "write pdf")
 }
 
+func (r *SnapshotRepository) ResolveTenantByDocumentID(ctx context.Context, docID string) (string, error) {
+	var tenantID string
+	if err := r.db.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT tenant_id::text
+		  FROM %s
+		 WHERE id = $1::uuid`, r.table("documents")),
+		docID,
+	).Scan(&tenantID); err != nil {
+		return "", err
+	}
+	return tenantID, nil
+}
+
 // AppendReconstruction appends a forensic attempt entry onto documents.reconstruction_attempts.
 // Never touches final_docx_s3_key or content_hash.
 func (r *SnapshotRepository) AppendReconstruction(ctx context.Context, tenant, docID string, entry []byte) error {
