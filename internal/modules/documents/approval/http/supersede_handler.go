@@ -38,6 +38,10 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	if h.db == nil {
+		WriteError(w, errors.New("database not configured"))
+		return
+	}
 
 	var body contracts.SupersedeRequest
 	if err := contracts.Decode(r, &body); err != nil {
@@ -49,22 +53,12 @@ func (h *Handler) SupersedeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var priorRevisionVersion int
-	if err := h.db.QueryRowContext(r.Context(),
-		`SELECT revision_version FROM documents WHERE id = $1 AND tenant_id = $2`,
-		body.SupersededDocumentID, tenantID,
-	).Scan(&priorRevisionVersion); err != nil {
-		WriteError(w, err)
-		return
-	}
-
 	_, err = publishSuperseding(h, r.Context(), h.db, application.SupersedeRequest{
-		TenantID:             tenantID,
-		NewDocumentID:        documentID,
-		PriorDocumentID:      body.SupersededDocumentID,
-		SupersededBy:         actorID,
-		NewRevisionVersion:   expectedRevisionVersion,
-		PriorRevisionVersion: priorRevisionVersion,
+		TenantID:           tenantID,
+		NewDocumentID:      documentID,
+		PriorDocumentID:    body.SupersededDocumentID,
+		SupersededBy:       actorID,
+		NewRevisionVersion: expectedRevisionVersion,
 	})
 	if err != nil {
 		WriteError(w, err)
