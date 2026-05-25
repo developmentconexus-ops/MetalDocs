@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +23,8 @@ const (
 	searchScopeArea         = "area"
 )
 
+var ErrTenantRequired = errors.New("search: tenant id required")
+
 type Service struct {
 	reader domain.Reader
 }
@@ -31,7 +34,12 @@ func NewService(reader domain.Reader) *Service {
 }
 
 func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain.Document, error) {
-	docs, err := s.reader.ListDocuments(ctx)
+	tenantID := strings.TrimSpace(q.TenantID)
+	if tenantID == "" {
+		return nil, ErrTenantRequired
+	}
+
+	docs, err := s.reader.ListDocuments(ctx, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +134,9 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 }
 
 func (s *Service) canView(ctx context.Context, doc domain.Document) (bool, error) {
+	if _, hasUser := authn.UserIDFromContext(ctx); !hasUser {
+		return false, nil
+	}
 	if shouldBypassPolicy(ctx) {
 		return true, nil
 	}
@@ -166,11 +177,7 @@ func (s *Service) policiesForDocument(ctx context.Context, doc domain.Document) 
 }
 
 func shouldBypassPolicy(ctx context.Context) bool {
-	// Policy: explicit bypass. Internal background callers (no IAM context
-	// installed) deliberately skip access-policy enforcement here; HTTP
-	// entrypoints are gated upstream by IAM middleware.
-	_, hasUser := authn.UserIDFromContext(ctx)
-	return !hasUser && len(authn.RolesFromContext(ctx)) == 0
+	return false
 }
 
 func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
