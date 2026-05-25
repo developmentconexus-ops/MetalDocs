@@ -10,6 +10,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
+	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -36,6 +37,10 @@ type routeAdminService interface {
 	Deactivate(ctx context.Context, db *sql.DB, in application.DeactivateRouteInput) (application.DeactivateRouteResult, error)
 }
 
+type routeListRepository interface {
+	ListRoutes(ctx context.Context, tenantID string) ([]repository.Route, error)
+}
+
 var (
 	ErrIfMatchRequired  = errors.New("precondition: If-Match header required")
 	ErrIfMatchMalformed = errors.New("precondition: If-Match header malformed; expected \"v<N>\" or \"*\"")
@@ -58,6 +63,7 @@ type Handler struct {
 	decisionSvc decisionService
 	readSvc     readService
 	routeAdmin  routeAdminService
+	routeRepo   routeListRepository
 	idempStore  signoffIdempStore
 }
 
@@ -72,6 +78,9 @@ func NewHandler(services *application.Services, db *sql.DB, idempStore signoffId
 		h.decisionSvc = services.Decision
 		h.readSvc = services.Read
 		h.routeAdmin = services.RouteAdmin
+	}
+	if db != nil {
+		h.routeRepo = repository.NewPostgresApprovalRepository(db)
 	}
 	return h
 }

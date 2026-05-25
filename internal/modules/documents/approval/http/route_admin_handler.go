@@ -1,17 +1,22 @@
 package approvalhttp
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
+	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/iam/authz"
 )
+
+const CapManageRoutes = "route.admin"
 
 func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
@@ -156,140 +161,89 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	actorID := actorIDFromRequest(r)
 
 	if h.db == nil {
 		WriteError(w, fmt.Errorf("database not configured"))
 		return
 	}
 
-	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT id, name, tenant_id::text, profile_code, active, created_at
-		  FROM approval_routes
-		 WHERE tenant_id = $1::uuid
-		 ORDER BY created_at DESC`,
-		tenantID,
-	)
+	if err := h.requireRouteManagement(r.Context(), tenantID, actorID); err != nil {
+		WriteError(w, err)
+		return
+	}
+
+	routeRepo := h.routeRepo
+	if routeRepo == nil {
+		routeRepo = repository.NewPostgresApprovalRepository(h.db)
+	}
+	routeRows, err := routeRepo.ListRoutes(r.Context(), tenantID)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
-	defer rows.Close()
 
-	routeMap := make(map[string]*contracts.ListRouteItem)
-	var routeOrder []string
-	var routeIDs []string
-
-	for rows.Next() {
-		var (
-			id, name, tid, profileCode string
-			active                     bool
-			createdAt                  time.Time
-		)
-		if err := rows.Scan(&id, &name, &tid, &profileCode, &active, &createdAt); err != nil {
-			WriteError(w, err)
-			return
-		}
-
-		ts := createdAt.UTC().Format(time.RFC3339)
-		routeMap[id] = &contracts.ListRouteItem{
-			ID:          id,
-			Name:        name,
-			TenantID:    tid,
-			ProfileCode: profileCode,
-			Active:      active,
-			Stages:      []contracts.ListStageItem{},
-			CreatedAt:   ts,
-			UpdatedAt:   ts,
-		}
-		routeOrder = append(routeOrder, id)
-		routeIDs = append(routeIDs, id)
-	}
-
-	if err := rows.Err(); err != nil {
-		WriteError(w, err)
-		return
-	}
-
-	if len(routeIDs) > 0 {
-		placeholders := make([]string, 0, len(routeIDs))
-		args := make([]any, 0, len(routeIDs))
-		for i, id := range routeIDs {
-			placeholders = append(placeholders, "$"+strconv.Itoa(i+1)+"::uuid")
-			args = append(args, id)
-		}
-
-		stageRows, err := h.db.QueryContext(r.Context(), `
-			SELECT route_id, name, required_role, required_capability, area_code, quorum, on_eligibility_drift
-			  FROM approval_route_stages
-			 WHERE route_id IN (`+strings.Join(placeholders, ", ")+`)
-			 ORDER BY route_id, stage_order`,
-			args...,
-		)
-		if err != nil {
-			WriteError(w, err)
-			return
-		}
-		defer stageRows.Close()
-
-		for stageRows.Next() {
-			var (
-				id                                                                      string
-				stageName, stageRole, requiredCapability, areaCode, quorum, driftPolicy *string
-			)
-			if err := stageRows.Scan(&id, &stageName, &stageRole, &requiredCapability, &areaCode, &quorum, &driftPolicy); err != nil {
-				WriteError(w, err)
-				return
-			}
-
-			if stageName != nil {
-				sn := *stageName
-				sr := ""
-				sc := ""
-				sa := ""
-				sq := ""
-				sd := ""
-				if stageRole != nil {
-					sr = *stageRole
-				}
-				if requiredCapability != nil {
-					sc = *requiredCapability
-				}
-				if areaCode != nil {
-					sa = *areaCode
-				}
-				if quorum != nil {
-					sq = *quorum
-				}
-				if driftPolicy != nil {
-					sd = *driftPolicy
-				}
-				routeMap[id].Stages = append(routeMap[id].Stages, contracts.ListStageItem{
-					Label:              sn,
-					Members:            []string{sr},
-					RequiredRole:       sr,
-					RequiredCapability: sc,
-					AreaCode:           sa,
-					QuorumKind:         sq,
-					DriftPolicy:        sd,
-				})
-			}
-		}
-
-		if err := stageRows.Err(); err != nil {
-			WriteError(w, err)
-			return
-		}
-	}
-
-	routes := make([]contracts.ListRouteItem, 0, len(routeOrder))
-	for _, id := range routeOrder {
-		routes = append(routes, *routeMap[id])
+	routes := make([]contracts.ListRouteItem, 0, len(routeRows))
+	for _, route := range routeRows {
+		routes = append(routes, mapListRoute(route))
 	}
 
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"routes": routes,
 		"total":  len(routes),
 	})
+}
+
+func (h *Handler) requireRouteManagement(ctx context.Context, tenantID, actorID string) error {
+	return withAuthzCheck(ctx, h.db, tenantID, actorID, CapManageRoutes, "tenant")
+}
+
+func withAuthzCheck(ctx context.Context, db *sql.DB, tenantID, actorID, capability, areaCode string) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("authz check: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
+		return fmt.Errorf("authz check: set tenant GUC: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", actorID); err != nil {
+		return fmt.Errorf("authz check: set actor GUC: %w", err)
+	}
+	return authz.Require(authz.WithCapCache(ctx), tx, capability, areaCode)
+}
+
+func mapListRoute(route repository.Route) contracts.ListRouteItem {
+	createdAt := route.CreatedAt.UTC().Format(time.RFC3339)
+	updatedAt := route.UpdatedAt.UTC().Format(time.RFC3339)
+	if route.UpdatedAt.IsZero() {
+		updatedAt = createdAt
+	}
+
+	stages := make([]contracts.ListStageItem, 0, len(route.Stages))
+	for _, stage := range route.Stages {
+		stages = append(stages, contracts.ListStageItem{
+			Label:              stage.Name,
+			Members:            []string{stage.RequiredRole},
+			RequiredRole:       stage.RequiredRole,
+			RequiredCapability: stage.RequiredCapability,
+			AreaCode:           stage.AreaCode,
+			QuorumKind:         stage.Quorum,
+			DriftPolicy:        stage.DriftPolicy,
+		})
+	}
+
+	return contracts.ListRouteItem{
+		ID:          route.ID,
+		Name:        route.Name,
+		TenantID:    route.TenantID,
+		ProfileCode: route.ProfileCode,
+		Active:      route.Active,
+		Stages:      stages,
+		CreatedAt:   createdAt,
+		UpdatedAt:   updatedAt,
+	}
 }
 
 func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {

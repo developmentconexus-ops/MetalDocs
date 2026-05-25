@@ -29,6 +29,29 @@ type ScheduledPublishRow struct {
 	ScheduleGeneration   int64
 }
 
+// Route is the repository projection for approval route administration lists.
+type Route struct {
+	ID          string
+	Name        string
+	TenantID    string
+	ProfileCode string
+	Active      bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Stages      []RouteStage
+}
+
+// RouteStage is the repository projection for an approval route stage.
+type RouteStage struct {
+	Order              int
+	Name               string
+	RequiredRole       string
+	RequiredCapability string
+	AreaCode           string
+	Quorum             string
+	DriftPolicy        string
+}
+
 // ApprovalRepository defines all persistence operations for the approval subsystem.
 // All mutating methods take *sql.Tx — callers own tx lifecycle (Phase 5 services).
 type ApprovalRepository interface {
@@ -41,6 +64,7 @@ type ApprovalRepository interface {
 	ValidateScheduledSupersedeTarget(ctx context.Context, tx *sql.Tx, tenantID, documentID, supersededDocumentID string) error
 	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error)
 	LoadCurrentPublishedHead(ctx context.Context, tx *sql.Tx, tenantID, controlledDocumentID string) (string, error)
+	ListRoutes(ctx context.Context, tenantID string) ([]Route, error)
 	MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error
 	UpdateStageStatus(ctx context.Context, tx *sql.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error
 	UpdateInstanceStatus(ctx context.Context, tx *sql.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error
