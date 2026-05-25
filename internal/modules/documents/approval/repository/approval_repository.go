@@ -64,6 +64,7 @@ type ApprovalRepository interface {
 	ValidateScheduledSupersedeTarget(ctx context.Context, tx *sql.Tx, tenantID, documentID, supersededDocumentID string) error
 	LoadCurrentPublishedHeadForDocument(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error)
 	LoadCurrentPublishedHead(ctx context.Context, tx *sql.Tx, tenantID, controlledDocumentID string) (string, error)
+	GetDocumentRevisionVersion(ctx context.Context, tx *sql.Tx, documentID, tenantID string) (int, error)
 	ListRoutes(ctx context.Context, tenantID string) ([]Route, error)
 	MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error
 	UpdateStageStatus(ctx context.Context, tx *sql.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error

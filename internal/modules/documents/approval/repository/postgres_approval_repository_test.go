@@ -47,7 +47,7 @@ func TestMapPgError(t *testing.T) {
 		{
 			name:       "unique_signoff_instance_actor",
 			err:        makePgErr("23505", "approval_signoffs_approval_instance_id_actor_user_id_key", ""),
-			wantTarget: ErrActorAlreadySigned,
+			wantTarget: ErrUnknownDB,
 		},
 		{
 			name:       "unique_signoff_stage_actor",
@@ -63,7 +63,7 @@ func TestMapPgError(t *testing.T) {
 		{
 			name:       "unique_unknown_no_hint",
 			err:        makePgErr("23505", "some_other_constraint", ""),
-			wantTarget: ErrActorAlreadySigned,
+			wantTarget: ErrUnknownDB,
 		},
 		{
 			name:       "fk_violation",
