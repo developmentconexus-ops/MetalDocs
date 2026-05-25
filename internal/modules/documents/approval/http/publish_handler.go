@@ -46,6 +46,10 @@ func (h *Handler) PublishHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	if h.readSvc == nil {
+		WriteError(w, errors.New("read service not configured"))
+		return
+	}
 
 	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, documentID)
 	if err != nil {
