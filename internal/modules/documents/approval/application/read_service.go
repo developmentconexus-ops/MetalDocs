@@ -10,6 +10,8 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // InboxView is the read-model projection for the inbox UI.
@@ -41,6 +43,23 @@ func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, ac
 		return nil, fmt.Errorf("read load instance: begin tx: %w", err)
 	}
 	defer tx.Rollback()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("read load instance: %w", err)
+	}
+
+	areaCode, err := loadInstanceAreaCode(ctx, tx, tenantID, instanceID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrNoActiveInstance
+		}
+		return nil, fmt.Errorf("read load instance: load area: %w", err)
+	}
+
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), areaCode); err != nil {
+		return nil, err
+	}
 
 	inst, err := s.repo.LoadInstance(ctx, tx, tenantID, instanceID)
 	if err != nil {
@@ -244,4 +263,31 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, db *sql.DB, tena
 		return 0, fmt.Errorf("count pending: query: %w", err)
 	}
 	return total, nil
+}
+
+func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) (string, error) {
+	var areaCode string
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(asi.area_code_snapshot, d.process_area_code_snapshot, cd.process_area_code, 'tenant')
+		  FROM approval_instances ai
+		  JOIN documents d
+		    ON d.id = ai.document_id
+		   AND d.tenant_id = ai.tenant_id
+		  LEFT JOIN controlled_documents cd
+		    ON cd.id = d.controlled_document_id
+		  LEFT JOIN approval_stage_instances asi
+		    ON asi.approval_instance_id = ai.id
+		   AND asi.status = 'active'
+		 WHERE ai.id = $1
+		   AND ai.tenant_id = $2
+		 LIMIT 1`,
+		instanceID, tenantID,
+	).Scan(&areaCode)
+	if err != nil {
+		return "", err
+	}
+	if areaCode == "" {
+		return "tenant", nil
+	}
+	return areaCode, nil
 }
