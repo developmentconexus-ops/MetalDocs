@@ -21,7 +21,7 @@ import (
 )
 
 type TemplateVersionChecker interface {
-	GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error)
+	GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error)
 }
 
 type ProfileReader interface {
@@ -199,7 +199,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		if !isReasonValid(cmd.OverrideTemplateReason) {
 			return nil, controlleddocumentsdomain.ErrOverrideReasonRequired
 		}
-		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, *cmd.OverrideTemplateVersionID)
+		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, cmd.TenantID, *cmd.OverrideTemplateVersionID)
 		if err != nil {
 			return nil, err
 		}
