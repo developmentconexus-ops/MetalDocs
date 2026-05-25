@@ -146,6 +146,10 @@ func (m *Middleware) resolveRoles(w http.ResponseWriter, r *http.Request, userID
 			_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "User is not authorized"))
 			return nil, false
 		}
+		if errors.Is(err, iamdomain.ErrNoRolesAssigned) {
+			_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			return nil, false
+		}
 		if err != nil {
 			_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authorization lookup failed"))
 			return nil, false

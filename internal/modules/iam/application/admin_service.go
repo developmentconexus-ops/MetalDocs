@@ -9,6 +9,7 @@ import (
 
 type RoleCacheInvalidator interface {
 	InvalidateUser(userID string)
+	InvalidateUserTenant(userID, tenantID string)
 }
 
 type AdminService struct {
@@ -39,7 +40,7 @@ func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, disp
 		return err
 	}
 	if s.invalidator != nil {
-		s.invalidator.InvalidateUser(userID)
+		s.invalidator.InvalidateUserTenant(userID, tenantID)
 	}
 	return nil
 }
@@ -66,7 +67,7 @@ func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName
 		return err
 	}
 	if s.invalidator != nil {
-		s.invalidator.InvalidateUser(userID)
+		s.invalidator.InvalidateUserTenant(userID, tenantID)
 	}
 	return nil
 }
