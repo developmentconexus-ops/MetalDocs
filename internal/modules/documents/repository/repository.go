@@ -1377,13 +1377,20 @@ func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID 
 		return fmt.Errorf("mark archived: authz check: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		UPDATE public.documents
 		   SET archived_at = now(), updated_at = now()
 		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NULL`,
 		tenantID, docID)
 	if err != nil {
-		return err
+		return fmt.Errorf("mark archived: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("mark archived rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("mark archived: not found or already in target state")
 	}
 	return tx.Commit()
 }
@@ -1401,13 +1408,20 @@ func (r *Repository) Unarchive(ctx context.Context, tenantID, docID, actorID str
 		return fmt.Errorf("unarchive: authz check: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		UPDATE public.documents
 		   SET archived_at = NULL, updated_at = now()
 		 WHERE tenant_id = $1 AND id = $2 AND archived_at IS NOT NULL`,
 		tenantID, docID)
 	if err != nil {
-		return err
+		return fmt.Errorf("unarchive: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("unarchive rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("unarchive: not found or already in target state")
 	}
 	return tx.Commit()
 }
