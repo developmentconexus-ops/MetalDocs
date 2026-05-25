@@ -94,18 +94,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, err
 	}
 
-	// Step 2: compute content hash.
-	contentHash, err := ComputeContentHash(ContentHashInput{
-		TenantID:       req.TenantID,
-		DocumentID:     req.InstanceID, // keyed on instance for signoff hashing
-		RevisionNumber: 0,              // signoff hash does not embed revision
-		FormData:       req.ContentFormData,
-	})
-	if err != nil {
-		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
-	}
-
-	// Step 3: begin transaction.
+	// Step 2: begin transaction.
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return SignoffResult{}, fmt.Errorf("recordSignoff: begin tx: %w", err)
@@ -144,6 +133,22 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSignoff), areaCode); err != nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, err
+	}
+
+	formData, err := loadCurrentDocumentFormData(ctx, tx, req.TenantID, instance.DocumentID)
+	if err != nil {
+		_ = tx.Rollback()
+		return SignoffResult{}, fmt.Errorf("recordSignoff: load document form data: %w", err)
+	}
+	contentHash, err := ComputeContentHash(ContentHashInput{
+		TenantID:       req.TenantID,
+		DocumentID:     req.InstanceID, // keyed on instance for signoff hashing
+		RevisionNumber: 0,              // signoff hash does not embed revision
+		FormData:       formData,
+	})
+	if err != nil {
+		_ = tx.Rollback()
+		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
 	}
 
 	// Step 5: identify active stage.
@@ -550,4 +555,30 @@ func hasUnresolvedComments(ctx context.Context, tx *sql.Tx, tenantID, documentID
 		return false, err
 	}
 	return unresolvedCount > 0, nil
+}
+
+func loadCurrentDocumentFormData(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (map[string]any, error) {
+	var raw []byte
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(form_data_json, '{}'::jsonb)
+		  FROM documents
+		 WHERE id = $1
+		   AND tenant_id = $2
+		 FOR UPDATE`,
+		documentID, tenantID,
+	).Scan(&raw)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return map[string]any{}, nil
+	}
+	var formData map[string]any
+	if err := json.Unmarshal(raw, &formData); err != nil {
+		return nil, fmt.Errorf("unmarshal form_data_json: %w", err)
+	}
+	if formData == nil {
+		return map[string]any{}, nil
+	}
+	return formData, nil
 }
