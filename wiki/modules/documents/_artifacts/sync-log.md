@@ -1,3 +1,17 @@
+## 2026-05-25 - PDF webhook tenant hardening sync
+
+- **Context:** uncommitted diff on `fix/docs-5b-webhook-tenant-c4` for C4 tenant spoofing fix in documents PDF webhook handler.
+- **Mode:** lite patch
+- **Affected-surface scan:** `internal/modules/documents/http/pdf_webhook_handler.go`; `internal/modules/documents/http/pdf_webhook_handler_test.go`; `internal/modules/documents/repository/snapshot_repository.go`.
+- **Routes/API:** no public contract change; existing `POST /api/v1/documents/{id}/pdf-complete` now resolves tenant from `documents.id` and validates optional body `tenant_id` against canonical tenant.
+- **Runtime flows:** webhook persistence now uses DB-derived tenant only; mismatched body tenant is rejected.
+- **Persistence:** tenant lookup read added before `WritePDF`; no schema changes.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: `wiki_sync_preflight.ps1` could not run tally because Git Bash failed with `CreateFileMapping ... Win32 error 5`.
+- **Patched files:** `internal/modules/documents/http/pdf_webhook_handler.go`; `internal/modules/documents/http/pdf_webhook_handler_test.go`; `internal/modules/documents/repository/snapshot_repository.go`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - editor-session tenant isolation sync
 
 - **Context:** uncommitted diff on `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` for 5a-C3..C8.
