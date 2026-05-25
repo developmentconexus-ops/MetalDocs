@@ -29,7 +29,9 @@ type JobConfig struct {
 type Metrics struct {
 	mu sync.Mutex
 
-	RunsTotal   map[string]int64
+	// RunsTotal counts completed job function invocations, regardless of success.
+	RunsTotal map[string]int64
+	// ErrorsTotal counts job function invocations that returned a non-nil error.
 	ErrorsTotal map[string]int64
 	SkipsTotal  map[string]int64
 }
@@ -90,7 +92,7 @@ type Scheduler struct {
 
 func New(db *sql.DB, leaderID string) (*Scheduler, error) {
 	if leaderID == "" {
-		return nil, errors.New("leaderID cannot be empty")
+		return nil, errors.New("leaderID required")
 	}
 	return &Scheduler{
 		db:             db,
@@ -350,7 +352,10 @@ func (s *Scheduler) heartbeatLease(ctx context.Context, job, leader string, epoc
 }
 
 func (s *Scheduler) releaseLease(ctx context.Context, job string, epoch int64) error {
-	_, err := s.db.ExecContext(ctx,
+	releaseCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	_, err := s.db.ExecContext(releaseCtx,
 		"SELECT metaldocs.release_lease($1, $2, $3)",
 		job,
 		s.leaderID,
@@ -454,6 +459,9 @@ func (s *Scheduler) unregisterTicker(t *time.Ticker) {
 
 func (s *Scheduler) stopAllTickers() {
 	s.mu.Lock()
+	// Copy under lock, then stop outside it. Ticker.Stop can race with loop
+	// teardown, so this stays intentionally two-phase to avoid holding s.mu
+	// across external calls.
 	tickers := append([]*time.Ticker(nil), s.tickers...)
 	s.mu.Unlock()
 	for _, t := range tickers {

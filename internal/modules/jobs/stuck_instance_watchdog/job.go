@@ -144,8 +144,8 @@ LEFT JOIN approval_stage_instances asi
   ON asi.approval_instance_id = ai.id
  AND asi.status = 'active'
 WHERE ai.status = 'in_progress'
-  AND ai.submitted_at < now() - interval '7 days'
-LIMIT $1`, BatchSize)
+  AND ai.submitted_at < now() - ($2 * interval '1 second')
+LIMIT $1`, BatchSize, int64(StuckAfter/time.Second))
 	if err != nil {
 		return nil, err
 	}

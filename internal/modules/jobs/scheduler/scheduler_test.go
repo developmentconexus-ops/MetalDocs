@@ -203,6 +203,12 @@ func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
 	t.Fatalf("condition was not met within %v", timeout)
 }
 
+func TestNew_LeaderIDRequired(t *testing.T) {
+	if _, err := New(nil, ""); err == nil || err.Error() != "leaderID required" {
+		t.Fatalf("New(nil, \"\") error = %v, want leaderID required", err)
+	}
+}
+
 func TestScheduler_LeaseAcquired_JobRuns(t *testing.T) {
 	state := &fakeSchedulerDB{
 		acquireResults:   []leaseAcquireResult{{acquired: true, epoch: 11}},

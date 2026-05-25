@@ -42,7 +42,11 @@ WHERE ctid IN (
 				return err
 			}
 
-			n, _ := result.RowsAffected()
+			n, err := result.RowsAffected()
+			if err != nil {
+				slog.ErrorContext(ctx, "idempotency_janitor: rows affected failed", "error", err)
+				return err
+			}
 			totalDeleted += int(n)
 			if n == 0 {
 				break

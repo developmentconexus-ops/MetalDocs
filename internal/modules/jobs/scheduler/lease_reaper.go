@@ -48,6 +48,7 @@ RETURNING job_name, leader_id, lease_epoch
 			var leaderID string
 			var leaseEpoch int64
 			if err := rows.Scan(&jobName, &leaderID, &leaseEpoch); err != nil {
+				slog.ErrorContext(ctx, "lease_reaper: scan reclaimed lease failed", "error", err)
 				rowErrs = append(rowErrs, err)
 				continue
 			}
@@ -58,6 +59,11 @@ RETURNING job_name, leader_id, lease_epoch
 				"lease_epoch": leaseEpoch,
 			})
 			if err != nil {
+				slog.ErrorContext(ctx, "lease_reaper: marshal governance payload failed",
+					"job_name", jobName,
+					"leader_id", leaderID,
+					"lease_epoch", leaseEpoch,
+					"error", err)
 				rowErrs = append(rowErrs, err)
 				continue
 			}
