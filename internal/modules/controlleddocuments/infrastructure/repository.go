@@ -546,14 +546,15 @@ func NewPostgresTemplateVersionChecker(db *sql.DB) *PostgresTemplateVersionCheck
 	return &PostgresTemplateVersionChecker{db: db}
 }
 
-func (c *PostgresTemplateVersionChecker) GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error) {
+func (c *PostgresTemplateVersionChecker) GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error) {
 	var status sql.NullString
 	var profileCode sql.NullString
 	err := c.db.QueryRowContext(ctx, `
 		SELECT v.status, t.profile_code
 		FROM templates_template_version v
 		JOIN templates_template t ON t.id = v.template_id
-		WHERE v.id = $1`, templateVersionID,
+		WHERE v.id = $1
+		  AND t.tenant_id = $2`, templateVersionID, tenantID,
 	).Scan(&status, &profileCode)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, "", nil
