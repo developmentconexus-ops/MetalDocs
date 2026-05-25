@@ -190,6 +190,9 @@ func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.Fam
 	if !ok {
 		return nil, fmt.Errorf("invalid family tx type %T", tx)
 	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return nil, fmt.Errorf("query family for update %q: %w", code, err)
+	}
 	const q = `
 SELECT code, name, description, is_active, created_at
 FROM metaldocs.document_families

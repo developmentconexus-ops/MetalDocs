@@ -16,6 +16,7 @@ import (
 
 type fakeProfileService struct {
 	createErr error
+	getErr    error
 }
 
 func (f fakeProfileService) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.DocumentProfile, error) {
@@ -23,7 +24,10 @@ func (f fakeProfileService) List(ctx context.Context, tenantID string, includeAr
 }
 
 func (f fakeProfileService) Get(ctx context.Context, tenantID string, code domain.ProfileCode) (*domain.DocumentProfile, error) {
-	return nil, domain.ErrProfileNotFound
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
+	return &domain.DocumentProfile{Code: code, TenantID: tenantID}, nil
 }
 
 func (f fakeProfileService) Create(ctx context.Context, p *domain.DocumentProfile) error {
@@ -43,7 +47,7 @@ func (f fakeProfileService) Archive(ctx context.Context, tenantID string, profil
 }
 
 func TestProfilesHandler_ErrorEnvelopeContract(t *testing.T) {
-	handler := &Handler{profiles: fakeProfileService{}}
+	handler := &Handler{profiles: fakeProfileService{getErr: domain.ErrProfileNotFound}}
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
@@ -77,6 +81,21 @@ func TestProfilesHandler_UpdateUsesPatch(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestProfilesHandler_UpdateReturns404WhenProfileMissing(t *testing.T) {
+	handler := &Handler{profiles: fakeProfileService{getErr: domain.ErrProfileNotFound}}
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/taxonomy/profiles/foo", strings.NewReader(`{}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }
 

@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"metaldocs/internal/modules/taxonomy/domain"
@@ -69,23 +70,37 @@ func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
 }
 
 func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
-	if err := s.areas.Update(ctx, a); err != nil {
-		return fmt.Errorf("taxonomy: update area %q: %w", a.Code, err)
+	existing, err := s.areas.GetByCode(ctx, a.TenantID, a.Code)
+	if err != nil {
+		return fmt.Errorf("taxonomy: get area %q for update: %w", a.Code, err)
+	}
+	normalized, err := domain.NewProcessArea(*a)
+	if err != nil {
+		return fmt.Errorf("taxonomy: validate area update: %w", err)
+	}
+	existing.Name = normalized.Name
+	existing.Description = normalized.Description
+	existing.ParentCode = normalized.ParentCode
+	existing.OwnerUserID = normalized.OwnerUserID
+	existing.DefaultApproverRole = normalized.DefaultApproverRole
+	existing.ArchivedAt = normalized.ArchivedAt
+	if err := s.areas.Update(ctx, existing); err != nil {
+		return fmt.Errorf("taxonomy: update area %q: %w", existing.Code, err)
 	}
 
 	payload, err := marshalGovernancePayload(map[string]string{
-		"name": a.Name,
+		"name": existing.Name,
 	})
 	if err != nil {
 		return fmt.Errorf("taxonomy: marshal area update governance payload: %w", err)
 	}
 	actorUserID, _ := authn.UserIDFromContext(ctx)
 	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
-		TenantID:     a.TenantID,
+		TenantID:     existing.TenantID,
 		EventType:    domain.GovernanceEventTypeAreaUpdated,
 		ActorUserID:  actorUserID,
 		ResourceType: "process_area",
-		ResourceID:   string(a.Code),
+		ResourceID:   string(existing.Code),
 		PayloadJSON:  payload,
 	}); err != nil {
 		return fmt.Errorf("taxonomy: log area update governance event: %w", err)
@@ -94,6 +109,9 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 }
 
 func (s *AreaService) SetParent(ctx context.Context, tenantID string, areaCode domain.AreaCode, parentCode *domain.AreaCode, actorID string) error {
+	if parentCode == nil || strings.TrimSpace(string(*parentCode)) == "" {
+		return domain.ErrAreaParentCodeRequired
+	}
 	tx, err := s.areas.BeginTx(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: begin set area parent tx: %w", err)

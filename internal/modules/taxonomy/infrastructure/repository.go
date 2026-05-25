@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -14,6 +15,11 @@ import (
 type ProfileRepository struct {
 	db *sql.DB
 }
+
+const (
+	maxTaxonomyListRows  = 1000
+	maxTaxonomyTreeDepth = 20
+)
 
 type taxonomyTx struct {
 	tx *sql.Tx
@@ -104,7 +110,7 @@ WHERE tenant_id = $1`
 	if !includeArchived {
 		q += " AND archived_at IS NULL"
 	}
-	q += " ORDER BY code ASC"
+	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // TODO: add pagination instead of returning the full profile catalog.
 
 	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {
@@ -386,7 +392,7 @@ WHERE tenant_id = $1`
 	if !includeArchived {
 		q += " AND archived_at IS NULL"
 	}
-	q += " ORDER BY code ASC"
+	q += " ORDER BY code ASC LIMIT " + strconv.Itoa(maxTaxonomyListRows) // TODO: add pagination instead of returning the full area catalog.
 
 	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {
@@ -543,8 +549,8 @@ func (r *AreaRepository) ListAncestorsTx(ctx context.Context, tx domain.FamilyTx
 		return nil, fmt.Errorf("invalid taxonomy tx type %T", tx)
 	}
 	const q = `
-WITH RECURSIVE ancestors AS (
-    SELECT p.code, p.parent_code
+	WITH RECURSIVE ancestors AS (
+    SELECT p.code, p.parent_code, 1 AS depth
     FROM metaldocs.document_process_areas p
     WHERE p.tenant_id = $1
       AND p.code = (
@@ -553,12 +559,13 @@ WITH RECURSIVE ancestors AS (
           WHERE tenant_id = $1 AND code = $2
       )
     UNION
-    SELECT p.code, p.parent_code
+    SELECT p.code, p.parent_code, a.depth + 1
     FROM metaldocs.document_process_areas p
     INNER JOIN ancestors a ON p.tenant_id = $1 AND p.code = a.parent_code
+    WHERE a.depth < $3
 )
 SELECT code FROM ancestors`
-	rows, err := sqlTx.tx.QueryContext(ctx, q, tenantID, code)
+	rows, err := sqlTx.tx.QueryContext(ctx, q, tenantID, code, maxTaxonomyTreeDepth)
 	if err != nil {
 		return nil, fmt.Errorf("query area ancestors tx %q: %w", code, err)
 	}
@@ -623,8 +630,8 @@ func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID string, cod
 	}
 
 	const q = `
-WITH RECURSIVE ancestors AS (
-    SELECT p.code, p.parent_code
+	WITH RECURSIVE ancestors AS (
+    SELECT p.code, p.parent_code, 1 AS depth
     FROM metaldocs.document_process_areas p
     WHERE p.tenant_id = $1
       AND p.code = (
@@ -633,13 +640,14 @@ WITH RECURSIVE ancestors AS (
           WHERE tenant_id = $1 AND code = $2
       )
     UNION
-    SELECT p.code, p.parent_code
+    SELECT p.code, p.parent_code, a.depth + 1
     FROM metaldocs.document_process_areas p
     INNER JOIN ancestors a ON p.tenant_id = $1 AND p.code = a.parent_code
+    WHERE a.depth < $3
 )
 SELECT code FROM ancestors`
 
-	rows, err := tx.QueryContext(ctx, q, tenantID, code)
+	rows, err := tx.QueryContext(ctx, q, tenantID, code, maxTaxonomyTreeDepth)
 	if err != nil {
 		return nil, err
 	}

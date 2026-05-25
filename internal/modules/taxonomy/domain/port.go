@@ -59,6 +59,8 @@ type FamilyTx interface {
 	Rollback() error
 }
 
+// FamilyTx intentionally stays minimal so services do not depend on *sql.Tx
+// directly; repository adapters perform the concrete type assertion internally.
 type FamilyRepository interface {
 	GetByCode(ctx context.Context, code FamilyCode) (*DocumentFamily, error)
 	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)
@@ -68,5 +70,7 @@ type FamilyRepository interface {
 	BeginTx(ctx context.Context) (FamilyTx, error)
 	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, code FamilyCode) (*DocumentFamily, error)
 	HasActiveProfilesTx(ctx context.Context, tx FamilyTx, tenantID string, familyCode FamilyCode) (bool, error)
+	// Tx methods intentionally mirror the non-tx methods so services can stage
+	// lock/read/write flows without leaking transaction details into callers.
 	UpdateTx(ctx context.Context, tx FamilyTx, f *DocumentFamily) error
 }

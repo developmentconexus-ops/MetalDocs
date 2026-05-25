@@ -19,13 +19,14 @@ type ProcessArea struct {
 }
 
 var (
-	ErrAreaNotFound       = errors.New("process area not found")
-	ErrAreaArchived       = errors.New("process area is archived")
-	ErrAreaParentCycle    = errors.New("area parent assignment creates cycle")
-	ErrAreaCodeImmutable  = errors.New("area code is immutable")
-	ErrAreaCodeRequired   = errors.New("area code must not be empty")
-	ErrAreaTenantRequired = errors.New("area tenant must not be empty")
-	ErrAreaNameRequired   = errors.New("area name must not be empty")
+	ErrAreaNotFound           = errors.New("process area not found")
+	ErrAreaArchived           = errors.New("process area is archived")
+	ErrAreaParentCycle        = errors.New("area parent assignment creates cycle")
+	ErrAreaParentCodeRequired = errors.New("area parent code must not be empty")
+	ErrAreaCodeImmutable      = errors.New("area code is immutable")
+	ErrAreaCodeRequired       = errors.New("area code must not be empty")
+	ErrAreaTenantRequired     = errors.New("area tenant must not be empty")
+	ErrAreaNameRequired       = errors.New("area name must not be empty")
 )
 
 type AreaCode string

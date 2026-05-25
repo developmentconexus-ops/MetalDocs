@@ -137,6 +137,10 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
+	if _, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code"))); err != nil {
+		h.writeProfileError(w, err)
+		return
+	}
 
 	updateCode := r.PathValue("code")
 	updateAlias := strings.TrimSpace(req.Alias)
@@ -196,9 +200,7 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 		h.writeProfileError(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("{}"))
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{})
 }
 
 func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {

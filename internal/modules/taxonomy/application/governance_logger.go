@@ -12,6 +12,8 @@ type DBGovernanceLogger struct {
 	db *sql.DB
 }
 
+// Deprecated: prefer NewAuditGovernanceAdapter so taxonomy writes to the
+// canonical audit sink instead of the legacy governance_events table.
 func NewDBGovernanceLogger(db *sql.DB) *DBGovernanceLogger {
 	return &DBGovernanceLogger{db: db}
 }

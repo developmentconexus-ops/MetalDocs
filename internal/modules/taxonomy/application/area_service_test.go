@@ -70,6 +70,16 @@ func TestAreaServiceSetParentFailsWhenCycleDetected(t *testing.T) {
 	}
 }
 
+func TestAreaServiceSetParentRequiresParentCode(t *testing.T) {
+	repo := newFakeAreaRepository()
+	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})
+
+	service := NewAreaService(repo, &fakeGovernanceLogger{})
+	if err := service.SetParent(context.Background(), "tenant-a", "child", nil, "user-1"); !errors.Is(err, domain.ErrAreaParentCodeRequired) {
+		t.Fatalf("expected ErrAreaParentCodeRequired, got %v", err)
+	}
+}
+
 func TestAreaServiceArchiveSetsArchivedAt(t *testing.T) {
 	repo := newFakeAreaRepository()
 	repo.put(&domain.ProcessArea{Code: "child", TenantID: "tenant-a"})

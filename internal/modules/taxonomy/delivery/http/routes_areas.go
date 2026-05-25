@@ -99,6 +99,10 @@ func (h *Handler) updateArea(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
+	if _, err := h.areas.Get(r.Context(), tenantID, domain.AreaCode(r.PathValue("code"))); err != nil {
+		h.writeAreaError(w, err)
+		return
+	}
 
 	area := &domain.ProcessArea{
 		Code:                domain.AreaCode(r.PathValue("code")),
@@ -157,6 +161,8 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "AREA_ARCHIVED", "process area is archived")
 	case errors.Is(err, domain.ErrAreaParentCycle):
 		writeError(w, http.StatusBadRequest, "AREA_PARENT_CYCLE", "area parent assignment creates cycle")
+	case errors.Is(err, domain.ErrAreaParentCodeRequired):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "parentCode is required")
 	case errors.Is(err, domain.ErrAreaCodeImmutable):
 		writeError(w, http.StatusBadRequest, "AREA_CODE_IMMUTABLE", "area code is immutable")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":

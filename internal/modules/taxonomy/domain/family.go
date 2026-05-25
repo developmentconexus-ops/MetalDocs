@@ -10,8 +10,9 @@ type DocumentFamily struct {
 	Code        FamilyCode `json:"code"`
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
-	IsActive    bool       `json:"isActive"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	// IsActive remains an exported field because taxonomy JSON responses bind it directly.
+	IsActive  bool      `json:"isActive"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 var (
