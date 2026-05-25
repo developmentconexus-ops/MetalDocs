@@ -9,6 +9,7 @@ import (
 var (
 	uuidPattern   = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	sha256Pattern = regexp.MustCompile(`(?i)^[0-9a-f]{64}$`)
+	slugPattern   = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 )
 
 type SubmitRequest struct {
@@ -56,6 +57,20 @@ func validateSHA256Hex(field, value string) error {
 func validateRequired(field, value string) error {
 	if strings.TrimSpace(value) == "" {
 		return fmt.Errorf("%s is required", field)
+	}
+	return nil
+}
+
+func validateSlug(field, value string, maxLen int) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fmt.Errorf("%s is required", field)
+	}
+	if len(value) > maxLen {
+		return fmt.Errorf("%s must be at most %d characters", field, maxLen)
+	}
+	if !slugPattern.MatchString(value) {
+		return fmt.Errorf("%s must match ^[a-z][a-z0-9_-]*$", field)
 	}
 	return nil
 }

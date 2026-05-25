@@ -76,6 +76,16 @@ func MapErrorToResponse(err error) *problem.Problem {
 	statusCode := http.StatusInternalServerError
 	code := approvalCodeInternalUnknown
 
+	var capabilityDenied authz.ErrCapDenied
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	var invalidParamErr *approvalapi.InvalidParamFormatError
+	var unmarshalParamErr *approvalapi.UnmarshalingParamError
+	var requiredParamErr *approvalapi.RequiredParamError
+	var requiredHeaderErr *approvalapi.RequiredHeaderError
+	var tooManyValuesErr *approvalapi.TooManyValuesForParamError
+	var validationErr *ValidationError
+
 	switch {
 	case errors.Is(err, repository.ErrStaleRevision):
 		statusCode = http.StatusConflict
@@ -137,79 +147,66 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, domain.ErrNoActiveStage):
 		statusCode = http.StatusConflict
 		code = approvalCodeStateInstanceCompleted
-	default:
-		var capabilityDenied authz.ErrCapDenied
-		var syntaxErr *json.SyntaxError
-		var typeErr *json.UnmarshalTypeError
-		var invalidParamErr *approvalapi.InvalidParamFormatError
-		var unmarshalParamErr *approvalapi.UnmarshalingParamError
-		var requiredParamErr *approvalapi.RequiredParamError
-		var requiredHeaderErr *approvalapi.RequiredHeaderError
-		var tooManyValuesErr *approvalapi.TooManyValuesForParamError
-		var validationErr *ValidationError
-
-		switch {
-		case errors.As(err, &invalidParamErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamFormat
-		case errors.As(err, &unmarshalParamErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamUnmarshal
-		case errors.As(err, &requiredParamErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamRequired
-		case errors.As(err, &requiredHeaderErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationHeaderRequired
-		case errors.As(err, &tooManyValuesErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationParamTooMany
-		case errors.As(err, &capabilityDenied):
-			statusCode = http.StatusForbidden
-			code = approvalCodeAuthzCapDenied
-		case errors.Is(err, application.ErrApprovalBlockedByUnresolvedComments):
-			statusCode = http.StatusConflict
-			code = approvalCodeApprovalUnresolved
-		case errors.Is(err, application.ErrReasonRequired):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationReasonRequired
-		case errors.Is(err, application.ErrInvalidObsoleteSource):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
-		case errors.Is(err, application.ErrEffectiveDateInPast):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
-		case errors.Is(err, application.ErrRouteNotFound):
-			statusCode = http.StatusNotFound
-			code = approvalCodeNotFoundRoute
-		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-			statusCode = http.StatusGatewayTimeout
-			code = approvalCodeTimeout
-		case errors.As(err, &syntaxErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationJSONDecode
-		case errors.Is(err, io.ErrUnexpectedEOF):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationJSONDecode
-		case errors.As(err, &typeErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationJSONTypeError
-		case errors.Is(err, io.EOF):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationEmptyBody
-		case errors.Is(err, contracts.ErrContentType):
-			statusCode = http.StatusUnsupportedMediaType
-			code = approvalCodeValidationContentType
-		case errors.Is(err, contracts.ErrBodyTooLarge):
-			statusCode = http.StatusRequestEntityTooLarge
-			code = approvalCodeValidationBodyTooLarge
-		case errors.Is(err, contracts.ErrEmptyBody):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationEmptyBody
-		case errors.As(err, &validationErr):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
-		}
+	case errors.As(err, &invalidParamErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationParamFormat
+	case errors.As(err, &unmarshalParamErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationParamUnmarshal
+	case errors.As(err, &requiredParamErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationParamRequired
+	case errors.As(err, &requiredHeaderErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationHeaderRequired
+	case errors.As(err, &tooManyValuesErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationParamTooMany
+	case errors.As(err, &capabilityDenied):
+		statusCode = http.StatusForbidden
+		code = approvalCodeAuthzCapDenied
+	case errors.Is(err, application.ErrApprovalBlockedByUnresolvedComments):
+		statusCode = http.StatusConflict
+		code = approvalCodeApprovalUnresolved
+	case errors.Is(err, application.ErrReasonRequired):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationReasonRequired
+	case errors.Is(err, application.ErrInvalidObsoleteSource):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationRequestInvalid
+	case errors.Is(err, application.ErrEffectiveDateInPast):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationRequestInvalid
+	case errors.Is(err, application.ErrRouteNotFound):
+		statusCode = http.StatusNotFound
+		code = approvalCodeNotFoundRoute
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		statusCode = http.StatusGatewayTimeout
+		code = approvalCodeTimeout
+	case errors.As(err, &syntaxErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationJSONDecode
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationJSONDecode
+	case errors.As(err, &typeErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationJSONTypeError
+	case errors.Is(err, io.EOF):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationEmptyBody
+	case errors.Is(err, contracts.ErrContentType):
+		statusCode = http.StatusUnsupportedMediaType
+		code = approvalCodeValidationContentType
+	case errors.Is(err, contracts.ErrBodyTooLarge):
+		statusCode = http.StatusRequestEntityTooLarge
+		code = approvalCodeValidationBodyTooLarge
+	case errors.Is(err, contracts.ErrEmptyBody):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationEmptyBody
+	case errors.As(err, &validationErr):
+		statusCode = http.StatusBadRequest
+		code = approvalCodeValidationRequestInvalid
 	}
 
 	return problem.New(statusCode, code, responseTitle(err, statusCode))
