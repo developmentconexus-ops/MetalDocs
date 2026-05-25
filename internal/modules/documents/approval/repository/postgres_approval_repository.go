@@ -384,6 +384,88 @@ func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Contex
 	return documentID, nil
 }
 
+// ListRoutes loads tenant-scoped route configuration and stages in one joined query.
+func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID string) ([]Route, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.active, r.created_at, r.created_at AS updated_at,
+		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.on_eligibility_drift
+		  FROM approval_routes r
+		  JOIN approval_route_stages s
+		    ON s.route_id = r.id
+		 WHERE r.tenant_id = $1::uuid
+		 ORDER BY r.created_at DESC, s.stage_order ASC`,
+		tenantID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer rows.Close()
+
+	routeMap := make(map[string]*Route)
+	var routeOrder []string
+	for rows.Next() {
+		var (
+			routeID, routeName, routeTenantID, profileCode string
+			active                                         bool
+			createdAt, updatedAt                           time.Time
+			stage                                          RouteStage
+			stageName, stageRole, stageCapability          sql.NullString
+			stageArea, stageQuorum, stageDrift             sql.NullString
+		)
+		if err := rows.Scan(
+			&routeID, &routeName, &routeTenantID, &profileCode, &active, &createdAt, &updatedAt,
+			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageDrift,
+		); err != nil {
+			return nil, fmt.Errorf("scan approval route list row: %w", err)
+		}
+
+		route := routeMap[routeID]
+		if route == nil {
+			route = &Route{
+				ID:          routeID,
+				Name:        routeName,
+				TenantID:    routeTenantID,
+				ProfileCode: profileCode,
+				Active:      active,
+				CreatedAt:   createdAt,
+				UpdatedAt:   updatedAt,
+				Stages:      []RouteStage{},
+			}
+			routeMap[routeID] = route
+			routeOrder = append(routeOrder, routeID)
+		}
+
+		if stageName.Valid {
+			stage.Name = stageName.String
+		}
+		if stageRole.Valid {
+			stage.RequiredRole = stageRole.String
+		}
+		if stageCapability.Valid {
+			stage.RequiredCapability = stageCapability.String
+		}
+		if stageArea.Valid {
+			stage.AreaCode = stageArea.String
+		}
+		if stageQuorum.Valid {
+			stage.Quorum = stageQuorum.String
+		}
+		if stageDrift.Valid {
+			stage.DriftPolicy = stageDrift.String
+		}
+		route.Stages = append(route.Stages, stage)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate approval route list rows: %w", err)
+	}
+
+	routes := make([]Route, 0, len(routeOrder))
+	for _, routeID := range routeOrder {
+		routes = append(routes, *routeMap[routeID])
+	}
+	return routes, nil
+}
+
 func (r *postgresApprovalRepository) MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error {
 	res, err := tx.ExecContext(ctx, `
 		UPDATE documents
