@@ -182,7 +182,7 @@ func (r *fakeProfileRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, p
 
 func (r *fakeProfileRepository) put(p *domain.DocumentProfile) {
 	copy := *p
-	r.byKey[p.TenantID+"|"+p.Code] = &copy
+	r.byKey[p.TenantID+"|"+string(p.Code)] = &copy
 }
 
 func (r *fakeProfileRepository) get(tenantID, code string) *domain.DocumentProfile {

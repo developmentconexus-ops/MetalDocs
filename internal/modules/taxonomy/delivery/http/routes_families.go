@@ -48,7 +48,7 @@ func (h *Handler) createFamily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := &domain.DocumentFamily{
-		Code:        req.Code,
+		Code:        domain.FamilyCode(req.Code),
 		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
 	}
@@ -75,7 +75,7 @@ func (h *Handler) updateFamily(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := &domain.DocumentFamily{
-		Code:        r.PathValue("code"),
+		Code:        domain.FamilyCode(r.PathValue("code")),
 		Name:        strings.TrimSpace(req.Name),
 		Description: strings.TrimSpace(req.Description),
 	}

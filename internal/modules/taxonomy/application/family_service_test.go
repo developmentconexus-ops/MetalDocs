@@ -47,15 +47,15 @@ func (r *fakeFamilyRepo) List(_ context.Context, includeInactive bool) ([]domain
 }
 
 func (r *fakeFamilyRepo) Create(_ context.Context, f *domain.DocumentFamily) error {
-	r.families[f.Code] = f
+	r.families[string(f.Code)] = f
 	return nil
 }
 
 func (r *fakeFamilyRepo) Update(_ context.Context, f *domain.DocumentFamily) error {
-	if _, ok := r.families[f.Code]; !ok {
+	if _, ok := r.families[string(f.Code)]; !ok {
 		return domain.ErrFamilyNotFound
 	}
-	r.families[f.Code] = f
+	r.families[string(f.Code)] = f
 	return nil
 }
 
@@ -188,7 +188,7 @@ func TestFamilyService_Update_NotFound(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	svc := NewFamilyService(repo, nil)
 	_, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "missing", Name: "X"})
-	if err != domain.ErrFamilyNotFound {
+	if !errors.Is(err, domain.ErrFamilyNotFound) {
 		t.Fatalf("want ErrFamilyNotFound, got %v", err)
 	}
 }

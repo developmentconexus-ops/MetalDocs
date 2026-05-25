@@ -7,18 +7,18 @@ import (
 )
 
 type DocumentProfile struct {
-	Code                     string     `json:"code"`
-	TenantID                 string     `json:"tenantId"`
-	FamilyCode               string     `json:"familyCode"`
-	Name                     string     `json:"name"`
-	Description              string     `json:"description"`
-	Alias                    string     `json:"alias"`
-	ReviewIntervalDays       int        `json:"reviewIntervalDays"`
-	DefaultTemplateVersionID *string    `json:"defaultTemplateVersionId"`
-	OwnerUserID              *string    `json:"ownerUserId"`
-	EditableByRole           string     `json:"editableByRole"`
-	ArchivedAt               *time.Time `json:"archivedAt"`
-	CreatedAt                time.Time  `json:"createdAt"`
+	Code                     ProfileCode `json:"code"`
+	TenantID                 string      `json:"tenantId"`
+	FamilyCode               FamilyCode  `json:"familyCode"`
+	Name                     string      `json:"name"`
+	Description              string      `json:"description"`
+	Alias                    string      `json:"alias"`
+	ReviewIntervalDays       int         `json:"reviewIntervalDays"`
+	DefaultTemplateVersionID *string     `json:"defaultTemplateVersionId"`
+	OwnerUserID              *string     `json:"ownerUserId"`
+	EditableByRole           string      `json:"editableByRole"`
+	ArchivedAt               *time.Time  `json:"archivedAt"`
+	CreatedAt                time.Time   `json:"createdAt"`
 }
 
 var (
@@ -35,9 +35,9 @@ var (
 
 func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 	profile := DocumentProfile{
-		Code:                     strings.TrimSpace(input.Code),
+		Code:                     ProfileCode(strings.TrimSpace(string(input.Code))),
 		TenantID:                 strings.TrimSpace(input.TenantID),
-		FamilyCode:               strings.TrimSpace(input.FamilyCode),
+		FamilyCode:               FamilyCode(strings.TrimSpace(string(input.FamilyCode))),
 		Name:                     strings.TrimSpace(input.Name),
 		Description:              strings.TrimSpace(input.Description),
 		Alias:                    strings.TrimSpace(input.Alias),
@@ -48,20 +48,20 @@ func NewDocumentProfile(input DocumentProfile) (*DocumentProfile, error) {
 		ArchivedAt:               input.ArchivedAt,
 		CreatedAt:                input.CreatedAt,
 	}
-	if profile.Code == "" {
+	if strings.TrimSpace(string(profile.Code)) == "" {
 		return nil, ErrProfileCodeRequired
 	}
 	if profile.TenantID == "" {
 		return nil, ErrProfileTenantRequired
 	}
-	if profile.FamilyCode == "" {
+	if strings.TrimSpace(string(profile.FamilyCode)) == "" {
 		return nil, ErrProfileFamilyRequired
 	}
 	if profile.Name == "" {
 		return nil, ErrProfileNameRequired
 	}
 	if profile.Alias == "" {
-		profile.Alias = profile.Code
+		profile.Alias = string(profile.Code)
 		if len(profile.Alias) > 24 {
 			profile.Alias = profile.Alias[:24]
 		}
