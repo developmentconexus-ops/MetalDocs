@@ -24,7 +24,7 @@ type Event struct {
 
 var ErrInvalidEvent = errors.New("invalid event")
 
-func NewEvent(tenantID, resourceType, resourceID, actorID string, payload any) (Event, error) {
+func NewEvent(tenantID, resourceType, resourceID, actorID, action string, payload any) (Event, error) {
 	payloadJSON := "{}"
 	if payload != nil {
 		raw, err := json.Marshal(payload)
@@ -36,12 +36,13 @@ func NewEvent(tenantID, resourceType, resourceID, actorID string, payload any) (
 	event := Event{
 		TenantID:     strings.TrimSpace(tenantID),
 		ActorID:      strings.TrimSpace(actorID),
+		Action:       strings.TrimSpace(action),
 		ResourceType: strings.TrimSpace(resourceType),
 		ResourceID:   strings.TrimSpace(resourceID),
 		PayloadJSON:  payloadJSON,
 		OccurredAt:   time.Now().UTC(),
 	}
-	if event.TenantID == "" || event.ActorID == "" || event.ResourceType == "" || event.ResourceID == "" {
+	if event.TenantID == "" || event.ActorID == "" || event.Action == "" || event.ResourceType == "" || event.ResourceID == "" {
 		return Event{}, fmt.Errorf("audit: %w", ErrInvalidEvent)
 	}
 	return event, nil

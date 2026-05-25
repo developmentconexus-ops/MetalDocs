@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -719,10 +718,10 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 
 func isUndefinedTable(err error) bool {
 	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UndefinedTable
+	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
 }
 
 func isUndefinedColumn(err error) bool {
 	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UndefinedColumn
+	return errors.As(err, &pgErr) && pgErr.Code == "42703"
 }
