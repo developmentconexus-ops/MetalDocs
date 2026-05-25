@@ -28,9 +28,10 @@ var ErrInstanceNotApproved = errors.New("approval: instance is not in approved s
 
 // PublishRequest carries all inputs for PublishApproved.
 type PublishRequest struct {
-	TenantID    string
-	InstanceID  string
-	PublishedBy string // user_id triggering publish
+	TenantID                string
+	InstanceID              string
+	PublishedBy             string // user_id triggering publish
+	ExpectedRevisionVersion int
 }
 
 // PublishResult is returned on successful publish.
@@ -62,6 +63,10 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 	if instance == nil {
 		_ = tx.Rollback()
 		return PublishResult{}, repository.ErrNoActiveInstance
+	}
+	if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
+		_ = tx.Rollback()
+		return PublishResult{}, repository.ErrStaleRevision
 	}
 
 	// Verify instance is in approved state.
@@ -99,8 +104,9 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		       revision_version = revision_version + 1
 		 WHERE id        = $1
 		   AND tenant_id = $2
-		   AND status    = 'approved'`,
-		instance.DocumentID, req.TenantID,
+		   AND status    = 'approved'
+		   AND revision_version = $3`,
+		instance.DocumentID, req.TenantID, instance.RevisionVersion,
 	)
 	if err != nil {
 		_ = tx.Rollback()
