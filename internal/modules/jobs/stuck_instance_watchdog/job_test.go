@@ -35,6 +35,10 @@ func (m *mockCancelService) CancelInstance(_ context.Context, _ *sql.DB, in appl
 	return application.CancelResult{DocumentID: "doc"}, nil
 }
 
+func (m *mockCancelService) SystemCancelInstance(_ context.Context, _ *sql.DB, in application.CancelInput) (application.CancelResult, error) {
+	return m.CancelInstance(context.Background(), nil, in)
+}
+
 func (m *mockCancelService) callCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
