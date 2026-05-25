@@ -85,7 +85,8 @@ func (w *PDFOutboxWorker) dispatchOne(ctx context.Context, r OutboxRow) {
 		return
 	}
 	finalize := r.Attempts+1 >= w.maxAttempt
-	backoff := time.Duration(math.Min(float64(30*time.Minute), float64(time.Duration(1<<r.Attempts)*30*time.Second)))
+	cappedAttempts := min(max(r.Attempts, 0), 30)
+	backoff := time.Duration(math.Min(float64(30*time.Minute), float64(time.Duration(1<<cappedAttempts)*30*time.Second)))
 	nextRetry := time.Now().Add(backoff)
 	if mErr := w.repo.MarkFailed(ctx, r.ID, err.Error(), nextRetry, finalize); mErr != nil {
 		w.log.Error("mark failed", "id", r.ID, "err", mErr)
