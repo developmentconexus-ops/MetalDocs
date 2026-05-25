@@ -122,6 +122,12 @@ func (s *watchdogStmt) Exec(_ []driver.Value) (driver.Result, error) {
 
 func (s *watchdogStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "pg_try_advisory_lock") {
+		return &watchdogRows{
+			cols: []string{"pg_try_advisory_lock"},
+			rows: [][]driver.Value{{true}},
+		}, nil
+	}
 	if strings.Contains(q, "from approval_instances") {
 		s.state.mu.Lock()
 		rows := append([]StuckInstance(nil), s.state.stuckRows...)
@@ -307,8 +313,8 @@ func TestWatchdog_CancelError(t *testing.T) {
 	emitter := &recordingEmitter{}
 
 	fn := New(db, cancelSvc, emitter)
-	if err := fn(context.Background(), 4); err != nil {
-		t.Fatalf("job returned error: %v", err)
+	if err := fn(context.Background(), 4); err == nil {
+		t.Fatal("expected job to return error when cancel path fails")
 	}
 
 	if got := cancelSvc.callCount(); got != 2 {
