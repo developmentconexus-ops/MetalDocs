@@ -180,7 +180,10 @@ func newFakeSchedulerDB(t *testing.T, state *fakeSchedulerDB) *sql.DB {
 }
 
 func newTestScheduler(db *sql.DB) *Scheduler {
-	s := New(db, "test-leader")
+	s, err := New(db, "test-leader")
+	if err != nil {
+		panic(err)
+	}
 	s.heartbeatEvery = 5 * time.Millisecond
 	s.drainWait = 200 * time.Millisecond
 	s.forceWait = 100 * time.Millisecond

@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"strings"
 
 	"metaldocs/internal/platform/tenant"
 )
@@ -37,12 +39,16 @@ RETURNING job_name, leader_id, lease_epoch
 		defer rows.Close()
 
 		reclaimed := 0
+		jobNames := make([]string, 0)
+		payloads := make([]string, 0)
+		var rowErrs []error
 		for rows.Next() {
 			var jobName string
 			var leaderID string
 			var leaseEpoch int64
 			if err := rows.Scan(&jobName, &leaderID, &leaseEpoch); err != nil {
-				return err
+				rowErrs = append(rowErrs, err)
+				continue
 			}
 
 			payloadJSON, err := json.Marshal(map[string]any{
@@ -51,32 +57,41 @@ RETURNING job_name, leader_id, lease_epoch
 				"lease_epoch": leaseEpoch,
 			})
 			if err != nil {
-				return err
+				rowErrs = append(rowErrs, err)
+				continue
 			}
 
+			jobNames = append(jobNames, jobName)
+			payloads = append(payloads, string(payloadJSON))
+			reclaimed++
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if len(jobNames) > 0 {
+			sep := "\x1f"
 			if _, err := tx.ExecContext(ctx, `
 INSERT INTO governance_events
 	(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, occurred_at)
 SELECT
 	COALESCE(
-		(SELECT d.tenant_id FROM public.documents d WHERE d.id::text = $1 LIMIT 1),
+		(SELECT d.tenant_id FROM public.documents d WHERE d.id::text = u.job_name LIMIT 1),
 		$3::uuid
 	),
 	'lease.reaped',
 	'system:reaper',
 	'job_lease',
-	$1,
+	u.job_name,
 	'expired_lease_reclaimed',
-	$2,
+	u.payload_json::jsonb,
 	now()
-`, jobName, payloadJSON, tenantID); err != nil {
+FROM unnest(
+	string_to_array($1, $4),
+	string_to_array($2, $4)
+) AS u(job_name, payload_json)
+`, strings.Join(jobNames, sep), strings.Join(payloads, sep), tenantID, sep); err != nil {
 				return err
 			}
-
-			reclaimed++
-		}
-		if err := rows.Err(); err != nil {
-			return err
 		}
 		if err := tx.Commit(); err != nil {
 			return err
@@ -86,6 +101,6 @@ SELECT
 			"job", "lease_reaper",
 			"epoch", epoch,
 			"reclaimed", reclaimed)
-		return nil
+		return errors.Join(rowErrs...)
 	}
 }
