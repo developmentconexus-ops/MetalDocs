@@ -2,10 +2,10 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/authn"
 )
 
 type AreaService struct {
@@ -31,19 +31,31 @@ func (s *AreaService) Get(ctx context.Context, tenantID, code string) (*domain.P
 }
 
 func (s *AreaService) Create(ctx context.Context, a *domain.ProcessArea) error {
-	if err := s.areas.Create(ctx, a); err != nil {
+	newArea, err := domain.NewProcessArea(*a)
+	if err != nil {
+		return err
+	}
+	if err := s.areas.Create(ctx, newArea); err != nil {
 		return err
 	}
 
-	payload, _ := json.Marshal(map[string]string{
-		"name": a.Name,
+	payload, err := marshalGovernancePayload(map[string]string{
+		"name": newArea.Name,
 	})
-	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
-		EventType:    "area.created",
+	if err != nil {
+		return err
+	}
+	actorUserID, _ := authn.UserIDFromContext(ctx)
+	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+		TenantID:     newArea.TenantID,
+		EventType:    domain.GovernanceEventTypeAreaCreated,
+		ActorUserID:  actorUserID,
 		ResourceType: "process_area",
-		ResourceID:   a.Code,
+		ResourceID:   newArea.Code,
 		PayloadJSON:  payload,
-	})
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -52,15 +64,23 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 		return err
 	}
 
-	payload, _ := json.Marshal(map[string]string{
+	payload, err := marshalGovernancePayload(map[string]string{
 		"name": a.Name,
 	})
-	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
-		EventType:    "area.updated",
+	if err != nil {
+		return err
+	}
+	actorUserID, _ := authn.UserIDFromContext(ctx)
+	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+		TenantID:     a.TenantID,
+		EventType:    domain.GovernanceEventTypeAreaUpdated,
+		ActorUserID:  actorUserID,
 		ResourceType: "process_area",
 		ResourceID:   a.Code,
 		PayloadJSON:  payload,
-	})
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -112,7 +132,7 @@ func (s *AreaService) SetParent(ctx context.Context, tenantID, areaCode string, 
 	committed = true
 	return s.govLogger.Log(ctx, domain.GovernanceEvent{
 		TenantID:     tenantID,
-		EventType:    "area.parent_changed",
+		EventType:    domain.GovernanceEventTypeAreaParentChanged,
 		ActorUserID:  actorID,
 		ResourceType: "process_area",
 		ResourceID:   areaCode,
@@ -148,7 +168,7 @@ func (s *AreaService) Archive(ctx context.Context, tenantID, areaCode, actorID s
 	committed = true
 	return s.govLogger.Log(ctx, domain.GovernanceEvent{
 		TenantID:     tenantID,
-		EventType:    "area.archived",
+		EventType:    domain.GovernanceEventTypeAreaArchived,
 		ActorUserID:  actorID,
 		ResourceType: "process_area",
 		ResourceID:   areaCode,

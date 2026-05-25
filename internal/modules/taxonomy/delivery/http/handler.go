@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	taxonomyapi "metaldocs/internal/modules/taxonomy/api"
-	"metaldocs/internal/modules/taxonomy/application"
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
@@ -40,14 +39,6 @@ type Handler struct {
 	families familyService
 }
 
-func NewHandler(profiles *application.ProfileService, areas *application.AreaService, families *application.FamilyService) *Handler {
-	return &Handler{
-		profiles: profiles,
-		areas:    areas,
-		families: families,
-	}
-}
-
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	taxonomyapi.HandlerWithOptions(h, taxonomyapi.StdHTTPServerOptions{
 		BaseRouter: mux,
@@ -55,4 +46,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 			writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		},
 	})
+}
+
+func NewHandler(profiles profileService, areas areaService, families familyService) *Handler {
+	return &Handler{
+		profiles: profiles,
+		areas:    areas,
+		families: families,
+	}
 }

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	authdomain "metaldocs/internal/modules/auth/domain"
 )
 
@@ -24,14 +26,24 @@ func (r *Repository) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx,
 }
 
 func (r *Repository) FindIdentityByIdentifier(ctx context.Context, identifier string) (authdomain.Identity, error) {
+	needle := strings.ToLower(strings.TrimSpace(identifier))
 	const q = `
 SELECT i.user_id, i.username, COALESCE(i.email, ''), i.display_name, i.password_hash, i.password_algo,
        i.must_change_password, i.last_login_at, i.failed_login_attempts, i.locked_until, i.is_active,
        i.created_at, i.updated_at
 FROM metaldocs.auth_identities i
-WHERE lower(i.username) = lower($1) OR lower(COALESCE(i.email, '')) = lower($1)
+WHERE lower(i.username) = $1
+UNION ALL
+SELECT i.user_id, i.username, COALESCE(i.email, ''), i.display_name, i.password_hash, i.password_algo,
+       i.must_change_password, i.last_login_at, i.failed_login_attempts, i.locked_until, i.is_active,
+       i.created_at, i.updated_at
+FROM metaldocs.auth_identities i
+WHERE i.email IS NOT NULL
+  AND lower(i.email) = $1
+  AND lower(i.username) <> $1
+LIMIT 1
 `
-	return r.loadIdentity(ctx, q, identifier)
+	return r.loadIdentity(ctx, q, needle)
 }
 
 func (r *Repository) FindIdentityByUserID(ctx context.Context, userID string) (authdomain.Identity, error) {
@@ -216,15 +228,14 @@ func (r *Repository) CreateUser(ctx context.Context, params authdomain.CreateUse
 }
 
 func (r *Repository) CreateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.CreateUserParams) error {
-	if err := ensureUniqueIdentity(ctx, tx, params.UserID, params.Username, params.Email); err != nil {
-		return err
-	}
-
 	const insertIdentity = `
 INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
 VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
 `
 	if _, err := tx.ExecContext(ctx, insertIdentity, params.UserID, params.Username, params.Email, params.DisplayName, params.IsActive, params.PasswordHash, params.PasswordAlgo, params.MustChangePassword); err != nil {
+		if isUniqueViolation(err) {
+			return authdomain.ErrUserAlreadyExists
+		}
 		return fmt.Errorf("insert auth identity: %w", err)
 	}
 	return nil
@@ -326,11 +337,6 @@ WHERE user_id = $1
 	}
 
 	if params.Email != nil || params.NewPasswordHash != nil || params.MustChangePassword != nil || params.ResetLockState {
-		if params.Email != nil {
-			if err := ensureUniqueIdentity(ctx, tx, params.UserID, "", strings.TrimSpace(*params.Email)); err != nil {
-				return err
-			}
-		}
 		if _, err := tx.ExecContext(ctx, `
 UPDATE metaldocs.auth_identities
 SET email = COALESCE($2, email),
@@ -342,6 +348,9 @@ SET email = COALESCE($2, email),
     updated_at = NOW()
 WHERE user_id = $1
 `, params.UserID, nullableText(params.Email), nullablePasswordHash(params.NewPasswordHash), nullableBool(params.MustChangePassword), params.ResetLockState); err != nil {
+			if isUniqueViolation(err) {
+				return authdomain.ErrUserAlreadyExists
+			}
 			return fmt.Errorf("update auth identity: %w", err)
 		}
 	}
@@ -359,28 +368,26 @@ func (r *Repository) BootstrapAdmin(ctx context.Context, params authdomain.Boots
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := ensureUniqueIdentity(ctx, tx, params.UserID, params.Username, params.Email); err != nil {
-		return false, err
-	}
-	if _, err := tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
 VALUES ($1, $2, NULLIF($3, ''), $4, TRUE, $5, $6, $7, NULL, 0, NULL, NOW(), NOW())
 ON CONFLICT (user_id)
-DO UPDATE SET username = EXCLUDED.username,
-              email = EXCLUDED.email,
-              display_name = EXCLUDED.display_name,
-              is_active = TRUE,
-              password_hash = EXCLUDED.password_hash,
-              password_algo = EXCLUDED.password_algo,
-              must_change_password = EXCLUDED.must_change_password,
-              updated_at = NOW()
-`, params.UserID, params.Username, params.Email, params.DisplayName, params.PasswordHash, params.PasswordAlgo, params.MustChangePassword); err != nil {
+DO NOTHING
+`, params.UserID, params.Username, params.Email, params.DisplayName, params.PasswordHash, params.PasswordAlgo, params.MustChangePassword)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return false, authdomain.ErrUserAlreadyExists
+		}
 		return false, fmt.Errorf("bootstrap auth identity: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("bootstrap auth identity rows affected: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return false, fmt.Errorf("commit bootstrap admin tx: %w", err)
 	}
-	return true, nil
+	return rows > 0, nil
 }
 
 func (r *Repository) loadIdentity(ctx context.Context, query string, arg string) (authdomain.Identity, error) {
@@ -408,37 +415,9 @@ func (r *Repository) loadIdentity(ctx context.Context, query string, arg string)
 	return identity, nil
 }
 
-func ensureUniqueIdentity(ctx context.Context, tx *sql.Tx, userID, username, email string) error {
-	if strings.TrimSpace(username) != "" {
-		var otherUserID string
-		err := tx.QueryRowContext(ctx, `
-SELECT user_id
-FROM metaldocs.auth_identities
-WHERE lower(username) = lower($1)
-`, username).Scan(&otherUserID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("check username uniqueness: %w", err)
-		}
-		if err == nil && otherUserID != strings.TrimSpace(userID) {
-			return authdomain.ErrUserAlreadyExists
-		}
-	}
-
-	if strings.TrimSpace(email) != "" {
-		var otherUserID string
-		err := tx.QueryRowContext(ctx, `
-SELECT user_id
-FROM metaldocs.auth_identities
-WHERE lower(email) = lower($1)
-`, email).Scan(&otherUserID)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("check email uniqueness: %w", err)
-		}
-		if err == nil && otherUserID != strings.TrimSpace(userID) {
-			return authdomain.ErrUserAlreadyExists
-		}
-	}
-	return nil
+func isUniqueViolation(err error) bool {
+	var pgErr *pq.Error
+	return errors.As(err, &pgErr) && string(pgErr.Code) == "23505"
 }
 
 func nullableText(value *string) any {

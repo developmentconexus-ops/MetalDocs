@@ -9,6 +9,37 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
+func TestAreaServiceCreate_UsesDomainConstructorNormalizationAndValidation(t *testing.T) {
+	repo := newFakeAreaRepository()
+	service := NewAreaService(repo, &fakeGovernanceLogger{})
+
+	in := &domain.ProcessArea{
+		Code:     " AR-01 ",
+		TenantID: " tenant-a ",
+		Name:     " Finance ",
+	}
+	if err := service.Create(context.Background(), in); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := repo.get("tenant-a", "AR-01")
+	if got == nil {
+		t.Fatal("expected created area in repository")
+	}
+	if got.Code != "AR-01" || got.TenantID != "tenant-a" || got.Name != "Finance" {
+		t.Fatalf("unexpected normalized area: %#v", got)
+	}
+	if in.Code != " AR-01 " || in.TenantID != " tenant-a " || in.Name != " Finance " {
+		t.Fatalf("caller pointer mutated: %#v", in)
+	}
+	if err := service.Create(context.Background(), &domain.ProcessArea{
+		Code:     " ",
+		TenantID: "tenant-a",
+		Name:     "Finance",
+	}); !errors.Is(err, domain.ErrAreaCodeRequired) {
+		t.Fatalf("expected ErrAreaCodeRequired, got %v", err)
+	}
+}
+
 func TestAreaServiceSetParentValid(t *testing.T) {
 	repo := newFakeAreaRepository()
 	repo.put(&domain.ProcessArea{Code: "root", TenantID: "tenant-a"})

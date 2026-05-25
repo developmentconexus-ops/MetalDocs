@@ -2,11 +2,10 @@ package application
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"strings"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -28,25 +27,37 @@ func (s *FamilyService) Get(ctx context.Context, code string) (*domain.DocumentF
 }
 
 func (s *FamilyService) Create(ctx context.Context, f *domain.DocumentFamily) error {
-	f.IsActive = true
-	if err := s.families.Create(ctx, f); err != nil {
+	newFamily, err := domain.NewDocumentFamily(*f)
+	if err != nil {
+		return err
+	}
+	if err := s.families.Create(ctx, newFamily); err != nil {
 		return err
 	}
 	if s.govLogger != nil {
-		payload, _ := json.Marshal(map[string]string{"code": f.Code, "name": f.Name})
-		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
-			EventType:    "family.created",
+		payload, err := marshalGovernancePayload(map[string]string{"code": newFamily.Code, "name": newFamily.Name})
+		if err != nil {
+			return err
+		}
+		tenantID, _ := tenant.FromContext(ctx)
+		actorUserID, _ := authn.UserIDFromContext(ctx)
+		if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+			TenantID:     tenantID,
+			EventType:    domain.GovernanceEventTypeFamilyCreated,
+			ActorUserID:  actorUserID,
 			ResourceType: "document_family",
-			ResourceID:   f.Code,
+			ResourceID:   newFamily.Code,
 			PayloadJSON:  payload,
-		})
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*domain.DocumentFamily, error) {
 	if strings.TrimSpace(f.Name) == "" {
-		return nil, errors.New("family name must not be empty")
+		return nil, domain.ErrFamilyNameRequired
 	}
 	tx, err := s.families.BeginTx(ctx)
 	if err != nil {
@@ -63,8 +74,16 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	if err != nil {
 		return nil, err
 	}
-	existing.Name = f.Name
-	existing.Description = f.Description
+	normalized, err := domain.NewDocumentFamily(domain.DocumentFamily{
+		Code:        existing.Code,
+		Name:        f.Name,
+		Description: f.Description,
+	})
+	if err != nil {
+		return nil, err
+	}
+	existing.Name = normalized.Name
+	existing.Description = normalized.Description
 	if err := s.families.UpdateTx(ctx, tx, existing); err != nil {
 		return nil, err
 	}
@@ -73,13 +92,22 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	}
 	committed = true
 	if s.govLogger != nil {
-		payload, _ := json.Marshal(map[string]string{"code": existing.Code, "name": existing.Name})
-		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
-			EventType:    "family.updated",
+		payload, err := marshalGovernancePayload(map[string]string{"code": existing.Code, "name": existing.Name})
+		if err != nil {
+			return nil, err
+		}
+		tenantID, _ := tenant.FromContext(ctx)
+		actorUserID, _ := authn.UserIDFromContext(ctx)
+		if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+			TenantID:     tenantID,
+			EventType:    domain.GovernanceEventTypeFamilyUpdated,
+			ActorUserID:  actorUserID,
 			ResourceType: "document_family",
 			ResourceID:   existing.Code,
 			PayloadJSON:  payload,
-		})
+		}); err != nil {
+			return nil, err
+		}
 	}
 	return existing, nil
 }
@@ -122,13 +150,21 @@ func (s *FamilyService) Deactivate(ctx context.Context, code string) error {
 	}
 	committed = true
 	if s.govLogger != nil {
-		payload, _ := json.Marshal(map[string]string{"code": code})
-		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
-			EventType:    "family.deactivated",
+		payload, err := marshalGovernancePayload(map[string]string{"code": code})
+		if err != nil {
+			return err
+		}
+		actorUserID, _ := authn.UserIDFromContext(ctx)
+		if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+			TenantID:     tenantID,
+			EventType:    domain.GovernanceEventTypeFamilyDeactivated,
+			ActorUserID:  actorUserID,
 			ResourceType: "document_family",
 			ResourceID:   code,
 			PayloadJSON:  payload,
-		})
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -107,7 +107,7 @@ func (h *Handler) writeFamilyError(w http.ResponseWriter, err error) {
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		writeError(w, http.StatusConflict, "FAMILY_ALREADY_EXISTS", "family code already exists")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", pgErr.Message)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "request violates data constraints")
 	default:
 		slog.Error("taxonomy family error", "err", err)
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")

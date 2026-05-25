@@ -280,6 +280,12 @@ func docSignoffTestMux(h *Handler) *http.ServeMux {
 	return mux
 }
 
+func docCancelTestMux(h *Handler) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/documents/{id}/cancel", h.CancelByDocumentHandler)
+	return mux
+}
+
 // TestSignoffByDocumentHandler_ReplayAfterClose verifies that replaying the same
 // Idempotency-Key after the approval instance is already closed returns 200 with
 // was_replay:true instead of 404/500.
@@ -358,5 +364,55 @@ func TestSignoffByDocumentHandler_ReplayRequiresCurrentEligibility(t *testing.T)
 
 	if rr.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusForbidden, rr.Body.String())
+	}
+}
+
+func TestCancelByDocumentHandler_UsesIfMatchRevision(t *testing.T) {
+	cancelSvc := &fakeCancelService{result: application.CancelResult{DocumentID: "doc-1"}}
+	h := &Handler{
+		readSvc: &fakeReadService{inst: &domain.Instance{
+			ID:         "inst-1",
+			DocumentID: "doc-1",
+			TenantID:   "tenant-1",
+		}},
+		cancelSvc: cancelSvc,
+	}
+	mux := docCancelTestMux(h)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/cancel", strings.NewReader(`{"reason":"withdrawn"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("If-Match", "\"v6\"")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	if cancelSvc.gotReq.ExpectedRevisionVersion != 6 {
+		t.Fatalf("expected revision = %d, want 6", cancelSvc.gotReq.ExpectedRevisionVersion)
+	}
+	if cancelSvc.gotReq.InstanceID != "inst-1" || cancelSvc.gotReq.ActorUserID != "actor-1" {
+		t.Fatalf("unexpected cancel request: %+v", cancelSvc.gotReq)
+	}
+}
+
+func TestCancelByDocumentHandler_RequiresIfMatch(t *testing.T) {
+	h := &Handler{readSvc: &fakeReadService{}, cancelSvc: &fakeCancelService{}}
+	mux := docCancelTestMux(h)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/cancel", strings.NewReader(`{"reason":"withdrawn"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusPreconditionRequired {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusPreconditionRequired, rr.Body.String())
 	}
 }

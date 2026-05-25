@@ -48,8 +48,8 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 
 	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
@@ -60,7 +60,24 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &apiErr); err != nil {
 		t.Fatalf("unmarshal api error: %v body=%s", err, rec.Body.String())
 	}
-	if apiErr.Code != "MEMBERSHIP_NOT_FOUND" {
-		t.Fatalf("code = %q, want MEMBERSHIP_NOT_FOUND", apiErr.Code)
+	if apiErr.Code != "AUTH_FORBIDDEN" {
+		t.Fatalf("code = %q, want AUTH_FORBIDDEN", apiErr.Code)
+	}
+}
+
+func TestMembershipsHandler_SystemAdminCanTargetOtherUser(t *testing.T) {
+	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, nil)
+	handler := NewMembershipHandler(svc)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships?userId=user-1&areaCode=ops", nil)
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "admin-1", []iamdomain.Role{iamdomain.RoleSystemAdmin}))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 }

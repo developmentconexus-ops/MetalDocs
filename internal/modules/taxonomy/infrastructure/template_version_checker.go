@@ -21,13 +21,13 @@ const templateVersionQuery = `
 `
 
 func NewTemplateVersionChecker(db *sql.DB) *TemplateVersionChecker {
+	if db == nil {
+		panic("taxonomy: template version checker db must not be nil")
+	}
 	return &TemplateVersionChecker{db: db}
 }
 
 func (c *TemplateVersionChecker) IsPublished(ctx context.Context, versionID string) (bool, string, error) {
-	if c.db == nil {
-		return false, "", nil
-	}
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {
 		return false, "", err

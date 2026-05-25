@@ -2,8 +2,10 @@ package application
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -98,6 +100,43 @@ func TestFamilyService_Create(t *testing.T) {
 	}
 }
 
+func TestFamilyService_Create_DoesNotMutateCallerPointer_AndLogsTenantActor(t *testing.T) {
+	repo := newFakeFamilyRepo()
+	logger := &fakeGovernanceLogger{}
+	svc := NewFamilyService(repo, logger)
+	in := &domain.DocumentFamily{
+		Code:        " policy ",
+		Name:        " Policy ",
+		Description: " Desc ",
+		IsActive:    false,
+	}
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
+
+	if err := svc.Create(ctx, in); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if in.IsActive {
+		t.Fatal("caller pointer must not be mutated")
+	}
+	got, err := svc.Get(context.Background(), "policy")
+	if err != nil {
+		t.Fatalf("Get after Create: %v", err)
+	}
+	if !got.IsActive {
+		t.Fatal("created family must be active")
+	}
+	if got.Name != "Policy" || got.Description != "Desc" {
+		t.Fatalf("created family must be trimmed, got %#v", got)
+	}
+	if len(logger.events) != 1 {
+		t.Fatalf("expected 1 governance event, got %d", len(logger.events))
+	}
+	if logger.events[0].TenantID != "tenant-a" || logger.events[0].ActorUserID != "actor-1" {
+		t.Fatalf("event tenant/actor = %q/%q", logger.events[0].TenantID, logger.events[0].ActorUserID)
+	}
+}
+
 func TestFamilyService_Deactivate_BlockedByProfiles(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	repo.families["policy"] = &domain.DocumentFamily{Code: "policy", IsActive: true}
@@ -151,5 +190,15 @@ func TestFamilyService_Update_NotFound(t *testing.T) {
 	_, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "missing", Name: "X"})
 	if err != domain.ErrFamilyNotFound {
 		t.Fatalf("want ErrFamilyNotFound, got %v", err)
+	}
+}
+
+func TestFamilyService_Create_ValidationFromDomainConstructor(t *testing.T) {
+	repo := newFakeFamilyRepo()
+	svc := NewFamilyService(repo, nil)
+
+	err := svc.Create(context.Background(), &domain.DocumentFamily{Code: "  ", Name: "Policy"})
+	if !errors.Is(err, domain.ErrFamilyCodeRequired) {
+		t.Fatalf("want ErrFamilyCodeRequired, got %v", err)
 	}
 }

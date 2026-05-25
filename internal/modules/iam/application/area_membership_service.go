@@ -52,10 +52,7 @@ func (s *AreaMembershipService) Grant(
 	role domain.Role,
 	grantedBy string,
 ) error {
-	switch role {
-	case domain.RoleApprover, domain.RoleAuthor, domain.RoleEditor, domain.RoleSystemAdmin, domain.RoleViewer:
-		// known
-	default:
+	if !domain.IsValidRole(role) {
 		return ErrUnknownRole
 	}
 

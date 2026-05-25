@@ -11,11 +11,11 @@ import (
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 )
 
-var cancelInstance = func(h *Handler, ctx context.Context, db *sql.DB, req application.CancelInput) (application.CancelResult, error) {
-	if h.services == nil || h.services.Cancel == nil {
+func (h *Handler) cancelInstance(ctx context.Context, db *sql.DB, req application.CancelInput) (application.CancelResult, error) {
+	if h.cancelSvc == nil {
 		return application.CancelResult{}, errors.New("cancel service not configured")
 	}
-	return h.services.Cancel.CancelInstance(ctx, db, req)
+	return h.cancelSvc.CancelInstance(ctx, db, req)
 }
 
 func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +49,7 @@ func (h *Handler) CancelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := cancelInstance(h, r.Context(), h.db, application.CancelInput{
+	result, err := h.cancelInstance(r.Context(), h.db, application.CancelInput{
 		TenantID:                tenantID,
 		InstanceID:              instanceID,
 		ExpectedRevisionVersion: expectedRevisionVersion,

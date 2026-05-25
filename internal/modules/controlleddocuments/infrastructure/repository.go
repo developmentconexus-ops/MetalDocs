@@ -405,7 +405,10 @@ func (r *PostgresControlledDocumentRepository) UpdateStatus(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, rowsErr := res.RowsAffected()
+	if rowsErr != nil {
+		return rowsErr
+	}
 	if n == 0 {
 		return controlleddocumentsdomain.ErrCDNotFound
 	}
@@ -420,7 +423,10 @@ func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Contex
 	if err != nil {
 		return err
 	}
-	n, _ := res.RowsAffected()
+	n, rowsErr := res.RowsAffected()
+	if rowsErr != nil {
+		return rowsErr
+	}
 	if n == 0 {
 		return controlleddocumentsdomain.ErrCDNotFound
 	}
@@ -524,10 +530,17 @@ func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx con
 
 	var next int
 	if err := exec.QueryRowContext(ctx, `
-		UPDATE cd_sequence_counters
-		SET next_seq = next_seq + 1
-		WHERE tenant_id = $1 AND profile_code = $2 AND process_area_code = $3
-		RETURNING next_seq - 1`,
+		WITH locked AS (
+			SELECT next_seq
+			FROM cd_sequence_counters
+			WHERE tenant_id = $1 AND profile_code = $2 AND process_area_code = $3
+			FOR UPDATE
+		)
+		UPDATE cd_sequence_counters c
+		SET next_seq = locked.next_seq + 1
+		FROM locked
+		WHERE c.tenant_id = $1 AND c.profile_code = $2 AND c.process_area_code = $3
+		RETURNING locked.next_seq`,
 		tenantID, profileCode, areaCode,
 	).Scan(&next); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

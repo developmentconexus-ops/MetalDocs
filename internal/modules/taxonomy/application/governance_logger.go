@@ -27,7 +27,7 @@ func (l *DBGovernanceLogger) Log(ctx context.Context, e domain.GovernanceEvent) 
 		 VALUES
 		    ($1, $2, $3, $4, $5, $6, $7)`,
 		e.TenantID,
-		e.EventType,
+		string(e.EventType),
 		e.ActorUserID,
 		e.ResourceType,
 		e.ResourceID,

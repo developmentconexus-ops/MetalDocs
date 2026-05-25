@@ -38,6 +38,21 @@ type TemplateVersion struct {
 	CreatedAt           time.Time
 }
 
+func NewTemplateVersionDraft(id, templateID, authorID, docxStorageKey string, versionNumber int, metadata MetadataSchema, placeholders []Placeholder, createdAt time.Time) *TemplateVersion {
+	return &TemplateVersion{
+		ID:                id,
+		TemplateID:        templateID,
+		VersionNumber:     versionNumber,
+		Status:            VersionStatusDraft,
+		DocxStorageKey:    docxStorageKey,
+		ContentHash:       "",
+		MetadataSchema:    metadata,
+		PlaceholderSchema: placeholders,
+		AuthorID:          authorID,
+		CreatedAt:         createdAt,
+	}
+}
+
 func (v *TemplateVersion) CanTransition(next VersionStatus, hasReviewer bool) error {
 	switch v.Status {
 	case VersionStatusDraft:

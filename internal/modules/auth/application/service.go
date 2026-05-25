@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,7 +24,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const passwordAlgoBcrypt = "bcrypt"
+const (
+	passwordAlgoBcrypt = "bcrypt"
+	bcryptCost         = 12
+)
 
 type Config struct {
 	SessionCookieName      string
@@ -53,11 +57,31 @@ type Config struct {
 	TrustedProxyCIDRs []netip.Prefix
 }
 
+func (c Config) redacted() Config {
+	if c.BootstrapAdminPassword != "" {
+		c.BootstrapAdminPassword = "[REDACTED]"
+	}
+	return c
+}
+
+func (c Config) String() string {
+	type configAlias Config
+	redacted := configAlias(c.redacted())
+	return fmt.Sprintf("%+v", redacted)
+}
+
+func (c Config) MarshalJSON() ([]byte, error) {
+	type configAlias Config
+	redacted := configAlias(c.redacted())
+	return json.Marshal(redacted)
+}
+
 type Service struct {
 	repo         authdomain.Repository
 	roleProvider iamdomain.RoleProvider
 	roleAdmin    iamdomain.RoleAdminRepository
 	cfg          Config
+	now          func() time.Time
 }
 
 type createUserTxRepository interface {
@@ -76,11 +100,17 @@ func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider,
 	if len(cfg.SessionSecret) < 32 {
 		return nil, fmt.Errorf("new auth service: session secret must be at least 32 characters")
 	}
-	return &Service{repo: repo, roleProvider: roleProvider, roleAdmin: roleAdmin, cfg: cfg}, nil
+	return &Service{
+		repo:         repo,
+		roleProvider: roleProvider,
+		roleAdmin:    roleAdmin,
+		cfg:          cfg,
+		now:          time.Now,
+	}, nil
 }
 
 func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
-	if !s.cfg.BootstrapAdminEnabled || strings.TrimSpace(s.cfg.BootstrapAdminPassword) == "" {
+	if !s.cfg.BootstrapAdminEnabled || s.cfg.BootstrapAdminPassword == "" {
 		return nil
 	}
 	if s.roleAdmin == nil {
@@ -96,7 +126,9 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		return nil
 	}
 
-	passwordHash, err := s.hashPassword(strings.TrimSpace(s.cfg.BootstrapAdminPassword))
+	bootstrapPassword := s.cfg.BootstrapAdminPassword
+	passwordHash, err := s.hashPassword(bootstrapPassword)
+	s.cfg.BootstrapAdminPassword = ""
 	if err != nil {
 		return err
 	}
@@ -125,7 +157,6 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 
 func (s *Service) Authenticate(ctx context.Context, identifier, password string, r *http.Request) (authdomain.AuthenticatedSession, error) {
 	identifier = strings.TrimSpace(identifier)
-	password = strings.TrimSpace(password)
 	if identifier == "" || password == "" {
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
 	}
@@ -134,7 +165,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	if err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
-	if identity.LockedUntil != nil && identity.LockedUntil.After(time.Now().UTC()) {
+	if identity.LockedUntil != nil && identity.LockedUntil.After(s.now().UTC()) {
 		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityLocked
 	}
 	if !identity.IsActive {
@@ -147,7 +178,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
 	}
 
-	now := time.Now().UTC()
+	now := s.now().UTC()
 	claimedTenant := strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
 	tenantID, err := s.resolveLoginTenant(ctx, identity.UserID, claimedTenant)
 	if err != nil {
@@ -230,10 +261,10 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdoma
 	if session.RevokedAt != nil {
 		return authdomain.CurrentUser{}, authdomain.ErrSessionRevoked
 	}
-	if session.ExpiresAt.Before(time.Now().UTC()) {
+	if session.ExpiresAt.Before(s.now().UTC()) {
 		return authdomain.CurrentUser{}, authdomain.ErrSessionExpired
 	}
-	if err := s.repo.TouchSession(ctx, sessionID, time.Now().UTC()); err != nil {
+	if err := s.repo.TouchSession(ctx, sessionID, s.now().UTC()); err != nil {
 		return authdomain.CurrentUser{}, err
 	}
 	return s.buildCurrentUser(ctx, session.UserID, session.TenantID)
@@ -242,13 +273,13 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdoma
 func (s *Service) Logout(ctx context.Context, rawToken string) error {
 	token := strings.TrimSpace(rawToken)
 	if token == "" {
-		return nil
+		return authdomain.ErrSessionNotFound
 	}
 	sessionID, err := s.tokenHashFromCookieValue(token)
 	if err != nil {
-		return nil
+		return err
 	}
-	return s.repo.RevokeSession(ctx, sessionID, time.Now().UTC())
+	return s.repo.RevokeSession(ctx, sessionID, s.now().UTC())
 }
 
 func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
@@ -258,8 +289,6 @@ func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, n
 func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdomain.CurrentUser, currentPassword, newPassword string) error {
 	userID := strings.TrimSpace(currentUser.UserID)
 	userID = strings.TrimSpace(userID)
-	currentPassword = strings.TrimSpace(currentPassword)
-	newPassword = strings.TrimSpace(newPassword)
 	if userID == "" {
 		return authdomain.ErrInvalidCredentials
 	}
@@ -304,18 +333,19 @@ func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.
 	if err != nil {
 		return nil, err
 	}
+	filtered := make([]authdomain.ManagedUser, 0, len(items))
 	for i := range items {
 		roles, roleErr := s.roleProvider.RolesByUserID(ctx, items[i].UserID, tenantID)
 		if roleErr != nil {
 			if errors.Is(roleErr, iamdomain.ErrUserNotFound) {
-				items[i].Roles = nil
 				continue
 			}
 			return nil, roleErr
 		}
 		items[i].Roles = roles
+		filtered = append(filtered, items[i])
 	}
-	return items, nil
+	return filtered, nil
 }
 
 func (s *Service) ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error) {
@@ -326,6 +356,28 @@ func (s *Service) ListOnlineUsers(ctx context.Context, activeSince time.Time) ([
 }
 
 func (s *Service) CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamdomain.Role, createdBy string) error {
+	return s.CreateUserWithInput(ctx, authdomain.CreateUserInput{
+		UserID:      authdomain.UserID(userID),
+		Username:    username,
+		Email:       email,
+		DisplayName: displayName,
+		Password:    authdomain.PlainPassword(password),
+		TenantID:    authdomain.TenantID(tenantID),
+		Roles:       roles,
+		CreatedBy:   createdBy,
+	})
+}
+
+func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.CreateUserInput) error {
+	userID := input.UserID.String()
+	username := input.Username
+	email := input.Email
+	displayName := input.DisplayName
+	password := string(input.Password)
+	tenantID := input.TenantID.String()
+	roles := input.Roles
+	createdBy := input.CreatedBy
+
 	userID = strings.TrimSpace(userID)
 	username = strings.TrimSpace(username)
 	email = strings.TrimSpace(email)
@@ -377,11 +429,16 @@ func (s *Service) CreateUser(ctx context.Context, userID, username, email, displ
 		if err != nil {
 			return fmt.Errorf("begin create user tx: %w", err)
 		}
-		defer func() { _ = tx.Rollback() }()
 		if err := repoTx.CreateUserTx(ctx, tx, params); err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+				return fmt.Errorf("create auth identity tx: %w (rollback failed: %v)", err, rollbackErr)
+			}
 			return err
 		}
 		if err := roleTx.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, roles, createdBy); err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
+				return fmt.Errorf("replace user roles tx: %w (rollback failed: %v)", err, rollbackErr)
+			}
 			return err
 		}
 		if err := tx.Commit(); err != nil {
@@ -429,7 +486,7 @@ func (s *Service) AdminResetPassword(ctx context.Context, userID, newPassword st
 	}); err != nil {
 		return err
 	}
-	return s.repo.RevokeSessionsByUserID(ctx, strings.TrimSpace(userID), time.Now().UTC())
+	return s.repo.RevokeSessionsByUserID(ctx, strings.TrimSpace(userID), s.now().UTC())
 }
 
 func (s *Service) UnlockUser(ctx context.Context, userID string) error {
@@ -440,6 +497,10 @@ func (s *Service) UnlockUser(ctx context.Context, userID string) error {
 }
 
 func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cookie {
+	seconds := int(expiresAt.UTC().Sub(s.now().UTC()).Seconds())
+	if seconds < 0 {
+		seconds = 0
+	}
 	return &http.Cookie{
 		Name:     s.cfg.SessionCookieName,
 		Value:    rawToken,
@@ -448,7 +509,7 @@ func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cook
 		SameSite: http.SameSiteLaxMode,
 		Secure:   s.cfg.CookieSecure,
 		Expires:  expiresAt.UTC(),
-		MaxAge:   int(time.Until(expiresAt).Seconds()),
+		MaxAge:   seconds,
 	}
 }
 
@@ -494,14 +555,14 @@ func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string)
 }
 
 func (s *Service) validatePassword(password string) error {
-	if len(strings.TrimSpace(password)) < s.cfg.PasswordMinLength {
+	if password == "" || len(password) < s.cfg.PasswordMinLength {
 		return fmt.Errorf("%w: password must contain at least %d characters", authdomain.ErrPasswordPolicy, s.cfg.PasswordMinLength)
 	}
 	return nil
 }
 
 func (s *Service) hashPassword(password string) (authdomain.PasswordHash, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
 	if err != nil {
 		return "", fmt.Errorf("hash password: %w", err)
 	}

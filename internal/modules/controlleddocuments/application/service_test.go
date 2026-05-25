@@ -17,6 +17,43 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
+func TestNewControlledDocumentService_PanicsOnNilRequiredDependencies(t *testing.T) {
+	validRepo := newFakeControlledDocumentRepository()
+	validSeq := &fakeSequenceAllocator{next: 1}
+	validTpl := &fakeTemplateVersionChecker{}
+	validProfiles := &fakeProfileReader{}
+	validAreas := &fakeAreaReader{}
+	validLogger := &fakeGovernanceLogger{}
+	assertPanic := func(name string, fn func()) {
+		t.Helper()
+		defer func() {
+			if recover() == nil {
+				t.Fatalf("%s: expected panic", name)
+			}
+		}()
+		fn()
+	}
+
+	assertPanic("nil repository", func() {
+		NewControlledDocumentService(nil, nil, validSeq, validTpl, validProfiles, validAreas, validLogger, nil)
+	})
+	assertPanic("nil sequence allocator", func() {
+		NewControlledDocumentService(nil, validRepo, nil, validTpl, validProfiles, validAreas, validLogger, nil)
+	})
+	assertPanic("nil template checker", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, nil, validProfiles, validAreas, validLogger, nil)
+	})
+	assertPanic("nil profile reader", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, validTpl, nil, validAreas, validLogger, nil)
+	})
+	assertPanic("nil area reader", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, validTpl, validProfiles, nil, validLogger, nil)
+	})
+	assertPanic("nil governance logger", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, validTpl, validProfiles, validAreas, nil, nil)
+	})
+}
+
 func TestCreate_AutoCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
@@ -118,6 +155,22 @@ func TestCreate_ManualCode_ShortReason(t *testing.T) {
 	})
 	if !errors.Is(err, controlleddocumentsdomain.ErrManualCodeReasonRequired) {
 		t.Fatalf("expected ErrManualCodeReasonRequired, got %v", err)
+	}
+}
+
+func TestCreate_UsesControlledDocumentConstructorValidation(t *testing.T) {
+	svc := NewControlledDocumentService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:        "tenant-a",
+		ProfileCode:     "po",
+		ProcessAreaCode: "quality",
+		Title:           " ",
+		OwnerUserID:     "owner-1",
+		ActorUserID:     "actor-1",
+		VisibilityScope: "company",
+	})
+	if !errors.Is(err, controlleddocumentsdomain.ErrCDTitleRequired) {
+		t.Fatalf("expected ErrCDTitleRequired, got %v", err)
 	}
 }
 
@@ -663,6 +716,28 @@ func TestControlledDocumentService_PreviewCode_ReturnsFormatted(t *testing.T) {
 	}
 }
 
+func TestPeekSeq_ProfileTenantValidationError(t *testing.T) {
+	svc := NewControlledDocumentService(
+		nil,
+		newFakeControlledDocumentRepository(),
+		&fakeSequenceAllocator{next: 7},
+		&fakeTemplateVersionChecker{},
+		&fakeProfileReader{item: nil},
+		&fakeAreaReader{},
+		&fakeGovernanceLogger{},
+		nil,
+	)
+	profileErr := taxonomydomain.ErrProfileNotFound
+	svc.profiles = profileReaderFunc(func(context.Context, string, string) (*taxonomydomain.DocumentProfile, error) {
+		return nil, profileErr
+	})
+
+	_, err := svc.PeekSeq(context.Background(), "tenant-a", "DC", "RH")
+	if !errors.Is(err, profileErr) {
+		t.Fatalf("expected profile error, got %v", err)
+	}
+}
+
 func TestList_MissingActorContextReturnsErrActorMissing(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
@@ -844,4 +919,10 @@ SELECT EXISTS (
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
 		WithArgs(sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+}
+
+type profileReaderFunc func(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)
+
+func (f profileReaderFunc) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
+	return f(ctx, tenantID, code)
 }

@@ -606,7 +606,10 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected publish to fail when creating next draft fails")
 	}
-	if version.Status != domain.VersionStatusPublished {
-		t.Fatalf("expected non-tx path to leave published state after failure, got %q", version.Status)
+	if !errors.Is(err, domain.ErrTransactionRequired) {
+		t.Fatalf("expected ErrTransactionRequired, got %v", err)
+	}
+	if version.Status != domain.VersionStatusDraft {
+		t.Fatalf("expected version status to remain draft, got %q", version.Status)
 	}
 }
