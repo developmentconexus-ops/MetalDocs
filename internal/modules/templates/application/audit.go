@@ -13,4 +13,3 @@ func newAuditEvent(tenantID, templateID, actorID string, versionID *string, acti
 	}
 	return &event, nil
 }
-
