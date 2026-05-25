@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/repository"
-	e2etest "metaldocs/internal/test"
 )
 
 // Clock abstracts time so services can be tested deterministically.
@@ -18,7 +17,7 @@ type Clock interface {
 // RealClock is the production Clock implementation.
 type RealClock struct{}
 
-func (RealClock) Now() time.Time { return time.Now().UTC().Add(e2etest.E2EClockOffset()) }
+func (RealClock) Now() time.Time { return time.Now().UTC() }
 
 // ErrFloatInPayload is returned by ValidateEventPayload when a float64 value
 // is found in the payload map. JSON-unmarshalled numbers default to float64

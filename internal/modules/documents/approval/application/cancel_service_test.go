@@ -23,9 +23,9 @@ import (
 
 type cancelFakeRepo struct {
 	repository.ApprovalRepository
-	instance          *domain.Instance
-	loadErr           error
-	updateInstErr     error
+	instance      *domain.Instance
+	loadErr       error
+	updateInstErr error
 }
 
 func (r *cancelFakeRepo) LoadInstance(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
@@ -57,8 +57,8 @@ type cancelTestRows struct {
 	done   bool
 }
 
-func (r *cancelTestRows) Columns() []string              { return r.cols }
-func (r *cancelTestRows) Close() error                   { return nil }
+func (r *cancelTestRows) Columns() []string { return r.cols }
+func (r *cancelTestRows) Close() error      { return nil }
 func (r *cancelTestRows) Next(dest []driver.Value) error {
 	if r.done {
 		return io.EOF
@@ -72,9 +72,9 @@ func (r *cancelTestRows) Next(dest []driver.Value) error {
 
 type cancelEmptyRows struct{ cols []string }
 
-func (r cancelEmptyRows) Columns() []string              { return r.cols }
-func (r cancelEmptyRows) Close() error                   { return nil }
-func (r cancelEmptyRows) Next([]driver.Value) error      { return io.EOF }
+func (r cancelEmptyRows) Columns() []string         { return r.cols }
+func (r cancelEmptyRows) Close() error              { return nil }
+func (r cancelEmptyRows) Next([]driver.Value) error { return io.EOF }
 
 type cancelTestResult struct{ rowsAffected int64 }
 
@@ -251,6 +251,36 @@ func TestCancelInstance_CapDenied(t *testing.T) {
 	var denied authz.ErrCapDenied
 	if !errors.As(err, &denied) {
 		t.Errorf("expected ErrCapabilityDenied; got %v", err)
+	}
+}
+
+func TestSystemCancelInstance_BypassesUserCapability(t *testing.T) {
+	now := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	emitter := &MemoryEmitter{}
+	conn := &cancelTestConn{
+		authzGranted:  false,
+		docUpdateRows: 1,
+	}
+	db := newCancelTestDB(t, conn)
+
+	repo := &cancelFakeRepo{instance: buildCancelInstance()}
+	svc := &CancelService{repo: repo, emitter: emitter, clock: fixedClock{t: now}}
+
+	result, err := svc.SystemCancelInstance(context.Background(), db, CancelInput{
+		TenantID:                "tenant-1",
+		InstanceID:              "inst-1",
+		ExpectedRevisionVersion: 2,
+		ActorUserID:             "system",
+		Reason:                  "watchdog timeout",
+	})
+	if err != nil {
+		t.Fatalf("SystemCancelInstance: unexpected error: %v", err)
+	}
+	if result.DocumentID != "doc-1" {
+		t.Errorf("DocumentID = %q; want %q", result.DocumentID, "doc-1")
+	}
+	if len(emitter.Events) != 1 {
+		t.Fatalf("events = %d; want 1", len(emitter.Events))
 	}
 }
 

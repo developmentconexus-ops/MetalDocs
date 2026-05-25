@@ -62,11 +62,14 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 	}
 
 	// Step 3: compute idempotency key.
-	idempotencyKey := ComputeIdempotencyKey(IdempotencyInput{
+	idempotencyKey, err := ComputeIdempotencyKey(IdempotencyInput{
 		ActorUserID: req.SubmittedBy,
 		DocumentID:  req.DocumentID,
 		Timestamp:   s.clock.Now(),
 	})
+	if err != nil {
+		return SubmitResult{}, fmt.Errorf("submit: idempotency key: %w", err)
+	}
 
 	// Step 4: begin transaction.
 	tx, err := db.BeginTx(ctx, nil)

@@ -93,6 +93,11 @@ type fakeProfileRepository struct {
 	byKey map[string]*domain.DocumentProfile
 }
 
+type fakeTx struct{}
+
+func (fakeTx) Commit() error   { return nil }
+func (fakeTx) Rollback() error { return nil }
+
 func newFakeProfileRepository() *fakeProfileRepository {
 	return &fakeProfileRepository{byKey: map[string]*domain.DocumentProfile{}}
 }
@@ -116,6 +121,19 @@ func (r *fakeProfileRepository) Create(_ context.Context, p *domain.DocumentProf
 }
 
 func (r *fakeProfileRepository) Update(_ context.Context, p *domain.DocumentProfile) error {
+	r.put(p)
+	return nil
+}
+
+func (r *fakeProfileRepository) BeginTx(_ context.Context) (domain.FamilyTx, error) {
+	return fakeTx{}, nil
+}
+
+func (r *fakeProfileRepository) GetByCodeForUpdate(ctx context.Context, _ domain.FamilyTx, tenantID, code string) (*domain.DocumentProfile, error) {
+	return r.GetByCode(ctx, tenantID, code)
+}
+
+func (r *fakeProfileRepository) UpdateTx(_ context.Context, _ domain.FamilyTx, p *domain.DocumentProfile) error {
 	r.put(p)
 	return nil
 }

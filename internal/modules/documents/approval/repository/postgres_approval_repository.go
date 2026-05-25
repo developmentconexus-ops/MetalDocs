@@ -131,7 +131,7 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx *sql.
 		   decision, comment, signed_at, signature_method, signature_payload, content_hash,
 		   actor_display_name_snapshot)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		ON CONFLICT (approval_instance_id, actor_user_id) DO NOTHING
+		ON CONFLICT (stage_instance_id, actor_user_id) DO NOTHING
 		RETURNING id`,
 		s.ID(),
 		s.ApprovalInstanceID(),
@@ -158,7 +158,7 @@ func (r *postgresApprovalRepository) InsertSignoff(ctx context.Context, tx *sql.
 	}
 
 	// ON CONFLICT fired — RETURNING was empty. Load the existing signoff.
-	existing, loadErr := r.LoadSignoffByActor(ctx, tx, s.ActorTenantID(), s.ApprovalInstanceID(), s.ActorUserID())
+	existing, loadErr := r.loadSignoffByStageActor(ctx, tx, s.ActorTenantID(), s.StageInstanceID(), s.ActorUserID())
 	if loadErr != nil {
 		return SignoffInsertResult{}, fmt.Errorf("load existing signoff for replay check: %w", loadErr)
 	}
@@ -187,6 +187,21 @@ func (r *postgresApprovalRepository) LoadSignoffByActor(ctx context.Context, tx 
 		  AND s.actor_user_id = $2
 		  AND i.tenant_id = $3`,
 		instanceID, actorUserID, tenantID,
+	)
+	return scanSignoff(row)
+}
+
+func (r *postgresApprovalRepository) loadSignoffByStageActor(ctx context.Context, tx *sql.Tx, tenantID, stageInstanceID, actorUserID string) (*domain.Signoff, error) {
+	row := tx.QueryRowContext(ctx, `
+		SELECT s.id, s.approval_instance_id, s.stage_instance_id, s.actor_user_id,
+		       s.actor_tenant_id, s.decision, coalesce(s.comment,''), s.signed_at,
+		       s.signature_method, s.signature_payload, s.content_hash
+		FROM approval_signoffs s
+		JOIN approval_instances i ON i.id = s.approval_instance_id
+		WHERE s.stage_instance_id = $1
+		  AND s.actor_user_id = $2
+		  AND i.tenant_id = $3::uuid`,
+		stageInstanceID, actorUserID, tenantID,
 	)
 	return scanSignoff(row)
 }
@@ -259,7 +274,7 @@ func (r *postgresApprovalRepository) LoadInstance(ctx context.Context, tx *sql.T
 		inst.CompletedAt = &completedAt.Time
 	}
 
-	stages, err := r.loadStageInstances(ctx, tx, inst.ID)
+	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +319,7 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 		inst.CompletedAt = &completedAt.Time
 	}
 
-	stages, err := r.loadStageInstances(ctx, tx, inst.ID)
+	stages, err := r.loadStageInstances(ctx, tx, tenantID, inst.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -384,6 +399,107 @@ func (r *postgresApprovalRepository) LoadCurrentPublishedHead(ctx context.Contex
 	return documentID, nil
 }
 
+func (r *postgresApprovalRepository) GetDocumentRevisionVersion(ctx context.Context, tx *sql.Tx, documentID, tenantID string) (int, error) {
+	var revisionVersion int
+	err := tx.QueryRowContext(ctx, `
+		SELECT revision_version
+		  FROM documents
+		 WHERE id = $1
+		   AND tenant_id = $2::uuid
+		 FOR UPDATE`,
+		documentID, tenantID,
+	).Scan(&revisionVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrStaleRevision
+	}
+	if err != nil {
+		return 0, MapPgError(err, MapHints{})
+	}
+	return revisionVersion, nil
+}
+
+// ListRoutes loads tenant-scoped route configuration and stages in one joined query.
+func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID string) ([]Route, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.active, r.created_at, r.created_at AS updated_at,
+		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.on_eligibility_drift
+		  FROM approval_routes r
+		  JOIN approval_route_stages s
+		    ON s.route_id = r.id
+		 WHERE r.tenant_id = $1::uuid
+		 ORDER BY r.created_at DESC, s.stage_order ASC`,
+		tenantID,
+	)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer rows.Close()
+
+	routeMap := make(map[string]*Route)
+	var routeOrder []string
+	for rows.Next() {
+		var (
+			routeID, routeName, routeTenantID, profileCode string
+			active                                         bool
+			createdAt, updatedAt                           time.Time
+			stage                                          RouteStage
+			stageName, stageRole, stageCapability          sql.NullString
+			stageArea, stageQuorum, stageDrift             sql.NullString
+		)
+		if err := rows.Scan(
+			&routeID, &routeName, &routeTenantID, &profileCode, &active, &createdAt, &updatedAt,
+			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageDrift,
+		); err != nil {
+			return nil, fmt.Errorf("scan approval route list row: %w", err)
+		}
+
+		route := routeMap[routeID]
+		if route == nil {
+			route = &Route{
+				ID:          routeID,
+				Name:        routeName,
+				TenantID:    routeTenantID,
+				ProfileCode: profileCode,
+				Active:      active,
+				CreatedAt:   createdAt,
+				UpdatedAt:   updatedAt,
+				Stages:      []RouteStage{},
+			}
+			routeMap[routeID] = route
+			routeOrder = append(routeOrder, routeID)
+		}
+
+		if stageName.Valid {
+			stage.Name = stageName.String
+		}
+		if stageRole.Valid {
+			stage.RequiredRole = stageRole.String
+		}
+		if stageCapability.Valid {
+			stage.RequiredCapability = stageCapability.String
+		}
+		if stageArea.Valid {
+			stage.AreaCode = stageArea.String
+		}
+		if stageQuorum.Valid {
+			stage.Quorum = stageQuorum.String
+		}
+		if stageDrift.Valid {
+			stage.DriftPolicy = stageDrift.String
+		}
+		route.Stages = append(route.Stages, stage)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate approval route list rows: %w", err)
+	}
+
+	routes := make([]Route, 0, len(routeOrder))
+	for _, routeID := range routeOrder {
+		routes = append(routes, *routeMap[routeID])
+	}
+	return routes, nil
+}
+
 func (r *postgresApprovalRepository) MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error {
 	res, err := tx.ExecContext(ctx, `
 		UPDATE documents
@@ -408,20 +524,26 @@ func (r *postgresApprovalRepository) MarkSuperseded(ctx context.Context, tx *sql
 }
 
 // loadStageInstances loads all stage instances for a given approval instance, ordered by stage_order.
-func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx *sql.Tx, instanceID string) ([]domain.StageInstance, error) {
+func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) ([]domain.StageInstance, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, approval_instance_id, stage_order, name_snapshot,
 		       required_role_snapshot, required_capability_snapshot, area_code_snapshot,
 		       quorum_snapshot, quorum_m_snapshot,
 		       on_eligibility_drift_snapshot,
 		       eligible_actor_ids, effective_denominator,
-		       status, opened_at, completed_at
+		       status, opened_at, completed_at, skip_reason
 		FROM approval_stage_instances
 		WHERE approval_instance_id = $1
+		  AND EXISTS (
+		      SELECT 1
+		        FROM approval_instances ai
+		       WHERE ai.id = $1
+		         AND ai.tenant_id = $2::uuid
+		  )
 		-- FOR UPDATE: prevents re-submit from re-snapshotting eligible_actor_ids during signoff (J1).
 		ORDER BY stage_order ASC
 		FOR UPDATE`,
-		instanceID,
+		instanceID, tenantID,
 	)
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
@@ -443,7 +565,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 			&s.QuorumSnapshot, &quorumMSnapshot,
 			&s.OnEligibilityDriftSnapshot,
 			&eligibleJSON, &effectiveDenominator,
-			&s.Status, &openedAt, &completedAt,
+			&s.Status, &openedAt, &completedAt, &skipReason,
 		)
 		if err != nil {
 			return nil, err
@@ -480,7 +602,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 	}
 
 	// Load signoffs for the instance and attach to stages.
-	byStage, err := r.loadSignoffsForInstance(ctx, tx, instanceID)
+	byStage, err := r.loadSignoffsForInstance(ctx, tx, tenantID, instanceID)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +616,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 
 // loadSignoffsForInstance fetches all signoffs for an approval instance,
 // keyed by stage_instance_id.
-func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context, tx *sql.Tx, instanceID string) (map[string][]*domain.Signoff, error) {
+func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) (map[string][]*domain.Signoff, error) {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id, approval_instance_id, stage_instance_id, actor_user_id,
 		       actor_tenant_id, decision, coalesce(comment,''), signed_at,
@@ -502,8 +624,14 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 		       coalesce(actor_display_name_snapshot,'')
 		FROM approval_signoffs
 		WHERE approval_instance_id = $1
+		  AND EXISTS (
+		      SELECT 1
+		        FROM approval_instances ai
+		       WHERE ai.id = $1
+		         AND ai.tenant_id = $2::uuid
+		  )
 		ORDER BY signed_at ASC`,
-		instanceID,
+		instanceID, tenantID,
 	)
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})

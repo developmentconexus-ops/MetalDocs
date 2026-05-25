@@ -5,10 +5,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log/slog"
+
+	"metaldocs/internal/platform/tenant"
 )
 
 func RunLeaseReaper(db *sql.DB) JobFunc {
 	return func(ctx context.Context, epoch int64) error {
+		tenantID, err := tenant.FromContext(ctx)
+		if err != nil {
+			tenantID = tenant.DevTenantID
+		}
+
 		tx, err := db.BeginTx(ctx, nil)
 		if err != nil {
 			return err
@@ -50,8 +57,19 @@ RETURNING job_name, leader_id, lease_epoch
 			if _, err := tx.ExecContext(ctx, `
 INSERT INTO governance_events
 	(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, occurred_at)
-VALUES ('system', 'lease.reaped', 'system:reaper', 'job_lease', $1, 'expired_lease_reclaimed', $2, now())
-`, jobName, payloadJSON); err != nil {
+SELECT
+	COALESCE(
+		(SELECT d.tenant_id FROM public.documents d WHERE d.id::text = $1 LIMIT 1),
+		$3::uuid
+	),
+	'lease.reaped',
+	'system:reaper',
+	'job_lease',
+	$1,
+	'expired_lease_reclaimed',
+	$2,
+	now()
+`, jobName, payloadJSON, tenantID); err != nil {
 				return err
 			}
 

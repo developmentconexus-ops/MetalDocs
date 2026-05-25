@@ -133,6 +133,9 @@ func (s *phase5Stmt) Exec(_ []driver.Value) (driver.Result, error) {
 func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &submitSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -29,6 +31,7 @@ type StuckInstance struct {
 
 type cancelSvcInterface interface {
 	CancelInstance(ctx context.Context, db *sql.DB, in application.CancelInput) (application.CancelResult, error)
+	SystemCancelInstance(ctx context.Context, db *sql.DB, in application.CancelInput) (application.CancelResult, error)
 }
 
 type governanceEmitter interface {
@@ -37,30 +40,39 @@ type governanceEmitter interface {
 
 func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) scheduler.JobFunc {
 	return func(ctx context.Context, epoch int64) error {
+		unlock, err := acquireRunLock(ctx, db)
+		if err != nil {
+			slog.ErrorContext(ctx, "stuck_instance_watchdog: acquire run lock failed",
+				"job", JobName, "epoch", epoch, "error", err)
+			return err
+		}
+		defer unlock()
+
 		stuck, err := listStuckInstances(ctx, db)
 		if err != nil {
 			slog.ErrorContext(ctx, "stuck_instance_watchdog: list stuck instances failed",
 				"job", JobName, "epoch", epoch, "error", err)
-			return nil
+			return err
 		}
 
 		stuckDetected := len(stuck)
 		autoCancelled := 0
 		alertsEmitted := 0
+		var runErr error
 
 		for _, inst := range stuck {
 			if inst.DriftPolicy == "auto_cancel" {
-				_, err := cancelSvc.CancelInstance(ctx, db, application.CancelInput{
+				_, err := cancelSvc.SystemCancelInstance(ctx, db, application.CancelInput{
 					TenantID:                inst.TenantID,
 					InstanceID:              inst.ID,
 					ExpectedRevisionVersion: 0,
 					ActorUserID:             SystemActor,
 					Reason:                  "stuck_watchdog_auto_cancel",
-					BypassAuthz:             true,
 				})
 				if err != nil {
 					slog.ErrorContext(ctx, "stuck_instance_watchdog: auto-cancel failed",
 						"job", JobName, "epoch", epoch, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
+					runErr = errors.Join(runErr, err)
 					continue
 				}
 				autoCancelled++
@@ -70,6 +82,7 @@ func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) sc
 			if err := emitStuckAlert(ctx, db, emitter, inst); err != nil {
 				slog.ErrorContext(ctx, "stuck_instance_watchdog: emit stuck alert failed",
 					"job", JobName, "epoch", epoch, "instance_id", inst.ID, "tenant_id", inst.TenantID, "error", err)
+				runErr = errors.Join(runErr, err)
 				continue
 			}
 			alertsEmitted++
@@ -82,8 +95,30 @@ func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) sc
 			"auto_cancelled", autoCancelled,
 			"alerts_emitted", alertsEmitted)
 
-		return nil
+		return runErr
 	}
+}
+
+func acquireRunLock(ctx context.Context, db *sql.DB) (func(), error) {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var locked bool
+	if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock(hashtext($1))`, JobName).Scan(&locked); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	if !locked {
+		_ = conn.Close()
+		return nil, fmt.Errorf("watchdog run lock not acquired")
+	}
+
+	return func() {
+		_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock(hashtext($1))`, JobName)
+		_ = conn.Close()
+	}, nil
 }
 
 func listStuckInstances(ctx context.Context, db *sql.DB) ([]StuckInstance, error) {
@@ -93,7 +128,7 @@ func listStuckInstances(ctx context.Context, db *sql.DB) ([]StuckInstance, error
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.bypass_authz', $1, true)`, BypassGUC); err != nil {
+	if err := setBypassAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
 
@@ -141,7 +176,7 @@ func emitStuckAlert(ctx context.Context, db *sql.DB, emitter governanceEmitter, 
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.bypass_authz', $1, true)`, BypassGUC); err != nil {
+	if err := setBypassAuthzGUC(ctx, tx); err != nil {
 		return err
 	}
 
@@ -170,4 +205,9 @@ func emitStuckAlert(ctx context.Context, db *sql.DB, emitter governanceEmitter, 
 	}
 
 	return tx.Commit()
+}
+
+func setBypassAuthzGUC(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.bypass_authz', $1, true)`, BypassGUC)
+	return err
 }

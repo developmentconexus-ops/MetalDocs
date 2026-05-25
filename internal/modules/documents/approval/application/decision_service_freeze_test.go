@@ -37,9 +37,9 @@ func (f *fakePDFDispatchInvoker) Dispatch(_ context.Context, _, _ string) error 
 }
 
 type fakePDFOutboxEnqueuer struct {
-	calls      int
-	err        error
-	tenantIDs  []string
+	calls       int
+	err         error
+	tenantIDs   []string
 	revisionIDs []string
 }
 
@@ -51,14 +51,14 @@ func (f *fakePDFOutboxEnqueuer) Enqueue(_ context.Context, _ *sql.Tx, tenantID, 
 }
 
 type freezeDecisionConn struct {
-	stageSignoffs []signoffRow
-	authzGranted  bool
-	authzSet      bool
-	areaCode      string
-	actorID       string
-	tenantID      string
+	stageSignoffs      []signoffRow
+	authzGranted       bool
+	authzSet           bool
+	areaCode           string
+	actorID            string
+	tenantID           string
 	unresolvedComments int
-	assertedCaps  string
+	assertedCaps       string
 
 	documentStatus string
 	pendingStatus  *string
@@ -120,6 +120,9 @@ func (s *freezeDecisionStmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 func (s *freezeDecisionStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &freezeDecisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &freezeDecisionSingleValueRows{value: s.conn.areaCode}, nil
 	}
@@ -494,7 +497,7 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 	}
 	freeze := &fakeFreezeInvoker{}
 	conn := &freezeDecisionConn{
-		actorID: actorID,
+		actorID:            actorID,
 		unresolvedComments: 1,
 		stageSignoffs: []signoffRow{{
 			id:                 "sig-comments",
