@@ -264,7 +264,8 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdoma
 	if session.ExpiresAt.Before(s.now().UTC()) {
 		return authdomain.CurrentUser{}, authdomain.ErrSessionExpired
 	}
-	if err := s.repo.TouchSession(ctx, sessionID, s.now().UTC()); err != nil {
+	now := s.now().UTC()
+	if err := s.repo.TouchSession(ctx, sessionID, now); err != nil {
 		return authdomain.CurrentUser{}, err
 	}
 	return s.buildCurrentUser(ctx, session.UserID, session.TenantID)
@@ -506,7 +507,7 @@ func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cook
 		Value:    rawToken,
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		Secure:   s.cfg.CookieSecure,
 		Expires:  expiresAt.UTC(),
 		MaxAge:   seconds,
@@ -523,7 +524,7 @@ func (s *Service) ExpiredSessionCookie() *http.Cookie {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		Secure:   s.cfg.CookieSecure,
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0).UTC(),
