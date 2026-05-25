@@ -23,7 +23,7 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 		return nil, domain.ErrSystemTemplateImmutable
 	}
 
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 		return nil, domain.ErrUploadMissing
 	}
 
-	config, err := s.repo.GetApprovalConfig(ctx, cmd.TemplateID)
+	config, err := s.repo.GetApprovalConfig(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +55,9 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 			return nil, fmt.Errorf("templates submit: begin tx: %w", err)
 		}
 		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates submit: setAuthzGUC: %w", err)
+		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateSubmit), "tenant"); err != nil {
 			return nil, fmt.Errorf("templates submit: authz: %w", err)
 		}
@@ -104,7 +107,7 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 		return nil, domain.ErrSystemTemplateImmutable
 	}
 
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +133,7 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 		version.ReviewerID = &cmd.ActorUserID
 		version.ReviewedAt = &now
 
-		if err := s.updateVersionWithAuthz(ctx, version, string(iamdomain.CapTemplateEdit)); err != nil {
+		if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateEdit)); err != nil {
 			return nil, err
 		}
 		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
@@ -153,7 +156,7 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 	version.Status = domain.VersionStatusDraft
 	version.SubmittedAt = nil
 
-	if err := s.updateVersionWithAuthz(ctx, version, string(iamdomain.CapTemplateEdit)); err != nil {
+	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateEdit)); err != nil {
 		return nil, err
 	}
 	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
@@ -191,7 +194,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 	if template.SystemOwned {
 		return nil, domain.ErrSystemTemplateImmutable
 	}
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +233,9 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 				return nil, fmt.Errorf("templates approve: begin tx: %w", err)
 			}
 			defer func() { _ = tx.Rollback() }()
+			if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+				return nil, fmt.Errorf("templates approve: setAuthzGUC: %w", err)
+			}
 			if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateApprove), "tenant"); err != nil {
 				return nil, fmt.Errorf("templates approve: authz: %w", err)
 			}
@@ -289,7 +295,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 	version.ReviewedAt = nil
 	version.ApprovedAt = nil
 
-	if err := s.updateVersionWithAuthz(ctx, version, string(iamdomain.CapTemplateApprove)); err != nil {
+	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateApprove)); err != nil {
 		return nil, err
 	}
 	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
@@ -334,7 +340,7 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	if template.SystemOwned {
 		return nil, domain.ErrSystemTemplateImmutable
 	}
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -365,6 +371,9 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 			return nil, fmt.Errorf("templates publish: begin tx: %w", err)
 		}
 		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates publish: setAuthzGUC: %w", err)
+		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplatePublish), "tenant"); err != nil {
 			return nil, fmt.Errorf("templates publish: authz: %w", err)
 		}
@@ -467,6 +476,9 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 			return nil, fmt.Errorf("templates archive: begin tx: %w", err)
 		}
 		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates archive: setAuthzGUC: %w", err)
+		}
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return nil, fmt.Errorf("templates archive: authz: %w", err)
 		}
@@ -495,13 +507,16 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 	return template, nil
 }
 
-func (s *Service) updateVersionWithAuthz(ctx context.Context, version *domain.TemplateVersion, cap string) error {
+func (s *Service) updateVersionWithAuthz(ctx context.Context, tenantID, actorID string, version *domain.TemplateVersion, cap string) error {
 	if s.db != nil {
 		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("templates update version: begin tx: %w", err)
 		}
 		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+			return fmt.Errorf("templates update version: setAuthzGUC: %w", err)
+		}
 		if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
 			return fmt.Errorf("templates update version: authz: %w", err)
 		}

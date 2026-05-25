@@ -154,19 +154,19 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/reconstruct", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Taxonomy profiles / areas / families.
-	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
