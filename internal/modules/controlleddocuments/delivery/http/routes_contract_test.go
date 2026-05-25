@@ -323,14 +323,14 @@ func TestWriteDomainError_TemplateArtifactMissingIs409(t *testing.T) {
 	}
 }
 
-func TestWriteDomainError_ActorMissingIs500(t *testing.T) {
+func TestWriteDomainError_ActorMissingIs401(t *testing.T) {
 	handler := &Handler{}
 	rec := httptest.NewRecorder()
 
 	handler.writeDomainError(rec, application.ErrActorMissing)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusUnauthorized, rec.Body.String())
 	}
 	var body struct {
 		Code string `json:"code"`
@@ -338,12 +338,12 @@ func TestWriteDomainError_ActorMissingIs500(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != "INTERNAL_ERROR" {
-		t.Fatalf("code = %q, want INTERNAL_ERROR", body.Code)
+	if body.Code != "UNAUTHENTICATED" {
+		t.Fatalf("code = %q, want UNAUTHENTICATED", body.Code)
 	}
 }
 
-func TestAtomicCreate_MissingAuthContext_Returns500NotFullTenant(t *testing.T) {
+func TestAtomicCreate_MissingAuthContext_Returns401NotFullTenant(t *testing.T) {
 	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
@@ -359,8 +359,8 @@ func TestAtomicCreate_MissingAuthContext_Returns500NotFullTenant(t *testing.T) {
 
 	handler.AtomicCreateControlledDocument(rec, req, controlleddocumentsapi.AtomicCreateControlledDocumentParams{})
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusUnauthorized, rec.Body.String())
 	}
 	if spy.gotCreate.ActorUserID != "" {
 		t.Fatalf("service Create must not be invoked when actor missing; got ActorUserID=%q", spy.gotCreate.ActorUserID)

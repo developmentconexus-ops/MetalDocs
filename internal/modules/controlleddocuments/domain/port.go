@@ -6,11 +6,14 @@ import (
 )
 
 type ControlledDocumentRepository interface {
+	// Read operations.
 	GetByID(ctx context.Context, tenantID, id string) (*ControlledDocument, error)
 	GetByCode(ctx context.Context, tenantID, profileCode, code string) (*ControlledDocument, error)
 	CodeExists(ctx context.Context, tenantID, profileCode, code string) (bool, error)
 	List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error)
 	CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error)
+
+	// Write operations.
 	Create(ctx context.Context, doc *ControlledDocument) error
 	CreateTx(ctx context.Context, tx DBTX, doc *ControlledDocument) error
 	UpdateStatus(ctx context.Context, tenantID, id string, status CDStatus, updatedAt time.Time) error

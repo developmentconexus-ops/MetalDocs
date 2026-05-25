@@ -548,11 +548,7 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
 		httpresponse.WriteError(w, http.StatusInternalServerError, "template.artifact_invariant_unconfigured", "template artifact invariant not configured")
 	case errors.Is(err, application.ErrActorMissing):
-		slog.Error("controlled-documents request missing authenticated actor",
-			"route", "controlledDocuments.writeDomainError",
-			"error", err,
-		)
-		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		httpresponse.WriteError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "authentication required")
 	case errors.Is(err, errTenantIDInvalid):
 		slog.Error("controlled-documents request has invalid tenant id in context",
 			"route", "controlledDocuments.writeDomainError",

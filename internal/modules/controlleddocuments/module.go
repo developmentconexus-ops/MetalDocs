@@ -39,6 +39,12 @@ func New(deps Dependencies) *Module {
 	}
 	svc := application.NewControlledDocumentService(deps.DB, repo, seq, tplCheck, profiles, areas, govLogger, nil)
 	h := dhttp.NewHandler(svc, deps.DB)
+	if svc == nil {
+		panic("controlled_documents: service construction returned nil")
+	}
+	if h == nil {
+		panic("controlled_documents: handler construction returned nil")
+	}
 	return &Module{Handler: h, svc: svc}
 }
 

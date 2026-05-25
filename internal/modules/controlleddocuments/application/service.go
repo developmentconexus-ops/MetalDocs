@@ -36,6 +36,7 @@ type ControlledDocument = controlleddocumentsdomain.ControlledDocument
 type CDFilter = controlleddocumentsdomain.CDFilter
 
 type ControlledDocumentService struct {
+	// Core dependencies.
 	db        *sql.DB
 	docs      controlleddocumentsdomain.ControlledDocumentRepository
 	seq       controlleddocumentsdomain.SequenceAllocator
@@ -44,7 +45,9 @@ type ControlledDocumentService struct {
 	areas     AreaReader
 	govLogger taxonomydomain.GovernanceLogger
 	docInit   controlleddocumentsdomain.DocumentInitializer
-	now       func() time.Time
+
+	// Runtime configuration.
+	now func() time.Time
 }
 
 type CreateControlledDocumentCmd struct {

@@ -20,9 +20,9 @@ var (
 // flow that the documents module needs to materialize an initial document
 // revision alongside the new ControlledDocument row.
 type CloneTemplateRequest struct {
-	TemplateVersionID *string
-	Name              string
-	FormData          map[string]any
+	templateVersionID *string
+	name              string
+	formData          map[string]any
 }
 
 // NewCloneTemplateRequest validates and normalizes the request sent through the
@@ -36,11 +36,17 @@ func NewCloneTemplateRequest(templateVersionID *string, name string, formData ma
 		formData = map[string]any{}
 	}
 	return CloneTemplateRequest{
-		TemplateVersionID: trimOptionalString(templateVersionID),
-		Name:              trimmedName,
-		FormData:          formData,
+		templateVersionID: trimOptionalString(templateVersionID),
+		name:              trimmedName,
+		formData:          formData,
 	}, nil
 }
+
+func (r CloneTemplateRequest) TemplateVersionID() *string { return r.templateVersionID }
+
+func (r CloneTemplateRequest) Name() string { return r.name }
+
+func (r CloneTemplateRequest) FormData() map[string]any { return r.formData }
 
 // DocumentRef is the minimal handle the registry returns to callers after a
 // successful atomic create. The registry stores no document state itself —

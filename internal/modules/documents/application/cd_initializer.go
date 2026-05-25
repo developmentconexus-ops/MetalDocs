@@ -39,8 +39,8 @@ func (i *CDDocumentInitializer) Exists(ctx context.Context, storageKey string) (
 // placeholder rows commit atomically with the CD row.
 func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx *sql.Tx, cd *controlleddocumentsdomain.ControlledDocument, req controlleddocumentsdomain.CloneTemplateRequest) (*controlleddocumentsdomain.DocumentRef, error) {
 	var formData json.RawMessage
-	if req.FormData != nil {
-		raw, err := json.Marshal(req.FormData)
+	if req.FormData() != nil {
+		raw, err := json.Marshal(req.FormData())
 		if err != nil {
 			return nil, err
 		}
@@ -53,9 +53,9 @@ func (i *CDDocumentInitializer) CloneTemplate(ctx context.Context, tx *sql.Tx, c
 		ProfileCode:               cd.ProfileCode,
 		ProcessAreaCode:           cd.ProcessAreaCode,
 		Code:                      cd.Code,
-		OverrideTemplateVersionID: req.TemplateVersionID,
+		OverrideTemplateVersionID: req.TemplateVersionID(),
 		OwnerUserID:               cd.OwnerUserID,
-		Name:                      req.Name,
+		Name:                      req.Name(),
 		FormData:                  formData,
 	})
 	if err != nil {

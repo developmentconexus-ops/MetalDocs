@@ -9,7 +9,7 @@ import (
 type VisibilityScope string
 
 const (
-	VisibilityScopeCompany    VisibilityScope = "company"
+	VisibilityScopePublic     VisibilityScope = "company"
 	VisibilityScopeRestricted VisibilityScope = "restricted"
 )
 
@@ -28,12 +28,12 @@ func NewVisibility(scope string, areaCodes, userIDs []string, defaultAreaCode st
 	if normalizedScope == "" {
 		normalizedScope = VisibilityScopeRestricted
 	}
-	if normalizedScope != VisibilityScopeCompany && normalizedScope != VisibilityScopeRestricted {
+	if normalizedScope != VisibilityScopePublic && normalizedScope != VisibilityScopeRestricted {
 		return Visibility{}, ErrVisibilityScopeInvalid
 	}
 
-	if normalizedScope == VisibilityScopeCompany {
-		return Visibility{Scope: VisibilityScopeCompany, AreaCodes: []string{}, UserIDs: []string{}}, nil
+	if normalizedScope == VisibilityScopePublic {
+		return Visibility{Scope: VisibilityScopePublic, AreaCodes: []string{}, UserIDs: []string{}}, nil
 	}
 
 	normAreas := uniqueNonEmpty(areaCodes)

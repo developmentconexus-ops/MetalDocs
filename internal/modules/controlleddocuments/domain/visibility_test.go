@@ -23,8 +23,8 @@ func TestNewVisibility_CompanyClearsGrants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if v.Scope != VisibilityScopeCompany {
-		t.Fatalf("scope = %q, want %q", v.Scope, VisibilityScopeCompany)
+	if v.Scope != VisibilityScopePublic {
+		t.Fatalf("scope = %q, want %q", v.Scope, VisibilityScopePublic)
 	}
 	if len(v.AreaCodes) != 0 || len(v.UserIDs) != 0 {
 		t.Fatalf("grants should be empty for company scope: %+v", v)

@@ -120,7 +120,7 @@ func TestCreate_ManualCode(t *testing.T) {
 	if len(logger.events) != 1 || logger.events[0].EventType != "numbering.override" {
 		t.Fatalf("expected numbering.override event, got %+v", logger.events)
 	}
-	if cd.Visibility.Scope != controlleddocumentsdomain.VisibilityScopeCompany {
+	if cd.Visibility.Scope != controlleddocumentsdomain.VisibilityScopePublic {
 		t.Fatalf("visibility scope = %q, want company", cd.Visibility.Scope)
 	}
 }
@@ -490,8 +490,8 @@ func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
 	if !docInit.called {
 		t.Fatalf("expected docInit.CloneTemplate to be called")
 	}
-	if docInit.gotReq.Name != "HR Policy v1" {
-		t.Fatalf("expected DocumentName forwarded, got %q", docInit.gotReq.Name)
+	if docInit.gotReq.Name() != "HR Policy v1" {
+		t.Fatalf("expected DocumentName forwarded, got %q", docInit.gotReq.Name())
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sqlmock expectations: %v", err)
