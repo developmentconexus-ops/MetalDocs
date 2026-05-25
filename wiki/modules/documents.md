@@ -336,7 +336,7 @@ sequenceDiagram
     C->>H: POST /api/v1/documents/{id}/finalize
     H->>H: hasAnyRole(admin|filler) â€” 403 else
     H->>H: load draft guard (status==draft else 409)
-    H->>H: resolve approval route + content hash (409 if missing)
+    H->>H: resolve approval route + content hash (empty when no revision row; 500 on DB read failure)
     H->>SS: SubmitRevisionForReview(...)
     SS->>DB: BeginTx
     SS->>DB: setAuthzGUC (actor, tenant)
@@ -534,6 +534,7 @@ Top 3 (by severity, then blast radius):
 ## Changelog (this doc)
 
 - 2026-05-25 - PDF webhook tenant hardening sync: `POST /api/v1/documents/{id}/pdf-complete` now resolves canonical tenant from `documents.id` and rejects mismatched body `tenant_id` before persisting PDF metadata.
+- 2026-05-25 - Finalize C1/C2 hardening sync: `finalizeDocument` now treats `sql.ErrNoRows` from the `document_revisions` content-hash lookup as an allowed empty hash but fails closed with `500 internal_error` on real DB errors; duplicate document 500 paths no longer echo `err.Error()` in HTTP responses and now log server-side details only.
 - 2026-05-25 - IAM role-header hardening sync: documents HTTP role gates now derive admin/filler roles only from `iamdomain.RolesFromContext`; the prior `X-User-Roles` request-header fallback was removed.
 - 2026-05-25 - Editor-session tenant isolation sync: post-baseline migration `0211_editor_sessions_tenant_id.sql` adds/backfills `editor_sessions.tenant_id`; document create/acquire/presign/commit/session paths and pending/checkpoint/revision repository reads now thread tenant scope and filter by tenant.
 - 2026-05-25 - Values-hash marshal error sync: `ComputeValuesHash` now returns `(string, error)` and propagates JSON marshal failures through `FreezeService`, so unmarshalable placeholder values abort freeze instead of silently producing a hash with omitted value bytes.
