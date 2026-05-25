@@ -24,6 +24,7 @@ type Document struct {
 }
 
 type Query struct {
+	TenantID        string
 	Text            string
 	DocumentType    string
 	DocumentProfile string
