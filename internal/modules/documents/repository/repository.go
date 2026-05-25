@@ -677,9 +677,16 @@ func (r *Repository) ExpireStaleSessions(ctx context.Context, now time.Time) (in
 
 	var n int
 	err = tx.QueryRowContext(ctx, `
-		WITH expired AS (
-			UPDATE editor_sessions SET status='expired'
+		WITH batch AS (
+			SELECT id
+			FROM editor_sessions
 			WHERE status='active' AND expires_at < $1
+			ORDER BY expires_at, id
+			LIMIT 500
+		),
+		expired AS (
+			UPDATE editor_sessions SET status='expired'
+			WHERE id IN (SELECT id FROM batch)
 			RETURNING id
 		),
 		cleared AS (
@@ -1038,7 +1045,16 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 
 func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Time) (int, error) {
 	res, err := r.db.ExecContext(ctx,
-		`DELETE FROM autosave_pending_uploads WHERE expires_at < $1 AND consumed_at IS NULL`,
+		`WITH batch AS (
+			SELECT id
+			FROM autosave_pending_uploads
+			WHERE expires_at < $1 AND consumed_at IS NULL
+			ORDER BY expires_at, id
+			LIMIT 500
+		)
+		DELETE FROM autosave_pending_uploads p
+		USING batch
+		WHERE p.id = batch.id`,
 		olderThan)
 	if err != nil {
 		return 0, err
