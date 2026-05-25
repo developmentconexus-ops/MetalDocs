@@ -16,7 +16,7 @@ func NewReader(db *sql.DB) *Reader {
 	return &Reader{db: db}
 }
 
-func (r *Reader) ListDocuments(ctx context.Context, tenantID string) ([]searchdomain.Document, error) {
+func (r *Reader) ListDocuments(ctx context.Context, tenantID string, limit int) ([]searchdomain.Document, error) {
 	const q = `
 SELECT
 	d.id,
@@ -33,8 +33,9 @@ LEFT JOIN controlled_documents cd ON cd.id = d.controlled_document_id
 WHERE d.tenant_id = $1
   AND d.archived_at IS NULL
 ORDER BY d.created_at DESC
+LIMIT $2
 `
-	rows, err := r.db.QueryContext(ctx, q, tenantID)
+	rows, err := r.db.QueryContext(ctx, q, tenantID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("v2 list documents: %w", err)
 	}

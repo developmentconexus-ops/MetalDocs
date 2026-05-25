@@ -38,8 +38,9 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 	if tenantID == "" {
 		return nil, ErrTenantRequired
 	}
+	limit := effectiveLimit(q.Limit)
 
-	docs, err := s.reader.ListDocuments(ctx, tenantID)
+	docs, err := s.reader.ListDocuments(ctx, tenantID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -119,13 +120,6 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
 	})
 
-	limit := q.Limit
-	if limit <= 0 {
-		limit = defaultLimit
-	}
-	if limit > maxLimit {
-		limit = maxLimit
-	}
 	if len(filtered) > limit {
 		filtered = filtered[:limit]
 	}
@@ -178,6 +172,16 @@ func (s *Service) policiesForDocument(ctx context.Context, doc domain.Document) 
 
 func shouldBypassPolicy(ctx context.Context) bool {
 	return false
+}
+
+func effectiveLimit(limit int) int {
+	if limit <= 0 {
+		return defaultLimit
+	}
+	if limit > maxLimit {
+		return maxLimit
+	}
+	return limit
 }
 
 func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
