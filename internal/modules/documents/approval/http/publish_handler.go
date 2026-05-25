@@ -108,7 +108,7 @@ func (h *Handler) SchedulePublishHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
 

@@ -279,12 +279,16 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		effectiveDenominator = len(activeStage.EligibleActorIDs)
 	}
 	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
-		// No eligible actors configured — default denominator of 1 to allow any_1_of.
-		effectiveDenominator = 1
+		_ = tx.Rollback()
+		return SignoffResult{}, domain.ErrEmptyEligiblePool
 	}
 	outcome := drift.ForcedOutcome
 	if outcome == domain.QuorumPending {
 		outcome = domain.EvaluateQuorum(*activeStage, approvals, rejections, effectiveDenominator)
+		if outcome == domain.QuorumError {
+			_ = tx.Rollback()
+			return SignoffResult{}, domain.ErrEmptyEligiblePool
+		}
 	}
 
 	var result SignoffResult
