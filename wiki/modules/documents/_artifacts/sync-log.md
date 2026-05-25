@@ -1,3 +1,19 @@
+## 2026-05-25 - values-hash marshal error sync
+
+- **Context:** uncommitted diff on `fix/docs-5a-values-hash-c9` for 5a-C9.
+- **Mode:** lite patch
+- **Anchors moved:** `ComputeValuesHash` -> `domain/values_hash.go:11`.
+- **Public surface:** `ComputeValuesHash` now returns `(string, error)`; `FreezeService` propagates hash computation errors.
+- **Routes/API:** none.
+- **Runtime flows:** freeze now aborts before `WriteFreeze` when placeholder values cannot be JSON-marshaled for `values_hash`.
+- **Persistence:** no schema change; prevents persisting a `values_hash` derived from silently omitted value bytes.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: Git Bash terminated with `CreateFileMapping ... Win32 error 5` during `wiki_sync_preflight.ps1`.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/01-surface.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - repository RowsAffected hardening sync
 
 - **Context:** uncommitted diff on `fix/docs-5a-rows-affected-c1-c2` for 5a-C1/C2.

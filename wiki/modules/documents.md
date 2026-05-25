@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-25 (repository RowsAffected hardening sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-25 (values-hash marshal error sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -168,7 +168,8 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/application/service.go:564` | `Service.RenameDocument` | func | Validate + UPDATE + audit (T-005: not transactional) |
 | `internal/modules/documents/application/service.go:753` | `Service.UpdateDocumentStatus` | func | Status transitions; finalize tail-call lands here |
 | `internal/modules/documents/application/snapshot_service.go` | `SnapshotService` | type | Populates `placeholder_schema_snapshot` (ADR 0008) |
-| `internal/modules/documents/application/freeze_service.go` | `FreezeService` | type | `{name}` token substitution at freeze |
+| `internal/modules/documents/application/freeze_service.go` | `FreezeService` | type | `{name}` token substitution at freeze; aborts when values-hash JSON marshaling fails |
+| `internal/modules/documents/domain/values_hash.go:11` | `ComputeValuesHash` | func | Deterministic placeholder-values hash; returns marshal errors instead of hashing nil bytes |
 | `internal/modules/documents/application/fillin_service.go` | `FillinService` | type | Placeholder-value writes |
 | `internal/modules/documents/application/fillin_authz.go:9` | typed `iamdomain.Capability` consts | imports | Cross-ref iam T-001 |
 | `internal/modules/documents/application/cd_initializer.go` | `CDDocumentInitializer` | type | controlled-documents-side hook for atomic CD create |
@@ -433,6 +434,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - `SnapshotService` populates `placeholder_schema_snapshot` (ADR 0008; `wiki/concepts/placeholders.md`).
 - Trigger `enforce_snapshot_on_submit_trg` (`migrations/0152_*.sql:47`) blocks `documents.status='under_review'` UPDATE when snapshot is null. Fires in finalize tx (step Â§6.3 box `UPDATE documents`).
 - `FreezeService` performs `{name}` token substitution at freeze (`wiki/concepts/token-syntax.md`).
+- `ComputeValuesHash` sorts placeholder IDs and JSON-marshals every value; marshal failure is returned to `FreezeService` as `compute values_hash` instead of producing a silent hash over missing value bytes.
 - `document_placeholder_values` schema bug surfaced: `revision_id REFERENCES documents(id)` (T-009).
 
 ### 8.8 Artifact metadata
@@ -471,6 +473,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Audit completeness on rename | Crash between UPDATE and audit.Write | **T-005: row mutated, no audit row** â€” fails today |
 | Replay safety on finalize | Client retries finalize with the same `Idempotency-Key` and unchanged payload | Second call replays `201 { instanceId }` with `Idempotent-Replay: true`; mismatched payload under the same key is rejected by the shared idempotency store |
 | Snapshot guard on submit | Submit with null placeholder snapshot | DB trigger `enforce_snapshot_on_submit_trg` raises; 500 surfaces as mapped error |
+| Values-hash integrity | Placeholder value cannot be JSON-marshaled during freeze | `ComputeValuesHash` returns an error; freeze aborts before persisting `values_hash` |
 | Repository mutation outcome | Archive/unarchive or snapshot/freeze/final artifact UPDATE targets zero rows | Repository returns an error before commit/downstream success instead of silently reporting success |
 | Multi-tenant isolation | Cross-tenant id guessed | Every owned table carries `tenant_id`; repo queries scope (`repository.go:343, :376`) |
 
@@ -529,6 +532,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-25 - Values-hash marshal error sync: `ComputeValuesHash` now returns `(string, error)` and propagates JSON marshal failures through `FreezeService`, so unmarshalable placeholder values abort freeze instead of silently producing a hash with omitted value bytes.
 - 2026-05-25 - Repository RowsAffected hardening sync: `MarkArchived`, `Unarchive`, and the `SnapshotRepository` write methods now check `sql.Result.RowsAffected()` and return an error when zero rows are updated, preventing silent success on missing, cross-tenant, or already-target-state document writes.
 - 2026-05-21 - Generated-wrapper mount sync: documents module route mounting now uses `documentsapi.HandlerWithOptions` + `ServerInterfaceWrapper` via a legacy-delegating adapter, replacing manual generated-route enumeration while preserving existing handler behavior and rate-limit wiring.
 - 2026-05-21 - Public route cleanup sync: retired the orphaned `POST /api/v1/documents/{id}/artifact-metadata` HTTP mount from documents handler routing. Artifact metadata remains sourced through autosave commit plus document detail current-head fields; no OpenAPI/frontend contract path exists for the retired endpoint.
