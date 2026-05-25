@@ -323,11 +323,15 @@ func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *
 	return tx.Commit()
 }
 
-func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx *sql.Tx, doc *controlleddocumentsdomain.ControlledDocument) error {
+func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx controlleddocumentsdomain.DBTX, doc *controlleddocumentsdomain.ControlledDocument) error {
 	if tx == nil {
 		return errors.New("nil transaction")
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+	sqlTx, ok := tx.(*sql.Tx)
+	if !ok {
+		return errors.New("create tx requires *sql.Tx for authz")
+	}
+	if err := authz.Require(ctx, sqlTx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
 		return fmt.Errorf("registry: authz check CreateTx: %w", err)
 	}
 	return r.createWithQueryer(ctx, tx, doc)
@@ -371,7 +375,7 @@ RETURNING id::text`
 		}
 		return controlleddocumentsdomain.ErrCDCodeTaken
 	}
-	return err
+	return fmt.Errorf("insert controlled document: %w", err)
 }
 
 func (r *PostgresControlledDocumentRepository) createVisibilityGrants(ctx context.Context, qr queryRower, doc *controlleddocumentsdomain.ControlledDocument) error {
@@ -383,7 +387,7 @@ func (r *PostgresControlledDocumentRepository) createVisibilityGrants(ctx contex
 INSERT INTO controlled_document_area_grants (tenant_id, controlled_document_id, area_code)
 VALUES ($1, $2::uuid, $3)
 ON CONFLICT (tenant_id, controlled_document_id, area_code) DO NOTHING`, doc.TenantID, doc.ID, areaCode); err != nil {
-			return err
+			return fmt.Errorf("insert controlled document area grant: %w", err)
 		}
 	}
 	for _, userID := range doc.Visibility.UserIDs {
@@ -391,7 +395,7 @@ ON CONFLICT (tenant_id, controlled_document_id, area_code) DO NOTHING`, doc.Tena
 INSERT INTO controlled_document_user_grants (tenant_id, controlled_document_id, user_id)
 VALUES ($1, $2::uuid, $3)
 ON CONFLICT (tenant_id, controlled_document_id, user_id) DO NOTHING`, doc.TenantID, doc.ID, userID); err != nil {
-			return err
+			return fmt.Errorf("insert controlled document user grant: %w", err)
 		}
 	}
 	return nil
@@ -415,7 +419,7 @@ func (r *PostgresControlledDocumentRepository) UpdateStatus(ctx context.Context,
 	return nil
 }
 
-func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Context, tx *sql.Tx, tenantID, id string, status controlleddocumentsdomain.CDStatus, updatedAt time.Time) error {
+func (r *PostgresControlledDocumentRepository) UpdateStatusTx(ctx context.Context, tx controlleddocumentsdomain.DBTX, tenantID, id string, status controlleddocumentsdomain.CDStatus, updatedAt time.Time) error {
 	res, err := tx.ExecContext(ctx,
 		`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`,
 		status, updatedAt, tenantID, id,
@@ -473,7 +477,7 @@ SELECT EXISTS (
 )`
 	var exists bool
 	if err := r.db.QueryRowContext(ctx, q, tenantID, controlledDocumentID, actorUserID).Scan(&exists); err != nil {
-		return false, err
+		return false, fmt.Errorf("check controlled document visibility: %w", err)
 	}
 	return exists, nil
 }
@@ -491,14 +495,17 @@ func (a *PostgresSequenceAllocator) EnsureCounter(ctx context.Context, tenantID,
 	return a.ensureCounterViaExec(ctx, a.db, tenantID, profileCode, areaCode)
 }
 
-func (a *PostgresSequenceAllocator) ensureCounterViaExec(ctx context.Context, exec controlleddocumentsdomain.DBExecutor, tenantID, profileCode, areaCode string) error {
+func (a *PostgresSequenceAllocator) ensureCounterViaExec(ctx context.Context, exec controlleddocumentsdomain.DBTX, tenantID, profileCode, areaCode string) error {
 	_, err := exec.ExecContext(ctx, `
 		INSERT INTO cd_sequence_counters (tenant_id, profile_code, process_area_code, next_seq)
 		VALUES ($1, $2, $3, 1)
 		ON CONFLICT (tenant_id, profile_code, process_area_code) DO NOTHING`,
 		tenantID, profileCode, areaCode,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("ensure sequence counter: %w", err)
+	}
+	return nil
 }
 
 // Peek returns the current next_seq value without incrementing it.
@@ -514,18 +521,21 @@ func (a *PostgresSequenceAllocator) Peek(ctx context.Context, tenantID, profileC
 	if errors.Is(err, sql.ErrNoRows) {
 		return 1, nil
 	}
-	return next, err
+	if err != nil {
+		return 0, fmt.Errorf("peek sequence query: %w", err)
+	}
+	return next, nil
 }
 
 // NextAndIncrement atomically increments and returns the next sequence number.
-func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx controlleddocumentsdomain.DBExecutor, tenantID, profileCode, areaCode string) (int, error) {
-	var exec controlleddocumentsdomain.DBExecutor = a.db
+func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx controlleddocumentsdomain.DBTX, tenantID, profileCode, areaCode string) (int, error) {
+	var exec controlleddocumentsdomain.DBTX = a.db
 	if tx != nil {
 		exec = tx
 	}
 
 	if err := a.ensureCounterViaExec(ctx, exec, tenantID, profileCode, areaCode); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("ensure sequence counter before increment: %w", err)
 	}
 
 	var next int
@@ -546,7 +556,7 @@ func (a *PostgresSequenceAllocator) NextAndIncrement(ctx context.Context, tx con
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, controlleddocumentsdomain.ErrSequenceCounterNotFound
 		}
-		return 0, err
+		return 0, fmt.Errorf("next sequence increment query: %w", err)
 	}
 	return next, nil
 }
@@ -573,7 +583,7 @@ func (c *PostgresTemplateVersionChecker) GetTemplateVersionState(ctx context.Con
 		return nil, "", nil
 	}
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("get template version state query: %w", err)
 	}
 	if !status.Valid {
 		return nil, profileCode.String, nil
@@ -617,7 +627,7 @@ WHERE tenant_id = $1 AND code = $2`
 		return nil, taxonomydomain.ErrProfileNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get document profile by code query: %w", err)
 	}
 	profile.DefaultTemplateVersionID = nullStringPtr(defaultTemplateVersionID)
 	profile.OwnerUserID = nullStringPtr(ownerUserID)
@@ -655,7 +665,7 @@ WHERE tenant_id = $1 AND code = $2`
 		return nil, taxonomydomain.ErrAreaNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get process area by code query: %w", err)
 	}
 	area.ParentCode = nullStringPtr(parentCode)
 	area.OwnerUserID = nullStringPtr(ownerUserID)
