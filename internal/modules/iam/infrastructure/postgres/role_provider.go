@@ -56,7 +56,7 @@ ORDER BY role_code ASC
 		return nil, fmt.Errorf("iterate iam roles: %w", err)
 	}
 	if len(roles) == 0 {
-		return nil, domain.ErrUserNotFound
+		return nil, domain.ErrNoRolesAssigned
 	}
 
 	return roles, nil
