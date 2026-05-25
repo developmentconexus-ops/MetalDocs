@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -14,7 +15,16 @@ import (
 func strPtr(v string) *string { return &v }
 
 func withActorRoles(req *http.Request, roles string) {
-	req.Header.Set("X-Actor-Roles", roles)
+	parts := strings.Split(roles, ",")
+	ctxRoles := make([]iamdomain.Role, 0, len(parts))
+	for _, role := range parts {
+		role = strings.TrimSpace(role)
+		if role == "" {
+			continue
+		}
+		ctxRoles = append(ctxRoles, iamdomain.Role(role))
+	}
+	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), iamdomain.UserIDFromContext(req.Context()), ctxRoles))
 }
 
 func TestSubmitForReview_Happy(t *testing.T) {
