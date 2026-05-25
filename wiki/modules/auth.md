@@ -2,9 +2,10 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-24 | **Owner:** unassigned | **Status:** active (legacy envelope; no audit-trail emission yet) | **Maturity:** L2
+**Last verified:** 2026-05-25 | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
 
 > **Key files:**
+> - Current Phase 8 anchors: `internal/modules/auth/delivery/http/handler.go:40` (`traceIDPattern`), `handler.go:185` (`recordAudit`), `internal/modules/auth/application/service.go:246` (`ResolveSession`), `internal/modules/auth/domain/model.go:140`/`:144` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:121` (`TouchSession` grace window).
 > - `internal/modules/auth/application/service.go:75` â€” `NewService` (rejects `SessionSecret` shorter than 32 bytes)
 > - `internal/modules/auth/application/service.go:126` â€” `Authenticate` (login; calls `resolveLoginTenant` to bind tenant at login)
 > - `internal/modules/auth/application/service.go:172` â€” `resolveLoginTenant` (binds tenant from session; uses `AllowDevTenantFallback`)
@@ -73,7 +74,7 @@
 - Persistence: Postgres; tables under `metaldocs.auth_identities`, `metaldocs.auth_sessions` (auth-owned) + writes to `metaldocs.iam_users` / `iam_user_roles` via injected `iamdomain.RoleAdminRepository` (cross-module).
 - Identity table is **tenant-global** â€” `auth_identities` has no `tenant_id` column (`migrations/0021_init_auth_identities_and_sessions.sql:1-13`); roles are tenant-scoped in IAM (T-008). **Sessions are now tenant-bound** â€” `auth_sessions.tenant_id` added by migration 0184; `resolveLoginTenant` picks the tenant at login time and stores it in the session row. Subsequent requests read tenant from the session via `tenant.FromContext` (set by middleware) â€” `X-Tenant-ID` header is stripped after auth and never trusted by downstream handlers.
 - Session token format: `<base64url(rand32)>.<base64url(HMAC-SHA256(secret, token))>`; cookie value carries the signed pair, DB stores the SHA-256 hash of the token half (`application/service.go:439-468`).
-- Cookie attributes: `HttpOnly`, `SameSite=Lax`, `Secure` from `Config.CookieSecure` (defaults to `APP_ENV != local`), `Path=/`, `MaxAge` from `SessionTTL`.
+- Cookie attributes: `HttpOnly`, `SameSite=Strict`, `Secure` from `Config.CookieSecure` (defaults to `APP_ENV != local`), `Path=/`, `MaxAge` from `SessionTTL`.
 - Auth is NOT under `oapi-codegen` â€” routes are registered via `mux.HandleFunc` (`delivery/http/handler.go:35-39`); no entry in `api/openapi/v1/openapi.yaml` for `/api/v1/auth/*`. Consistent with ADR 0012's partial-rollout scope.
 - Error envelope is legacy `{error:{code,message,details,trace_id}}` â€” does NOT yet match RFC 9457 Problem Details from `wiki/architecture/api-design-system.md` (T-003).
 - Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, controlled-documents, taxonomy, templates) but auth tables remain unguarded â€” per ADR 0007 amendment.
@@ -299,6 +300,8 @@ State transitions:
 |---|---|---|---|
 | `metaldocs.auth_sessions.last_seen_at` | prior timestamp | request timestamp | every authenticated request (`TouchSession`) |
 
+Phase 8 update: `TouchSession` now no-ops inside a 30-second grace window and only updates `last_seen_at` when the stored value is older than `seenAt - 30 seconds`; missing sessions still return `ErrSessionNotFound`.
+
 Tripwire pairing: N/A. Audit emission: NO.
 
 ### 6.3 Admin create user â€” Service.CreateUser (invoked from iam admin handler)
@@ -510,6 +513,8 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 - References: [`references/local-dev-credentials.md`](../references/local-dev-credentials.md)
 
 ## Changelog
+
+- 2026-05-25 - Phase 8 auth mediums: failed-login audit now records `auth.login.failed` with SHA-256 identifier hash; audit trace IDs are allowlisted with server UUID fallback; audit payload marshal failures emit a sentinel payload; session cookies use `SameSite=Strict`; `TouchSession` has a 30-second grace window; `AuthenticatedSession` redacts raw tokens in string/JSON output; tenant selection query is ordered.
 
 - 2026-05-11 â€” Plan 3 (session-bound tenant): `Session.TenantID` + `CurrentUser.TenantID` added; `ResolveSession` drops `tenantID` arg; `resolveLoginTenant` + `AllowDevTenantFallback`; new errors `ErrTenantNotPermitted`/`ErrTenantClaimRequired`; middleware now injects `tenant.WithTenantID` + strips `X-Tenant-ID` header; migrations 0184/0185; `SeedUserTenants` helper; Key files, Â§2, Â§5.2, Â§6.1, Â§6.2, Â§6.4, Â§8.7, Â§12 updated.
 - 2026-05-10 â€” initial publish; first auth module doc. Author: Claude (Opus 4.7) under metaldocs-module-doc skill.

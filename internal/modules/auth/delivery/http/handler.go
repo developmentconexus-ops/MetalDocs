@@ -1,10 +1,14 @@
 package httpdelivery
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,6 +35,16 @@ type loginRequest struct {
 type changePasswordRequest struct {
 	CurrentPassword string `json:"currentPassword"`
 	NewPassword     string `json:"newPassword"`
+}
+
+var traceIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+func (r loginRequest) String() string {
+	return fmt.Sprintf("loginRequest{identifier:%q}", r.Identifier)
+}
+
+func (r changePasswordRequest) String() string {
+	return "changePasswordRequest{redacted}"
 }
 
 func NewHandler(service *authapp.Service) *Handler {
@@ -64,6 +78,10 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("auth login failed for %q: %v", strings.TrimSpace(req.Identifier), err)
 		http.SetCookie(w, h.service.ExpiredSessionCookie())
+		identifierHash := hashIdentifier(req.Identifier)
+		h.recordAudit(r, "", "auth.login.failed", identifierHash, map[string]any{
+			"identifier_sha256": identifierHash,
+		})
 		h.writeAuthError(w, err)
 		return
 	}
@@ -168,9 +186,12 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	if h.audit == nil {
 		return
 	}
-	raw, _ := json.Marshal(payload)
-	traceID := "trace-local"
-	if v := strings.TrimSpace(r.Header.Get("X-Trace-Id")); v != "" {
+	raw, marshalErr := json.Marshal(payload)
+	if marshalErr != nil {
+		raw = []byte(`{"error":"marshal_failed"}`)
+	}
+	traceID := uuid.NewString()
+	if v := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceIDPattern.MatchString(v) {
 		traceID = v
 	}
 	tenantID := ""
@@ -190,4 +211,9 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	}); err != nil {
 		log.Printf("auth audit write failed action=%s actor=%s: %v", action, actorID, err)
 	}
+}
+
+func hashIdentifier(identifier string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(identifier)))
+	return hex.EncodeToString(sum[:])
 }

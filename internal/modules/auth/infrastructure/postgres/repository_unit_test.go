@@ -134,3 +134,62 @@ LIMIT 1
 		t.Fatalf("unmet expectations: %v", err)
 	}
 }
+
+func TestTouchSession_NoOpInsideGraceWindowReturnsNil(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	repo := NewRepository(db)
+	seenAt := time.Date(2026, 5, 25, 12, 0, 31, 0, time.UTC)
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE metaldocs.auth_sessions
+SET last_seen_at = $2
+WHERE session_id = $1
+  AND last_seen_at < $2 - INTERVAL '30 seconds'
+`)).
+		WithArgs("session-1", seenAt).
+		WillReturnResult(driver.RowsAffected(0))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT EXISTS (SELECT 1 FROM metaldocs.auth_sessions WHERE session_id = $1)`)).
+		WithArgs("session-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+
+	if err := repo.TouchSession(context.Background(), "session-1", seenAt); err != nil {
+		t.Fatalf("TouchSession: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestTouchSession_MissingSessionReturnsNotFound(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock: %v", err)
+	}
+	defer db.Close()
+
+	repo := NewRepository(db)
+	seenAt := time.Date(2026, 5, 25, 12, 0, 31, 0, time.UTC)
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE metaldocs.auth_sessions
+SET last_seen_at = $2
+WHERE session_id = $1
+  AND last_seen_at < $2 - INTERVAL '30 seconds'
+`)).
+		WithArgs("missing-session", seenAt).
+		WillReturnResult(driver.RowsAffected(0))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT EXISTS (SELECT 1 FROM metaldocs.auth_sessions WHERE session_id = $1)`)).
+		WithArgs("missing-session").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+
+	err = repo.TouchSession(context.Background(), "missing-session", seenAt)
+	if !errors.Is(err, authdomain.ErrSessionNotFound) {
+		t.Fatalf("TouchSession error = %v, want ErrSessionNotFound", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}

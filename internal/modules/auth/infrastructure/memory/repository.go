@@ -79,6 +79,9 @@ func (r *Repository) TouchSession(_ context.Context, sessionID string, seenAt ti
 	if !ok {
 		return authdomain.ErrSessionNotFound
 	}
+	if !session.LastSeenAt.Before(seenAt.UTC().Add(-30 * time.Second)) {
+		return nil
+	}
 	session.LastSeenAt = seenAt
 	r.sessions[sessionID] = session
 	return nil
