@@ -202,12 +202,14 @@ status TEXT NOT NULL
 | `CreateDocumentTx` (`repository.go:76`) | Yes | `document.create` before INSERT; `document.edit` before pointer/snapshot UPDATEs; area=`tenant` | INSERT/UPDATE | `documents` |
 | `UpdateDocumentName` (`repository.go:216`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `documents` |
 | `UpdateDocumentStatus` (`repository.go:428`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `documents` |
-| `MarkArchived` (`repository.go:1071`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `public.documents` |
-| `Unarchive` (`repository.go:1082`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `public.documents` |
+| `MarkArchived` (`repository.go:1368`) | Yes | `document.edit`; area=`tenant` | UPDATE + non-zero `RowsAffected` required | `public.documents` |
+| `Unarchive` (`repository.go:1399`) | Yes | `document.edit`; area=`tenant` | UPDATE + non-zero `RowsAffected` required | `public.documents` |
 
 Tripwire rule evaluation facts:
 - `approval_instances` / `approval_signoffs` writes above have no `authz.Require` call in the scanned repository files; DB tripwire trigger exists in `0142b_role_capabilities_v2_enforce.sql:201-209`.
 - `CreateDocumentTx` now asserts `document.create` and `document.edit` in order inside the caller-owned transaction; the remaining `documents` rows in this audit are pre-existing scanned findings outside this sync scope.
+- `MarkArchived` and `Unarchive` now fail when the scoped UPDATE affects zero rows; this prevents silent archive/unarchive success for missing, cross-tenant, or already-target-state documents.
+- `SnapshotRepository` document UPDATE writers (`WriteSnapshot`, `WriteFreeze`, `WriteFinalDocx`, `WritePDF`, `AppendReconstruction`) now share `requireRowsAffected` and fail when no document row is updated.
 - Reads were not audited per rule.
 
 ## 6. Migration History

@@ -1,3 +1,19 @@
+## 2026-05-25 - repository RowsAffected hardening sync
+
+- **Context:** uncommitted diff on `fix/docs-5a-rows-affected-c1-c2` for 5a-C1/C2.
+- **Mode:** lite patch
+- **Anchors moved:** `MarkArchived` -> `repository.go:1368`; `Unarchive` -> `repository.go:1399`; snapshot writer anchor -> `snapshot_repository.go:55`.
+- **Public surface:** no API/handler surface changed; repository method behavior now fails zero-row archive/unarchive and snapshot/freeze/final artifact writes.
+- **Routes/API:** none.
+- **Runtime flows:** no route flow changed; repository write flows now stop on zero-row `RowsAffected`.
+- **Persistence:** `public.documents` archive/unarchive and snapshot/freeze/final artifact UPDATEs now require at least one affected row.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: Git Bash terminated with `CreateFileMapping ... Win32 error 5` during `wiki_sync_preflight.ps1`.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-21 - documents generated-wrapper mount sync
 
 - **Context:** uncommitted Phase 3 backend-platform-freeze slice to migrate documents module public route mounting to generated boundary ownership.
