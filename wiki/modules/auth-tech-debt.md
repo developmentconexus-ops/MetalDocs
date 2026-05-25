@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/auth.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/auth-refactor.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-25 (Phase 8 auth mediums)
 
 ## Severity scale
 
@@ -56,6 +56,7 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Observation:** Every authenticated request issues an `UPDATE auth_sessions SET last_seen_at = now()` via `TouchSession`. At sustained QPS this is one row-write per request on the hot session row. Latent perf concern; no caller currently observes pressure. Trigger fired: latent (surface exists, not yet a bug).
 - **Evidence:** `_artifacts/02-flow-resolve-session.md` §middleware chain; `_artifacts/04-persistence.md` §auth_sessions.
 - **Linked backlog row:** `backlog/auth-refactor.md#R-006`
+- **Phase 8 status:** CLOSED 2026-05-25. `TouchSession` now updates `auth_sessions.last_seen_at` only outside a 30-second grace window and treats in-window rows as successful no-ops; missing sessions still return `ErrSessionNotFound`.
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 
 ### T-007 · Auth↔IAM bidirectional dependency
