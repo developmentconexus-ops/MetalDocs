@@ -166,7 +166,7 @@ func (f *fakeRepo) AcquireSession(_ context.Context, _, _, _ string) (*domain.Se
 	return f.acquireSess, f.acquireErr
 }
 
-func (f *fakeRepo) HeartbeatSession(_ context.Context, _, _ string) error { return nil }
+func (f *fakeRepo) HeartbeatSession(_ context.Context, _, _, _ string) error { return nil }
 
 func (f *fakeRepo) ReleaseSession(_ context.Context, _, _, _ string) error { return nil }
 
@@ -174,11 +174,11 @@ func (f *fakeRepo) ForceReleaseSession(_ context.Context, _, _, _ string) error 
 
 func (f *fakeRepo) ExpireStaleSessions(_ context.Context, _ time.Time) (int, error) { return 0, nil }
 
-func (f *fakeRepo) PresignReserve(_ context.Context, _, _, _, _, _, _ string, _ time.Time) (string, error) {
+func (f *fakeRepo) PresignReserve(_ context.Context, _, _, _, _, _, _, _ string, _ time.Time) (string, error) {
 	return "pending_1", nil
 }
 
-func (f *fakeRepo) GetPendingForCommit(_ context.Context, _ string) (*application.PendingCommitMeta, error) {
+func (f *fakeRepo) GetPendingForCommit(_ context.Context, _, _ string) (*application.PendingCommitMeta, error) {
 	if f.pendingErr != nil {
 		return nil, f.pendingErr
 	}
@@ -213,18 +213,18 @@ func (f *fakeRepo) SyncCurrentRevisionArtifactMetadata(_ context.Context, tenant
 	return f.commitResult, nil
 }
 
-func (f *fakeRepo) CreateCheckpoint(_ context.Context, _, _, _ string) (*domain.Checkpoint, error) {
+func (f *fakeRepo) CreateCheckpoint(_ context.Context, _, _, _, _ string) (*domain.Checkpoint, error) {
 	if f.checkpointErr != nil {
 		return nil, f.checkpointErr
 	}
 	return f.checkpointResult, nil
 }
 
-func (f *fakeRepo) ListCheckpoints(_ context.Context, _ string) ([]domain.Checkpoint, error) {
+func (f *fakeRepo) ListCheckpoints(_ context.Context, _, _ string) ([]domain.Checkpoint, error) {
 	return f.checkpoints, nil
 }
 
-func (f *fakeRepo) RestoreCheckpoint(_ context.Context, _, _ string, _ int) (*application.RestoreResult, error) {
+func (f *fakeRepo) RestoreCheckpoint(_ context.Context, _, _, _ string, _ int) (*application.RestoreResult, error) {
 	if f.restoreErr != nil {
 		return nil, f.restoreErr
 	}
@@ -238,7 +238,7 @@ func (f *fakeRepo) IsDocumentOwner(_ context.Context, _, _, _ string) (bool, err
 	return f.ownerReturn, nil
 }
 
-func (f *fakeRepo) GetRevision(_ context.Context, _, _ string) (*domain.Revision, error) {
+func (f *fakeRepo) GetRevision(_ context.Context, _, _, _ string) (*domain.Revision, error) {
 	if f.revisionReturn == nil {
 		return nil, errors.New("revision not configured")
 	}

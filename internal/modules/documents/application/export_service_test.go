@@ -25,7 +25,7 @@ func (f *fakeExportRepo) GetDocument(_ context.Context, _, _ string) (*domain.Do
 	return f.doc, nil
 }
 
-func (f *fakeExportRepo) GetRevision(_ context.Context, _, _ string) (*domain.Revision, error) {
+func (f *fakeExportRepo) GetRevision(_ context.Context, _, _, _ string) (*domain.Revision, error) {
 	if f.rev == nil {
 		return nil, domain.ErrNotFound
 	}
