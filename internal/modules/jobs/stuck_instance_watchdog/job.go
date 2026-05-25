@@ -31,6 +31,7 @@ type StuckInstance struct {
 
 type cancelSvcInterface interface {
 	CancelInstance(ctx context.Context, db *sql.DB, in application.CancelInput) (application.CancelResult, error)
+	SystemCancelInstance(ctx context.Context, db *sql.DB, in application.CancelInput) (application.CancelResult, error)
 }
 
 type governanceEmitter interface {
@@ -61,13 +62,12 @@ func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) sc
 
 		for _, inst := range stuck {
 			if inst.DriftPolicy == "auto_cancel" {
-				_, err := cancelSvc.CancelInstance(ctx, db, application.CancelInput{
+				_, err := cancelSvc.SystemCancelInstance(ctx, db, application.CancelInput{
 					TenantID:                inst.TenantID,
 					InstanceID:              inst.ID,
 					ExpectedRevisionVersion: 0,
 					ActorUserID:             SystemActor,
 					Reason:                  "stuck_watchdog_auto_cancel",
-					BypassAuthz:             true,
 				})
 				if err != nil {
 					slog.ErrorContext(ctx, "stuck_instance_watchdog: auto-cancel failed",
