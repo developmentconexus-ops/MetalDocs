@@ -556,12 +556,16 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 
 	// Retrieve the latest content hash from the most recent autosaved revision.
 	var contentHash string
-	_ = h.db.QueryRowContext(r.Context(),
+	if err := h.db.QueryRowContext(r.Context(),
 		`SELECT COALESCE(content_hash, '') FROM document_revisions
 		  WHERE document_id = $1
 		  ORDER BY created_at DESC LIMIT 1`,
 		docID,
-	).Scan(&contentHash)
+	).Scan(&contentHash); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("documents finalize load content hash error: doc_id=%s tenant_id=%s err=%v", docID, tenantID, err)
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 
 	result, err := h.submitSvc.SubmitRevisionForReview(r.Context(), h.db, approvalapp.SubmitRequest{
 		TenantID:        tenantID,
@@ -617,7 +621,8 @@ func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status, msg := mapErr(err)
 		if status == http.StatusInternalServerError {
-			http.Error(w, `{"error":"`+msg+`","detail":"`+err.Error()+`"}`, status)
+			log.Printf("documents duplicate failed: doc_id=%s tenant_id=%s actor_id=%s err=%v", docID, tenantID, userID, err)
+			httpErr(w, status, msg)
 			return
 		}
 		httpErr(w, status, msg)

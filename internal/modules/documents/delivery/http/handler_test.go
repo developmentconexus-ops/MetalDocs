@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -42,6 +43,7 @@ type fakeSvc struct {
 
 	renameErr  error
 	renameName string
+	duplicateErr error
 
 	listPaginatedItems []*domain.Document
 	listPaginatedTotal int64
@@ -215,6 +217,9 @@ func (f *fakeSvc) RestoreCheckpoint(_ context.Context, _, _, _ string, _ int) (*
 }
 
 func (f *fakeSvc) DuplicateDocument(_ context.Context, _, _, _ string) (*application.CreateDocumentResult, error) {
+	if f.duplicateErr != nil {
+		return nil, f.duplicateErr
+	}
 	return &application.CreateDocumentResult{DocumentID: "doc_dup", InitialRevisionID: "rev_dup", SessionID: "sess_dup"}, nil
 }
 
@@ -663,6 +668,109 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	}
 	if submitter.called {
 		t.Fatalf("submit service should not be called on replay")
+	}
+}
+
+func TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT revision_version, revision_number, controlled_document_id::text").
+		WithArgs("doc_1", "tenant_1").
+		WillReturnRows(sqlmock.NewRows([]string{"revision_version", "revision_number", "controlled_document_id"}).
+			AddRow(int64(0), int64(1), "cd_1"))
+	mock.ExpectQuery("SELECT profile_code FROM controlled_documents WHERE id = \\$1 AND tenant_id = \\$2").
+		WithArgs("cd_1", "tenant_1").
+		WillReturnRows(sqlmock.NewRows([]string{"profile_code"}).AddRow("QA"))
+	mock.ExpectQuery("SELECT id FROM approval_routes").
+		WithArgs("tenant_1", "QA").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("route_1"))
+	mock.ExpectQuery("SELECT COALESCE\\(content_hash, ''\\) FROM document_revisions").
+		WithArgs("doc_1").
+		WillReturnError(sql.ErrNoRows)
+
+	submitter := &fakeApprovalSubmitter{}
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(&fakeSvc{}, db, submitter, &fakeFinalizeIdempotencyStore{})
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	withAuthHeaders(req, "document_filler")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if !submitter.called {
+		t.Fatal("expected submit service to be called")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("SELECT revision_version, revision_number, controlled_document_id::text").
+		WithArgs("doc_1", "tenant_1").
+		WillReturnRows(sqlmock.NewRows([]string{"revision_version", "revision_number", "controlled_document_id"}).
+			AddRow(int64(0), int64(1), "cd_1"))
+	mock.ExpectQuery("SELECT profile_code FROM controlled_documents WHERE id = \\$1 AND tenant_id = \\$2").
+		WithArgs("cd_1", "tenant_1").
+		WillReturnRows(sqlmock.NewRows([]string{"profile_code"}).AddRow("QA"))
+	mock.ExpectQuery("SELECT id FROM approval_routes").
+		WithArgs("tenant_1", "QA").
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("route_1"))
+	mock.ExpectQuery("SELECT COALESCE\\(content_hash, ''\\) FROM document_revisions").
+		WithArgs("doc_1").
+		WillReturnError(errors.New("db offline"))
+
+	submitter := &fakeApprovalSubmitter{}
+	h := httphandler.NewHandlerWithSubmitAndFinalizeStore(&fakeSvc{}, db, submitter, &fakeFinalizeIdempotencyStore{})
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
+	withAuthHeaders(req, "document_filler")
+	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if submitter.called {
+		t.Fatal("submit service should not be called on content-hash query failure")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestDuplicateDocument_InternalError_DoesNotLeakDetail(t *testing.T) {
+	mux := newMux(t, &fakeSvc{duplicateErr: errors.New("sensitive db detail")})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/duplicate", nil)
+	req.SetPathValue("id", "doc_1")
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "sensitive db detail") {
+		t.Fatalf("response must not leak internal error details: %s", rr.Body.String())
 	}
 }
 

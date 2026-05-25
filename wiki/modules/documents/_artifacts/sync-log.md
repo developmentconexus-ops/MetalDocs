@@ -302,3 +302,15 @@
 - **R-NNN touched:** none.
 - **Tally gate:** preflight/tally blocked by Git Bash `CreateFileMapping` Win32 error 5; treated as pre-existing tooling failure, not an edit-caused doc failure.
 - **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
+## 2026-05-25 - finalize C1/C2 error-path sync
+
+- **Context:** branch `fix/docs-5b-finalize-c1-c2`; targeted handler hardening for Track 3B Step 2B C1/C2 in `internal/modules/documents/delivery/http/handler.go`.
+- **Affected modules:** documents.
+- **Mode:** lite patch.
+- **Affected-surface scan:** finalize runtime error path and duplicate 500 response behavior changed; no route, OpenAPI/codegen, persistence schema, dependency graph, or public exported surface change.
+- **Facts updated:** finalize content-hash lookup now distinguishes `sql.ErrNoRows` (allowed empty hash) from real query errors (500 + server log); duplicate internal errors now use `httpErr` without leaking raw `err.Error()` payload details.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Tally gate:** preflight/tally blocked by Git Bash `CreateFileMapping` Win32 error 5; treated as pre-existing tooling failure, not an edit-caused doc failure.
+- **Patched files:** `internal/modules/documents/delivery/http/handler.go`; `internal/modules/documents/delivery/http/handler_test.go`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
