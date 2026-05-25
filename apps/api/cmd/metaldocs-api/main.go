@@ -77,13 +77,26 @@ type controlledDocumentDuplicatorAdapter struct {
 	svc *controlleddocumentsapp.ControlledDocumentService
 }
 
+type fanoutComponents struct {
+	client             *fanout.Client
+	freezeService      *docapp.FreezeService
+	pdfDispatchAdapter approvalapp.PDFDispatchInvoker
+}
+
+func newControlledDocumentDuplicatorAdapter(svc *controlleddocumentsapp.ControlledDocumentService) *controlledDocumentDuplicatorAdapter {
+	if svc == nil {
+		panic("controlled document duplicator service is nil")
+	}
+	return &controlledDocumentDuplicatorAdapter{svc: svc}
+}
+
 func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (*controlleddocumentsdomain.ControlledDocument, error) {
 	if a.svc == nil {
-		return nil, fmt.Errorf("controlled document service not configured")
+		return nil, fmt.Errorf("duplicate controlled document %s: service not configured", controlledDocumentID)
 	}
 	source, err := a.svc.Get(ctx, tenantID, controlledDocumentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("duplicate controlled document %s: load source: %w", controlledDocumentID, err)
 	}
 	var overrideReason *string
 	if source.OverrideTemplateVersionID != nil {
@@ -102,7 +115,7 @@ func (a controlledDocumentDuplicatorAdapter) DuplicateControlledDocument(ctx con
 		OverrideTemplateReason:    overrideReason,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("duplicate controlled document %s: create duplicate: %w", controlledDocumentID, err)
 	}
 	return res.ControlledDocument, nil
 }
@@ -223,20 +236,12 @@ func main() {
 	searchHandler.RegisterRoutes(mux)
 	iamAdminHandler.RegisterRoutes(mux)
 
-	taxonomyModule := taxonomy.New(taxonomy.Dependencies{
-		DB:          deps.SQLDB,
-		TplChecker:  taxonomyinfra.NewTemplateVersionChecker(deps.SQLDB),
-		AuditWriter: deps.AuditWriter,
-	})
+	taxonomyModule := buildTaxonomyModule(deps)
 	taxonomyModule.RegisterRoutes(mux)
 
-	controlledDocumentsModule := controlleddocuments.New(controlleddocuments.Dependencies{
-		DB:          deps.SQLDB,
-		Logger:      slog.Default(),
-		AuditWriter: deps.AuditWriter,
-	})
+	controlledDocumentsModule := buildControlledDocumentsModule(deps)
 	controlledDocumentsModule.RegisterRoutes(mux)
-	controlledDocumentDuplicator := controlledDocumentDuplicatorAdapter{svc: controlledDocumentsModule.Service()}
+	controlledDocumentDuplicator := newControlledDocumentDuplicatorAdapter(controlledDocumentsModule.Service())
 
 	var membershipService *iamapp.AreaMembershipService
 	if deps.SQLDB != nil {
@@ -251,39 +256,45 @@ func main() {
 	profileRepo := taxonomyinfra.NewProfileRepository(deps.SQLDB)
 
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
+	fanoutCfg := fanoutComponents{}
 	fanoutURL := strings.TrimSpace(os.Getenv("METALDOCS_FANOUT_URL"))
 	if fanoutURL == "" {
 		if strings.EqualFold(strings.TrimSpace(os.Getenv("METALDOCS_REQUIRE_FANOUT")), "true") {
 			log.Fatalf("METALDOCS_FANOUT_URL is required but not set")
 		}
+		// Optional integration: local and test setups are allowed to run without
+		// fanout/docgen, so missing config remains non-fatal unless
+		// METALDOCS_REQUIRE_FANOUT=true explicitly tightens startup.
 		slog.Warn("METALDOCS_FANOUT_URL not set; document approval will fail at freeze step")
 	}
 	serviceToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCGEN_V2_SERVICE_TOKEN"))
 	if fanoutURL != "" && serviceToken == "" {
 		log.Fatalf("METALDOCS_DOCGEN_V2_SERVICE_TOKEN is required when METALDOCS_FANOUT_URL is set")
 	}
-	var fanoutCli *fanout.Client
-	var freezeSvc *docapp.FreezeService
-	var pdfDispatchAdapter approvalapp.PDFDispatchInvoker
 	if fanoutURL != "" && deps.SQLDB != nil {
-		fanoutCli = fanout.NewClient(fanoutURL, serviceToken, httpclient.NewInternalClient())
+		fanoutCfg.client = fanout.NewClient(fanoutURL, serviceToken, httpclient.NewInternalClient())
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
 		fillInRepo := docrepo.NewFillInRepository(deps.SQLDB)
 		schemaReader := docapp.NewSnapshotSchemaReader(deps.SQLDB)
 		revReader := docrepo.NewRevisionReader(deps.SQLDB)
 		wfReader := docrepo.NewWorkflowReader(deps.SQLDB)
-		ctxBuilder := docapp.NewDocumentContextBuilder(deps.SQLDB, revReader, wfReader,
-			controlledDocumentsReaderAdapter{controlledDocumentsRepo}, revReader)
+		ctxBuilder := docapp.NewDocumentContextBuilder(
+			deps.SQLDB,
+			searchRevisionReaderAdapter{reader: revReader},
+			searchWorkflowReaderAdapter{reader: wfReader},
+			controlledDocumentsReaderAdapter{repo: controlledDocumentsRepo},
+			searchDocumentReaderAdapter{reader: revReader},
+		)
 		resolverReg := resolvers.NewRegistry()
 		resolvers.RegisterBuiltins(resolverReg)
-		freezeSvc = docapp.NewFreezeService(
+		fanoutCfg.freezeService = docapp.NewFreezeService(
 			schemaReader, fillInRepo, fillInRepo,
 			resolverReg, snapRepo, ctxBuilder,
-			snapRepo, snapRepo, fillInRepo, fanoutCli,
+			snapRepo, snapRepo, fillInRepo, fanoutCfg.client,
 		)
 		if deps.Publisher != nil {
 			pdfDispatcher := fanout.NewPDFDispatcher(deps.Publisher)
-			pdfDispatchAdapter = fanout.NewPDFDispatchAdapter(pdfDispatcher, snapRepo)
+			fanoutCfg.pdfDispatchAdapter = fanout.NewPDFDispatchAdapter(pdfDispatcher, snapRepo)
 		}
 	}
 
@@ -310,11 +321,11 @@ func main() {
 	if deps.DocgenV2Client != nil {
 		docDeps.ExportDocgen = deps.DocgenV2Client
 	}
-	if fanoutCli != nil && deps.SQLDB != nil {
+	if fanoutCfg.client != nil && deps.SQLDB != nil {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
 		inputsReader := docrepo.NewFanoutInputsReader(deps.SQLDB)
 		docDeps.ReconstructRunner = fanout.NewReconstructService(
-			inputsReader, fanoutCli, snapRepo,
+			inputsReader, fanoutCfg.client, snapRepo,
 			fanout.EngineVersions{EigenpalVer: "local", DocxtemplaterVer: "local"},
 			nil,
 		)
@@ -344,8 +355,8 @@ func main() {
 		approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))
 	}
 	var effectiveFreezeInvoker approvalapp.FreezeInvoker = noopFreezeInvoker{}
-	if freezeSvc != nil {
-		effectiveFreezeInvoker = freezeSvc
+	if fanoutCfg.freezeService != nil {
+		effectiveFreezeInvoker = fanoutCfg.freezeService
 	}
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
 	pdfOutboxWorker := fanout.NewPDFOutboxWorker(pdfOutboxRepo, deps.Publisher, slog.Default())
@@ -378,7 +389,7 @@ func main() {
 		}
 	}()
 	approvalServices.Decision = approvalapp.NewDecisionService(
-		approvalRepo, approvalEmitter, approvalapp.RealClock{}, effectiveFreezeInvoker, pdfDispatchAdapter,
+		approvalRepo, approvalEmitter, approvalapp.RealClock{}, effectiveFreezeInvoker, fanoutCfg.pdfDispatchAdapter,
 	).WithPDFOutbox(pdfOutboxRepo)
 	docDeps.SubmitSvc = approvalServices.Submit
 
@@ -391,13 +402,7 @@ func main() {
 	// needs ControlledDocumentDuplicator), hence the post-construction setter.
 	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
-	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
-	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
-	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
-		userID := iamdomain.UserIDFromContext(r.Context())
-		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
-	}
-	templateshttp.New(templatesSvc, templatesAuthzFn).Register(mux)
+	buildTemplatesModule(deps, capabilityService).Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
@@ -552,6 +557,32 @@ func shutdownServer(
 	return exitCode
 }
 
+func buildTaxonomyModule(deps bootstrap.APIDependencies) *taxonomy.Module {
+	return taxonomy.New(taxonomy.Dependencies{
+		DB:          deps.SQLDB,
+		TplChecker:  taxonomyinfra.NewTemplateVersionChecker(deps.SQLDB),
+		AuditWriter: deps.AuditWriter,
+	})
+}
+
+func buildControlledDocumentsModule(deps bootstrap.APIDependencies) *controlleddocuments.Module {
+	return controlleddocuments.New(controlleddocuments.Dependencies{
+		DB:          deps.SQLDB,
+		Logger:      slog.Default(),
+		AuditWriter: deps.AuditWriter,
+	})
+}
+
+func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService) *templateshttp.Handler {
+	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
+	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
+	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
+		userID := iamdomain.UserIDFromContext(r.Context())
+		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
+	}
+	return templateshttp.New(templatesSvc, templatesAuthzFn)
+}
+
 type realClock struct{}
 
 func (realClock) Now() time.Time { return time.Now().UTC() }
@@ -628,8 +659,8 @@ func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, ac
 }
 
 func traceIDFromContext(_ context.Context) string {
-	// Observability middleware stores the trace ID in the slog logger context, not in the
-	// Go context value chain. Generating a fresh UUID per audit event is correct here.
+	// TODO(trace): plumb the request trace identifier through context so document
+	// audit events can reuse the server-generated trace instead of a synthetic ID.
 	return uuid.NewString()
 }
 
@@ -653,12 +684,57 @@ type controlledDocumentsReaderAdapter struct {
 	}
 }
 
-func (a controlledDocumentsReaderAdapter) GetControlledDocument(ctx context.Context, tenantID, controlledDocumentID string) (resolvers.ControlledDocumentInfo, error) {
-	cd, err := a.repo.GetByID(ctx, tenantID, controlledDocumentID)
+func (a controlledDocumentsReaderAdapter) GetControlledDocument(ctx context.Context, tenantID resolvers.TenantID, controlledDocumentID resolvers.ControlledDocumentID) (resolvers.ControlledDocumentInfo, error) {
+	cd, err := a.repo.GetByID(ctx, string(tenantID), string(controlledDocumentID))
 	if err != nil {
 		return resolvers.ControlledDocumentInfo{}, err
 	}
 	return resolvers.ControlledDocumentInfo{DocCode: cd.Code}, nil
+}
+
+type searchRevisionReaderAdapter struct {
+	reader interface {
+		GetRevisionNumber(ctx context.Context, tenantID, revisionID string) (int64, error)
+		GetEffectiveFrom(ctx context.Context, tenantID, revisionID string) (time.Time, error)
+		GetAuthor(ctx context.Context, tenantID, revisionID string) (resolvers.AuthorInfo, error)
+	}
+}
+
+func (a searchRevisionReaderAdapter) GetRevisionNumber(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (int64, error) {
+	return a.reader.GetRevisionNumber(ctx, string(tenantID), string(revisionID))
+}
+
+func (a searchRevisionReaderAdapter) GetEffectiveFrom(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (time.Time, error) {
+	return a.reader.GetEffectiveFrom(ctx, string(tenantID), string(revisionID))
+}
+
+func (a searchRevisionReaderAdapter) GetAuthor(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (resolvers.AuthorInfo, error) {
+	return a.reader.GetAuthor(ctx, string(tenantID), string(revisionID))
+}
+
+type searchWorkflowReaderAdapter struct {
+	reader interface {
+		GetApprovers(ctx context.Context, tenantID, revisionID, approvalInstanceID string) ([]resolvers.ApproverInfo, error)
+		GetFinalApprovalDate(ctx context.Context, tenantID, revisionID string) (time.Time, error)
+	}
+}
+
+func (a searchWorkflowReaderAdapter) GetApprovers(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID, approvalInstanceID resolvers.ApprovalInstanceID) ([]resolvers.ApproverInfo, error) {
+	return a.reader.GetApprovers(ctx, string(tenantID), string(revisionID), string(approvalInstanceID))
+}
+
+func (a searchWorkflowReaderAdapter) GetFinalApprovalDate(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (time.Time, error) {
+	return a.reader.GetFinalApprovalDate(ctx, string(tenantID), string(revisionID))
+}
+
+type searchDocumentReaderAdapter struct {
+	reader interface {
+		GetDocumentTitle(ctx context.Context, tenantID, revisionID string) (string, error)
+	}
+}
+
+func (a searchDocumentReaderAdapter) GetDocumentTitle(ctx context.Context, tenantID resolvers.TenantID, revisionID resolvers.RevisionID) (string, error) {
+	return a.reader.GetDocumentTitle(ctx, string(tenantID), string(revisionID))
 }
 
 // profileDefaultsAdapter bridges taxonomy ProfileRepository → documents module ProfileDefaultTemplateReader.

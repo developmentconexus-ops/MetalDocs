@@ -55,9 +55,11 @@ func (r routeRule) matches(method, path string) bool {
 }
 
 // routeRules is the single authoritative table for route visibility +
-// capability. New routes MUST be added here; the unmatched default is
-// VisibilitySessionRequired, so a forgotten entry produces a 401 (loud), not a
-// silent public route (catastrophic).
+// capability. This intentionally couples startup route registration and authz
+// classification until the app has generated route metadata. New routes MUST be
+// added here; the unmatched default is VisibilitySessionRequired, so a
+// forgotten entry produces a 401 (loud), not a silent public route
+// (catastrophic).
 var routeRules = []routeRule{
 	// ---- Public (no session required) -----------------------------------
 	{method: http.MethodGet, pathPrefix: "/api/v1/health/", visibility: iamdelivery.VisibilityPublic},
@@ -197,13 +199,31 @@ var routeRules = []routeRule{
 
 func newPermissionResolver() iamdelivery.PermissionResolver {
 	return func(method, path string) (iamdomain.Capability, iamdelivery.Visibility) {
-		for _, rule := range routeRules {
-			if rule.matches(method, path) {
-				return rule.capability, rule.visibility
-			}
+		if capability, visibility, ok := resolveRoutePermission(method, path); ok {
+			return capability, visibility
 		}
 		// Fail-closed default. Any route not enumerated above demands at
 		// least a session — never silently public.
+		return resolvePermissionFallback(path)
+	}
+}
+
+func resolveRoutePermission(method, path string) (iamdomain.Capability, iamdelivery.Visibility, bool) {
+	for _, rule := range routeRules {
+		if rule.matches(method, path) {
+			return rule.capability, rule.visibility, true
+		}
+	}
+	return "", iamdelivery.VisibilityPermissionGuarded, false
+}
+
+func resolvePermissionFallback(path string) (iamdomain.Capability, iamdelivery.Visibility) {
+	_ = path
+	// Fail-closed default. Any route not enumerated above demands at least a
+	// session and does not receive an inferred capability grant.
+	switch {
+	default:
+		// no permission granted
 		return "", iamdelivery.VisibilitySessionRequired
 	}
 }
