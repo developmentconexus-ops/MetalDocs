@@ -6,7 +6,10 @@ func TestLoadDocgenConfigDefaultsToLocalDocgenEndpoint(t *testing.T) {
 	t.Setenv("APP_ENV", "local")
 	t.Setenv("METALDOCS_DOCGEN_API_URL", "")
 
-	cfg := LoadDocgenConfig()
+	cfg, err := LoadDocgenConfig()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
 	if !cfg.Enabled {
 		t.Fatalf("expected enabled config in local env when URL is omitted")
@@ -20,7 +23,10 @@ func TestLoadDocgenConfigDisabledOutsideLocalWhenURLMissing(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("METALDOCS_DOCGEN_API_URL", "")
 
-	cfg := LoadDocgenConfig()
+	cfg, err := LoadDocgenConfig()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
 	if cfg.Enabled {
 		t.Fatalf("expected disabled config when URL is missing outside local env")

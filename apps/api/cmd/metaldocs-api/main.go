@@ -149,7 +149,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("invalid auth config: %v", err)
 	}
-	featureFlagsCfg := config.LoadFeatureFlagsConfig()
+	featureFlagsCfg, err := config.LoadFeatureFlagsConfig()
+	if err != nil {
+		log.Fatalf("invalid feature flags config: %v", err)
+	}
 
 	deps, err := bootstrap.BuildAPIDependencies(ctx, repoMode, attachmentsCfg)
 	if err != nil {
