@@ -37,7 +37,7 @@ func (h *Handler) SubmitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.Validate(); err != nil {
-		WriteError(w, err)
+		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
 

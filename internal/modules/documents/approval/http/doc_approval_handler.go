@@ -81,15 +81,15 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if body.Decision != "approve" && body.Decision != "reject" {
-		WriteError(w, errors.New("decision must be one of: approve, reject"))
+		WriteError(w, NewValidationError("decision must be one of: approve, reject"))
 		return
 	}
 	if body.Decision == "reject" && strings.TrimSpace(body.Reason) == "" {
-		WriteError(w, errors.New("reason is required for reject"))
+		WriteError(w, NewValidationError("reason is required for reject"))
 		return
 	}
 	if strings.TrimSpace(body.Password) == "" {
-		WriteError(w, errors.New("password is required"))
+		WriteError(w, NewValidationError("password is required"))
 		return
 	}
 
@@ -186,7 +186,7 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
 
