@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"os"
 	"sync"
@@ -87,7 +88,10 @@ type Scheduler struct {
 	logger         *slog.Logger
 }
 
-func New(db *sql.DB, leaderID string) *Scheduler {
+func New(db *sql.DB, leaderID string) (*Scheduler, error) {
+	if leaderID == "" {
+		return nil, errors.New("leaderID cannot be empty")
+	}
 	return &Scheduler{
 		db:             db,
 		leaderID:       leaderID,
@@ -98,10 +102,12 @@ func New(db *sql.DB, leaderID string) *Scheduler {
 		forceWait:      5 * time.Second,
 		maxSkipStreak:  10,
 		logger:         slog.New(slog.NewTextHandler(os.Stdout, nil)),
-	}
+	}, nil
 }
 
 func (s *Scheduler) Register(cfg JobConfig) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.jobs = append(s.jobs, cfg)
 }
 
@@ -224,7 +230,10 @@ func (s *Scheduler) runJobLoop(ctx context.Context, cfg JobConfig) {
 			<-hbDone
 			jobCancel()
 
-			if releaseErr := s.releaseLease(context.Background(), cfg.Name, epoch); releaseErr != nil {
+			releaseCtx, releaseCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			releaseErr := s.releaseLease(releaseCtx, cfg.Name, epoch)
+			releaseCancel()
+			if releaseErr != nil {
 				s.logger.Error("scheduler_release_lease_failed", "job", cfg.Name, "epoch", epoch, "error", releaseErr)
 			}
 
@@ -260,27 +269,27 @@ func (s *Scheduler) heartbeatLoop(ctx context.Context, cancel context.CancelFunc
 }
 
 func (s *Scheduler) probePressure(ctx context.Context) bool {
-	current := s.currentPressure()
+	probeCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
 
 	var active float64
 	var maxConn float64
-	err := s.db.QueryRowContext(ctx, `
+	err := s.db.QueryRowContext(probeCtx, `
 SELECT
     COALESCE((SELECT count(*)::float8 FROM pg_stat_activity WHERE state = 'active'), 0),
     COALESCE(current_setting('max_connections')::float8, 1)
 `).Scan(&active, &maxConn)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err != nil {
 		s.logger.Debug("scheduler_pressure_probe_failed", "error", err)
-		return current
+		return s.inPressure
 	}
 
 	if maxConn <= 0 {
 		maxConn = 1
 	}
 	ratio := active / maxConn
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if ratio > 0.70 {
 		s.pressureCount++
@@ -303,12 +312,6 @@ SELECT
 		s.quietCount = 0
 	}
 
-	return s.inPressure
-}
-
-func (s *Scheduler) currentPressure() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.inPressure
 }
 
@@ -362,7 +365,10 @@ func (s *Scheduler) drain() {
 	s.logger.Warn("scheduler_force_release", "timeout", s.forceWait)
 	runs = s.snapshotInFlight()
 	for _, r := range runs {
-		if err := s.releaseLease(context.Background(), r.job, r.epoch); err != nil {
+		releaseCtx, releaseCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := s.releaseLease(releaseCtx, r.job, r.epoch)
+		releaseCancel()
+		if err != nil {
 			s.logger.Error("scheduler_force_release_failed", "job", r.job, "epoch", r.epoch, "error", err)
 			continue
 		}
