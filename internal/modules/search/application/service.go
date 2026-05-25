@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sort"
 	"strings"
-	"time"
 
 	"metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/authn"
@@ -40,7 +39,8 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 	}
 	limit := effectiveLimit(q.Limit)
 
-	docs, err := s.reader.ListDocuments(ctx, tenantID, limit)
+	q.TenantID = tenantID
+	docs, err := s.reader.ListDocuments(ctx, q, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -233,12 +233,4 @@ func hasTag(tags []string, expected string) bool {
 		}
 	}
 	return false
-}
-
-func cloneOptionalUTC(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	cloned := value.UTC()
-	return &cloned
 }
