@@ -306,7 +306,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				return SignoffResult{}, fmt.Errorf("recordSignoff: freeze: %w", err)
 			}
 			// Transition document under_review → approved.
-			if _, err := tx.ExecContext(ctx, `
+			res, err := tx.ExecContext(ctx, `
 				UPDATE documents
 				   SET status           = 'approved',
 				       revision_version = revision_version + 1
@@ -314,9 +314,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				   AND tenant_id = $2
 				   AND status    = 'under_review'`,
 				instance.DocumentID, req.TenantID,
-			); err != nil {
+			)
+			if err != nil {
 				_ = tx.Rollback()
 				return SignoffResult{}, fmt.Errorf("recordSignoff: approve document: %w", err)
+			}
+			rows, err := res.RowsAffected()
+			if err != nil {
+				_ = tx.Rollback()
+				return SignoffResult{}, fmt.Errorf("recordSignoff: approve document rows affected: %w", err)
+			}
+			if rows == 0 {
+				_ = tx.Rollback()
+				return SignoffResult{}, repository.ErrStaleRevision
 			}
 			result.InstanceApproved = true
 			shouldDispatchPDF = true
@@ -360,7 +370,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		}
 
 		// Transition document under_review -> draft so the author can edit and resubmit.
-		if _, err := tx.ExecContext(ctx, `
+		res, err := tx.ExecContext(ctx, `
         UPDATE documents
            SET status           = 'draft',
                revision_version = revision_version + 1
@@ -368,9 +378,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
            AND tenant_id = $2
            AND status    = 'under_review'`,
 			instance.DocumentID, req.TenantID,
-		); err != nil {
+		)
+		if err != nil {
 			_ = tx.Rollback()
 			return SignoffResult{}, fmt.Errorf("recordSignoff: reject document: %w", err)
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: reject document rows affected: %w", err)
+		}
+		if rows == 0 {
+			_ = tx.Rollback()
+			return SignoffResult{}, repository.ErrStaleRevision
 		}
 
 	default:
