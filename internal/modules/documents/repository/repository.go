@@ -116,9 +116,9 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 	}
 
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO editor_sessions (document_id, user_id, expires_at, last_acknowledged_revision_id, status)
-		 VALUES ($1, $2, now() + interval '5 minutes', '00000000-0000-0000-0000-000000000000', 'active') RETURNING id`,
-		docID, d.CreatedBy,
+		`INSERT INTO editor_sessions (tenant_id, document_id, user_id, expires_at, last_acknowledged_revision_id, status)
+		 VALUES ($1, $2, $3, now() + interval '5 minutes', '00000000-0000-0000-0000-000000000000', 'active') RETURNING id`,
+		d.TenantID, docID, d.CreatedBy,
 	).Scan(&sessionID); err != nil {
 		return "", "", "", fmt.Errorf("insert session: %w", err)
 	}
@@ -136,8 +136,8 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 	}
 
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE editor_sessions SET last_acknowledged_revision_id = $1 WHERE id = $2`,
-		revID, sessionID,
+		`UPDATE editor_sessions SET last_acknowledged_revision_id = $1 WHERE id = $2 AND tenant_id = $3::uuid`,
+		revID, sessionID, d.TenantID,
 	); err != nil {
 		return "", "", "", fmt.Errorf("update session ack: %w", err)
 	}
@@ -540,7 +540,7 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 	var existingID, existingUser, existingStatus, existingAck string
 	err = tx.QueryRowContext(ctx,
 		`SELECT id::text, user_id::text, status, coalesce(last_acknowledged_revision_id::text,'') FROM editor_sessions
-		 WHERE document_id=$1 AND status='active' FOR UPDATE`, docID,
+		 WHERE tenant_id=$1::uuid AND document_id=$2 AND status='active' FOR UPDATE`, tenantID, docID,
 	).Scan(&existingID, &existingUser, &existingStatus, &existingAck)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -549,7 +549,7 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 		// Caller already holds it - refresh.
 		if existingUser == userID {
 			var refreshedExpiresAt time.Time
-			if err := tx.QueryRowContext(ctx, `UPDATE editor_sessions SET expires_at = now() + interval '5 minutes' WHERE id=$1 RETURNING expires_at`, existingID).Scan(&refreshedExpiresAt); err != nil {
+			if err := tx.QueryRowContext(ctx, `UPDATE editor_sessions SET expires_at = now() + interval '5 minutes' WHERE id=$1 AND tenant_id=$2::uuid RETURNING expires_at`, existingID, tenantID).Scan(&refreshedExpiresAt); err != nil {
 				return nil, err
 			}
 			s := &domain.Session{ID: existingID, DocumentID: docID, UserID: userID, LastAcknowledgedRevisionID: existingAck, Status: domain.SessionActive, ExpiresAt: refreshedExpiresAt}
@@ -574,9 +574,9 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 	var newID string
 	var newExpiresAt time.Time
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO editor_sessions (document_id, user_id, expires_at, last_acknowledged_revision_id, status)
-		 VALUES ($1, $2, now() + interval '5 minutes', $3, 'active') RETURNING id, expires_at`,
-		docID, userID, curRev,
+		`INSERT INTO editor_sessions (tenant_id, document_id, user_id, expires_at, last_acknowledged_revision_id, status)
+		 VALUES ($1, $2, $3, now() + interval '5 minutes', $4, 'active') RETURNING id, expires_at`,
+		tenantID, docID, userID, curRev,
 	).Scan(&newID, &newExpiresAt); err != nil {
 		return nil, err
 	}
@@ -588,10 +588,10 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 	return &domain.Session{ID: newID, DocumentID: docID, UserID: userID, LastAcknowledgedRevisionID: curRev, Status: domain.SessionActive, ExpiresAt: newExpiresAt}, tx.Commit()
 }
 
-func (r *Repository) HeartbeatSession(ctx context.Context, sessionID, userID string) error {
+func (r *Repository) HeartbeatSession(ctx context.Context, tenantID, sessionID, userID string) error {
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE editor_sessions SET expires_at = now() + interval '5 minutes'
-		 WHERE id=$1 AND user_id=$2 AND status='active'`, sessionID, userID)
+		 WHERE id=$1 AND tenant_id=$2::uuid AND user_id=$3 AND status='active'`, sessionID, tenantID, userID)
 	if err != nil {
 		return err
 	}
@@ -619,7 +619,7 @@ func (r *Repository) ReleaseSession(ctx context.Context, tenantID, sessionID, us
 	}
 	res, err := tx.ExecContext(ctx,
 		`UPDATE editor_sessions SET status='released', released_at=now()
-		 WHERE id=$1 AND user_id=$2 AND status='active'`, sessionID, userID)
+		 WHERE id=$1 AND tenant_id=$2::uuid AND user_id=$3 AND status='active'`, sessionID, tenantID, userID)
 	if err != nil {
 		return err
 	}
@@ -650,7 +650,7 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID,
 	}
 	res, err := tx.ExecContext(ctx,
 		`UPDATE editor_sessions SET status='force_released', released_at=now()
-		 WHERE id=$1 AND status='active'`, sessionID)
+		 WHERE id=$1 AND tenant_id=$2::uuid AND status='active'`, sessionID, tenantID)
 	if err != nil {
 		return err
 	}
@@ -695,7 +695,7 @@ func (r *Repository) ExpireStaleSessions(ctx context.Context, now time.Time) (in
 	return n, tx.Commit()
 }
 
-func (r *Repository) PresignReserve(ctx context.Context, sessionID, userID, docID, baseRevisionID, contentHash, storageKey string, expiresAt time.Time) (pendingID string, err error) {
+func (r *Repository) PresignReserve(ctx context.Context, tenantID, sessionID, userID, docID, baseRevisionID, contentHash, storageKey string, expiresAt time.Time) (pendingID string, err error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return "", err
@@ -706,7 +706,7 @@ func (r *Repository) PresignReserve(ctx context.Context, sessionID, userID, docI
 	var sessUser, sessDoc, sessAck, sessStatus string
 	err = tx.QueryRowContext(ctx,
 		`SELECT user_id::text, document_id::text, last_acknowledged_revision_id::text, status
-		 FROM editor_sessions WHERE id=$1 FOR UPDATE`, sessionID,
+		 FROM editor_sessions WHERE id=$1 AND tenant_id=$2::uuid FOR UPDATE`, sessionID, tenantID,
 	).Scan(&sessUser, &sessDoc, &sessAck, &sessStatus)
 	if err != nil {
 		return "", err
@@ -772,12 +772,14 @@ type RestoreResult struct {
 // GetPendingForCommit returns the minimal metadata the service needs before
 // performing server-authoritative hash verification. Short, unlocked read;
 // CommitUpload re-locks and re-checks under FOR UPDATE.
-func (r *Repository) GetPendingForCommit(ctx context.Context, pendingID string) (*PendingCommitMeta, error) {
+func (r *Repository) GetPendingForCommit(ctx context.Context, tenantID, pendingID string) (*PendingCommitMeta, error) {
 	var m PendingCommitMeta
 	err := r.db.QueryRowContext(ctx,
 		`SELECT session_id::text, document_id::text, base_revision_id::text,
 		        content_hash, storage_key, expires_at, consumed_at
-		 FROM autosave_pending_uploads WHERE id=$1`, pendingID,
+		 FROM autosave_pending_uploads p
+		 JOIN documents d ON d.id = p.document_id
+		 WHERE p.id=$1 AND d.tenant_id=$2::uuid`, pendingID, tenantID,
 	).Scan(&m.SessionID, &m.DocumentID, &m.BaseRevisionID,
 		&m.ExpectedContentHash, &m.StorageKey, &m.ExpiresAt, &m.ConsumedAt)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -823,9 +825,11 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	// Lock pending row.
 	var p domain.PendingUpload
 	err = tx.QueryRowContext(ctx,
-		`SELECT id::text, session_id::text, document_id::text, base_revision_id::text, content_hash,
-		        storage_key, expires_at, consumed_at
-		 FROM autosave_pending_uploads WHERE id=$1 FOR UPDATE`, pendingID,
+		`SELECT p.id::text, p.session_id::text, p.document_id::text, p.base_revision_id::text, p.content_hash,
+		        p.storage_key, p.expires_at, p.consumed_at
+		 FROM autosave_pending_uploads p
+		 JOIN documents d ON d.id = p.document_id
+		 WHERE p.id=$1 AND d.tenant_id=$2::uuid FOR UPDATE`, pendingID, tenantID,
 	).Scan(&p.ID, &p.SessionID, &p.DocumentID, &p.BaseRevisionID, &p.ContentHash, &p.StorageKey, &p.ExpiresAt, &p.ConsumedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrPendingNotFound
@@ -873,7 +877,7 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	var sessUser, sessAck, sessStatus string
 	err = tx.QueryRowContext(ctx,
 		`SELECT user_id::text, last_acknowledged_revision_id::text, status
-		 FROM editor_sessions WHERE id=$1 FOR UPDATE`, sessionID,
+		 FROM editor_sessions WHERE id=$1 AND tenant_id=$2::uuid FOR UPDATE`, sessionID, tenantID,
 	).Scan(&sessUser, &sessAck, &sessStatus)
 	if err != nil {
 		return nil, err
@@ -911,13 +915,13 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	}
 
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE documents SET current_revision_id=$1, form_data_json=$2, updated_at=now() WHERE id=$3`,
-		revID, formDataSnapshot, docID,
+		`UPDATE documents SET current_revision_id=$1, form_data_json=$2, updated_at=now() WHERE id=$3 AND tenant_id=$4::uuid`,
+		revID, formDataSnapshot, docID, tenantID,
 	); err != nil {
 		return nil, err
 	}
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE editor_sessions SET last_acknowledged_revision_id=$1 WHERE id=$2`, revID, sessionID,
+		`UPDATE editor_sessions SET last_acknowledged_revision_id=$1 WHERE id=$2 AND tenant_id=$3::uuid`, revID, sessionID, tenantID,
 	); err != nil {
 		return nil, err
 	}
@@ -986,9 +990,9 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 	if err := tx.QueryRowContext(ctx,
 		`SELECT user_id::text, status
 		   FROM editor_sessions
-		  WHERE id = $1
+		  WHERE id = $1 AND tenant_id = $2::uuid
 		  FOR UPDATE`,
-		sessionID,
+		sessionID, tenantID,
 	).Scan(&sessUser, &sessStatus); err != nil {
 		return nil, err
 	}
@@ -1043,7 +1047,7 @@ func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Ti
 	return int(n), nil
 }
 
-func (r *Repository) CreateCheckpoint(ctx context.Context, docID, actorUserID, label string) (*domain.Checkpoint, error) {
+func (r *Repository) CreateCheckpoint(ctx context.Context, tenantID, docID, actorUserID, label string) (*domain.Checkpoint, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -1052,7 +1056,7 @@ func (r *Repository) CreateCheckpoint(ctx context.Context, docID, actorUserID, l
 
 	var revID string
 	if err := tx.QueryRowContext(ctx,
-		`SELECT current_revision_id::text FROM documents WHERE id=$1 FOR UPDATE`, docID,
+		`SELECT current_revision_id::text FROM documents WHERE id=$1 AND tenant_id=$2::uuid FOR UPDATE`, docID, tenantID,
 	).Scan(&revID); err != nil {
 		return nil, err
 	}
@@ -1062,7 +1066,10 @@ func (r *Repository) CreateCheckpoint(ctx context.Context, docID, actorUserID, l
 
 	var nextVer int
 	if err := tx.QueryRowContext(ctx,
-		`SELECT coalesce(max(version_num),0)+1 FROM document_checkpoints WHERE document_id=$1`, docID,
+		`SELECT coalesce(max(cp.version_num),0)+1
+		   FROM document_checkpoints cp
+		   JOIN documents d ON d.id = cp.document_id
+		  WHERE cp.document_id=$1 AND d.tenant_id=$2::uuid`, docID, tenantID,
 	).Scan(&nextVer); err != nil {
 		return nil, err
 	}
@@ -1079,10 +1086,12 @@ func (r *Repository) CreateCheckpoint(ctx context.Context, docID, actorUserID, l
 	return cp, tx.Commit()
 }
 
-func (r *Repository) ListCheckpoints(ctx context.Context, docID string) ([]domain.Checkpoint, error) {
+func (r *Repository) ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id::text, document_id::text, revision_id::text, version_num, coalesce(label,''), created_at, created_by::text
-		 FROM document_checkpoints WHERE document_id=$1 ORDER BY version_num DESC`, docID)
+		`SELECT cp.id::text, cp.document_id::text, cp.revision_id::text, cp.version_num, coalesce(cp.label,''), cp.created_at, cp.created_by::text
+		 FROM document_checkpoints cp
+		 JOIN documents d ON d.id = cp.document_id
+		 WHERE cp.document_id=$1 AND d.tenant_id=$2::uuid ORDER BY cp.version_num DESC`, docID, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -1143,11 +1152,13 @@ ORDER BY d.revision_number DESC, d.created_at DESC
 	return items, rows.Err()
 }
 
-func (r *Repository) GetRevision(ctx context.Context, docID, revID string) (*domain.Revision, error) {
+func (r *Repository) GetRevision(ctx context.Context, tenantID, docID, revID string) (*domain.Revision, error) {
 	var rv domain.Revision
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id::text, document_id::text, revision_num, coalesce(parent_revision_id::text,''), session_id::text, storage_key, content_hash, form_data_snapshot, created_at
-		 FROM document_revisions WHERE id=$1 AND document_id=$2`, revID, docID,
+		`SELECT r.id::text, r.document_id::text, r.revision_num, coalesce(r.parent_revision_id::text,''), r.session_id::text, r.storage_key, r.content_hash, r.form_data_snapshot, r.created_at
+		 FROM document_revisions r
+		 JOIN documents d ON d.id = r.document_id
+		 WHERE r.id=$1 AND r.document_id=$2 AND d.tenant_id=$3::uuid`, revID, docID, tenantID,
 	).Scan(&rv.ID, &rv.DocumentID, &rv.RevisionNum, &rv.ParentRevisionID, &rv.SessionID, &rv.StorageKey, &rv.ContentHash, &rv.FormDataSnapshot, &rv.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
@@ -1163,7 +1174,7 @@ func (r *Repository) GetRevision(ctx context.Context, docID, revID string) (*dom
 // a NEW revision appended to head (parent = current_revision_id). It never
 // rewrites history or rewinds revision_num. Session holder/active checks apply
 // - restore is a session-authoritative action equivalent to a large autosave.
-func (r *Repository) RestoreCheckpoint(ctx context.Context, docID, actorUserID string, versionNum int) (*RestoreResult, error) {
+func (r *Repository) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorUserID string, versionNum int) (*RestoreResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -1175,7 +1186,7 @@ func (r *Repository) RestoreCheckpoint(ctx context.Context, docID, actorUserID s
 	var curRev string
 	if err := tx.QueryRowContext(ctx,
 		`SELECT coalesce(active_session_id::text,''), coalesce(current_revision_id::text,'')
-		 FROM documents WHERE id=$1 FOR UPDATE`, docID,
+		 FROM documents WHERE id=$1 AND tenant_id=$2::uuid FOR UPDATE`, docID, tenantID,
 	).Scan(&sessID, &curRev); err != nil {
 		return nil, err
 	}
@@ -1183,7 +1194,7 @@ func (r *Repository) RestoreCheckpoint(ctx context.Context, docID, actorUserID s
 		return nil, domain.ErrSessionInactive
 	}
 	if err := tx.QueryRowContext(ctx,
-		`SELECT user_id::text, status FROM editor_sessions WHERE id=$1 FOR UPDATE`, sessID,
+		`SELECT user_id::text, status FROM editor_sessions WHERE id=$1 AND tenant_id=$2::uuid FOR UPDATE`, sessID, tenantID,
 	).Scan(&sessUser, &sessStatus); err != nil {
 		return nil, err
 	}
@@ -1201,7 +1212,8 @@ func (r *Repository) RestoreCheckpoint(ctx context.Context, docID, actorUserID s
 		`SELECT cp.revision_id::text, r.storage_key, r.content_hash, r.form_data_snapshot
 		 FROM document_checkpoints cp
 		 JOIN document_revisions r ON r.id = cp.revision_id
-		 WHERE cp.document_id=$1 AND cp.version_num=$2`, docID, versionNum,
+		 JOIN documents d ON d.id = cp.document_id
+		 WHERE cp.document_id=$1 AND cp.version_num=$2 AND d.tenant_id=$3::uuid`, docID, versionNum, tenantID,
 	).Scan(&cpRevID, &cpStorageKey, &cpContentHash, &cpFormData)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, domain.ErrCheckpointNotFound
@@ -1237,13 +1249,13 @@ func (r *Repository) RestoreCheckpoint(ctx context.Context, docID, actorUserID s
 	// On fresh insert: advance head + session ack.
 	if !idempotent {
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE documents SET current_revision_id=$1, form_data_json=$2, updated_at=now() WHERE id=$3`,
-			newRevID, cpFormData, docID,
+			`UPDATE documents SET current_revision_id=$1, form_data_json=$2, updated_at=now() WHERE id=$3 AND tenant_id=$4::uuid`,
+			newRevID, cpFormData, docID, tenantID,
 		); err != nil {
 			return nil, err
 		}
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE editor_sessions SET last_acknowledged_revision_id=$1 WHERE id=$2`, newRevID, sessID,
+			`UPDATE editor_sessions SET last_acknowledged_revision_id=$1 WHERE id=$2 AND tenant_id=$3::uuid`, newRevID, sessID, tenantID,
 		); err != nil {
 			return nil, err
 		}

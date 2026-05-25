@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-25 (values-hash marshal error sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-25 (editor-session tenant isolation sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -475,7 +475,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Snapshot guard on submit | Submit with null placeholder snapshot | DB trigger `enforce_snapshot_on_submit_trg` raises; 500 surfaces as mapped error |
 | Values-hash integrity | Placeholder value cannot be JSON-marshaled during freeze | `ComputeValuesHash` returns an error; freeze aborts before persisting `values_hash` |
 | Repository mutation outcome | Archive/unarchive or snapshot/freeze/final artifact UPDATE targets zero rows | Repository returns an error before commit/downstream success instead of silently reporting success |
-| Multi-tenant isolation | Cross-tenant id guessed | Every owned table carries `tenant_id`; repo queries scope (`repository.go:343, :376`) |
+| Multi-tenant isolation | Cross-tenant session, pending upload, checkpoint, or revision id guessed | `editor_sessions.tenant_id` migration plus repository tenant filters/joins reject foreign-tenant rows |
 
 ---
 
@@ -532,6 +532,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-25 - Editor-session tenant isolation sync: post-baseline migration `0211_editor_sessions_tenant_id.sql` adds/backfills `editor_sessions.tenant_id`; document create/acquire/presign/commit/session paths and pending/checkpoint/revision repository reads now thread tenant scope and filter by tenant.
 - 2026-05-25 - Values-hash marshal error sync: `ComputeValuesHash` now returns `(string, error)` and propagates JSON marshal failures through `FreezeService`, so unmarshalable placeholder values abort freeze instead of silently producing a hash with omitted value bytes.
 - 2026-05-25 - Repository RowsAffected hardening sync: `MarkArchived`, `Unarchive`, and the `SnapshotRepository` write methods now check `sql.Result.RowsAffected()` and return an error when zero rows are updated, preventing silent success on missing, cross-tenant, or already-target-state document writes.
 - 2026-05-21 - Generated-wrapper mount sync: documents module route mounting now uses `documentsapi.HandlerWithOptions` + `ServerInterfaceWrapper` via a legacy-delegating adapter, replacing manual generated-route enumeration while preserving existing handler behavior and rate-limit wiring.
