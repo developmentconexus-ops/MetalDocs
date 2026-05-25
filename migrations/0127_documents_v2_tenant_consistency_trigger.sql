@@ -1,4 +1,5 @@
 -- 0127_documents_v2_tenant_consistency_trigger.sql
+BEGIN;
 
 CREATE OR REPLACE FUNCTION check_document_tenant_consistency() RETURNS trigger AS $$
 DECLARE
@@ -28,3 +29,5 @@ DROP TRIGGER IF EXISTS trg_documents_v2_tenant_consistency ON documents_v2;
 CREATE TRIGGER trg_documents_v2_tenant_consistency
   BEFORE INSERT OR UPDATE ON documents_v2
   FOR EACH ROW EXECUTE FUNCTION check_document_tenant_consistency();
+
+COMMIT;

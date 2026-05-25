@@ -7,8 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"metaldocs/internal/platform/tenant"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeOptionsSchemaReader struct {
@@ -34,6 +35,7 @@ func newOptionsReq(docID, pid string) *http.Request {
 	req.SetPathValue("id", docID)
 	req.SetPathValue("pid", pid)
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{iamdomain.Role("document_filler")}))
 	return req
 }
 
@@ -100,5 +102,21 @@ func TestPlaceholderOptions_UnknownPID_Returns400(t *testing.T) {
 	h.HandleGetOptions(rec, newOptionsReq("doc-1", "nonexistent"))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status=%d, want 400", rec.Code)
+	}
+}
+
+func TestPlaceholderOptions_ForbiddenWithoutDocumentRole(t *testing.T) {
+	schema := []templatesdomain.Placeholder{{ID: "p-user", Type: templatesdomain.PHUser}}
+	h := NewPlaceholderOptionsHandler(fakeOptionsSchemaReader{phs: schema}, fakeOptionsIAMReader{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc-1/placeholder-options/p-user", nil)
+	req.SetPathValue("id", "doc-1")
+	req.SetPathValue("pid", "p-user")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{iamdomain.Role("template_author")}))
+
+	h.HandleGetOptions(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status=%d, want 403", rec.Code)
 	}
 }

@@ -35,17 +35,19 @@ WHERE d.tenant_id = $1
   AND d.archived_at IS NULL
   AND ($2 = '' OR UPPER(COALESCE(d.status, '')) = $2)
   AND ($3 = '' OR LOWER(COALESCE(d.profile_code_snapshot, '')) = $3)
-  AND ($4 = '' OR LOWER(COALESCE(d.process_area_code_snapshot, '')) = $4)
-  AND ($5 = '' OR d.created_by::text = $5)
+  AND ($4 = '' OR LOWER(COALESCE(d.profile_code_snapshot, '')) = $4)
+  AND ($5 = '' OR LOWER(COALESCE(d.process_area_code_snapshot, '')) = $5)
+  AND ($6 = '' OR d.created_by::text = $6)
 ORDER BY d.created_at DESC
-LIMIT $6
+LIMIT $7
 `
 	rows, err := r.db.QueryContext(
 		ctx,
 		q,
 		query.TenantID,
-		strings.ToUpper(strings.TrimSpace(query.Status)),
+		strings.ToUpper(strings.TrimSpace(string(query.Status))),
 		strings.ToLower(strings.TrimSpace(query.DocumentType)),
+		strings.ToLower(strings.TrimSpace(query.DocumentProfile)),
 		strings.ToLower(strings.TrimSpace(query.ProcessArea)),
 		strings.TrimSpace(query.OwnerID),
 		limit,
@@ -58,11 +60,13 @@ LIMIT $6
 	var out []searchdomain.Document
 	for rows.Next() {
 		var doc searchdomain.Document
+		var status string
+		var profile string
 		if err := rows.Scan(
 			&doc.ID,
 			&doc.Title,
-			&doc.Status,
-			&doc.DocumentProfile,
+			&status,
+			&profile,
 			&doc.ProcessArea,
 			&doc.OwnerID,
 			&doc.DocumentCode,
@@ -71,6 +75,8 @@ LIMIT $6
 		); err != nil {
 			return nil, fmt.Errorf("v2 scan document: %w", err)
 		}
+		doc.Status = searchdomain.DocStatus(status)
+		doc.DocumentProfile = profile
 		doc.DocumentType = doc.DocumentProfile
 		out = append(out, doc)
 	}

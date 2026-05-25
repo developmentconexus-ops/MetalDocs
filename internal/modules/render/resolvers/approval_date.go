@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -12,7 +13,13 @@ func (ApprovalDateResolver) Key() string { return "approval_date" }
 
 func (ApprovalDateResolver) Version() int { return 1 }
 
-func (ApprovalDateResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+func (r ApprovalDateResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if in.TenantID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: TenantID is required", r.Key())
+	}
+	if in.RevisionID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: RevisionID is required", r.Key())
+	}
 	if in.WorkflowReader == nil {
 		return ResolvedValue{}, errors.New("approval_date resolver: workflow reader is nil")
 	}

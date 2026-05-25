@@ -266,6 +266,9 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 			for _, split := range strings.Split(raw, ",") {
 				s := strings.TrimSpace(split)
 				if s != "" {
+					if !isKnownDocumentStatus(s) {
+						return opts, "", fmt.Errorf("invalid status: %s", s)
+					}
 					statuses = append(statuses, s)
 				}
 			}
@@ -293,6 +296,15 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 	}
 
 	return opts, effectiveUserID, nil
+}
+
+func isKnownDocumentStatus(status string) bool {
+	switch domain.DocumentStatus(status) {
+	case domain.DocStatusDraft, domain.DocStatusFinalized, domain.DocStatusArchived:
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Handler) getDocument(w http.ResponseWriter, r *http.Request) {
@@ -392,6 +404,11 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	req.Name = strings.TrimSpace(req.Name)
+	if req.Name == "" || len(req.Name) > 255 {
+		httpErr(w, http.StatusBadRequest, "invalid_name")
 		return
 	}
 
@@ -939,6 +956,11 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	req.Label = strings.TrimSpace(req.Label)
+	if req.Label == "" || len(req.Label) > 255 {
+		httpErr(w, http.StatusBadRequest, "invalid_label")
 		return
 	}
 

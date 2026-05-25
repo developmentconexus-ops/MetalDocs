@@ -14,9 +14,6 @@ const (
 	defaultLimit            = 20
 	maxLimit                = 100
 	searchCapabilityView    = "document.view"
-	searchPolicyEffectDeny  = "deny"
-	searchSubjectTypeUser   = "user"
-	searchSubjectTypeRole   = "role"
 	searchScopeDocument     = "document"
 	searchScopeDocumentType = "document_type"
 	searchScopeArea         = "area"
@@ -46,16 +43,11 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 	}
 
 	text := strings.ToLower(strings.TrimSpace(q.Text))
-	documentType := strings.ToLower(strings.TrimSpace(q.DocumentType))
-	documentProfile := strings.ToLower(strings.TrimSpace(q.DocumentProfile))
 	documentFamily := strings.ToLower(strings.TrimSpace(q.DocumentFamily))
-	processArea := strings.ToLower(strings.TrimSpace(q.ProcessArea))
 	subject := strings.ToLower(strings.TrimSpace(q.Subject))
-	ownerID := strings.TrimSpace(q.OwnerID)
 	businessUnit := strings.TrimSpace(q.BusinessUnit)
 	department := strings.TrimSpace(q.Department)
-	classification := strings.ToUpper(strings.TrimSpace(q.Classification))
-	status := strings.ToUpper(strings.TrimSpace(q.Status))
+	classification := strings.ToUpper(strings.TrimSpace(string(q.Classification)))
 	tag := strings.ToLower(strings.TrimSpace(q.Tag))
 
 	filtered := make([]domain.Document, 0, len(docs))
@@ -70,22 +62,10 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 		if text != "" && !strings.Contains(strings.ToLower(doc.Title), text) {
 			continue
 		}
-		if documentType != "" && strings.ToLower(doc.DocumentType) != documentType {
-			continue
-		}
-		if documentProfile != "" && strings.ToLower(doc.DocumentProfile) != documentProfile {
-			continue
-		}
 		if documentFamily != "" && strings.ToLower(doc.DocumentFamily) != documentFamily {
 			continue
 		}
-		if processArea != "" && strings.ToLower(doc.ProcessArea) != processArea {
-			continue
-		}
 		if subject != "" && strings.ToLower(doc.Subject) != subject {
-			continue
-		}
-		if ownerID != "" && doc.OwnerID != ownerID {
 			continue
 		}
 		if businessUnit != "" && doc.BusinessUnit != businessUnit {
@@ -94,10 +74,7 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 		if department != "" && doc.Department != department {
 			continue
 		}
-		if classification != "" && strings.ToUpper(doc.Classification) != classification {
-			continue
-		}
-		if status != "" && strings.ToUpper(doc.Status) != status {
+		if classification != "" && strings.ToUpper(string(doc.Classification)) != classification {
 			continue
 		}
 		if tag != "" && !hasTag(doc.Tags, tag) {
@@ -202,7 +179,7 @@ func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
 		if !matchesPolicySubject(item, userID, rolesSet) {
 			continue
 		}
-		if item.Effect == searchPolicyEffectDeny {
+		if item.Effect == domain.EffectDeny {
 			return false
 		}
 	}
@@ -212,9 +189,9 @@ func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
 
 func matchesPolicySubject(item domain.AccessPolicy, userID string, rolesSet map[string]struct{}) bool {
 	switch item.SubjectType {
-	case searchSubjectTypeUser:
+	case domain.SubjectTypeUser:
 		return strings.EqualFold(item.SubjectID, userID)
-	case searchSubjectTypeRole:
+	case domain.SubjectTypeRole:
 		_, ok := rolesSet[strings.ToLower(strings.TrimSpace(item.SubjectID))]
 		return ok
 	default:

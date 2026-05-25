@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -77,6 +78,9 @@ func (r *SnapshotSchemaReader) LoadPlaceholderSchema(ctx context.Context, tenant
 		  FROM documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`, tenantID, revisionID).
 		Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, v2domain.ErrNotFound
+		}
 		return nil, err
 	}
 	return parsePlaceholderSchema(raw)

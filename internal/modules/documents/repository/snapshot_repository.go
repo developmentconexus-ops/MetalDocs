@@ -117,7 +117,7 @@ func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenant, docID stri
 	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET values_hash=$1, values_frozen_at=$2
-         WHERE tenant_id=$3 AND id=$4`, r.table("documents")),
+         WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
 		valuesHash, frozenAt, tenant, docID)
 	if err != nil {
 		return fmt.Errorf("write freeze: %w", err)

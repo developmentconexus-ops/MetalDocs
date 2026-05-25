@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -11,7 +12,10 @@ func (ControlledByAreaResolver) Key() string { return "controlled_by_area" }
 
 func (ControlledByAreaResolver) Version() int { return 2 }
 
-func (ControlledByAreaResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+func (r ControlledByAreaResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if in.TenantID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: TenantID is required", r.Key())
+	}
 	value := in.AreaNameSnapshot
 	if value == "" {
 		value = in.AreaCodeSnapshot

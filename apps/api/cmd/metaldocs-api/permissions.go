@@ -204,6 +204,12 @@ func newPermissionResolver() iamdelivery.PermissionResolver {
 		}
 		// Fail-closed default. Any route not enumerated above demands at
 		// least a session — never silently public.
+		if strings.HasPrefix(path, "/api/v1/documents") {
+			return iamdomain.CapDocumentView, iamdelivery.VisibilitySessionRequired
+		}
+		if strings.HasPrefix(path, "/api/v1/templates") {
+			return iamdomain.CapTemplateView, iamdelivery.VisibilitySessionRequired
+		}
 		return "", iamdelivery.VisibilitySessionRequired
 	}
 }

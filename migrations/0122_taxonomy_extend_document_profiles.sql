@@ -1,4 +1,5 @@
 -- 0122_taxonomy_extend_document_profiles.sql
+BEGIN;
 
 -- Step 1: add tenant_id with sentinel default (single-tenant MVP)
 ALTER TABLE metaldocs.document_profiles
@@ -47,3 +48,5 @@ DROP TRIGGER IF EXISTS trg_document_profiles_code_immutable ON metaldocs.documen
 CREATE TRIGGER trg_document_profiles_code_immutable
   BEFORE UPDATE ON metaldocs.document_profiles
   FOR EACH ROW EXECUTE FUNCTION reject_code_update();
+
+COMMIT;

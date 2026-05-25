@@ -16,8 +16,8 @@ func TestListDocumentsFiltersByTenantID(t *testing.T) {
 	}
 	defer db.Close()
 
-	mock.ExpectQuery(regexp.QuoteMeta("LIMIT $6")).
-		WithArgs("tenant-1", "", "", "", "", 20).
+	mock.ExpectQuery(regexp.QuoteMeta("LIMIT $7")).
+		WithArgs("tenant-1", "", "", "", "", "", 20).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id",
 			"name",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -27,6 +28,11 @@ type PlaceholderOptionsHandler struct {
 	iam    placeholderOptionsIAMReader
 }
 
+const (
+	placeholderRoleAdmin  = "system_admin"
+	placeholderRoleFiller = "document_filler"
+)
+
 func NewPlaceholderOptionsHandler(schema placeholderOptionsSchemaReader, iam placeholderOptionsIAMReader) *PlaceholderOptionsHandler {
 	return &PlaceholderOptionsHandler{schema: schema, iam: iam}
 }
@@ -36,6 +42,11 @@ func (h *PlaceholderOptionsHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *http.Request) {
+	if !canReadDocumentPlaceholderOptions(r.Context()) {
+		writeFillInJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
+		return
+	}
+
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
 		writeFillInError(w, requestID(r), err)
@@ -75,6 +86,15 @@ func (h *PlaceholderOptionsHandler) HandleGetOptions(w http.ResponseWriter, r *h
 	default:
 		writeFillInError(w, requestID(r), errNotChoicePlaceholder(placeholderID))
 	}
+}
+
+func canReadDocumentPlaceholderOptions(ctx context.Context) bool {
+	for _, role := range iamdomain.RolesFromContext(ctx) {
+		if string(role) == placeholderRoleAdmin || string(role) == placeholderRoleFiller {
+			return true
+		}
+	}
+	return false
 }
 
 func selectOptions(values []string) []map[string]string {

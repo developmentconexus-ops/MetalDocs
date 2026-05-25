@@ -3,6 +3,7 @@ package resolvers
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -20,7 +21,7 @@ func contractCases() []resolverContractCase {
 		RevisionID:           "rev-contract",
 		ControlledDocumentID: "ctrl-contract",
 		AreaCodeSnapshot:     "CONTRACT",
-		DocumentReader: fakeDocReader{title: "Contract Document Title"},
+		DocumentReader:       fakeDocReader{title: "Contract Document Title"},
 		RevisionReader: fakeRevisionReader{
 			revisionNumber: 3,
 			effectiveFrom:  time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
@@ -86,6 +87,53 @@ func TestResolverContracts(t *testing.T) {
 			// Value must be non-nil.
 			if v1.Value == nil {
 				t.Errorf("Value is nil")
+			}
+		})
+	}
+}
+
+func TestResolverContracts_TenantIDIsRequired(t *testing.T) {
+	for _, tc := range contractCases() {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			in := tc.input
+			in.TenantID = ""
+			_, err := tc.resolver.Resolve(context.Background(), in)
+			if err == nil {
+				t.Fatalf("expected error when TenantID is empty")
+			}
+			want := fmt.Sprintf("%s: TenantID is required", tc.resolver.Key())
+			if err.Error() != want {
+				t.Fatalf("error = %q, want %q", err.Error(), want)
+			}
+		})
+	}
+}
+
+func TestResolverContracts_RevisionIDIsRequired_WhenLoadBearing(t *testing.T) {
+	loadBearing := map[string]bool{
+		"doc_title":       true,
+		"revision_number": true,
+		"effective_date":  true,
+		"author":          true,
+		"approvers":       true,
+		"approval_date":   true,
+	}
+	for _, tc := range contractCases() {
+		tc := tc
+		if !loadBearing[tc.name] {
+			continue
+		}
+		t.Run(tc.name, func(t *testing.T) {
+			in := tc.input
+			in.RevisionID = ""
+			_, err := tc.resolver.Resolve(context.Background(), in)
+			if err == nil {
+				t.Fatalf("expected error when RevisionID is empty")
+			}
+			want := fmt.Sprintf("%s: RevisionID is required", tc.resolver.Key())
+			if err.Error() != want {
+				t.Fatalf("error = %q, want %q", err.Error(), want)
 			}
 		})
 	}

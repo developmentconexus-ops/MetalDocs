@@ -2,8 +2,8 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 	"time"
-
 )
 
 type EffectiveDateResolver struct{}
@@ -12,7 +12,13 @@ func (EffectiveDateResolver) Key() string { return "effective_date" }
 
 func (EffectiveDateResolver) Version() int { return 1 }
 
-func (EffectiveDateResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+func (r EffectiveDateResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if in.TenantID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: TenantID is required", r.Key())
+	}
+	if in.RevisionID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: RevisionID is required", r.Key())
+	}
 	effectiveFrom, err := in.RevisionReader.GetEffectiveFrom(ctx, in.TenantID, in.RevisionID)
 	if err != nil {
 		return ResolvedValue{}, err

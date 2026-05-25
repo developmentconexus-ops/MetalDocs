@@ -11,6 +11,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -37,13 +38,15 @@ func (h *PDFWebhookHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 type pdfCompleteBody struct {
-	TenantID        string `json:"tenant_id"`
-	FinalPDFS3Key   string `json:"final_pdf_s3_key"`
-	PDFHash         string `json:"pdf_hash"`
-	PDFGeneratedAt  string `json:"pdf_generated_at"`
+	TenantID       string `json:"tenant_id"`
+	FinalPDFS3Key  string `json:"final_pdf_s3_key"`
+	PDFHash        string `json:"pdf_hash"`
+	PDFGeneratedAt string `json:"pdf_generated_at"`
 }
 
 const pdfWebhookMaxBytes = 64 << 10 // 64 KiB
+
+var pdfS3KeyPattern = regexp.MustCompile(`^[a-zA-Z0-9/_\-.]{1,512}$`)
 
 func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, pdfWebhookMaxBytes)
@@ -67,6 +70,11 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	}
 	if strings.TrimSpace(body.FinalPDFS3Key) == "" || body.PDFHash == "" || body.PDFGeneratedAt == "" {
 		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "missing_fields"})
+		return
+	}
+	finalPDFS3Key := strings.TrimSpace(body.FinalPDFS3Key)
+	if !pdfS3KeyPattern.MatchString(finalPDFS3Key) || strings.Contains(finalPDFS3Key, "..") || strings.HasPrefix(finalPDFS3Key, "/") {
+		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_s3_key"})
 		return
 	}
 	docID := r.PathValue("id")
@@ -97,14 +105,14 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	}
 	generatedAt = generatedAt.UTC()
 
-	if err := h.writer.WritePDF(r.Context(), canonicalTenantID, docID, body.FinalPDFS3Key, hashBytes, generatedAt); err != nil {
+	if err := h.writer.WritePDF(r.Context(), canonicalTenantID, docID, finalPDFS3Key, hashBytes, generatedAt); err != nil {
 		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "persist_failed"})
 		return
 	}
 
 	writeFillInJSON(w, http.StatusOK, map[string]any{
 		"document_id":      docID,
-		"final_pdf_s3_key": body.FinalPDFS3Key,
+		"final_pdf_s3_key": finalPDFS3Key,
 	})
 }
 

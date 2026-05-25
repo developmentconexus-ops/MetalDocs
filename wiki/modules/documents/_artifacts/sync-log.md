@@ -1,3 +1,18 @@
+## 2026-05-25 - documents 5b medium hardening sync (M3-M8)
+
+- **Context:** uncommitted diff on `fix/phase9-documents-5b` for review items `5b-M3..M8` in `internal/modules/documents/delivery/http/*` and `internal/modules/documents/http/*`.
+- **Mode:** structural refresh
+- **Affected-surface scan:** `delivery/http/handler.go` (+ tests), `delivery/http/export_handler.go` (+ tests), `http/pdf_webhook_handler.go` (+ tests), `http/placeholder_options_handler.go` (+ tests), `http/fillin_handler.go` (+ tests).
+- **Routes/API:** no new routes and no OpenAPI shape change; runtime validations tightened for `GET /api/v1/documents` (`status` filter enum), `PATCH /api/v1/documents/{id}` (name bounds), `POST /api/v1/documents/{id}/checkpoints` (label bounds), `POST /api/v1/documents/{id}/export/pdf` (paper-size allowlist), and `POST /api/v1/documents/{id}/pdf-complete` (safe S3-key validation); fill-in write now enforces `application/json` media type with HTTP 415.
+- **Runtime flows:** PHUser placeholder-options now requires document-reader role (`system_admin`/`document_filler`) before returning tenant user options.
+- **Persistence:** none.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: `wiki_sync_preflight.ps1` failed because Git Bash terminated with `CreateFileMapping ... Win32 error 5`.
+- **Patched files:** `internal/modules/documents/delivery/http/handler.go`; `internal/modules/documents/delivery/http/handler_pagination_test.go`; `internal/modules/documents/delivery/http/handler_test.go`; `internal/modules/documents/delivery/http/export_handler.go`; `internal/modules/documents/delivery/http/export_handler_test.go`; `internal/modules/documents/http/pdf_webhook_handler.go`; `internal/modules/documents/http/pdf_webhook_handler_test.go`; `internal/modules/documents/http/placeholder_options_handler.go`; `internal/modules/documents/http/placeholder_options_handler_test.go`; `internal/modules/documents/http/fillin_handler.go`; `internal/modules/documents/http/fillin_handler_test.go`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - PDF webhook tenant hardening sync
 
 - **Context:** uncommitted diff on `fix/docs-5b-webhook-tenant-c4` for C4 tenant spoofing fix in documents PDF webhook handler.

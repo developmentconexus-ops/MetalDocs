@@ -1,4 +1,5 @@
 -- 0124_registry_controlled_documents.sql
+BEGIN;
 
 CREATE TABLE IF NOT EXISTS controlled_documents (
   id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -69,3 +70,5 @@ DROP TRIGGER IF EXISTS trg_controlled_documents_code_immutable ON controlled_doc
 CREATE TRIGGER trg_controlled_documents_code_immutable
   BEFORE UPDATE ON controlled_documents
   FOR EACH ROW EXECUTE FUNCTION reject_code_update();
+
+COMMIT;

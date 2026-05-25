@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 
+	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
 )
 
 // requireDocEditDraft opens a short tx, sets authz GUCs, resolves the
 // document's area_code, and calls authz.Require for "doc.edit_draft".
 // The tx is rolled back after the check — no writes happen here.
-// If the document doesn't exist, area "tenant" is used (matches submit_service).
 func requireDocEditDraft(ctx context.Context, db *sql.DB, tenantID, actorID, docID string) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -52,7 +52,7 @@ func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID 
 	).Scan(&areaCode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "tenant", nil
+			return "", domain.ErrNotFound
 		}
 		return "", err
 	}

@@ -41,9 +41,11 @@ type fakeSvc struct {
 	syncErr      error
 	syncCmd      application.SyncArtifactMetadataCmd
 
-	renameErr  error
-	renameName string
-	duplicateErr error
+	renameErr       error
+	renameName      string
+	duplicateErr    error
+	checkpointLabel string
+	checkpointCalls int
 
 	listPaginatedItems []*domain.Document
 	listPaginatedTotal int64
@@ -187,7 +189,9 @@ func (f *fakeSvc) SyncArtifactMetadata(_ context.Context, cmd application.SyncAr
 	return f.syncResult, nil
 }
 
-func (f *fakeSvc) CreateCheckpoint(_ context.Context, _, _, _, _ string) (*domain.Checkpoint, error) {
+func (f *fakeSvc) CreateCheckpoint(_ context.Context, _, _, _, label string) (*domain.Checkpoint, error) {
+	f.checkpointCalls++
+	f.checkpointLabel = label
 	return &domain.Checkpoint{ID: "cp_1", VersionNum: 1}, nil
 }
 
@@ -551,6 +555,60 @@ func TestRenameDocument_EmptyName_Returns400(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestRenameDocument_NameTooLong_Returns400(t *testing.T) {
+	svc := &fakeSvc{}
+	mux := newMux(t, svc)
+
+	body := []byte(`{"name":"` + strings.Repeat("a", 256) + `"}`)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if svc.renameName != "" {
+		t.Fatalf("rename service should not be called for invalid payload, got %q", svc.renameName)
+	}
+}
+
+func TestCreateCheckpoint_EmptyLabel_Returns400(t *testing.T) {
+	svc := &fakeSvc{}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/checkpoints", bytes.NewReader([]byte(`{"label":"   "}`)))
+	withAuthHeaders(req, "document_filler")
+	req.SetPathValue("id", "doc_1")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if svc.checkpointCalls != 0 {
+		t.Fatalf("create checkpoint service should not be called, calls=%d", svc.checkpointCalls)
+	}
+}
+
+func TestCreateCheckpoint_LabelTooLong_Returns400(t *testing.T) {
+	svc := &fakeSvc{}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/checkpoints", bytes.NewReader([]byte(`{"label":"`+strings.Repeat("b", 256)+`"}`)))
+	withAuthHeaders(req, "document_filler")
+	req.SetPathValue("id", "doc_1")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if svc.checkpointCalls != 0 {
+		t.Fatalf("create checkpoint service should not be called, calls=%d", svc.checkpointCalls)
 	}
 }
 

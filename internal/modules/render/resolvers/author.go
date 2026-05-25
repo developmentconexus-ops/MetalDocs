@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -12,7 +13,13 @@ func (AuthorResolver) Key() string { return "author" }
 
 func (AuthorResolver) Version() int { return 1 }
 
-func (AuthorResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+func (r AuthorResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if in.TenantID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: TenantID is required", r.Key())
+	}
+	if in.RevisionID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: RevisionID is required", r.Key())
+	}
 	if in.RevisionReader == nil {
 		return ResolvedValue{}, errors.New("author resolver: revision reader is nil")
 	}

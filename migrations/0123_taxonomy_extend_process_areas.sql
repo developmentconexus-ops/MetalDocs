@@ -1,4 +1,5 @@
 -- 0123_taxonomy_extend_process_areas.sql
+BEGIN;
 
 ALTER TABLE metaldocs.document_process_areas
   ADD COLUMN IF NOT EXISTS tenant_id UUID NOT NULL DEFAULT 'ffffffff-ffff-ffff-ffff-ffffffffffff';
@@ -73,3 +74,5 @@ DROP TRIGGER IF EXISTS trg_process_areas_code_immutable ON metaldocs.document_pr
 CREATE TRIGGER trg_process_areas_code_immutable
   BEFORE UPDATE ON metaldocs.document_process_areas
   FOR EACH ROW EXECUTE FUNCTION reject_code_update();
+
+COMMIT;

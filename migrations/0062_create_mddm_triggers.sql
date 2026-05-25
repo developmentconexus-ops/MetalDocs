@@ -1,5 +1,6 @@
 -- 0062_create_mddm_triggers.sql
 -- Enforces template immutability via DB trigger.
+BEGIN;
 
 CREATE OR REPLACE FUNCTION metaldocs.prevent_published_template_mutation()
 RETURNS TRIGGER AS $$
@@ -16,3 +17,5 @@ CREATE TRIGGER trg_template_immutable
   BEFORE UPDATE ON metaldocs.document_template_versions_mddm
   FOR EACH ROW
   EXECUTE FUNCTION metaldocs.prevent_published_template_mutation();
+
+COMMIT;

@@ -103,3 +103,33 @@ func TestApproversResolver_FiltersByInstanceID(t *testing.T) {
 		t.Fatalf("stale approver must not appear in output, got %q", valStr)
 	}
 }
+
+func TestApproversResolver_InputsHashIncludesApprovalInstanceID(t *testing.T) {
+	r := ApproversResolver{}
+	wr := fakeWorkflowReader{
+		approversByInstance: map[string][]ApproverInfo{
+			"inst-a": {{UserID: "u-1", DisplayName: "Jane"}},
+			"inst-b": {{UserID: "u-2", DisplayName: "John"}},
+		},
+	}
+	inA := ResolveInput{
+		TenantID:           "tenant-a",
+		RevisionID:         "rev-1",
+		ApprovalInstanceID: "inst-a",
+		WorkflowReader:     wr,
+	}
+	inB := inA
+	inB.ApprovalInstanceID = "inst-b"
+
+	outA, err := r.Resolve(context.Background(), inA)
+	if err != nil {
+		t.Fatalf("Resolve inst-a: %v", err)
+	}
+	outB, err := r.Resolve(context.Background(), inB)
+	if err != nil {
+		t.Fatalf("Resolve inst-b: %v", err)
+	}
+	if bytes.Equal(outA.InputsHash, outB.InputsHash) {
+		t.Fatalf("expected different hash for different approval instances")
+	}
+}

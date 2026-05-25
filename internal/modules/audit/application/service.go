@@ -14,11 +14,13 @@ type Service struct {
 	reader domain.Reader
 }
 
+type ListQuery = domain.ListEventsQuery
+
 func NewService(reader domain.Reader) *Service {
 	return &Service{reader: reader}
 }
 
-func (s *Service) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, error) {
+func (s *Service) ListEvents(ctx context.Context, query ListQuery) ([]domain.Event, error) {
 	if s == nil || s.reader == nil {
 		return []domain.Event{}, nil
 	}

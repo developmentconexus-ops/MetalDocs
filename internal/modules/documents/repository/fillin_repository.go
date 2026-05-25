@@ -48,6 +48,10 @@ func (r *FillInRepository) table(name string) string {
 // SeedDefaults inserts one row per Required placeholder with source='default'.
 // Uses ON CONFLICT DO NOTHING so the call is idempotent.
 func (r *FillInRepository) SeedDefaults(ctx context.Context, tenantID, revisionID string, phs []templatesdomain.Placeholder) error {
+	if len(phs) == 0 {
+		return nil
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

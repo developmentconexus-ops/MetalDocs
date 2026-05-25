@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -127,6 +128,8 @@ type fillInErrorBody struct {
 	Message string `json:"message"`
 }
 
+var errUnsupportedMediaType = errors.New("content-type must be application/json")
+
 func mapFillInError(err error) (int, fillInErrorResponse) {
 	status := http.StatusInternalServerError
 	code := "internal.unknown"
@@ -150,6 +153,9 @@ func mapFillInError(err error) (int, fillInErrorResponse) {
 	case errors.Is(err, io.EOF):
 		status = http.StatusBadRequest
 		code = "validation.empty_body"
+	case errors.Is(err, errUnsupportedMediaType):
+		status = http.StatusUnsupportedMediaType
+		code = "validation.unsupported_media_type"
 	case looksLikeDecodeError(err):
 		status = http.StatusBadRequest
 		code = "validation.json_decode"
@@ -181,9 +187,8 @@ func writeFillInJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func decodeJSON(r *http.Request, out any) error {
-	if strings.TrimSpace(r.Header.Get("Content-Type")) != "" &&
-		!strings.Contains(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
-		return fmt.Errorf("content-type must be application/json")
+	if ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); ct != "application/json" {
+		return errUnsupportedMediaType
 	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()

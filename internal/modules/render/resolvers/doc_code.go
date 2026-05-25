@@ -2,6 +2,7 @@ package resolvers
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -11,7 +12,10 @@ func (DocCodeResolver) Key() string { return "doc_code" }
 
 func (DocCodeResolver) Version() int { return 1 }
 
-func (DocCodeResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+func (r DocCodeResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if in.TenantID == "" {
+		return ResolvedValue{}, fmt.Errorf("%s: TenantID is required", r.Key())
+	}
 	rec, err := in.RegistryReader.GetControlledDocument(ctx, in.TenantID, in.ControlledDocumentID)
 	if err != nil {
 		return ResolvedValue{}, err

@@ -79,3 +79,33 @@ func TestDocumentStats_OK(t *testing.T) {
 		t.Fatalf("unexpected stats: %+v", out)
 	}
 }
+
+func TestListDocuments_InvalidStatusFilter_Returns400(t *testing.T) {
+	mux := newMux(t, &fakeSvc{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?status=draft,not_real", nil)
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestListDocuments_ValidStatusFilters_ArePassedToService(t *testing.T) {
+	svc := &fakeSvc{}
+	mux := newMux(t, svc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?status=draft&status=under_review,archived", nil)
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if got, want := len(svc.listPaginatedOpts.Status), 3; got != want {
+		t.Fatalf("status filters len=%d want=%d", got, want)
+	}
+}

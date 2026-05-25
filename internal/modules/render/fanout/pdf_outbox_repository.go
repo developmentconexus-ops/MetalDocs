@@ -40,6 +40,7 @@ ON CONFLICT (tenant_id, revision_id) DO NOTHING`,
 	return nil
 }
 
+// ClaimPending is intentionally cross-tenant - the outbox worker services all tenants.
 func (r *PDFOutboxRepository) ClaimPending(ctx context.Context, limit, maxAttempts int) ([]OutboxRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
 WITH claimed AS (

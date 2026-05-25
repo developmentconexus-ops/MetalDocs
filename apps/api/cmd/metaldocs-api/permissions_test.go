@@ -35,8 +35,8 @@ func TestPermissionResolver(t *testing.T) {
 
 		// --- C2 fail-closed regressions: unmatched routes MUST default to SessionRequired, never Public ---
 		{name: "unknown endpoint session required", method: http.MethodGet, path: "/api/v1/unknown", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
-		{name: "unknown documents subpath session required", method: http.MethodDelete, path: "/api/v1/documents/d1/some-unmapped-action", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
-		{name: "unknown templates subpath session required", method: http.MethodDelete, path: "/api/v1/templates/t1/unmapped", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
+		{name: "unknown documents subpath session required", method: http.MethodDelete, path: "/api/v1/documents/d1/some-unmapped-action", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilitySessionRequired},
+		{name: "unknown templates subpath session required", method: http.MethodDelete, path: "/api/v1/templates/t1/unmapped", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilitySessionRequired},
 		{name: "iam users patch roles falls through to session required", method: http.MethodPatch, path: "/api/v1/iam/users/u-1/roles", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
 		{name: "completely unknown root session required", method: http.MethodGet, path: "/random/path", wantCap: "", wantVisibility: iamdelivery.VisibilitySessionRequired},
 

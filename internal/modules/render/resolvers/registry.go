@@ -16,7 +16,11 @@ func NewRegistry() *Registry {
 func (r *Registry) Register(cr ComputedResolver) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.items[cr.Key()] = cr
+	key := cr.Key()
+	if _, exists := r.items[key]; exists {
+		panic("resolvers: duplicate registration: " + key)
+	}
+	r.items[key] = cr
 }
 
 func (r *Registry) Get(key string) (ComputedResolver, bool) {

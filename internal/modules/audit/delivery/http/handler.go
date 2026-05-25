@@ -1,6 +1,7 @@
 package httpdelivery
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -18,7 +19,11 @@ import (
 )
 
 type Handler struct {
-	service *application.Service
+	service eventLister
+}
+
+type eventLister interface {
+	ListEvents(ctx context.Context, query application.ListQuery) ([]domain.Event, error)
 }
 
 type EventResponse struct {
@@ -32,7 +37,7 @@ type EventResponse struct {
 	TraceID      string         `json:"traceId"`
 }
 
-func NewHandler(service *application.Service) *Handler {
+func NewHandler(service eventLister) *Handler {
 	return &Handler{service: service}
 }
 
@@ -63,7 +68,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 		limit = parsed
 	}
 
-	items, err := h.service.ListEvents(r.Context(), domain.ListEventsQuery{
+	items, err := h.service.ListEvents(r.Context(), application.ListQuery{
 		ResourceType: strings.TrimSpace(r.URL.Query().Get("resourceType")),
 		ResourceID:   strings.TrimSpace(r.URL.Query().Get("resourceId")),
 		TenantID:     tenantID,

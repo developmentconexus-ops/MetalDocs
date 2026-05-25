@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
@@ -64,9 +65,14 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 			httpErr(w, http.StatusBadRequest, "invalid_body")
 			return
 		}
-		if req.PaperSize == "" {
-			req.PaperSize = "A4"
-		}
+	}
+	req.PaperSize = strings.TrimSpace(req.PaperSize)
+	if req.PaperSize == "" {
+		req.PaperSize = "A4"
+	}
+	if !isAllowedPaperSize(req.PaperSize) {
+		httpErr(w, http.StatusBadRequest, "invalid_paper_size")
+		return
 	}
 
 	res, err := h.svc.ExportPDF(r.Context(), tenantID, userID, docID, domain.RenderOptions{
@@ -93,6 +99,15 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 		Cached:        res.Cached,
 		RevisionID:    res.Export.RevisionID,
 	})
+}
+
+func isAllowedPaperSize(size string) bool {
+	switch size {
+	case "A4", "Letter", "Legal", "Tabloid":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {

@@ -13,8 +13,8 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
-	"metaldocs/internal/platform/tenant"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 type fakeFillInService struct {
@@ -98,5 +98,22 @@ func TestFillInHandler_MapErrorInternal(t *testing.T) {
 	}
 	if body.Error.Code != "internal.unknown" {
 		t.Fatalf("code=%q", body.Error.Code)
+	}
+}
+
+func TestFillInHandler_PutPlaceholderValue_MissingContentType_Returns415(t *testing.T) {
+	svc := &fakeFillInService{}
+	h := NewFillInHandler(svc)
+	mux := fillInTestMux(h)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/documents/rev-1/placeholders/p1", bytes.NewBufferString(`{"value":"ABC"}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-1", []iamdomain.Role{}))
+	req.Header.Set("X-Request-ID", "req-1")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("status=%d want=%d body=%s", rr.Code, http.StatusUnsupportedMediaType, rr.Body.String())
 	}
 }

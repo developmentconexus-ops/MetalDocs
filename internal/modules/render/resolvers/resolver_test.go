@@ -8,7 +8,7 @@ import (
 
 type fixedResolver struct{}
 
-func (fixedResolver) Key() string { return "doc_code" }
+func (fixedResolver) Key() string  { return "doc_code" }
 func (fixedResolver) Version() int { return 1 }
 func (fixedResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
 	return ResolvedValue{
@@ -42,4 +42,20 @@ func TestRegistry_Known_ReturnsAllResolvers(t *testing.T) {
 	if known["doc_code"] != 1 {
 		t.Fatalf("expected doc_code version 1, got %d", known["doc_code"])
 	}
+}
+
+func TestRegistry_RegisterPanicsOnDuplicateKey(t *testing.T) {
+	r := NewRegistry()
+	r.Register(fixedResolver{})
+
+	defer func() {
+		got := recover()
+		if got == nil {
+			t.Fatal("expected panic on duplicate registration")
+		}
+		if got != "resolvers: duplicate registration: doc_code" {
+			t.Fatalf("panic = %v, want %q", got, "resolvers: duplicate registration: doc_code")
+		}
+	}()
+	r.Register(fixedResolver{})
 }

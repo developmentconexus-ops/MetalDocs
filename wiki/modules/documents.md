@@ -214,7 +214,7 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | GET | `/api/v1/documents/{id}/revisions` | â€” | revisions URL handler | role |
 | POST | `/api/v1/documents/{id}/export/pdf` | â€” | `ExportHandler` | role |
 | GET | `/api/v1/documents/{id}/export/docx-url` | â€” | `ExportHandler` | role |
-| POST | `/api/v1/documents/{id}/pdf-complete` | â€” | `PDFWebhookHandler.HandlePDFComplete` (`http/pdf_webhook_handler.go`) | HMAC signature (`X-Docgen-Signature`); canonical tenant resolved server-side by `{id}` and body `tenant_id` rejected when mismatched |
+| POST | `/api/v1/documents/{id}/pdf-complete` | â€” | `PDFWebhookHandler.HandlePDFComplete` (`http/pdf_webhook_handler.go`) | HMAC signature (`X-Docgen-Signature`); canonical tenant resolved server-side by `{id}`; body `tenant_id` mismatches are rejected; `final_pdf_s3_key` must match `^[a-zA-Z0-9/_\-.]{1,512}$`, cannot contain `..`, and cannot start with `/` |
 | POST | `/api/v1/documents/{id}/submit` | â€” | `ApprovalHandler` (`approval/http/router.go`) | tier-2 `document.submit` |
 | POST | `/api/v1/documents/{id}/signoff` | â€” | `ApprovalHandler` | tier-2 `document.signoff` |
 | POST | `/api/v1/documents/{id}/cancel` | â€” | `ApprovalHandler` | tier-2 |
@@ -533,6 +533,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-25 - Documents 5b M3-M8 hardening sync: list/status query filters now reject unknown document statuses; `renameDocument` and `createCheckpoint` now fail fast on empty or >255-character payloads; PDF export validates `paper_size` against `A4|Letter|Legal|Tabloid`; fill-in JSON decode now requires explicit `Content-Type: application/json` and returns 415 otherwise; placeholder options now require document-reader roles before returning PHUser tenant user options; PDF webhook now validates `final_pdf_s3_key` against a bounded safe-key policy before persistence.
 - 2026-05-25 - PDF webhook tenant hardening sync: `POST /api/v1/documents/{id}/pdf-complete` now resolves canonical tenant from `documents.id` and rejects mismatched body `tenant_id` before persisting PDF metadata.
 - 2026-05-25 - Finalize C1/C2 hardening sync: `finalizeDocument` now treats `sql.ErrNoRows` from the `document_revisions` content-hash lookup as an allowed empty hash but fails closed with `500 internal_error` on real DB errors; duplicate document 500 paths no longer echo `err.Error()` in HTTP responses and now log server-side details only.
 - 2026-05-25 - IAM role-header hardening sync: documents HTTP role gates now derive admin/filler roles only from `iamdomain.RolesFromContext`; the prior `X-User-Roles` request-header fallback was removed.
