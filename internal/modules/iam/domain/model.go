@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 type Role string
 
 const (
@@ -9,6 +11,19 @@ const (
 	RoleSystemAdmin Role = "system_admin"
 	RoleViewer      Role = "viewer"
 )
+
+var validRoles = map[Role]struct{}{
+	RoleApprover:    {},
+	RoleAuthor:      {},
+	RoleEditor:      {},
+	RoleSystemAdmin: {},
+	RoleViewer:      {},
+}
+
+func IsValidRole(role Role) bool {
+	_, ok := validRoles[role]
+	return ok
+}
 
 type Capability string
 
@@ -38,3 +53,41 @@ const (
 	CapUserManage                  Capability = "user.manage"
 	CapAuditRead                   Capability = "audit.read"
 )
+
+var validCapabilities = map[Capability]struct{}{
+	CapDocumentView:                {},
+	CapDocumentCreate:              {},
+	CapDocumentEdit:                {},
+	CapDocumentSubmit:              {},
+	CapDocumentSignoff:             {},
+	CapWorkflowReview:              {},
+	CapWorkflowApprove:             {},
+	CapTemplateView:                {},
+	CapTemplateCreate:              {},
+	CapTemplateEdit:                {},
+	CapTemplateSubmit:              {},
+	CapTemplateReview:              {},
+	CapTemplateApprove:             {},
+	CapTemplatePublish:             {},
+	CapControlledDocumentCreate:    {},
+	CapControlledDocumentObsolete:  {},
+	CapControlledDocumentSupersede: {},
+	CapTaxonomyManage:              {},
+	CapMembershipManage:            {},
+	CapRouteManage:                 {},
+	CapUserManage:                  {},
+	CapAuditRead:                   {},
+}
+
+func IsValidCapability(cap Capability) bool {
+	_, ok := validCapabilities[cap]
+	return ok
+}
+
+func MustCapability(raw string) Capability {
+	capability := Capability(raw)
+	if !IsValidCapability(capability) {
+		panic(fmt.Sprintf("invalid capability: %q", raw))
+	}
+	return capability
+}

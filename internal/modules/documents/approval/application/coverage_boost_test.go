@@ -725,6 +725,24 @@ func TestRecordSignoff_StageNotActive(t *testing.T) {
 	}
 }
 
+func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
+	inst := buildSingleStageInstance("inst-missing-stage", "stage-required", "author", []string{"actor"})
+	conn := &decisionTestConn{}
+	repo := &fakeDecisionRepo{instance: inst}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:    "t",
+		InstanceID:  "inst-missing-stage",
+		ActorUserID: "actor",
+		Decision:    "approve",
+	})
+	if !errors.Is(err, repository.ErrStageNotActive) {
+		t.Errorf("want ErrStageNotActive for missing stage instance id; got %v", err)
+	}
+}
+
 func TestRecordSignoff_InsertSignoffError(t *testing.T) {
 	inst := buildSingleStageInstance("inst-isig", "stage-isig", "author", []string{"actor"})
 	signoffErr := errors.New("insert signoff failed")
@@ -1680,7 +1698,7 @@ func (s *commitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: "user-1"}, nil
 	}
 	// For route query (submit) return valid route rows.
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil
 	}
 	if strings.Contains(q, "approval_route_stages") {
@@ -2556,7 +2574,7 @@ func (s *submitStageQueryErrorStmt) Exec(_ []driver.Value) (driver.Result, error
 }
 func (s *submitStageQueryErrorStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil
 	}
 	if strings.Contains(q, "approval_route_stages") {
@@ -3365,7 +3383,7 @@ func (s *submitNoStageStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: "user-1"}, nil
 	}
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil
 	}
 	if strings.Contains(q, "approval_route_stages") {

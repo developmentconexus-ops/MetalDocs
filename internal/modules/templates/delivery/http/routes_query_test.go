@@ -43,4 +43,3 @@ func TestGetSystemBlankTemplate_RequiresTemplateViewAuthz(t *testing.T) {
 		t.Fatalf("unexpected authz call: tenant=%q area=%q action=%q", gotTenant, gotArea, gotAction)
 	}
 }
-

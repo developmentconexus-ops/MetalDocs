@@ -93,6 +93,21 @@ func NewControlledDocumentService(
 	govLogger taxonomydomain.GovernanceLogger,
 	docInit controlleddocumentsdomain.DocumentInitializer,
 ) *ControlledDocumentService {
+	if docs == nil {
+		panic("controlled_documents: repository must not be nil")
+	}
+	if seq == nil {
+		panic("controlled_documents: sequence allocator must not be nil")
+	}
+	if tplCheck == nil {
+		panic("controlled_documents: template checker must not be nil")
+	}
+	if profiles == nil {
+		panic("controlled_documents: profile reader must not be nil")
+	}
+	if areas == nil {
+		panic("controlled_documents: area reader must not be nil")
+	}
 	if govLogger == nil {
 		panic("controlled_documents: governance logger must not be nil")
 	}
@@ -278,7 +293,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	if err != nil {
 		return nil, err
 	}
-	doc := &controlleddocumentsdomain.ControlledDocument{
+	doc, err := controlleddocumentsdomain.NewControlledDocument(controlleddocumentsdomain.ControlledDocument{
 		TenantID:                  cmd.TenantID,
 		ProfileCode:               cmd.ProfileCode,
 		ProcessAreaCode:           cmd.ProcessAreaCode,
@@ -292,6 +307,9 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		Status:                    controlleddocumentsdomain.CDStatusActive,
 		CreatedAt:                 now,
 		UpdatedAt:                 now,
+	})
+	if err != nil {
+		return nil, err
 	}
 	var docRef *controlleddocumentsdomain.DocumentRef
 	if createTx != nil {
@@ -373,6 +391,9 @@ func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, p
 // PeekSeq returns the next sequence number that NextAndIncrement would
 // allocate for (profile, area). Used by handlers that need the raw integer.
 func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	if err := s.validateSequenceSeries(ctx, tenantID, profileCode, areaCode); err != nil {
+		return 0, err
+	}
 	if s.db == nil {
 		return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 	}
@@ -395,6 +416,24 @@ func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profi
 	}
 
 	return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+}
+
+func (s *ControlledDocumentService) validateSequenceSeries(ctx context.Context, tenantID, profileCode, areaCode string) error {
+	profile, err := s.profiles.GetByCode(ctx, tenantID, profileCode)
+	if err != nil {
+		return err
+	}
+	if !profile.IsActive() {
+		return taxonomydomain.ErrProfileArchived
+	}
+	area, err := s.areas.GetByCode(ctx, tenantID, areaCode)
+	if err != nil {
+		return err
+	}
+	if !area.IsActive() {
+		return taxonomydomain.ErrAreaArchived
+	}
+	return nil
 }
 
 func (s *ControlledDocumentService) Obsolete(ctx context.Context, tenantID, controlledDocumentID string) error {
@@ -492,7 +531,7 @@ SELECT status
 	}
 	if err := s.govLogger.Log(ctx, taxonomydomain.GovernanceEvent{
 		TenantID:     tenantID,
-		EventType:    eventType,
+		EventType:    taxonomydomain.GovernanceEventType(eventType),
 		ActorUserID:  actorID,
 		ResourceType: "controlled_document",
 		ResourceID:   controlledDocumentID,

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -22,7 +23,34 @@ var (
 	ErrAreaArchived      = errors.New("process area is archived")
 	ErrAreaParentCycle   = errors.New("area parent assignment creates cycle")
 	ErrAreaCodeImmutable = errors.New("area code is immutable")
+	ErrAreaCodeRequired  = errors.New("area code must not be empty")
+	ErrAreaTenantRequired = errors.New("area tenant must not be empty")
+	ErrAreaNameRequired  = errors.New("area name must not be empty")
 )
+
+func NewProcessArea(input ProcessArea) (*ProcessArea, error) {
+	area := ProcessArea{
+		Code:                strings.TrimSpace(input.Code),
+		TenantID:            strings.TrimSpace(input.TenantID),
+		Name:                strings.TrimSpace(input.Name),
+		Description:         strings.TrimSpace(input.Description),
+		ParentCode:          trimOptionalString(input.ParentCode),
+		OwnerUserID:         trimOptionalString(input.OwnerUserID),
+		DefaultApproverRole: trimOptionalString(input.DefaultApproverRole),
+		ArchivedAt:          input.ArchivedAt,
+		CreatedAt:           input.CreatedAt,
+	}
+	if area.Code == "" {
+		return nil, ErrAreaCodeRequired
+	}
+	if area.TenantID == "" {
+		return nil, ErrAreaTenantRequired
+	}
+	if area.Name == "" {
+		return nil, ErrAreaNameRequired
+	}
+	return &area, nil
+}
 
 func (a *ProcessArea) IsActive() bool {
 	return a.ArchivedAt == nil

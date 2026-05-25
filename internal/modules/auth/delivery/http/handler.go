@@ -20,6 +20,7 @@ import (
 type Handler struct {
 	service *authapp.Service
 	audit   auditdomain.Writer
+	now     func() time.Time
 }
 
 type loginRequest struct {
@@ -33,7 +34,7 @@ type changePasswordRequest struct {
 }
 
 func NewHandler(service *authapp.Service) *Handler {
-	return &Handler{service: service}
+	return &Handler{service: service, now: time.Now}
 }
 
 func (h *Handler) WithAudit(w auditdomain.Writer) *Handler {
@@ -82,10 +83,14 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cookie, err := r.Cookie(h.service.SessionCookieName()); err == nil {
-		if err := h.service.Logout(r.Context(), cookie.Value); err == nil {
-			if user, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
-				h.recordAudit(r, user.UserID, "auth.logout", user.UserID, map[string]any{})
-			}
+		if err := h.service.Logout(r.Context(), cookie.Value); err != nil {
+			log.Printf("auth logout failed: %v", err)
+			http.SetCookie(w, h.service.ExpiredSessionCookie())
+			h.writeAuthError(w, err)
+			return
+		}
+		if user, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
+			h.recordAudit(r, user.UserID, "auth.logout", user.UserID, map[string]any{})
 		}
 	}
 	http.SetCookie(w, h.service.ExpiredSessionCookie())
@@ -174,7 +179,7 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	}
 	if err := h.audit.Record(r.Context(), auditdomain.Event{
 		ID:           uuid.NewString(),
-		OccurredAt:   time.Now().UTC(),
+		OccurredAt:   h.now().UTC(),
 		ActorID:      actorID,
 		Action:       action,
 		ResourceType: "user",

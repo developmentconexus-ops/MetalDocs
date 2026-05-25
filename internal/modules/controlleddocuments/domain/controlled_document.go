@@ -41,7 +41,62 @@ var (
 	ErrActiveRevisionExists     = errors.New("controlled document already has an active revision")
 	ErrManualCodeReasonRequired = errors.New("manual code reason is required")
 	ErrOverrideReasonRequired   = errors.New("override reason is required")
+	ErrCDTenantRequired         = errors.New("controlled document tenant must not be empty")
+	ErrCDProfileRequired        = errors.New("controlled document profile must not be empty")
+	ErrCDAreaRequired           = errors.New("controlled document process area must not be empty")
+	ErrCDCodeRequired           = errors.New("controlled document code must not be empty")
+	ErrCDTitleRequired          = errors.New("controlled document title must not be empty")
+	ErrCDOwnerRequired          = errors.New("controlled document owner user id must not be empty")
 )
+
+func NewControlledDocument(input ControlledDocument) (*ControlledDocument, error) {
+	doc := ControlledDocument{
+		ID:                        strings.TrimSpace(input.ID),
+		TenantID:                  strings.TrimSpace(input.TenantID),
+		ProfileCode:               strings.TrimSpace(input.ProfileCode),
+		ProcessAreaCode:           strings.TrimSpace(input.ProcessAreaCode),
+		DepartmentCode:            trimOptionalString(input.DepartmentCode),
+		Code:                      strings.TrimSpace(input.Code),
+		SequenceNum:               input.SequenceNum,
+		Title:                     strings.TrimSpace(input.Title),
+		OwnerUserID:               strings.TrimSpace(input.OwnerUserID),
+		OverrideTemplateVersionID: trimOptionalString(input.OverrideTemplateVersionID),
+		Visibility:                input.Visibility,
+		Status:                    input.Status,
+		CreatedAt:                 input.CreatedAt,
+		UpdatedAt:                 input.UpdatedAt,
+	}
+	if doc.TenantID == "" {
+		return nil, ErrCDTenantRequired
+	}
+	if doc.ProfileCode == "" {
+		return nil, ErrCDProfileRequired
+	}
+	if doc.ProcessAreaCode == "" {
+		return nil, ErrCDAreaRequired
+	}
+	if doc.Code == "" {
+		return nil, ErrCDCodeRequired
+	}
+	if doc.Title == "" {
+		return nil, ErrCDTitleRequired
+	}
+	if doc.OwnerUserID == "" {
+		return nil, ErrCDOwnerRequired
+	}
+	return &doc, nil
+}
+
+func trimOptionalString(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*v)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
 
 func (d ControlledDocument) IsActive() bool {
 	return d.Status == CDStatusActive

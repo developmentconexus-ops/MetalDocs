@@ -25,7 +25,7 @@ type Handler struct {
 
 func New(svc *application.Service, authz AuthzFunc) *Handler {
 	if authz == nil {
-		authz = func(*http.Request, string, string, string) error { return nil }
+		panic("templates http: authz function is required")
 	}
 	return &Handler{svc: svc, authz: authz}
 }

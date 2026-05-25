@@ -55,7 +55,7 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 	version.MetadataSchema = cloneMetadataSchema(cmd.MetadataSchema)
 	version.PlaceholderSchema = clonePlaceholders(cmd.PlaceholderSchema)
 
-	if err := s.repo.UpdateVersion(ctx, version); err != nil {
+	if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
 		return nil, err
 	}
 

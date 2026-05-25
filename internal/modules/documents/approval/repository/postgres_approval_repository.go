@@ -692,7 +692,10 @@ func (r *postgresApprovalRepository) UpdateStageStatus(ctx context.Context, tx *
 	if err != nil {
 		return MapPgError(err, MapHints{})
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("approval: update stage status rows affected: %w", err)
+	}
 	if n == 0 {
 		return ErrStageNotActive
 	}
@@ -713,7 +716,10 @@ func (r *postgresApprovalRepository) UpdateInstanceStatus(ctx context.Context, t
 	if err != nil {
 		return MapPgError(err, MapHints{})
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("approval: update instance status rows affected: %w", err)
+	}
 	if n == 0 {
 		return ErrInstanceCompleted
 	}

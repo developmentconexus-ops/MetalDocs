@@ -235,6 +235,35 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 	}
 }
 
+func TestCommitAutosave_HashMismatchReturnsDeleteError(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  2,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/2.docx",
+	}
+	deleteErr := errors.New("delete failed")
+	presigner := &fakePresigner{HeadResult: "hash_actual", DeleteErr: deleteErr}
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+		TenantID:            "tenant-a",
+		ActorUserID:         "user-a",
+		TemplateID:          "tpl-1",
+		VersionNumber:       2,
+		ExpectedContentHash: "hash_expected",
+	})
+	if !errors.Is(err, domain.ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
+	}
+	if !errors.Is(err, deleteErr) {
+		t.Fatalf("expected delete error to be returned, got %v", err)
+	}
+}
+
 func TestCommitAutosave_UploadMissing(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{

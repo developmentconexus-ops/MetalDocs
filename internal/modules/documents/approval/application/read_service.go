@@ -36,6 +36,9 @@ func newReadService(repo repository.ApprovalRepository) *ReadService {
 	return &ReadService{repo: repo}
 }
 
+// Read methods intentionally use default (read-write) transactions because
+// repository stage loads may use SELECT ... FOR UPDATE on approval rows.
+
 // LoadInstance loads a single approval instance by ID for the given tenant.
 func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, actorID, instanceID string) (*domain.Instance, error) {
 	tx, err := db.BeginTx(ctx, nil)

@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,13 +24,17 @@ func NewAuditGovernanceAdapter(w auditdomain.Writer) *AuditGovernanceAdapter {
 func (a *AuditGovernanceAdapter) Log(ctx context.Context, event domain.GovernanceEvent) error {
 	payload := event.PayloadJSON
 	if payload == nil {
-		payload, _ = json.Marshal(map[string]string{})
+		var err error
+		payload, err = json.Marshal(map[string]string{})
+		if err != nil {
+			return fmt.Errorf("marshal empty governance payload: %w", err)
+		}
 	}
 	return a.writer.Record(ctx, auditdomain.Event{
 		ID:           uuid.NewString(),
 		OccurredAt:   time.Now().UTC(),
 		ActorID:      event.ActorUserID,
-		Action:       event.EventType,
+		Action:       string(event.EventType),
 		ResourceType: event.ResourceType,
 		ResourceID:   event.ResourceID,
 		PayloadJSON:  string(payload),

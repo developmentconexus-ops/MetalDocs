@@ -1,6 +1,7 @@
 package httpdelivery
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -47,6 +48,10 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId is required"))
 		return
 	}
+	if !canManageMembershipTarget(r.Context(), userID) {
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+		return
+	}
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
@@ -75,6 +80,10 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 	}
 	if strings.TrimSpace(req.UserID) == "" || strings.TrimSpace(req.AreaCode) == "" || strings.TrimSpace(req.Role) == "" {
 		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId, areaCode and role are required"))
+		return
+	}
+	if !canManageMembershipTarget(r.Context(), strings.TrimSpace(req.UserID)) {
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
 		return
 	}
 	tenantID, err := tenantIDFromRequest(r)
@@ -121,6 +130,10 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId and areaCode are required"))
 		return
 	}
+	if !canManageMembershipTarget(r.Context(), userID) {
+		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+		return
+	}
 	revokedBy, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
 		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
@@ -154,4 +167,25 @@ func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err erro
 
 func tenantIDFromRequest(r *http.Request) (string, error) {
 	return tenant.FromContext(r.Context())
+}
+
+func canManageMembershipTarget(ctx context.Context, targetUserID string) bool {
+	actor := strings.TrimSpace(authenticatedActorFromContext(ctx))
+	if actor == "" {
+		return false
+	}
+	if strings.EqualFold(actor, strings.TrimSpace(targetUserID)) {
+		return true
+	}
+	for _, role := range iamdomain.RolesFromContext(ctx) {
+		if role == iamdomain.RoleSystemAdmin {
+			return true
+		}
+	}
+	return false
+}
+
+func authenticatedActorFromContext(ctx context.Context) string {
+	userID, _ := authn.UserIDFromContext(ctx)
+	return userID
 }

@@ -83,13 +83,13 @@ func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, tenant
 type fakeProfileReader struct{}
 
 func (f fakeProfileReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
-	return nil, nil
+	return &taxonomydomain.DocumentProfile{Code: code, TenantID: tenantID}, nil
 }
 
 type fakeAreaReader struct{}
 
 func (f fakeAreaReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error) {
-	return nil, nil
+	return &taxonomydomain.ProcessArea{Code: code, TenantID: tenantID}, nil
 }
 
 type fakeGovernanceLogger struct{}
@@ -433,6 +433,22 @@ func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
 	}
 }
 
+func TestAtomicCreate_BodyTooLarge_Returns400(t *testing.T) {
+	handler := &Handler{svc: &spyControlledDocumentService{}}
+	oversized := `{"documentName":"` + strings.Repeat("x", int(maxControlledDocumentsJSONBodyBytes)) + `","visibility":{"scope":"company","areaCodes":[],"userIds":[]},"profileCode":"DC","processAreaCode":"RH","title":"Policy","ownerUserId":"user-1"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(oversized))
+	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin})
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.AtomicCreateControlledDocument(rec, req, controlleddocumentsapi.AtomicCreateControlledDocumentParams{})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestAtomicCreate_ForwardsGeneratedOnlyFields(t *testing.T) {
 	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
@@ -525,6 +541,19 @@ func TestListControlledDocuments_InvalidStatus_Returns400(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestListControlledDocuments_ZeroTenantContext_Returns500(t *testing.T) {
+	handler := &Handler{svc: &spyControlledDocumentService{}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), uuid.Nil.String()))
+	rec := httptest.NewRecorder()
+
+	handler.ListControlledDocuments(rec, req, controlleddocumentsapi.ListControlledDocumentsParams{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -639,6 +668,21 @@ func TestCreateControlledDocumentRevision_UnknownField_Returns400(t *testing.T) 
 	}
 	if !strings.Contains(rec.Body.String(), "evilField") {
 		t.Fatalf("body %q does not mention evilField", rec.Body.String())
+	}
+}
+
+func TestCreateControlledDocumentRevision_BodyTooLarge_Returns400(t *testing.T) {
+	handler := &Handler{svc: &spyControlledDocumentService{}}
+	cdID := "22222222-2222-2222-2222-222222222222"
+	oversized := `{"name":"` + strings.Repeat("x", int(maxControlledDocumentsJSONBodyBytes)) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(oversized))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+
+	handler.CreateControlledDocumentRevision(rec, req, uuid.MustParse(cdID), controlleddocumentsapi.CreateControlledDocumentRevisionParams{})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 }
 

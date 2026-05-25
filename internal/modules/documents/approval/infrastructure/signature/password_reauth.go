@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("signature: invalid credentials")
 	ErrRateLimited        = errors.New("signature: too many failed attempts, try again later")
+	ErrRateLimiterConfig  = errors.New("signature: auth-failure rate limiter not configured")
 )
 
 // IamUserReader abstracts password-hash lookup for testability.
@@ -26,11 +26,17 @@ type EventEmitterStub interface {
 	EmitAuthFailed(ctx context.Context, actorUserID, reason string)
 }
 
+// AuthFailureRateLimiter controls password failure attempts.
+// Implementations may use shared state (redis/postgres) for cross-replica limits.
+type AuthFailureRateLimiter interface {
+	Allow(ctx context.Context, actorID string) (bool, error)
+	RecordFailure(ctx context.Context, actorID string) error
+	Reset(ctx context.Context, actorID string) error
+}
+
 const (
 	maxFailures   = 5
 	windowDur     = 60 * time.Second
-	entryTTL      = windowDur * 2
-	janitorPeriod = 30 * time.Second
 )
 
 type failEntry struct {
@@ -43,23 +49,16 @@ type failEntry struct {
 type PasswordReauthProvider struct {
 	reader  IamUserReader
 	emitter EventEmitterStub
-
-	mu      sync.Mutex
-	entries map[string]*failEntry
-	cancel  context.CancelFunc
+	limiter AuthFailureRateLimiter
 }
 
-// NewPasswordReauthProvider creates the provider and starts a background janitor.
-func NewPasswordReauthProvider(ctx context.Context, reader IamUserReader, emitter EventEmitterStub) *PasswordReauthProvider {
-	ctx2, cancel := context.WithCancel(ctx)
-	p := &PasswordReauthProvider{
+// NewPasswordReauthProvider creates the provider.
+func NewPasswordReauthProvider(_ context.Context, reader IamUserReader, emitter EventEmitterStub, limiter AuthFailureRateLimiter) *PasswordReauthProvider {
+	return &PasswordReauthProvider{
 		reader:  reader,
 		emitter: emitter,
-		entries: make(map[string]*failEntry),
-		cancel:  cancel,
+		limiter: limiter,
 	}
-	go p.janitor(ctx2)
-	return p
 }
 
 func (p *PasswordReauthProvider) Method() string { return "password_reauth" }
@@ -70,15 +69,21 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 		return SignatureResult{}, ErrInvalidCredentials
 	}
 
-	// Rate limit check.
-	if err := p.checkRateLimit(req.ActorUserID); err != nil {
-		return SignatureResult{}, err
+	if p.limiter == nil {
+		return SignatureResult{}, ErrRateLimiterConfig
+	}
+
+	allowed, err := p.limiter.Allow(ctx, req.ActorUserID)
+	if err != nil || !allowed {
+		return SignatureResult{}, ErrRateLimited
 	}
 
 	hash, err := p.reader.GetPasswordHash(ctx, req.ActorUserID)
 	if err != nil {
 		// User missing → same error as wrong password (disclosure-safe).
-		p.recordFailure(req.ActorUserID)
+		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
+			return SignatureResult{}, ErrRateLimited
+		}
 		if p.emitter != nil {
 			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, "user_not_found")
 		}
@@ -87,7 +92,9 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 
 	cost, _ := bcrypt.Cost(hash)
 	if err := bcrypt.CompareHashAndPassword(hash, []byte(password)); err != nil {
-		p.recordFailure(req.ActorUserID)
+		if err := p.limiter.RecordFailure(ctx, req.ActorUserID); err != nil {
+			return SignatureResult{}, ErrRateLimited
+		}
 		if p.emitter != nil {
 			p.emitter.EmitAuthFailed(ctx, req.ActorUserID, "wrong_password")
 		}
@@ -95,7 +102,9 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 	}
 
 	// Success — clear failure state.
-	p.clearFailure(req.ActorUserID)
+	if err := p.limiter.Reset(ctx, req.ActorUserID); err != nil {
+		return SignatureResult{}, ErrRateLimited
+	}
 
 	now := time.Now().UTC()
 	payload, _ := json.Marshal(map[string]any{
@@ -106,74 +115,56 @@ func (p *PasswordReauthProvider) Sign(ctx context.Context, req SignRequest) (Sig
 	return SignatureResult{Method: "password_reauth", Payload: payload, SignedAt: now}, nil
 }
 
-func (p *PasswordReauthProvider) checkRateLimit(actorID string) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	e, ok := p.entries[actorID]
-	if !ok {
-		return nil
-	}
-
-	// Evict if window expired.
-	if time.Since(e.oldest) >= windowDur {
-		delete(p.entries, actorID)
-		return nil
-	}
-
-	if e.count >= maxFailures {
-		return ErrRateLimited
-	}
-	return nil
+// InMemoryAuthFailureRateLimiter is process-local and intended for tests/dev only.
+// Production should provide a shared implementation.
+type InMemoryAuthFailureRateLimiter struct {
+	mu      sync.Mutex
+	entries map[string]*failEntry
 }
 
-func (p *PasswordReauthProvider) recordFailure(actorID string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func NewInMemoryAuthFailureRateLimiter() *InMemoryAuthFailureRateLimiter {
+	return &InMemoryAuthFailureRateLimiter{entries: make(map[string]*failEntry)}
+}
+
+func (l *InMemoryAuthFailureRateLimiter) Allow(_ context.Context, actorID string) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	e, ok := l.entries[actorID]
+	if !ok {
+		return true, nil
+	}
+	now := time.Now()
+	if now.Sub(e.oldest) >= windowDur {
+		delete(l.entries, actorID)
+		return true, nil
+	}
+	return e.count < maxFailures, nil
+}
+
+func (l *InMemoryAuthFailureRateLimiter) RecordFailure(_ context.Context, actorID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
 	now := time.Now()
-	e, ok := p.entries[actorID]
+	e, ok := l.entries[actorID]
 	if !ok {
-		p.entries[actorID] = &failEntry{count: 1, oldest: now, lastAt: now}
-		return
+		l.entries[actorID] = &failEntry{count: 1, oldest: now, lastAt: now}
+		return nil
 	}
-	// Reset window if oldest is expired.
-	if time.Since(e.oldest) >= windowDur {
+	if now.Sub(e.oldest) >= windowDur {
 		e.count = 1
 		e.oldest = now
 	} else {
 		e.count++
 	}
 	e.lastAt = now
+	return nil
 }
 
-func (p *PasswordReauthProvider) clearFailure(actorID string) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	delete(p.entries, actorID)
-}
-
-// janitor sweeps expired entries every 30s.
-func (p *PasswordReauthProvider) janitor(ctx context.Context) {
-	ticker := time.NewTicker(janitorPeriod)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			p.sweepExpired()
-		}
-	}
-}
-
-func (p *PasswordReauthProvider) sweepExpired() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	for id, e := range p.entries {
-		if time.Since(e.lastAt) >= entryTTL {
-			delete(p.entries, id)
-		}
-	}
-	_ = fmt.Sprintf // keep fmt imported for future debug
+func (l *InMemoryAuthFailureRateLimiter) Reset(_ context.Context, actorID string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	delete(l.entries, actorID)
+	return nil
 }
