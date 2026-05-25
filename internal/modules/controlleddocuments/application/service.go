@@ -21,7 +21,7 @@ import (
 )
 
 type TemplateVersionChecker interface {
-	GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error)
+	GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error)
 }
 
 type ProfileReader interface {
@@ -162,7 +162,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		if taken {
 			return nil, controlleddocumentsdomain.ErrCDCodeTaken
 		}
-		payload, _ := json.Marshal(map[string]string{"code": code})
+		payload, err := json.Marshal(map[string]string{"code": code})
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: marshal numbering override payload: %w", err)
+		}
 		events = append(events, taxonomydomain.GovernanceEvent{
 			TenantID:     cmd.TenantID,
 			EventType:    "numbering.override",
@@ -196,7 +199,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		if !isReasonValid(cmd.OverrideTemplateReason) {
 			return nil, controlleddocumentsdomain.ErrOverrideReasonRequired
 		}
-		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, *cmd.OverrideTemplateVersionID)
+		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, cmd.TenantID, *cmd.OverrideTemplateVersionID)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +253,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	}
 
 	if overrideID != nil {
-		payload, _ := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+		payload, err := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: marshal template override payload: %w", err)
+		}
 		events = append(events, taxonomydomain.GovernanceEvent{
 			TenantID:     cmd.TenantID,
 			EventType:    "template.override",
@@ -367,6 +373,27 @@ func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, p
 // PeekSeq returns the next sequence number that NextAndIncrement would
 // allocate for (profile, area). Used by handlers that need the raw integer.
 func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	if s.db == nil {
+		return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+	}
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return 0, ErrActorMissing
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+		return 0, fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+		return 0, fmt.Errorf("controlled_documents: authz check preview code: %w", err)
+	}
+
 	return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 }
 
@@ -403,12 +430,16 @@ func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string
 }
 
 func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, controlledDocumentID string, next controlleddocumentsdomain.CDStatus, cap string) error {
-	doc, err := s.docs.GetByID(ctx, tenantID, controlledDocumentID)
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return ErrActorMissing
+	}
+	canRead, err := s.docs.CanRead(ctx, tenantID, controlledDocumentID, actorUserID)
 	if err != nil {
 		return err
 	}
-	if !doc.IsActive() {
-		return controlleddocumentsdomain.ErrCDNotActive
+	if !canRead {
+		return controlleddocumentsdomain.ErrCDNotFound
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -417,9 +448,29 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+		return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
+	}
 	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
 		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
 	}
+
+	var currentStatus controlleddocumentsdomain.CDStatus
+	if err := tx.QueryRowContext(ctx, `
+SELECT status
+  FROM controlled_documents
+ WHERE tenant_id = $1
+   AND id = $2
+ FOR UPDATE`, tenantID, controlledDocumentID).Scan(&currentStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return controlleddocumentsdomain.ErrCDNotFound
+		}
+		return err
+	}
+	if currentStatus != controlleddocumentsdomain.CDStatusActive {
+		return controlleddocumentsdomain.ErrCDNotActive
+	}
+
 	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
 		return err
 	}
@@ -431,7 +482,10 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	if next == controlleddocumentsdomain.CDStatusSuperseded {
 		eventType = "controlled_documents.cd.superseded"
 	}
-	payload, _ := json.Marshal(map[string]string{"status": string(next)})
+	payload, err := json.Marshal(map[string]string{"status": string(next)})
+	if err != nil {
+		return fmt.Errorf("controlled_documents: marshal changeStatus payload: %w", err)
+	}
 	actorID := ""
 	if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
 		actorID = u.UserID

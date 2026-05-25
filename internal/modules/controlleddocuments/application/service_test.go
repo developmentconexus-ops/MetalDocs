@@ -304,7 +304,7 @@ type fakeTemplateVersionChecker struct {
 	byID map[string]templateVersionState
 }
 
-func (f *fakeTemplateVersionChecker) GetTemplateVersionState(_ context.Context, templateVersionID string) (*string, string, error) {
+func (f *fakeTemplateVersionChecker) GetTemplateVersionState(_ context.Context, _ string, templateVersionID string) (*string, string, error) {
 	if f.byID == nil {
 		return nil, "", nil
 	}

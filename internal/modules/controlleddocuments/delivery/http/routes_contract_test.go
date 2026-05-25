@@ -76,7 +76,7 @@ func (f fakeSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, prof
 
 type fakeTemplateChecker struct{}
 
-func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error) {
+func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error) {
 	return nil, "", nil
 }
 
@@ -188,7 +188,7 @@ func newSQLMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 
 func newTestHandler(db *sql.DB) *Handler {
 	svc := application.NewControlledDocumentService(
-		nil,
+		db,
 		fakeRegistryDocs{},
 		fakeSequenceAllocator{},
 		fakeTemplateChecker{},
@@ -203,7 +203,9 @@ func newTestHandler(db *sql.DB) *Handler {
 func newAuthedRequest(t *testing.T, method, url, tenantID string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(method, url, nil)
-	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantID))
+	ctx := tenant.WithTenantID(req.Context(), tenantID)
+	ctx = iamdomain.WithAuthContext(ctx, "user-1", []iamdomain.Role{"author"})
+	req = req.WithContext(ctx)
 	// extract {id} path value from URL pattern /api/v1/controlled-documents/{id}/active-document
 	// httptest doesn't set path values automatically; set manually
 	// URL format: /api/v1/controlled-documents/<id>/active-document
@@ -793,6 +795,9 @@ func TestActiveDocument_OnlyPublished_Returns200_WithPublishedID(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(nil, nil, nil, nil, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -843,6 +848,9 @@ func TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth(t *testing.T)
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -890,6 +898,9 @@ func TestActiveDocument_ScheduledActive_ReturnsScheduledState(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -936,6 +947,9 @@ func TestActiveDocument_UnderReview_ReturnsApprovalInstanceID(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -983,6 +997,9 @@ func TestActiveDocument_UnderReviewApprovalLookupFailure_Returns500(t *testing.T
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, nil)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -1087,6 +1104,9 @@ func TestActiveDocument_NoneExist_Returns404(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	})
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
