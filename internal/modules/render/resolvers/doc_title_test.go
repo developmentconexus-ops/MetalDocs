@@ -7,7 +7,7 @@ import (
 
 type fakeDocReader struct{ title string }
 
-func (f fakeDocReader) GetDocumentTitle(_ context.Context, _, _ string) (string, error) {
+func (f fakeDocReader) GetDocumentTitle(_ context.Context, _ TenantID, _ RevisionID) (string, error) {
 	return f.title, nil
 }
 

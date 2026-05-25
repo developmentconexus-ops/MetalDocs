@@ -9,13 +9,13 @@ import (
 
 type stubRevReaderZero struct{}
 
-func (stubRevReaderZero) GetRevisionNumber(_ context.Context, _, _ string) (int64, error) {
+func (stubRevReaderZero) GetRevisionNumber(_ context.Context, _ TenantID, _ RevisionID) (int64, error) {
 	return 0, nil
 }
-func (stubRevReaderZero) GetEffectiveFrom(_ context.Context, _, _ string) (time.Time, error) {
+func (stubRevReaderZero) GetEffectiveFrom(_ context.Context, _ TenantID, _ RevisionID) (time.Time, error) {
 	return time.Time{}, nil
 }
-func (stubRevReaderZero) GetAuthor(_ context.Context, _, _ string) (AuthorInfo, error) {
+func (stubRevReaderZero) GetAuthor(_ context.Context, _ TenantID, _ RevisionID) (AuthorInfo, error) {
 	return AuthorInfo{}, nil
 }
 

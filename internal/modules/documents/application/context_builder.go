@@ -63,12 +63,12 @@ func (b *DocumentContextBuilder) Build(ctx context.Context, tenantID, revisionID
 		slog.WarnContext(ctx, "approval instance lookup failed", "revision_id", revisionID, "err", err)
 	}
 	return resolvers.ResolveInput{
-		TenantID:             tenantID,
-		RevisionID:           revisionID,
-		ControlledDocumentID: controlledDocumentID,
+		TenantID:             resolvers.TenantID(tenantID),
+		RevisionID:           resolvers.RevisionID(revisionID),
+		ControlledDocumentID: resolvers.ControlledDocumentID(controlledDocumentID),
 		AreaCodeSnapshot:     areaCode,
 		AreaNameSnapshot:     areaName,
-		ApprovalInstanceID:   instanceID.String,
+		ApprovalInstanceID:   resolvers.ApprovalInstanceID(instanceID.String),
 		RevisionReader:       b.revReader,
 		WorkflowReader:       b.workflowReader,
 		RegistryReader:       b.registryReader,

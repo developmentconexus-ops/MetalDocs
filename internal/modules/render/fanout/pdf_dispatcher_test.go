@@ -56,7 +56,7 @@ func TestPDFDispatcher_Dispatch_PublishesEvent(t *testing.T) {
 	if e.EventID == "" {
 		t.Error("EventID must be non-empty")
 	}
-	wantKey := messaging.IdempotencyKey("docgen_v2_pdf:rev-1")
+	wantKey := messaging.IdempotencyKey("docgen_v2_pdf:tenant-1:rev-1")
 	if e.IdempotencyKey != wantKey {
 		t.Errorf("IdempotencyKey = %q, want %q", e.IdempotencyKey, wantKey)
 	}

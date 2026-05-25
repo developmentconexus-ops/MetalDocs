@@ -32,7 +32,7 @@ func (d *PDFDispatcher) Dispatch(ctx context.Context, in DispatchInput) error {
 		EventType:      messaging.EventTypePDFConvert,
 		AggregateType:  messaging.AggregateType("document_revision"),
 		AggregateID:    messaging.AggregateID(in.RevisionID),
-		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + in.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + in.TenantID + ":" + in.RevisionID),
 		Payload: messaging.PDFConvertPayload{
 			TenantID:       in.TenantID,
 			RevisionID:     in.RevisionID,

@@ -13,6 +13,12 @@ func (ApprovalDateResolver) Key() string { return "approval_date" }
 func (ApprovalDateResolver) Version() int { return 1 }
 
 func (ApprovalDateResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if err := requireTenantID("approval_date", in.TenantID); err != nil {
+		return ResolvedValue{}, err
+	}
+	if err := requireRevisionID("approval_date", in.RevisionID); err != nil {
+		return ResolvedValue{}, err
+	}
 	if in.WorkflowReader == nil {
 		return ResolvedValue{}, errors.New("approval_date resolver: workflow reader is nil")
 	}
@@ -25,8 +31,8 @@ func (ApprovalDateResolver) Resolve(ctx context.Context, in ResolveInput) (Resol
 	}
 
 	inputsHash, err := hashInputs(struct {
-		TenantID   string `json:"tenant_id"`
-		RevisionID string `json:"revision_id"`
+		TenantID   TenantID   `json:"tenant_id"`
+		RevisionID RevisionID `json:"revision_id"`
 	}{
 		TenantID:   in.TenantID,
 		RevisionID: in.RevisionID,

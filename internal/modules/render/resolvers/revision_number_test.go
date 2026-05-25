@@ -14,15 +14,15 @@ type fakeRevisionReader struct {
 	err            error
 }
 
-func (f fakeRevisionReader) GetRevisionNumber(ctx context.Context, tenantID, revisionID string) (int64, error) {
+func (f fakeRevisionReader) GetRevisionNumber(ctx context.Context, tenantID TenantID, revisionID RevisionID) (int64, error) {
 	return f.revisionNumber, f.err
 }
 
-func (f fakeRevisionReader) GetEffectiveFrom(ctx context.Context, tenantID, revisionID string) (time.Time, error) {
+func (f fakeRevisionReader) GetEffectiveFrom(ctx context.Context, tenantID TenantID, revisionID RevisionID) (time.Time, error) {
 	return f.effectiveFrom, f.err
 }
 
-func (f fakeRevisionReader) GetAuthor(ctx context.Context, tenantID, revisionID string) (AuthorInfo, error) {
+func (f fakeRevisionReader) GetAuthor(ctx context.Context, tenantID TenantID, revisionID RevisionID) (AuthorInfo, error) {
 	return f.author, f.err
 }
 

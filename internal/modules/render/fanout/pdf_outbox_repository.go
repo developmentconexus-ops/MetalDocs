@@ -40,6 +40,9 @@ ON CONFLICT (tenant_id, revision_id) DO NOTHING`,
 	return nil
 }
 
+// TODO(render): thread tenant scope through the worker claim path before adding
+// a tenant_id predicate here; the current worker intentionally drains the shared
+// outbox across tenants.
 func (r *PDFOutboxRepository) ClaimPending(ctx context.Context, limit, maxAttempts int) ([]OutboxRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
 WITH claimed AS (
@@ -145,11 +148,14 @@ func (r *PDFOutboxRepository) ResetStaleClaims(ctx context.Context, olderThan ti
 	res, err := r.db.ExecContext(ctx, `
 UPDATE metaldocs.pdf_dispatch_outbox
    SET status='pending', claimed_at=NULL
- WHERE status='processing' AND claimed_at < NOW() - $1::interval`,
-		fmt.Sprintf("%d milliseconds", olderThan.Milliseconds()))
+ WHERE status='processing' AND claimed_at < NOW() - ($1 * interval '1 millisecond')`,
+		olderThan.Milliseconds())
 	if err != nil {
 		return 0, err
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
 	return int(n), nil
 }

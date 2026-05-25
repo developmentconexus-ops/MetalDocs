@@ -71,7 +71,7 @@ func (w *PDFOutboxWorker) dispatchOne(ctx context.Context, r OutboxRow) {
 		EventType:      messaging.EventTypePDFConvert,
 		AggregateType:  messaging.AggregateType("document_revision"),
 		AggregateID:    messaging.AggregateID(r.RevisionID),
-		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.TenantID + ":" + r.RevisionID),
 		Payload: messaging.PDFConvertPayload{
 			TenantID:    r.TenantID,
 			RevisionID:  r.RevisionID,
