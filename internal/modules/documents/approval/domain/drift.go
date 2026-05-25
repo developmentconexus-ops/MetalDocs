@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 // DriftResult holds the output of ApplyEligibilityDrift.
 type DriftResult struct {
 	EffectiveDenominator int
@@ -63,7 +65,11 @@ func ApplyEligibilityDrift(stage StageInstance, currentEligible []string) DriftR
 		}
 
 	default:
-		return DriftResult{EffectiveDenominator: len(stage.EligibleActorIDs), ForcedOutcome: QuorumPending}
+		return DriftResult{
+			EffectiveDenominator: len(stage.EligibleActorIDs),
+			ForcedOutcome:        QuorumPending,
+			Reason:               fmt.Sprintf("unknown_drift_policy:%s", stage.OnEligibilityDriftSnapshot),
+		}
 	}
 }
 

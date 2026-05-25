@@ -93,14 +93,18 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 
 	// Fetch document area_code for authz check. FOR UPDATE locks the document row
 	// to prevent concurrent area_code changes between authz decision and status update.
-	var areaCode string
+	var areaCodeSnapshot sql.NullString
 	err = tx.QueryRowContext(ctx,
 		`SELECT process_area_code_snapshot FROM documents WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
 		docID, in.TenantID,
-	).Scan(&areaCode)
+	).Scan(&areaCodeSnapshot)
 	if err != nil {
 		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: fetch area_code: %w", err)
+	}
+	areaCode := "tenant"
+	if areaCodeSnapshot.Valid && areaCodeSnapshot.String != "" {
+		areaCode = areaCodeSnapshot.String
 	}
 
 	// Authz gate: require workflow.instance.cancel capability.

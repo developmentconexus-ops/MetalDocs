@@ -20,7 +20,8 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+   SET search_path = pg_catalog, pg_temp;
 
 DROP TRIGGER IF EXISTS enforce_signoff_eligibility_trg ON approval_signoffs;
 CREATE TRIGGER enforce_signoff_eligibility_trg

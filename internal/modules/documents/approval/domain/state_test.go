@@ -3,6 +3,8 @@ package domain
 import (
 	"errors"
 	"testing"
+
+	documentsdomain "metaldocs/internal/modules/documents/domain"
 )
 
 func TestStateLegalTransitions(t *testing.T) {
@@ -10,18 +12,18 @@ func TestStateLegalTransitions(t *testing.T) {
 
 	// Build truth table from spec.
 	legal := map[[2]DocState]bool{
-		{StateDraft, StateUnderReview}:     true,
-		{StateUnderReview, StateApproved}:  true,
-		{StateUnderReview, StateRejected}:  true,
-		{StateRejected, StateDraft}:        true,
-		{StateApproved, StatePublished}:    true,
-		{StateApproved, StateScheduled}:    true,
-		{StateApproved, StateDraft}:        true,
-		{StateScheduled, StatePublished}:   true,
-		{StateScheduled, StateDraft}:       true,
-		{StatePublished, StateSuperseded}:  true,
-		{StatePublished, StateObsolete}:    true,
-		{StateSuperseded, StateObsolete}:   true,
+		{StateDraft, StateUnderReview}:    true,
+		{StateUnderReview, StateApproved}: true,
+		{StateUnderReview, StateRejected}: true,
+		{StateRejected, StateDraft}:       true,
+		{StateApproved, StatePublished}:   true,
+		{StateApproved, StateScheduled}:   true,
+		{StateApproved, StateDraft}:       true,
+		{StateScheduled, StatePublished}:  true,
+		{StateScheduled, StateDraft}:      true,
+		{StatePublished, StateSuperseded}: true,
+		{StatePublished, StateObsolete}:   true,
+		{StateSuperseded, StateObsolete}:  true,
 	}
 
 	for _, from := range states {
@@ -89,6 +91,32 @@ func TestStateString(t *testing.T) {
 	}
 	if StateUnderReview.String() != "under_review" {
 		t.Errorf("StateUnderReview.String() = %q; want 'under_review'", StateUnderReview.String())
+	}
+}
+
+func TestDocumentStatusToDocState(t *testing.T) {
+	tests := []struct {
+		name string
+		in   documentsdomain.DocumentStatus
+		want DocState
+		ok   bool
+	}{
+		{name: "draft", in: documentsdomain.DocStatusDraft, want: StateDraft, ok: true},
+		{name: "under review", in: documentsdomain.DocStatusFinalized, want: StateUnderReview, ok: true},
+		{name: "published open value", in: documentsdomain.DocumentStatus("published"), want: StatePublished, ok: true},
+		{name: "legacy archived", in: documentsdomain.DocStatusArchived, ok: false},
+		{name: "unknown", in: documentsdomain.DocumentStatus("banana"), ok: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := DocumentStatusToDocState(tt.in)
+			if ok != tt.ok {
+				t.Fatalf("ok = %v; want %v", ok, tt.ok)
+			}
+			if got != tt.want {
+				t.Fatalf("state = %q; want %q", got, tt.want)
+			}
+		})
 	}
 }
 
