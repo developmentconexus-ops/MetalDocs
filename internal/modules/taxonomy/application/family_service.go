@@ -48,15 +48,30 @@ func (s *FamilyService) Update(ctx context.Context, f *domain.DocumentFamily) (*
 	if strings.TrimSpace(f.Name) == "" {
 		return nil, errors.New("family name must not be empty")
 	}
-	existing, err := s.families.GetByCode(ctx, f.Code)
+	tx, err := s.families.BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	existing, err := s.families.GetByCodeForUpdate(ctx, tx, f.Code)
 	if err != nil {
 		return nil, err
 	}
 	existing.Name = f.Name
 	existing.Description = f.Description
-	if err := s.families.Update(ctx, existing); err != nil {
+	if err := s.families.UpdateTx(ctx, tx, existing); err != nil {
 		return nil, err
 	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	committed = true
 	if s.govLogger != nil {
 		payload, _ := json.Marshal(map[string]string{"code": existing.Code, "name": existing.Name})
 		_ = s.govLogger.Log(ctx, domain.GovernanceEvent{

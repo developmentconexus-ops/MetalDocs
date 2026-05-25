@@ -65,7 +65,18 @@ func (s *AreaService) Update(ctx context.Context, a *domain.ProcessArea) error {
 }
 
 func (s *AreaService) SetParent(ctx context.Context, tenantID, areaCode string, parentCode *string, actorID string) error {
-	area, err := s.areas.GetByCode(ctx, tenantID, areaCode)
+	tx, err := s.areas.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	area, err := s.areas.GetByCodeForUpdate(ctx, tx, tenantID, areaCode)
 	if err != nil {
 		return err
 	}
@@ -77,10 +88,10 @@ func (s *AreaService) SetParent(ctx context.Context, tenantID, areaCode string, 
 		if *parentCode == areaCode {
 			return domain.ErrAreaParentCycle
 		}
-		if _, err := s.areas.GetByCode(ctx, tenantID, *parentCode); err != nil {
+		if _, err := s.areas.GetByCodeForUpdate(ctx, tx, tenantID, *parentCode); err != nil {
 			return err
 		}
-		ancestors, err := s.areas.ListAncestors(ctx, tenantID, *parentCode)
+		ancestors, err := s.areas.ListAncestorsTx(ctx, tx, tenantID, *parentCode)
 		if err != nil {
 			return err
 		}
@@ -92,9 +103,13 @@ func (s *AreaService) SetParent(ctx context.Context, tenantID, areaCode string, 
 	}
 
 	area.ParentCode = parentCode
-	if err := s.areas.Update(ctx, area); err != nil {
+	if err := s.areas.UpdateTx(ctx, tx, area); err != nil {
 		return err
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 	return s.govLogger.Log(ctx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    "area.parent_changed",
@@ -106,16 +121,31 @@ func (s *AreaService) SetParent(ctx context.Context, tenantID, areaCode string, 
 }
 
 func (s *AreaService) Archive(ctx context.Context, tenantID, areaCode, actorID string) error {
-	area, err := s.areas.GetByCode(ctx, tenantID, areaCode)
+	tx, err := s.areas.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	area, err := s.areas.GetByCodeForUpdate(ctx, tx, tenantID, areaCode)
 	if err != nil {
 		return err
 	}
 	if err := area.Archive(s.now()); err != nil {
 		return err
 	}
-	if err := s.areas.Update(ctx, area); err != nil {
+	if err := s.areas.UpdateTx(ctx, tx, area); err != nil {
 		return err
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 	return s.govLogger.Log(ctx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    "area.archived",
