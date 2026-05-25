@@ -44,7 +44,7 @@ func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID, code string
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get profile: %w", err)
 	}
 
@@ -92,7 +92,7 @@ func (r *ProfileRepository) List(ctx context.Context, tenantID string, includeAr
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List profiles: %w", err)
 	}
 
@@ -323,7 +323,7 @@ func (r *AreaRepository) GetByCode(ctx context.Context, tenantID, code string) (
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get area: %w", err)
 	}
 
@@ -369,7 +369,7 @@ func (r *AreaRepository) List(ctx context.Context, tenantID string, includeArchi
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List areas: %w", err)
 	}
 
@@ -606,7 +606,7 @@ func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID, code strin
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List area ancestors: %w", err)
 	}
 

@@ -22,7 +22,7 @@ func (s *Service) GetVersion(ctx context.Context, tenantID, templateID string, n
 	if _, err := s.GetTemplate(ctx, tenantID, templateID); err != nil {
 		return nil, err
 	}
-	return s.repo.GetVersion(ctx, templateID, n)
+	return s.repo.GetVersion(ctx, tenantID, templateID, n)
 }
 
 func (s *Service) ListTemplates(ctx context.Context, f ListFilter) ([]*domain.Template, error) {
@@ -33,7 +33,7 @@ func (s *Service) ListAudit(ctx context.Context, tenantID, templateID string, li
 	if _, err := s.GetTemplate(ctx, tenantID, templateID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListAudit(ctx, templateID, limit, offset)
+	return s.repo.ListAudit(ctx, tenantID, templateID, limit, offset)
 }
 
 const docxDownloadTTL = 15 * time.Minute
@@ -47,7 +47,7 @@ func (s *Service) GetDocxURL(ctx context.Context, cmd GetDocxURLCmd) (string, er
 	if _, err := s.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return "", err
 	}
-	v, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	v, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return "", err
 	}

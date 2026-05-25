@@ -96,7 +96,11 @@ func (r *fakeRepo) CreateVersionTx(_ context.Context, _ *sql.Tx, v *domain.Templ
 	return r.CreateVersion(context.Background(), v)
 }
 
-func (r *fakeRepo) GetVersion(_ context.Context, templateID string, n int) (*domain.TemplateVersion, error) {
+func (r *fakeRepo) GetVersion(_ context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error) {
+	t, ok := r.templates[templateID]
+	if !ok || t.TenantID != tenantID {
+		return nil, domain.ErrNotFound
+	}
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.VersionNumber == n {
 			return v, nil
@@ -105,9 +109,13 @@ func (r *fakeRepo) GetVersion(_ context.Context, templateID string, n int) (*dom
 	return nil, domain.ErrNotFound
 }
 
-func (r *fakeRepo) GetVersionByID(_ context.Context, id string) (*domain.TemplateVersion, error) {
+func (r *fakeRepo) GetVersionByID(_ context.Context, tenantID, id string) (*domain.TemplateVersion, error) {
 	v, ok := r.versions[id]
 	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	t, ok := r.templates[v.TemplateID]
+	if !ok || t.TenantID != tenantID {
 		return nil, domain.ErrNotFound
 	}
 	return v, nil
@@ -174,7 +182,11 @@ func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ *sql.Tx, tem
 	return r.ObsoletePreviousPublished(context.Background(), templateID, keepVersionID)
 }
 
-func (r *fakeRepo) GetApprovalConfig(_ context.Context, templateID string) (*domain.ApprovalConfig, error) {
+func (r *fakeRepo) GetApprovalConfig(_ context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
+	t, ok := r.templates[templateID]
+	if !ok || t.TenantID != tenantID {
+		return nil, domain.ErrNotFound
+	}
 	c, ok := r.approvalConfigs[templateID]
 	if !ok {
 		return nil, domain.ErrNotFound
@@ -200,10 +212,10 @@ func (r *fakeRepo) AppendAuditTx(_ context.Context, _ *sql.Tx, e *domain.AuditEv
 	return r.AppendAudit(context.Background(), e)
 }
 
-func (r *fakeRepo) ListAudit(_ context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
+func (r *fakeRepo) ListAudit(_ context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
 	matched := make([]*domain.AuditEvent, 0, len(r.audit))
 	for _, e := range r.audit {
-		if e.TemplateID == templateID {
+		if e.TenantID == tenantID && e.TemplateID == templateID {
 			matched = append(matched, e)
 		}
 	}
@@ -224,9 +236,11 @@ type fakePresigner struct {
 	HeadResult   string
 	HeadErr      error
 	DeleteCalled int
+	PutKeys      []string
 }
 
 func (p *fakePresigner) PresignPUT(_ context.Context, key string, _ time.Duration) (string, error) {
+	p.PutKeys = append(p.PutKeys, key)
 	return "https://presigned/put/" + key, nil
 }
 
@@ -298,6 +312,7 @@ func newService(repo *fakeRepo, opts ...serviceOption) *application.Service {
 
 func updateCmdWithComputed(phID, resolverKey string) application.UpdateSchemasCmd {
 	return application.UpdateSchemasCmd{
+		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
 		PlaceholderSchema: []domain.Placeholder{

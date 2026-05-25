@@ -34,17 +34,14 @@ func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplate
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, err
 	}
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
 	if version.Status != domain.VersionStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
 	}
-	key := cmd.StorageKey
-	if key == "" {
-		key = version.DocxStorageKey
-	}
+	key := version.DocxStorageKey
 	url, err := s.presign.PresignPUT(ctx, key, autosaveUploadTTL)
 	if err != nil {
 		return nil, err
@@ -61,7 +58,7 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 		return nil, err
 	}
 
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +98,7 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return err
 	}
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return err
 	}
@@ -153,7 +150,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		return nil, err
 	}
 
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
