@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/auth-tech-debt.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-25 (Phase 8 auth mediums)
 
 ## Rows
 
@@ -23,5 +23,6 @@
 
 ## Notes
 
+- R-006 merged in Phase 8 on 2026-05-25 as a 30-second database grace window in `TouchSession`; in-window rows are successful no-ops and missing sessions still return `ErrSessionNotFound`.
 - R-007 + R-008 are `L`: split into reader-extraction PR + writer-migration PR before opening.
 - R-001 + R-002 + R-005 are critical-path: prioritise before any new auth feature.

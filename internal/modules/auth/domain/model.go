@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -134,4 +135,20 @@ type AuthenticatedSession struct {
 	RawToken    string
 	CurrentUser CurrentUser
 	ExpiresAt   time.Time
+}
+
+func (s AuthenticatedSession) String() string {
+	return "AuthenticatedSession{redacted}"
+}
+
+func (s AuthenticatedSession) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		RawToken    string      `json:"rawToken"`
+		CurrentUser CurrentUser `json:"currentUser"`
+		ExpiresAt   time.Time   `json:"expiresAt"`
+	}{
+		RawToken:    "[REDACTED]",
+		CurrentUser: s.CurrentUser,
+		ExpiresAt:   s.ExpiresAt,
+	})
 }

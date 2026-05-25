@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
@@ -217,6 +218,20 @@ func TestHashPassword_UsesCost12(t *testing.T) {
 	}
 	if cost != bcryptCost {
 		t.Fatalf("cost = %d, want %d", cost, bcryptCost)
+	}
+}
+
+func TestSessionCookiesUseStrictSameSite(t *testing.T) {
+	svc := mustNewService(t, memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
+		SessionCookieName: "session",
+		SessionSecret:     testSessionSecret,
+	})
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	if got := svc.SessionCookie("raw", expiresAt).SameSite; got != http.SameSiteStrictMode {
+		t.Fatalf("SessionCookie SameSite = %v, want %v", got, http.SameSiteStrictMode)
+	}
+	if got := svc.ExpiredSessionCookie().SameSite; got != http.SameSiteStrictMode {
+		t.Fatalf("ExpiredSessionCookie SameSite = %v, want %v", got, http.SameSiteStrictMode)
 	}
 }
 

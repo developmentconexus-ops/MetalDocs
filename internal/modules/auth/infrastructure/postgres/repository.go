@@ -100,6 +100,7 @@ func (r *Repository) GetUserTenants(ctx context.Context, userID string) ([]strin
 SELECT DISTINCT tenant_id
 FROM metaldocs.iam_user_roles
 WHERE user_id = $1
+ORDER BY tenant_id
 `
 	rows, err := r.db.QueryContext(ctx, q, userID)
 	if err != nil {
@@ -122,6 +123,7 @@ func (r *Repository) TouchSession(ctx context.Context, sessionID string, seenAt 
 UPDATE metaldocs.auth_sessions
 SET last_seen_at = $2
 WHERE session_id = $1
+  AND last_seen_at < $2 - INTERVAL '30 seconds'
 `
 	res, err := r.db.ExecContext(ctx, q, sessionID, seenAt)
 	if err != nil {
@@ -132,7 +134,13 @@ WHERE session_id = $1
 		return fmt.Errorf("touch auth session rows affected: %w", err)
 	}
 	if n == 0 {
-		return authdomain.ErrSessionNotFound
+		var exists bool
+		if err := r.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM metaldocs.auth_sessions WHERE session_id = $1)`, sessionID).Scan(&exists); err != nil {
+			return fmt.Errorf("touch auth session exists: %w", err)
+		}
+		if !exists {
+			return authdomain.ErrSessionNotFound
+		}
 	}
 	return nil
 }

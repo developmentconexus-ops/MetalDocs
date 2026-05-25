@@ -122,6 +122,47 @@ func TestSessionMutations_UnknownSessionReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestTouchSession_UsesGraceWindow(t *testing.T) {
+	repo := NewRepository()
+	ctx := context.Background()
+	created := mustParseTime(t, "2026-05-25T12:00:00Z")
+	session := authdomain.Session{
+		SessionID:  "session-1",
+		UserID:     "user-1",
+		TenantID:   "tenant-1",
+		CreatedAt:  created,
+		ExpiresAt:  created.Add(time.Hour),
+		LastSeenAt: created,
+	}
+	if err := repo.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	withinGrace := created.Add(29 * time.Second)
+	if err := repo.TouchSession(ctx, session.SessionID, withinGrace); err != nil {
+		t.Fatalf("TouchSession within grace: %v", err)
+	}
+	found, err := repo.FindSession(ctx, session.SessionID)
+	if err != nil {
+		t.Fatalf("FindSession: %v", err)
+	}
+	if !found.LastSeenAt.Equal(created) {
+		t.Fatalf("LastSeenAt updated within grace: got %v, want %v", found.LastSeenAt, created)
+	}
+
+	afterGrace := created.Add(31 * time.Second)
+	if err := repo.TouchSession(ctx, session.SessionID, afterGrace); err != nil {
+		t.Fatalf("TouchSession after grace: %v", err)
+	}
+	found, err = repo.FindSession(ctx, session.SessionID)
+	if err != nil {
+		t.Fatalf("FindSession after grace: %v", err)
+	}
+	if !found.LastSeenAt.Equal(afterGrace) {
+		t.Fatalf("LastSeenAt = %v, want %v", found.LastSeenAt, afterGrace)
+	}
+}
+
 func TestRecordFailedLogin_ConcurrentIncrementsAndLockout(t *testing.T) {
 	cases := []struct {
 		name            string

@@ -69,6 +69,7 @@ Tripwire pairing:
 - `N/A` (no authz.Require/authz.RequireAll call pair in this middleware/session-resolve path).
 
 Write amplification fact:
+- Phase 8 update: `TouchSession` now adds `AND last_seen_at < $2 - INTERVAL '30 seconds'`. A zero-row update checks session existence; existing in-window rows return nil, missing rows return `ErrSessionNotFound`.
 - `TouchSession` runs `UPDATE metaldocs.auth_sessions SET last_seen_at = $2 WHERE session_id = $1` on each successful authenticated request (`internal/modules/auth/application/service.go:187` → `internal/modules/auth/infrastructure/postgres/repository.go:82`).
 
 ### 5. Response shape

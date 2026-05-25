@@ -48,6 +48,19 @@ func (f failingAuditWriter) RecordTx(context.Context, *sql.Tx, auditdomain.Event
 	return errors.New("boom")
 }
 
+type captureAuditWriter struct {
+	event auditdomain.Event
+}
+
+func (c *captureAuditWriter) Record(_ context.Context, event auditdomain.Event) error {
+	c.event = event
+	return nil
+}
+
+func (c *captureAuditWriter) RecordTx(context.Context, *sql.Tx, auditdomain.Event) error {
+	return nil
+}
+
 func TestRecordAudit_AuditFailureDoesNotPanic(t *testing.T) {
 	h := &Handler{
 		audit: failingAuditWriter{},
@@ -60,4 +73,31 @@ func TestRecordAudit_AuditFailureDoesNotPanic(t *testing.T) {
 	}))
 
 	h.recordAudit(req, "u-1", "auth.logout", "u-1", map[string]any{})
+}
+
+func TestRecordAudit_RejectsUnsafeTraceID(t *testing.T) {
+	audit := &captureAuditWriter{}
+	h := &Handler{
+		audit: audit,
+		now:   func() time.Time { return time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC) },
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	req.Header.Set("X-Trace-Id", "trace\r\npoison")
+
+	h.recordAudit(req, "u-1", "auth.logout", "u-1", map[string]any{})
+
+	if audit.event.TraceID == "trace\r\npoison" {
+		t.Fatal("unsafe trace id was accepted")
+	}
+	if !traceIDPattern.MatchString(audit.event.TraceID) {
+		t.Fatalf("fallback trace id = %q, want safe generated id", audit.event.TraceID)
+	}
+}
+
+func TestHashIdentifier_TrimsAndHashes(t *testing.T) {
+	got := hashIdentifier(" user@example.com ")
+	want := "b4c9a289323b21a01c3e940f150eb9b8c542587f1abfd8f0e1cc1ffc5e475514"
+	if got != want {
+		t.Fatalf("hashIdentifier = %q, want %q", got, want)
+	}
 }
