@@ -19,8 +19,8 @@ type Repository interface {
 
 	CreateVersion(ctx context.Context, v *domain.TemplateVersion) error
 	CreateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error
-	GetVersion(ctx context.Context, templateID string, n int) (*domain.TemplateVersion, error)
-	GetVersionByID(ctx context.Context, id string) (*domain.TemplateVersion, error)
+	GetVersion(ctx context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error)
+	GetVersionByID(ctx context.Context, tenantID, id string) (*domain.TemplateVersion, error)
 	UpdateVersion(ctx context.Context, v *domain.TemplateVersion) error
 	UpdateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error
 	UpdateVersionDraftCAS(ctx context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error
@@ -28,13 +28,13 @@ type Repository interface {
 	ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error
 	ObsoletePreviousPublishedTx(ctx context.Context, tx *sql.Tx, templateID, keepVersionID string) error
 
-	GetApprovalConfig(ctx context.Context, templateID string) (*domain.ApprovalConfig, error)
+	GetApprovalConfig(ctx context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error)
 	UpsertApprovalConfig(ctx context.Context, c *domain.ApprovalConfig) error
 	UpsertApprovalConfigTx(ctx context.Context, tx *sql.Tx, c *domain.ApprovalConfig) error
 
 	AppendAudit(ctx context.Context, e *domain.AuditEvent) error
 	AppendAuditTx(ctx context.Context, tx *sql.Tx, e *domain.AuditEvent) error
-	ListAudit(ctx context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error)
+	ListAudit(ctx context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error)
 }
 
 type Presigner interface {

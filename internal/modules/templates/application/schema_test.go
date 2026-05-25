@@ -10,16 +10,20 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
-func TestUpdateSchemas_Happy(t *testing.T) {
-	repo := newFakeRepo()
-	version := &domain.TemplateVersion{
+func seedSchemaVersion(repo *fakeRepo, status domain.VersionStatus, contentHash string) {
+	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.versions["v1"] = &domain.TemplateVersion{
 		ID:            "v1",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-		ContentHash:   "hash-1",
+		Status:        status,
+		ContentHash:   contentHash,
 	}
-	repo.versions[version.ID] = version
+}
+
+func TestUpdateSchemas_Happy(t *testing.T) {
+	repo := newFakeRepo()
+	seedSchemaVersion(repo, domain.VersionStatusDraft, "hash-1")
 
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 	got, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
@@ -61,15 +65,11 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 
 func TestUpdateSchemas_NonDraft(t *testing.T) {
 	repo := newFakeRepo()
-	repo.versions["v1"] = &domain.TemplateVersion{
-		ID:            "v1",
-		TemplateID:    "tpl-1",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusPublished,
-	}
+	seedSchemaVersion(repo, domain.VersionStatusPublished, "")
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
+		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
 	})
@@ -80,16 +80,11 @@ func TestUpdateSchemas_NonDraft(t *testing.T) {
 
 func TestUpdateSchemas_StaleHash(t *testing.T) {
 	repo := newFakeRepo()
-	repo.versions["v1"] = &domain.TemplateVersion{
-		ID:            "v1",
-		TemplateID:    "tpl-1",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-		ContentHash:   "hash-1",
-	}
+	seedSchemaVersion(repo, domain.VersionStatusDraft, "hash-1")
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
+		TenantID:            "tenant-a",
 		TemplateID:          "tpl-1",
 		VersionNumber:       1,
 		ExpectedContentHash: "hash-2",
@@ -102,15 +97,11 @@ func TestUpdateSchemas_StaleHash(t *testing.T) {
 
 func TestUpdateSchemas_DuplicatePlaceholderID(t *testing.T) {
 	repo := newFakeRepo()
-	repo.versions["v1"] = &domain.TemplateVersion{
-		ID:            "v1",
-		TemplateID:    "tpl-1",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-	}
+	seedSchemaVersion(repo, domain.VersionStatusDraft, "")
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
+		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
 		PlaceholderSchema: []domain.Placeholder{
@@ -125,15 +116,11 @@ func TestUpdateSchemas_DuplicatePlaceholderID(t *testing.T) {
 
 func TestUpdateSchemas_SelectNoOptions(t *testing.T) {
 	repo := newFakeRepo()
-	repo.versions["v1"] = &domain.TemplateVersion{
-		ID:            "v1",
-		TemplateID:    "tpl-1",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-	}
+	seedSchemaVersion(repo, domain.VersionStatusDraft, "")
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
+		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
 		PlaceholderSchema: []domain.Placeholder{
@@ -147,15 +134,11 @@ func TestUpdateSchemas_SelectNoOptions(t *testing.T) {
 
 func TestUpdateSchemas_OptionsOnNonSelect(t *testing.T) {
 	repo := newFakeRepo()
-	repo.versions["v1"] = &domain.TemplateVersion{
-		ID:            "v1",
-		TemplateID:    "tpl-1",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-	}
+	seedSchemaVersion(repo, domain.VersionStatusDraft, "")
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
+		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
 		PlaceholderSchema: []domain.Placeholder{
@@ -260,12 +243,7 @@ func TestValidatePlaceholders_ComputedRequiresResolverKey(t *testing.T) {
 
 func TestUpdateSchemas_UnknownResolverKey_Error(t *testing.T) {
 	repo := newFakeRepo()
-	repo.versions["v1"] = &domain.TemplateVersion{
-		ID:            "v1",
-		TemplateID:    "tpl-1",
-		VersionNumber: 1,
-		Status:        domain.VersionStatusDraft,
-	}
+	seedSchemaVersion(repo, domain.VersionStatusDraft, "")
 	svc := newService(repo, WithKnownResolvers("doc_code"))
 
 	_, err := svc.UpdateSchemas(context.Background(), updateCmdWithComputed("p1", "missing_resolver"))

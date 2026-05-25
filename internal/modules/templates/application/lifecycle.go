@@ -23,7 +23,7 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 		return nil, domain.ErrSystemTemplateImmutable
 	}
 
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 		return nil, domain.ErrUploadMissing
 	}
 
-	config, err := s.repo.GetApprovalConfig(ctx, cmd.TemplateID)
+	config, err := s.repo.GetApprovalConfig(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 		return nil, domain.ErrSystemTemplateImmutable
 	}
 
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 	if template.SystemOwned {
 		return nil, domain.ErrSystemTemplateImmutable
 	}
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,7 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	if template.SystemOwned {
 		return nil, domain.ErrSystemTemplateImmutable
 	}
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
