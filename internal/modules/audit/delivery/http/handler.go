@@ -1,6 +1,7 @@
 package httpdelivery
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -18,7 +19,11 @@ import (
 )
 
 type Handler struct {
-	service *application.Service
+	service AuditQuerier
+}
+
+type AuditQuerier interface {
+	ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, error)
 }
 
 type EventResponse struct {
@@ -32,7 +37,7 @@ type EventResponse struct {
 	TraceID      string         `json:"traceId"`
 }
 
-func NewHandler(service *application.Service) *Handler {
+func NewHandler(service AuditQuerier) *Handler {
 	return &Handler{service: service}
 }
 
