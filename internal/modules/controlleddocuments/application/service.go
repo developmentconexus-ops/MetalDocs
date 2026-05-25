@@ -367,6 +367,27 @@ func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, p
 // PeekSeq returns the next sequence number that NextAndIncrement would
 // allocate for (profile, area). Used by handlers that need the raw integer.
 func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
+	if s.db == nil {
+		return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+	}
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return 0, ErrActorMissing
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+		return 0, fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+		return 0, fmt.Errorf("controlled_documents: authz check preview code: %w", err)
+	}
+
 	return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 }
 
@@ -403,6 +424,18 @@ func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string
 }
 
 func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, controlledDocumentID string, next controlleddocumentsdomain.CDStatus, cap string) error {
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return ErrActorMissing
+	}
+	canRead, err := s.docs.CanRead(ctx, tenantID, controlledDocumentID, actorUserID)
+	if err != nil {
+		return err
+	}
+	if !canRead {
+		return controlleddocumentsdomain.ErrCDNotFound
+	}
+
 	doc, err := s.docs.GetByID(ctx, tenantID, controlledDocumentID)
 	if err != nil {
 		return err
