@@ -105,19 +105,22 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 	if version.Status != domain.VersionStatusDraft {
 		return domain.ErrInvalidStateTransition
 	}
-	audit := &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditSaved,
-		Details: map[string]any{
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		&version.ID,
+		domain.AuditSaved,
+		map[string]any{
 			"docx_content_hash":   cmd.DocxContentHash,
 			"schema_content_hash": cmd.SchemaContentHash,
 			"schema_storage_key":  cmd.SchemaStorageKey,
 			"expected_lock":       cmd.ExpectedLockVersion,
 		},
-		OccurredAt: s.clock.Now(),
+		s.clock.Now(),
+	)
+	if err != nil {
+		return err
 	}
 	if s.db != nil {
 		tx, err := s.db.BeginTx(ctx, nil)
@@ -173,14 +176,17 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 	}
 
 	version.ContentHash = actualHash
-	audit := &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditSaved,
-		Details:    map[string]any{"content_hash": actualHash},
-		OccurredAt: s.clock.Now(),
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		&version.ID,
+		domain.AuditSaved,
+		map[string]any{"content_hash": actualHash},
+		s.clock.Now(),
+	)
+	if err != nil {
+		return nil, err
 	}
 	if s.db != nil {
 		tx, err := s.db.BeginTx(ctx, nil)

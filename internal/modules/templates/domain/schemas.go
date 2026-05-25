@@ -7,6 +7,18 @@ type MetadataSchema struct {
 	RequiredMetadata    []string `json:"required_metadata"`
 }
 
+func NewMetadataSchema(docCodePattern string, retentionDays int, distributionDefault, requiredMetadata []string) (MetadataSchema, error) {
+	if retentionDays < 0 {
+		return MetadataSchema{}, ErrInvalidConstraint
+	}
+	return MetadataSchema{
+		DocCodePattern:      docCodePattern,
+		RetentionDays:       retentionDays,
+		DistributionDefault: distributionDefault,
+		RequiredMetadata:    requiredMetadata,
+	}, nil
+}
+
 type PlaceholderType string
 
 const (
@@ -19,9 +31,27 @@ const (
 	PHComputed PlaceholderType = "computed"
 )
 
+type VisibilityOp string
+
+const (
+	VisibilityOpEquals    VisibilityOp = "eq"
+	VisibilityOpNotEquals VisibilityOp = "neq"
+	VisibilityOpIn        VisibilityOp = "in"
+	VisibilityOpNotIn     VisibilityOp = "not_in"
+)
+
+func (op VisibilityOp) Valid() bool {
+	switch op {
+	case VisibilityOpEquals, VisibilityOpNotEquals, VisibilityOpIn, VisibilityOpNotIn:
+		return true
+	default:
+		return false
+	}
+}
+
 type VisibilityCondition struct {
 	PlaceholderID string `json:"placeholder_id"`
-	Op            string `json:"op"`
+	Op            VisibilityOp `json:"op"`
 	Value         any    `json:"value"`
 }
 

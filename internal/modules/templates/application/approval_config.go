@@ -43,28 +43,32 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		return nil, domain.ErrInvalidApprovalConfig
 	}
 
-	config := &domain.ApprovalConfig{
-		TemplateID:   cmd.TemplateID,
-		ReviewerRole: cmd.ReviewerRole,
-		ApproverRole: cmd.ApproverRole,
+	cfg, err := domain.NewApprovalConfig(cmd.TemplateID, cmd.ApproverRole, cmd.ReviewerRole)
+	if err != nil {
+		return nil, err
 	}
+	config := &cfg
 
 	if err := s.repo.UpsertApprovalConfig(ctx, config); err != nil {
 		return nil, err
 	}
 
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  nil,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditApprovalConfigUpdated,
-		Details: map[string]any{
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		nil,
+		domain.AuditApprovalConfigUpdated,
+		map[string]any{
 			"reviewer_role": cmd.ReviewerRole,
 			"approver_role": cmd.ApproverRole,
 		},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+		s.clock.Now(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
 		return nil, err
 	}
 

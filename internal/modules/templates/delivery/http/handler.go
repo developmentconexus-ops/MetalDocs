@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -105,7 +106,9 @@ func userIDFromReq(r *http.Request) string {
 }
 
 func writeErr(w http.ResponseWriter, status int, code problem.Code, message string) {
-	_ = problem.Write(w, problem.New(status, code, message))
+	if err := problem.Write(w, problem.New(status, code, message)); err != nil {
+		slog.Warn("templates http: failed to write problem response", "err", err, "status", status, "code", code)
+	}
 }
 
 var friendlyMsg = map[problem.Code]string{
