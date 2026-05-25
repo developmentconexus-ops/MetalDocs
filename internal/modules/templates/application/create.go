@@ -151,7 +151,7 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 
 	var source *domain.TemplateVersion
 	if template.PublishedVersionID != nil {
-		source, err = s.repo.GetVersionByID(ctx, *template.PublishedVersionID)
+		source, err = s.repo.GetVersionByID(ctx, cmd.TenantID, *template.PublishedVersionID)
 		if err != nil {
 			return nil, err
 		}
@@ -160,7 +160,7 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 			return nil, domain.ErrNotFound
 		}
 	} else {
-		source, err = s.repo.GetVersion(ctx, template.ID, template.LatestVersion)
+		source, err = s.repo.GetVersion(ctx, cmd.TenantID, template.ID, template.LatestVersion)
 		if err != nil {
 			return nil, err
 		}

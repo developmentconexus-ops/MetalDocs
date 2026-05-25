@@ -18,7 +18,7 @@ type UpdateSchemasCmd struct {
 }
 
 func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*domain.TemplateVersion, error) {
-	version, err := s.repo.GetVersion(ctx, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, err
 	}
