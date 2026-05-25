@@ -82,6 +82,40 @@ func TestPresignAutosave_NonDraft(t *testing.T) {
 	}
 }
 
+func TestPresignTemplateUpload_IgnoresCallerStorageKey(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{
+		ID:       "tpl-1",
+		TenantID: "tenant-a",
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+	}
+	presigner := &fakePresigner{}
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
+
+	got, err := svc.PresignTemplateUpload(context.Background(), application.PresignTemplateUploadCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "user-a",
+		TemplateID:    "tpl-1",
+		VersionNumber: 1,
+		StorageKey:    "templates/other-tenant/versions/1.docx",
+	})
+	if err != nil {
+		t.Fatalf("PresignTemplateUpload returned error: %v", err)
+	}
+	if got.StorageKey != "templates/tpl-1/versions/1.docx" {
+		t.Fatalf("expected server-derived storage key, got %q", got.StorageKey)
+	}
+	if len(presigner.PutKeys) != 1 || presigner.PutKeys[0] != "templates/tpl-1/versions/1.docx" {
+		t.Fatalf("unexpected presign keys: %v", presigner.PutKeys)
+	}
+}
+
 func TestCommitAutosave_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{
