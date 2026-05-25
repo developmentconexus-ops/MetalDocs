@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -495,14 +496,36 @@ func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) 
 	if r.audit == nil {
 		return nil
 	}
-	payload, _ := json.Marshal(entry.Details)
+	event, err := r.auditEvent(ctx, entry)
+	if err != nil {
+		return err
+	}
+	return r.audit.Record(ctx, event)
+}
+
+func (r *Repository) AppendAuditTx(ctx context.Context, tx *sql.Tx, entry *domain.AuditEvent) error {
+	if r.audit == nil {
+		return nil
+	}
+	event, err := r.auditEvent(ctx, entry)
+	if err != nil {
+		return err
+	}
+	return r.audit.RecordTx(ctx, tx, event)
+}
+
+func (r *Repository) auditEvent(ctx context.Context, entry *domain.AuditEvent) (auditdomain.Event, error) {
+	payload, err := json.Marshal(entry.Details)
+	if err != nil {
+		return auditdomain.Event{}, fmt.Errorf("templates audit marshal details: %w", err)
+	}
 	tenantID := entry.TenantID
 	if tenantID == "" {
 		if tid, err := tenant.FromContext(ctx); err == nil {
 			tenantID = tid
 		}
 	}
-	return r.audit.Record(ctx, auditdomain.Event{
+	return auditdomain.Event{
 		ID:           uuid.NewString(),
 		OccurredAt:   time.Now().UTC(),
 		ActorID:      entry.ActorID,
@@ -511,11 +534,7 @@ func (r *Repository) AppendAudit(ctx context.Context, entry *domain.AuditEvent) 
 		ResourceID:   entry.TemplateID,
 		PayloadJSON:  string(payload),
 		TenantID:     tenantID,
-	})
-}
-
-func (r *Repository) AppendAuditTx(ctx context.Context, _ *sql.Tx, entry *domain.AuditEvent) error {
-	return r.AppendAudit(ctx, entry)
+	}, nil
 }
 
 func (r *Repository) ListAudit(ctx context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {

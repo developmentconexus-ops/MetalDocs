@@ -41,10 +41,7 @@ func (s *Service) PresignTemplateUpload(ctx context.Context, cmd PresignTemplate
 	if version.Status != domain.VersionStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
 	}
-	key := cmd.StorageKey
-	if key == "" {
-		key = version.DocxStorageKey
-	}
+	key := version.DocxStorageKey
 	url, err := s.presign.PresignPUT(ctx, key, autosaveUploadTTL)
 	if err != nil {
 		return nil, err
