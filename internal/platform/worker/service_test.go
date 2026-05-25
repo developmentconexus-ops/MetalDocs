@@ -17,7 +17,7 @@ func (f *fakeConsumer) ClaimUnpublished(_ context.Context, _ int) ([]messaging.E
 	return f.events, nil
 }
 
-func (f *fakeConsumer) MarkPublished(_ context.Context, _ []string) error { return nil }
+func (f *fakeConsumer) MarkPublished(_ context.Context, _ []messaging.EventID) error { return nil }
 
 func (f *fakeConsumer) MarkFailed(_ context.Context, _ messaging.FailedEvent) error { return nil }
 
@@ -25,11 +25,11 @@ func TestWorkerService_RoutesPDFEventToPDFRunner(t *testing.T) {
 	consumer := &fakeConsumer{events: []messaging.Event{
 		{
 			EventID:   "e1",
-			EventType: "docgen_v2_pdf",
-			Payload: map[string]any{
-				"tenant_id":         "t1",
-				"revision_id":       "r1",
-				"final_docx_s3_key": "tenants/t1/revisions/r1/frozen.docx",
+			EventType: messaging.EventTypePDFConvert,
+			Payload: messaging.PDFConvertPayload{
+				TenantID:       "t1",
+				RevisionID:     "r1",
+				FinalDocxS3Key: "tenants/t1/revisions/r1/frozen.docx",
 			},
 		},
 	}}

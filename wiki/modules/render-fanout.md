@@ -1,10 +1,11 @@
 # Module: render-fanout
 
-> **Last verified:** 2026-05-13
+> **Last verified:** 2026-05-24
 > **Status:** active (pipeline module)`r`n> **Maturity:** L2
 > **Scope:** DOCX ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ PDF rendering pipeline, token substitution engine, outbox-driven dispatch.
 > **Out of scope:** Approval-triggered freeze invocation (see `modules/approval.md`).
 > **Key files:**
+> - `internal/platform/messaging/events.go` - typed event envelope and `PDFConvertPayload`
 > - `internal/modules/render/fanout/client.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â HTTP client to docgen-v2
 > - `internal/modules/render/fanout/pdf_dispatcher.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â outbox publisher
 > - `internal/modules/render/fanout/pdf_dispatch_adapter.go` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â invoker bridge
@@ -19,8 +20,8 @@
 
 1. Freeze service substitutes the 7 fixed tokens in the DOCX (eigenpal-native format).
 2. Frozen DOCX uploaded to MinIO.
-3. PDFDispatcher publishes a `docgen_v2_pdf` outbox event.
-4. PDFJobRunner picks up the event, calls Gotenberg via docgen-v2.
+3. PDFDispatcher publishes a `docgen_v2_pdf` outbox event with `messaging.PDFConvertPayload`.
+4. PDFJobRunner picks up the typed payload, calls Gotenberg via docgen-v2.
 5. Resulting PDF stored alongside the DOCX in MinIO.
 
 ## See also

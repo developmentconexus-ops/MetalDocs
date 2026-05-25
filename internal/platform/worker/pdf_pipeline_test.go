@@ -56,10 +56,10 @@ func TestPDFPipeline_RealClient(t *testing.T) {
 	persister := &fakePDFPersister{}
 	runner := NewPDFJobRunner(client, persister)
 
-	event := makePDFEvent(map[string]any{
-		"tenant_id":         tenantID,
-		"revision_id":       revisionID,
-		"final_docx_s3_key": docxKey,
+	event := makePDFEvent(messaging.PDFConvertPayload{
+		TenantID:       tenantID,
+		RevisionID:     revisionID,
+		FinalDocxS3Key: docxKey,
 	})
 	if err := runner.Handle(context.Background(), event); err != nil {
 		t.Fatalf("Handle: %v", err)
@@ -93,10 +93,10 @@ func TestPDFPipeline_RealClient_DocgenError(t *testing.T) {
 	persister := &fakePDFPersister{}
 	runner := NewPDFJobRunner(client, persister)
 
-	err := runner.Handle(context.Background(), makePDFEvent(map[string]any{
-		"tenant_id":         "t1",
-		"revision_id":       "r1",
-		"final_docx_s3_key": "some/key.docx",
+	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
+		TenantID:       "t1",
+		RevisionID:     "r1",
+		FinalDocxS3Key: "some/key.docx",
 	}))
 	if err == nil {
 		t.Fatal("expected error from docgen, got nil")
@@ -126,10 +126,10 @@ func TestPDFPipeline_WorkerLoop(t *testing.T) {
 	defer srv.Close()
 
 	consumer := &fakeConsumer{events: []messaging.Event{
-		makePDFEvent(map[string]any{
-			"tenant_id":         tenantID,
-			"revision_id":       revisionID,
-			"final_docx_s3_key": docxKey,
+		makePDFEvent(messaging.PDFConvertPayload{
+			TenantID:       tenantID,
+			RevisionID:     revisionID,
+			FinalDocxS3Key: docxKey,
 		}),
 	}}
 	client := servicebus.NewDocgenV2Client(srv.URL, "", 10*time.Second)
