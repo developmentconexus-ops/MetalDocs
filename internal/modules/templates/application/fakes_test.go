@@ -236,9 +236,11 @@ type fakePresigner struct {
 	HeadResult   string
 	HeadErr      error
 	DeleteCalled int
+	PutKeys      []string
 }
 
 func (p *fakePresigner) PresignPUT(_ context.Context, key string, _ time.Duration) (string, error) {
+	p.PutKeys = append(p.PutKeys, key)
 	return "https://presigned/put/" + key, nil
 }
 
