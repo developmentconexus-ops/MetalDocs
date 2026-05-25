@@ -71,18 +71,22 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 		return nil, err
 	}
 
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditSubmitted,
-		Details: map[string]any{
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		&version.ID,
+		domain.AuditSubmitted,
+		map[string]any{
 			"reviewer_role": config.ReviewerRole,
 			"approver_role": config.ApproverRole,
 		},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+		s.clock.Now(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
 		return nil, err
 	}
 
@@ -136,15 +140,11 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 		if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateEdit)); err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-			TenantID:   cmd.TenantID,
-			TemplateID: cmd.TemplateID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditReviewed,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
+		audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditReviewed, map[string]any{}, s.clock.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAudit(ctx, audit); err != nil {
 			return nil, err
 		}
 		return version, nil
@@ -159,18 +159,22 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateEdit)); err != nil {
 		return nil, err
 	}
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditRejected,
-		Details: map[string]any{
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		&version.ID,
+		domain.AuditRejected,
+		map[string]any{
 			"reason": cmd.Reason,
 			"stage":  "reviewer",
 		},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+		s.clock.Now(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
 		return nil, err
 	}
 
@@ -248,15 +252,11 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 			if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
 				return nil, err
 			}
-			if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
-				TenantID:   cmd.TenantID,
-				TemplateID: cmd.TemplateID,
-				VersionID:  &version.ID,
-				ActorID:    cmd.ActorUserID,
-				Action:     domain.AuditPublished,
-				Details:    map[string]any{},
-				OccurredAt: s.clock.Now(),
-			}); err != nil {
+			audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{}, s.clock.Now())
+			if err != nil {
+				return nil, err
+			}
+			if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
 				return nil, err
 			}
 			if err := tx.Commit(); err != nil {
@@ -272,15 +272,11 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 			if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
 				return nil, err
 			}
-			if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-				TenantID:   cmd.TenantID,
-				TemplateID: cmd.TemplateID,
-				VersionID:  &version.ID,
-				ActorID:    cmd.ActorUserID,
-				Action:     domain.AuditPublished,
-				Details:    map[string]any{},
-				OccurredAt: s.clock.Now(),
-			}); err != nil {
+			audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{}, s.clock.Now())
+			if err != nil {
+				return nil, err
+			}
+			if err := s.repo.AppendAudit(ctx, audit); err != nil {
 				return nil, err
 			}
 		}
@@ -298,18 +294,22 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateApprove)); err != nil {
 		return nil, err
 	}
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditRejected,
-		Details: map[string]any{
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		&version.ID,
+		domain.AuditRejected,
+		map[string]any{
 			"reason": cmd.Reason,
 			"stage":  "approver",
 		},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+		s.clock.Now(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
 		return nil, err
 	}
 
@@ -406,15 +406,11 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 		return nil, err
 	}
-	if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditPublished,
-		Details:    map[string]any{"schema_key": cmd.SchemaKey},
-		OccurredAt: now,
-	}); err != nil {
+	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, map[string]any{"schema_key": cmd.SchemaKey}, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -460,15 +456,11 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 		return nil, err
 	}
 
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  nil,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditArchived,
-		Details:    map[string]any{},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, nil, domain.AuditArchived, map[string]any{}, s.clock.Now())
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
 		return nil, err
 	}
 

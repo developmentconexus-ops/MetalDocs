@@ -6,6 +6,17 @@ type ApprovalConfig struct {
 	ApproverRole string
 }
 
+func NewApprovalConfig(templateID, approverRole string, reviewerRole *string) (ApprovalConfig, error) {
+	if templateID == "" || approverRole == "" {
+		return ApprovalConfig{}, ErrInvalidApprovalConfig
+	}
+	return ApprovalConfig{
+		TemplateID:   templateID,
+		ReviewerRole: reviewerRole,
+		ApproverRole: approverRole,
+	}, nil
+}
+
 func (c ApprovalConfig) HasReviewer() bool { return c.ReviewerRole != nil && *c.ReviewerRole != "" }
 
 type SegregationRole string
@@ -16,7 +27,7 @@ const (
 )
 
 // CheckSegregation enforces ISO segregation of duties.
-// role = "reviewer" | "approver"
+// role = SegregationRoleReviewer | SegregationRoleApprover
 // Rules:
 //
 //	role="reviewer": actorID != authorID

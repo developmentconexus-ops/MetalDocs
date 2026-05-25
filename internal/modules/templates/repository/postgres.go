@@ -27,7 +27,7 @@ func isInvalidUUID(err error) bool {
 func rowsAffected(res sql.Result) (int64, error) {
 	n, err := res.RowsAffected()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("templates repository: rows affected: %w", err)
 	}
 	return n, nil
 }

@@ -30,7 +30,7 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 	if _, err := s.repo.GetTemplateByKey(ctx, cmd.TenantID, cmd.Key); err == nil {
 		return nil, domain.ErrKeyConflict
 	} else if !errors.Is(err, domain.ErrNotFound) {
-		return nil, err
+		return nil, fmt.Errorf("templates create: check template key uniqueness: %w", err)
 	}
 
 	template := &domain.Template{
@@ -52,7 +52,7 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		cmd.ActorUserID,
 		fmt.Sprintf("templates/%s/versions/1.docx", template.ID),
 		1,
-		domain.MetadataSchema{},
+		mustMetadataSchema(),
 		[]domain.Placeholder{},
 		s.clock.Now(),
 	)
@@ -77,22 +77,18 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
 			return nil, err
 		}
-		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &domain.ApprovalConfig{
-			TemplateID:   template.ID,
-			ApproverRole: cmd.ApproverRole,
-			ReviewerRole: cmd.ReviewerRole,
-		}); err != nil {
+		config, err := domain.NewApprovalConfig(template.ID, cmd.ApproverRole, cmd.ReviewerRole)
+		if err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
+		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &config); err != nil {
+			return nil, err
+		}
+		audit, err := newAuditEvent(cmd.TenantID, template.ID, cmd.ActorUserID, &version.ID, domain.AuditCreated, map[string]any{}, s.clock.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
 			return nil, err
 		}
 		if err := tx.Commit(); err != nil {
@@ -105,22 +101,18 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		if err := s.repo.CreateVersion(ctx, version); err != nil {
 			return nil, err
 		}
-		if err := s.repo.UpsertApprovalConfig(ctx, &domain.ApprovalConfig{
-			TemplateID:   template.ID,
-			ApproverRole: cmd.ApproverRole,
-			ReviewerRole: cmd.ReviewerRole,
-		}); err != nil {
+		config, err := domain.NewApprovalConfig(template.ID, cmd.ApproverRole, cmd.ReviewerRole)
+		if err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
+		if err := s.repo.UpsertApprovalConfig(ctx, &config); err != nil {
+			return nil, err
+		}
+		audit, err := newAuditEvent(cmd.TenantID, template.ID, cmd.ActorUserID, &version.ID, domain.AuditCreated, map[string]any{}, s.clock.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAudit(ctx, audit); err != nil {
 			return nil, err
 		}
 	}
@@ -155,7 +147,6 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 		if err != nil {
 			return nil, err
 		}
-		// T-002: GetVersionByID has no tenant predicate — reject if version belongs to a different template.
 		if source.TemplateID != template.ID {
 			return nil, domain.ErrNotFound
 		}
@@ -191,15 +182,11 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
+		audit, err := newAuditEvent(cmd.TenantID, template.ID, cmd.ActorUserID, &version.ID, domain.AuditCreated, map[string]any{}, s.clock.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
 			return nil, err
 		}
 		if err := tx.Commit(); err != nil {
@@ -213,20 +200,24 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 		if err := s.repo.UpdateTemplate(ctx, template); err != nil {
 			return nil, err
 		}
-		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-			TenantID:   cmd.TenantID,
-			TemplateID: template.ID,
-			VersionID:  &version.ID,
-			ActorID:    cmd.ActorUserID,
-			Action:     domain.AuditCreated,
-			Details:    map[string]any{},
-			OccurredAt: s.clock.Now(),
-		}); err != nil {
+		audit, err := newAuditEvent(cmd.TenantID, template.ID, cmd.ActorUserID, &version.ID, domain.AuditCreated, map[string]any{}, s.clock.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAudit(ctx, audit); err != nil {
 			return nil, err
 		}
 	}
 
 	return version, nil
+}
+
+func mustMetadataSchema() domain.MetadataSchema {
+	schema, err := domain.NewMetadataSchema("", 0, nil, nil)
+	if err != nil {
+		panic("templates create: default metadata schema must be valid")
+	}
+	return schema
 }
 
 func cloneMetadataSchema(s domain.MetadataSchema) domain.MetadataSchema {

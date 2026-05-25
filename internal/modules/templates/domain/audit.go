@@ -27,3 +27,21 @@ type AuditEvent struct {
 	Details    map[string]any
 	OccurredAt time.Time
 }
+
+func NewAuditEvent(tenantID, templateID, actorID string, versionID *string, action AuditAction, details map[string]any, occurredAt time.Time) (AuditEvent, error) {
+	if tenantID == "" || templateID == "" || actorID == "" || action == "" || occurredAt.IsZero() {
+		return AuditEvent{}, ErrInvalidConstraint
+	}
+	if details == nil {
+		details = map[string]any{}
+	}
+	return AuditEvent{
+		TenantID:   tenantID,
+		TemplateID: templateID,
+		VersionID:  versionID,
+		ActorID:    actorID,
+		Action:     action,
+		Details:    details,
+		OccurredAt: occurredAt,
+	}, nil
+}

@@ -59,15 +59,19 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 		return nil, err
 	}
 
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditSaved,
-		Details:    map[string]any{"kind": "schema"},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		&version.ID,
+		domain.AuditSaved,
+		map[string]any{"kind": "schema"},
+		s.clock.Now(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.AppendAudit(ctx, audit); err != nil {
 		return nil, err
 	}
 
