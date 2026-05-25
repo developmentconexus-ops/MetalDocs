@@ -46,7 +46,7 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 	for _, event := range events {
 		var handleErr error
 		switch event.EventType {
-		case "docgen_v2_pdf":
+		case messaging.EventTypePDFConvert:
 			if s.pdfRunner != nil {
 				handleErr = s.pdfRunner.Handle(ctx, event)
 			}
@@ -65,7 +65,7 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 			continue
 		}
 
-		if err := s.consumer.MarkPublished(ctx, []string{event.EventID}); err != nil {
+		if err := s.consumer.MarkPublished(ctx, []messaging.EventID{event.EventID}); err != nil {
 			return err
 		}
 		processed++

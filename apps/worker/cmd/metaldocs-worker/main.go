@@ -25,7 +25,7 @@ func main() {
 	workerSvc := workerapp.NewService(deps.Consumer, workerCfg)
 	if deps.DocgenV2Client != nil && deps.SQLDB != nil {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
-		pdfRunner := workerapp.NewPDFJobRunner(deps.DocgenV2Client, snapRepo)
+		pdfRunner := workerapp.NewPDFJobRunner(deps.DocgenV2Client, workerapp.NewSnapshotPDFPersister(snapRepo))
 		workerSvc = workerSvc.WithPDFRunner(pdfRunner)
 	}
 
