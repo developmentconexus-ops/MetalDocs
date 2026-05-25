@@ -75,7 +75,18 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 }
 
 func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID, profileCode, templateVersionID, actorID string) error {
-	profile, err := s.profiles.GetByCode(ctx, tenantID, profileCode)
+	tx, err := s.profiles.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	profile, err := s.profiles.GetByCodeForUpdate(ctx, tx, tenantID, profileCode)
 	if err != nil {
 		return err
 	}
@@ -95,9 +106,13 @@ func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID, profi
 	}
 
 	profile.DefaultTemplateVersionID = &templateVersionID
-	if err := s.profiles.Update(ctx, profile); err != nil {
+	if err := s.profiles.UpdateTx(ctx, tx, profile); err != nil {
 		return err
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 
 	payload, _ := json.Marshal(map[string]string{
 		"template_version_id": templateVersionID,
@@ -113,16 +128,31 @@ func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID, profi
 }
 
 func (s *ProfileService) Archive(ctx context.Context, tenantID, profileCode, actorID string) error {
-	profile, err := s.profiles.GetByCode(ctx, tenantID, profileCode)
+	tx, err := s.profiles.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	profile, err := s.profiles.GetByCodeForUpdate(ctx, tx, tenantID, profileCode)
 	if err != nil {
 		return err
 	}
 	if err := profile.Archive(s.now()); err != nil {
 		return err
 	}
-	if err := s.profiles.Update(ctx, profile); err != nil {
+	if err := s.profiles.UpdateTx(ctx, tx, profile); err != nil {
 		return err
 	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	committed = true
 	return s.govLogger.Log(ctx, domain.GovernanceEvent{
 		TenantID:     tenantID,
 		EventType:    "profile.archived",
