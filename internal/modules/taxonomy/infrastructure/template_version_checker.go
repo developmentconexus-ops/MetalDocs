@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+
+	"metaldocs/internal/platform/tenant"
 )
 
 type TemplateVersionChecker struct {
@@ -15,6 +17,7 @@ const templateVersionQuery = `
 	FROM templates_template_version v
 	JOIN templates_template t ON t.id = v.template_id
 	WHERE v.id = $1
+	  AND t.tenant_id = $2::uuid
 `
 
 func NewTemplateVersionChecker(db *sql.DB) *TemplateVersionChecker {
@@ -25,9 +28,13 @@ func (c *TemplateVersionChecker) IsPublished(ctx context.Context, versionID stri
 	if c.db == nil {
 		return false, "", nil
 	}
+	tenantID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return false, "", err
+	}
 	var status sql.NullString
 	var profileCode sql.NullString
-	err := c.db.QueryRowContext(ctx, templateVersionQuery, versionID).Scan(&status, &profileCode)
+	err = c.db.QueryRowContext(ctx, templateVersionQuery, versionID, tenantID).Scan(&status, &profileCode)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, "", nil
 	}

@@ -20,6 +20,19 @@ func NewProfileRepository(db *sql.DB) *ProfileRepository {
 }
 
 func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID, code string) (*domain.DocumentProfile, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin get profile tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check Get profile: %w", err)
+	}
+
 	const q = `
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
        default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
@@ -29,7 +42,7 @@ WHERE tenant_id = $1 AND code = $2`
 	var profile domain.DocumentProfile
 	var defaultTemplateVersionID sql.NullString
 	var ownerUserID sql.NullString
-	err := r.db.QueryRowContext(ctx, q, tenantID, code).Scan(
+	err = tx.QueryRowContext(ctx, q, tenantID, code).Scan(
 		&profile.Code,
 		&profile.TenantID,
 		&profile.FamilyCode,
@@ -55,6 +68,19 @@ WHERE tenant_id = $1 AND code = $2`
 }
 
 func (r *ProfileRepository) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.DocumentProfile, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin list profiles tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check List profiles: %w", err)
+	}
+
 	q := `
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
        default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
@@ -65,7 +91,7 @@ WHERE tenant_id = $1`
 	}
 	q += " ORDER BY code ASC"
 
-	rows, err := r.db.QueryContext(ctx, q, tenantID)
+	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +227,19 @@ func NewAreaRepository(db *sql.DB) *AreaRepository {
 }
 
 func (r *AreaRepository) GetByCode(ctx context.Context, tenantID, code string) (*domain.ProcessArea, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin get area tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check Get area: %w", err)
+	}
+
 	const q = `
 SELECT code, tenant_id, name, description, parent_code, owner_user_id, default_approver_role, archived_at, created_at
 FROM metaldocs.document_process_areas
@@ -210,7 +249,7 @@ WHERE tenant_id = $1 AND code = $2`
 	var parentCode sql.NullString
 	var ownerUserID sql.NullString
 	var defaultApproverRole sql.NullString
-	err := r.db.QueryRowContext(ctx, q, tenantID, code).Scan(
+	err = tx.QueryRowContext(ctx, q, tenantID, code).Scan(
 		&area.Code,
 		&area.TenantID,
 		&area.Name,
@@ -234,6 +273,19 @@ WHERE tenant_id = $1 AND code = $2`
 }
 
 func (r *AreaRepository) List(ctx context.Context, tenantID string, includeArchived bool) ([]domain.ProcessArea, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin list areas tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check List areas: %w", err)
+	}
+
 	q := `
 SELECT code, tenant_id, name, description, parent_code, owner_user_id, default_approver_role, archived_at, created_at
 FROM metaldocs.document_process_areas
@@ -243,7 +295,7 @@ WHERE tenant_id = $1`
 	}
 	q += " ORDER BY code ASC"
 
-	rows, err := r.db.QueryContext(ctx, q, tenantID)
+	rows, err := tx.QueryContext(ctx, q, tenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -361,6 +413,19 @@ WHERE tenant_id = $7 AND code = $8`
 }
 
 func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID, code string) ([]string, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin list area ancestors tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx); err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check List area ancestors: %w", err)
+	}
+
 	const q = `
 WITH RECURSIVE ancestors AS (
     SELECT p.code, p.parent_code
@@ -378,7 +443,7 @@ WITH RECURSIVE ancestors AS (
 )
 SELECT code FROM ancestors`
 
-	rows, err := r.db.QueryContext(ctx, q, tenantID, code)
+	rows, err := tx.QueryContext(ctx, q, tenantID, code)
 	if err != nil {
 		return nil, err
 	}
