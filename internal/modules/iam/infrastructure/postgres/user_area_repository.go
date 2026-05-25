@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/iam/authz"
@@ -54,7 +55,7 @@ func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.Us
 	if err != nil {
 		return fmt.Errorf("begin insert area tx: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer rollbackTx("insert_user_process_area", tx)
 
 	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
 		return fmt.Errorf("iam: authz check Insert area: %w", err)
@@ -66,7 +67,7 @@ INSERT INTO user_process_areas
 VALUES
   ($1, $2::uuid, $3, $4, $5, $6, $7)
 `
-	if _, err := tx.ExecContext(
+	result, err := tx.ExecContext(
 		ctx, q,
 		membership.UserID,
 		membership.TenantID,
@@ -75,8 +76,23 @@ VALUES
 		membership.EffectiveFrom,
 		membership.EffectiveTo,
 		membership.GrantedBy,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("insert user process area: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("insert user process area rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "insert",
+			"user_id", membership.UserID,
+			"tenant_id", membership.TenantID,
+			"area_code", membership.AreaCode,
+			"role", membership.Role,
+		)
+		return fmt.Errorf("insert user process area: no rows inserted")
 	}
 	return tx.Commit()
 }
@@ -86,7 +102,7 @@ func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, 
 	if err != nil {
 		return fmt.Errorf("begin close area tx: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer rollbackTx("close_active_user_process_area", tx)
 
 	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
 		return fmt.Errorf("iam: authz check CloseActive area: %w", err)
@@ -109,6 +125,12 @@ WHERE user_id = $1
 		return fmt.Errorf("close active user process area rows affected: %w", err)
 	}
 	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "close_active",
+			"user_id", userID,
+			"tenant_id", tenantID,
+			"area_code", areaCode,
+		)
 		return fmt.Errorf("close active user process area: no rows updated")
 	}
 	return tx.Commit()
@@ -119,9 +141,7 @@ func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, new
 	if err != nil {
 		return fmt.Errorf("begin grant transaction: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	defer rollbackTx("grant_atomic_user_process_area", tx)
 
 	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
 		return fmt.Errorf("iam: authz check GrantAtomic: %w", err)
@@ -153,6 +173,12 @@ WHERE user_id = $1
 		return fmt.Errorf("read affected rows for close active membership: %w", err)
 	}
 	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "grant_atomic_close",
+			"user_id", oldMembership.UserID,
+			"tenant_id", oldMembership.TenantID,
+			"area_code", oldMembership.AreaCode,
+		)
 		return fmt.Errorf("close active membership in grant transaction: no rows updated")
 	}
 
@@ -233,4 +259,10 @@ func scanUserProcessArea(s scanner) (iamdomain.UserProcessArea, error) {
 		item.GrantedBy = &value
 	}
 	return item, nil
+}
+
+func rollbackTx(action string, tx *sql.Tx) {
+	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+		slog.Warn("iam tx rollback failed", "action", action, "error", err)
+	}
 }

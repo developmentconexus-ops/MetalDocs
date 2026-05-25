@@ -24,6 +24,10 @@ type Dependencies struct {
 func New(deps Dependencies) *Module {
 	profileRepo := infrastructure.NewProfileRepository(deps.DB)
 	areaRepo := infrastructure.NewAreaRepository(deps.DB)
+	tplChecker := deps.TplChecker
+	if tplChecker == nil {
+		tplChecker = infrastructure.NewTemplateVersionChecker(deps.DB)
+	}
 	var govLogger domain.GovernanceLogger
 	if deps.AuditWriter != nil {
 		govLogger = application.NewAuditGovernanceAdapter(deps.AuditWriter)
@@ -33,7 +37,7 @@ func New(deps Dependencies) *Module {
 
 	familyRepo := infrastructure.NewFamilyRepository(deps.DB)
 
-	profileService := application.NewProfileService(profileRepo, deps.TplChecker, govLogger)
+	profileService := application.NewProfileService(profileRepo, tplChecker, govLogger)
 	areaService := application.NewAreaService(areaRepo, govLogger)
 	familyService := application.NewFamilyService(familyRepo, govLogger)
 	handler := thttp.NewHandler(profileService, areaService, familyService)

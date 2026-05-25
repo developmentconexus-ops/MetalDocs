@@ -16,6 +16,22 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+type fakeObsoleteService struct {
+	gotReq application.MarkObsoleteRequest
+	result application.MarkObsoleteResult
+	err    error
+	called bool
+}
+
+func (f *fakeObsoleteService) MarkObsolete(_ context.Context, _ *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
+	f.called = true
+	f.gotReq = req
+	if f.err != nil {
+		return application.MarkObsoleteResult{}, f.err
+	}
+	return f.result, nil
+}
+
 func obsoleteTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/documents/{id}/obsolete", h.ObsoleteHandler)
@@ -23,11 +39,6 @@ func obsoleteTestMux(h *Handler) *http.ServeMux {
 }
 
 func TestObsoleteHandler(t *testing.T) {
-	origMarkObsolete := markObsolete
-	t.Cleanup(func() {
-		markObsolete = origMarkObsolete
-	})
-
 	tests := []struct {
 		name         string
 		body         string
@@ -65,16 +76,7 @@ func TestObsoleteHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var called bool
-			var gotReq application.MarkObsoleteRequest
-			markObsolete = func(_ *Handler, _ context.Context, _ *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
-				called = true
-				gotReq = req
-				if tt.svcErr != nil {
-					return application.MarkObsoleteResult{}, tt.svcErr
-				}
-				return application.MarkObsoleteResult{PriorStatus: "published"}, nil
-			}
+			fakeSvc := &fakeObsoleteService{result: application.MarkObsoleteResult{PriorStatus: "published"}, err: tt.svcErr}
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-3/obsolete", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -84,18 +86,18 @@ func TestObsoleteHandler(t *testing.T) {
 			req.Header.Set("If-Match", "\"v7\"")
 
 			rr := httptest.NewRecorder()
-			obsoleteTestMux(&Handler{}).ServeHTTP(rr, req)
+			obsoleteTestMux(&Handler{obsoleteSvc: fakeSvc}).ServeHTTP(rr, req)
 
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
 			}
-			if called != tt.wantSvcCalls {
-				t.Fatalf("service called = %v, want %v", called, tt.wantSvcCalls)
+			if fakeSvc.called != tt.wantSvcCalls {
+				t.Fatalf("service called = %v, want %v", fakeSvc.called, tt.wantSvcCalls)
 			}
 
 			if tt.wantSvcCalls {
-				if gotReq.TenantID != "tenant-1" || gotReq.DocumentID != "doc-3" || gotReq.MarkedBy != "actor-1" || gotReq.RevisionVersion != 7 {
-					t.Fatalf("unexpected service request: %+v", gotReq)
+				if fakeSvc.gotReq.TenantID != "tenant-1" || fakeSvc.gotReq.DocumentID != "doc-3" || fakeSvc.gotReq.MarkedBy != "actor-1" || fakeSvc.gotReq.RevisionVersion != 7 {
+					t.Fatalf("unexpected service request: %+v", fakeSvc.gotReq)
 				}
 			}
 

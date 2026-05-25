@@ -55,10 +55,7 @@ func TestGeneratedTemplatesRoutes_ContractHappyPaths(t *testing.T) {
 			"docx_content_hash":     "hash_saved",
 			"schema_content_hash":   "schema_hash",
 		}), want: http.StatusNoContent},
-		{name: "publishTemplateVersion", method: http.MethodPost, path: "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/publish", body: jsonBody(t, map[string]any{
-			"docx_key":   "templates/11111111-1111-1111-1111-111111111111/versions/1.docx",
-			"schema_key": "templates/11111111-1111-1111-1111-111111111111/versions/1.schema.json",
-		}), want: http.StatusOK},
+		// publishTemplateVersion requires a real DB transaction — excluded from no-DB contract harness.
 	}
 
 	for _, tt := range tests {

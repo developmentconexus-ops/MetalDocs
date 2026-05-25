@@ -2,10 +2,10 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"metaldocs/internal/modules/taxonomy/domain"
+	"metaldocs/internal/platform/authn"
 )
 
 type TemplateVersionChecker interface {
@@ -27,6 +27,9 @@ func NewProfileService(
 	if govLogger == nil {
 		panic("taxonomy: ProfileService govLogger must not be nil")
 	}
+	if tplCheck == nil {
+		panic("taxonomy: ProfileService template checker must not be nil")
+	}
 	return &ProfileService{profiles: profiles, tplCheck: tplCheck, govLogger: govLogger, now: time.Now}
 }
 
@@ -39,20 +42,32 @@ func (s *ProfileService) Get(ctx context.Context, tenantID, code string) (*domai
 }
 
 func (s *ProfileService) Create(ctx context.Context, p *domain.DocumentProfile) error {
-	if err := s.profiles.Create(ctx, p); err != nil {
+	newProfile, err := domain.NewDocumentProfile(*p)
+	if err != nil {
+		return err
+	}
+	if err := s.profiles.Create(ctx, newProfile); err != nil {
 		return err
 	}
 
-	payload, _ := json.Marshal(map[string]string{
-		"code": p.Code,
-		"name": p.Name,
+	payload, err := marshalGovernancePayload(map[string]string{
+		"code": newProfile.Code,
+		"name": newProfile.Name,
 	})
-	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
-		EventType:    "profile.created",
+	if err != nil {
+		return err
+	}
+	actorUserID, _ := authn.UserIDFromContext(ctx)
+	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+		TenantID:     newProfile.TenantID,
+		EventType:    domain.GovernanceEventTypeProfileCreated,
+		ActorUserID:  actorUserID,
 		ResourceType: "document_profile",
-		ResourceID:   p.Code,
+		ResourceID:   newProfile.Code,
 		PayloadJSON:  payload,
-	})
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -61,16 +76,24 @@ func (s *ProfileService) Update(ctx context.Context, p *domain.DocumentProfile) 
 		return err
 	}
 
-	payload, _ := json.Marshal(map[string]string{
+	payload, err := marshalGovernancePayload(map[string]string{
 		"code": p.Code,
 		"name": p.Name,
 	})
-	_ = s.govLogger.Log(ctx, domain.GovernanceEvent{
-		EventType:    "profile.updated",
+	if err != nil {
+		return err
+	}
+	actorUserID, _ := authn.UserIDFromContext(ctx)
+	if err := s.govLogger.Log(ctx, domain.GovernanceEvent{
+		TenantID:     p.TenantID,
+		EventType:    domain.GovernanceEventTypeProfileUpdated,
+		ActorUserID:  actorUserID,
 		ResourceType: "document_profile",
 		ResourceID:   p.Code,
 		PayloadJSON:  payload,
-	})
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -114,12 +137,15 @@ func (s *ProfileService) SetDefaultTemplate(ctx context.Context, tenantID, profi
 	}
 	committed = true
 
-	payload, _ := json.Marshal(map[string]string{
+	payload, err := marshalGovernancePayload(map[string]string{
 		"template_version_id": templateVersionID,
 	})
+	if err != nil {
+		return err
+	}
 	return s.govLogger.Log(ctx, domain.GovernanceEvent{
 		TenantID:     tenantID,
-		EventType:    "profile.default_template_change",
+		EventType:    domain.GovernanceEventTypeProfileDefaultTemplateChange,
 		ActorUserID:  actorID,
 		ResourceType: "document_profile",
 		ResourceID:   profileCode,
@@ -155,7 +181,7 @@ func (s *ProfileService) Archive(ctx context.Context, tenantID, profileCode, act
 	committed = true
 	return s.govLogger.Log(ctx, domain.GovernanceEvent{
 		TenantID:     tenantID,
-		EventType:    "profile.archived",
+		EventType:    domain.GovernanceEventTypeProfileArchived,
 		ActorUserID:  actorID,
 		ResourceType: "document_profile",
 		ResourceID:   profileCode,

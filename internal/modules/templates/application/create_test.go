@@ -98,6 +98,24 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	}
 }
 
+func TestCreateTemplate_KeyLookupInfraError(t *testing.T) {
+	repo := newFakeRepo()
+	repo.getTemplateByKeyErr = errors.New("db unavailable")
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
+		TenantID:     "tenant-a",
+		ActorUserID:  "user-a",
+		DocTypeCode:  "CONTRACT",
+		Key:          "contract-default",
+		Name:         "Contract Template",
+		ApproverRole: "approver",
+	})
+	if err == nil || errors.Is(err, domain.ErrKeyConflict) {
+		t.Fatalf("expected infra error passthrough, got %v", err)
+	}
+}
+
 func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -229,6 +247,35 @@ func TestCreateNextVersion_Archived(t *testing.T) {
 	})
 	if !errors.Is(err, domain.ErrArchived) {
 		t.Fatalf("expected ErrArchived, got %v", err)
+	}
+}
+
+func TestCreateNextVersion_WithDB_UsesTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	v1 := &domain.TemplateVersion{ID: "v1", TemplateID: template.ID, VersionNumber: 1, Status: domain.VersionStatusDraft}
+	repo.templates[template.ID] = template
+	repo.versions[v1.ID] = v1
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+
+	mock.ExpectBegin()
+	mock.ExpectCommit()
+
+	if _, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
+		TenantID:    "tenant-a",
+		ActorUserID: "user-b",
+		TemplateID:  template.ID,
+	}); err != nil {
+		t.Fatalf("CreateNextVersion returned error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
 	}
 }
 

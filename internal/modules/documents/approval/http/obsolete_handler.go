@@ -11,11 +11,11 @@ import (
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 )
 
-var markObsolete = func(h *Handler, ctx context.Context, db *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
-	if h.services == nil || h.services.Obsolete == nil {
+func (h *Handler) markObsolete(ctx context.Context, db *sql.DB, req application.MarkObsoleteRequest) (application.MarkObsoleteResult, error) {
+	if h.obsoleteSvc == nil {
 		return application.MarkObsoleteResult{}, errors.New("obsolete service not configured")
 	}
-	return h.services.Obsolete.MarkObsolete(ctx, db, req)
+	return h.obsoleteSvc.MarkObsolete(ctx, db, req)
 }
 
 func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,7 +49,7 @@ func (h *Handler) ObsoleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = markObsolete(h, r.Context(), h.db, application.MarkObsoleteRequest{
+	_, err = h.markObsolete(r.Context(), h.db, application.MarkObsoleteRequest{
 		TenantID:        tenantID,
 		DocumentID:      documentID,
 		MarkedBy:        actorID,

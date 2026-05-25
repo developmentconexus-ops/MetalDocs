@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,6 +16,15 @@ import (
 
 type fixedClock struct {
 	t time.Time
+}
+
+func TestScheduledPublishWorker_GuardsNilDependencies(t *testing.T) {
+	if err := (*ScheduledPublishWorker)(nil).Work(context.Background(), &river.Job[ScheduledPublishArgs]{}); !errors.Is(err, ErrScheduledPublishWorkerDeps) {
+		t.Fatalf("nil worker error = %v, want %v", err, ErrScheduledPublishWorkerDeps)
+	}
+	if err := NewScheduledPublishWorker(nil, nil).Work(context.Background(), &river.Job[ScheduledPublishArgs]{}); !errors.Is(err, ErrScheduledPublishWorkerDeps) {
+		t.Fatalf("nil deps error = %v, want %v", err, ErrScheduledPublishWorkerDeps)
+	}
 }
 
 func (c fixedClock) Now() time.Time {
@@ -47,7 +57,7 @@ func TestScheduledPublishWorker_PublishesWhenTruthMatches(t *testing.T) {
 
 	emitter := &approvalapp.MemoryEmitter{}
 	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db), emitter, approvalapp.RealClock{})
-	worker := &ScheduledPublishWorker{Service: services.Scheduler, DB: db}
+	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
 		Args: ScheduledPublishArgs{
@@ -114,7 +124,7 @@ func TestScheduledPublishWorker_NoOpWhenGenerationIsStale(t *testing.T) {
 
 	emitter := &approvalapp.MemoryEmitter{}
 	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db), emitter, approvalapp.RealClock{})
-	worker := &ScheduledPublishWorker{Service: services.Scheduler, DB: db}
+	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
 		Args: ScheduledPublishArgs{
@@ -177,7 +187,7 @@ func TestScheduledPublishWorker_NoOpWhenDeliveredBeforeEffectiveTime(t *testing.
 
 	emitter := &approvalapp.MemoryEmitter{}
 	services := approvalapp.NewServices(approvalrepo.NewPostgresApprovalRepository(db), emitter, fixedClock{t: effectiveAt.Add(-1 * time.Minute)})
-	worker := &ScheduledPublishWorker{Service: services.Scheduler, DB: db}
+	worker := NewScheduledPublishWorker(services.Scheduler, db)
 
 	if err := worker.Work(ctx, &river.Job[ScheduledPublishArgs]{
 		Args: ScheduledPublishArgs{

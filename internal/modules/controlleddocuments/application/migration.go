@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -60,7 +61,13 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 				continue
 			}
 
-			legacyCode := "MIG-" + strings.ToUpper(strings.ReplaceAll(docID, "-", "")[:8])
+			legacyCode, err := legacyCodeFromDocumentID(docID)
+			if err != nil {
+				_ = tx.Rollback()
+				errorsCount++
+				logger.Error("controlled-documents backfill legacy code generation failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+				continue
+			}
 			insertRes, err := tx.ExecContext(ctx, `
 				INSERT INTO controlled_documents
 					(tenant_id, profile_code, process_area_code, code, sequence_num, title, owner_user_id, status)
@@ -76,7 +83,13 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 				logger.Error("controlled-documents backfill controlled_document insert failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
 				continue
 			}
-			insertedRows, _ := insertRes.RowsAffected()
+			insertedRows, rowsErr := insertRes.RowsAffected()
+			if rowsErr != nil {
+				_ = tx.Rollback()
+				errorsCount++
+				logger.Error("controlled-documents backfill insert rows affected failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", rowsErr)
+				continue
+			}
 			if insertedRows == 0 {
 				skipped++
 			}
@@ -111,7 +124,13 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 				logger.Error("controlled-documents backfill document update failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
 				continue
 			}
-			updatedRows, _ := res.RowsAffected()
+			updatedRows, rowsErr := res.RowsAffected()
+			if rowsErr != nil {
+				_ = tx.Rollback()
+				errorsCount++
+				logger.Error("controlled-documents backfill update rows affected failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", rowsErr)
+				continue
+			}
 
 			if err := tx.Commit(); err != nil {
 				_ = tx.Rollback()
@@ -135,4 +154,12 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 
 	logger.Info("controlled-documents backfill completed", "event", "backfill", "processed", processed, "skipped", skipped, "errors", errorsCount)
 	return nil
+}
+
+func legacyCodeFromDocumentID(docID string) (string, error) {
+	normalized := strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(docID), "-", ""))
+	if len(normalized) < 8 {
+		return "", errors.New("invalid legacy document id")
+	}
+	return "MIG-" + normalized[:8], nil
 }

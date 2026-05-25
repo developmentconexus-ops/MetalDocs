@@ -22,7 +22,9 @@ func (f fakeFamilyService) List(_ context.Context, includeInactive bool) ([]doma
 func (f fakeFamilyService) Get(_ context.Context, code string) (*domain.DocumentFamily, error) {
 	return nil, domain.ErrFamilyNotFound
 }
-func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily) error { return f.createErr }
+func (f fakeFamilyService) Create(_ context.Context, fam *domain.DocumentFamily) error {
+	return f.createErr
+}
 func (f fakeFamilyService) Update(_ context.Context, fam *domain.DocumentFamily) (*domain.DocumentFamily, error) {
 	return fam, nil
 }
@@ -75,5 +77,25 @@ func TestFamiliesHandler_CreateUniqueViolationReturns409(t *testing.T) {
 
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusConflict)
+	}
+}
+
+func TestFamiliesHandler_CreateConstraintViolationReturnsGenericValidationMessage(t *testing.T) {
+	handler := &Handler{families: fakeFamilyService{createErr: &pgconn.PgError{Code: "23514", Message: "sensitive detail"}}}
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/taxonomy/families", strings.NewReader(`{"code":"F1","name":"Family"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if strings.Contains(rec.Body.String(), "sensitive detail") {
+		t.Fatalf("response must not include pg constraint detail: %s", rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "request violates data constraints") {
+		t.Fatalf("response must include generic constraint message: %s", rec.Body.String())
 	}
 }

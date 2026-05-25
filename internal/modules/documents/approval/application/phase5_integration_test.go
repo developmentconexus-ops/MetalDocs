@@ -159,7 +159,7 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	}
 
 	// Submit: approval_routes SELECT
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil // reuse submit_service_test.go's routeRows
 	}
 	// Submit: approval_route_stages SELECT

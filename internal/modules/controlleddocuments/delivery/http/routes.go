@@ -22,6 +22,9 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+const maxControlledDocumentsJSONBodyBytes int64 = 1 << 20 // 1 MiB
+var errTenantIDInvalid = errors.New("controlled_documents: tenant id invalid")
+
 func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.ListControlledDocumentsParams) {
 	filter, err := filterFromListParams(params)
 	if err != nil {
@@ -55,6 +58,7 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var req controlleddocumentsapi.CreateAtomicRequest
 	if err := decodeStrictJSON(r, &req); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -182,6 +186,7 @@ func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *htt
 		return
 	}
 	cdID := r.PathValue("id")
+	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var body controlleddocumentsapi.CreateRevisionRequest
 	if err := decodeStrictJSON(r, &body); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -548,6 +553,12 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 			"error", err,
 		)
 		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+	case errors.Is(err, errTenantIDInvalid):
+		slog.Error("controlled-documents request has invalid tenant id in context",
+			"route", "controlledDocuments.writeDomainError",
+			"error", err,
+		)
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 	case errors.Is(err, controlleddocumentsdomain.ErrProfileHasNoDefaultTemplate):
 		httpresponse.WriteError(w, http.StatusConflict, "PROFILE_NO_DEFAULT_TEMPLATE", "profile has no default template")
 	case errors.Is(err, controlleddocumentsdomain.ErrDefaultObsolete):
@@ -570,7 +581,14 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 }
 
 func tenantIDFromRequest(r *http.Request) (string, error) {
-	return tenant.FromContext(r.Context())
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		return "", err
+	}
+	if strings.EqualFold(strings.TrimSpace(tenantID), uuid.Nil.String()) {
+		return "", errTenantIDInvalid
+	}
+	return tenantID, nil
 }
 
 func filterFromListParams(params controlleddocumentsapi.ListControlledDocumentsParams) (application.CDFilter, error) {

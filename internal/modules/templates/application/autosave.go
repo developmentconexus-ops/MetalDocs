@@ -131,7 +131,7 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return fmt.Errorf("templates save draft: authz: %w", err)
 		}
-		if err := s.repo.UpdateVersionDraftCASTx(ctx, tx, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
+		if err := s.repo.UpdateVersionDraftCASTx(ctx, tx, cmd.TenantID, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
 			return err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
@@ -139,7 +139,7 @@ func (s *Service) SaveTemplateDraft(ctx context.Context, cmd SaveTemplateDraftCm
 		}
 		return tx.Commit()
 	}
-	if err := s.repo.UpdateVersionDraftCAS(ctx, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
+	if err := s.repo.UpdateVersionDraftCAS(ctx, cmd.TenantID, version.ID, cmd.ExpectedLockVersion, cmd.DocxStorageKey, cmd.DocxContentHash); err != nil {
 		return err
 	}
 	return s.repo.AppendAudit(ctx, audit)
@@ -166,7 +166,9 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		return nil, err
 	}
 	if actualHash != cmd.ExpectedContentHash {
-		_ = s.presign.Delete(ctx, version.DocxStorageKey)
+		if err := s.presign.Delete(ctx, version.DocxStorageKey); err != nil {
+			return nil, errors.Join(domain.ErrContentHashMismatch, fmt.Errorf("delete mismatched upload: %w", err))
+		}
 		return nil, domain.ErrContentHashMismatch
 	}
 
@@ -192,7 +194,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return nil, fmt.Errorf("templates commit autosave: authz: %w", err)
 		}
-		if err := s.repo.UpdateVersionTx(ctx, tx, version); err != nil {
+		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
 			return nil, err
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
@@ -203,7 +205,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*d
 		}
 		return version, nil
 	}
-	if err := s.repo.UpdateVersion(ctx, version); err != nil {
+	if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
 		return nil, err
 	}
 	if err := s.repo.AppendAudit(ctx, audit); err != nil {

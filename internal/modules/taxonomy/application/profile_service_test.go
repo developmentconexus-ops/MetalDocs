@@ -9,6 +9,39 @@ import (
 	"metaldocs/internal/modules/taxonomy/domain"
 )
 
+func TestProfileServiceCreate_UsesDomainConstructorNormalizationAndValidation(t *testing.T) {
+	repo := newFakeProfileRepository()
+	service := NewProfileService(repo, &fakeTemplateVersionChecker{}, &fakeGovernanceLogger{})
+
+	in := &domain.DocumentProfile{
+		Code:       " PO-01 ",
+		TenantID:   " tenant-a ",
+		FamilyCode: " policy ",
+		Name:       " Procedure ",
+	}
+	if err := service.Create(context.Background(), in); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := repo.get("tenant-a", "PO-01")
+	if got == nil {
+		t.Fatal("expected created profile in repository")
+	}
+	if got.Code != "PO-01" || got.TenantID != "tenant-a" || got.FamilyCode != "policy" || got.Name != "Procedure" {
+		t.Fatalf("unexpected normalized profile: %#v", got)
+	}
+	if in.Code != " PO-01 " || in.TenantID != " tenant-a " || in.FamilyCode != " policy " || in.Name != " Procedure " {
+		t.Fatalf("caller pointer mutated: %#v", in)
+	}
+	if err := service.Create(context.Background(), &domain.DocumentProfile{
+		Code:       "PO",
+		TenantID:   "tenant-a",
+		FamilyCode: "policy",
+		Name:       " ",
+	}); !errors.Is(err, domain.ErrProfileNameRequired) {
+		t.Fatalf("expected ErrProfileNameRequired, got %v", err)
+	}
+}
+
 func TestProfileServiceSetDefaultTemplateHappyPath(t *testing.T) {
 	repo := newFakeProfileRepository()
 	profile := &domain.DocumentProfile{Code: "po", TenantID: "tenant-a"}
@@ -30,6 +63,15 @@ func TestProfileServiceSetDefaultTemplateHappyPath(t *testing.T) {
 	if len(logger.events) != 1 {
 		t.Fatalf("expected 1 governance event, got %d", len(logger.events))
 	}
+}
+
+func TestNewProfileService_PanicsWhenTemplateCheckerNil(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected panic")
+		}
+	}()
+	_ = NewProfileService(newFakeProfileRepository(), nil, &fakeGovernanceLogger{})
 }
 
 func TestProfileServiceSetDefaultTemplateFailsWhenTemplateNotPublished(t *testing.T) {

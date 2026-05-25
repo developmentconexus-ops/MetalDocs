@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"metaldocs/internal/modules/iam/authz"
 )
 
 // ErrLegacyDocumentsRemain is returned by ValidateLegacyCutoverReady when one
@@ -34,11 +36,20 @@ func NewCutoverService(emitter EventEmitter, clock Clock) *CutoverService {
 // wraps ErrLegacyDocumentsRemain and includes the count so the caller can
 // surface a meaningful message.
 //
-// This method is read-only; it does not modify any state. Run it (and confirm
+// This method is read-only, but it runs inside a system-bypassed transaction so
+// RLS cannot hide legacy rows during the cutover preflight. Run it (and confirm
 // it returns nil) before applying migration 0142_disable_legacy_compat.sql.
 func (s *CutoverService) ValidateLegacyCutoverReady(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("cutover: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		return fmt.Errorf("cutover: system authz bypass: %w", err)
+	}
 	var count int64
-	err := db.QueryRowContext(ctx,
+	err = tx.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM documents WHERE status IN ('finalized','archived')`,
 	).Scan(&count)
 	if err != nil {
@@ -46,6 +57,9 @@ func (s *CutoverService) ValidateLegacyCutoverReady(ctx context.Context, db *sql
 	}
 	if count > 0 {
 		return fmt.Errorf("%w (count: %d)", ErrLegacyDocumentsRemain, count)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("cutover: commit tx: %w", err)
 	}
 	return nil
 }

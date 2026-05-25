@@ -42,7 +42,7 @@ func (e *fakeEmitter) EmitAuthFailed(_ context.Context, actorID, _ string) {
 
 func newProvider(users map[string]string) (*PasswordReauthProvider, *fakeEmitter) {
 	em := &fakeEmitter{}
-	p := NewPasswordReauthProvider(context.Background(), newFakeReader(users), em)
+	p := NewPasswordReauthProvider(context.Background(), newFakeReader(users), em, NewInMemoryAuthFailureRateLimiter())
 	return p, em
 }
 
@@ -107,9 +107,13 @@ func TestPasswordReauthRateLimitResetAfterWindow(t *testing.T) {
 	}
 
 	// Fake expiry by directly manipulating entry.
-	p.mu.Lock()
-	p.entries["u1"].oldest = time.Now().Add(-windowDur - time.Second)
-	p.mu.Unlock()
+	limiter, ok := p.limiter.(*InMemoryAuthFailureRateLimiter)
+	if !ok {
+		t.Fatalf("expected in-memory limiter")
+	}
+	limiter.mu.Lock()
+	limiter.entries["u1"].oldest = time.Now().Add(-windowDur - time.Second)
+	limiter.mu.Unlock()
 
 	// Window expired — rate limit should reset; still fails (wrong pw) but not rate-limited.
 	_, err := p.Sign(context.Background(), req)
@@ -118,5 +122,17 @@ func TestPasswordReauthRateLimitResetAfterWindow(t *testing.T) {
 	}
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("want ErrInvalidCredentials after reset; got %v", err)
+	}
+}
+
+func TestPasswordReauthFailsClosedWhenLimiterMissing(t *testing.T) {
+	em := &fakeEmitter{}
+	p := NewPasswordReauthProvider(context.Background(), newFakeReader(map[string]string{"u1": "secret"}), em, nil)
+	_, err := p.Sign(context.Background(), SignRequest{
+		ActorUserID: "u1",
+		Credentials: map[string]string{"password": "secret"},
+	})
+	if !errors.Is(err, ErrRateLimiterConfig) {
+		t.Fatalf("error = %v, want %v", err, ErrRateLimiterConfig)
 	}
 }

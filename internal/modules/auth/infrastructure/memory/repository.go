@@ -289,6 +289,9 @@ func (r *Repository) BootstrapAdmin(_ context.Context, params authdomain.Bootstr
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if _, ok := r.users[params.UserID]; ok {
+		return false, nil
+	}
 	for _, identity := range r.users {
 		for _, role := range identity.Roles {
 			if role == iamdomain.RoleSystemAdmin {
