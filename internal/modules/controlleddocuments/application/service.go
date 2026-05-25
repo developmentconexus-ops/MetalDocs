@@ -436,14 +436,6 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 		return controlleddocumentsdomain.ErrCDNotFound
 	}
 
-	doc, err := s.docs.GetByID(ctx, tenantID, controlledDocumentID)
-	if err != nil {
-		return err
-	}
-	if !doc.IsActive() {
-		return controlleddocumentsdomain.ErrCDNotActive
-	}
-
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin changeStatus tx: %w", err)
@@ -456,6 +448,23 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
 		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
 	}
+
+	var currentStatus controlleddocumentsdomain.CDStatus
+	if err := tx.QueryRowContext(ctx, `
+SELECT status
+  FROM controlled_documents
+ WHERE tenant_id = $1
+   AND id = $2
+ FOR UPDATE`, tenantID, controlledDocumentID).Scan(&currentStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return controlleddocumentsdomain.ErrCDNotFound
+		}
+		return err
+	}
+	if currentStatus != controlleddocumentsdomain.CDStatusActive {
+		return controlleddocumentsdomain.ErrCDNotActive
+	}
+
 	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
 		return err
 	}
