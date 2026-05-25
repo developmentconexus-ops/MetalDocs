@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 
 	approvalapi "metaldocs/internal/modules/documents/approval/api"
 	"metaldocs/internal/modules/documents/approval/application"
@@ -58,9 +57,20 @@ const (
 	approvalCodeValidationEmptyBody      problem.Code = "validation.empty_body"
 	approvalCodeValidationContentType    problem.Code = "validation.content_type"
 	approvalCodeValidationBodyTooLarge   problem.Code = "validation.body_too_large"
-	approvalCodeValidationDuplicateKey   problem.Code = "validation.duplicate_key"
 	approvalCodeValidationRequestInvalid problem.Code = "validation.request_invalid"
 )
+
+type ValidationError struct {
+	msg string
+}
+
+func NewValidationError(msg string) *ValidationError {
+	return &ValidationError{msg: msg}
+}
+
+func (e *ValidationError) Error() string {
+	return e.msg
+}
 
 func MapErrorToResponse(err error) *problem.Problem {
 	statusCode := http.StatusInternalServerError
@@ -136,6 +146,7 @@ func MapErrorToResponse(err error) *problem.Problem {
 		var requiredParamErr *approvalapi.RequiredParamError
 		var requiredHeaderErr *approvalapi.RequiredHeaderError
 		var tooManyValuesErr *approvalapi.TooManyValuesForParamError
+		var validationErr *ValidationError
 
 		switch {
 		case errors.As(err, &invalidParamErr):
@@ -162,6 +173,12 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, application.ErrReasonRequired):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationReasonRequired
+		case errors.Is(err, application.ErrInvalidObsoleteSource):
+			statusCode = http.StatusBadRequest
+			code = approvalCodeValidationRequestInvalid
+		case errors.Is(err, application.ErrEffectiveDateInPast):
+			statusCode = http.StatusBadRequest
+			code = approvalCodeValidationRequestInvalid
 		case errors.Is(err, application.ErrRouteNotFound):
 			statusCode = http.StatusNotFound
 			code = approvalCodeNotFoundRoute
@@ -189,10 +206,7 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, contracts.ErrEmptyBody):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationEmptyBody
-		case errors.Is(err, contracts.ErrDuplicateKey):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationDuplicateKey
-		case looksLikeValidationError(err):
+		case errors.As(err, &validationErr):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationRequestInvalid
 		}
@@ -232,15 +246,4 @@ func responseTitle(err error, statusCode int) string {
 		return internalErrorMessage
 	}
 	return err.Error()
-}
-
-func looksLikeValidationError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, " is required") ||
-		strings.Contains(msg, " must be ") ||
-		strings.Contains(msg, " must not be ") ||
-		strings.HasPrefix(msg, "json: unknown field")
 }

@@ -109,6 +109,28 @@ func TestQuorumZeroDenominator(t *testing.T) {
 	}
 }
 
+func TestQuorumEmptyEligibleSetReturnsError(t *testing.T) {
+	st := stageWithEligible(nil, QuorumAny1Of, nil)
+	result := EvaluateQuorumResult(st, []Signoff{makeSignoff("a", DecisionApprove)}, nil, 1)
+	if result.Outcome != QuorumError {
+		t.Fatalf("Outcome = %s, want %s", result.Outcome, QuorumError)
+	}
+	if result.Reason != "empty_eligible_set" {
+		t.Fatalf("Reason = %q, want empty_eligible_set", result.Reason)
+	}
+}
+
+func TestQuorumUnknownTypeReturnsError(t *testing.T) {
+	st := stageWithEligible([]string{"a"}, QuorumPolicy("future"), nil)
+	result := EvaluateQuorumResult(st, nil, nil, 1)
+	if result.Outcome != QuorumError {
+		t.Fatalf("Outcome = %s, want %s", result.Outcome, QuorumError)
+	}
+	if result.Reason != `unknown quorum type: "future"` {
+		t.Fatalf("Reason = %q", result.Reason)
+	}
+}
+
 func TestQuorumIneligibleActorIgnored(t *testing.T) {
 	st := stageWithEligible([]string{"a"}, QuorumAny1Of, nil)
 	// "outsider" not in eligible list.
