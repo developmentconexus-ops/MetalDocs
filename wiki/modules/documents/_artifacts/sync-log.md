@@ -1,3 +1,19 @@
+## 2026-05-25 - editor-session tenant isolation sync
+
+- **Context:** uncommitted diff on `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` for 5a-C3..C8.
+- **Mode:** structural refresh
+- **Anchors moved:** repository tenant-scoped methods now include tenant parameters around `HeartbeatSession`, `GetPendingForCommit`, `CreateCheckpoint`, `ListCheckpoints`, `GetRevision`, and `RestoreCheckpoint`.
+- **Public surface:** application repository/export interfaces now pass tenant scope to revision, pending upload, checkpoint, and session repository methods; HTTP service interface unchanged.
+- **Routes/API:** none.
+- **Runtime flows:** document create/acquire/presign/commit/session heartbeat, checkpoint list/create/restore, pending metadata read, and revision URL/export reads now reject cross-tenant rows through explicit tenant filters or joins.
+- **Persistence:** new post-baseline migration `db/migrations/0211_editor_sessions_tenant_id.sql` adds/backfills `public.editor_sessions.tenant_id` and indexes it.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** module tally not rerun; previous runs failed from Git Bash `CreateFileMapping ... Win32 error 5`. Database dictionary coverage passed.
+- **Patched files:** `internal/modules/documents/repository/repository.go`; `internal/modules/documents/repository/repository_tenant_isolation_test.go`; `internal/modules/documents/application/service.go`; `internal/modules/documents/application/service_test.go`; `internal/modules/documents/application/export_service.go`; `internal/modules/documents/application/export_service_test.go`; `tests/integration/testdb/fixtures.go`; `db/migrations/0211_editor_sessions_tenant_id.sql`; `wiki/database/tables/editor_sessions.md`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - values-hash marshal error sync
 
 - **Context:** uncommitted diff on `fix/docs-5a-values-hash-c9` for 5a-C9.

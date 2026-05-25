@@ -34,6 +34,7 @@ schedule_generation BIGINT NOT NULL DEFAULT 0
 ```sql
 -- public.editor_sessions (migrations/0110_docx_v2_documents.sql:34)
 id UUID NOT NULL PRIMARY KEY
+tenant_id UUID NOT NULL -- added by db/migrations/0211_editor_sessions_tenant_id.sql
 document_id UUID NOT NULL REFERENCES documents(id)
 user_id UUID NOT NULL
 last_acknowledged_revision_id UUID NOT NULL
@@ -247,3 +248,4 @@ Tripwire rule evaluation facts:
 | 30 | 0182_cd_sequence_per_area.sql | DROP old counter; CREATE `cd_sequence_counters` | (unclear: filename has no date) |
 | 31 | 0183_documents_name_not_empty.sql | UPDATE + ALTER `documents` NOT NULL/CHECK name | (unclear: filename has no date) |
 | 32 | 0208_documents_schedule_generation.sql | ALTER `public.documents` add `schedule_generation` discriminator for scheduled publish jobs | (unclear: filename has no date) |
+| 33 | 0211_editor_sessions_tenant_id.sql | ALTER `public.editor_sessions` add/backfill `tenant_id`; index for tenant-scoped session updates | (unclear: filename has no date) |
