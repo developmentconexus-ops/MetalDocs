@@ -66,6 +66,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Del("X-User-ID")
+		r.Header.Del("X-User-Roles")
 
 		// C3: nil resolver is a misconfiguration — fail closed, never pass unauthenticated.
 		if m.resolver == nil {

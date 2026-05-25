@@ -290,3 +290,15 @@
 - **Counts after:** Critical=1 Major=7 Minor=4
 - **Tally gate:** PASS
 - **Patched files:** `frontend/apps/web/src/features/documents/pages/DocumentPublishedPage.tsx`; `frontend/apps/web/src/features/documents/pages/DocumentPublishedPage.test.tsx`; `frontend/apps/web/src/features/documents/queries/useDocumentDetailQuery.ts`; `frontend/apps/web/src/features/documents/queries/useDocumentRevisionHistoryQuery.ts`; `frontend/apps/web/src/features/documents/queries/useControlledDocumentActiveDocumentQuery.ts`; `wiki/architecture/frontend-structure.md`; `.agents/skills/metaldocs-tanstack-query/SKILL.md`; `.agents/skills/metaldocs-frontend/SKILL.md`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
+
+## 2026-05-25 - IAM role-header hardening sync
+
+- **Context:** branch `fix/docs-5b-header-roles-c3`; documents handler removed `X-User-Roles` fallback from `withAdminCtx`/`hasRole`, and IAM middleware strips `X-User-Roles` with `X-User-ID`.
+- **Affected modules:** documents, iam.
+- **Mode:** structural refresh.
+- **Affected-surface scan:** Documents authz/runtime-flow behavior changed; no route, OpenAPI, persistence, dependency, public exported surface, debt, or backlog change.
+- **Facts updated:** documents tier-1 role source now `iamdomain.RolesFromContext` only; caller-supplied role headers are not trusted.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Tally gate:** preflight/tally blocked by Git Bash `CreateFileMapping` Win32 error 5; treated as pre-existing tooling failure, not an edit-caused doc failure.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.

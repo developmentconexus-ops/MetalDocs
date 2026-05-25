@@ -281,8 +281,14 @@ func (f *fakeFinalizeIdempotencyStore) FailReplay(_ *idempotency.ReplayHandle, _
 func withAuthHeaders(req *http.Request, roles string) {
 	req.Header.Set("content-type", "application/json")
 	*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant_1"))
-	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user_1", []iamdomain.Role{}))
-	req.Header.Set("X-User-Roles", roles)
+	ctxRoles := make([]iamdomain.Role, 0)
+	for _, part := range strings.Split(roles, ",") {
+		role := strings.TrimSpace(part)
+		if role != "" {
+			ctxRoles = append(ctxRoles, iamdomain.Role(role))
+		}
+	}
+	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user_1", ctxRoles))
 }
 
 func TestListDocuments_Happy(t *testing.T) {

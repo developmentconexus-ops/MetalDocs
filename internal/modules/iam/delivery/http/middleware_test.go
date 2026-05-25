@@ -9,9 +9,10 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-func TestMiddlewareStripsUserIDHeader(t *testing.T) {
+func TestMiddlewareStripsTrustedIdentityHeaders(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
 	req.Header.Set("X-User-ID", "attacker")
+	req.Header.Set("X-User-Roles", "system_admin")
 
 	ctx := iamdomain.WithAuthContext(req.Context(), "real-user", []iamdomain.Role{iamdomain.RoleSystemAdmin})
 	ctx = tenant.WithTenantID(ctx, tenant.DevTenantID)
@@ -29,6 +30,9 @@ func TestMiddlewareStripsUserIDHeader(t *testing.T) {
 		}
 		if got := r.Header.Get("X-User-ID"); got != "" {
 			t.Fatalf("X-User-ID header = %q, want empty", got)
+		}
+		if got := r.Header.Get("X-User-Roles"); got != "" {
+			t.Fatalf("X-User-Roles header = %q, want empty", got)
 		}
 	})
 

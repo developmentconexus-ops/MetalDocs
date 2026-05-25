@@ -216,7 +216,7 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 
 	rootReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":100,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"root"}]}]}`)))
 	withAuthHeaders(rootReq, "document_filler")
-	rootReq = rootReq.WithContext(iamdomain.WithAuthContext(rootReq.Context(), "user_root", []iamdomain.Role{}))
+	rootReq = rootReq.WithContext(iamdomain.WithAuthContext(rootReq.Context(), "user_root", []iamdomain.Role{iamdomain.Role("document_filler")}))
 	rootRR := httptest.NewRecorder()
 	mux.ServeHTTP(rootRR, rootReq)
 	if rootRR.Code != http.StatusCreated {
@@ -225,7 +225,7 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 
 	replyReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":101,"parent_library_id":100,"author_display":"Bob","content":[{"type":"paragraph","children":[{"text":"reply"}]}]}`)))
 	withAuthHeaders(replyReq, "document_filler")
-	replyReq = replyReq.WithContext(iamdomain.WithAuthContext(replyReq.Context(), "user_reply", []iamdomain.Role{}))
+	replyReq = replyReq.WithContext(iamdomain.WithAuthContext(replyReq.Context(), "user_reply", []iamdomain.Role{iamdomain.Role("document_filler")}))
 	replyRR := httptest.NewRecorder()
 	mux.ServeHTTP(replyRR, replyReq)
 	if replyRR.Code != http.StatusCreated {

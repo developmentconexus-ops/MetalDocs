@@ -42,3 +42,15 @@ One line per `metaldocs-module-doc-sync` run. Append-only.
 - **Counts after:** Critical=2 Major=5 Minor=5; missing-ADR=11
 - **Tally gate:** PASS
 - **Patched files:** wiki/modules/iam.md; wiki/modules/iam-tech-debt.md; wiki/backlog/iam-refactor.md; wiki/modules/iam/_artifacts/*
+
+## 2026-05-25 - trusted role-header strip sync
+
+- **Context:** branch `fix/docs-5b-header-roles-c3`; `internal/modules/iam/delivery/http/middleware.go` now deletes `X-User-Roles` alongside `X-User-ID` before downstream handlers run.
+- **Affected modules:** iam, documents.
+- **Mode:** structural refresh.
+- **Affected-surface scan:** IAM middleware trust-boundary behavior changed; no route, OpenAPI, persistence, dependency, public exported surface, debt, or backlog change.
+- **Facts updated:** middleware trusted-header stripping now includes `X-User-Roles`; downstream role context remains sourced from IAM role context/provider paths instead of caller-controlled headers.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Tally gate:** preflight/tally blocked by Git Bash `CreateFileMapping` Win32 error 5; treated as pre-existing tooling failure, not an edit-caused doc failure.
+- **Patched files:** `wiki/modules/iam.md`; `wiki/modules/iam/_artifacts/sync-log.md`.
