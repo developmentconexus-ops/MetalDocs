@@ -214,6 +214,7 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | GET | `/api/v1/documents/{id}/revisions` | â€” | revisions URL handler | role |
 | POST | `/api/v1/documents/{id}/export/pdf` | â€” | `ExportHandler` | role |
 | GET | `/api/v1/documents/{id}/export/docx-url` | â€” | `ExportHandler` | role |
+| POST | `/api/v1/documents/{id}/pdf-complete` | â€” | `PDFWebhookHandler.HandlePDFComplete` (`http/pdf_webhook_handler.go`) | HMAC signature (`X-Docgen-Signature`); canonical tenant resolved server-side by `{id}` and body `tenant_id` rejected when mismatched |
 | POST | `/api/v1/documents/{id}/submit` | â€” | `ApprovalHandler` (`approval/http/router.go`) | tier-2 `document.submit` |
 | POST | `/api/v1/documents/{id}/signoff` | â€” | `ApprovalHandler` | tier-2 `document.signoff` |
 | POST | `/api/v1/documents/{id}/cancel` | â€” | `ApprovalHandler` | tier-2 |
@@ -532,6 +533,7 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-25 - PDF webhook tenant hardening sync: `POST /api/v1/documents/{id}/pdf-complete` now resolves canonical tenant from `documents.id` and rejects mismatched body `tenant_id` before persisting PDF metadata.
 - 2026-05-25 - IAM role-header hardening sync: documents HTTP role gates now derive admin/filler roles only from `iamdomain.RolesFromContext`; the prior `X-User-Roles` request-header fallback was removed.
 - 2026-05-25 - Editor-session tenant isolation sync: post-baseline migration `0211_editor_sessions_tenant_id.sql` adds/backfills `editor_sessions.tenant_id`; document create/acquire/presign/commit/session paths and pending/checkpoint/revision repository reads now thread tenant scope and filter by tenant.
 - 2026-05-25 - Values-hash marshal error sync: `ComputeValuesHash` now returns `(string, error)` and propagates JSON marshal failures through `FreezeService`, so unmarshalable placeholder values abort freeze instead of silently producing a hash with omitted value bytes.
