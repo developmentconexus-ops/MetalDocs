@@ -340,7 +340,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	// Governance events are best-effort; document creation is already committed.
 	for _, event := range events {
 		if err := s.govLogger.Log(ctx, event); err != nil {
-			slog.Warn("controlled documents governance event logging failed", "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
+			slog.WarnContext(ctx, "controlled documents governance event logging failed", "tenant_id", cmd.TenantID, "actor_user_id", cmd.ActorUserID, "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
 		}
 	}
 
@@ -475,7 +475,7 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	}
 	canRead, err := s.docs.CanRead(ctx, tenantID, controlledDocumentID, actorUserID)
 	if err != nil {
-		return err
+		return fmt.Errorf("check read visibility: %w", err)
 	}
 	if !canRead {
 		return controlleddocumentsdomain.ErrCDNotFound
@@ -537,7 +537,7 @@ SELECT status
 		ResourceID:   controlledDocumentID,
 		PayloadJSON:  payload,
 	}); err != nil {
-		slog.Warn("controlled documents governance event logging failed", "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
+		slog.WarnContext(ctx, "controlled documents governance event logging failed", "tenant_id", tenantID, "actor_user_id", actorUserID, "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
 	}
 	return nil
 }

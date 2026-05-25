@@ -2,7 +2,6 @@ package domain
 
 import (
 	"context"
-	"database/sql"
 	"time"
 )
 
@@ -13,9 +12,9 @@ type ControlledDocumentRepository interface {
 	List(ctx context.Context, tenantID string, filter CDFilter) ([]ControlledDocument, error)
 	CanRead(ctx context.Context, tenantID, controlledDocumentID, actorUserID string) (bool, error)
 	Create(ctx context.Context, doc *ControlledDocument) error
-	CreateTx(ctx context.Context, tx *sql.Tx, doc *ControlledDocument) error
+	CreateTx(ctx context.Context, tx DBTX, doc *ControlledDocument) error
 	UpdateStatus(ctx context.Context, tenantID, id string, status CDStatus, updatedAt time.Time) error
-	UpdateStatusTx(ctx context.Context, tx *sql.Tx, tenantID, id string, status CDStatus, updatedAt time.Time) error
+	UpdateStatusTx(ctx context.Context, tx DBTX, tenantID, id string, status CDStatus, updatedAt time.Time) error
 }
 
 type CDFilter struct {

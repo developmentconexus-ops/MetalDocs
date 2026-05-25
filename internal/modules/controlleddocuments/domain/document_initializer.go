@@ -3,6 +3,8 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"strings"
 )
 
 // CloneTemplateRequest carries the user-supplied bits of an atomic CD-create
@@ -14,12 +16,37 @@ type CloneTemplateRequest struct {
 	FormData          map[string]any
 }
 
+var ErrCloneTemplateRequestNameRequired = errors.New("controlled_documents: clone template request name is required")
+
+func NewCloneTemplateRequest(templateVersionID *string, name string, formData map[string]any) (CloneTemplateRequest, error) {
+	if strings.TrimSpace(name) == "" {
+		return CloneTemplateRequest{}, ErrCloneTemplateRequestNameRequired
+	}
+	return CloneTemplateRequest{
+		TemplateVersionID: templateVersionID,
+		Name:              name,
+		FormData:          formData,
+	}, nil
+}
+
 // DocumentRef is the minimal handle the registry returns to callers after a
 // successful atomic create. The registry stores no document state itself —
 // downstream code uses this to redirect to the editor or to enrich responses.
 type DocumentRef struct {
 	ID          string `json:"id"`
 	ContentHash string `json:"contentHash"`
+}
+
+var ErrDocumentRefIDRequired = errors.New("controlled_documents: document ref id is required")
+
+func NewDocumentRef(id, contentHash string) (DocumentRef, error) {
+	if strings.TrimSpace(id) == "" {
+		return DocumentRef{}, ErrDocumentRefIDRequired
+	}
+	return DocumentRef{
+		ID:          id,
+		ContentHash: contentHash,
+	}, nil
 }
 
 // DocumentInitializer is the controlled-documents-owned port that the documents module
