@@ -30,7 +30,8 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
-	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
+	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -50,15 +51,16 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
-		TenantID:         tenantID,
-		InstanceID:       instanceID,
-		StageInstanceID:  stageID,
-		ActorUserID:      actorID,
-		Decision:         body.Decision,
-		Comment:          body.Reason,
-		SignatureMethod:  "password_reauth",
-		SignaturePayload: map[string]any{"password_token": body.PasswordToken},
-		ContentFormData:  map[string]any{"_content_hash": body.ContentHash},
+		TenantID:                tenantID,
+		InstanceID:              instanceID,
+		StageInstanceID:         stageID,
+		ActorUserID:             actorID,
+		Decision:                string(body.Decision),
+		Comment:                 body.Reason,
+		SignatureMethod:         "password_reauth",
+		SignaturePayload:        map[string]any{"password_token": body.PasswordToken},
+		ContentFormData:         map[string]any{"_content_hash": body.ContentHash},
+		ExpectedRevisionVersion: expectedRevisionVersion,
 	})
 	if err != nil {
 		WriteError(w, err)

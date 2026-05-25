@@ -68,16 +68,17 @@ func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionSer
 
 // SignoffRequest carries all inputs for RecordSignoff.
 type SignoffRequest struct {
-	TenantID         string
-	InstanceID       string
-	StageInstanceID  string
-	ActorUserID      string
-	Decision         string // "approve" or "reject"
-	Comment          string
-	SignatureMethod  string
-	SignaturePayload map[string]any
-	ContentFormData  map[string]any // current document content for hash
-	Capabilities     []string
+	TenantID                string
+	InstanceID              string
+	StageInstanceID         string
+	ActorUserID             string
+	Decision                string // "approve" or "reject"
+	Comment                 string
+	SignatureMethod         string
+	SignaturePayload        map[string]any
+	ContentFormData         map[string]any // current document content for hash
+	ExpectedRevisionVersion int
+	Capabilities            []string
 }
 
 // SignoffResult is returned by RecordSignoff.
@@ -118,6 +119,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	if instance == nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, repository.ErrNoActiveInstance
+	}
+	if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
+		_ = tx.Rollback()
+		return SignoffResult{}, repository.ErrStaleRevision
 	}
 
 	// Reject if instance is already terminal.
