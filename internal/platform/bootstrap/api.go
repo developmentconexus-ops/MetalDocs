@@ -75,7 +75,11 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			return APIDependencies{}, fmt.Errorf("open postgres: %w", err)
 		}
 		authRepo := authpg.NewRepository(db)
-		docgenV2Cfg := config.LoadDocgenV2Config()
+		docgenV2Cfg, err := config.LoadDocgenV2Config()
+		if err != nil {
+			_ = closeDB(db)
+			return APIDependencies{}, fmt.Errorf("load docgen-v2 config: %w", err)
+		}
 		var docgenV2Client *servicebus.DocgenV2Client
 		if docgenV2Cfg.Enabled {
 			docgenV2Client = servicebus.NewDocgenV2Client(
