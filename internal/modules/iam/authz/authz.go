@@ -21,13 +21,20 @@ func (e ErrCapDenied) Error() string {
 type capCacheKey struct{}
 
 type capCache struct {
-	mu      sync.Mutex
-	granted map[string]bool
+	mu              sync.Mutex
+	granted         map[string]bool
+	assertedByTxPtr map[*sql.Tx]*assertedCache
+}
+
+type assertedCache struct {
+	items []map[string]string
+	set   map[string]struct{}
 }
 
 func WithCapCache(ctx context.Context) context.Context {
 	return context.WithValue(ctx, capCacheKey{}, &capCache{
-		granted: make(map[string]bool),
+		granted:         make(map[string]bool),
+		assertedByTxPtr: make(map[*sql.Tx]*assertedCache),
 	})
 }
 
@@ -130,28 +137,58 @@ func cacheKey(capability, areaCode string) string {
 }
 
 func appendAssertedCap(ctx context.Context, tx *sql.Tx, capability, areaCode string) error {
-	var raw sql.NullString
-	if err := tx.QueryRowContext(ctx, "SELECT current_setting('metaldocs.asserted_caps', true)").Scan(&raw); err != nil {
-		return err
+	cache, _ := ctx.Value(capCacheKey{}).(*capCache)
+	var asserted *assertedCache
+	if cache != nil {
+		cache.mu.Lock()
+		asserted = cache.assertedByTxPtr[tx]
+		cache.mu.Unlock()
 	}
 
-	var asserted []map[string]string
-	if raw.Valid && raw.String != "" {
-		if err := json.Unmarshal([]byte(raw.String), &asserted); err != nil {
+	if asserted == nil {
+		loaded, err := loadAssertedCaps(ctx, tx)
+		if err != nil {
 			return err
+		}
+		asserted = loaded
+		if cache != nil {
+			cache.mu.Lock()
+			cache.assertedByTxPtr[tx] = asserted
+			cache.mu.Unlock()
 		}
 	}
 
-	asserted = append(asserted, map[string]string{
-		"cap":  capability,
-		"area": areaCode,
-	})
+	compoundKey := cacheKey(capability, areaCode)
+	if _, exists := asserted.set[compoundKey]; exists {
+		return nil
+	}
+	asserted.items = append(asserted.items, map[string]string{"cap": capability, "area": areaCode})
+	asserted.set[compoundKey] = struct{}{}
 
-	encoded, err := json.Marshal(asserted)
+	encoded, err := json.Marshal(asserted.items)
 	if err != nil {
 		return err
 	}
 
 	_, err = tx.ExecContext(ctx, "SELECT set_config('metaldocs.asserted_caps', $1, true)", string(encoded))
 	return err
+}
+
+func loadAssertedCaps(ctx context.Context, tx *sql.Tx) (*assertedCache, error) {
+	var raw sql.NullString
+	if err := tx.QueryRowContext(ctx, "SELECT current_setting('metaldocs.asserted_caps', true)").Scan(&raw); err != nil {
+		return nil, err
+	}
+
+	items := make([]map[string]string, 0, 4)
+	if raw.Valid && raw.String != "" {
+		if err := json.Unmarshal([]byte(raw.String), &items); err != nil {
+			return nil, err
+		}
+	}
+	set := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		set[cacheKey(item["cap"], item["area"])] = struct{}{}
+	}
+	return &assertedCache{items: items, set: set}, nil
 }

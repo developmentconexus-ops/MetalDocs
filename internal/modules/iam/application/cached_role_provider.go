@@ -26,11 +26,26 @@ func NewCachedRoleProvider(base domain.RoleProvider, ttl time.Duration) *CachedR
 	if ttl <= 0 {
 		ttl = 30 * time.Second
 	}
-	return &CachedRoleProvider{
+	provider := &CachedRoleProvider{
 		base:  base,
 		ttl:   ttl,
 		items: map[string]cacheEntry{},
 	}
+	go func() {
+		ticker := time.NewTicker(ttl)
+		defer ticker.Stop()
+		for now := range ticker.C {
+			cutoff := now.UTC()
+			provider.mu.Lock()
+			for key, entry := range provider.items {
+				if !cutoff.Before(entry.expiresAt) {
+					delete(provider.items, key)
+				}
+			}
+			provider.mu.Unlock()
+		}
+	}()
+	return provider
 }
 
 func roleCacheKey(userID, tenantID string) string {
@@ -72,9 +87,19 @@ func (c *CachedRoleProvider) InvalidateUser(userID string) {
 	c.mu.Unlock()
 }
 
+func (c *CachedRoleProvider) InvalidateUserTenant(userID, tenantID string) {
+	c.evict(userID, tenantID)
+}
+
 func (c *CachedRoleProvider) InvalidateAll() {
 	c.mu.Lock()
 	c.items = map[string]cacheEntry{}
+	c.mu.Unlock()
+}
+
+func (c *CachedRoleProvider) evict(userID, tenantID string) {
+	c.mu.Lock()
+	delete(c.items, roleCacheKey(userID, tenantID))
 	c.mu.Unlock()
 }
 
