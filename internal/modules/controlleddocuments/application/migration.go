@@ -27,85 +27,110 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		_, _ = db.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, controlledDocumentsBackfillAdvisoryLock)
 	}()
 
-	rows, err := db.QueryContext(ctx, `
-		SELECT id::text, tenant_id::text
-		FROM documents
-		WHERE controlled_document_id IS NULL
-		ORDER BY created_at ASC`)
-	if err != nil {
-		return fmt.Errorf("query legacy documents: %w", err)
-	}
-	defer rows.Close()
-
 	processed := 0
 	skipped := 0
 	errorsCount := 0
-	for rows.Next() {
-		var docID string
-		var tenantID string
-		if err := rows.Scan(&docID, &tenantID); err != nil {
-			errorsCount++
-			logger.Error("controlled-documents backfill row scan failed", "event", "backfill", "error", err)
-			continue
-		}
-
-		tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+	for {
+		rows, err := db.QueryContext(ctx, `
+			SELECT id::text, tenant_id::text
+			FROM documents
+			WHERE controlled_document_id IS NULL
+			ORDER BY created_at ASC
+			LIMIT 100`)
 		if err != nil {
-			errorsCount++
-			logger.Error("controlled-documents backfill begin tx failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
-			continue
+			return fmt.Errorf("query legacy documents: %w", err)
 		}
 
-		legacyCode := "MIG-" + strings.ToUpper(strings.ReplaceAll(docID, "-", "")[:8])
-		var controlledDocumentID string
-		if err := tx.QueryRowContext(ctx, `
-			INSERT INTO controlled_documents
-				(tenant_id, profile_code, process_area_code, code, sequence_num, title, owner_user_id, status)
-			VALUES
-				($1, 'unassigned', 'unassigned', $2, NULL, 'Legacy backfill', 'system', 'active')
-			ON CONFLICT (tenant_id, profile_code, code)
-			DO UPDATE SET updated_at = now()
-			RETURNING id::text`,
-			tenantID, legacyCode,
-		).Scan(&controlledDocumentID); err != nil {
-			_ = tx.Rollback()
-			errorsCount++
-			logger.Error("controlled-documents backfill controlled_document upsert failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
-			continue
-		}
+		batchCount := 0
+		for rows.Next() {
+			batchCount++
 
-		res, err := tx.ExecContext(ctx, `
-			UPDATE documents
-			SET controlled_document_id = $1,
-			    profile_code_snapshot = 'unassigned',
-			    process_area_code_snapshot = 'unassigned'
-			WHERE id = $2
-			  AND controlled_document_id IS NULL`,
-			controlledDocumentID, docID,
-		)
-		if err != nil {
-			_ = tx.Rollback()
-			errorsCount++
-			logger.Error("controlled-documents backfill document update failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
-			continue
-		}
-		updatedRows, _ := res.RowsAffected()
+			var docID string
+			var tenantID string
+			if err := rows.Scan(&docID, &tenantID); err != nil {
+				errorsCount++
+				logger.Error("controlled-documents backfill row scan failed", "event", "backfill", "error", err)
+				continue
+			}
 
-		if err := tx.Commit(); err != nil {
-			_ = tx.Rollback()
-			errorsCount++
-			logger.Error("controlled-documents backfill commit failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
-			continue
-		}
+			tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+			if err != nil {
+				errorsCount++
+				logger.Error("controlled-documents backfill begin tx failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+				continue
+			}
 
-		// This migration intentionally falls back to "unassigned" profile/process area.
-		skipped++
-		if updatedRows > 0 {
-			processed++
+			legacyCode := "MIG-" + strings.ToUpper(strings.ReplaceAll(docID, "-", "")[:8])
+			insertRes, err := tx.ExecContext(ctx, `
+				INSERT INTO controlled_documents
+					(tenant_id, profile_code, process_area_code, code, sequence_num, title, owner_user_id, status)
+				VALUES
+					($1, 'unassigned', 'unassigned', $2, NULL, 'Legacy backfill', 'system', 'active')
+				ON CONFLICT (tenant_id, profile_code, code)
+				DO NOTHING`,
+				tenantID, legacyCode,
+			)
+			if err != nil {
+				_ = tx.Rollback()
+				errorsCount++
+				logger.Error("controlled-documents backfill controlled_document insert failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+				continue
+			}
+			insertedRows, _ := insertRes.RowsAffected()
+			if insertedRows == 0 {
+				skipped++
+			}
+
+			var controlledDocumentID string
+			if err := tx.QueryRowContext(ctx, `
+				SELECT id::text
+				FROM controlled_documents
+				WHERE tenant_id = $1
+				  AND profile_code = 'unassigned'
+				  AND code = $2`,
+				tenantID, legacyCode,
+			).Scan(&controlledDocumentID); err != nil {
+				_ = tx.Rollback()
+				errorsCount++
+				logger.Error("controlled-documents backfill controlled_document lookup failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+				continue
+			}
+
+			res, err := tx.ExecContext(ctx, `
+				UPDATE documents
+				SET controlled_document_id = $1,
+				    profile_code_snapshot = 'unassigned',
+				    process_area_code_snapshot = 'unassigned'
+				WHERE id = $2
+				  AND controlled_document_id IS NULL`,
+				controlledDocumentID, docID,
+			)
+			if err != nil {
+				_ = tx.Rollback()
+				errorsCount++
+				logger.Error("controlled-documents backfill document update failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+				continue
+			}
+			updatedRows, _ := res.RowsAffected()
+
+			if err := tx.Commit(); err != nil {
+				_ = tx.Rollback()
+				errorsCount++
+				logger.Error("controlled-documents backfill commit failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)
+				continue
+			}
+			if updatedRows > 0 {
+				processed++
+			}
 		}
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate legacy documents: %w", err)
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("iterate legacy documents: %w", err)
+		}
+		_ = rows.Close()
+		if batchCount == 0 {
+			break
+		}
 	}
 
 	logger.Info("controlled-documents backfill completed", "event", "backfill", "processed", processed, "skipped", skipped, "errors", errorsCount)
