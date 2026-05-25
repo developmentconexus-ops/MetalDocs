@@ -162,7 +162,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		if taken {
 			return nil, controlleddocumentsdomain.ErrCDCodeTaken
 		}
-		payload, _ := json.Marshal(map[string]string{"code": code})
+		payload, err := json.Marshal(map[string]string{"code": code})
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: marshal numbering override payload: %w", err)
+		}
 		events = append(events, taxonomydomain.GovernanceEvent{
 			TenantID:     cmd.TenantID,
 			EventType:    "numbering.override",
@@ -250,7 +253,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	}
 
 	if overrideID != nil {
-		payload, _ := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+		payload, err := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: marshal template override payload: %w", err)
+		}
 		events = append(events, taxonomydomain.GovernanceEvent{
 			TenantID:     cmd.TenantID,
 			EventType:    "template.override",
@@ -476,7 +482,10 @@ SELECT status
 	if next == controlleddocumentsdomain.CDStatusSuperseded {
 		eventType = "controlled_documents.cd.superseded"
 	}
-	payload, _ := json.Marshal(map[string]string{"status": string(next)})
+	payload, err := json.Marshal(map[string]string{"status": string(next)})
+	if err != nil {
+		return fmt.Errorf("controlled_documents: marshal changeStatus payload: %w", err)
+	}
 	actorID := ""
 	if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
 		actorID = u.UserID
