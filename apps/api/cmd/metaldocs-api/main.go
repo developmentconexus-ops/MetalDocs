@@ -406,7 +406,10 @@ func main() {
 	})
 
 	leaderID := schedulerLeaderID()
-	s := jobscheduler.New(deps.SQLDB, leaderID)
+	s, err := jobscheduler.New(deps.SQLDB, leaderID)
+	if err != nil {
+		log.Fatalf("jobs scheduler configuration failed: %v", err)
+	}
 	if jobEnabled("ENABLE_JOB_STUCK_INSTANCE_WATCHDOG") {
 		s.Register(jobscheduler.JobConfig{
 			Name:     "stuck-instance-watchdog",
