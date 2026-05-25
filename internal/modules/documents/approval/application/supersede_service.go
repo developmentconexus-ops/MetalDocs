@@ -67,6 +67,15 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, db *sql.DB, r
 	}
 
 	// Step 2: OCC UPDATE for new document (approved → published).
+	priorRevisionVersion := req.PriorRevisionVersion
+	if s.repo != nil {
+		priorRevisionVersion, err = s.repo.GetDocumentRevisionVersion(ctx, tx, req.PriorDocumentID, req.TenantID)
+		if err != nil {
+			_ = tx.Rollback()
+			return SupersedeResult{}, fmt.Errorf("publishSuperseding: load prior revision version: %w", err)
+		}
+	}
+
 	newResult, err := tx.ExecContext(ctx, `
 		UPDATE documents
 		   SET status           = 'published',
@@ -100,7 +109,7 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, db *sql.DB, r
 		   AND tenant_id        = $2
 		   AND status           = 'published'
 		   AND revision_version = $3`,
-		req.PriorDocumentID, req.TenantID, req.PriorRevisionVersion,
+		req.PriorDocumentID, req.TenantID, priorRevisionVersion,
 	)
 	if err != nil {
 		_ = tx.Rollback()

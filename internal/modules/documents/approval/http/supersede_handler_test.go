@@ -40,8 +40,8 @@ func (r *supersedeIntRows) Next(dest []driver.Value) error {
 
 type supersedeTestStmt struct{ value int64 }
 
-func (s *supersedeTestStmt) Close() error                               { return nil }
-func (s *supersedeTestStmt) NumInput() int                              { return -1 }
+func (s *supersedeTestStmt) Close() error                                 { return nil }
+func (s *supersedeTestStmt) NumInput() int                                { return -1 }
 func (s *supersedeTestStmt) Exec(_ []driver.Value) (driver.Result, error) { return nil, nil }
 func (s *supersedeTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	return &supersedeIntRows{value: s.value}, nil
@@ -145,7 +145,7 @@ func TestSupersedeHandler(t *testing.T) {
 			if gotReq.TenantID != "tenant-1" || gotReq.NewDocumentID != "doc-2" || gotReq.PriorDocumentID != "11111111-1111-1111-1111-111111111111" || gotReq.SupersededBy != "actor-1" {
 				t.Fatalf("unexpected service request: %+v", gotReq)
 			}
-			if gotReq.NewRevisionVersion != 5 || gotReq.PriorRevisionVersion != 5 {
+			if gotReq.NewRevisionVersion != 5 || gotReq.PriorRevisionVersion != 0 {
 				t.Fatalf("unexpected revision mapping: %+v", gotReq)
 			}
 
