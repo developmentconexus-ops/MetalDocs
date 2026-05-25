@@ -3,6 +3,9 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -16,6 +19,23 @@ type Event struct {
 	PayloadJSON  string
 	TraceID      string
 	TenantID     string
+}
+
+var ErrInvalidEvent = errors.New("invalid event")
+
+func NewEvent(tenantID, actorID, action, resourceType, resourceID string, now time.Time) (Event, error) {
+	event := Event{
+		TenantID:     strings.TrimSpace(tenantID),
+		ActorID:      strings.TrimSpace(actorID),
+		Action:       strings.TrimSpace(action),
+		ResourceType: strings.TrimSpace(resourceType),
+		ResourceID:   strings.TrimSpace(resourceID),
+		OccurredAt:   now.UTC(),
+	}
+	if event.TenantID == "" || event.ActorID == "" || event.Action == "" || event.ResourceType == "" || event.ResourceID == "" {
+		return Event{}, fmt.Errorf("audit: %w", ErrInvalidEvent)
+	}
+	return event, nil
 }
 
 type IntegrityIssueKind string

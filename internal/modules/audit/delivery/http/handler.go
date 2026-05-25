@@ -3,6 +3,7 @@ package httpdelivery
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -54,7 +55,9 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed < 1 {
-			_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid limit value"))
+			if writeErr := problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid limit value")); writeErr != nil {
+				slog.Warn("write problem response failed", "error", writeErr)
+			}
 			return
 		}
 		limit = parsed
@@ -68,10 +71,14 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, application.ErrTenantRequired) {
-			_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Tenant claim required"))
+			if writeErr := problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Tenant claim required")); writeErr != nil {
+				slog.Warn("write problem response failed", "error", writeErr)
+			}
 			return
 		}
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events"))
+		if writeErr := problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events")); writeErr != nil {
+			slog.Warn("write problem response failed", "error", writeErr)
+		}
 		return
 	}
 
@@ -100,12 +107,16 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 func auditTenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {
 	if _, ok := authn.UserIDFromContext(r.Context()); !ok {
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		if writeErr := problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required")); writeErr != nil {
+			slog.Warn("write problem response failed", "error", writeErr)
+		}
 		return "", false
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Tenant claim required"))
+		if writeErr := problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Tenant claim required")); writeErr != nil {
+			slog.Warn("write problem response failed", "error", writeErr)
+		}
 		return "", false
 	}
 	return tenantID, true
