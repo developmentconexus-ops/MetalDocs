@@ -27,7 +27,8 @@ func LoadPostgresConfig() (PostgresConfig, error) {
 	pass := os.Getenv("PGPASSWORD")
 	sslMode := strings.TrimSpace(os.Getenv("PGSSLMODE"))
 	if sslMode == "" {
-		sslMode = "disable"
+		// Use sslmode=disable only for local development; never in production.
+		sslMode = "require"
 	}
 
 	if host == "" || db == "" || user == "" || pass == "" {
