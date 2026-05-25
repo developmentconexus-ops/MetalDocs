@@ -229,5 +229,6 @@ func actorRolesFromReq(r *http.Request) []string {
 		}
 		return out
 	}
+	// Fallback: no context roles available (legacy callers may still rely on header-based role wiring upstream).
 	return nil
 }

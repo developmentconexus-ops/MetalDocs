@@ -26,9 +26,13 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 
-	limit, ok := readQueryInt(q.Get("limit"), 50)
+	limit, ok := readQueryInt(q.Get("limit"), 200)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, "invalid_limit", "limit must be an integer")
+		return
+	}
+	if limit > 200 {
+		writeErr(w, http.StatusBadRequest, "invalid_limit", "limit must be less than or equal to 200")
 		return
 	}
 	offset, ok := readQueryInt(q.Get("offset"), 0)
@@ -215,6 +219,7 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO(pagination): migrate templates audit listing to keyset pagination.
 	events, err := h.svc.ListAudit(r.Context(), tenantID, templateID, limit, offset)
 	if err != nil {
 		writeMappedErr(w, err)

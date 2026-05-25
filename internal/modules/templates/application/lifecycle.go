@@ -50,6 +50,8 @@ func (s *Service) SubmitForReview(ctx context.Context, cmd SubmitForReviewCmd) (
 	version.SubmittedAt = &now
 
 	if s.db != nil {
+		// Validation reads above still happen before the write transaction; this tx
+		// only serializes the state update itself in the current implementation.
 		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
 			return nil, fmt.Errorf("templates submit: begin tx: %w", err)

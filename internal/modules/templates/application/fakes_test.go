@@ -320,6 +320,9 @@ func updateCmdWithComputed(phID, resolverKey string) application.UpdateSchemasCm
 		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
+		MetadataSchema: domain.MetadataSchema{
+			RetentionDays: 1,
+		},
 		PlaceholderSchema: []domain.Placeholder{
 			{
 				ID:          phID,

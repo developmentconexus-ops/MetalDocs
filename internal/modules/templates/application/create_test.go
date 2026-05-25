@@ -265,6 +265,7 @@ func TestCreateNextVersion_WithDB_UsesTransaction(t *testing.T) {
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
 
 	mock.ExpectBegin()
+	expectTemplateAuthz(mock, "user-b", "tenant-a", "template.edit")
 	mock.ExpectCommit()
 
 	if _, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
@@ -284,6 +285,10 @@ func strPtr(v string) *string {
 }
 
 func expectTemplateCreateAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
+	expectTemplateAuthz(mock, actorID, tenantID, "template.create")
+}
+
+func expectTemplateAuthz(mock sqlmock.Sqlmock, actorID, tenantID, capability string) {
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.tenant_id', $1, true)")).
 		WithArgs(tenantID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -306,6 +311,6 @@ SELECT EXISTS (
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
-		WithArgs(`[{"area":"tenant","cap":"template.create"}]`).
+		WithArgs(`[{"area":"tenant","cap":"` + capability + `"}]`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 }

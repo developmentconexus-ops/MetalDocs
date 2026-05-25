@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"time"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
 )
 
@@ -18,10 +20,10 @@ type UpdateSchemasCmd struct {
 }
 
 func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*domain.TemplateVersion, error) {
-	if _, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
+	if _, err := s.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID); err != nil {
 		return nil, wrapAppErr("templates update schemas: get template", err)
 	}
-	version, err := s.repo.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
+	version, err := s.GetVersion(ctx, cmd.TenantID, cmd.TemplateID, cmd.VersionNumber)
 	if err != nil {
 		return nil, wrapAppErr("templates update schemas: get version", err)
 	}
@@ -67,16 +69,39 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 	version.MetadataSchema = metadata
 	version.PlaceholderSchema = clonePlaceholders(cmd.PlaceholderSchema)
 
-	if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
-		return nil, wrapAppErr("templates update schemas: update version", err)
-	}
-
 	audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditSaved, map[string]any{"kind": "schema"}, s.clock.Now())
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.AppendAudit(ctx, audit); err != nil {
-		return nil, wrapAppErr("templates update schemas: append audit", err)
+
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("templates update schemas: begin tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates update schemas: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return nil, fmt.Errorf("templates update schemas: authz: %w", err)
+		}
+		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+			return nil, wrapAppErr("templates update schemas: update version", err)
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return nil, wrapAppErr("templates update schemas: append audit", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
+			return nil, wrapAppErr("templates update schemas: update version", err)
+		}
+		if err := s.repo.AppendAudit(ctx, audit); err != nil {
+			return nil, wrapAppErr("templates update schemas: append audit", err)
+		}
 	}
 
 	return version, nil

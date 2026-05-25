@@ -31,6 +31,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 	body := map[string]any{
 		"metadata_schema": map[string]any{
 			"doc_code_pattern": "ABC-###",
+			"retention_days":   1,
 		},
 		"placeholder_schema": []map[string]any{
 			{"id": "ph-1", "label": "Signer", "type": "select", "options": []string{"a", "b"}},

@@ -184,6 +184,12 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 			return nil, fmt.Errorf("templates create next version: begin tx: %w", err)
 		}
 		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates create next version: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return nil, fmt.Errorf("templates create next version: authz: %w", err)
+		}
 		if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
 			return nil, err
 		}

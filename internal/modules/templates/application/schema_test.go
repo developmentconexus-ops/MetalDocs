@@ -33,6 +33,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 		VersionNumber: 1,
 		MetadataSchema: domain.MetadataSchema{
 			DocCodePattern: "ABC-###",
+			RetentionDays:  1,
 		},
 		PlaceholderSchema: []domain.Placeholder{
 			{ID: "ph-1", Name: "doc_code", Label: "Doc Code", Type: domain.PHComputed, Computed: true, ResolverKey: func() *string { s := "doc_code"; return &s }()},
@@ -88,6 +89,7 @@ func TestUpdateSchemas_StaleHash(t *testing.T) {
 		TemplateID:          "tpl-1",
 		VersionNumber:       1,
 		ExpectedContentHash: "hash-2",
+		MetadataSchema:      domain.MetadataSchema{RetentionDays: 1},
 		PlaceholderSchema:   []domain.Placeholder{{ID: "ph-1", Type: domain.PHText}},
 	})
 	if !errors.Is(err, domain.ErrStaleBase) {
@@ -104,6 +106,9 @@ func TestUpdateSchemas_DuplicatePlaceholderID(t *testing.T) {
 		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
+		MetadataSchema: domain.MetadataSchema{
+			RetentionDays: 1,
+		},
 		PlaceholderSchema: []domain.Placeholder{
 			{ID: "ph-1", Type: domain.PHText},
 			{ID: "ph-1", Type: domain.PHText},
@@ -123,6 +128,9 @@ func TestUpdateSchemas_SelectNoOptions(t *testing.T) {
 		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
+		MetadataSchema: domain.MetadataSchema{
+			RetentionDays: 1,
+		},
 		PlaceholderSchema: []domain.Placeholder{
 			{ID: "ph-1", Type: domain.PHSelect},
 		},
@@ -141,12 +149,36 @@ func TestUpdateSchemas_OptionsOnNonSelect(t *testing.T) {
 		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
+		MetadataSchema: domain.MetadataSchema{
+			RetentionDays: 1,
+		},
 		PlaceholderSchema: []domain.Placeholder{
 			{ID: "ph-1", Type: domain.PHText, Options: []string{"x"}},
 		},
 	})
 	if err == nil || !strings.Contains(err.Error(), "options_allowed_only_for_select") {
 		t.Fatalf("expected options_allowed_only_for_select error, got %v", err)
+	}
+}
+
+func TestUpdateSchemas_MetadataRetentionDaysLowerBound(t *testing.T) {
+	repo := newFakeRepo()
+	seedSchemaVersion(repo, domain.VersionStatusDraft, "")
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
+		TenantID:      "tenant-a",
+		TemplateID:    "tpl-1",
+		VersionNumber: 1,
+		MetadataSchema: domain.MetadataSchema{
+			RetentionDays: 0,
+		},
+		PlaceholderSchema: []domain.Placeholder{
+			{ID: "ph-1", Type: domain.PHText},
+		},
+	})
+	if !errors.Is(err, domain.ErrInvalidConstraint) {
+		t.Fatalf("expected ErrInvalidConstraint, got %v", err)
 	}
 }
 

@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 type MetadataSchema struct {
 	DocCodePattern      string   `json:"doc_code_pattern"`
 	RetentionDays       int      `json:"retention_days"`
@@ -8,6 +10,9 @@ type MetadataSchema struct {
 }
 
 func NewMetadataSchema(docCodePattern string, retentionDays int, distributionDefault, requiredMetadata []string) (MetadataSchema, error) {
+	if retentionDays < 1 {
+		return MetadataSchema{}, fmt.Errorf("retention_days must be at least 1: %w", ErrInvalidConstraint)
+	}
 	return MetadataSchema{
 		DocCodePattern:      docCodePattern,
 		RetentionDays:       retentionDays,
