@@ -120,7 +120,7 @@ func TestCreate_ManualCode(t *testing.T) {
 	if len(logger.events) != 1 || logger.events[0].EventType != "numbering.override" {
 		t.Fatalf("expected numbering.override event, got %+v", logger.events)
 	}
-	if cd.Visibility.Scope != controlleddocumentsdomain.VisibilityScopePublic {
+	if cd.Visibility.Scope != controlleddocumentsdomain.VisibilityScopeCompany {
 		t.Fatalf("visibility scope = %q, want company", cd.Visibility.Scope)
 	}
 }

@@ -26,7 +26,7 @@ func (h *Handler) listTemplates(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 
-	limit, ok := readQueryInt(q.Get("limit"), 200)
+	limit, ok := readQueryInt(q.Get("limit"), 50)
 	if !ok {
 		writeErr(w, http.StatusBadRequest, "invalid_limit", "limit must be an integer")
 		return
