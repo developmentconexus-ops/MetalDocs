@@ -34,6 +34,8 @@ func (c *Consumer) ClaimUnpublished(ctx context.Context, limit int) ([]messaging
 	defer func() { _ = tx.Rollback() }()
 
 	const q = `
+-- TODO(phase11): heartbeat_lease is mirrored here as claimLease; make the DB interval configurable in the follow-up migration/worker sweep.
+-- TODO(phase11): this claim query depends on the current partial-index status predicate; revisit together with the pending DB index fix.
 WITH candidates AS (
   SELECT event_id
   FROM metaldocs.outbox_events

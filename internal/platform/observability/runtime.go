@@ -15,7 +15,8 @@ type RuntimeStatusProvider interface {
 type DependencyCheckResult struct {
 	Status string
 	Detail string
-	Meta   map[string]any
+	// Meta keys are defined in observability/keys.go (or the equivalent runtime payload contract).
+	Meta map[string]any
 }
 
 type DependencyCheck struct {
@@ -49,6 +50,7 @@ func (p *StaticRuntimeStatusProvider) Live(_ context.Context) (int, map[string]a
 }
 
 func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
+	// TODO: gate behind admin auth before exposing to external traffic.
 	return 200, map[string]any{
 		"status": "ready",
 		"checks": p.applyDependencyChecks(ctx, []map[string]any{
@@ -60,6 +62,7 @@ func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[strin
 }
 
 func (p *StaticRuntimeStatusProvider) RuntimeMetrics(_ context.Context) map[string]any {
+	// TODO: gate behind admin auth before exposing to external traffic.
 	return map[string]any{
 		"repositoryMode":  p.repositoryMode,
 		"storageProvider": p.storageProvider,
@@ -88,6 +91,7 @@ func (p *StaticRuntimeStatusProvider) RuntimeMetrics(_ context.Context) map[stri
 }
 
 type PostgresRuntimeStatusProvider struct {
+	// embedded for JSON serialization; do not add methods to the embedded type.
 	*StaticRuntimeStatusProvider
 	db *sql.DB
 }
@@ -100,6 +104,7 @@ func NewPostgresRuntimeStatusProvider(db *sql.DB, repositoryMode, storageProvide
 }
 
 func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
+	// TODO: gate behind admin auth before exposing to external traffic.
 	readyCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -115,7 +120,7 @@ func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[str
 		status = "degraded"
 		code = 503
 		checks[0]["status"] = "down"
-		checks[0]["detail"] = "database handle is not configured"
+		checks[0]["detail"] = "runtime: database handle is not configured"
 	} else if err := p.db.PingContext(readyCtx); err != nil {
 		status = "degraded"
 		code = 503
@@ -136,6 +141,7 @@ func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[str
 }
 
 func (p *PostgresRuntimeStatusProvider) RuntimeMetrics(ctx context.Context) map[string]any {
+	// TODO: gate behind admin auth before exposing to external traffic.
 	metrics := p.StaticRuntimeStatusProvider.RuntimeMetrics(ctx)
 	if p.db == nil {
 		metrics["repositoryStatus"] = "down"
@@ -233,7 +239,7 @@ func truncateReadinessError(err error) string {
 	if err == nil {
 		return ""
 	}
-	msg := err.Error()
+	msg := "runtime: " + err.Error()
 	if len(msg) > 160 {
 		return msg[:160]
 	}
@@ -244,6 +250,8 @@ func (p *StaticRuntimeStatusProvider) applyDependencyChecks(ctx context.Context,
 	if len(p.checks) == 0 {
 		return checks
 	}
+	// status/code are optional out-params so Ready can reuse this helper without
+	// allocating a result wrapper for the common static-provider fast path.
 	for _, check := range p.checks {
 		if check.Check == nil {
 			continue

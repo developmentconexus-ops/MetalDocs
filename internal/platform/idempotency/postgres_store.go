@@ -84,6 +84,7 @@ func (s *Store) BeginReplay(ctx context.Context, tenantID, actorID, key, payload
 	// row-inserting transaction observes RETURNING.
 	var claimedTenant string
 	err = tx.QueryRowContext(ctx, `
+		-- TODO(phase11): event_id/idempotency_key are still TEXT-backed in the current schema; tighten column bounds in the pending DB migration.
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, status, expires_at)
 		VALUES
@@ -331,6 +332,7 @@ func (s *Store) RecordReplay(ctx context.Context, tenantID, actorID, key, payloa
 		return fmt.Errorf("idempotency: response body %d bytes exceeds %d-byte cap; idempotency not recorded", len(body), maxBodyBytes)
 	}
 	_, err := s.db.ExecContext(ctx, `
+		-- TODO(phase11): review idempotency janitor/index ordering together when the DB migration is scheduled; current cleanup still relies on expires_at pruning.
 		INSERT INTO metaldocs.idempotency_keys
 			(tenant_id, actor_user_id, route_template, key, payload_hash, response_status, response_body, status, expires_at)
 		VALUES

@@ -26,6 +26,7 @@ const migrateLockKey int64 = 0x4D444D4947528000
 // is not present in public.schema_migrations. Files are applied in lexical
 // order. Each file is executed as a single Exec; files must be self-contained
 // SQL (BEGIN/COMMIT and ledger insert included).
+// TODO: fail closed when a migration file omits explicit BEGIN/COMMIT so mixed transactional semantics cannot slip through.
 func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retErr error) {
 	if log == nil {
 		log = slog.Default()
@@ -108,7 +109,7 @@ func loadApplied(ctx context.Context, db queryer) (map[string]bool, error) {
 	for rows.Next() {
 		var v string
 		if err := rows.Scan(&v); err != nil {
-			return nil, fmt.Errorf("scan schema_migrations version: %w", err)
+			return nil, fmt.Errorf("scan migration row: %w", err)
 		}
 		out[v] = true
 	}

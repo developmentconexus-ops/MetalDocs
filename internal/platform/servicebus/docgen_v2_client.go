@@ -16,7 +16,13 @@ type DocgenV2Client struct {
 	http    *http.Client
 }
 
-func NewDocgenV2Client(baseURL, token string, timeout time.Duration) *DocgenV2Client {
+func NewDocgenV2Client(
+	// baseURL
+	baseURL string,
+	// authToken
+	token string,
+	timeout time.Duration,
+) *DocgenV2Client {
 	return &DocgenV2Client{
 		baseURL: baseURL,
 		token:   token,
@@ -33,11 +39,11 @@ type healthResponse struct {
 func (c *DocgenV2Client) Health(ctx context.Context) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/health", nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("docgen v2 client: %w", err)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("docgen v2 client: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {

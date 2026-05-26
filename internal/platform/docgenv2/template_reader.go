@@ -35,11 +35,14 @@ func (t *TemplateReader) GetPublishedVersion(ctx context.Context, tenantID, temp
 		  AND tv.status = 'published'`,
 		templateVersionID, tenantID, systemTemplateTenantID,
 	).Scan(&docxKey, &schemaKey); err != nil {
-		return "", "", "", err
+		return "", "", "", fmt.Errorf("get published version: %w", err)
 	}
 
-	if t.client == nil || schemaKey == "" {
+	if schemaKey == "" {
 		return docxKey, schemaKey, "", nil
+	}
+	if t.client == nil {
+		return "", "", "", errors.New("template reader minio client is nil")
 	}
 	obj, err := t.client.GetObject(ctx, t.bucket, schemaKey, minio.GetObjectOptions{})
 	if err != nil {

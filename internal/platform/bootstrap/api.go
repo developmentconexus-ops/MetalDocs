@@ -47,6 +47,7 @@ type APIDependencies struct {
 	DocgenV2Client *servicebus.DocgenV2Client
 	// MinioClient is the minio client for presigning. Nil when storage is not minio.
 	MinioClient *miniogo.Client
+	// MinIO wiring.
 	// MinioPublicClient signs browser-facing URLs against a browser-reachable endpoint.
 	MinioPublicClient *miniogo.Client
 	MinioBucket       string
@@ -61,7 +62,11 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 	gotenbergCfg := config.LoadGotenbergConfig()
 	var gotenbergClient *gotenberg.Client
 	if gotenbergCfg.Enabled {
-		gotenbergClient = gotenberg.NewClient(gotenbergCfg.URL)
+		var err error
+		gotenbergClient, err = gotenberg.NewClient(gotenbergCfg.URL)
+		if err != nil {
+			return APIDependencies{}, err
+		}
 	}
 
 	switch repoMode {
@@ -109,7 +114,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			AuditValidator:    auditStore,
 			Publisher:         outboxpg.NewPublisher(db),
 			GotenbergClient:   gotenbergClient,
-			StatusProvider:    observability.NewPostgresRuntimeStatusProvider(db, repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
+			StatusProvider:    observability.NewPostgresRuntimeStatusProvider(db, repoMode, string(attachmentsCfg.Provider), authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
 			SQLDB:             db,
 			DocgenV2Client:    docgenV2Client,
 			MinioClient:       minioClient,
@@ -140,7 +145,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			AuditValidator:  auditStore,
 			Publisher:       nooppub.NewPublisher(),
 			GotenbergClient: gotenbergClient,
-			StatusProvider:  observability.NewStaticRuntimeStatusProvider(repoMode, attachmentsCfg.Provider, authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
+			StatusProvider:  observability.NewStaticRuntimeStatusProvider(repoMode, string(attachmentsCfg.Provider), authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
 			Cleanup:         func() {},
 		}, nil
 	}

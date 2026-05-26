@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
@@ -39,7 +40,7 @@ func (r *TemplatesSnapshotReader) LoadForSnapshot(ctx context.Context, tenantID,
 		return domain.TemplateSnapshot{}, domain.ErrSnapshotTemplateNotFound
 	}
 	if err != nil {
-		return domain.TemplateSnapshot{}, err
+		return domain.TemplateSnapshot{}, fmt.Errorf("templates snapshot reader: %w", err)
 	}
 
 	return domain.TemplateSnapshot{

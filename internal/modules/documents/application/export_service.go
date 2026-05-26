@@ -91,7 +91,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 			DocxKey:   rev.StorageKey,
 			OutputKey: storageKey,
 			RenderOpts: &servicebus.PDFRenderOpts{
-				PaperSize: opts.PaperSize,
+				PaperSize: servicebus.PaperSize(opts.PaperSize),
 				Landscape: opts.LandscapeP,
 			},
 		})

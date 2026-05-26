@@ -26,6 +26,7 @@ func (p *Publisher) Publish(ctx context.Context, event messaging.Event) error {
 	}
 
 	const q = `
+-- TODO(phase11): event_id/idempotency_key are still TEXT-backed in the current schema; tighten column bounds in the pending DB migration.
 INSERT INTO metaldocs.outbox_events (
   event_id, event_type, aggregate_type, aggregate_id, occurred_at, version,
   idempotency_key, producer, trace_id, payload, published_at
