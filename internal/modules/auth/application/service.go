@@ -135,8 +135,9 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 		return nil
 	}
 
-	bootstrapPassword := s.cfg.BootstrapAdminPassword.Value()
-	passwordHash, err := s.hashPassword(bootstrapPassword)
+	bootstrapPassword := []byte(s.cfg.BootstrapAdminPassword.Value())
+	passwordHash, err := s.hashPasswordBytes(bootstrapPassword)
+	zeroBytes(bootstrapPassword)
 	s.cfg.BootstrapAdminPassword = ""
 	if err != nil {
 		return err
@@ -180,6 +181,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	if !identity.IsActive {
 		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
 	}
+	// TODO: use SELECT ... FOR UPDATE or advisory lock to make lockout atomic.
 	if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(password)) != nil {
 		if _, _, err := s.repo.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds())); err != nil {
 			return authdomain.AuthenticatedSession{}, fmt.Errorf("record failed login: %w", err)
@@ -343,6 +345,7 @@ func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.
 	if err != nil {
 		return nil, err
 	}
+	// TODO: batch role lookup with IN clause to avoid N+1 role queries.
 	filtered := make([]authdomain.ManagedUser, 0, len(items))
 	for i := range items {
 		roles, roleErr := s.roleProvider.RolesByUserID(ctx, items[i].UserID, tenantID)
@@ -359,9 +362,6 @@ func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.
 }
 
 func (s *Service) ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error) {
-	if s == nil {
-		return nil, nil
-	}
 	return s.repo.ListOnlineUsers(ctx, activeSince)
 }
 
@@ -379,57 +379,19 @@ func (s *Service) CreateUser(ctx context.Context, userID, username, email, displ
 }
 
 func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.CreateUserInput) error {
-	userID := input.UserID.String()
-	username := input.Username
-	email := input.Email
-	displayName := input.DisplayName
-	password := string(input.Password)
-	tenantID := input.TenantID.String()
-	roles := input.Roles
-	createdBy := input.CreatedBy
-
-	userID = strings.TrimSpace(userID)
-	username = strings.TrimSpace(username)
-	email = strings.TrimSpace(email)
-	displayName = strings.TrimSpace(displayName)
-	createdBy = strings.TrimSpace(createdBy)
-	if userID == "" {
-		userID = username
-	}
-	if username == "" {
-		return authdomain.ErrUserAlreadyExists
-	}
-	if displayName == "" {
-		displayName = username
-	}
-	if createdBy == "" {
-		createdBy = "system"
-	}
-	if err := s.validatePassword(password); err != nil {
-		return err
-	}
-	passwordHash, err := s.hashPassword(password)
+	fields, err := s.normalizeCreateUserInput(input)
 	if err != nil {
 		return err
 	}
-
-	params := authdomain.CreateUserParams{
-		UserID:             userID,
-		Username:           username,
-		Email:              email,
-		DisplayName:        displayName,
-		PasswordHash:       passwordHash,
-		PasswordAlgo:       passwordAlgoBcrypt,
-		MustChangePassword: true,
-		IsActive:           true,
-		Roles:              nil,
-		CreatedBy:          createdBy,
+	params, err := s.buildCreateUserParams(fields)
+	if err != nil {
+		return err
 	}
 	if s.roleAdmin == nil {
 		return fmt.Errorf("role admin repository is required")
 	}
-	if tenantID == "" {
-		tenantID = tenant.DevTenantID
+	if fields.tenantID == "" {
+		fields.tenantID = tenant.DevTenantID
 	}
 	repoTx, repoTxOK := s.repo.(createUserTxRepository)
 	roleTx, roleTxOK := s.roleAdmin.(replaceUserRolesTxRepository)
@@ -445,7 +407,7 @@ func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.Crea
 			}
 			return err
 		}
-		if err := roleTx.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, roles, createdBy); err != nil {
+		if err := roleTx.ReplaceUserRolesTx(ctx, tx, fields.userID, fields.displayName, fields.tenantID, fields.roles, fields.createdBy); err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
 				return fmt.Errorf("replace user roles tx: %w (rollback failed: %v)", err, rollbackErr)
 			}
@@ -460,7 +422,7 @@ func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.Crea
 	if err := s.repo.CreateUser(ctx, params); err != nil {
 		return err
 	}
-	return s.roleAdmin.ReplaceUserRoles(ctx, userID, displayName, tenantID, roles, createdBy)
+	return s.roleAdmin.ReplaceUserRoles(ctx, fields.userID, fields.displayName, fields.tenantID, fields.roles, fields.createdBy)
 }
 
 func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams, newPassword string) error {
@@ -516,6 +478,8 @@ func (s *Service) SessionCookie(rawToken string, expiresAt time.Time) *http.Cook
 		Value:    rawToken,
 		Path:     "/",
 		HttpOnly: true,
+		// SameSite=Strict keeps the session cookie off cross-site requests; revisit
+		// this if future SSO or cross-site navigation flows require Lax semantics.
 		SameSite: http.SameSiteStrictMode,
 		Secure:   s.cfg.CookieSecure,
 		Expires:  expiresAt.UTC(),
@@ -533,6 +497,8 @@ func (s *Service) ExpiredSessionCookie() *http.Cookie {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		// SameSite=Strict keeps the session cookie off cross-site requests; revisit
+		// this if future SSO or cross-site navigation flows require Lax semantics.
 		SameSite: http.SameSiteStrictMode,
 		Secure:   s.cfg.CookieSecure,
 		MaxAge:   -1,
@@ -572,11 +538,74 @@ func (s *Service) validatePassword(password string) error {
 }
 
 func (s *Service) hashPassword(password string) (authdomain.PasswordHash, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcryptCost)
+	return s.hashPasswordBytes([]byte(password))
+}
+
+func (s *Service) hashPasswordBytes(password []byte) (authdomain.PasswordHash, error) {
+	hash, err := bcrypt.GenerateFromPassword(password, bcryptCost)
 	if err != nil {
 		return "", fmt.Errorf("hash password: %w", err)
 	}
 	return authdomain.PasswordHash(string(hash)), nil
+}
+
+type createUserFields struct {
+	userID      string
+	username    string
+	email       string
+	displayName string
+	password    string
+	tenantID    string
+	roles       []iamdomain.Role
+	createdBy   string
+}
+
+func (s *Service) normalizeCreateUserInput(input authdomain.CreateUserInput) (createUserFields, error) {
+	fields := createUserFields{
+		userID:      strings.TrimSpace(input.UserID.String()),
+		username:    strings.TrimSpace(input.Username),
+		email:       strings.TrimSpace(input.Email),
+		displayName: strings.TrimSpace(input.DisplayName),
+		password:    string(input.Password),
+		tenantID:    strings.TrimSpace(input.TenantID.String()),
+		roles:       input.Roles,
+		createdBy:   strings.TrimSpace(input.CreatedBy),
+	}
+	if fields.userID == "" {
+		fields.userID = fields.username
+	}
+	if fields.username == "" {
+		return createUserFields{}, authdomain.ErrUserAlreadyExists
+	}
+	if fields.displayName == "" {
+		fields.displayName = fields.username
+	}
+	if fields.createdBy == "" {
+		fields.createdBy = "system"
+	}
+	if err := s.validatePassword(fields.password); err != nil {
+		return createUserFields{}, err
+	}
+	return fields, nil
+}
+
+func (s *Service) buildCreateUserParams(fields createUserFields) (authdomain.CreateUserParams, error) {
+	passwordHash, err := s.hashPassword(fields.password)
+	if err != nil {
+		return authdomain.CreateUserParams{}, err
+	}
+	return authdomain.CreateUserParams{
+		UserID:             fields.userID,
+		Username:           fields.username,
+		Email:              fields.email,
+		DisplayName:        fields.displayName,
+		PasswordHash:       passwordHash,
+		PasswordAlgo:       passwordAlgoBcrypt,
+		MustChangePassword: true,
+		IsActive:           true,
+		Roles:              nil,
+		CreatedBy:          fields.createdBy,
+	}, nil
 }
 
 func (s *Service) newSessionToken() (string, string, error) {
@@ -627,4 +656,10 @@ func truncate(value string, max int) string {
 		return value
 	}
 	return value[:max]
+}
+
+func zeroBytes(buf []byte) {
+	for i := range buf {
+		buf[i] = 0
+	}
 }

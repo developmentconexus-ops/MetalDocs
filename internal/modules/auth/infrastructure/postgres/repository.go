@@ -119,6 +119,7 @@ ORDER BY tenant_id
 }
 
 func (r *Repository) TouchSession(ctx context.Context, sessionID string, seenAt time.Time) error {
+	// TODO: consider updating only expired/grace-window-stale sessions to reduce write amplification further.
 	const q = `
 UPDATE metaldocs.auth_sessions
 SET last_seen_at = $2
@@ -289,6 +290,7 @@ ORDER BY i.created_at DESC
 }
 
 func (r *Repository) ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error) {
+	// TODO: use monotonic heartbeat or session token expiry instead of wall-clock comparison.
 	const q = `
 SELECT s.user_id, i.username, i.display_name, MAX(s.last_seen_at)
 FROM metaldocs.auth_sessions s
@@ -326,6 +328,8 @@ ORDER BY MAX(s.last_seen_at) DESC
 }
 
 func (r *Repository) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams) error {
+	// Keep profile and credential updates in one transaction so mixed update
+	// requests stay atomic even though each branch may issue its own statement.
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin update user tx: %w", err)

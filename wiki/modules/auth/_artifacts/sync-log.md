@@ -2,6 +2,16 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-25 - Phase 11 auth medium sweep
+
+- **Context:** uncommitted diff for Batch F auth mediums in `internal/modules/auth/*` plus shared migration-runner comment.
+- **Mode:** structural refresh, bounded to auth create-user transactionality, audit tracing, password handling, and session/login documentation.
+- **Affected surface scan:** `application/service.go`, `delivery/http/handler.go`, `domain/{errors,model}.go`, `infrastructure/{memory,postgres}/repository.go`, auth tests, `wiki/modules/auth.md`, `wiki/modules/auth/_artifacts/{02-flow-create-user,02-flow-login,sync-log}.md`.
+- **Facts updated:** shared tx-aware `CreateUserWithInput` path documented; bootstrap admin password bytes zeroed after hashing; auth audit trace IDs are always server-generated UUIDs; marshal-failed audit payloads are skipped instead of writing sentinel JSON; session cookie ADR note corrected to `SameSite=Strict`; TODO notes added for lockout atomicity, `ListUsers` N+1, wall-clock online-user checks, and touch-session write amplification.
+- **T/R rows touched:** none.
+- **Preflight/tally:** preflight attempted; Git Bash tally failed before doc edits with Windows `CreateFileMapping` error 5.
+- **Patched files:** `wiki/modules/auth.md`, `wiki/modules/auth/_artifacts/02-flow-create-user.md`, `wiki/modules/auth/_artifacts/02-flow-login.md`, `wiki/modules/auth/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - Phase 8 auth mediums
 
 - **Context:** uncommitted diff on `fix/phase8-auth-mediums` - Worker 8A fixes for auth-M4/M8/M10/M11/M13/M17/M18/M20.

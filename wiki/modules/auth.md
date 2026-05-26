@@ -5,7 +5,7 @@
 **Last verified:** 2026-05-25 | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
 
 > **Key files:**
-> - Current Phase 8 anchors: `internal/modules/auth/delivery/http/handler.go:40` (`traceIDPattern`), `handler.go:185` (`recordAudit`), `internal/modules/auth/application/service.go:246` (`ResolveSession`), `internal/modules/auth/domain/model.go:140`/`:144` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:121` (`TouchSession` grace window).
+> - Current Phase 11 anchors: `internal/modules/auth/delivery/http/handler.go:181` (`recordAudit`), `internal/modules/auth/application/service.go:255` (`ResolveSession`), `service.go:381` (`CreateUserWithInput` shared-tx path), `internal/modules/auth/domain/model.go:145`/`:149` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:121` (`TouchSession` grace window).
 > - `internal/modules/auth/application/service.go:75` â€” `NewService` (rejects `SessionSecret` shorter than 32 bytes)
 > - `internal/modules/auth/application/service.go:126` â€” `Authenticate` (login; calls `resolveLoginTenant` to bind tenant at login)
 > - `internal/modules/auth/application/service.go:172` â€” `resolveLoginTenant` (binds tenant from session; uses `AllowDevTenantFallback`)
@@ -76,7 +76,7 @@
 - Session token format: `<base64url(rand32)>.<base64url(HMAC-SHA256(secret, token))>`; cookie value carries the signed pair, DB stores the SHA-256 hash of the token half (`application/service.go:439-468`).
 - Cookie attributes: `HttpOnly`, `SameSite=Strict`, `Secure` from `Config.CookieSecure` (defaults to `APP_ENV != local`), `Path=/`, `MaxAge` from `SessionTTL`.
 - Auth is NOT under `oapi-codegen` â€” routes are registered via `mux.HandleFunc` (`delivery/http/handler.go:35-39`); no entry in `api/openapi/v1/openapi.yaml` for `/api/v1/auth/*`. Consistent with ADR 0012's partial-rollout scope.
-- Error envelope is legacy `{error:{code,message,details,trace_id}}` â€” does NOT yet match RFC 9457 Problem Details from `wiki/architecture/api-design-system.md` (T-003).
+- Error envelope uses RFC 9457 Problem Details via `problem.Write(...)`. Auth audit trace IDs are server-generated UUIDs and do not trust caller-supplied headers.
 - Auth tables (`auth_identities`, `auth_sessions`) are explicitly **outside** the `enforce_capability_asserted` tripwire scope. Plan 5 migration 0188 expanded the trigger to 10 additional tables (IAM, documents, controlled-documents, taxonomy, templates) but auth tables remain unguarded â€” per ADR 0007 amendment.
 - `LegacyHeaderEnabled` â€” when true, requests with `X-User-Id` header bypass session enforcement entirely (`middleware.go:58-61`); single-flag compromise vector (T-001).
 
@@ -139,7 +139,7 @@ Quality-managed app. Every controlled-document mutation must trace to a known ac
 - **Failed-login counter increments atomically in the repository** â€” driver: avoid TOCTOU under concurrent bad-password attempts; source: `infrastructure/postgres/repository.go:163-183` and `infrastructure/memory/repository.go:130-145`.
 - **Session secret is one process-wide HMAC key** â€” driver: simplicity; rotation invalidates all sessions (no key-id in cookie, no rolling window). Captured as latent â€” see T-010.
 - **Identity is tenant-global; roles are tenant-scoped** â€” driver: a single human may be a member of multiple tenants under the same `user_id`; IAM enforces per-tenant role assignment. Trade-off: no row-level tenant isolation on `auth_identities`/`auth_sessions` (T-008).
-- **Admin user-creation goes through auth.Service.CreateUser, not iam directly** â€” driver: password hashing + identity row owned by auth; role assignment delegated to injected `RoleAdminRepository`. Two distinct DB transactions (T-004).
+- **Admin user-creation goes through auth.Service.CreateUser, not iam directly** â€” driver: password hashing + identity row owned by auth; role assignment delegated to injected `RoleAdminRepository`. On the canonical postgres path auth now prefers a shared transaction across identity insert and IAM role replacement; fallback adapters may still execute sequentially (residual T-004).
 
 ---
 
@@ -316,11 +316,11 @@ sequenceDiagram
     participant DB as Postgres
     H->>S: CreateUser(userID, ..., roles, createdBy)
     S->>S: validatePassword + hashPassword (bcrypt.DefaultCost)
-    S->>R: CreateUser(params)
-    R->>DB: BeginTx; INSERT auth_identities; COMMIT  (TX-A)
-    R-->>S: nil
-    S->>RA: ReplaceUserRoles(userID, displayName, tenantID, roles, createdBy)
-    RA->>DB: BeginTx; UPSERT iam_users; DELETE iam_user_roles; INSERT iam_user_roles; COMMIT  (TX-B)
+    S->>R: BeginTx + CreateUserTx(params)
+    R->>DB: BEGIN; INSERT auth_identities
+    S->>RA: ReplaceUserRolesTx(userID, displayName, tenantID, roles, createdBy)
+    RA->>DB: UPSERT iam_users; DELETE iam_user_roles; INSERT iam_user_roles
+    S->>DB: COMMIT (shared tx)
     RA-->>S: nil
     S-->>H: nil
     H-->>C: 201 {userId}
@@ -330,11 +330,11 @@ State transitions:
 
 | Entity | From | To | Trigger | Tx |
 |---|---|---|---|---|
-| `metaldocs.auth_identities` row | absent | inserted | TX-A | own |
-| `metaldocs.iam_users` row | absent or stale | upserted | TX-B | own |
-| `metaldocs.iam_user_roles` rows for `(tenant_id, user_id)` | any | deleted then optionally one inserted | TX-B | own |
+| `metaldocs.auth_identities` row | absent | inserted | shared tx | own |
+| `metaldocs.iam_users` row | absent or stale | upserted | shared tx | own |
+| `metaldocs.iam_user_roles` rows for `(tenant_id, user_id)` | any | deleted then optionally one inserted | shared tx | own |
 
-Two distinct transactions. Failure between TX-A and TX-B leaves an orphan `auth_identities` row with no role binding (T-004). Audit emission: NO on `handleCreateUser` (artifact 02-flow-create-user Â§6); compare `handleReplaceUserRoles` which DOES emit `recordAudit` at `iam/delivery/http/admin_handler.go:398`. T-002 covers this gap.
+Postgres now uses a shared transaction when both auth and IAM adapters expose tx-aware methods, eliminating the orphan-identity gap on the canonical path. Fallback adapters may still execute sequentially. Audit emission remains handled by IAM `handleCreateUser`.
 
 ### 6.4 Failure modes (current envelope)
 
@@ -376,7 +376,7 @@ RFC 9457 Problem envelope: **not used** (T-003).
 
 ### 8.2 Error envelope
 
-All non-2xx responses use legacy `apiErrorEnvelope` (`handler.go:148-157`). Fields: `error.code` (string enum), `error.message`, `error.details` (always `{}` today), `error.trace_id` (echoes `X-Trace-Id` or `"trace-local"`). Drift from RFC 9457 `application/problem+json` recorded as T-003.
+All non-2xx responses use RFC 9457 Problem Details via `problem.Write(...)`. Auth audit events stamp a server-generated UUID trace ID and do not echo client-provided `X-Trace-Id` values.
 
 ### 8.3 Idempotency
 
@@ -390,12 +390,12 @@ Auth's own HTTP surface (4 routes) has no list endpoints. `Service.ListUsers` / 
 
 - `log.Printf` on login failure (`handler.go:56`) and change-password failure (`handler.go:112`).
 - `internal/platform/observability/http.go:15` reads `CurrentUserFromContext` for log enrichment downstream.
-- No structured log keys; no metrics. Trace-id propagation: opportunistic echo of `X-Trace-Id` header.
+- No structured log keys; no metrics. Auth audit events stamp a server-generated UUID trace ID rather than reusing caller-supplied headers.
 
 ### 8.6 Concurrency / Transactions
 
 - `Authenticate`, `ResolveSession`, `Logout`, `ChangePasswordForUser`, `BootstrapLocalAdmin`, `AdminResetPassword`, `UnlockUser` each issue their own `db.Exec/QueryRow` with no shared transaction.
-- `Repository.CreateUser` opens its own `BeginTx` (artifact 02-flow-create-user Â§2); `RoleAdminRepository.ReplaceUserRoles` opens its own `BeginTx`. `Service.CreateUser` calls them sequentially without an outer tx â€” non-atomic across modules (T-004).
+- `Service.CreateUser` now prefers a shared transaction when both auth and IAM adapters expose tx-aware methods; fallback adapters still run sequentially and remain the residual T-004 case.
 
 ### 8.7 Configuration surface
 
@@ -435,11 +435,11 @@ From artifact 03 Â§4. Loaded in `internal/platform/authn/config.go:101-116`.
 | Bcrypt at `bcrypt.DefaultCost` (= 10) for password hashing | No ADR. **missing-ADR** â†’ T-010 |
 | Per-account lockout; no IP-rate-limit | No ADR. **missing-ADR** â†’ T-010 |
 | Identity tenant-global (`auth_identities` has no `tenant_id`); roles tenant-scoped | No ADR. **missing-ADR** â†’ T-008 |
-| `CreateUser` non-atomic across `auth_identities` + `iam_user_roles` (two transactions) | No ADR. **missing-ADR** â†’ T-004 |
+| `CreateUser` relies on tx-aware auth/IAM adapters for atomicity; fallback adapters still execute sequentially | No ADR. **missing-ADR** â†’ T-004 |
 | `LegacyHeaderEnabled` X-User-Id bypass retained as opt-in | No ADR. **missing-ADR** â†’ T-001 |
 | Auth NOT under oapi-codegen (consistent with ADR 0012 partial rollout) | [`wiki/decisions/0012-contract-first-api.md`](../decisions/0012-contract-first-api.md) |
 | Legacy `{error:{code,...}}` envelope retained pending RFC 9457 migration | No ADR. **missing-ADR** â†’ T-003 |
-| Session cookie attributes: HttpOnly, SameSite=Lax, Secure conditional on env | No ADR. **missing-ADR** â†’ T-010 |
+| Session cookie attributes: HttpOnly, SameSite=Strict, Secure conditional on env | No ADR. **missing-ADR** â†’ T-010 |
 
 ---
 
@@ -514,6 +514,7 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 
 ## Changelog
 
+- 2026-05-25 - Phase 11 auth medium sweep: `CreateUserWithInput` now routes through shared tx-aware helpers when available, bootstrap admin password bytes are zeroed after hashing, `problem.Write` failures are logged through a helper, audit writes skip marshal-failed payloads, audit trace IDs are always server-generated UUIDs, and `ListUsers`/lockout/session-touch hot spots are documented with TODOs.
 - 2026-05-25 - Phase 8 auth mediums: failed-login audit now records `auth.login.failed` with SHA-256 identifier hash; audit trace IDs are allowlisted with server UUID fallback; audit payload marshal failures emit a sentinel payload; session cookies use `SameSite=Strict`; `TouchSession` has a 30-second grace window; `AuthenticatedSession` redacts raw tokens in string/JSON output; tenant selection query is ordered.
 
 - 2026-05-11 â€” Plan 3 (session-bound tenant): `Session.TenantID` + `CurrentUser.TenantID` added; `ResolveSession` drops `tenantID` arg; `resolveLoginTenant` + `AllowDevTenantFallback`; new errors `ErrTenantNotPermitted`/`ErrTenantClaimRequired`; middleware now injects `tenant.WithTenantID` + strips `X-Tenant-ID` header; migrations 0184/0185; `SeedUserTenants` helper; Key files, Â§2, Â§5.2, Â§6.1, Â§6.2, Â§6.4, Â§8.7, Â§12 updated.

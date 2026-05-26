@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/platform/problem"
@@ -75,7 +77,7 @@ func TestRecordAudit_AuditFailureDoesNotPanic(t *testing.T) {
 	h.recordAudit(req, "u-1", "auth.logout", "u-1", map[string]any{})
 }
 
-func TestRecordAudit_RejectsUnsafeTraceID(t *testing.T) {
+func TestRecordAudit_GeneratesServerTraceID(t *testing.T) {
 	audit := &captureAuditWriter{}
 	h := &Handler{
 		audit: audit,
@@ -89,8 +91,8 @@ func TestRecordAudit_RejectsUnsafeTraceID(t *testing.T) {
 	if audit.event.TraceID == "trace\r\npoison" {
 		t.Fatal("unsafe trace id was accepted")
 	}
-	if !traceIDPattern.MatchString(audit.event.TraceID) {
-		t.Fatalf("fallback trace id = %q, want safe generated id", audit.event.TraceID)
+	if _, err := uuid.Parse(audit.event.TraceID); err != nil {
+		t.Fatalf("trace id = %q, want generated uuid: %v", audit.event.TraceID, err)
 	}
 }
 

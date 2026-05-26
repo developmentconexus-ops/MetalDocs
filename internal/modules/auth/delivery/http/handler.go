@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -37,10 +36,8 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"newPassword"`
 }
 
-var traceIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
-
 func (r loginRequest) String() string {
-	return fmt.Sprintf("loginRequest{identifier:%q}", r.Identifier)
+	return fmt.Sprintf("{identifier:%s}", strings.TrimSpace(r.Identifier))
 }
 
 func (r changePasswordRequest) String() string {
@@ -70,7 +67,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 
@@ -122,7 +119,7 @@ func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, user)
@@ -135,13 +132,13 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 		return
 	}
 
 	var req changePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 	if err := h.service.ChangePasswordForUser(r.Context(), user, req.CurrentPassword, req.NewPassword); err != nil {
@@ -151,7 +148,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, user.TenantID)
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
@@ -164,21 +161,21 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrInvalidCredentials):
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityLocked):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_LOCKED", "Account is temporarily locked"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_LOCKED", "Account is temporarily locked"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 	case errors.Is(err, authdomain.ErrIdentityInactive):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive"))
 	case errors.Is(err, authdomain.ErrTenantNotPermitted):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant"))
 	case errors.Is(err, authdomain.ErrTenantClaimRequired):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required"))
 	default:
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
 	}
 }
 
@@ -188,12 +185,10 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	}
 	raw, marshalErr := json.Marshal(payload)
 	if marshalErr != nil {
-		raw = []byte(`{"error":"marshal_failed"}`)
+		log.Printf("auth audit payload marshal failed action=%s actor=%s: %v", action, actorID, marshalErr)
+		return
 	}
 	traceID := uuid.NewString()
-	if v := strings.TrimSpace(r.Header.Get("X-Trace-Id")); traceIDPattern.MatchString(v) {
-		traceID = v
-	}
 	tenantID := ""
 	if sess, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
 		tenantID = sess.TenantID
@@ -210,6 +205,12 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 		TenantID:     tenantID,
 	}); err != nil {
 		log.Printf("auth audit write failed action=%s actor=%s: %v", action, actorID, err)
+	}
+}
+
+func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
+	if err := problem.Write(w, p); err != nil {
+		log.Printf("auth problem write failed: %v", err)
 	}
 }
 

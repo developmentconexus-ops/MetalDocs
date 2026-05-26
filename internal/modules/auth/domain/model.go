@@ -8,6 +8,7 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// PasswordHash must only be set via bcrypt.GenerateFromPassword; never assign raw strings.
 type PasswordHash string
 type PlainPassword string
 type UserID string
@@ -19,9 +20,11 @@ func (id SessionID) String() string { return string(id) }
 func (id TenantID) String() string  { return string(id) }
 
 type Identity struct {
-	UserID              string
-	Username            string
-	Email               string
+	UserID   string
+	Username string
+	Email    string
+	// TODO: migration 0021 originally missed display_name/is_active in early
+	// environments; keep later auth migrations applied before relying on them.
 	DisplayName         string
 	PasswordHash        PasswordHash
 	PasswordAlgo        string
@@ -121,6 +124,7 @@ type BootstrapAdminParams struct {
 	MustChangePassword bool
 }
 
+// CurrentUser fields are PII; do not log this struct directly.
 type CurrentUser struct {
 	UserID             string           `json:"userId"`
 	TenantID           string           `json:"tenantId"`
@@ -138,7 +142,7 @@ type AuthenticatedSession struct {
 }
 
 func (s AuthenticatedSession) String() string {
-	return "AuthenticatedSession{redacted}"
+	return "***"
 }
 
 func (s AuthenticatedSession) MarshalJSON() ([]byte, error) {
@@ -147,7 +151,7 @@ func (s AuthenticatedSession) MarshalJSON() ([]byte, error) {
 		CurrentUser CurrentUser `json:"currentUser"`
 		ExpiresAt   time.Time   `json:"expiresAt"`
 	}{
-		RawToken:    "[REDACTED]",
+		RawToken:    "***",
 		CurrentUser: s.CurrentUser,
 		ExpiresAt:   s.ExpiresAt,
 	})

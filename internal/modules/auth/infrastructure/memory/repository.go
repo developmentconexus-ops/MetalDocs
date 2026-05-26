@@ -410,6 +410,7 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 }
 
 // SeedUserTenants sets the tenant list for a user. Used in tests only.
+// GetUserTenants returns an empty slice until this helper seeds the user.
 func (r *Repository) SeedUserTenants(userID string, tenantIDs []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

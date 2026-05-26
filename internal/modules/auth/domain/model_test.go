@@ -38,7 +38,7 @@ func TestAuthenticatedSession_RedactsRawToken(t *testing.T) {
 	if strings.Contains(string(raw), "secret-token") {
 		t.Fatalf("MarshalJSON leaked token: %s", raw)
 	}
-	if !strings.Contains(string(raw), "[REDACTED]") {
+	if !strings.Contains(string(raw), "***") {
 		t.Fatalf("MarshalJSON did not include redaction marker: %s", raw)
 	}
 }
