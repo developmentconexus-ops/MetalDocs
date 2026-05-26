@@ -3,6 +3,7 @@ package gotenberg
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -15,7 +16,10 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewClient(baseURL string) *Client {
+func NewClient(baseURL string) (*Client, error) {
+	if baseURL == "" {
+		return nil, errors.New("gotenberg: baseURL required")
+	}
 	return &Client{
 		baseURL: baseURL,
 		httpClient: &http.Client{
@@ -24,7 +28,7 @@ func NewClient(baseURL string) *Client {
 				return http.ErrUseLastResponse
 			},
 		},
-	}
+	}, nil
 }
 
 // ConvertHTMLToPDF sends an HTML document plus an auxiliary stylesheet to

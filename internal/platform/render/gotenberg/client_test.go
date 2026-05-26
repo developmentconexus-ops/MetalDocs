@@ -60,7 +60,10 @@ func TestConvertDocxToPDFPostsMultipartDOCX(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
 	client.httpClient = server.Client()
 
 	pdfContent, err := client.ConvertDocxToPDF(context.Background(), docxContent)
@@ -88,7 +91,10 @@ func TestConvertHTMLToPDF_SendsMultipartToChromiumRoute(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
 	client.httpClient = server.Client()
 
 	pdf, err := client.ConvertHTMLToPDF(
@@ -143,14 +149,27 @@ func TestConvertDocxToPDFReturnsStatusErrorBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
 	client.httpClient = server.Client()
 
-	_, err := client.ConvertDocxToPDF(context.Background(), []byte("fake-docx-content"))
+	_, err = client.ConvertDocxToPDF(context.Background(), []byte("fake-docx-content"))
 	if err == nil {
 		t.Fatalf("expected error when server returns non-200")
 	}
 	if !strings.Contains(err.Error(), "status 502: conversion failed") {
 		t.Fatalf("expected status error with response body, got %v", err)
+	}
+}
+
+func TestNewClientRequiresBaseURL(t *testing.T) {
+	client, err := NewClient("")
+	if err == nil {
+		t.Fatal("expected constructor error")
+	}
+	if client != nil {
+		t.Fatalf("expected nil client, got %#v", client)
 	}
 }

@@ -7,8 +7,11 @@ import (
 )
 
 type DocgenConfig struct {
-	Enabled               bool
-	APIURL                string
+	// immutable after Load().
+	Enabled bool
+	// immutable after Load().
+	APIURL string
+	// immutable after Load().
 	RequestTimeoutSeconds int
 }
 
@@ -26,9 +29,10 @@ func LoadDocgenConfig() (DocgenConfig, error) {
 		if err != nil {
 			return DocgenConfig{}, err
 		}
-		if parsed > 0 {
-			timeoutSeconds = parsed
-		}
+		timeoutSeconds = parsed
+	}
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 30
 	}
 
 	return DocgenConfig{

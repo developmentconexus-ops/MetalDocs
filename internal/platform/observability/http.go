@@ -61,7 +61,7 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
 
-		path := r.URL.EscapedPath()
+		path := strings.ReplaceAll(r.URL.Path, "\n", "")
 		route := normalizeRoute(path)
 		method := r.Method
 		elapsedMs := time.Since(start).Milliseconds()
@@ -152,6 +152,9 @@ func (o *HTTPObservability) snapshot() []metricItem {
 
 func (o *HTTPObservability) getMetric(route, method string) *routeMetrics {
 	key := method + " " + route
+	// Take the read lock first so hot-path lookups do not queue behind writers.
+	// We release it before Lock to avoid starving concurrent readers while a new
+	// route bucket is being created.
 	o.mu.RLock()
 	m, ok := o.byKey[key]
 	o.mu.RUnlock()
@@ -238,6 +241,7 @@ func (w *statusWriter) WriteHeader(statusCode int) {
 
 func (w *statusWriter) Write(b []byte) (int, error) {
 	if w.status == 0 {
+		// Header() is called before Write; the result here is always the set value.
 		if v := w.Header().Get("Status"); v != "" {
 			if code, err := strconv.Atoi(v); err == nil {
 				w.status = code

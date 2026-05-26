@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 // TemplatesTemplateReader implements documents/application.TemplateReader
@@ -31,13 +32,15 @@ func (r *TemplatesTemplateReader) GetPublishedVersion(ctx context.Context, tenan
 		templateVersionID, tenantID, systemTemplateTenantID,
 	).Scan(&docxKey)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", fmt.Errorf("templates reader: %w", err)
 	}
 	return docxKey, "", "", nil
 }
 
 // FanoutTemplateReader tries the primary reader first; if it returns sql.ErrNoRows,
 // it falls back to the secondary reader.
+// TODO: extract interfaces for testing so fanout behavior can be exercised
+// without constructing concrete storage-backed readers.
 type FanoutTemplateReader struct {
 	primary   *TemplateReader
 	secondary *TemplatesTemplateReader
@@ -53,7 +56,7 @@ func (f *FanoutTemplateReader) GetPublishedVersion(ctx context.Context, tenantID
 		return docxKey, schemaKey, schemaJSON, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return "", "", "", err
+		return "", "", "", fmt.Errorf("templates reader secondary: %w", err)
 	}
 	return f.secondary.GetPublishedVersion(ctx, tenantID, templateVersionID)
 }

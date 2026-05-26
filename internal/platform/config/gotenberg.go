@@ -3,8 +3,10 @@ package config
 import "os"
 
 type GotenbergConfig struct {
+	// immutable after Load().
 	Enabled bool
-	URL     string
+	// immutable after Load().
+	URL string
 }
 
 func LoadGotenbergConfig() GotenbergConfig {

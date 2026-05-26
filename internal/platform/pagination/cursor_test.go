@@ -58,17 +58,19 @@ func equalCursor(a, b Cursor) bool {
 
 func TestCursor(t *testing.T) {
 	t.Run("round-trip", func(t *testing.T) {
-		in := Cursor{
-			V: CursorVersion,
-			Sort: []SortField{
+		in, err := NewCursor(
+			[]SortField{
 				{Field: "updated_at", Direction: "desc"},
 				{Field: "id", Direction: "asc"},
 			},
-			Anchor: map[string]any{
+			map[string]any{
 				"updated_at": "2026-05-10T14:30:00Z",
 				"id":         "550e8400-abc",
 			},
-			FilterHash: "abc123",
+			"abc123",
+		)
+		if err != nil {
+			t.Fatalf("NewCursor error: %v", err)
 		}
 
 		enc, err := Encode(in, testSigningSecret)
@@ -264,6 +266,15 @@ func TestCursor(t *testing.T) {
 					t.Fatalf("got=%+v want=%+v", got, tc.want)
 				}
 			})
+		}
+	})
+
+	t.Run("NewCursor validates sort", func(t *testing.T) {
+		if _, err := NewCursor(nil, nil, "h"); !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor for empty sort, got %v", err)
+		}
+		if _, err := NewCursor([]SortField{{Field: "id", Direction: "sideways"}}, nil, "h"); !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor for bad direction, got %v", err)
 		}
 	})
 }

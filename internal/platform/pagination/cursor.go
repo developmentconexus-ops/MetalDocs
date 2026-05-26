@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"strings"
 )
 
 type SortField struct {
@@ -22,6 +23,27 @@ type Cursor struct {
 	Sort       []SortField    `json:"sort"`
 	Anchor     map[string]any `json:"anchor"`
 	FilterHash string         `json:"filter_hash"`
+}
+
+func NewCursor(sortFields []SortField, anchor map[string]any, filterHash string) (Cursor, error) {
+	c := Cursor{
+		V:          CursorVersion,
+		Sort:       append([]SortField(nil), sortFields...),
+		Anchor:     anchor,
+		FilterHash: filterHash,
+	}
+	if len(c.Sort) == 0 {
+		return Cursor{}, fmt.Errorf("%w: sort must not be empty", ErrInvalidCursor)
+	}
+	for i, sf := range c.Sort {
+		if sf.Direction != "asc" && sf.Direction != "desc" {
+			return Cursor{}, fmt.Errorf("%w: sort[%d].dir %q must be asc or desc", ErrInvalidCursor, i, sf.Direction)
+		}
+		if sf.Field == "" {
+			return Cursor{}, fmt.Errorf("%w: sort[%d].field empty", ErrInvalidCursor, i)
+		}
+	}
+	return c, nil
 }
 
 const (
@@ -125,24 +147,25 @@ func HashFilters(params url.Values, allowed []string) string {
 	}
 	sort.Strings(keys)
 
-	canonical := ""
+	var canonical strings.Builder
 	for i, k := range keys {
 		vals := append([]string(nil), params[k]...)
 		sort.Strings(vals)
 
 		if i > 0 {
-			canonical += ";"
+			canonical.WriteByte(';')
 		}
-		canonical += url.QueryEscape(k) + "="
+		canonical.WriteString(url.QueryEscape(k))
+		canonical.WriteByte('=')
 		for j, v := range vals {
 			if j > 0 {
-				canonical += ","
+				canonical.WriteByte(',')
 			}
-			canonical += url.QueryEscape(v)
+			canonical.WriteString(url.QueryEscape(v))
 		}
 	}
 
-	sum := sha256.Sum256([]byte(canonical))
+	sum := sha256.Sum256([]byte(canonical.String()))
 	return hex.EncodeToString(sum[:])
 }
 

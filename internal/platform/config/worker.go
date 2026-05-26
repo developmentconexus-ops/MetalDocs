@@ -13,8 +13,9 @@ type WorkerConfig struct {
 	ReviewReminderDays  int
 	RunOnce             bool
 	MaxAttempts         int
-	RetryBaseSeconds    int
-	RetryMaxSeconds     int
+	// RetryMaxSeconds must stay >= RetryBaseSeconds so backoff growth remains monotonic.
+	RetryBaseSeconds int
+	RetryMaxSeconds  int
 }
 
 func LoadWorkerConfig() (WorkerConfig, error) {

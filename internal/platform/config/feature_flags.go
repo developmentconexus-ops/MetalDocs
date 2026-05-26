@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -15,6 +16,8 @@ type FeatureFlagsConfig struct {
 	MDDMNativeExportRolloutPercent int
 }
 
+var ErrInvalidPercentage = errors.New("invalid percentage")
+
 // LoadFeatureFlagsConfig reads feature flag config from environment variables.
 func LoadFeatureFlagsConfig() (FeatureFlagsConfig, error) {
 	pct := 0
@@ -23,10 +26,8 @@ func LoadFeatureFlagsConfig() (FeatureFlagsConfig, error) {
 		if err != nil {
 			return FeatureFlagsConfig{}, err
 		}
-		if parsed < 0 {
-			parsed = 0
-		} else if parsed > 100 {
-			parsed = 100
+		if parsed < 0 || parsed > 100 {
+			return FeatureFlagsConfig{}, ErrInvalidPercentage
 		}
 		pct = parsed
 	}

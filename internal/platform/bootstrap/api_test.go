@@ -96,8 +96,8 @@ func TestBuildAPIDependenciesMarksGotenbergDownWhenHealthCheckFails(t *testing.T
 	if got := check["status"]; got != "down" {
 		t.Fatalf("gotenberg status = %v, want down", got)
 	}
-	if got := check["detail"]; got != "gotenberg unhealthy: status 503" {
-		t.Fatalf("gotenberg detail = %v, want %q", got, "gotenberg unhealthy: status 503")
+	if got := check["detail"]; got != "runtime: gotenberg unhealthy: status 503" {
+		t.Fatalf("gotenberg detail = %v, want %q", got, "runtime: gotenberg unhealthy: status 503")
 	}
 }
 
