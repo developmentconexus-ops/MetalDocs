@@ -109,7 +109,7 @@ func (r *SnapshotRepository) readSnapshot(ctx context.Context, exec DBTX, tenant
 	return s, valuesFrozenAt, err
 }
 
-func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenant, docID string, valuesHash []byte, frozenAt time.Time, q ...DBTX) error {
+func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenantID, docID string, valuesHash []byte, frozenAt time.Time, q ...DBTX) error {
 	exec := DBTX(r.db)
 	if len(q) > 0 && q[0] != nil {
 		exec = q[0]
@@ -117,8 +117,8 @@ func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenant, docID stri
 	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET values_hash=$1, values_frozen_at=$2
-         WHERE tenant_id=$3 AND id=$4`, r.table("documents")),
-		valuesHash, frozenAt, tenant, docID)
+         WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
+		valuesHash, frozenAt, tenantID, docID)
 	if err != nil {
 		return fmt.Errorf("write freeze: %w", err)
 	}
@@ -126,7 +126,7 @@ func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenant, docID stri
 }
 
 // WriteFinalDocx persists the fanout output pointer and content hash onto a document.
-func (r *SnapshotRepository) WriteFinalDocx(ctx context.Context, tenant, docID, s3Key string, contentHash []byte, q ...DBTX) error {
+func (r *SnapshotRepository) WriteFinalDocx(ctx context.Context, tenantID, docID, s3Key string, contentHash []byte, q ...DBTX) error {
 	exec := DBTX(r.db)
 	if len(q) > 0 && q[0] != nil {
 		exec = q[0]
@@ -135,7 +135,7 @@ func (r *SnapshotRepository) WriteFinalDocx(ctx context.Context, tenant, docID, 
         UPDATE %s
            SET final_docx_s3_key=$1, content_hash=$2
          WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
-		s3Key, contentHash, tenant, docID)
+		s3Key, contentHash, tenantID, docID)
 	if err != nil {
 		return fmt.Errorf("write final docx: %w", err)
 	}
@@ -164,12 +164,12 @@ func (r *SnapshotRepository) ReadFinalDocxS3Key(ctx context.Context, tenantID, d
 }
 
 // WritePDF persists the rendered PDF pointer, hash, and generation timestamp.
-func (r *SnapshotRepository) WritePDF(ctx context.Context, tenant, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error {
+func (r *SnapshotRepository) WritePDF(ctx context.Context, tenantID, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error {
 	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET final_pdf_s3_key=$1, pdf_hash=$2, pdf_generated_at=$3
          WHERE tenant_id=$4::uuid AND id=$5::uuid`, r.table("documents")),
-		s3Key, pdfHash, generatedAt, tenant, docID)
+		s3Key, pdfHash, generatedAt, tenantID, docID)
 	if err != nil {
 		return fmt.Errorf("write pdf: %w", err)
 	}
@@ -191,12 +191,12 @@ func (r *SnapshotRepository) ResolveTenantByDocumentID(ctx context.Context, docI
 
 // AppendReconstruction appends a forensic attempt entry onto documents.reconstruction_attempts.
 // Never touches final_docx_s3_key or content_hash.
-func (r *SnapshotRepository) AppendReconstruction(ctx context.Context, tenant, docID string, entry []byte) error {
+func (r *SnapshotRepository) AppendReconstruction(ctx context.Context, tenantID, docID string, entry []byte) error {
 	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET reconstruction_attempts = reconstruction_attempts || $1::jsonb
          WHERE tenant_id=$2::uuid AND id=$3::uuid`, r.table("documents")),
-		entry, tenant, docID)
+		entry, tenantID, docID)
 	if err != nil {
 		return fmt.Errorf("append reconstruction: %w", err)
 	}

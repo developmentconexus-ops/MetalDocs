@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"time"
@@ -77,6 +78,9 @@ func (r *SnapshotSchemaReader) LoadPlaceholderSchema(ctx context.Context, tenant
 		  FROM documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`, tenantID, revisionID).
 		Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, v2domain.ErrNotFound
+		}
 		return nil, err
 	}
 	return parsePlaceholderSchema(raw)
@@ -142,7 +146,7 @@ func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actor
 	}
 	if s.draftResolver != nil {
 		if rerr := s.draftResolver.ResolveComputedIfStale(ctx, tenantID, revisionID); rerr != nil {
-			log.Printf("draft resolver best-effort error: %v", rerr)
+			slog.WarnContext(ctx, "draft resolver best-effort error: %v", "tenant_id", tenantID, "revision_id", revisionID, "err", rerr)
 		}
 	}
 	return nil
@@ -276,14 +280,14 @@ func (s *FillInService) WithTemplateSchemaReader(r *TemplateVersionSchemaReader)
 
 func (s *FillInService) GetPlaceholderValues(ctx context.Context, tenantID, docID string) ([]repository.PlaceholderValue, error) {
 	if s.reader == nil {
-		return nil, nil
+		return nil, errors.New("fill-in reader not configured")
 	}
 	return s.reader.ListValues(ctx, tenantID, docID)
 }
 
 func (s *FillInService) GetFillInSchema(ctx context.Context, tenantID, docID string) ([]templatesdomain.Placeholder, error) {
 	if s.schemaFromTpl == nil {
-		return nil, nil
+		return nil, errors.New("fill-in schema reader not configured")
 	}
 	return s.schemaFromTpl.LoadFillInSchema(ctx, tenantID, docID)
 }

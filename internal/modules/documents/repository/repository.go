@@ -1044,7 +1044,16 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 }
 
 func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Time) (int, error) {
-	res, err := r.db.ExecContext(ctx,
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	if err := authz.BypassSystem(ctx, tx); err != nil {
+		return 0, err
+	}
+
+	res, err := tx.ExecContext(ctx,
 		`WITH batch AS (
 			SELECT id
 			FROM autosave_pending_uploads
@@ -1060,6 +1069,9 @@ func (r *Repository) DeleteExpiredPending(ctx context.Context, olderThan time.Ti
 		return 0, err
 	}
 	n, _ := res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
 	return int(n), nil
 }
 

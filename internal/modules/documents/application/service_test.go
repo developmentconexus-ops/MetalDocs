@@ -514,7 +514,7 @@ func TestFinalize_FromDraft_OK(t *testing.T) {
 	if repo.statusCalls != 1 {
 		t.Fatalf("expected one status update call, got %d", repo.statusCalls)
 	}
-	if repo.statusCur != domain.DocStatusDraft || repo.statusNext != domain.DocStatusFinalized || !repo.statusStamp {
+	if repo.statusCur != domain.DocStatusDraft || repo.statusNext != domain.DocStatusUnderReview || !repo.statusStamp {
 		t.Fatalf("unexpected status transition cur=%s next=%s stamp=%v", repo.statusCur, repo.statusNext, repo.statusStamp)
 	}
 }

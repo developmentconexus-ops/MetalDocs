@@ -12,34 +12,34 @@ import (
 
 type stubRevisionReader struct{}
 
-func (stubRevisionReader) GetRevisionNumber(_ context.Context, _, _ string) (int64, error) {
+func (stubRevisionReader) GetRevisionNumber(_ context.Context, _ resolvers.TenantID, _ resolvers.RevisionID) (int64, error) {
 	return 0, nil
 }
-func (stubRevisionReader) GetEffectiveFrom(_ context.Context, _, _ string) (time.Time, error) {
+func (stubRevisionReader) GetEffectiveFrom(_ context.Context, _ resolvers.TenantID, _ resolvers.RevisionID) (time.Time, error) {
 	return time.Time{}, nil
 }
-func (stubRevisionReader) GetAuthor(_ context.Context, _, _ string) (resolvers.AuthorInfo, error) {
+func (stubRevisionReader) GetAuthor(_ context.Context, _ resolvers.TenantID, _ resolvers.RevisionID) (resolvers.AuthorInfo, error) {
 	return resolvers.AuthorInfo{}, nil
 }
 
 type stubWorkflowReader struct{}
 
-func (stubWorkflowReader) GetApprovers(_ context.Context, _, _, _ string) ([]resolvers.ApproverInfo, error) {
+func (stubWorkflowReader) GetApprovers(_ context.Context, _ resolvers.TenantID, _ resolvers.RevisionID, _ resolvers.ApprovalInstanceID) ([]resolvers.ApproverInfo, error) {
 	return nil, nil
 }
-func (stubWorkflowReader) GetFinalApprovalDate(_ context.Context, _, _ string) (time.Time, error) {
+func (stubWorkflowReader) GetFinalApprovalDate(_ context.Context, _ resolvers.TenantID, _ resolvers.RevisionID) (time.Time, error) {
 	return time.Time{}, nil
 }
 
 type stubRegistryReader struct{}
 
-func (stubRegistryReader) GetControlledDocument(_ context.Context, _, _ string) (resolvers.ControlledDocumentInfo, error) {
+func (stubRegistryReader) GetControlledDocument(_ context.Context, _ resolvers.TenantID, _ resolvers.ControlledDocumentID) (resolvers.ControlledDocumentInfo, error) {
 	return resolvers.ControlledDocumentInfo{}, nil
 }
 
 type stubDocumentReader struct{}
 
-func (stubDocumentReader) GetDocumentTitle(_ context.Context, _, _ string) (string, error) {
+func (stubDocumentReader) GetDocumentTitle(_ context.Context, _ resolvers.TenantID, _ resolvers.RevisionID) (string, error) {
 	return "", nil
 }
 
@@ -74,7 +74,7 @@ func TestBuild_WiresDocumentReaderAndControlledDocumentID(t *testing.T) {
 	if in.DocumentReader == nil {
 		t.Fatalf("DocumentReader was not set on ResolveInput")
 	}
-	if in.ControlledDocumentID != cdID {
+	if in.ControlledDocumentID != resolvers.ControlledDocumentID(cdID) {
 		t.Fatalf("ControlledDocumentID = %q, want %q", in.ControlledDocumentID, cdID)
 	}
 	if in.AreaCodeSnapshot != areaCode {

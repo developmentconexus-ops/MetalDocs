@@ -105,16 +105,12 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 		return nil, err
 	}
 
-	exp, err := s.repo.InsertExport(ctx, &domain.Export{
-		DocumentID:    documentID,
-		RevisionID:    rev.ID,
-		CompositeHash: compositeHash,
-		StorageKey:    storageKey,
-		SizeBytes:     sizeBytes,
-		PaperSize:     opts.PaperSize,
-		Landscape:     opts.LandscapeP,
-		DocgenV2Ver:   s.docgenVer,
-	})
+	exportRow, err := domain.NewExport(documentID, rev.ID, compositeHash, storageKey, sizeBytes, opts.PaperSize, opts.LandscapeP, s.docgenVer)
+	if err != nil {
+		return nil, err
+	}
+
+	exp, err := s.repo.InsertExport(ctx, exportRow)
 	if err != nil {
 		return nil, err
 	}

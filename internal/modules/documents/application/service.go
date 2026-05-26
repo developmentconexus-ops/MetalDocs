@@ -887,7 +887,7 @@ func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorI
 }
 
 func (s *Service) Finalize(ctx context.Context, tenantID, docID, actorID string) error {
-	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, docID, domain.DocStatusDraft, domain.DocStatusFinalized, true); err != nil {
+	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, docID, domain.DocStatusDraft, domain.DocStatusUnderReview, true); err != nil {
 		return err
 	}
 	s.audit.Write(ctx, tenantID, actorID, "document.finalized", docID, nil)
