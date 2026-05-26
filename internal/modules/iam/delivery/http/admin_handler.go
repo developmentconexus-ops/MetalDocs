@@ -487,7 +487,7 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 		ResourceType: "user",
 		ResourceID:   userID,
 		PayloadJSON:  string(payloadJSON),
-		TraceID:      uuid.NewString(),
+		TraceID:      r.Header.Get("X-Trace-Id"),
 		TenantID:     tenantID,
 	}); err != nil {
 		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
