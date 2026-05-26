@@ -456,7 +456,7 @@ func main() {
 	}()
 
 	stopSessions := jobs.StartSessionSweeper(ctx, docMod.Repo(), 60*time.Second)
-	stopOrphans := jobs.StartOrphanPendingSweeper(ctx, docMod.Repo(), time.Hour)
+	stopOrphans := jobs.StartOrphanPendingSweeper(ctx, docMod.Repo(), time.Hour, 24*time.Hour)
 	defer stopSessions()
 	defer stopOrphans()
 	mux.Handle("/api/v1/metrics", httpObs.MetricsHandler())

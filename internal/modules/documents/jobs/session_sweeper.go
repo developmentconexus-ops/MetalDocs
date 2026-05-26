@@ -17,8 +17,8 @@ func StartSessionSweeper(ctx context.Context, r *repository.Repository, interval
 			select {
 			case <-ctx.Done():
 				return
-			case now := <-ticker.C:
-				n, err := r.ExpireStaleSessions(ctx, now)
+			case <-ticker.C:
+				n, err := r.ExpireStaleSessions(ctx, time.Now())
 				if err != nil {
 					log.Printf("session_sweeper error: %v", err)
 					continue

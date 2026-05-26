@@ -13,6 +13,7 @@ import (
 	"time"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	documentsapi "metaldocs/internal/modules/documents/api"
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/domain"
@@ -266,6 +267,9 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 			for _, split := range strings.Split(raw, ",") {
 				s := strings.TrimSpace(split)
 				if s != "" {
+					if !isKnownDocumentStatus(s) {
+						return opts, "", fmt.Errorf("invalid status %q", s)
+					}
 					statuses = append(statuses, s)
 				}
 			}
@@ -392,6 +396,10 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	if !isValidBoundedText(req.Name, 255) {
+		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
 
@@ -559,7 +567,7 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	if err := h.db.QueryRowContext(r.Context(),
 		`SELECT COALESCE(content_hash, '') FROM document_revisions
 		  WHERE document_id = $1
-		  ORDER BY created_at DESC LIMIT 1`,
+		  ORDER BY created_at DESC, id DESC LIMIT 1`,
 		docID,
 	).Scan(&contentHash); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		log.Printf("documents finalize load content hash error: doc_id=%s tenant_id=%s err=%v", docID, tenantID, err)
@@ -584,7 +592,11 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	respBody := map[string]string{"instanceId": result.InstanceID}
 	if idempStore != nil && idempHandle != nil {
-		body, _ := json.Marshal(respBody)
+		body, err := json.Marshal(respBody)
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, "internal_error")
+			return
+		}
 		if err := idempStore.CompleteReplay(idempHandle, http.StatusCreated, body); err != nil {
 			log.Printf("documents finalize idempotency complete error: %v", err)
 		}
@@ -812,7 +824,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("documents.commit_autosave failed: doc_id=%s tenant_id=%s actor_id=%s session_id=%s pending_upload_id=%s err=%v",
-			docID, tenantID, userID, req.SessionID, req.PendingUploadID, err)
+			docID, tenantID, userID, redactID(req.SessionID), redactID(req.PendingUploadID), err)
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -939,6 +951,10 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	if !isValidBoundedText(req.Label, 255) {
+		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
 
@@ -1260,4 +1276,35 @@ func mapErr(err error) (int, string) {
 
 func httpErr(w http.ResponseWriter, status int, msg string) {
 	_ = problem.Write(w, problem.New(status, problem.Code(msg), msg))
+}
+
+func isKnownDocumentStatus(status string) bool {
+	switch documentsapi.DocumentSummaryStatus(status) {
+	case documentsapi.Approved,
+		documentsapi.Draft,
+		documentsapi.Obsolete,
+		documentsapi.Published,
+		documentsapi.Rejected,
+		documentsapi.Scheduled,
+		documentsapi.Superseded,
+		documentsapi.UnderReview:
+		return true
+	default:
+		return status == string(domain.DocStatusArchived)
+	}
+}
+
+func isValidBoundedText(value string, max int) bool {
+	trimmed := strings.TrimSpace(value)
+	return trimmed != "" && len(trimmed) <= max
+}
+
+func redactID(value string) string {
+	if value == "" {
+		return ""
+	}
+	if len(value) <= 8 {
+		return value + "..."
+	}
+	return value[:8] + "..."
 }

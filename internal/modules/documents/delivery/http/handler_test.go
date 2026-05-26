@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -41,8 +42,8 @@ type fakeSvc struct {
 	syncErr      error
 	syncCmd      application.SyncArtifactMetadataCmd
 
-	renameErr  error
-	renameName string
+	renameErr    error
+	renameName   string
 	duplicateErr error
 
 	listPaginatedItems []*domain.Document
@@ -554,6 +555,24 @@ func TestRenameDocument_EmptyName_Returns400(t *testing.T) {
 	}
 }
 
+func TestRenameDocument_NameTooLong_Returns400WithoutCallingService(t *testing.T) {
+	svc := &fakeSvc{}
+	mux := newMux(t, svc)
+
+	body := []byte(`{"name":"` + strings.Repeat("a", 256) + `"}`)
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+	if svc.renameName != "" {
+		t.Fatalf("rename service should not be called, got %q", svc.renameName)
+	}
+}
+
 func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
@@ -714,6 +733,16 @@ func TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash(t *testi
 	}
 }
 
+func TestFinalizeDocument_ContentHashQueryUsesDeterministicTieBreaker(t *testing.T) {
+	src, err := os.ReadFile("handler.go")
+	if err != nil {
+		t.Fatalf("read handler.go: %v", err)
+	}
+	if !regexp.MustCompile(`ORDER BY created_at DESC, id DESC LIMIT 1`).Match(src) {
+		t.Fatal("content-hash lookup must sort by created_at DESC, id DESC")
+	}
+}
+
 func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -771,6 +800,19 @@ func TestDuplicateDocument_InternalError_DoesNotLeakDetail(t *testing.T) {
 	}
 	if strings.Contains(rr.Body.String(), "sensitive db detail") {
 		t.Fatalf("response must not leak internal error details: %s", rr.Body.String())
+	}
+}
+
+func TestCreateCheckpoint_EmptyLabel_Returns400(t *testing.T) {
+	mux := newMux(t, &fakeSvc{})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/checkpoints", bytes.NewReader([]byte(`{"label":"   "}`)))
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
 	}
 }
 

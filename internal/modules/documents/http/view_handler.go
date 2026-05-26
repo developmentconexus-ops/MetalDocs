@@ -3,6 +3,7 @@ package documentshttp
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	v2domain "metaldocs/internal/modules/documents/domain"
@@ -43,7 +44,7 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 		r.PathValue("id"),
 	)
 	if err != nil {
-		writeViewError(w, err)
+		writeViewError(r.Context(), w, tenantID, r.PathValue("id"), err)
 		return
 	}
 	payload := map[string]any{"pdf_status": result.PDFStatus}
@@ -54,13 +55,14 @@ func (h *ViewHandler) HandleView(w http.ResponseWriter, r *http.Request) {
 	writeFillInJSON(w, http.StatusOK, payload)
 }
 
-func writeViewError(w http.ResponseWriter, err error) {
+func writeViewError(ctx context.Context, w http.ResponseWriter, tenantID, documentID string, err error) {
 	switch {
 	case errors.As(err, &authz.ErrCapDenied{}):
 		writeFillInJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
 	case errors.Is(err, v2domain.ErrNotFound):
 		writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})
 	default:
+		slog.ErrorContext(ctx, "view document failed", "tenant_id", tenantID, "document_id", documentID, "err", err)
 		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal"})
 	}
 }

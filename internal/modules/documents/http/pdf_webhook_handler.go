@@ -37,10 +37,10 @@ func (h *PDFWebhookHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 type pdfCompleteBody struct {
-	TenantID        string `json:"tenant_id"`
-	FinalPDFS3Key   string `json:"final_pdf_s3_key"`
-	PDFHash         string `json:"pdf_hash"`
-	PDFGeneratedAt  string `json:"pdf_generated_at"`
+	TenantID       string `json:"tenant_id"`
+	FinalPDFS3Key  string `json:"final_pdf_s3_key"`
+	PDFHash        string `json:"pdf_hash"`
+	PDFGeneratedAt string `json:"pdf_generated_at"`
 }
 
 const pdfWebhookMaxBytes = 64 << 10 // 64 KiB
@@ -63,6 +63,10 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	var body pdfCompleteBody
 	if err := json.NewDecoder(bytes.NewReader(raw)).Decode(&body); err != nil {
 		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})
+		return
+	}
+	if !isValidFinalPDFS3Key(body.FinalPDFS3Key) {
+		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_final_pdf_s3_key"})
 		return
 	}
 	if strings.TrimSpace(body.FinalPDFS3Key) == "" || body.PDFHash == "" || body.PDFGeneratedAt == "" {
@@ -119,4 +123,12 @@ func validSignature(body []byte, sigHex, secret string) bool {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	return hmac.Equal(expected, mac.Sum(nil))
+}
+
+func isValidFinalPDFS3Key(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || len(trimmed) > 512 {
+		return false
+	}
+	return !strings.Contains(trimmed, "..") && !strings.Contains(trimmed, "\x00")
 }

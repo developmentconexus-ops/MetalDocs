@@ -3,6 +3,7 @@ package documentshttp
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	v2dom "metaldocs/internal/modules/documents/domain"
@@ -30,7 +31,7 @@ func (h *ReconstructHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeReconstructError(w, err)
+		writeReconstructError(r.Context(), w, "", r.PathValue("id"), err)
 		return
 	}
 
@@ -41,20 +42,21 @@ func (h *ReconstructHandler) HandleReconstruct(w http.ResponseWriter, r *http.Re
 		r.PathValue("id"),
 	)
 	if err != nil {
-		writeReconstructError(w, err)
+		writeReconstructError(r.Context(), w, tenantID, r.PathValue("id"), err)
 		return
 	}
 
 	writeFillInJSON(w, http.StatusOK, entry)
 }
 
-func writeReconstructError(w http.ResponseWriter, err error) {
+func writeReconstructError(ctx context.Context, w http.ResponseWriter, tenantID, documentID string, err error) {
 	switch {
 	case errors.As(err, &authz.ErrCapDenied{}):
 		writeFillInJSON(w, http.StatusForbidden, map[string]any{"error": "forbidden"})
 	case errors.Is(err, v2dom.ErrNotFound):
 		writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "not_found"})
 	default:
+		slog.ErrorContext(ctx, "reconstruct document failed", "tenant_id", tenantID, "document_id", documentID, "err", err)
 		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "internal"})
 	}
 }

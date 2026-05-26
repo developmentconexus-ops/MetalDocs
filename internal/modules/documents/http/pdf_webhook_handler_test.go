@@ -184,3 +184,19 @@ func TestPDFWebhookHandler_ResolveTenantFailureRejected500(t *testing.T) {
 		t.Fatalf("status=%d, want 500", rec.Code)
 	}
 }
+
+func TestPDFWebhookHandler_InvalidFinalPDFS3KeyRejected400(t *testing.T) {
+	h := NewPDFWebhookHandler(&fakePDFWriter{}, "shh")
+
+	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"../escape.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
+	req.SetPathValue("id", "doc-1")
+	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
+	rec := httptest.NewRecorder()
+
+	h.HandlePDFComplete(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d, want 400", rec.Code)
+	}
+}
