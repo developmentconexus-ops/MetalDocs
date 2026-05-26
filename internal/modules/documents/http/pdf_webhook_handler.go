@@ -69,7 +69,7 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_final_pdf_s3_key"})
 		return
 	}
-	if strings.TrimSpace(body.FinalPDFS3Key) == "" || body.PDFHash == "" || body.PDFGeneratedAt == "" {
+	if body.PDFHash == "" || body.PDFGeneratedAt == "" {
 		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "missing_fields"})
 		return
 	}

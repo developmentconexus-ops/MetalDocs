@@ -1304,7 +1304,7 @@ func redactID(value string) string {
 		return ""
 	}
 	if len(value) <= 8 {
-		return value + "..."
+		return "..."
 	}
 	return value[:8] + "..."
 }

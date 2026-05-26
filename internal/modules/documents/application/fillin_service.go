@@ -146,7 +146,7 @@ func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actor
 	}
 	if s.draftResolver != nil {
 		if rerr := s.draftResolver.ResolveComputedIfStale(ctx, tenantID, revisionID); rerr != nil {
-			slog.WarnContext(ctx, "draft resolver best-effort error: %v", "tenant_id", tenantID, "revision_id", revisionID, "err", rerr)
+			slog.WarnContext(ctx, "draft resolver best-effort error", "tenant_id", tenantID, "revision_id", revisionID, "err", rerr)
 		}
 	}
 	return nil
@@ -252,7 +252,7 @@ func (r *TemplateVersionSchemaReader) LoadFillInSchema(ctx context.Context, tena
 		docID, tenantID,
 	).Scan(&pRaw)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

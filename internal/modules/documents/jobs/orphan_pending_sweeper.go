@@ -18,7 +18,7 @@ func StartOrphanPendingSweeper(ctx context.Context, r *repository.Repository, in
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				cutoff := time.Now().Add(-maxAge)
+				cutoff := time.Now().UTC().Add(-maxAge)
 				n, err := r.DeleteExpiredPending(ctx, cutoff)
 				if err != nil {
 					log.Printf("orphan_pending_sweeper error: %v", err)
