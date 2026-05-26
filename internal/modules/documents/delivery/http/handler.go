@@ -180,7 +180,8 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	isAdmin := hasRole(r, roleAdmin)
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, err.Error())
+		log.Printf("documents listDocuments invalid query params: %v", err)
+		httpErr(w, http.StatusBadRequest, "bad_request")
 		return
 	}
 
@@ -214,7 +215,8 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 	isAdmin := hasRole(r, roleAdmin)
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, err.Error())
+		log.Printf("documents documentStats invalid query params: %v", err)
+		httpErr(w, http.StatusBadRequest, "bad_request")
 		return
 	}
 
