@@ -146,7 +146,6 @@ func MapErrorToResponse(err error) *problem.Problem {
 		var requiredParamErr *approvalapi.RequiredParamError
 		var requiredHeaderErr *approvalapi.RequiredHeaderError
 		var tooManyValuesErr *approvalapi.TooManyValuesForParamError
-		var validationErr *ValidationError
 
 		switch {
 		case errors.As(err, &invalidParamErr):
@@ -207,9 +206,6 @@ func MapErrorToResponse(err error) *problem.Problem {
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationEmptyBody
 		case errors.Is(err, contracts.ErrValidation):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationRequestInvalid
-		case errors.As(err, &validationErr):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationRequestInvalid
 		}

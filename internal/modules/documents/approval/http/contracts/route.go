@@ -93,6 +93,9 @@ func validateStages(stages []StageRequest) error {
 		if err := validateRequired(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
 			return err
 		}
+		if err := validateRouteCode(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
+			return err
+		}
 		if err := validateRequired(fmt.Sprintf("stages[%d].area_code", i), stage.AreaCode); err != nil {
 			return err
 		}

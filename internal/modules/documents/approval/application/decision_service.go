@@ -492,11 +492,12 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 }
 
 func (s *DecisionService) emitEligibilityRejection(ctx context.Context, db *sql.DB, tenantID, actorID string, event GovernanceEvent) error {
+	ctx = authz.WithCapCache(ctx)
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
 		return err

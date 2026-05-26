@@ -151,6 +151,7 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 		ResourceID:   row.DocumentID,
 		Reason:       "scheduled publish",
 		PayloadJSON:  json.RawMessage(payload),
+		OccurredAt:   s.clock.Now(),
 	}
 
 	if err = s.emitter.Emit(ctx, tx, ev); err != nil {

@@ -598,13 +598,13 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 		stages = append(stages, s)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("iterate stage instances for approval instance %s: %w", instanceID, err)
 	}
 
 	// Load signoffs for the instance and attach to stages.
 	byStage, err := r.loadSignoffsForInstance(ctx, tx, tenantID, instanceID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load signoffs for approval instance %s: %w", instanceID, err)
 	}
 	for i := range stages {
 		if sigs, ok := byStage[stages[i].ID]; ok {
@@ -671,7 +671,10 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 		}
 		out[stageID] = append(out[stageID], sig)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate signoff rows for approval instance %s: %w", instanceID, err)
+	}
+	return out, nil
 }
 
 // UpdateStageStatus applies an OCC (optimistic concurrency control) UPDATE.
