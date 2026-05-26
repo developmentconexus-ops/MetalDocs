@@ -12,6 +12,7 @@ import (
 var ErrCapabilityDenied = errors.New("capability denied")
 
 type CapabilityService struct {
+	// TODO: replace *sql.DB with a query executor interface for testability.
 	db *sql.DB
 }
 

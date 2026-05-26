@@ -8,9 +8,9 @@ import (
 	"metaldocs/internal/modules/iam/domain"
 )
 
-// DevRoleProvider is a deterministic in-memory provider used for local memory mode.
+// DevRoleProvider is a deterministic in-memory provider used for local memory mode only.
 type DevRoleProvider struct {
-	rolesByUser      map[string][]domain.Role
+	rolesByUser     map[string][]domain.Role
 	allowedTenantID string
 }
 

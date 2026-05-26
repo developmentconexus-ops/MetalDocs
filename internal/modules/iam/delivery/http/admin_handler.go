@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
@@ -112,7 +114,8 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
-	activeSince := time.Now().UTC().Add(-10 * time.Minute)
+	now := time.Now().UTC()
+	activeSince := now.Add(-10 * time.Minute)
 	users, err := h.authService.ListUsers(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("iam admin: list users failed: %v", err)
@@ -127,6 +130,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	}
 	recentEvents := []auditdomain.Event{}
 	if h.auditReader != nil {
+		// TODO: keep this tenant filter in place until the backing governance_events resource index includes tenant_id.
 		events, err := h.auditReader.ListEvents(r.Context(), auditdomain.ListEventsQuery{Limit: 25, TenantID: tenantID})
 		if err != nil {
 			log.Printf("iam admin: list audit events failed: %v", err)
@@ -332,13 +336,12 @@ func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	role := iamdomain.Role(strings.ToLower(strings.TrimSpace(req.Role)))
-	if role == "" {
+	role, err := iamdomain.ParseRole(req.Role)
+	if errors.Is(err, iamdomain.ErrInvalidRole) && strings.TrimSpace(req.Role) == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Role is required"))
 		return
 	}
-
-	if !iamdomain.IsValidRole(role) {
+	if err != nil {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid role"))
 		return
 	}
@@ -475,15 +478,16 @@ func (h *AdminHandler) recordAudit(r *http.Request, userID, action string, paylo
 	if err != nil {
 		return
 	}
+	now := time.Now().UTC()
 	if err := h.audit.Record(r.Context(), auditdomain.Event{
-		ID:           "evt_" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", ""),
-		OccurredAt:   time.Now().UTC(),
+		ID:           "evt_" + uuid.NewString(),
+		OccurredAt:   now,
 		ActorID:      authenticatedActor(r),
 		Action:       action,
 		ResourceType: "user",
 		ResourceID:   userID,
 		PayloadJSON:  string(payloadJSON),
-		TraceID:      strings.TrimSpace(r.Header.Get("X-Trace-Id")),
+		TraceID:      uuid.NewString(),
 		TenantID:     tenantID,
 	}); err != nil {
 		log.Printf("audit: failed to record %s for user %s: %v", action, userID, err)
@@ -494,8 +498,8 @@ func parseRoles(items []string) ([]iamdomain.Role, bool) {
 	out := make([]iamdomain.Role, 0, len(items))
 	seen := map[iamdomain.Role]bool{}
 	for _, item := range items {
-		role := iamdomain.Role(strings.ToLower(strings.TrimSpace(item)))
-		if !iamdomain.IsValidRole(role) {
+		role, err := iamdomain.ParseRole(item)
+		if err != nil {
 			return nil, false
 		}
 		if !seen[role] {

@@ -16,9 +16,10 @@ type cacheEntry struct {
 
 // CachedRoleProvider wraps a RoleProvider with TTL cache and explicit invalidation.
 type CachedRoleProvider struct {
-	base  domain.RoleProvider
-	ttl   time.Duration
-	mu    sync.RWMutex
+	base domain.RoleProvider
+	ttl  time.Duration
+	mu   sync.RWMutex
+	// TODO: add TTL-based eviction or a max-size limit so the cache cannot grow without bound.
 	items map[string]cacheEntry
 }
 
@@ -75,6 +76,7 @@ func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID, tenantID
 	}
 
 	c.mu.Lock()
+	// TODO: invalidate cache entries on out-of-band role assignment/revocation paths too, not just the admin service.
 	c.items[key] = cacheEntry{roles: cloneRoles(roles), expiresAt: now.Add(c.ttl)}
 	c.mu.Unlock()
 

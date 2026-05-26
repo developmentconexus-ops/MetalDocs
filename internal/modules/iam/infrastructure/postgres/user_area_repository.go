@@ -67,6 +67,7 @@ INSERT INTO user_process_areas
 VALUES
   ($1, $2::uuid, $3, $4, $5, $6, $7)
 `
+	// TODO: migration 0136 hangs these FKs off a non-PK unique key on iam_users; keep caller identity writes aligned with iam_users uniqueness.
 	result, err := tx.ExecContext(
 		ctx, q,
 		membership.UserID,
@@ -188,6 +189,7 @@ INSERT INTO user_process_areas
 VALUES
   ($1, $2::uuid, $3, $4, $5, $6, $7)
 `
+	// TODO: migration 0136 hangs these FKs off a non-PK unique key on iam_users; keep caller identity writes aligned with iam_users uniqueness.
 	if _, err := tx.ExecContext(
 		ctx,
 		insertQ,

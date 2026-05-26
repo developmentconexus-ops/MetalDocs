@@ -24,10 +24,17 @@ func NewAdminService(repo domain.RoleAdminRepository, invalidator RoleCacheInval
 func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, displayName, tenantID string, role domain.Role, assignedBy string) error {
 	userID = strings.TrimSpace(userID)
 	displayName = strings.TrimSpace(displayName)
+	tenantID = strings.TrimSpace(tenantID)
 	assignedBy = strings.TrimSpace(assignedBy)
 
 	if userID == "" {
 		return domain.ErrUserNotFound
+	}
+	if tenantID == "" {
+		return domain.ErrUserNotFound
+	}
+	if !domain.IsValidRole(role) {
+		return domain.ErrInvalidRole
 	}
 	if displayName == "" {
 		displayName = userID
@@ -48,9 +55,13 @@ func (s *AdminService) UpsertUserAndAssignRole(ctx context.Context, userID, disp
 func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []domain.Role, assignedBy string) error {
 	userID = strings.TrimSpace(userID)
 	displayName = strings.TrimSpace(displayName)
+	tenantID = strings.TrimSpace(tenantID)
 	assignedBy = strings.TrimSpace(assignedBy)
 
 	if userID == "" {
+		return domain.ErrUserNotFound
+	}
+	if tenantID == "" {
 		return domain.ErrUserNotFound
 	}
 	if displayName == "" {
@@ -61,6 +72,11 @@ func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName
 	}
 	if len(roles) == 0 {
 		return domain.ErrUserNotFound
+	}
+	for _, role := range roles {
+		if !domain.IsValidRole(role) {
+			return domain.ErrInvalidRole
+		}
 	}
 
 	if err := s.repo.ReplaceUserRoles(ctx, userID, displayName, tenantID, roles, assignedBy); err != nil {

@@ -56,6 +56,7 @@ DO UPDATE SET display_name = EXCLUDED.display_name, is_active = TRUE, updated_at
 	}
 
 	if _, err := tx.ExecContext(ctx,
+		// TODO: migration 0002 uses cascading FKs from iam_user_roles; keep role replacement explicit and review any future hard-delete path carefully.
 		`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`,
 		tenantID, userID); err != nil {
 		return fmt.Errorf("delete prior iam roles: %w", err)
@@ -103,6 +104,7 @@ DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
 	}
 
 	if _, err := tx.ExecContext(ctx,
+		// TODO: migration 0002 uses cascading FKs from iam_user_roles; keep role replacement explicit and review any future hard-delete path carefully.
 		`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`,
 		tenantID, userID); err != nil {
 		return fmt.Errorf("delete prior iam roles: %w", err)

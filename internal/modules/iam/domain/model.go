@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Role string
 
@@ -23,6 +26,14 @@ var validRoles = map[Role]struct{}{
 func IsValidRole(role Role) bool {
 	_, ok := validRoles[role]
 	return ok
+}
+
+func ParseRole(raw string) (Role, error) {
+	role := Role(strings.ToLower(strings.TrimSpace(raw)))
+	if role == "" || !IsValidRole(role) {
+		return "", ErrInvalidRole
+	}
+	return role, nil
 }
 
 type Capability string
