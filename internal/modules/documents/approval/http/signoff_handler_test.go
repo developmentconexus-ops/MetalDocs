@@ -235,7 +235,7 @@ type fakeReadService struct {
 	err  error
 }
 
-func (f *fakeReadService) LoadInstance(_ context.Context, _ *sql.DB, _, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadService) LoadInstance(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
 	return f.inst, f.err
 }
 

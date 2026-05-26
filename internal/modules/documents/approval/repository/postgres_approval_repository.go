@@ -300,7 +300,7 @@ func (r *postgresApprovalRepository) LoadActiveInstanceByDocument(ctx context.Co
 		WHERE ai.document_id = $1
 		  AND ai.tenant_id = $2
 		  AND ai.status IN ('in_progress', 'approved')
-			ORDER BY ai.submitted_at DESC
+			ORDER BY ai.submitted_at DESC, ai.id DESC
 			LIMIT 1`,
 		docID, tenantID,
 	).Scan(
@@ -568,7 +568,7 @@ func (r *postgresApprovalRepository) loadStageInstances(ctx context.Context, tx 
 			&s.Status, &openedAt, &completedAt, &skipReason,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan stage instance for approval instance %s: %w", instanceID, err)
 		}
 
 		if quorumMSnapshot.Valid {
@@ -650,7 +650,7 @@ func (r *postgresApprovalRepository) loadSignoffsForInstance(ctx context.Context
 		if err := rows.Scan(&id, &instID, &stageID, &actorUserID, &actorTenantID,
 			&decision, &comment, &signedAt, &signatureMethod, &sigPayload,
 			&contentHash, &displayName); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan signoff row for approval instance %s: %w", instanceID, err)
 		}
 		sig, err := domain.NewSignoff(domain.SignoffParams{
 			ID:                       id,

@@ -112,7 +112,7 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 
 	WriteJSON(w, http.StatusOK, contracts.RouteResponse{
 		RouteID:    result.RouteID,
-		NewVersion: result.NewVersion,
+		NewVersion: intPtr(result.NewVersion),
 	})
 }
 
@@ -229,8 +229,8 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 			RequiredRole:       stage.RequiredRole,
 			RequiredCapability: stage.RequiredCapability,
 			AreaCode:           stage.AreaCode,
-			QuorumKind:         stage.Quorum,
-			DriftPolicy:        stage.DriftPolicy,
+			QuorumKind:         contracts.QuorumKind(stage.Quorum),
+			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
 		})
 	}
 
@@ -261,4 +261,8 @@ func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 		})
 	}
 	return out
+}
+
+func intPtr(v int) *int {
+	return &v
 }

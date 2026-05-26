@@ -89,7 +89,11 @@ func EvaluateQuorumResult(stage StageInstance, approvals []Signoff, rejections [
 
 	case QuorumMofN:
 		m := 1
-		if stage.QuorumMSnapshot != nil {
+		switch {
+		case stage.QuorumMSnapshot == nil:
+		case *stage.QuorumMSnapshot < 1:
+			return QuorumResult{Outcome: QuorumRejectedStage}
+		default:
 			m = *stage.QuorumMSnapshot
 		}
 		if approveCount >= m {

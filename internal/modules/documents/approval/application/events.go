@@ -7,10 +7,20 @@ import (
 	"time"
 )
 
+type EventType string
+
+const (
+	EventTypeApprovalInstanceCancelled EventType = "approval.instance_cancelled"
+	EventTypeDocumentPublished         EventType = "document_published"
+	EventTypePublishScheduled          EventType = "publish_scheduled"
+	EventTypeSignoffRejected           EventType = "signoff.rejected"
+	EventTypeSignoffRecorded           EventType = "signoff_recorded"
+)
+
 // GovernanceEvent mirrors the governance_events table columns.
 type GovernanceEvent struct {
 	TenantID     string
-	EventType    string
+	EventType    EventType
 	ActorUserID  string
 	ResourceType string
 	ResourceID   string
@@ -33,17 +43,21 @@ func NewSQLEmitter() EventEmitter { return &sqlEmitter{} }
 
 const insertEventSQL = `
 INSERT INTO governance_events
-  (tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json)
-VALUES ($1, $2, $3, $4, $5, $6, $7)`
+  (tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, occurred_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, now()))`
 
 func (e *sqlEmitter) Emit(ctx context.Context, tx *sql.Tx, ev GovernanceEvent) error {
 	payload := ev.PayloadJSON
 	if payload == nil {
 		payload = json.RawMessage("{}")
 	}
+	var occurredAt any
+	if !ev.OccurredAt.IsZero() {
+		occurredAt = ev.OccurredAt.UTC()
+	}
 	_, err := tx.ExecContext(ctx, insertEventSQL,
-		ev.TenantID, ev.EventType, ev.ActorUserID,
-		ev.ResourceType, ev.ResourceID, ev.Reason, payload,
+		ev.TenantID, string(ev.EventType), ev.ActorUserID,
+		ev.ResourceType, ev.ResourceID, ev.Reason, payload, occurredAt,
 	)
 	return err
 }

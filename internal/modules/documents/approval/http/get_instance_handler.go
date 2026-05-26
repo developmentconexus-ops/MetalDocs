@@ -12,7 +12,6 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -21,7 +20,6 @@ func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	actorID := iamdomain.UserIDFromContext(r.Context())
 	instanceID := r.PathValue("instance_id")
 
 	if h.readSvc == nil {
@@ -29,7 +27,7 @@ func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inst, err := h.readSvc.LoadInstance(r.Context(), h.db, tenantID, actorID, instanceID)
+	inst, err := h.readSvc.LoadInstance(r.Context(), h.db, tenantID, instanceID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
 			WriteError(w, repository.ErrNoActiveInstance)
@@ -71,9 +69,9 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 			recs = append(recs, contracts.SignoffRecord{
 				ID:              sig.ID(),
 				ActorUserID:     name,
-				Decision:        string(sig.Decision()),
+				Decision:        contracts.SignoffDecision(sig.Decision()),
 				Reason:          sig.Comment(),
-				SignatureMethod: sig.SignatureMethod(),
+				SignatureMethod: contracts.SignatureMethod(sig.SignatureMethod()),
 				SignedAt:        sig.SignedAt().UTC().Format(time.RFC3339),
 			})
 		}
@@ -92,7 +90,7 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 		DocumentID:  inst.DocumentID,
 		RouteID:     inst.RouteID,
 		TenantID:    inst.TenantID,
-		Status:      string(inst.Status),
+		Status:      contracts.InstanceStatus(inst.Status),
 		SubmittedBy: inst.SubmittedBy,
 		SubmittedAt: inst.SubmittedAt.UTC().Format(time.RFC3339),
 		CompletedAt: completedAt,
@@ -164,7 +162,7 @@ func buildStageActors(stage domain.StageInstance, eligibleNames map[string]strin
 	actors := make([]contracts.StageActor, 0, len(stage.Signoffs)+len(stage.EligibleActorIDs))
 	seen := make(map[string]struct{}, len(stage.Signoffs))
 	for _, sig := range stage.Signoffs {
-		decision := string(sig.Decision())
+		decision := contracts.SignoffDecision(sig.Decision())
 		status := "approved"
 		if sig.Decision() == domain.DecisionReject {
 			status = "rejected"

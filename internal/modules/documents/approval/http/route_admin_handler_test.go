@@ -230,8 +230,8 @@ func TestUpdateRoute_HappyPath(t *testing.T) {
 			if out.RouteID != "route-1" {
 				t.Fatalf("route_id = %q, want %q", out.RouteID, "route-1")
 			}
-			if out.NewVersion != 5 {
-				t.Fatalf("new_version = %d, want %d", out.NewVersion, 5)
+			if out.NewVersion == nil || *out.NewVersion != 5 {
+				t.Fatalf("new_version = %v, want %d", out.NewVersion, 5)
 			}
 
 			if svc.updateReq.TenantID != "tenant-1" || svc.updateReq.RouteID != "route-1" || svc.updateReq.ActorUserID != "actor-1" {

@@ -72,7 +72,7 @@ type SignoffRequest struct {
 	InstanceID              string
 	StageInstanceID         string
 	ActorUserID             string
-	Decision                string // "approve" or "reject"
+	Decision                domain.Decision
 	Comment                 string
 	SignatureMethod         string
 	SignaturePayload        map[string]any
@@ -95,6 +95,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	if err := ValidateEventPayload(req.SignaturePayload); err != nil {
 		return SignoffResult{}, err
 	}
+	ctx = authz.WithCapCache(ctx)
 
 	// Step 2: begin transaction.
 	tx, err := db.BeginTx(ctx, nil)
@@ -173,7 +174,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	if err := domain.CheckEligibility(req.ActorUserID, activeStage.EligibleActorIDs); err != nil {
 		event := GovernanceEvent{
 			TenantID:     req.TenantID,
-			EventType:    "signoff.rejected",
+			EventType:    EventTypeSignoffRejected,
 			ActorUserID:  req.ActorUserID,
 			ResourceType: "approval_instance",
 			ResourceID:   req.InstanceID,
@@ -224,7 +225,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		StageInstanceID:          activeStage.ID,
 		ActorUserID:              req.ActorUserID,
 		ActorTenantID:            req.TenantID,
-		Decision:                 domain.Decision(req.Decision),
+		Decision:                 req.Decision,
 		Comment:                  req.Comment,
 		SignedAt:                 now,
 		SignatureMethod:          req.SignatureMethod,
@@ -453,7 +454,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 	event := GovernanceEvent{
 		TenantID:     req.TenantID,
-		EventType:    "signoff_recorded",
+		EventType:    EventTypeSignoffRecorded,
 		ActorUserID:  req.ActorUserID,
 		ResourceType: "approval_instance",
 		ResourceID:   req.InstanceID,

@@ -22,18 +22,18 @@ func (r SignoffRequest) Validate() error {
 	case DecisionApprove:
 	case DecisionReject:
 	default:
-		return fmt.Errorf("decision must be one of: approve, reject")
+		return wrapValidation(fmt.Errorf("decision must be one of: approve, reject"))
 	}
 	if r.Decision == DecisionReject {
 		if err := validateRequired("reason", r.Reason); err != nil {
-			return err
+			return wrapValidation(err)
 		}
 	}
 	if err := validateRequired("password_token", r.PasswordToken); err != nil {
-		return err
+		return wrapValidation(err)
 	}
 	if err := validateSHA256Hex("content_hash", r.ContentHash); err != nil {
-		return err
+		return wrapValidation(err)
 	}
 	return nil
 }

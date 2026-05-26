@@ -7,7 +7,7 @@ type ObsoleteRequest struct {
 }
 
 func (r ObsoleteRequest) Validate() error {
-	return validateRequired("reason", r.Reason)
+	return wrapValidation(validateRequired("reason", r.Reason))
 }
 
 type ObsoleteResponse struct {

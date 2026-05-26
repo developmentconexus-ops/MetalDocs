@@ -1,5 +1,10 @@
 package domain
 
+import (
+	"fmt"
+	"strconv"
+)
+
 // DriftResult holds the output of ApplyEligibilityDrift.
 type DriftResult struct {
 	EffectiveDenominator int
@@ -32,7 +37,7 @@ func ApplyEligibilityDrift(stage StageInstance, currentEligible []string) DriftR
 		delta := len(stage.EligibleActorIDs) - denom
 		reason := ""
 		if delta > 0 {
-			reason = "eligibility drift: reduce_quorum policy, denominator reduced by " + itoa(delta)
+			reason = "eligibility drift: reduce_quorum policy, denominator reduced by " + strconv.Itoa(delta)
 		}
 		return DriftResult{EffectiveDenominator: denom, ForcedOutcome: QuorumPending, Reason: reason}
 
@@ -63,32 +68,10 @@ func ApplyEligibilityDrift(stage StageInstance, currentEligible []string) DriftR
 		}
 
 	default:
-		return DriftResult{EffectiveDenominator: len(stage.EligibleActorIDs), ForcedOutcome: QuorumPending}
+		return DriftResult{
+			EffectiveDenominator: len(stage.EligibleActorIDs),
+			ForcedOutcome:        QuorumPending,
+			Reason:               fmt.Sprintf("unknown drift policy %q; snapshot denominator applied", stage.OnEligibilityDriftSnapshot),
+		}
 	}
-}
-
-// itoa converts int to string without importing strconv in domain.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := false
-	if n < 0 {
-		neg = true
-		n = -n
-	}
-	buf := [20]byte{}
-	pos := len(buf)
-	for n >= 10 {
-		pos--
-		buf[pos] = byte('0' + n%10)
-		n /= 10
-	}
-	pos--
-	buf[pos] = byte('0' + n)
-	if neg {
-		pos--
-		buf[pos] = '-'
-	}
-	return string(buf[pos:])
 }

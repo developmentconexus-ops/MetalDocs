@@ -24,7 +24,7 @@ type decisionService interface {
 }
 
 type readService interface {
-	LoadInstance(ctx context.Context, db *sql.DB, tenantID, actorID, instanceID string) (*domain.Instance, error)
+	LoadInstance(ctx context.Context, db *sql.DB, tenantID, instanceID string) (*domain.Instance, error)
 	LoadActiveInstanceByDocument(ctx context.Context, db *sql.DB, tenantID, documentID string) (*domain.Instance, error)
 	ListPendingForActor(ctx context.Context, db *sql.DB, tenantID, actorID string, areaCode string, limit, offset int) ([]domain.Instance, error)
 	ListInboxItems(ctx context.Context, db *sql.DB, tenantID, actorID, areaCode string, limit, offset int) ([]application.InboxView, error)
@@ -56,9 +56,6 @@ type routeListRepository interface {
 var (
 	ErrIfMatchRequired  = errors.New("precondition: If-Match header required")
 	ErrIfMatchMalformed = errors.New("precondition: If-Match header malformed; expected \"v<N>\" or \"*\"")
-
-	errIfMatchRequired  = ErrIfMatchRequired
-	errIfMatchMalformed = ErrIfMatchMalformed
 )
 
 // signoffIdempStore backs idempotent replay for SignoffByDocumentHandler.
@@ -118,7 +115,7 @@ func tenantIDFromReq(r *http.Request) (string, error) {
 func parseIfMatch(header string) (int, error) {
 	value := strings.TrimSpace(header)
 	if value == "" {
-		return -1, errIfMatchRequired
+		return -1, ErrIfMatchRequired
 	}
 	if value == "*" {
 		return 0, nil
@@ -126,12 +123,12 @@ func parseIfMatch(header string) (int, error) {
 
 	value = strings.Trim(value, "\"")
 	if !strings.HasPrefix(value, "v") {
-		return -1, errIfMatchMalformed
+		return -1, ErrIfMatchMalformed
 	}
 
 	version, err := strconv.Atoi(strings.TrimPrefix(value, "v"))
 	if err != nil || version < 0 {
-		return -1, errIfMatchMalformed
+		return -1, ErrIfMatchMalformed
 	}
 	return version, nil
 }

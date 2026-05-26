@@ -184,8 +184,8 @@ func TestSQLEmitter_Emit_NilPayload_SentAsEmptyObject(t *testing.T) {
 
 func TestValidateEventPayload_Float64Rejected(t *testing.T) {
 	err := ValidateEventPayload(map[string]any{"value": float64(3.14)})
-	if !errors.Is(err, ErrFloatInPayload) {
-		t.Errorf("want ErrFloatInPayload; got %v", err)
+	if !errors.Is(err, ErrFloatInFormData) {
+		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
 }
 
@@ -515,8 +515,8 @@ func TestSubmitRevisionForReview_FloatPayloadRejected(t *testing.T) {
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
-	if !errors.Is(err, ErrFloatInPayload) {
-		t.Errorf("want ErrFloatInPayload; got %v", err)
+	if !errors.Is(err, ErrFloatInFormData) {
+		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
 }
 
@@ -614,8 +614,8 @@ func TestRecordSignoff_FloatInPayload(t *testing.T) {
 		ContentFormData:  map[string]any{"title": "Doc"},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
-	if !errors.Is(err, ErrFloatInPayload) {
-		t.Errorf("want ErrFloatInPayload; got %v", err)
+	if !errors.Is(err, ErrFloatInFormData) {
+		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
 }
 

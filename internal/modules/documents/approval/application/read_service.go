@@ -40,13 +40,14 @@ func newReadService(repo repository.ApprovalRepository) *ReadService {
 // repository stage loads may use SELECT ... FOR UPDATE on approval rows.
 
 // LoadInstance loads a single approval instance by ID for the given tenant.
-func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, actorID, instanceID string) (*domain.Instance, error) {
+func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, instanceID string) (*domain.Instance, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("read load instance: begin tx: %w", err)
 	}
 	defer tx.Rollback()
 
+	actorID := iamdomain.UserIDFromContext(ctx)
 	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
 		return nil, fmt.Errorf("read load instance: %w", err)
 	}

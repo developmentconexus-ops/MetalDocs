@@ -7,7 +7,7 @@ type CancelRequest struct {
 }
 
 func (r CancelRequest) Validate() error {
-	return validateRequired("reason", r.Reason)
+	return wrapValidation(validateRequired("reason", r.Reason))
 }
 
 type CancelResponse struct {

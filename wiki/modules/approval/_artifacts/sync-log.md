@@ -1,5 +1,21 @@
 # Sync log - approval
 
+## 2026-05-25 - approval 5c + 5d medium sweep sync
+
+- **Context:** current uncommitted Phase 11 medium-sweep diff scoped to `internal/modules/documents/approval/**`.
+- **Mode:** structural refresh
+- **Anchors moved:** none.
+- **Public surface:** `ReadService.LoadInstance` no longer accepts `actorID`; `application.SignoffRequest.Decision` is now typed as `domain.Decision`; approval contract DTOs now use typed quorum/drift/status/decision/signature aliases and `RouteResponse.NewVersion` is a pointer field.
+- **Routes/API:** no route or OpenAPI ownership change; HTTP contract validation is stricter and now wraps a typed `contracts.ErrValidation` sentinel.
+- **Runtime flows:** signoff seeds `authz.WithCapCache` before authz GUC setup; publish/cancel set authz context before repository reads; scheduler logs all three nil-return skip reasons; doc-signoff handlers parse boundary decisions into `domain.Decision`.
+- **Persistence:** governance events now persist `occurred_at`; active-instance lookup orders by `submitted_at DESC, id DESC`; repository scan failures now include approval-instance context; cancel area snapshot scan now tolerates SQL NULL with `sql.NullString`.
+- **Dependencies:** none beyond existing approval/http/authz/repository surfaces.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** unchanged from prior row (Critical=2 Major=4 Minor=6; missing-ADR=10).
+- **Tally gate:** FAIL pre-existing/environment: module-doc-sync preflight Git Bash step still aborts with `CreateFileMapping ... Win32 error 5`.
+- **Patched files:** `wiki/modules/approval.md`; `wiki/modules/approval-tech-debt.md`; `wiki/backlog/approval-refactor.md`; `wiki/modules/approval/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - residual Phase 7 highs sync (5c-H12 / 5d-H5 / 5d-H6)
 
 - **Context:** current uncommitted residual-highs hardening diff scoped to `internal/modules/documents/approval/**`.

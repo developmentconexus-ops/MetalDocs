@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/approval.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/approval-refactor.md`.
 
-**Last verified:** 2026-05-25 (5c high hardening sync)
+**Last verified:** 2026-05-25 (5c + 5d medium sweep sync)
 
 ## Severity scale
 

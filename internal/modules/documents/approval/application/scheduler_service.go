@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -52,15 +53,18 @@ func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, db *sql.D
 
 	state, err := s.loadScheduledDocumentState(ctx, tx, input.TenantID, input.DocumentID)
 	if errors.Is(err, sql.ErrNoRows) {
+		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "document_not_found")
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("scheduler: load scheduled state for doc %s: %w", input.DocumentID, err)
 	}
 	if !scheduledJobMatchesState(state, input) {
+		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "stale_job")
 		return nil
 	}
 	if s.clock.Now().UTC().Before(state.EffectiveFrom.Time.UTC()) {
+		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "pre_effective_date")
 		return nil
 	}
 
@@ -141,7 +145,7 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 
 	ev := GovernanceEvent{
 		TenantID:     row.TenantID,
-		EventType:    "document_published",
+		EventType:    EventTypeDocumentPublished,
 		ActorUserID:  "scheduler",
 		ResourceType: "document",
 		ResourceID:   row.DocumentID,

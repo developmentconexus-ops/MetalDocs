@@ -80,11 +80,12 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		WriteError(w, err)
 		return
 	}
-	if body.Decision != "approve" && body.Decision != "reject" {
+	decision := domain.Decision(strings.TrimSpace(body.Decision))
+	if decision != domain.DecisionApprove && decision != domain.DecisionReject {
 		WriteError(w, NewValidationError("decision must be one of: approve, reject"))
 		return
 	}
-	if body.Decision == "reject" && strings.TrimSpace(body.Reason) == "" {
+	if decision == domain.DecisionReject && strings.TrimSpace(body.Reason) == "" {
 		WriteError(w, NewValidationError("reason is required for reject"))
 		return
 	}
@@ -130,7 +131,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		InstanceID:       inst.ID,
 		StageInstanceID:  activeStage.ID,
 		ActorUserID:      actorID,
-		Decision:         body.Decision,
+		Decision:         decision,
 		Comment:          body.Reason,
 		SignatureMethod:  "password_reauth",
 		SignaturePayload: map[string]any{"password_token": body.Password},

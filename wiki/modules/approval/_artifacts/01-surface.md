@@ -128,11 +128,12 @@ Test files: 43 total `_test.go` files across application/domain/http/repository/
 | `decision_service.go:33` | type | `DecisionService` | struct | (undocumented) |
 | `decision_service.go:43` | func | `NewDecisionService` | `(repo, EventEmitter, FreezeInvoker, PDFDispatchInvoker, Clock) *DecisionService` | (undocumented) |
 | `decision_service.go:60` | method | `(*DecisionService).WithPDFOutbox` | `(PDFOutboxEnqueuer) *DecisionService` | (undocumented) |
-| `decision_service.go:66` | type | `SignoffRequest` | struct | (undocumented) |
+| `decision_service.go:66` | type | `SignoffRequest` | struct (`Decision domain.Decision`) | (undocumented) |
 | `decision_service.go:80` | type | `SignoffResult` | struct | (undocumented) |
 | `decision_service.go:88` | method | `(*DecisionService).RecordSignoff` | `(ctx, *sql.DB, SignoffRequest) (SignoffResult, error)` | (undocumented) |
-| `events.go:11` | type | `GovernanceEvent` | struct | (undocumented) |
-| `events.go:24` | iface | `EventEmitter` | `Emit(ctx, *sql.Tx, GovernanceEvent) error` | (undocumented) |
+| `events.go:11` | type | `EventType` | `string` constants (`approval.instance_cancelled`, `document_published`, `publish_scheduled`, `signoff.rejected`, `signoff_recorded`) | (undocumented) |
+| `events.go:19` | type | `GovernanceEvent` | struct (`EventType EventType`, `OccurredAt time.Time`) | (undocumented) |
+| `events.go:32` | iface | `EventEmitter` | `Emit(ctx, *sql.Tx, GovernanceEvent) error` | (undocumented) |
 | `events.go:32` | func | `NewSQLEmitter` | `() EventEmitter` | (undocumented) |
 | `events.go:52` | type | `MemoryEmitter` | struct (test seam) | (undocumented) |
 | `idempotency.go:12` | type | `IdempotencyInput` | struct | (undocumented) |
@@ -155,7 +156,7 @@ Test files: 43 total `_test.go` files across application/domain/http/repository/
 | `publish_service.go:166` | method | `(*PublishService).SchedulePublish` | `(ctx, *sql.DB, SchedulePublishRequest) (SchedulePublishResult, error)` | (undocumented) |
 | `read_service.go:16` | type | `InboxView` | struct | (undocumented) |
 | `read_service.go:29` | type | `ReadService` | struct | (undocumented) |
-| `read_service.go:38` | method | `(*ReadService).LoadInstance` | `(ctx, *sql.DB, tenant, actor, id) (*Instance, error)` | (undocumented) |
+| `read_service.go:38` | method | `(*ReadService).LoadInstance` | `(ctx, *sql.DB, tenant, id) (*Instance, error)` | reads actor from session context |
 | `read_service.go:63` | method | `(*ReadService).LoadActiveInstanceByDocument` | `(ctx, *sql.DB, tenant, doc) (*Instance, error)` | (undocumented) |
 | `read_service.go:88` | method | `(*ReadService).ListPendingForActor` | `(ctx, *sql.DB, tenant, actor, area, limit, offset) ([]Instance, error)` | (undocumented) |
 | `read_service.go:153` | method | `(*ReadService).ListInboxItems` | `(ctx, *sql.DB, tenant, actor, area, limit, offset) ([]InboxView, error)` | (undocumented) |
@@ -167,13 +168,12 @@ Test files: 43 total `_test.go` files across application/domain/http/repository/
 | `scheduler_service.go:34` | method | `(*SchedulerService).RunScheduledPublishJob` | `(ctx, *sql.DB, ScheduledPublishJobInput) error` | dedicated jobs-runtime path; stale, mismatched, or early jobs no-op before publish |
 | `services.go:12` | iface | `Clock` | `Now() time.Time` | (undocumented) |
 | `services.go:17` | type | `RealClock` | struct | (undocumented) |
-| `services.go:24` | var | `ErrFloatInPayload` | error | (undocumented) |
 | `services.go:29` | type | `Services` | struct (composition root) | (undocumented) |
 | `services.go:39` | type | `ScheduledPublishJobInput` | struct | River scheduled-publish payload boundary shared by API enqueue + jobs runtime |
 | `services.go:47` | iface | `ScheduledPublishEnqueuer` | `EnqueueScheduledPublishTx(context.Context, *sql.Tx, ScheduledPublishJobInput) error` | transactional enqueue seam |
 | `services.go:43` | func | `NewServices` | `(repo, EventEmitter, Clock) *Services` | (undocumented) |
 | `services.go:61` | method | `(*Services).WithScheduledPublishEnqueuer` | `(ScheduledPublishEnqueuer) *Services` | wires the River enqueue seam into PublishService |
-| `services.go:61` | func | `ValidateEventPayload` | `(map[string]any) error` | (undocumented) |
+| `services.go:61` | func | `ValidateEventPayload` | `(map[string]any) error` | now returns `ErrFloatInFormData` for float-bearing payloads |
 | `submit_service.go:19` | type | `SubmitService` | struct | (undocumented) |
 | `submit_service.go:26` | type | `SubmitRequest` | struct | (undocumented) |
 | `submit_service.go:36` | type | `SubmitResult` | struct | (undocumented) |

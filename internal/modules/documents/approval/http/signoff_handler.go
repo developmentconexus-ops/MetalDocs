@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 )
 
@@ -49,13 +50,20 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
+	decision := domain.Decision(body.Decision)
+	switch decision {
+	case domain.DecisionApprove, domain.DecisionReject:
+	default:
+		WriteError(w, NewValidationError("decision must be one of: approve, reject"))
+		return
+	}
 
 	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
 		TenantID:                tenantID,
 		InstanceID:              instanceID,
 		StageInstanceID:         stageID,
 		ActorUserID:             actorID,
-		Decision:                string(body.Decision),
+		Decision:                decision,
 		Comment:                 body.Reason,
 		SignatureMethod:         "password_reauth",
 		SignaturePayload:        map[string]any{"password_token": body.PasswordToken},

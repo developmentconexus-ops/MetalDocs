@@ -93,7 +93,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 
 	// Fetch document area_code for authz check. FOR UPDATE locks the document row
 	// to prevent concurrent area_code changes between authz decision and status update.
-	var areaCode string
+	var areaCode sql.NullString
 	err = tx.QueryRowContext(ctx,
 		`SELECT process_area_code_snapshot FROM documents WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
 		docID, in.TenantID,
@@ -106,7 +106,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	// Authz gate: require workflow.instance.cancel capability.
 	if !system {
 		ctx = authz.WithCapCache(ctx)
-		if err := authz.Require(ctx, tx, "workflow.instance.cancel", areaCode); err != nil {
+		if err := authz.Require(ctx, tx, "workflow.instance.cancel", areaCode.String); err != nil {
 			rollback()
 			return CancelResult{}, err
 		}
@@ -180,7 +180,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	}
 	if err = s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
-		EventType:    "approval.instance_cancelled",
+		EventType:    EventTypeApprovalInstanceCancelled,
 		ActorUserID:  in.ActorUserID,
 		ResourceType: "document",
 		ResourceID:   docID,
@@ -198,7 +198,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	return CancelResult{DocumentID: docID}, nil
 }
 
-// newCancelService constructs a CancelService (wired by NewServices).
+// newCancelService constructs a CancelService.
 func newCancelService(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock) *CancelService {
 	return &CancelService{repo: repo, emitter: emitter, clock: clock}
 }
