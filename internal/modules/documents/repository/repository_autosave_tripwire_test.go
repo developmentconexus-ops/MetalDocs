@@ -23,13 +23,9 @@ func TestCommitUpload_AssertsDocumentEditBeforeDocumentsUpdate(t *testing.T) {
 	}
 	commitUpload := body[start : start+end]
 
-	tenantGUC := strings.Index(commitUpload, "set_config('metaldocs.tenant_id'")
-	if tenantGUC == -1 {
-		t.Fatal("CommitUpload must set metaldocs.tenant_id before asserting document.edit")
-	}
-	actorGUC := strings.Index(commitUpload, "set_config('metaldocs.actor_id'")
-	if actorGUC == -1 {
-		t.Fatal("CommitUpload must set metaldocs.actor_id before asserting document.edit")
+	seedIdentity := strings.Index(commitUpload, "SeedTxIdentity")
+	if seedIdentity == -1 {
+		t.Fatal("CommitUpload must seed authz identity before asserting document.edit")
 	}
 	editRequire := strings.Index(commitUpload, "CapDocumentEdit")
 	if editRequire == -1 {
@@ -39,8 +35,8 @@ func TestCommitUpload_AssertsDocumentEditBeforeDocumentsUpdate(t *testing.T) {
 	if updateDocuments == -1 {
 		t.Fatal("CommitUpload documents pointer update not found")
 	}
-	if tenantGUC > editRequire || actorGUC > editRequire {
-		t.Fatal("CommitUpload sets authz GUCs after document.edit assertion")
+	if seedIdentity > editRequire {
+		t.Fatal("CommitUpload seeds authz identity after document.edit assertion")
 	}
 	if editRequire > updateDocuments {
 		t.Fatal("CommitUpload asserts document.edit after documents update; tripwire requires it before UPDATE")
@@ -109,13 +105,9 @@ func TestAcquireSession_AssertsDocumentEditBeforeSettingDocumentSession(t *testi
 	}
 	acquire := body[start : start+end]
 
-	tenantGUC := strings.Index(acquire, "set_config('metaldocs.tenant_id'")
-	if tenantGUC == -1 {
-		t.Fatal("AcquireSession must set metaldocs.tenant_id before asserting document.edit")
-	}
-	actorGUC := strings.Index(acquire, "set_config('metaldocs.actor_id'")
-	if actorGUC == -1 {
-		t.Fatal("AcquireSession must set metaldocs.actor_id before asserting document.edit")
+	seedIdentity := strings.Index(acquire, "SeedTxIdentity")
+	if seedIdentity == -1 {
+		t.Fatal("AcquireSession must seed authz identity before asserting document.edit")
 	}
 	editRequire := strings.Index(acquire, "CapDocumentEdit")
 	if editRequire == -1 {
@@ -125,8 +117,8 @@ func TestAcquireSession_AssertsDocumentEditBeforeSettingDocumentSession(t *testi
 	if updateDocuments == -1 {
 		t.Fatal("AcquireSession documents active-session update not found")
 	}
-	if tenantGUC > editRequire || actorGUC > editRequire {
-		t.Fatal("AcquireSession sets authz GUCs after document.edit assertion")
+	if seedIdentity > editRequire {
+		t.Fatal("AcquireSession seeds authz identity after document.edit assertion")
 	}
 	if editRequire > updateDocuments {
 		t.Fatal("AcquireSession asserts document.edit after documents update; tripwire requires it before UPDATE")

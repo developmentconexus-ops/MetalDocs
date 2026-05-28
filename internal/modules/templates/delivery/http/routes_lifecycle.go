@@ -3,7 +3,6 @@ package http
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/application"
@@ -23,7 +22,7 @@ func (h *Handler) submitForReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
+	if err := h.authz(r, tenantID, "*", "template.submit"); err != nil {
 		writeMappedErr(w, err)
 		return
 	}
@@ -223,7 +222,6 @@ func (h *Handler) upsertApprovalConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func actorRolesFromReq(r *http.Request) []string {
-	// Prefer IAM-middleware roles from context (set by iamMiddleware from DB).
 	if ctxRoles := iamdomain.RolesFromContext(r.Context()); len(ctxRoles) > 0 {
 		out := make([]string, len(ctxRoles))
 		for i, role := range ctxRoles {
@@ -231,19 +229,6 @@ func actorRolesFromReq(r *http.Request) []string {
 		}
 		return out
 	}
-	// Fallback: explicit header (used in tests / service-to-service calls).
-	vals := r.Header.Values("X-Actor-Roles")
-	if len(vals) == 0 {
-		return nil
-	}
-	roles := make([]string, 0, len(vals))
-	for _, v := range vals {
-		for _, role := range strings.Split(v, ",") {
-			role = strings.TrimSpace(role)
-			if role != "" {
-				roles = append(roles, role)
-			}
-		}
-	}
-	return roles
+	// Fallback: no context roles available (legacy callers may still rely on header-based role wiring upstream).
+	return nil
 }

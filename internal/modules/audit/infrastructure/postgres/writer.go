@@ -14,6 +14,8 @@ type Writer struct {
 }
 
 const auditHashChainLockID int64 = 90120260513004
+const auditIntegrityValidationWindow = 10000
+const auditIntegrityIssueLimit = 256
 
 func NewWriter(db *sql.DB) *Writer {
 	return &Writer{db: db}
@@ -24,6 +26,7 @@ func (w *Writer) Record(ctx context.Context, event domain.Event) error {
 	if err != nil {
 		return fmt.Errorf("begin audit hash-chain tx: %w", err)
 	}
+	// Best-effort rollback for the uncommitted path; Commit makes sql.ErrTxDone expected.
 	defer func() { _ = tx.Rollback() }()
 
 	if err := w.RecordTx(ctx, tx, event); err != nil {
@@ -70,12 +73,19 @@ FROM prepared
 
 func (w *Writer) ValidateIntegrity(ctx context.Context) ([]domain.IntegrityIssue, error) {
 	const q = `
-WITH ordered AS (
+WITH recent AS (
+  SELECT audit_sequence, id, occurred_at, actor_id, action, resource_type, resource_id,
+         payload, trace_id, tenant_id, prev_hash, row_hash
+  FROM metaldocs.audit_events
+  ORDER BY audit_sequence DESC
+  LIMIT $1
+),
+ordered AS (
   SELECT audit_sequence, id, occurred_at, actor_id, action, resource_type, resource_id,
          payload, trace_id, tenant_id, prev_hash, row_hash,
          ROW_NUMBER() OVER (ORDER BY audit_sequence) AS rn,
          LAG(row_hash, 1, '') OVER (ORDER BY audit_sequence) AS previous_row_hash
-  FROM metaldocs.audit_events
+  FROM recent
 )
 SELECT audit_sequence, id, prev_hash, row_hash, expected_prev_hash,
        metaldocs.audit_event_row_hash(prev_hash, id, occurred_at, actor_id, action, resource_type, resource_id, payload, trace_id, tenant_id) AS expected_row_hash
@@ -85,13 +95,13 @@ FROM (
 ) checked
 ORDER BY audit_sequence
 `
-	rows, err := w.db.QueryContext(ctx, q)
+	rows, err := w.db.QueryContext(ctx, q, auditIntegrityValidationWindow)
 	if err != nil {
 		return nil, fmt.Errorf("validate audit integrity: %w", err)
 	}
 	defer rows.Close()
 
-	var issues []domain.IntegrityIssue
+	issues := make([]domain.IntegrityIssue, 0, 4)
 	for rows.Next() {
 		var sequence int64
 		var id, prevHash, rowHash, expectedPrevHash, expectedRowHash string
@@ -115,6 +125,9 @@ ORDER BY audit_sequence
 				ExpectedHash: expectedRowHash,
 				ActualHash:   rowHash,
 			})
+		}
+		if len(issues) >= auditIntegrityIssueLimit {
+			break
 		}
 	}
 	if err := rows.Err(); err != nil {

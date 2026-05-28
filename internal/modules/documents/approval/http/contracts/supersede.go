@@ -7,7 +7,7 @@ type SupersedeRequest struct {
 }
 
 func (r SupersedeRequest) Validate() error {
-	return validateUUID("superseded_document_id", r.SupersededDocumentID)
+	return wrapValidation(validateUUID("superseded_document_id", r.SupersededDocumentID))
 }
 
 type SupersedeResponse struct {

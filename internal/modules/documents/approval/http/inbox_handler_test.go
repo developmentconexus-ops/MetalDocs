@@ -29,7 +29,7 @@ type fakeReadServiceInbox struct {
 	gotOffset   int
 }
 
-func (f *fakeReadServiceInbox) LoadInstance(_ context.Context, _ *sql.DB, _, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadServiceInbox) LoadInstance(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
 	return nil, nil
 }
 

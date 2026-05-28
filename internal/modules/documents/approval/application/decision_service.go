@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,16 +69,17 @@ func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionSer
 
 // SignoffRequest carries all inputs for RecordSignoff.
 type SignoffRequest struct {
-	TenantID         string
-	InstanceID       string
-	StageInstanceID  string
-	ActorUserID      string
-	Decision         string // "approve" or "reject"
-	Comment          string
-	SignatureMethod  string
-	SignaturePayload map[string]any
-	ContentFormData  map[string]any // current document content for hash
-	Capabilities     []string
+	TenantID                string
+	InstanceID              string
+	StageInstanceID         string
+	ActorUserID             string
+	Decision                domain.Decision
+	Comment                 string
+	SignatureMethod         string
+	SignaturePayload        map[string]any
+	ContentFormData         map[string]any // current document content for hash
+	ExpectedRevisionVersion int
+	Capabilities            []string
 }
 
 // SignoffResult is returned by RecordSignoff.
@@ -93,19 +96,9 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	if err := ValidateEventPayload(req.SignaturePayload); err != nil {
 		return SignoffResult{}, err
 	}
+	ctx = authz.WithCapCache(ctx)
 
-	// Step 2: compute content hash.
-	contentHash, err := ComputeContentHash(ContentHashInput{
-		TenantID:       req.TenantID,
-		DocumentID:     req.InstanceID, // keyed on instance for signoff hashing
-		RevisionNumber: 0,              // signoff hash does not embed revision
-		FormData:       req.ContentFormData,
-	})
-	if err != nil {
-		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
-	}
-
-	// Step 3: begin transaction.
+	// Step 2: begin transaction.
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return SignoffResult{}, fmt.Errorf("recordSignoff: begin tx: %w", err)
@@ -129,6 +122,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		_ = tx.Rollback()
 		return SignoffResult{}, repository.ErrNoActiveInstance
 	}
+	if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
+		_ = tx.Rollback()
+		return SignoffResult{}, repository.ErrStaleRevision
+	}
 
 	// Reject if instance is already terminal.
 	if instance.Status != domain.InstanceInProgress {
@@ -146,6 +143,26 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, err
 	}
 
+	formData, err := loadCurrentDocumentFormData(ctx, tx, req.TenantID, instance.DocumentID)
+	if err != nil {
+		_ = tx.Rollback()
+		return SignoffResult{}, fmt.Errorf("recordSignoff: load document form data: %w", err)
+	}
+	contentHash, err := ComputeContentHash(ContentHashInput{
+		TenantID:       req.TenantID,
+		DocumentID:     req.InstanceID, // keyed on instance for signoff hashing
+		RevisionNumber: 0,              // signoff hash does not embed revision
+		FormData:       formData,
+	})
+	if err != nil {
+		_ = tx.Rollback()
+		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
+	}
+	if clientContentHash, ok := clientContentHash(req.ContentFormData); ok && clientContentHash != contentHash {
+		_ = tx.Rollback()
+		return SignoffResult{}, ErrContentHashMismatch
+	}
+
 	// Step 5: identify active stage.
 	activeStage := instance.Active()
 	if activeStage == nil {
@@ -153,22 +170,26 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, domain.ErrNoActiveStage
 	}
 	// Ensure the requested StageInstanceID matches the active stage.
-	if req.StageInstanceID != "" && activeStage.ID != req.StageInstanceID {
+	if req.StageInstanceID == "" || activeStage.ID != req.StageInstanceID {
 		_ = tx.Rollback()
 		return SignoffResult{}, repository.ErrStageNotActive
 	}
 
 	// Step 5b: eligibility check — actor must be in the eligible_actor_ids snapshot (J1).
 	if err := domain.CheckEligibility(req.ActorUserID, activeStage.EligibleActorIDs); err != nil {
-		_ = s.emitter.Emit(ctx, tx, GovernanceEvent{
+		event := GovernanceEvent{
 			TenantID:     req.TenantID,
-			EventType:    "signoff.rejected",
+			EventType:    EventTypeSignoffRejected,
 			ActorUserID:  req.ActorUserID,
 			ResourceType: "approval_instance",
 			ResourceID:   req.InstanceID,
 			Reason:       "not_eligible",
-		})
+			OccurredAt:   s.clock.Now(),
+		}
 		_ = tx.Rollback()
+		if emitErr := s.emitEligibilityRejection(ctx, db, req.TenantID, req.ActorUserID, event); emitErr != nil {
+			return SignoffResult{}, fmt.Errorf("recordSignoff: emit eligibility rejection: %w", emitErr)
+		}
 		return SignoffResult{}, err
 	}
 
@@ -191,7 +212,13 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 
 	var actorDisplayName sql.NullString
-	if err := tx.QueryRowContext(ctx, `SELECT display_name FROM metaldocs.iam_users WHERE user_id = $1`, req.ActorUserID).Scan(&actorDisplayName); err != nil && err != sql.ErrNoRows {
+	if err := tx.QueryRowContext(ctx, `
+		SELECT display_name
+		  FROM metaldocs.iam_users
+		 WHERE user_id = $1
+		   AND tenant_id = $2::uuid`,
+		req.ActorUserID, req.TenantID,
+	).Scan(&actorDisplayName); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: lookup actor display name: %w", err)
 	}
@@ -203,7 +230,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		StageInstanceID:          activeStage.ID,
 		ActorUserID:              req.ActorUserID,
 		ActorTenantID:            req.TenantID,
-		Decision:                 domain.Decision(req.Decision),
+		Decision:                 req.Decision,
 		Comment:                  req.Comment,
 		SignedAt:                 now,
 		SignatureMethod:          req.SignatureMethod,
@@ -234,7 +261,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 
 	// Step 9: collect all signoffs for the active stage to evaluate quorum.
-	allStageSignoffs, err := s.loadStageSignoffs(ctx, tx, activeStage.ID)
+	allStageSignoffs, err := s.loadStageSignoffs(ctx, tx, req.TenantID, activeStage.ID)
 	if err != nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: load stage signoffs: %w", err)
@@ -242,16 +269,37 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 
 	// Step 10: evaluate quorum.
 	approvals, rejections := splitSignoffs(allStageSignoffs)
-	effectiveDenominator := domain.ComputeEffectiveDenominator(*activeStage, activeStage.EligibleActorIDs)
-	if effectiveDenominator == 0 {
+	currentEligible := activeStage.EligibleActorIDs
+	if activeStage.OnEligibilityDriftSnapshot != domain.DriftKeepSnapshot {
+		currentEligible, err = resolveEligibleActors(ctx, tx, req.TenantID, activeStage.AreaCodeSnapshot, activeStage.RequiredRoleSnapshot)
+		if err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: resolve current eligible actors: %w", err)
+		}
+	}
+	drift := domain.ApplyEligibilityDrift(*activeStage, currentEligible)
+	effectiveDenominator := drift.EffectiveDenominator
+	skipLegacyQuorumFallback := false
+	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
 		// Fallback: treat every eligible actor as in scope.
 		effectiveDenominator = len(activeStage.EligibleActorIDs)
 	}
-	if effectiveDenominator == 0 {
-		// No eligible actors configured — default denominator of 1 to allow any_1_of.
-		effectiveDenominator = 1
+	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			slog.Error("recordSignoff: rollback failed on empty eligible pool", "err", rbErr)
+		}
+		return SignoffResult{}, domain.ErrEmptyEligiblePool
 	}
-	outcome := domain.EvaluateQuorum(*activeStage, approvals, rejections, effectiveDenominator)
+	outcome := drift.ForcedOutcome
+	if outcome == domain.QuorumPending {
+		outcome = domain.EvaluateQuorum(*activeStage, approvals, rejections, effectiveDenominator)
+		if outcome == domain.QuorumError {
+			if rbErr := tx.Rollback(); rbErr != nil {
+				slog.Error("recordSignoff: rollback failed on quorum error", "err", rbErr)
+			}
+			return SignoffResult{}, domain.ErrEmptyEligiblePool
+		}
+	}
 
 	var result SignoffResult
 	var shouldDispatchPDF bool
@@ -306,7 +354,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				return SignoffResult{}, fmt.Errorf("recordSignoff: freeze: %w", err)
 			}
 			// Transition document under_review → approved.
-			if _, err := tx.ExecContext(ctx, `
+			res, err := tx.ExecContext(ctx, `
 				UPDATE documents
 				   SET status           = 'approved',
 				       revision_version = revision_version + 1
@@ -314,9 +362,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				   AND tenant_id = $2
 				   AND status    = 'under_review'`,
 				instance.DocumentID, req.TenantID,
-			); err != nil {
+			)
+			if err != nil {
 				_ = tx.Rollback()
 				return SignoffResult{}, fmt.Errorf("recordSignoff: approve document: %w", err)
+			}
+			rows, err := res.RowsAffected()
+			if err != nil {
+				_ = tx.Rollback()
+				return SignoffResult{}, fmt.Errorf("recordSignoff: approve document rows affected: %w", err)
+			}
+			if rows == 0 {
+				_ = tx.Rollback()
+				return SignoffResult{}, repository.ErrStaleRevision
 			}
 			result.InstanceApproved = true
 			shouldDispatchPDF = true
@@ -360,7 +418,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		}
 
 		// Transition document under_review -> draft so the author can edit and resubmit.
-		if _, err := tx.ExecContext(ctx, `
+		res, err := tx.ExecContext(ctx, `
         UPDATE documents
            SET status           = 'draft',
                revision_version = revision_version + 1
@@ -368,9 +426,19 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
            AND tenant_id = $2
            AND status    = 'under_review'`,
 			instance.DocumentID, req.TenantID,
-		); err != nil {
+		)
+		if err != nil {
 			_ = tx.Rollback()
 			return SignoffResult{}, fmt.Errorf("recordSignoff: reject document: %w", err)
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			_ = tx.Rollback()
+			return SignoffResult{}, fmt.Errorf("recordSignoff: reject document rows affected: %w", err)
+		}
+		if rows == 0 {
+			_ = tx.Rollback()
+			return SignoffResult{}, repository.ErrStaleRevision
 		}
 
 	default:
@@ -391,7 +459,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 	event := GovernanceEvent{
 		TenantID:     req.TenantID,
-		EventType:    "signoff_recorded",
+		EventType:    EventTypeSignoffRecorded,
 		ActorUserID:  req.ActorUserID,
 		ResourceType: "approval_instance",
 		ResourceID:   req.InstanceID,
@@ -421,9 +489,31 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		// Client fails fast; retry owned by PDFOutboxWorker (wiki/decisions/0009-pdf-dispatch-outbox.md).
 		dispatchCtx, dispatchCancel := context.WithTimeout(ctx, 45*time.Second)
 		defer dispatchCancel()
-		_ = s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID)
+		if err := s.pdfDispatcher.Dispatch(dispatchCtx, pdfTenantID, pdfRevisionID); err != nil {
+			slog.ErrorContext(dispatchCtx, "pdf dispatch failed", "tenantID", pdfTenantID, "revisionID", pdfRevisionID, "err", err)
+		}
 	}
 	return result, nil
+}
+
+func (s *DecisionService) emitEligibilityRejection(ctx context.Context, db *sql.DB, tenantID, actorID string, event GovernanceEvent) error {
+	ctx = authz.WithCapCache(ctx)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
+	if err := s.emitter.Emit(ctx, tx, event); err != nil {
+		return fmt.Errorf("emit event: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit: %w", err)
+	}
+	return nil
 }
 
 // loadPriorSignoffs fetches all signoffs for the instance EXCEPT the active stage,
@@ -448,15 +538,22 @@ func (s *DecisionService) loadPriorSignoffs(ctx context.Context, tx *sql.Tx, ten
 }
 
 // loadStageSignoffs fetches all signoffs for a single stage instance.
-func (s *DecisionService) loadStageSignoffs(ctx context.Context, tx *sql.Tx, stageInstanceID string) ([]domain.Signoff, error) {
+func (s *DecisionService) loadStageSignoffs(ctx context.Context, tx *sql.Tx, tenantID, stageInstanceID string) ([]domain.Signoff, error) {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, approval_instance_id, stage_instance_id,
-		       actor_user_id, actor_tenant_id, decision,
-		       comment, signed_at, signature_method, signature_payload, content_hash
-		FROM approval_signoffs
-		WHERE stage_instance_id = $1
-		ORDER BY signed_at ASC`,
-		stageInstanceID,
+		SELECT s.id, s.approval_instance_id, s.stage_instance_id,
+		       s.actor_user_id, s.actor_tenant_id, s.decision,
+		       s.comment, s.signed_at, s.signature_method, s.signature_payload, s.content_hash
+		  FROM approval_signoffs s
+		  JOIN approval_stage_instances asi
+		    ON asi.id = s.stage_instance_id
+		  JOIN approval_instances ai
+		    ON ai.id = asi.approval_instance_id
+		   AND ai.id = s.approval_instance_id
+		 WHERE s.stage_instance_id = $1
+		   AND ai.tenant_id = $2::uuid
+		   AND s.actor_tenant_id = ai.tenant_id
+		 ORDER BY s.signed_at ASC`,
+		stageInstanceID, tenantID,
 	)
 	if err != nil {
 		return nil, err
@@ -550,4 +647,49 @@ func hasUnresolvedComments(ctx context.Context, tx *sql.Tx, tenantID, documentID
 		return false, err
 	}
 	return unresolvedCount > 0, nil
+}
+
+func clientContentHash(formData map[string]any) (string, bool) {
+	if len(formData) == 0 {
+		return "", false
+	}
+	raw, ok := formData["_content_hash"]
+	if !ok {
+		return "", false
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", false
+	}
+	return value, true
+}
+
+func loadCurrentDocumentFormData(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (map[string]any, error) {
+	var raw []byte
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(form_data_json, '{}'::jsonb)
+		  FROM documents
+		 WHERE id = $1
+		   AND tenant_id = $2
+		 FOR UPDATE`,
+		documentID, tenantID,
+	).Scan(&raw)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return map[string]any{}, nil
+	}
+	var formData map[string]any
+	if err := json.Unmarshal(raw, &formData); err != nil {
+		return nil, fmt.Errorf("unmarshal form_data_json: %w", err)
+	}
+	if formData == nil {
+		return map[string]any{}, nil
+	}
+	return formData, nil
 }

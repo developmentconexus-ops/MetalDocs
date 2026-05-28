@@ -40,10 +40,21 @@ func (r *SnapshotRepository) table(name string) string {
 	return fmt.Sprintf("%q.%q", r.schema, name)
 }
 
+func requireRowsAffected(result sql.Result, action string) error {
+	n, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("%s rows affected: %w", action, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("%s: not found or already in target state", action)
+	}
+	return nil
+}
+
 // WriteSnapshot updates the snapshot columns for a document.
 func (r *SnapshotRepository) WriteSnapshot(ctx context.Context, tenantID, docID string, s domain.TemplateSnapshot) error {
 	h := s.Hashes()
-	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
 		UPDATE %s
 		   SET placeholder_schema_snapshot    = $1,
 		       placeholder_schema_hash        = $2,
@@ -57,7 +68,10 @@ func (r *SnapshotRepository) WriteSnapshot(ctx context.Context, tenantID, docID 
 		s.BodyDocxS3Key, h.BodyDocxHash,
 		tenantID, docID,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("write snapshot: %w", err)
+	}
+	return requireRowsAffected(result, "write snapshot")
 }
 
 // ReadSnapshot reads the snapshot columns for a document.
@@ -95,31 +109,37 @@ func (r *SnapshotRepository) readSnapshot(ctx context.Context, exec DBTX, tenant
 	return s, valuesFrozenAt, err
 }
 
-func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenant, docID string, valuesHash []byte, frozenAt time.Time, q ...DBTX) error {
+func (r *SnapshotRepository) WriteFreeze(ctx context.Context, tenantID, docID string, valuesHash []byte, frozenAt time.Time, q ...DBTX) error {
 	exec := DBTX(r.db)
 	if len(q) > 0 && q[0] != nil {
 		exec = q[0]
 	}
-	_, err := exec.ExecContext(ctx, fmt.Sprintf(`
+	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET values_hash=$1, values_frozen_at=$2
-         WHERE tenant_id=$3 AND id=$4`, r.table("documents")),
-		valuesHash, frozenAt, tenant, docID)
-	return err
+         WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
+		valuesHash, frozenAt, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("write freeze: %w", err)
+	}
+	return requireRowsAffected(result, "write freeze")
 }
 
 // WriteFinalDocx persists the fanout output pointer and content hash onto a document.
-func (r *SnapshotRepository) WriteFinalDocx(ctx context.Context, tenant, docID, s3Key string, contentHash []byte, q ...DBTX) error {
+func (r *SnapshotRepository) WriteFinalDocx(ctx context.Context, tenantID, docID, s3Key string, contentHash []byte, q ...DBTX) error {
 	exec := DBTX(r.db)
 	if len(q) > 0 && q[0] != nil {
 		exec = q[0]
 	}
-	_, err := exec.ExecContext(ctx, fmt.Sprintf(`
+	result, err := exec.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET final_docx_s3_key=$1, content_hash=$2
          WHERE tenant_id=$3::uuid AND id=$4::uuid`, r.table("documents")),
-		s3Key, contentHash, tenant, docID)
-	return err
+		s3Key, contentHash, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("write final docx: %w", err)
+	}
+	return requireRowsAffected(result, "write final docx")
 }
 
 // ReadFinalDocxS3Key returns the frozen DOCX S3 key for a document.
@@ -144,22 +164,41 @@ func (r *SnapshotRepository) ReadFinalDocxS3Key(ctx context.Context, tenantID, d
 }
 
 // WritePDF persists the rendered PDF pointer, hash, and generation timestamp.
-func (r *SnapshotRepository) WritePDF(ctx context.Context, tenant, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error {
-	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+func (r *SnapshotRepository) WritePDF(ctx context.Context, tenantID, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error {
+	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET final_pdf_s3_key=$1, pdf_hash=$2, pdf_generated_at=$3
          WHERE tenant_id=$4::uuid AND id=$5::uuid`, r.table("documents")),
-		s3Key, pdfHash, generatedAt, tenant, docID)
-	return err
+		s3Key, pdfHash, generatedAt, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("write pdf: %w", err)
+	}
+	return requireRowsAffected(result, "write pdf")
+}
+
+func (r *SnapshotRepository) ResolveTenantByDocumentID(ctx context.Context, docID string) (string, error) {
+	var tenantID string
+	if err := r.db.QueryRowContext(ctx, fmt.Sprintf(`
+		SELECT tenant_id::text
+		  FROM %s
+		 WHERE id = $1::uuid`, r.table("documents")),
+		docID,
+	).Scan(&tenantID); err != nil {
+		return "", err
+	}
+	return tenantID, nil
 }
 
 // AppendReconstruction appends a forensic attempt entry onto documents.reconstruction_attempts.
 // Never touches final_docx_s3_key or content_hash.
-func (r *SnapshotRepository) AppendReconstruction(ctx context.Context, tenant, docID string, entry []byte) error {
-	_, err := r.db.ExecContext(ctx, fmt.Sprintf(`
+func (r *SnapshotRepository) AppendReconstruction(ctx context.Context, tenantID, docID string, entry []byte) error {
+	result, err := r.db.ExecContext(ctx, fmt.Sprintf(`
         UPDATE %s
            SET reconstruction_attempts = reconstruction_attempts || $1::jsonb
          WHERE tenant_id=$2::uuid AND id=$3::uuid`, r.table("documents")),
-		entry, tenant, docID)
-	return err
+		entry, tenantID, docID)
+	if err != nil {
+		return fmt.Errorf("append reconstruction: %w", err)
+	}
+	return requireRowsAffected(result, "append reconstruction")
 }

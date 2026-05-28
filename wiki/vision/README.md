@@ -1,7 +1,8 @@
 # Vision
 
-> **Last verified:** 2026-04-25
-> **Scope:** What MetalDocs is, who it serves, why it exists.
+> **Last verified:** 2026-05-27
+> **Purpose:** Compatibility entrypoint for the canonical vision index.
 
-- product-vision.md — TBD
-- target-users.md — TBD
+The canonical vision landing page is [index.md](index.md).
+
+Use `index.md` for the maintained vision map. This file remains only for stable backward-compatible linking.

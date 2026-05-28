@@ -20,31 +20,31 @@ const (
 
 // Signoff is an immutable value object. All fields are unexported.
 type Signoff struct {
-	id                         string
-	approvalInstanceID         string
-	stageInstanceID            string
-	actorUserID                string
-	actorTenantID              string
-	decision                   Decision
-	comment                    string
-	signedAt                   time.Time
-	signatureMethod            string
-	signaturePayload           json.RawMessage
-	contentHash                string // always lowercase hex sha-256
-	actorDisplayNameSnapshot   string
+	id                       string
+	approvalInstanceID       string
+	stageInstanceID          string
+	actorUserID              string
+	actorTenantID            string
+	decision                 Decision
+	comment                  string
+	signedAt                 time.Time
+	signatureMethod          string
+	signaturePayload         json.RawMessage
+	contentHash              string // always lowercase hex sha-256
+	actorDisplayNameSnapshot string
 }
 
 // Getters — no setters exist; immutable after construction.
-func (s *Signoff) ID() string                         { return s.id }
-func (s *Signoff) ApprovalInstanceID() string         { return s.approvalInstanceID }
-func (s *Signoff) StageInstanceID() string            { return s.stageInstanceID }
-func (s *Signoff) ActorUserID() string                { return s.actorUserID }
-func (s *Signoff) ActorTenantID() string              { return s.actorTenantID }
-func (s *Signoff) Decision() Decision                 { return s.decision }
-func (s *Signoff) Comment() string                    { return s.comment }
-func (s *Signoff) SignedAt() time.Time                { return s.signedAt }
-func (s *Signoff) SignatureMethod() string            { return s.signatureMethod }
-func (s *Signoff) SignaturePayload() json.RawMessage  { return s.signaturePayload }
+func (s *Signoff) ID() string                        { return s.id }
+func (s *Signoff) ApprovalInstanceID() string        { return s.approvalInstanceID }
+func (s *Signoff) StageInstanceID() string           { return s.stageInstanceID }
+func (s *Signoff) ActorUserID() string               { return s.actorUserID }
+func (s *Signoff) ActorTenantID() string             { return s.actorTenantID }
+func (s *Signoff) Decision() Decision                { return s.decision }
+func (s *Signoff) Comment() string                   { return s.comment }
+func (s *Signoff) SignedAt() time.Time               { return s.signedAt }
+func (s *Signoff) SignatureMethod() string           { return s.signatureMethod }
+func (s *Signoff) SignaturePayload() json.RawMessage { return s.signaturePayload }
 func (s *Signoff) ContentHash() string               { return s.contentHash }
 func (s *Signoff) ActorDisplayNameSnapshot() string  { return s.actorDisplayNameSnapshot }
 
@@ -114,15 +114,16 @@ func NewSignoff(p SignoffParams) (*Signoff, error) {
 // MarshalJSON exposes Signoff for API responses.
 func (s *Signoff) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]any{
-		"id":                   s.id,
-		"approval_instance_id": s.approvalInstanceID,
-		"stage_instance_id":    s.stageInstanceID,
-		"actor_user_id":        s.actorUserID,
-		"actor_tenant_id":      s.actorTenantID,
-		"decision":             s.decision,
-		"comment":              s.comment,
-		"signed_at":            s.signedAt,
-		"signature_method":     s.signatureMethod,
-		"content_hash":         s.contentHash,
+		"id":                          s.id,
+		"approval_instance_id":        s.approvalInstanceID,
+		"stage_instance_id":           s.stageInstanceID,
+		"actor_user_id":               s.actorUserID,
+		"actor_tenant_id":             s.actorTenantID,
+		"decision":                    s.decision,
+		"comment":                     s.comment,
+		"signed_at":                   s.signedAt,
+		"signature_method":            s.signatureMethod,
+		"content_hash":                s.contentHash,
+		"actor_display_name_snapshot": s.actorDisplayNameSnapshot,
 	})
 }

@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/approval.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/approval-refactor.md`.
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-25 (5c + 5d medium sweep sync)
 
 ## Severity scale
 
@@ -57,6 +57,7 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Evidence:** `_artifacts/04-persistence.md` §6 (statement-local FAILs); cross-deps §1 (cancel_service.go:12 imports `authz`).
 - **Linked backlog row:** `backlog/approval-refactor.md#R-006`
 - **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md` (covers tier-2 model)
+- **Resolution sync 2026-05-25:** CLOSED by 5c High hardening. `cancel_service.go` now sets authz/RLS context before instance load, requires `workflow.instance.cancel` for user cancels, keeps system bypass behind `SystemCancelInstance`, tenant-scopes stage cancellation through `approval_instances`, and checks cancel event `json.Marshal` errors. `cutover_service.go` now counts legacy statuses inside a transaction with `authz.BypassSystem`, so RLS cannot hide rows during preflight. Verified with `go test ./internal/modules/documents/approval/application ./internal/modules/documents/approval/repository -count=1`.
 
 ### T-007 · `infra/signature/` vs `infrastructure/` package naming inconsistency
 - **Severity:** minor

@@ -21,5 +21,14 @@ var placeholderCatalog = []catalogEntry{
 }
 
 func (h *Handler) listPlaceholderCatalog(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := tenantIDFromReq(r)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
+		return
+	}
+	if err := h.authz(r, tenantID, "*", "template.view"); err != nil {
+		writeMappedErr(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": placeholderCatalog})
 }

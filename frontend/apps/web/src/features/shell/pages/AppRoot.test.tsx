@@ -76,6 +76,8 @@ describe('AppRoot', () => {
   it('stores returnTo on auth:expired event', async () => {
     vi.mocked(authApi.me).mockResolvedValue({
       userId: '1',
+      tenantId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      tenantName: 'System Tenant',
       username: 'admin',
       displayName: 'Admin',
       mustChangePassword: false,
@@ -93,6 +95,8 @@ describe('AppRoot', () => {
   it('ignores root path and login paths on auth:expired event', async () => {
     vi.mocked(authApi.me).mockResolvedValue({
       userId: '1',
+      tenantId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      tenantName: 'System Tenant',
       username: 'admin',
       displayName: 'Admin',
       mustChangePassword: false,

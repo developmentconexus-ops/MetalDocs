@@ -2,8 +2,10 @@ package application
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/taxonomy/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -26,8 +28,8 @@ func newFakeFamilyRepo() *fakeFamilyRepo {
 	}
 }
 
-func (r *fakeFamilyRepo) GetByCode(_ context.Context, code string) (*domain.DocumentFamily, error) {
-	f, ok := r.families[code]
+func (r *fakeFamilyRepo) GetByCode(_ context.Context, code domain.FamilyCode) (*domain.DocumentFamily, error) {
+	f, ok := r.families[string(code)]
 	if !ok {
 		return nil, domain.ErrFamilyNotFound
 	}
@@ -45,33 +47,33 @@ func (r *fakeFamilyRepo) List(_ context.Context, includeInactive bool) ([]domain
 }
 
 func (r *fakeFamilyRepo) Create(_ context.Context, f *domain.DocumentFamily) error {
-	r.families[f.Code] = f
+	r.families[string(f.Code)] = f
 	return nil
 }
 
 func (r *fakeFamilyRepo) Update(_ context.Context, f *domain.DocumentFamily) error {
-	if _, ok := r.families[f.Code]; !ok {
+	if _, ok := r.families[string(f.Code)]; !ok {
 		return domain.ErrFamilyNotFound
 	}
-	r.families[f.Code] = f
+	r.families[string(f.Code)] = f
 	return nil
 }
 
-func (r *fakeFamilyRepo) HasActiveProfiles(_ context.Context, _ string, familyCode string) (bool, error) {
-	return r.activeProfiles[familyCode], nil
+func (r *fakeFamilyRepo) HasActiveProfiles(_ context.Context, _ string, familyCode domain.FamilyCode) (bool, error) {
+	return r.activeProfiles[string(familyCode)], nil
 }
 
 func (r *fakeFamilyRepo) BeginTx(_ context.Context) (domain.FamilyTx, error) {
 	return fakeFamilyTx{}, nil
 }
 
-func (r *fakeFamilyRepo) GetByCodeForUpdate(_ context.Context, _ domain.FamilyTx, code string) (*domain.DocumentFamily, error) {
+func (r *fakeFamilyRepo) GetByCodeForUpdate(_ context.Context, _ domain.FamilyTx, code domain.FamilyCode) (*domain.DocumentFamily, error) {
 	return r.GetByCode(context.Background(), code)
 }
 
-func (r *fakeFamilyRepo) HasActiveProfilesTx(_ context.Context, _ domain.FamilyTx, tenantID, familyCode string) (bool, error) {
+func (r *fakeFamilyRepo) HasActiveProfilesTx(_ context.Context, _ domain.FamilyTx, tenantID string, familyCode domain.FamilyCode) (bool, error) {
 	r.lastTenantID = tenantID
-	return r.activeProfiles[familyCode], nil
+	return r.activeProfiles[string(familyCode)], nil
 }
 
 func (r *fakeFamilyRepo) UpdateTx(_ context.Context, _ domain.FamilyTx, f *domain.DocumentFamily) error {
@@ -95,6 +97,43 @@ func TestFamilyService_Create(t *testing.T) {
 	}
 	if !got.IsActive {
 		t.Fatal("expected IsActive=true after Create")
+	}
+}
+
+func TestFamilyService_Create_DoesNotMutateCallerPointer_AndLogsTenantActor(t *testing.T) {
+	repo := newFakeFamilyRepo()
+	logger := &fakeGovernanceLogger{}
+	svc := NewFamilyService(repo, logger)
+	in := &domain.DocumentFamily{
+		Code:        " policy ",
+		Name:        " Policy ",
+		Description: " Desc ",
+		IsActive:    false,
+	}
+	ctx := tenant.WithTenantID(context.Background(), "tenant-a")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
+
+	if err := svc.Create(ctx, in); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if in.IsActive {
+		t.Fatal("caller pointer must not be mutated")
+	}
+	got, err := svc.Get(context.Background(), "policy")
+	if err != nil {
+		t.Fatalf("Get after Create: %v", err)
+	}
+	if !got.IsActive {
+		t.Fatal("created family must be active")
+	}
+	if got.Name != "Policy" || got.Description != "Desc" {
+		t.Fatalf("created family must be trimmed, got %#v", got)
+	}
+	if len(logger.events) != 1 {
+		t.Fatalf("expected 1 governance event, got %d", len(logger.events))
+	}
+	if logger.events[0].TenantID != "tenant-a" || logger.events[0].ActorUserID != "actor-1" {
+		t.Fatalf("event tenant/actor = %q/%q", logger.events[0].TenantID, logger.events[0].ActorUserID)
 	}
 }
 
@@ -149,7 +188,17 @@ func TestFamilyService_Update_NotFound(t *testing.T) {
 	repo := newFakeFamilyRepo()
 	svc := NewFamilyService(repo, nil)
 	_, err := svc.Update(context.Background(), &domain.DocumentFamily{Code: "missing", Name: "X"})
-	if err != domain.ErrFamilyNotFound {
+	if !errors.Is(err, domain.ErrFamilyNotFound) {
 		t.Fatalf("want ErrFamilyNotFound, got %v", err)
+	}
+}
+
+func TestFamilyService_Create_ValidationFromDomainConstructor(t *testing.T) {
+	repo := newFakeFamilyRepo()
+	svc := NewFamilyService(repo, nil)
+
+	err := svc.Create(context.Background(), &domain.DocumentFamily{Code: "  ", Name: "Policy"})
+	if !errors.Is(err, domain.ErrFamilyCodeRequired) {
+		t.Fatalf("want ErrFamilyCodeRequired, got %v", err)
 	}
 }

@@ -184,8 +184,8 @@ func TestSQLEmitter_Emit_NilPayload_SentAsEmptyObject(t *testing.T) {
 
 func TestValidateEventPayload_Float64Rejected(t *testing.T) {
 	err := ValidateEventPayload(map[string]any{"value": float64(3.14)})
-	if !errors.Is(err, ErrFloatInPayload) {
-		t.Errorf("want ErrFloatInPayload; got %v", err)
+	if !errors.Is(err, ErrFloatInFormData) {
+		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
 }
 
@@ -515,8 +515,8 @@ func TestSubmitRevisionForReview_FloatPayloadRejected(t *testing.T) {
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
-	if !errors.Is(err, ErrFloatInPayload) {
-		t.Errorf("want ErrFloatInPayload; got %v", err)
+	if !errors.Is(err, ErrFloatInFormData) {
+		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
 }
 
@@ -614,8 +614,8 @@ func TestRecordSignoff_FloatInPayload(t *testing.T) {
 		ContentFormData:  map[string]any{"title": "Doc"},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
-	if !errors.Is(err, ErrFloatInPayload) {
-		t.Errorf("want ErrFloatInPayload; got %v", err)
+	if !errors.Is(err, ErrFloatInFormData) {
+		t.Errorf("want ErrFloatInFormData; got %v", err)
 	}
 }
 
@@ -722,6 +722,24 @@ func TestRecordSignoff_StageNotActive(t *testing.T) {
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, repository.ErrStageNotActive) {
 		t.Errorf("want ErrStageNotActive; got %v", err)
+	}
+}
+
+func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
+	inst := buildSingleStageInstance("inst-missing-stage", "stage-required", "author", []string{"actor"})
+	conn := &decisionTestConn{}
+	repo := &fakeDecisionRepo{instance: inst}
+	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:    "t",
+		InstanceID:  "inst-missing-stage",
+		ActorUserID: "actor",
+		Decision:    "approve",
+	})
+	if !errors.Is(err, repository.ErrStageNotActive) {
+		t.Errorf("want ErrStageNotActive for missing stage instance id; got %v", err)
 	}
 }
 
@@ -1480,12 +1498,12 @@ func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 }
 
 // ============================================================
-// Extra: RecordSignoff content hash error (nested float in form data)
+// Extra: RecordSignoff content hash error (nested float in DB form data)
 // ============================================================
 
 func TestRecordSignoff_ContentHashError(t *testing.T) {
-	conn := &decisionTestConn{}
-	repo := &fakeDecisionRepo{}
+	conn := &decisionTestConn{formDataJSON: `{"nested":{"val":1.5}}`}
+	repo := &fakeDecisionRepo{instance: buildSingleStageInstance("inst", "stage", "author", []string{"actor"})}
 	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
 	db := newDecisionTestDB(t, conn)
 
@@ -1496,7 +1514,7 @@ func TestRecordSignoff_ContentHashError(t *testing.T) {
 		ActorUserID:      "actor",
 		Decision:         "approve",
 		SignaturePayload: map[string]any{},
-		ContentFormData:  map[string]any{"nested": map[string]any{"val": float64(1.5)}},
+		ContentFormData:  map[string]any{"nested": map[string]any{"val": "ignored"}},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -1658,6 +1676,9 @@ func (s *commitFailStmt) Exec(_ []driver.Value) (driver.Result, error) {
 }
 func (s *commitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &submitSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
 	}
@@ -1677,7 +1698,7 @@ func (s *commitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 		return &submitSingleValueRows{value: "user-1"}, nil
 	}
 	// For route query (submit) return valid route rows.
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil
 	}
 	if strings.Contains(q, "approval_route_stages") {
@@ -2553,7 +2574,7 @@ func (s *submitStageQueryErrorStmt) Exec(_ []driver.Value) (driver.Result, error
 }
 func (s *submitStageQueryErrorStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil
 	}
 	if strings.Contains(q, "approval_route_stages") {
@@ -2691,6 +2712,9 @@ func (s *decisionPriorQueryFailStmt) Exec(_ []driver.Value) (driver.Result, erro
 }
 func (s *decisionPriorQueryFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &decisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: "QA"}, nil
 	}
@@ -2958,6 +2982,9 @@ func (s *decisionReplayCommitFailStmt) Exec(_ []driver.Value) (driver.Result, er
 }
 func (s *decisionReplayCommitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &decisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: "QA"}, nil
 	}
@@ -3250,7 +3277,29 @@ func (s *decisionCommitFailStmt) Exec(_ []driver.Value) (driver.Result, error) {
 	return decisionNoopResult{}, nil
 }
 func (s *decisionCommitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	if strings.Contains(strings.ToLower(s.query), "approval_signoffs") {
+	q := strings.ToLower(s.query)
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &decisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
+	if strings.Contains(q, "from documents") {
+		return &decisionSingleValueRows{value: "QA"}, nil
+	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "iam_user_roles") {
+		return &decisionSingleValueRows{value: false}, nil
+	}
+	if strings.Contains(q, "select exists") && strings.Contains(q, "role_capabilities") {
+		return &decisionSingleValueRows{value: true}, nil
+	}
+	if strings.Contains(q, "current_setting('metaldocs.asserted_caps'") {
+		return &decisionSingleValueRows{value: nil}, nil
+	}
+	if strings.Contains(q, "current_setting('metaldocs.tenant_id'") {
+		return &decisionSingleValueRows{value: tenant.DevTenantID}, nil
+	}
+	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
+		return &decisionSingleValueRows{value: "actor"}, nil
+	}
+	if strings.Contains(q, "approval_signoffs") {
 		if isStageQuery(s.query) {
 			return &signoffRows{rows: s.conn.stageSignoffs}, nil
 		}
@@ -3313,6 +3362,9 @@ func (s *submitNoStageStmt) Exec(_ []driver.Value) (driver.Result, error) {
 }
 func (s *submitNoStageStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &submitSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
 	}
@@ -3331,7 +3383,7 @@ func (s *submitNoStageStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: "user-1"}, nil
 	}
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil
 	}
 	if strings.Contains(q, "approval_route_stages") {

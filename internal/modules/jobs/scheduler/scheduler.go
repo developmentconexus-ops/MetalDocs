@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"os"
 	"sync"
@@ -28,7 +29,9 @@ type JobConfig struct {
 type Metrics struct {
 	mu sync.Mutex
 
-	RunsTotal   map[string]int64
+	// RunsTotal counts completed job function invocations, regardless of success.
+	RunsTotal map[string]int64
+	// ErrorsTotal counts job function invocations that returned a non-nil error.
 	ErrorsTotal map[string]int64
 	SkipsTotal  map[string]int64
 }
@@ -59,6 +62,31 @@ func (m *Metrics) incSkip(job string) {
 	m.mu.Unlock()
 }
 
+func (m *Metrics) Snapshot() MetricsSnapshot {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return MetricsSnapshot{
+		RunsTotal:   cloneMetricMap(m.RunsTotal),
+		ErrorsTotal: cloneMetricMap(m.ErrorsTotal),
+		SkipsTotal:  cloneMetricMap(m.SkipsTotal),
+	}
+}
+
+type MetricsSnapshot struct {
+	RunsTotal   map[string]int64
+	ErrorsTotal map[string]int64
+	SkipsTotal  map[string]int64
+}
+
+func cloneMetricMap(src map[string]int64) map[string]int64 {
+	dst := make(map[string]int64, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
 type inFlightJob struct {
 	job    string
 	epoch  int64
@@ -75,7 +103,7 @@ type Scheduler struct {
 	inPressure    bool
 	quietCount    int
 
-	Metrics Metrics
+	metrics Metrics
 
 	mu             sync.Mutex
 	inFlight       map[*inFlightJob]struct{}
@@ -87,21 +115,26 @@ type Scheduler struct {
 	logger         *slog.Logger
 }
 
-func New(db *sql.DB, leaderID string) *Scheduler {
+func New(db *sql.DB, leaderID string) (*Scheduler, error) {
+	if leaderID == "" {
+		return nil, errors.New("leaderID required")
+	}
 	return &Scheduler{
 		db:             db,
 		leaderID:       leaderID,
-		Metrics:        newMetrics(),
+		metrics:        newMetrics(),
 		inFlight:       map[*inFlightJob]struct{}{},
 		heartbeatEvery: time.Minute,
 		drainWait:      30 * time.Second,
 		forceWait:      5 * time.Second,
 		maxSkipStreak:  10,
 		logger:         slog.New(slog.NewTextHandler(os.Stdout, nil)),
-	}
+	}, nil
 }
 
 func (s *Scheduler) Register(cfg JobConfig) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.jobs = append(s.jobs, cfg)
 }
 
@@ -174,7 +207,7 @@ func (s *Scheduler) runJobLoop(ctx context.Context, cfg JobConfig) {
 				}
 				if shouldSkip {
 					skipStreak++
-					s.Metrics.incSkip(cfg.Name)
+					s.metrics.incSkip(cfg.Name)
 					s.logger.Warn("scheduler_job_skipped", "job", cfg.Name, "reason", "backpressure", "streak", skipStreak)
 					if skipStreak >= s.maxSkipStreak {
 						s.logger.Warn("scheduler_backpressure_skip_streak_max", "job", cfg.Name, "streak", skipStreak)
@@ -214,17 +247,20 @@ func (s *Scheduler) runJobLoop(ctx context.Context, cfg JobConfig) {
 			err = cfg.Fn(jobCtx, epoch)
 			duration := time.Since(started)
 			if err != nil {
-				s.Metrics.incError(cfg.Name)
+				s.metrics.incError(cfg.Name)
 				s.logger.Error("scheduler_job_failed", "job", cfg.Name, "epoch", epoch, "duration", duration, "error", err)
 			}
-			s.Metrics.incRun(cfg.Name)
+			s.metrics.incRun(cfg.Name)
 			s.logger.Info("scheduler_job_completed", "job", cfg.Name, "epoch", epoch, "duration", duration)
 
 			close(hbStop)
 			<-hbDone
 			jobCancel()
 
-			if releaseErr := s.releaseLease(context.Background(), cfg.Name, epoch); releaseErr != nil {
+			releaseCtx, releaseCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			releaseErr := s.releaseLease(releaseCtx, cfg.Name, epoch)
+			releaseCancel()
+			if releaseErr != nil {
 				s.logger.Error("scheduler_release_lease_failed", "job", cfg.Name, "epoch", epoch, "error", releaseErr)
 			}
 
@@ -232,6 +268,10 @@ func (s *Scheduler) runJobLoop(ctx context.Context, cfg JobConfig) {
 			s.removeInFlight(inFlight)
 		}
 	}
+}
+
+func (s *Scheduler) MetricsSnapshot() MetricsSnapshot {
+	return s.metrics.Snapshot()
 }
 
 func (s *Scheduler) heartbeatLoop(ctx context.Context, cancel context.CancelFunc, job, leader string, epoch int64, stop <-chan struct{}) {
@@ -260,18 +300,22 @@ func (s *Scheduler) heartbeatLoop(ctx context.Context, cancel context.CancelFunc
 }
 
 func (s *Scheduler) probePressure(ctx context.Context) bool {
-	current := s.currentPressure()
+	probeCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
 
 	var active float64
 	var maxConn float64
-	err := s.db.QueryRowContext(ctx, `
+	err := s.db.QueryRowContext(probeCtx, `
 SELECT
     COALESCE((SELECT count(*)::float8 FROM pg_stat_activity WHERE state = 'active'), 0),
     COALESCE(current_setting('max_connections')::float8, 1)
 `).Scan(&active, &maxConn)
 	if err != nil {
+		s.mu.Lock()
+		cur := s.inPressure
+		s.mu.Unlock()
 		s.logger.Debug("scheduler_pressure_probe_failed", "error", err)
-		return current
+		return cur
 	}
 
 	if maxConn <= 0 {
@@ -279,16 +323,17 @@ SELECT
 	}
 	ratio := active / maxConn
 
+	// Update shared state under lock; log outside the lock to avoid lock-order issues
+	// with the logger's internal synchronization.
+	var logEnter, logExit bool
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if ratio > 0.70 {
 		s.pressureCount++
 		s.quietCount = 0
 		if !s.inPressure && s.pressureCount >= 3 {
 			s.inPressure = true
 			s.pressureCount = 0
-			s.logger.Warn("scheduler_backpressure_enter", "ratio", ratio)
+			logEnter = true
 		}
 	} else if ratio < 0.60 {
 		s.quietCount++
@@ -296,20 +341,21 @@ SELECT
 		if s.inPressure && s.quietCount >= 3 {
 			s.inPressure = false
 			s.quietCount = 0
-			s.logger.Info("scheduler_backpressure_exit", "ratio", ratio)
+			logExit = true
 		}
 	} else {
 		s.pressureCount = 0
 		s.quietCount = 0
 	}
+	cur := s.inPressure
+	s.mu.Unlock()
 
-	return s.inPressure
-}
-
-func (s *Scheduler) currentPressure() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.inPressure
+	if logEnter {
+		s.logger.Warn("scheduler_backpressure_enter", "ratio", ratio)
+	} else if logExit {
+		s.logger.Info("scheduler_backpressure_exit", "ratio", ratio)
+	}
+	return cur
 }
 
 func (s *Scheduler) acquireLease(ctx context.Context, job string) (bool, int64, error) {
@@ -335,7 +381,10 @@ func (s *Scheduler) heartbeatLease(ctx context.Context, job, leader string, epoc
 }
 
 func (s *Scheduler) releaseLease(ctx context.Context, job string, epoch int64) error {
-	_, err := s.db.ExecContext(ctx,
+	releaseCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	_, err := s.db.ExecContext(releaseCtx,
 		"SELECT metaldocs.release_lease($1, $2, $3)",
 		job,
 		s.leaderID,
@@ -362,7 +411,10 @@ func (s *Scheduler) drain() {
 	s.logger.Warn("scheduler_force_release", "timeout", s.forceWait)
 	runs = s.snapshotInFlight()
 	for _, r := range runs {
-		if err := s.releaseLease(context.Background(), r.job, r.epoch); err != nil {
+		releaseCtx, releaseCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := s.releaseLease(releaseCtx, r.job, r.epoch)
+		releaseCancel()
+		if err != nil {
 			s.logger.Error("scheduler_force_release_failed", "job", r.job, "epoch", r.epoch, "error", err)
 			continue
 		}
@@ -436,6 +488,9 @@ func (s *Scheduler) unregisterTicker(t *time.Ticker) {
 
 func (s *Scheduler) stopAllTickers() {
 	s.mu.Lock()
+	// Copy under lock, then stop outside it. Ticker.Stop can race with loop
+	// teardown, so this stays intentionally two-phase to avoid holding s.mu
+	// across external calls.
 	tickers := append([]*time.Ticker(nil), s.tickers...)
 	s.mu.Unlock()
 	for _, t := range tickers {

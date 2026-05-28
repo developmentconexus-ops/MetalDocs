@@ -24,7 +24,7 @@ type fakeReadServicePublish struct {
 	err  error
 }
 
-func (f *fakeReadServicePublish) LoadInstance(_ context.Context, _ *sql.DB, _, _, _ string) (*domain.Instance, error) {
+func (f *fakeReadServicePublish) LoadInstance(_ context.Context, _ *sql.DB, _, _ string) (*domain.Instance, error) {
 	return nil, nil
 }
 

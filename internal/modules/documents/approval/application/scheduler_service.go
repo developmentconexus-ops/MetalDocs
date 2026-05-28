@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -45,26 +46,25 @@ func (s *SchedulerService) RunScheduledPublishJob(ctx context.Context, db *sql.D
 	if err != nil {
 		return fmt.Errorf("scheduler: begin publish tx for doc %s: %w", input.DocumentID, err)
 	}
+	defer tx.Rollback()
 	if err := authz.BypassSystem(ctx, tx); err != nil {
-		_ = tx.Rollback()
 		return fmt.Errorf("scheduler: bypass authz for doc %s: %w", input.DocumentID, err)
 	}
 
 	state, err := s.loadScheduledDocumentState(ctx, tx, input.TenantID, input.DocumentID)
 	if errors.Is(err, sql.ErrNoRows) {
-		_ = tx.Rollback()
+		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "document_not_found")
 		return nil
 	}
 	if err != nil {
-		_ = tx.Rollback()
 		return fmt.Errorf("scheduler: load scheduled state for doc %s: %w", input.DocumentID, err)
 	}
 	if !scheduledJobMatchesState(state, input) {
-		_ = tx.Rollback()
+		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "stale_job")
 		return nil
 	}
 	if s.clock.Now().UTC().Before(state.EffectiveFrom.Time.UTC()) {
-		_ = tx.Rollback()
+		slog.InfoContext(ctx, "scheduler skipping publish job", "document_id", input.DocumentID, "reason", "pre_effective_date")
 		return nil
 	}
 
@@ -138,16 +138,20 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 	if row.SupersededDocumentID.Valid {
 		payloadMap["superseded_document_id"] = row.SupersededDocumentID.String
 	}
-	payload, _ := json.Marshal(payloadMap)
+	payload, err := json.Marshal(payloadMap)
+	if err != nil {
+		return false, fmt.Errorf("scheduler: marshal event payload for doc %s: %w", row.DocumentID, err)
+	}
 
 	ev := GovernanceEvent{
 		TenantID:     row.TenantID,
-		EventType:    "document_published",
+		EventType:    EventTypeDocumentPublished,
 		ActorUserID:  "scheduler",
 		ResourceType: "document",
 		ResourceID:   row.DocumentID,
 		Reason:       "scheduled publish",
 		PayloadJSON:  json.RawMessage(payload),
+		OccurredAt:   s.clock.Now(),
 	}
 
 	if err = s.emitter.Emit(ctx, tx, ev); err != nil {
@@ -156,7 +160,6 @@ func (s *SchedulerService) publishScheduledDocumentTx(ctx context.Context, tx *s
 	}
 
 	if err = tx.Commit(); err != nil {
-		_ = tx.Rollback()
 		return false, fmt.Errorf("scheduler: commit publish tx for doc %s: %w", row.DocumentID, err)
 	}
 

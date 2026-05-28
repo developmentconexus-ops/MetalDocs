@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"metaldocs/internal/platform/messaging"
 )
 
 type fakeDocxKeyReader struct {
@@ -32,11 +34,15 @@ func TestPDFDispatchAdapter_Dispatch_Success(t *testing.T) {
 	if e.EventType != "docgen_v2_pdf" {
 		t.Errorf("event_type = %q, want docgen_v2_pdf", e.EventType)
 	}
-	if e.Payload["final_docx_s3_key"] != "tenants/t1/revisions/r1/frozen.docx" {
-		t.Errorf("payload final_docx_s3_key = %v", e.Payload["final_docx_s3_key"])
+	payload, ok := e.Payload.(messaging.PDFConvertPayload)
+	if !ok {
+		t.Fatalf("payload type = %T, want messaging.PDFConvertPayload", e.Payload)
 	}
-	if e.Payload["tenant_id"] != "t1" || e.Payload["revision_id"] != "r1" {
-		t.Errorf("payload tenant/revision mismatch: %v", e.Payload)
+	if payload.FinalDocxS3Key != "tenants/t1/revisions/r1/frozen.docx" {
+		t.Errorf("payload final_docx_s3_key = %v", payload.FinalDocxS3Key)
+	}
+	if payload.TenantID != "t1" || payload.RevisionID != "r1" {
+		t.Errorf("payload tenant/revision mismatch: %v", payload)
 	}
 }
 

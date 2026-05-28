@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"metaldocs/internal/modules/taxonomy/domain"
 )
@@ -11,6 +12,8 @@ type DBGovernanceLogger struct {
 	db *sql.DB
 }
 
+// Deprecated: prefer NewAuditGovernanceAdapter so taxonomy writes to the
+// canonical audit sink instead of the legacy governance_events table.
 func NewDBGovernanceLogger(db *sql.DB) *DBGovernanceLogger {
 	return &DBGovernanceLogger{db: db}
 }
@@ -27,14 +30,17 @@ func (l *DBGovernanceLogger) Log(ctx context.Context, e domain.GovernanceEvent) 
 		 VALUES
 		    ($1, $2, $3, $4, $5, $6, $7)`,
 		e.TenantID,
-		e.EventType,
+		string(e.EventType),
 		e.ActorUserID,
 		e.ResourceType,
 		e.ResourceID,
 		nullString(e.Reason),
 		payload,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("taxonomy: insert governance event: %w", err)
+	}
+	return nil
 }
 
 func nullString(v string) sql.NullString {

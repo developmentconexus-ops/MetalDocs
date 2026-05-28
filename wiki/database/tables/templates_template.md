@@ -1,6 +1,6 @@
 # public.templates_template
 
-> **Source:** `db/baseline/0001_current_schema.sql`
+> **Source:** `db/baseline/0001_current_schema.sql` + `db/migrations/0213_templates_tenant_id_uuid.sql`
 > **Schema:** `public`
 > **Owner:** templates
 
@@ -12,7 +12,7 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 | Column | Type | Nullable | Meaning |
 |---|---|---|---|
 | `id` | `uuid` | no | Baseline column. |
-| `tenant_id` | `text` | no | Baseline column. |
+| `tenant_id` | `uuid` | no | Tenant scope for template ownership and all dependent template-version lookups; converted from `text` by forward migration `0213_templates_tenant_id_uuid.sql`. |
 | `doc_type_code` | `text` | no | Baseline column. |
 | `key` | `text` | no | Baseline column. |
 | `name` | `text` | no | Baseline column. |
@@ -32,7 +32,7 @@ Current curated-baseline table owned by `templates`. See the owning module wiki 
 ```sql
 CREATE TABLE public.templates_template (
 id uuid NOT NULL,
-    tenant_id text NOT NULL,
+    tenant_id uuid NOT NULL,
     doc_type_code text NOT NULL,
     key text NOT NULL,
     name text NOT NULL,
@@ -60,3 +60,5 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 ## Notes and Debt
 
 Retained in `public` because current runtime/baseline truth still uses it. Do not move schemas without an approved migration plan.
+
+Forward migration `0213_templates_tenant_id_uuid.sql` converts `tenant_id` from legacy `text` to `uuid` and fails fast when any existing row still needs a tenant backfill/coercion repair.

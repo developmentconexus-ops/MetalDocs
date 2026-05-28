@@ -17,6 +17,22 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+type fakeCancelService struct {
+	gotReq application.CancelInput
+	result application.CancelResult
+	err    error
+	called bool
+}
+
+func (f *fakeCancelService) CancelInstance(_ context.Context, _ *sql.DB, req application.CancelInput) (application.CancelResult, error) {
+	f.called = true
+	f.gotReq = req
+	if f.err != nil {
+		return application.CancelResult{}, f.err
+	}
+	return f.result, nil
+}
+
 func cancelTestMux(h *Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/approval/instances/{instance_id}/cancel", h.CancelHandler)
@@ -24,11 +40,6 @@ func cancelTestMux(h *Handler) *http.ServeMux {
 }
 
 func TestCancelHandler(t *testing.T) {
-	origCancelInstance := cancelInstance
-	t.Cleanup(func() {
-		cancelInstance = origCancelInstance
-	})
-
 	tests := []struct {
 		name         string
 		body         string
@@ -66,16 +77,7 @@ func TestCancelHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var called bool
-			var gotReq application.CancelInput
-			cancelInstance = func(_ *Handler, _ context.Context, _ *sql.DB, req application.CancelInput) (application.CancelResult, error) {
-				called = true
-				gotReq = req
-				if tt.svcErr != nil {
-					return application.CancelResult{}, tt.svcErr
-				}
-				return application.CancelResult{DocumentID: "doc-4"}, nil
-			}
+			fakeSvc := &fakeCancelService{result: application.CancelResult{DocumentID: "doc-4"}, err: tt.svcErr}
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/instances/inst-4/cancel", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -85,18 +87,18 @@ func TestCancelHandler(t *testing.T) {
 			req.Header.Set("If-Match", "\"v9\"")
 
 			rr := httptest.NewRecorder()
-			cancelTestMux(&Handler{}).ServeHTTP(rr, req)
+			cancelTestMux(&Handler{cancelSvc: fakeSvc}).ServeHTTP(rr, req)
 
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
 			}
-			if called != tt.wantSvcCalls {
-				t.Fatalf("service called = %v, want %v", called, tt.wantSvcCalls)
+			if fakeSvc.called != tt.wantSvcCalls {
+				t.Fatalf("service called = %v, want %v", fakeSvc.called, tt.wantSvcCalls)
 			}
 
 			if tt.wantSvcCalls {
-				if gotReq.TenantID != "tenant-1" || gotReq.InstanceID != "inst-4" || gotReq.ActorUserID != "actor-1" || gotReq.ExpectedRevisionVersion != 9 {
-					t.Fatalf("unexpected service request: %+v", gotReq)
+				if fakeSvc.gotReq.TenantID != "tenant-1" || fakeSvc.gotReq.InstanceID != "inst-4" || fakeSvc.gotReq.ActorUserID != "actor-1" || fakeSvc.gotReq.ExpectedRevisionVersion != 9 {
+					t.Fatalf("unexpected service request: %+v", fakeSvc.gotReq)
 				}
 			}
 

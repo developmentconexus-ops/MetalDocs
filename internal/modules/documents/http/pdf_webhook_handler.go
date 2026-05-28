@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -16,6 +18,7 @@ import (
 // PDFWriter persists PDF-completion columns on documents.
 type PDFWriter interface {
 	WritePDF(ctx context.Context, tenant, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error
+	ResolveTenantByDocumentID(ctx context.Context, docID string) (string, error)
 }
 
 // PDFWebhookHandler receives completion callbacks from docgen_v2_pdf workers.
@@ -34,10 +37,10 @@ func (h *PDFWebhookHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 type pdfCompleteBody struct {
-	TenantID        string `json:"tenant_id"`
-	FinalPDFS3Key   string `json:"final_pdf_s3_key"`
-	PDFHash         string `json:"pdf_hash"`
-	PDFGeneratedAt  string `json:"pdf_generated_at"`
+	TenantID       string `json:"tenant_id"`
+	FinalPDFS3Key  string `json:"final_pdf_s3_key"`
+	PDFHash        string `json:"pdf_hash"`
+	PDFGeneratedAt string `json:"pdf_generated_at"`
 }
 
 const pdfWebhookMaxBytes = 64 << 10 // 64 KiB
@@ -62,8 +65,26 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})
 		return
 	}
-	if strings.TrimSpace(body.TenantID) == "" || strings.TrimSpace(body.FinalPDFS3Key) == "" || body.PDFHash == "" || body.PDFGeneratedAt == "" {
+	if !isValidFinalPDFS3Key(body.FinalPDFS3Key) {
+		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_final_pdf_s3_key"})
+		return
+	}
+	if body.PDFHash == "" || body.PDFGeneratedAt == "" {
 		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "missing_fields"})
+		return
+	}
+	docID := r.PathValue("id")
+	canonicalTenantID, err := h.writer.ResolveTenantByDocumentID(r.Context(), docID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeFillInJSON(w, http.StatusNotFound, map[string]any{"error": "document_not_found"})
+			return
+		}
+		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "persist_failed"})
+		return
+	}
+	if strings.TrimSpace(body.TenantID) != "" && strings.TrimSpace(body.TenantID) != canonicalTenantID {
+		writeFillInJSON(w, http.StatusBadRequest, map[string]any{"error": "tenant_mismatch"})
 		return
 	}
 
@@ -80,13 +101,13 @@ func (h *PDFWebhookHandler) HandlePDFComplete(w http.ResponseWriter, r *http.Req
 	}
 	generatedAt = generatedAt.UTC()
 
-	if err := h.writer.WritePDF(r.Context(), body.TenantID, r.PathValue("id"), body.FinalPDFS3Key, hashBytes, generatedAt); err != nil {
+	if err := h.writer.WritePDF(r.Context(), canonicalTenantID, docID, body.FinalPDFS3Key, hashBytes, generatedAt); err != nil {
 		writeFillInJSON(w, http.StatusInternalServerError, map[string]any{"error": "persist_failed"})
 		return
 	}
 
 	writeFillInJSON(w, http.StatusOK, map[string]any{
-		"document_id":      r.PathValue("id"),
+		"document_id":      docID,
 		"final_pdf_s3_key": body.FinalPDFS3Key,
 	})
 }
@@ -102,4 +123,12 @@ func validSignature(body []byte, sigHex, secret string) bool {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	return hmac.Equal(expected, mac.Sum(nil))
+}
+
+func isValidFinalPDFS3Key(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || len(trimmed) > 512 {
+		return false
+	}
+	return !strings.Contains(trimmed, "..") && !strings.Contains(trimmed, "\x00")
 }

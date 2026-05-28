@@ -90,6 +90,9 @@ func TestMiddleware_FirstCall_RecordsAndPasses(t *testing.T) {
 	if rec2.Code != 201 {
 		t.Fatalf("replay status: got %d want 201", rec2.Code)
 	}
+	if got := rec2.Header().Get("Idempotent-Replay"); got != "true" {
+		t.Fatalf("replay header: got %q want true", got)
+	}
 	body, _ := io.ReadAll(rec2.Body)
 	if !jsonEqual(body, []byte(`{"id":"1"}`)) {
 		t.Fatalf("replay body mismatch: %s", body)

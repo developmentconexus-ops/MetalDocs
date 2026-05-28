@@ -14,6 +14,7 @@ func TestDocumentPresigner_UsesPublicSigningEndpointForBrowserURLs(t *testing.T)
 	internalClient, err := minio.New("minio:9000", &minio.Options{
 		Creds:  credentials.NewStaticV4("minioadmin", "minioadmin", ""),
 		Secure: false,
+		Region: "us-east-1",
 	})
 	if err != nil {
 		t.Fatalf("internal client: %v", err)
@@ -21,6 +22,7 @@ func TestDocumentPresigner_UsesPublicSigningEndpointForBrowserURLs(t *testing.T)
 	publicClient, err := minio.New("127.0.0.1:9000", &minio.Options{
 		Creds:  credentials.NewStaticV4("minioadmin", "minioadmin", ""),
 		Secure: false,
+		Region: "us-east-1",
 	})
 	if err != nil {
 		t.Fatalf("public client: %v", err)

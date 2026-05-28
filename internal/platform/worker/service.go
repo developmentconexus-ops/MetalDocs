@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/messaging"
 )
+
+var errUnsupportedEventType = errors.New("worker: unsupported event type")
 
 type Service struct {
 	consumer  messaging.Consumer
@@ -43,21 +46,23 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 	processed := 0
 	failed := 0
 	deadLettered := 0
+	var runErr error
 	for _, event := range events {
 		var handleErr error
 		switch event.EventType {
-		case "docgen_v2_pdf":
+		case messaging.EventTypePDFConvert:
 			if s.pdfRunner != nil {
 				handleErr = s.pdfRunner.Handle(ctx, event)
 			}
 		default:
-			log.Printf("worker_event event_id=%s event_type=%s result=skipped_unknown_type", event.EventID, event.EventType)
+			handleErr = fmt.Errorf("%w: %s", errUnsupportedEventType, event.EventType)
 		}
 		if handleErr != nil {
 			failed++
 			markedDLQ, markErr := s.markFailure(ctx, event, handleErr)
 			if markErr != nil {
-				return markErr
+				runErr = errors.Join(runErr, fmt.Errorf("worker: mark failed %s: %w", event.EventID, markErr))
+				continue
 			}
 			if markedDLQ {
 				deadLettered++
@@ -65,8 +70,9 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 			continue
 		}
 
-		if err := s.consumer.MarkPublished(ctx, []string{event.EventID}); err != nil {
-			return err
+		if err := s.consumer.MarkPublished(ctx, []messaging.EventID{event.EventID}); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("worker: mark published %s: %w", event.EventID, err))
+			continue
 		}
 		processed++
 		log.Printf("worker_event event_id=%s event_type=%s attempt_count=%d result=published trace_id=%s",
@@ -75,7 +81,7 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 
 	log.Printf("worker_batch result=completed processed=%d failed=%d dead_lettered=%d duration_ms=%d",
 		processed, failed, deadLettered, time.Since(start).Milliseconds())
-	return nil
+	return runErr
 }
 
 func (s *Service) markFailure(ctx context.Context, event messaging.Event, handleErr error) (bool, error) {
@@ -83,6 +89,9 @@ func (s *Service) markFailure(ctx context.Context, event messaging.Event, handle
 	attempt := event.AttemptCount
 	if attempt < 1 {
 		attempt = 1
+	}
+	if errors.Is(handleErr, errUnsupportedEventType) {
+		attempt = s.cfg.MaxAttempts
 	}
 
 	failure := messaging.FailedEvent{
@@ -118,10 +127,14 @@ func backoffDuration(attempt, baseSeconds, maxSeconds int) time.Duration {
 		maxSeconds = baseSeconds
 	}
 
-	multiplier := 1 << (attempt - 1)
-	delaySeconds := baseSeconds * multiplier
-	if delaySeconds > maxSeconds {
-		delaySeconds = maxSeconds
+	delaySeconds := int64(baseSeconds)
+	maxDelaySeconds := int64(maxSeconds)
+	for i := 1; i < attempt && delaySeconds < maxDelaySeconds; i++ {
+		if delaySeconds > maxDelaySeconds/2 {
+			delaySeconds = maxDelaySeconds
+			break
+		}
+		delaySeconds *= 2
 	}
 	return time.Duration(delaySeconds) * time.Second
 }

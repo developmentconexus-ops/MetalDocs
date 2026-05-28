@@ -53,6 +53,19 @@ func TestListDocuments_PageSizeCap_Returns400(t *testing.T) {
 	}
 }
 
+func TestListDocuments_InvalidStatus_Returns400(t *testing.T) {
+	mux := newMux(t, &fakeSvc{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?status=not_real", nil)
+	withAuthHeaders(req, "document_filler")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
 func TestDocumentStats_OK(t *testing.T) {
 	svc := &fakeSvc{
 		statsResult: &application.DocumentStats{

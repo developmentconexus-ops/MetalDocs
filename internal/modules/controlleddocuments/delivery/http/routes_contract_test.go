@@ -48,7 +48,7 @@ func (f fakeRegistryDocs) Create(ctx context.Context, doc *controlleddocumentsdo
 	return nil
 }
 
-func (f fakeRegistryDocs) CreateTx(ctx context.Context, tx *sql.Tx, doc *controlleddocumentsdomain.ControlledDocument) error {
+func (f fakeRegistryDocs) CreateTx(ctx context.Context, tx controlleddocumentsdomain.DBTX, doc *controlleddocumentsdomain.ControlledDocument) error {
 	return nil
 }
 
@@ -56,13 +56,13 @@ func (f fakeRegistryDocs) UpdateStatus(ctx context.Context, tenantID, id string,
 	return nil
 }
 
-func (f fakeRegistryDocs) UpdateStatusTx(_ context.Context, _ *sql.Tx, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
+func (f fakeRegistryDocs) UpdateStatusTx(_ context.Context, _ controlleddocumentsdomain.DBTX, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
 	return nil
 }
 
 type fakeSequenceAllocator struct{}
 
-func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx controlleddocumentsdomain.DBExecutor, tenantID, profileCode, areaCode string) (int, error) {
+func (f fakeSequenceAllocator) NextAndIncrement(ctx context.Context, tx controlleddocumentsdomain.DBTX, tenantID, profileCode, areaCode string) (int, error) {
 	return 1, nil
 }
 
@@ -76,20 +76,20 @@ func (f fakeSequenceAllocator) EnsureCounter(ctx context.Context, tenantID, prof
 
 type fakeTemplateChecker struct{}
 
-func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error) {
+func (f fakeTemplateChecker) GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error) {
 	return nil, "", nil
 }
 
 type fakeProfileReader struct{}
 
 func (f fakeProfileReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
-	return nil, nil
+	return &taxonomydomain.DocumentProfile{Code: taxonomydomain.ProfileCode(code), TenantID: tenantID}, nil
 }
 
 type fakeAreaReader struct{}
 
 func (f fakeAreaReader) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error) {
-	return nil, nil
+	return &taxonomydomain.ProcessArea{Code: taxonomydomain.AreaCode(code), TenantID: tenantID}, nil
 }
 
 type fakeGovernanceLogger struct{}
@@ -188,7 +188,7 @@ func newSQLMock(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
 
 func newTestHandler(db *sql.DB) *Handler {
 	svc := application.NewControlledDocumentService(
-		nil,
+		db,
 		fakeRegistryDocs{},
 		fakeSequenceAllocator{},
 		fakeTemplateChecker{},
@@ -203,7 +203,9 @@ func newTestHandler(db *sql.DB) *Handler {
 func newAuthedRequest(t *testing.T, method, url, tenantID string) *http.Request {
 	t.Helper()
 	req := httptest.NewRequest(method, url, nil)
-	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantID))
+	ctx := tenant.WithTenantID(req.Context(), tenantID)
+	ctx = iamdomain.WithAuthContext(ctx, "user-1", []iamdomain.Role{"author"})
+	req = req.WithContext(ctx)
 	// extract {id} path value from URL pattern /api/v1/controlled-documents/{id}/active-document
 	// httptest doesn't set path values automatically; set manually
 	// URL format: /api/v1/controlled-documents/<id>/active-document
@@ -321,14 +323,14 @@ func TestWriteDomainError_TemplateArtifactMissingIs409(t *testing.T) {
 	}
 }
 
-func TestWriteDomainError_ActorMissingIs500(t *testing.T) {
+func TestWriteDomainError_ActorMissingIs401(t *testing.T) {
 	handler := &Handler{}
 	rec := httptest.NewRecorder()
 
 	handler.writeDomainError(rec, application.ErrActorMissing)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusUnauthorized, rec.Body.String())
 	}
 	var body struct {
 		Code string `json:"code"`
@@ -336,12 +338,12 @@ func TestWriteDomainError_ActorMissingIs500(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v; body=%s", err, rec.Body.String())
 	}
-	if body.Code != "INTERNAL_ERROR" {
-		t.Fatalf("code = %q, want INTERNAL_ERROR", body.Code)
+	if body.Code != "UNAUTHENTICATED" {
+		t.Fatalf("code = %q, want UNAUTHENTICATED", body.Code)
 	}
 }
 
-func TestAtomicCreate_MissingAuthContext_Returns500NotFullTenant(t *testing.T) {
+func TestAtomicCreate_MissingAuthContext_Returns401NotFullTenant(t *testing.T) {
 	spy := &spyControlledDocumentService{}
 	handler := &Handler{svc: spy}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(`{
@@ -357,8 +359,8 @@ func TestAtomicCreate_MissingAuthContext_Returns500NotFullTenant(t *testing.T) {
 
 	handler.AtomicCreateControlledDocument(rec, req, controlleddocumentsapi.AtomicCreateControlledDocumentParams{})
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d; body = %s", rec.Code, http.StatusUnauthorized, rec.Body.String())
 	}
 	if spy.gotCreate.ActorUserID != "" {
 		t.Fatalf("service Create must not be invoked when actor missing; got ActorUserID=%q", spy.gotCreate.ActorUserID)
@@ -428,6 +430,22 @@ func TestAtomicCreate_UnknownField_Returns400(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "evilField") {
 		t.Fatalf("body %q does not mention evilField", rec.Body.String())
+	}
+}
+
+func TestAtomicCreate_BodyTooLarge_Returns400(t *testing.T) {
+	handler := &Handler{svc: &spyControlledDocumentService{}}
+	oversized := `{"documentName":"` + strings.Repeat("x", int(maxControlledDocumentsJSONBodyBytes)) + `","visibility":{"scope":"company","areaCodes":[],"userIds":[]},"profileCode":"DC","processAreaCode":"RH","title":"Policy","ownerUserId":"user-1"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents", strings.NewReader(oversized))
+	ctx := tenant.WithTenantID(req.Context(), "test-tenant")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-test", []iamdomain.Role{iamdomain.RoleSystemAdmin})
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	handler.AtomicCreateControlledDocument(rec, req, controlleddocumentsapi.AtomicCreateControlledDocumentParams{})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -523,6 +541,19 @@ func TestListControlledDocuments_InvalidStatus_Returns400(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestListControlledDocuments_ZeroTenantContext_Returns500(t *testing.T) {
+	handler := &Handler{svc: &spyControlledDocumentService{}}
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/controlled-documents", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), uuid.Nil.String()))
+	rec := httptest.NewRecorder()
+
+	handler.ListControlledDocuments(rec, req, controlleddocumentsapi.ListControlledDocumentsParams{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -637,6 +668,21 @@ func TestCreateControlledDocumentRevision_UnknownField_Returns400(t *testing.T) 
 	}
 	if !strings.Contains(rec.Body.String(), "evilField") {
 		t.Fatalf("body %q does not mention evilField", rec.Body.String())
+	}
+}
+
+func TestCreateControlledDocumentRevision_BodyTooLarge_Returns400(t *testing.T) {
+	handler := &Handler{svc: &spyControlledDocumentService{}}
+	cdID := "22222222-2222-2222-2222-222222222222"
+	oversized := `{"name":"` + strings.Repeat("x", int(maxControlledDocumentsJSONBodyBytes)) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/controlled-documents/"+cdID+"/revisions", strings.NewReader(oversized))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
+	rec := httptest.NewRecorder()
+
+	handler.CreateControlledDocumentRevision(rec, req, uuid.MustParse(cdID), controlleddocumentsapi.CreateControlledDocumentRevisionParams{})
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -793,6 +839,9 @@ func TestActiveDocument_OnlyPublished_Returns200_WithPublishedID(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(nil, nil, nil, nil, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -843,6 +892,9 @@ func TestActiveDocument_BothActiveAndPublished_Returns200_WithBoth(t *testing.T)
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -890,6 +942,9 @@ func TestActiveDocument_ScheduledActive_ReturnsScheduledState(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -936,6 +991,9 @@ func TestActiveDocument_UnderReview_ReturnsApprovalInstanceID(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, publishedDocID)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -983,6 +1041,9 @@ func TestActiveDocument_UnderReviewApprovalLookupFailure_Returns500(t *testing.T
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	}).AddRow(activeDocID, contentHash, revVersion, approvalState, nil)
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)
@@ -1087,6 +1148,9 @@ func TestActiveDocument_NoneExist_Returns404(t *testing.T) {
 	mainRows := sqlmock.NewRows([]string{
 		"doc_id", "content_hash", "revision_version", "approval_state", "published_doc_id",
 	})
+	mock.ExpectQuery(`SELECT EXISTS`).
+		WithArgs(tenantID, cdID, "user-1").
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(`SELECT`).
 		WithArgs(tenantID, cdID).
 		WillReturnRows(mainRows)

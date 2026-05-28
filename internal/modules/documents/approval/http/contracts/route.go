@@ -1,16 +1,40 @@
 package contracts
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
+
+type QuorumKind string
+
+const (
+	QuorumKindAny1Of QuorumKind = "any_1_of"
+	QuorumKindAllOf  QuorumKind = "all_of"
+	QuorumKindMOfN   QuorumKind = "m_of_n"
+)
+
+type DriftPolicyKind string
+
+const (
+	DriftPolicyKindReduceQuorum DriftPolicyKind = "reduce_quorum"
+	DriftPolicyKindFailStage    DriftPolicyKind = "fail_stage"
+	DriftPolicyKindKeepSnapshot DriftPolicyKind = "keep_snapshot"
+)
+
+var (
+	routeCodePattern          = regexp.MustCompile(`^[a-z0-9_-]+$`)
+	requiredCapabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*\.[a-z0-9._]*[a-z0-9]$`)
+)
 
 type StageRequest struct {
-	Order              int    `json:"order"`
-	Name               string `json:"name"`
-	RequiredRole       string `json:"required_role"`
-	RequiredCapability string `json:"required_capability"`
-	AreaCode           string `json:"area_code"`
-	Quorum             string `json:"quorum"`
-	QuorumM            *int   `json:"quorum_m,omitempty"`
-	DriftPolicy        string `json:"drift_policy"`
+	Order              int             `json:"order"`
+	Name               string          `json:"name"`
+	RequiredRole       string          `json:"required_role"`
+	RequiredCapability string          `json:"required_capability"`
+	AreaCode           string          `json:"area_code"`
+	Quorum             QuorumKind      `json:"quorum"`
+	QuorumM            *int            `json:"quorum_m,omitempty"`
+	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }
 
 type CreateRouteRequest struct {
@@ -22,12 +46,15 @@ type CreateRouteRequest struct {
 
 func (r CreateRouteRequest) Validate() error {
 	if err := validateRequired("profile_code", r.ProfileCode); err != nil {
-		return err
+		return wrapValidation(err)
+	}
+	if err := validateRouteCode("profile_code", r.ProfileCode); err != nil {
+		return wrapValidation(err)
 	}
 	if err := validateRequired("name", r.Name); err != nil {
-		return err
+		return wrapValidation(err)
 	}
-	return validateStages(r.Stages)
+	return wrapValidation(validateStages(r.Stages))
 }
 
 type UpdateRouteRequest struct {
@@ -38,9 +65,9 @@ type UpdateRouteRequest struct {
 
 func (r UpdateRouteRequest) Validate() error {
 	if err := validateRequired("name", r.Name); err != nil {
-		return err
+		return wrapValidation(err)
 	}
-	return validateStages(r.Stages)
+	return wrapValidation(validateStages(r.Stages))
 }
 
 func validateStages(stages []StageRequest) error {
@@ -63,18 +90,27 @@ func validateStages(stages []StageRequest) error {
 		if err := validateRequired(fmt.Sprintf("stages[%d].required_role", i), stage.RequiredRole); err != nil {
 			return err
 		}
+		if err := validateRouteCode(fmt.Sprintf("stages[%d].required_role", i), stage.RequiredRole); err != nil {
+			return err
+		}
 		if err := validateRequired(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
+			return err
+		}
+		if err := validateRequiredCapability(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
 			return err
 		}
 		if err := validateRequired(fmt.Sprintf("stages[%d].area_code", i), stage.AreaCode); err != nil {
 			return err
 		}
+		if err := validateRouteCode(fmt.Sprintf("stages[%d].area_code", i), stage.AreaCode); err != nil {
+			return err
+		}
 		switch stage.Quorum {
-		case "any_1_of", "all_of":
+		case QuorumKindAny1Of, QuorumKindAllOf:
 			if stage.QuorumM != nil {
 				return fmt.Errorf("stages[%d].quorum_m must be omitted unless quorum is m_of_n", i)
 			}
-		case "m_of_n":
+		case QuorumKindMOfN:
 			if stage.QuorumM == nil {
 				return fmt.Errorf("stages[%d].quorum_m is required when quorum is m_of_n", i)
 			}
@@ -85,10 +121,30 @@ func validateStages(stages []StageRequest) error {
 			return fmt.Errorf("stages[%d].quorum must be one of: any_1_of, all_of, m_of_n", i)
 		}
 		switch stage.DriftPolicy {
-		case "reduce_quorum", "fail_stage", "keep_snapshot":
+		case DriftPolicyKindReduceQuorum, DriftPolicyKindFailStage, DriftPolicyKindKeepSnapshot:
 		default:
 			return fmt.Errorf("stages[%d].drift_policy must be one of: reduce_quorum, fail_stage, keep_snapshot", i)
 		}
+	}
+	return nil
+}
+
+func validateRouteCode(field, value string) error {
+	if len(value) > 64 {
+		return fmt.Errorf("%s must be at most 64 characters", field)
+	}
+	if !routeCodePattern.MatchString(value) {
+		return fmt.Errorf("%s must match [a-z0-9_-]+", field)
+	}
+	return nil
+}
+
+func validateRequiredCapability(field, value string) error {
+	if len(value) > 64 {
+		return fmt.Errorf("%s must be at most 64 characters", field)
+	}
+	if !requiredCapabilityPattern.MatchString(value) {
+		return fmt.Errorf("%s must match <namespace>.<action> using [a-z0-9_.]", field)
 	}
 	return nil
 }
@@ -98,7 +154,7 @@ type RouteResponse struct {
 	ProfileCode string          `json:"profile_code"`
 	Name        string          `json:"name"`
 	Version     int             `json:"version"`
-	NewVersion  int             `json:"new_version,omitempty"`
+	NewVersion  *int            `json:"new_version,omitempty"`
 	Active      bool            `json:"active"`
 	InUse       bool            `json:"in_use"`
 	Stages      []StageResponse `json:"stages"`
@@ -106,24 +162,24 @@ type RouteResponse struct {
 }
 
 type StageResponse struct {
-	Order              int    `json:"order"`
-	Name               string `json:"name"`
-	RequiredRole       string `json:"required_role"`
-	RequiredCapability string `json:"required_capability"`
-	AreaCode           string `json:"area_code"`
-	Quorum             string `json:"quorum"`
-	QuorumM            *int   `json:"quorum_m,omitempty"`
-	DriftPolicy        string `json:"drift_policy"`
+	Order              int             `json:"order"`
+	Name               string          `json:"name"`
+	RequiredRole       string          `json:"required_role"`
+	RequiredCapability string          `json:"required_capability"`
+	AreaCode           string          `json:"area_code"`
+	Quorum             QuorumKind      `json:"quorum"`
+	QuorumM            *int            `json:"quorum_m,omitempty"`
+	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }
 
 type ListStageItem struct {
-	Label              string   `json:"label"`
-	Members            []string `json:"members"`
-	RequiredRole       string   `json:"required_role"`
-	RequiredCapability string   `json:"required_capability"`
-	AreaCode           string   `json:"area_code"`
-	QuorumKind         string   `json:"quorum_kind"`
-	DriftPolicy        string   `json:"drift_policy"`
+	Label              string          `json:"label"`
+	Members            []string        `json:"members"`
+	RequiredRole       string          `json:"required_role"`
+	RequiredCapability string          `json:"required_capability"`
+	AreaCode           string          `json:"area_code"`
+	QuorumKind         QuorumKind      `json:"quorum_kind"`
+	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }
 
 type ListRouteItem struct {

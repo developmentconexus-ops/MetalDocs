@@ -67,15 +67,15 @@ func (w *PDFOutboxWorker) tick(ctx context.Context) {
 
 func (w *PDFOutboxWorker) dispatchOne(ctx context.Context, r OutboxRow) {
 	err := w.pub.Publish(ctx, messaging.Event{
-		EventID:        uuid.NewString(),
-		EventType:      "docgen_v2_pdf",
-		AggregateType:  "document_revision",
-		AggregateID:    r.RevisionID,
-		IdempotencyKey: "docgen_v2_pdf:" + r.RevisionID,
-		Payload: map[string]any{
-			"tenant_id":    r.TenantID,
-			"revision_id":  r.RevisionID,
-			"content_hash": hex.EncodeToString(r.ContentHash),
+		EventID:        messaging.EventID(uuid.NewString()),
+		EventType:      messaging.EventTypePDFConvert,
+		AggregateType:  messaging.AggregateType("document_revision"),
+		AggregateID:    messaging.AggregateID(r.RevisionID),
+		IdempotencyKey: messaging.IdempotencyKey("docgen_v2_pdf:" + r.TenantID + ":" + r.RevisionID),
+		Payload: messaging.PDFConvertPayload{
+			TenantID:    r.TenantID,
+			RevisionID:  r.RevisionID,
+			ContentHash: hex.EncodeToString(r.ContentHash),
 		},
 	})
 	if err == nil {
@@ -85,7 +85,8 @@ func (w *PDFOutboxWorker) dispatchOne(ctx context.Context, r OutboxRow) {
 		return
 	}
 	finalize := r.Attempts+1 >= w.maxAttempt
-	backoff := time.Duration(math.Min(float64(30*time.Minute), float64(time.Duration(1<<r.Attempts)*30*time.Second)))
+	cappedAttempts := min(max(r.Attempts, 0), 30)
+	backoff := time.Duration(math.Min(float64(30*time.Minute), float64(time.Duration(1<<cappedAttempts)*30*time.Second)))
 	nextRetry := time.Now().Add(backoff)
 	if mErr := w.repo.MarkFailed(ctx, r.ID, err.Error(), nextRetry, finalize); mErr != nil {
 		w.log.Error("mark failed", "id", r.ID, "err", mErr)

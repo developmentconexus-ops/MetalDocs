@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	authapp "metaldocs/internal/modules/auth/application"
@@ -112,16 +113,18 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 	cfg := authapp.Config{
 		SessionCookieName:      sessionCookieName,
 		SessionTTL:             time.Duration(sessionTTLHours) * time.Hour,
-		SessionSecret:          sessionSecret,
+		SessionSecret:          authapp.Secret(sessionSecret),
 		PasswordMinLength:      passwordMinLength,
 		LoginMaxFailedAttempts: maxFailedAttempts,
 		LoginLockDuration:      time.Duration(lockMinutes) * time.Minute,
+		// LegacyHeaderEnabled preserves the retired pre-session header-based auth
+		// compatibility path. Remove it once the corresponding env toggle can be dropped.
 		LegacyHeaderEnabled:    parseBoolEnv("METALDOCS_AUTH_LEGACY_HEADER_ENABLED", false),
 		BootstrapAdminEnabled:  bootstrapEnabled,
 		BootstrapAdminUserID:   bootstrapUserID,
 		BootstrapAdminUsername: bootstrapUsername,
 		BootstrapAdminEmail:    strings.TrimSpace(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_EMAIL")),
-		BootstrapAdminPassword: os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_PASSWORD"),
+		BootstrapAdminPassword: authapp.Secret(os.Getenv("METALDOCS_BOOTSTRAP_ADMIN_PASSWORD")),
 		BootstrapAdminName:     bootstrapName,
 		CookieSecure:           parseBoolEnv("METALDOCS_AUTH_COOKIE_SECURE", appEnv != "local"),
 		TrustedOrigins:         splitCSV(os.Getenv("METALDOCS_AUTH_TRUSTED_ORIGINS")),
@@ -129,7 +132,7 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		TrustedProxyCIDRs:      trustedProxyCIDRs,
 	}
 
-	if cfg.BootstrapAdminEnabled && strings.TrimSpace(cfg.BootstrapAdminPassword) == "" {
+	if cfg.BootstrapAdminEnabled && strings.TrimSpace(cfg.BootstrapAdminPassword.Value()) == "" {
 		return authapp.Config{}, fmt.Errorf("METALDOCS_BOOTSTRAP_ADMIN_PASSWORD is required when bootstrap admin is enabled")
 	}
 
@@ -138,7 +141,18 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 
 // DevRoleMap parses METALDOCS_DEV_USER_ROLES as: user1:admin,user2:viewer|reviewer
 func DevRoleMap() map[string][]iamdomain.Role {
-	raw := strings.TrimSpace(os.Getenv("METALDOCS_DEV_USER_ROLES"))
+	devRoleMapOnce.Do(func() {
+		devRoleMapCached = parseDevRoleMap(strings.TrimSpace(os.Getenv("METALDOCS_DEV_USER_ROLES")))
+	})
+	return cloneDevRoleMap(devRoleMapCached)
+}
+
+var (
+	devRoleMapOnce   sync.Once
+	devRoleMapCached map[string][]iamdomain.Role
+)
+
+func parseDevRoleMap(raw string) map[string][]iamdomain.Role {
 	if raw == "" {
 		return map[string][]iamdomain.Role{"admin-local": {iamdomain.RoleSystemAdmin}}
 	}
@@ -174,6 +188,14 @@ func DevRoleMap() map[string][]iamdomain.Role {
 	}
 	if len(out) == 0 {
 		out["admin-local"] = []iamdomain.Role{iamdomain.RoleSystemAdmin}
+	}
+	return out
+}
+
+func cloneDevRoleMap(src map[string][]iamdomain.Role) map[string][]iamdomain.Role {
+	out := make(map[string][]iamdomain.Role, len(src))
+	for userID, roles := range src {
+		out[userID] = append([]iamdomain.Role(nil), roles...)
 	}
 	return out
 }

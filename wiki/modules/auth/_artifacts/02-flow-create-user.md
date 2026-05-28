@@ -9,14 +9,10 @@
 
 ## 2. Call chain
 - `handleCreateUser` parses request, roles, tenant, actor, then calls `authService.CreateUser` (`internal/modules/iam/delivery/http/admin_handler.go:265`, `internal/modules/iam/delivery/http/admin_handler.go:270`, `internal/modules/iam/delivery/http/admin_handler.go:275`, `internal/modules/iam/delivery/http/admin_handler.go:279`, `internal/modules/iam/delivery/http/admin_handler.go:280`).
-- `Service.CreateUser` entry is at `internal/modules/auth/application/service.go:279`.
-- `Service.CreateUser` calls `validatePassword(password)` (`internal/modules/auth/application/service.go:297`) then `hashPassword(password)` (`internal/modules/auth/application/service.go:300`).
+- `Service.CreateUser` delegates to `CreateUserWithInput`, which normalizes the input, validates the password, and hashes it before persistence.
 - `hashPassword` uses `bcrypt.GenerateFromPassword(..., bcrypt.DefaultCost)` (`internal/modules/auth/application/service.go:431`, `internal/modules/auth/application/service.go:432`).
-- `Service.CreateUser` calls `s.repo.CreateUser(...)` (`internal/modules/auth/application/service.go:305`).
-- Postgres `Repository.CreateUser` starts its own DB transaction with `BeginTx`, inserts `metaldocs.auth_identities`, then commits (`internal/modules/auth/infrastructure/postgres/repository.go:151`, `internal/modules/auth/infrastructure/postgres/repository.go:152`, `internal/modules/auth/infrastructure/postgres/repository.go:163`, `internal/modules/auth/infrastructure/postgres/repository.go:166`, `internal/modules/auth/infrastructure/postgres/repository.go:170`).
-- `Service.CreateUser` then calls `s.roleAdmin.ReplaceUserRoles(...)` (`internal/modules/auth/application/service.go:325`).
-- `RoleAdminRepository.ReplaceUserRoles` also starts its own transaction with `BeginTx`, upserts `metaldocs.iam_users`, deletes prior `metaldocs.iam_user_roles`, optionally inserts one new `metaldocs.iam_user_roles`, and commits (`internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:73`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:80`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:85`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:90`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:106`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:112`).
-- Transaction boundary fact: `repo.CreateUser` and `ReplaceUserRoles` execute in distinct transactions (each function independently calls `BeginTx` and commits) and there is no shared outer transaction in `Service.CreateUser` (`internal/modules/auth/application/service.go:279`, `internal/modules/auth/application/service.go:305`, `internal/modules/auth/application/service.go:325`, `internal/modules/auth/infrastructure/postgres/repository.go:152`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:73`).
+- On the canonical postgres path, auth opens a transaction via `BeginTx`, calls `CreateUserTx`, then reuses the same transaction for IAM `ReplaceUserRolesTx` before commit.
+- Fallback adapters still call `s.repo.CreateUser(...)` followed by `s.roleAdmin.ReplaceUserRoles(...)` sequentially when tx-aware interfaces are unavailable.
 
 ## 3. State changes
 - `metaldocs.auth_identities`: one row inserted by auth repository `CreateUser` (`internal/modules/auth/infrastructure/postgres/repository.go:163`, `internal/modules/auth/infrastructure/postgres/repository.go:166`).
@@ -42,6 +38,6 @@
 ## 6. Cross-refs
 - Idempotency: no explicit idempotency-key handling in this flow (`internal/modules/iam/delivery/http/admin_handler.go:259`, `internal/modules/iam/delivery/http/admin_handler.go:285`, `internal/modules/auth/application/service.go:279`, `internal/modules/auth/application/service.go:326`).
 - Pagination: no pagination in create-user flow (`internal/modules/iam/delivery/http/admin_handler.go:259`, `internal/modules/iam/delivery/http/admin_handler.go:285`).
-- Audit log emission for create-user variant: no `h.recordAudit(...)` call inside `handleCreateUser` (`internal/modules/iam/delivery/http/admin_handler.go:259`, `internal/modules/iam/delivery/http/admin_handler.go:285`).
+- Audit log emission for create-user variant is handled in IAM `handleCreateUser` after the auth service returns successfully.
 - Audit comparison point: `handleReplaceUserRoles` does emit `h.recordAudit(...)` (`internal/modules/iam/delivery/http/admin_handler.go:398`).
-- Two-transaction non-atomicity: factual; auth identity insert transaction and IAM role replacement transaction are separate and not wrapped by one transaction (`internal/modules/auth/infrastructure/postgres/repository.go:152`, `internal/modules/auth/infrastructure/postgres/repository.go:170`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:73`, `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:112`, `internal/modules/auth/application/service.go:305`, `internal/modules/auth/application/service.go:325`).
+- Transactionality note: the postgres shared-tx path is now atomic across auth identity insert and IAM role replacement; residual non-atomicity remains only for fallback adapters that lack tx-aware interfaces.

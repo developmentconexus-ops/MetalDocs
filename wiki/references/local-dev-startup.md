@@ -47,6 +47,34 @@ Skip the dedicated jobs runtime when you intentionally want API-only startup:
 .\scripts\start-api.ps1 -NoJobs
 ```
 
+## Fast API-only loop
+
+For backend debugging, route testing, or quick iteration where you do not want
+worker/jobs startup or broad binary freshness scans, use:
+
+```powershell
+.\scripts\dev-api.ps1
+```
+
+What it does:
+
+1. Loads `.env`
+2. Forces `APP_PORT=8081`
+3. Reuses the current healthy `metaldocs-api.exe` on `:8081` when possible
+4. Builds `metaldocs-api.exe` only when it is missing or when `-Build` is passed
+5. Starts only the API
+6. Waits only for `GET /api/v1/health/ready`
+
+Useful flags:
+
+```powershell
+.\scripts\dev-api.ps1 -Build
+.\scripts\dev-api.ps1 -ForceRestart
+```
+
+Use this for the inner dev loop. Keep `.\scripts\start-api.ps1` as the
+canonical heavier startup path when you intentionally need worker/jobs parity.
+
 ## Script-truth policy
 
 Local startup follows `script-truth` policy:
@@ -73,6 +101,11 @@ This checkpoint verifies:
 1. login succeeds from the current runtime
 2. session validation works after login
 3. the target route responds from the same runtime boundary
+
+When `-StartApi` is passed, `check-system-runnable.ps1` now uses the fast
+API-only launcher (`scripts/dev-api.ps1`) before it performs the auth and route
+checks. That keeps the verification gate intact without forcing worker/jobs
+startup for every backend smoke.
 
 If any checkpoint fails, classify it as a prerequisite first. Do not absorb startup, auth, or shared contract repair silently into a screen implementation task.
 

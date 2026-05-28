@@ -21,7 +21,7 @@ import (
 )
 
 type TemplateVersionChecker interface {
-	GetTemplateVersionState(ctx context.Context, templateVersionID string) (*string, string, error)
+	GetTemplateVersionState(ctx context.Context, tenantID, templateVersionID string) (*string, string, error)
 }
 
 type ProfileReader interface {
@@ -36,6 +36,7 @@ type ControlledDocument = controlleddocumentsdomain.ControlledDocument
 type CDFilter = controlleddocumentsdomain.CDFilter
 
 type ControlledDocumentService struct {
+	// Core dependencies.
 	db        *sql.DB
 	docs      controlleddocumentsdomain.ControlledDocumentRepository
 	seq       controlleddocumentsdomain.SequenceAllocator
@@ -44,7 +45,9 @@ type ControlledDocumentService struct {
 	areas     AreaReader
 	govLogger taxonomydomain.GovernanceLogger
 	docInit   controlleddocumentsdomain.DocumentInitializer
-	now       func() time.Time
+
+	// Runtime configuration.
+	now func() time.Time
 }
 
 type CreateControlledDocumentCmd struct {
@@ -93,6 +96,21 @@ func NewControlledDocumentService(
 	govLogger taxonomydomain.GovernanceLogger,
 	docInit controlleddocumentsdomain.DocumentInitializer,
 ) *ControlledDocumentService {
+	if docs == nil {
+		panic("controlled_documents: repository must not be nil")
+	}
+	if seq == nil {
+		panic("controlled_documents: sequence allocator must not be nil")
+	}
+	if tplCheck == nil {
+		panic("controlled_documents: template checker must not be nil")
+	}
+	if profiles == nil {
+		panic("controlled_documents: profile reader must not be nil")
+	}
+	if areas == nil {
+		panic("controlled_documents: area reader must not be nil")
+	}
 	if govLogger == nil {
 		panic("controlled_documents: governance logger must not be nil")
 	}
@@ -128,7 +146,7 @@ func (s *ControlledDocumentService) WithDocumentInitializer(d controlleddocument
 func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateControlledDocumentCmd) (*CreateResult, error) {
 	profile, err := s.profiles.GetByCode(ctx, cmd.TenantID, cmd.ProfileCode)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controlled_documents: get profile: %w", err)
 	}
 	if !profile.IsActive() {
 		return nil, taxonomydomain.ErrProfileArchived
@@ -136,7 +154,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 
 	area, err := s.areas.GetByCode(ctx, cmd.TenantID, cmd.ProcessAreaCode)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controlled_documents: get process area: %w", err)
 	}
 	if !area.IsActive() {
 		return nil, taxonomydomain.ErrAreaArchived
@@ -157,12 +175,15 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		code = strings.TrimSpace(*cmd.ManualCode)
 		taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controlled_documents: check manual code availability: %w", err)
 		}
 		if taken {
 			return nil, controlleddocumentsdomain.ErrCDCodeTaken
 		}
-		payload, _ := json.Marshal(map[string]string{"code": code})
+		payload, err := json.Marshal(map[string]string{"code": code})
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: marshal numbering override payload: %w", err)
+		}
 		events = append(events, taxonomydomain.GovernanceEvent{
 			TenantID:     cmd.TenantID,
 			EventType:    "numbering.override",
@@ -176,7 +197,7 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		if s.db != nil {
 			tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("controlled_documents: begin create tx: %w", err)
 			}
 			defer func() {
 				if createTx != nil {
@@ -196,9 +217,9 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		if !isReasonValid(cmd.OverrideTemplateReason) {
 			return nil, controlleddocumentsdomain.ErrOverrideReasonRequired
 		}
-		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, *cmd.OverrideTemplateVersionID)
+		status, profileCode, err := s.tplCheck.GetTemplateVersionState(ctx, cmd.TenantID, *cmd.OverrideTemplateVersionID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controlled_documents: get override template version state: %w", err)
 		}
 		_, err = controlleddocumentsdomain.Resolve(controlleddocumentsdomain.TemplateResolutionInput{
 			ProfileCode: cmd.ProfileCode,
@@ -209,25 +230,25 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			},
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controlled_documents: resolve template version: %w", err)
 		}
 		overrideID = cmd.OverrideTemplateVersionID
 	}
 	if err := s.ensureTemplateArtifact(ctx, cmd); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controlled_documents: ensure template artifact: %w", err)
 	}
 
 	if cmd.ManualCode == nil {
 		if createTx != nil {
 			next, err := s.seq.NextAndIncrement(ctx, createTx, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("controlled_documents: allocate sequence: %w", err)
 			}
 			code = controlleddocumentsdomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
 			sequence = &next
 			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("controlled_documents: check auto code availability: %w", err)
 			}
 			if taken {
 				return nil, controlleddocumentsdomain.ErrCDCodeTaken
@@ -235,13 +256,13 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		} else {
 			next, err := s.seq.NextAndIncrement(ctx, nil, cmd.TenantID, cmd.ProfileCode, cmd.ProcessAreaCode)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("controlled_documents: allocate sequence: %w", err)
 			}
 			code = controlleddocumentsdomain.AutoCode(cmd.ProfileCode, cmd.ProcessAreaCode, next)
 			sequence = &next
 			taken, err := s.docs.CodeExists(ctx, cmd.TenantID, cmd.ProfileCode, code)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("controlled_documents: check auto code availability: %w", err)
 			}
 			if taken {
 				return nil, controlleddocumentsdomain.ErrCDCodeTaken
@@ -250,7 +271,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 	}
 
 	if overrideID != nil {
-		payload, _ := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+		payload, err := json.Marshal(map[string]string{"override_template_version_id": *cmd.OverrideTemplateVersionID})
+		if err != nil {
+			return nil, fmt.Errorf("controlled_documents: marshal template override payload: %w", err)
+		}
 		events = append(events, taxonomydomain.GovernanceEvent{
 			TenantID:     cmd.TenantID,
 			EventType:    "template.override",
@@ -270,9 +294,9 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		cmd.ProcessAreaCode,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controlled_documents: build visibility: %w", err)
 	}
-	doc := &controlleddocumentsdomain.ControlledDocument{
+	doc, err := controlleddocumentsdomain.NewControlledDocument(controlleddocumentsdomain.ControlledDocument{
 		TenantID:                  cmd.TenantID,
 		ProfileCode:               cmd.ProfileCode,
 		ProcessAreaCode:           cmd.ProcessAreaCode,
@@ -286,37 +310,40 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 		Status:                    controlleddocumentsdomain.CDStatusActive,
 		CreatedAt:                 now,
 		UpdatedAt:                 now,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("controlled_documents: build controlled document: %w", err)
 	}
 	var docRef *controlleddocumentsdomain.DocumentRef
 	if createTx != nil {
 		if err := s.docs.CreateTx(ctx, createTx, doc); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controlled_documents: create controlled document in tx: %w", err)
 		}
 		if s.docInit != nil {
-			ref, err := s.docInit.CloneTemplate(ctx, createTx, doc, controlleddocumentsdomain.CloneTemplateRequest{
-				TemplateVersionID: cmd.TemplateVersionID,
-				Name:              cmd.DocumentName,
-				FormData:          cmd.FormData,
-			})
+			cloneReq, err := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.DocumentName, cmd.FormData)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("controlled_documents: build clone template request: %w", err)
+			}
+			ref, err := s.docInit.CloneTemplate(ctx, createTx, doc, cloneReq)
+			if err != nil {
+				return nil, fmt.Errorf("controlled_documents: clone template for initial revision: %w", err)
 			}
 			docRef = ref
 		}
 		if err := createTx.Commit(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controlled_documents: commit create tx: %w", err)
 		}
 		createTx = nil
 	} else {
 		if err := s.docs.Create(ctx, doc); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("controlled_documents: create controlled document: %w", err)
 		}
 	}
 
 	// Governance events are best-effort; document creation is already committed.
 	for _, event := range events {
 		if err := s.govLogger.Log(ctx, event); err != nil {
-			slog.Warn("controlled documents governance event logging failed", "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
+			slog.WarnContext(ctx, "controlled documents governance event logging failed", "tenant_id", event.TenantID, "actor_user_id", event.ActorUserID, "event_type", event.EventType, "resource_id", event.ResourceID, "error", err)
 		}
 	}
 
@@ -346,10 +373,10 @@ func (s *ControlledDocumentService) ensureTemplateArtifact(ctx context.Context, 
 
 func setAuthzGUC(ctx context.Context, tx *sql.Tx, tenantID, actorID string) error {
 	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
-		return err
+		return fmt.Errorf("set metaldocs.tenant_id: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", actorID); err != nil {
-		return err
+		return fmt.Errorf("set metaldocs.actor_id: %w", err)
 	}
 	return nil
 }
@@ -359,7 +386,7 @@ func setAuthzGUC(ctx context.Context, tx *sql.Tx, tenantID, actorID string) erro
 func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, profileCode, areaCode string) (string, error) {
 	next, err := s.seq.Peek(ctx, tenantID, profileCode, areaCode)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("controlled_documents: peek sequence for preview code: %w", err)
 	}
 	return controlleddocumentsdomain.AutoCode(profileCode, areaCode, next), nil
 }
@@ -367,7 +394,53 @@ func (s *ControlledDocumentService) PreviewCode(ctx context.Context, tenantID, p
 // PeekSeq returns the next sequence number that NextAndIncrement would
 // allocate for (profile, area). Used by handlers that need the raw integer.
 func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profileCode, areaCode string) (int, error) {
-	return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+	if err := s.validateSequenceSeries(ctx, tenantID, profileCode, areaCode); err != nil {
+		return 0, fmt.Errorf("controlled_documents: validate sequence series: %w", err)
+	}
+	if s.db == nil {
+		return s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+	}
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return 0, ErrActorMissing
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("controlled_documents: begin preview code tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+		return 0, fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+		return 0, fmt.Errorf("controlled_documents: authz check preview code: %w", err)
+	}
+
+	next, err := s.seq.Peek(ctx, tenantID, profileCode, areaCode)
+	if err != nil {
+		return 0, fmt.Errorf("controlled_documents: peek sequence for preview code: %w", err)
+	}
+	return next, nil
+}
+
+func (s *ControlledDocumentService) validateSequenceSeries(ctx context.Context, tenantID, profileCode, areaCode string) error {
+	profile, err := s.profiles.GetByCode(ctx, tenantID, profileCode)
+	if err != nil {
+		return fmt.Errorf("controlled_documents: get profile for sequence validation: %w", err)
+	}
+	if !profile.IsActive() {
+		return taxonomydomain.ErrProfileArchived
+	}
+	area, err := s.areas.GetByCode(ctx, tenantID, areaCode)
+	if err != nil {
+		return fmt.Errorf("controlled_documents: get process area for sequence validation: %w", err)
+	}
+	if !area.IsActive() {
+		return taxonomydomain.ErrAreaArchived
+	}
+	return nil
 }
 
 func (s *ControlledDocumentService) Obsolete(ctx context.Context, tenantID, controlledDocumentID string) error {
@@ -384,7 +457,11 @@ func (s *ControlledDocumentService) List(ctx context.Context, tenantID string, f
 		return nil, ErrActorMissing
 	}
 	filter.ActorUserID = &actorUserID
-	return s.docs.List(ctx, tenantID, filter)
+	docs, err := s.docs.List(ctx, tenantID, filter)
+	if err != nil {
+		return nil, fmt.Errorf("controlled_documents: list controlled documents: %w", err)
+	}
+	return docs, nil
 }
 
 func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string) (*ControlledDocument, error) {
@@ -394,21 +471,29 @@ func (s *ControlledDocumentService) Get(ctx context.Context, tenantID, id string
 	}
 	canRead, err := s.docs.CanRead(ctx, tenantID, id, actorUserID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controlled_documents: check read access: %w", err)
 	}
 	if !canRead {
 		return nil, controlleddocumentsdomain.ErrCDNotFound
 	}
-	return s.docs.GetByID(ctx, tenantID, id)
+	doc, err := s.docs.GetByID(ctx, tenantID, id)
+	if err != nil {
+		return nil, fmt.Errorf("controlled_documents: get controlled document: %w", err)
+	}
+	return doc, nil
 }
 
 func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, controlledDocumentID string, next controlleddocumentsdomain.CDStatus, cap string) error {
-	doc, err := s.docs.GetByID(ctx, tenantID, controlledDocumentID)
-	if err != nil {
-		return err
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return ErrActorMissing
 	}
-	if !doc.IsActive() {
-		return controlleddocumentsdomain.ErrCDNotActive
+	canRead, err := s.docs.CanRead(ctx, tenantID, controlledDocumentID, actorUserID)
+	if err != nil {
+		return fmt.Errorf("controlled_documents: check read access before status change: %w", err)
+	}
+	if !canRead {
+		return controlleddocumentsdomain.ErrCDNotFound
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -417,34 +502,57 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
+		return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
+	}
 	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
 		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
 	}
+
+	var currentStatus controlleddocumentsdomain.CDStatus
+	if err := tx.QueryRowContext(ctx, `
+SELECT status
+  FROM controlled_documents
+ WHERE tenant_id = $1
+   AND id = $2
+ FOR UPDATE`, tenantID, controlledDocumentID).Scan(&currentStatus); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return controlleddocumentsdomain.ErrCDNotFound
+		}
+		return fmt.Errorf("controlled_documents: lock controlled document for status change: %w", err)
+	}
+	if currentStatus != controlleddocumentsdomain.CDStatusActive {
+		return controlleddocumentsdomain.ErrCDNotActive
+	}
+
 	if err := s.docs.UpdateStatusTx(ctx, tx, tenantID, controlledDocumentID, next, s.now().UTC()); err != nil {
-		return err
+		return fmt.Errorf("controlled_documents: update controlled document status: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return err
+		return fmt.Errorf("controlled_documents: commit status change tx: %w", err)
 	}
 
 	eventType := "controlled_documents.cd.obsoleted"
 	if next == controlleddocumentsdomain.CDStatusSuperseded {
 		eventType = "controlled_documents.cd.superseded"
 	}
-	payload, _ := json.Marshal(map[string]string{"status": string(next)})
+	payload, err := json.Marshal(map[string]string{"status": string(next)})
+	if err != nil {
+		return fmt.Errorf("controlled_documents: marshal changeStatus payload: %w", err)
+	}
 	actorID := ""
 	if u, ok := authdomain.CurrentUserFromContext(ctx); ok {
 		actorID = u.UserID
 	}
 	if err := s.govLogger.Log(ctx, taxonomydomain.GovernanceEvent{
 		TenantID:     tenantID,
-		EventType:    eventType,
+		EventType:    taxonomydomain.GovernanceEventType(eventType),
 		ActorUserID:  actorID,
 		ResourceType: "controlled_document",
 		ResourceID:   controlledDocumentID,
 		PayloadJSON:  payload,
 	}); err != nil {
-		slog.Warn("controlled documents governance event logging failed", "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
+		slog.WarnContext(ctx, "controlled documents governance event logging failed", "tenant_id", tenantID, "actor_user_id", actorID, "event_type", eventType, "resource_id", controlledDocumentID, "error", err)
 	}
 	return nil
 }
@@ -460,9 +568,21 @@ type CreateRevisionCmd struct {
 // CreateRevision creates a new document revision for an existing controlled
 // document. It requires a DocumentInitializer to be wired (see WithDocumentInitializer).
 func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error) {
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return nil, ErrActorMissing
+	}
+	canRead, err := s.docs.CanRead(ctx, cmd.TenantID, cmd.CDID, actorUserID)
+	if err != nil {
+		return nil, fmt.Errorf("controlled_documents: check read access before revision create: %w", err)
+	}
+	if !canRead {
+		return nil, controlleddocumentsdomain.ErrCDNotFound
+	}
+
 	cd, err := s.docs.GetByID(ctx, cmd.TenantID, cmd.CDID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controlled_documents: get controlled document for revision: %w", err)
 	}
 	if !cd.IsActive() {
 		return nil, controlleddocumentsdomain.ErrCDNotActive
@@ -473,7 +593,7 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 
 	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("controlled_documents: begin create revision tx: %w", err)
 	}
 	var txErr error
 	defer func() {
@@ -481,12 +601,6 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 			_ = tx.Rollback()
 		}
 	}()
-
-	actorUserID, ok := authn.UserIDFromContext(ctx)
-	if !ok {
-		txErr = ErrActorMissing
-		return nil, txErr
-	}
 	if txErr = setAuthzGUC(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {
 		return nil, fmt.Errorf("controlled_documents: set authz guc for create revision: %w", txErr)
 	}
@@ -494,16 +608,19 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 		return nil, fmt.Errorf("controlled_documents: authz check create revision: %w", txErr)
 	}
 
-	ref, txErr := s.docInit.CloneTemplate(ctx, tx, cd, controlleddocumentsdomain.CloneTemplateRequest{
-		TemplateVersionID: cmd.TemplateVersionID,
-		Name:              cmd.Name,
-		FormData:          cmd.FormData,
-	})
+	cloneReq, txErr := controlleddocumentsdomain.NewCloneTemplateRequest(cmd.TemplateVersionID, cmd.Name, cmd.FormData)
 	if txErr != nil {
-		return nil, mapCreateRevisionError(txErr)
+		return nil, fmt.Errorf("controlled_documents: build revision clone template request: %w", txErr)
+	}
+	ref, txErr := s.docInit.CloneTemplate(ctx, tx, cd, cloneReq)
+	if txErr != nil {
+		return nil, fmt.Errorf("controlled_documents: clone template for revision: %w", mapCreateRevisionError(txErr))
 	}
 	txErr = tx.Commit()
-	return ref, txErr
+	if txErr != nil {
+		return nil, fmt.Errorf("controlled_documents: commit create revision tx: %w", txErr)
+	}
+	return ref, nil
 }
 
 func mapCreateRevisionError(err error) error {
@@ -511,7 +628,7 @@ func mapCreateRevisionError(err error) error {
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "ux_documents_cd_active" {
 		return controlleddocumentsdomain.ErrActiveRevisionExists
 	}
-	return err
+	return fmt.Errorf("create controlled document revision: %w", err)
 }
 
 func isReasonValid(reason *string) bool {

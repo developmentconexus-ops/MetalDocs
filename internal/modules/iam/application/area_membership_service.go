@@ -17,7 +17,7 @@ var (
 type UserAreaWriteRepository interface {
 	ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)
 	Insert(ctx context.Context, membership domain.UserProcessArea) error
-	CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time) error
+	CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
 	GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error
 	GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error)
 }
@@ -52,10 +52,7 @@ func (s *AreaMembershipService) Grant(
 	role domain.Role,
 	grantedBy string,
 ) error {
-	switch role {
-	case domain.RoleApprover, domain.RoleAuthor, domain.RoleEditor, domain.RoleSystemAdmin, domain.RoleViewer:
-		// known
-	default:
+	if _, err := domain.ParseRole(string(role)); err != nil {
 		return ErrUnknownRole
 	}
 
@@ -64,17 +61,8 @@ func (s *AreaMembershipService) Grant(
 	if err != nil {
 		return fmt.Errorf("get active membership: %w", err)
 	}
+	membership := buildMembership(userID, tenantID, areaCode, role, now, grantedBy)
 	if existing != nil && existing.IsActive(now) {
-		membership := domain.UserProcessArea{
-			UserID:        userID,
-			TenantID:      tenantID,
-			AreaCode:      areaCode,
-			Role:          role,
-			EffectiveFrom: now,
-		}
-		if grantedBy != "" {
-			membership.GrantedBy = &grantedBy
-		}
 		if err := s.repo.GrantAtomic(ctx, *existing, membership); err != nil {
 			return fmt.Errorf("grant membership atomically: %w", err)
 		}
@@ -86,17 +74,6 @@ func (s *AreaMembershipService) Grant(
 		return nil
 	}
 
-	membership := domain.UserProcessArea{
-		UserID:        userID,
-		TenantID:      tenantID,
-		AreaCode:      areaCode,
-		Role:          role,
-		EffectiveFrom: now,
-	}
-	if grantedBy != "" {
-		membership.GrantedBy = &grantedBy
-	}
-
 	if err := s.repo.Insert(ctx, membership); err != nil {
 		return fmt.Errorf("insert membership: %w", err)
 	}
@@ -106,6 +83,20 @@ func (s *AreaMembershipService) Grant(
 		}
 	}
 	return nil
+}
+
+func buildMembership(userID, tenantID, areaCode string, role domain.Role, effectiveFrom time.Time, grantedBy string) domain.UserProcessArea {
+	membership := domain.UserProcessArea{
+		UserID:        userID,
+		TenantID:      tenantID,
+		AreaCode:      areaCode,
+		Role:          role,
+		EffectiveFrom: effectiveFrom,
+	}
+	if grantedBy != "" {
+		membership.GrantedBy = &grantedBy
+	}
+	return membership
 }
 
 func (s *AreaMembershipService) Revoke(
@@ -122,7 +113,7 @@ func (s *AreaMembershipService) Revoke(
 		return ErrMembershipNotFound
 	}
 
-	if err := s.repo.CloseActive(ctx, userID, tenantID, areaCode, now); err != nil {
+	if err := s.repo.CloseActive(ctx, userID, tenantID, areaCode, now, revokedBy); err != nil {
 		return fmt.Errorf("close active membership: %w", err)
 	}
 

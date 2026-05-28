@@ -22,9 +22,9 @@
 
 ## Related skills
 
-- `.claude/skills/metaldocs-frontend/SKILL.md`     architecture rulebook (use for any frontend work).
+- `.agents/skills/metaldocs-frontend/SKILL.md`     Codex-discoverable entrypoint for the canonical frontend architecture rulebook.
 - `.agents/skills/metaldocs-tanstack-query/SKILL.md`     TanStack Query/API workflow for query keys, cache invalidation, optimistic updates, freshness, and query tests.
-- `.claude/skills/metaldocs-screen-implementation/SKILL.md`     6-phase workflow for implementing designed screens from `design-source/<slug>/`. Use when the task is "implement screen X".
+- `.agents/skills/metaldocs-screen-implementation/SKILL.md`     Codex-discoverable entrypoint for the 6-phase workflow used to implement designed screens from `design-source/<slug>/`.
 
 ---
 
@@ -388,5 +388,4 @@ When implementing:
 - `wiki/architecture/api-contract.md`     OpenAPI spec, oapi-codegen backend codegen, frontend `gen:api` script, CI drift guard
 - `wiki/decisions/`     architecture decision records
 - `frontend/apps/web/design-source/README.md`     screen intake protocol (added with Block 0)
-
 

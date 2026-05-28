@@ -37,10 +37,17 @@ func (f *fakeOutboxRepo) ResetStaleClaims(_ context.Context, _ time.Duration) (i
 }
 
 // fakeWorkerPublisher satisfies messaging.Publisher.
-type fakeWorkerPublisher struct{ err error }
+type fakeWorkerPublisher struct {
+	err    error
+	events []messaging.Event
+}
 
-func (p *fakeWorkerPublisher) Publish(_ context.Context, _ messaging.Event) error {
-	return p.err
+func (p *fakeWorkerPublisher) Publish(_ context.Context, e messaging.Event) error {
+	if p.err != nil {
+		return p.err
+	}
+	p.events = append(p.events, e)
+	return nil
 }
 
 func TestPDFOutboxWorker_PublishSuccessMarksDispatched(t *testing.T) {
@@ -50,6 +57,9 @@ func TestPDFOutboxWorker_PublishSuccessMarksDispatched(t *testing.T) {
 	w.tick(context.Background())
 	if len(repo.dispatchedIDs) != 1 || repo.dispatchedIDs[0] != "id-1" {
 		t.Fatalf("want id-1 dispatched, got %v", repo.dispatchedIDs)
+	}
+	if got, want := pub.events[0].IdempotencyKey, messaging.IdempotencyKey("docgen_v2_pdf:t1:r1"); got != want {
+		t.Fatalf("IdempotencyKey = %q, want %q", got, want)
 	}
 }
 

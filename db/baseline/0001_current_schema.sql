@@ -1039,7 +1039,22 @@ CREATE TABLE metaldocs.auth_sessions (
     ip_address text,
     user_agent text,
     last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
-    tenant_id text NOT NULL
+    tenant_id uuid NOT NULL
+);
+
+
+--
+-- Name: tenants; Type: TABLE; Schema: metaldocs; Owner: -
+--
+
+CREATE TABLE metaldocs.tenants (
+    id uuid NOT NULL,
+    name text NOT NULL,
+    slug text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tenants_name_not_blank CHECK ((length(btrim(name)) > 0)),
+    CONSTRAINT tenants_slug_not_blank CHECK ((length(btrim(slug)) > 0))
 );
 
 
@@ -1557,11 +1572,15 @@ CREATE TABLE metaldocs.idempotency_keys (
     route_template text NOT NULL,
     key text NOT NULL,
     payload_hash text NOT NULL,
-    response_status integer NOT NULL,
-    response_body jsonb NOT NULL,
+    response_status integer,
+    response_body bytea,
     status text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     expires_at timestamp with time zone NOT NULL,
+    CONSTRAINT idempotency_keys_actor_nonempty CHECK ((actor_user_id <> ''::text)),
+    CONSTRAINT idempotency_keys_completed_has_response CHECK (((status <> 'completed'::text) OR ((response_status IS NOT NULL) AND (response_body IS NOT NULL)))),
+    CONSTRAINT idempotency_keys_response_body_size CHECK (((response_body IS NULL) OR (octet_length(response_body) <= 65536))),
+    CONSTRAINT idempotency_keys_response_status_range CHECK (((response_status IS NULL) OR ((response_status >= 100) AND (response_status <= 599)))),
     CONSTRAINT idempotency_keys_status_check CHECK ((status = ANY (ARRAY['in_flight'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -2692,6 +2711,22 @@ ALTER TABLE ONLY metaldocs.iam_users
 
 
 --
+-- Name: tenants tenants_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenants
+    ADD CONSTRAINT tenants_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tenants tenants_slug_key; Type: CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.tenants
+    ADD CONSTRAINT tenants_slug_key UNIQUE (slug);
+
+
+--
 -- Name: idempotency_keys idempotency_keys_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -3404,6 +3439,13 @@ CREATE INDEX idx_idempotency_keys_completed_expires ON metaldocs.idempotency_key
 --
 
 CREATE INDEX idx_idempotency_keys_expires_at ON metaldocs.idempotency_keys USING btree (expires_at);
+
+
+--
+-- Name: idx_idempotency_keys_in_flight_expires; Type: INDEX; Schema: metaldocs; Owner: -
+--
+
+CREATE INDEX idx_idempotency_keys_in_flight_expires ON metaldocs.idempotency_keys USING btree (expires_at) WHERE (status = 'in_flight'::text);
 
 
 --
@@ -4145,6 +4187,14 @@ ALTER TABLE ONLY metaldocs.auth_sessions
 
 
 --
+-- Name: auth_sessions fk_auth_sessions_tenant; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.auth_sessions
+    ADD CONSTRAINT fk_auth_sessions_tenant FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id);
+
+
+--
 -- Name: documents fk_documents_document_family_code; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
@@ -4201,11 +4251,35 @@ ALTER TABLE ONLY metaldocs.iam_group_roles
 
 
 --
+-- Name: iam_groups iam_groups_tenant_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.iam_groups
+    ADD CONSTRAINT iam_groups_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id);
+
+
+--
+-- Name: iam_user_roles iam_user_roles_tenant_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.iam_user_roles
+    ADD CONSTRAINT iam_user_roles_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id);
+
+
+--
 -- Name: iam_user_roles iam_user_roles_user_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
 --
 
 ALTER TABLE ONLY metaldocs.iam_user_roles
     ADD CONSTRAINT iam_user_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES metaldocs.iam_users(user_id) ON DELETE CASCADE;
+
+
+--
+-- Name: iam_users iam_users_tenant_id_fkey; Type: FK CONSTRAINT; Schema: metaldocs; Owner: -
+--
+
+ALTER TABLE ONLY metaldocs.iam_users
+    ADD CONSTRAINT iam_users_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES metaldocs.tenants(id);
 
 
 --

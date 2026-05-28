@@ -21,10 +21,10 @@ func TestRolesByUserID_FiltersByTenant(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT is_active
+SELECT 1
 FROM metaldocs.iam_users
-WHERE user_id = $1
-`)).WithArgs("alice").WillReturnRows(sqlmock.NewRows([]string{"is_active"}).AddRow(true))
+WHERE user_id = $1 AND tenant_id = $2::uuid AND deactivated_at IS NULL
+`)).WithArgs("alice", testTenant).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(1))
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT role_code

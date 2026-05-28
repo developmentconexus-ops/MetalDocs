@@ -3,11 +3,19 @@ package gotenberg
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
+)
+
+const (
+	maxErrorBodyBytes = 4 * 1024
+	maxPDFBodyBytes   = 64 * 1024 * 1024
 )
 
 type Client struct {
@@ -15,13 +23,27 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func NewClient(baseURL string) *Client {
+func NewClient(baseURL string) (*Client, error) {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return nil, errors.New("gotenberg: baseURL required")
+	}
+	parsed, err := url.ParseRequestURI(baseURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return nil, errors.New("gotenberg: baseURL must be an absolute http(s) URL")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, errors.New("gotenberg: baseURL must use http or https")
+	}
 	return &Client{
-		baseURL: baseURL,
+		baseURL: strings.TrimRight(baseURL, "/"),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
-	}
+	}, nil
 }
 
 // ConvertHTMLToPDF sends an HTML document plus an auxiliary stylesheet to
@@ -66,11 +88,14 @@ func (c *Client) ConvertHTMLToPDF(ctx context.Context, htmlBytes []byte, cssByte
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 4*1024))
+		payload, err := readLimitedBody(resp.Body, maxErrorBodyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("gotenberg: read error response: %w", err)
+		}
 		return nil, fmt.Errorf("gotenberg: html conversion returned status %d: %s", resp.StatusCode, string(payload))
 	}
 
-	pdfBytes, err := io.ReadAll(resp.Body)
+	pdfBytes, err := readLimitedBody(resp.Body, maxPDFBodyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("gotenberg: read pdf response: %w", err)
 	}
@@ -105,9 +130,28 @@ func (c *Client) ConvertDocxToPDF(ctx context.Context, docxContent []byte) ([]by
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4*1024))
+		respBody, err := readLimitedBody(resp.Body, maxErrorBodyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("gotenberg: read error response: %w", err)
+		}
 		return nil, fmt.Errorf("gotenberg: status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	return io.ReadAll(resp.Body)
+	pdfBytes, err := readLimitedBody(resp.Body, maxPDFBodyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("gotenberg: read pdf response: %w", err)
+	}
+	return pdfBytes, nil
+}
+
+func readLimitedBody(body io.Reader, maxBytes int64) ([]byte, error) {
+	limited := io.LimitReader(body, maxBytes+1)
+	payload, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(payload)) > maxBytes {
+		return nil, fmt.Errorf("body exceeds %d-byte limit", maxBytes)
+	}
+	return payload, nil
 }

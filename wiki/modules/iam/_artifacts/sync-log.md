@@ -1,31 +1,51 @@
-# IAM module doc — sync log
+## 2026-05-26 - Wave 2 authz tx seeding sync
+
+- **Context:** uncommitted diff for Wave 2 shared authz transaction seeding across `internal/modules/iam/{authz,application,infrastructure/postgres}` plus documents tx-owner consumers.
+- **Mode:** lite patch
+- **Affected surface scan:** `authz/context.go`; `application/area_membership_service.go`; `infrastructure/postgres/user_area_repository.go`; targeted IAM authz/application/postgres tests.
+- **Facts updated:** IAM now exposes shared `authz.SeedTxIdentity(...)` for transaction-local actor/tenant seeding; area-membership writes use it before `authz.Require(...)`; revoke now passes the acting user into repository-owned tx authz.
+- **T/R rows touched:** T-004 evidence refreshed only; no status change.
+- **Preflight/tally:** preflight attempted; Git Bash tally failed before doc edits with Windows `CreateFileMapping` error 5.
+- **Patched files:** `wiki/modules/iam.md`; `wiki/modules/iam-tech-debt.md`; `wiki/modules/iam/_artifacts/sync-log.md`.
+
+# IAM module doc - sync log
 
 One line per `metaldocs-module-doc-sync` run. Append-only.
 
-## 2026-05-11 · Plan 6a — close T-005
+## 2026-05-25 - Phase 11 IAM medium sweep
 
-- **Context:** Plan 6a (commit f27529e8) · emit recordAudit in handleUserRoleUpsert + handleCreateUser
+- **Context:** uncommitted diff for Batch F IAM mediums in `internal/modules/iam/*` plus targeted TODO comments in `internal/platform/migrate/migrate.go`.
+- **Mode:** lite patch
+- **Affected surface scan:** `application/{admin_service,area_membership_service,cached_role_provider,capability_service,dev_role_provider}.go`, `delivery/http/{admin_handler,middleware}.go`, `domain/{errors,model,port}.go`, `infrastructure/postgres/{role_admin_repository,role_provider,user_area_repository}.go`, `internal/platform/migrate/migrate.go`, `wiki/modules/iam.md`, `wiki/modules/iam/_artifacts/sync-log.md`.
+- **Facts updated:** shared role parsing/validation is now centralized in `iamdomain.ParseRole`; admin audit writes capture one timestamp and always use server-generated UUID trace IDs; cached-role and migration follow-up TODOs were recorded; postgres role provider no longer surfaces `ErrNoRolesAssigned` for empty role sets.
+- **T/R rows touched:** none.
+- **Preflight/tally:** preflight attempted; Git Bash tally failed before doc edits with Windows `CreateFileMapping` error 5.
+- **Patched files:** `wiki/modules/iam.md`, `wiki/modules/iam/_artifacts/sync-log.md`.
+
+## 2026-05-11 - Plan 6a close T-005
+
+- **Context:** Plan 6a (commit f27529e8) - emit recordAudit in handleUserRoleUpsert + handleCreateUser
 - **Anchors moved:** 0
 - **Symbols renamed:** 0
-- **T-NNN closed:** T-005 · evidence: handleUserRoleUpsert now calls h.recordAudit after writeJSON; handleCreateUser emits auth.user.created event
-- **R-NNN updated:** R-005 → merged · commit f27529e8
+- **T-NNN closed:** T-005 - evidence: handleUserRoleUpsert now calls h.recordAudit after writeJSON; handleCreateUser emits auth.user.created event
+- **R-NNN updated:** R-005 -> merged - commit f27529e8
 - **§11 counts after:** Critical=2 Major=5 Minor=5 (unchanged)
 - **Tally gate:** PASS
-- **Patched files:** wiki/modules/iam-tech-debt.md · wiki/backlog/iam-refactor.md
+- **Patched files:** wiki/modules/iam-tech-debt.md; wiki/backlog/iam-refactor.md
 - **Structural changes noted:** none for iam (behavioral change in existing handlers only)
 
-## 2026-05-11 · Plan 4 — capability namespace collapse + IAM dual-surface consolidation
+## 2026-05-11 - Plan 4 capability namespace collapse + IAM dual-surface consolidation
 
-- **Context:** Plan 4 tasks 1-9 completed: deleted capabilities.go, role_capabilities.go, authorization.go, startup.go, area_membership/; renamed authz.ErrCapabilityDenied→ErrCapDenied; extended model.go to 18 typed Capability consts; migration 0186 reseeded doc.*→document.*
-- **Anchors moved:** 8+ (startup.go:15 DELETED; area_membership/area_membership.go DELETED; authorization.go DELETED; role_capabilities.go DELETED; authz/authz.go ErrCapabilityDenied→ErrCapDenied)
-- **Symbols renamed:** 1 (authz.ErrCapabilityDenied→authz.ErrCapDenied — all occurrences in doc trio updated)
-- **T-NNN closed:** T-001, T-002, T-003, T-009, T-012 · evidence: referenced files deleted; typed Capability namespace unified in model.go
-- **R-NNN updated:** R-001→merged, R-002→merged, R-003→merged, R-009→merged, R-012→merged · PR: Plan 4 (2026-05-11, commits 3a227642/8da32dbf/a66a8d62/ec7d151a/0cd2e75d)
+- **Context:** Plan 4 tasks 1-9 completed: deleted capabilities.go, role_capabilities.go, authorization.go, startup.go, area_membership/; renamed authz.ErrCapabilityDenied->ErrCapDenied; extended model.go to 18 typed Capability consts; migration 0186 reseeded doc.*->document.*
+- **Anchors moved:** 8+ (startup.go:15 deleted; area_membership/area_membership.go deleted; authorization.go deleted; role_capabilities.go deleted; authz/authz.go ErrCapabilityDenied->ErrCapDenied)
+- **Symbols renamed:** 1 (authz.ErrCapabilityDenied->authz.ErrCapDenied - all occurrences in doc trio updated)
+- **T-NNN closed:** T-001, T-002, T-003, T-009, T-012 - evidence: referenced files deleted; typed Capability namespace unified in model.go
+- **R-NNN updated:** R-001->merged, R-002->merged, R-003->merged, R-009->merged, R-012->merged - PR: Plan 4 (2026-05-11, commits 3a227642/8da32dbf/a66a8d62/ec7d151a/0cd2e75d)
 - **§11 counts after:** Critical=1 Major=3 Minor=3
 - **Tally gate:** PASS
-- **Patched files:** wiki/modules/iam.md · wiki/modules/iam-tech-debt.md · wiki/backlog/iam-refactor.md
+- **Patched files:** wiki/modules/iam.md; wiki/modules/iam-tech-debt.md; wiki/backlog/iam-refactor.md
 
-- 2026-05-11 · Plan 3 (session-bound tenant resolution, post-merge sweep). Patched anchors shifted by ~3 lines in `admin_handler.go` and `middleware.go` / `routes_memberships.go` (file growth from `tenant.FromContext` migration). Files: `wiki/modules/iam.md` (§2 + §6.4 envelope anchors :129→:132, :137→:150); `wiki/modules/iam-tech-debt.md` (T-005 :316→:319/:457→:454; T-006 :129→:132/:137→:150; Last verified bump); `wiki/backlog/iam-refactor.md` (Last verified bump); `wiki/README.md` (iam-tech-debt + iam-refactor index stamps). T-NNN affected: T-005, T-006 (anchors only — severity unchanged, debt not resolved). R-NNN affected: none. Escalation: no — verified no Plan 3 ADR exists in `wiki/decisions/` (flagged to caller).
+- 2026-05-11 - Plan 3 (session-bound tenant resolution, post-merge sweep). Patched anchors shifted by ~3 lines in `admin_handler.go` and `middleware.go` / `routes_memberships.go` (file growth from `tenant.FromContext` migration). Files: `wiki/modules/iam.md` (§2 + §6.4 envelope anchors :129->:132, :137->:150); `wiki/modules/iam-tech-debt.md` (T-005 :316->:319/:457->:454; T-006 :129->:132/:137->:150; Last verified bump); `wiki/backlog/iam-refactor.md` (Last verified bump); `wiki/README.md` (iam-tech-debt + iam-refactor index stamps). T-NNN affected: T-005, T-006 (anchors only - severity unchanged, debt not resolved). R-NNN affected: none. Escalation: no - verified no Plan 3 ADR exists in `wiki/decisions/` (flagged to caller).
 
 ## 2026-05-13 - Plan 10 IAM memberships route canonicalization
 
@@ -42,3 +62,15 @@ One line per `metaldocs-module-doc-sync` run. Append-only.
 - **Counts after:** Critical=2 Major=5 Minor=5; missing-ADR=11
 - **Tally gate:** PASS
 - **Patched files:** wiki/modules/iam.md; wiki/modules/iam-tech-debt.md; wiki/backlog/iam-refactor.md; wiki/modules/iam/_artifacts/*
+
+## 2026-05-25 - trusted role-header strip sync
+
+- **Context:** branch `fix/docs-5b-header-roles-c3`; `internal/modules/iam/delivery/http/middleware.go` now deletes `X-User-Roles` alongside `X-User-ID` before downstream handlers run.
+- **Affected modules:** iam, documents.
+- **Mode:** structural refresh.
+- **Affected-surface scan:** IAM middleware trust-boundary behavior changed; no route, OpenAPI, persistence, dependency, public exported surface, debt, or backlog change.
+- **Facts updated:** middleware trusted-header stripping now includes `X-User-Roles`; downstream role context remains sourced from IAM role context/provider paths instead of caller-controlled headers.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Tally gate:** preflight/tally blocked by Git Bash `CreateFileMapping` Win32 error 5; treated as pre-existing tooling failure, not an edit-caused doc failure.
+- **Patched files:** `wiki/modules/iam.md`; `wiki/modules/iam/_artifacts/sync-log.md`.

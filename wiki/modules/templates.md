@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates/` and routes still mount under `/api/v1/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates-refactor.md#R-101`).
 
-**Last verified:** 2026-05-17 (wizard DOCX import + permission simplification) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior) | **Maturity:** L3
+**Last verified:** 2026-05-26 (Wave 5 lifecycle concurrency + capability alignment) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table) | **Maturity:** L3
 
 > **Plan 12.4 route truth:** `api/openapi/v1/openapi.yaml`, `internal/modules/templates/api/api.gen.go`, and `frontend/apps/web/src/lib/api-types/index.d.ts` include the mounted template route set, including typed `GET /api/v1/templates/placeholder-catalog`. Several generated methods still delegate to existing internal handler bodies.
 
@@ -355,7 +355,7 @@ Failure modes:
 ### 8.1 Authentication & Authorization
 
 - Tier 1 (HTTP edge): `CapabilityService` now wired ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â `AuthzFunc` receives real `capabilityService` check (T-001 closed Plan 5).
-- Tier 2 (in-tx): `internal/modules/iam/authz.Require` called in `CreateTemplate`, template lifecycle mutations, `SaveTemplateDraft`, and `CommitAutosave` when `s.db != nil` (injected via `WithDB`). The 2026-05-17 repair added transaction-local tenant/actor GUC setup and `template.edit` assertion around DOCX import/autosave commits so the tripwire accepts `templates_template_version` updates.
+- Tier 2 (in-tx): `internal/modules/iam/authz.Require` called in `CreateTemplate`, template lifecycle mutations, `SaveTemplateDraft`, and `CommitAutosave` when `s.db != nil` (injected via `WithDB`). The 2026-05-17 repair added transaction-local tenant/actor GUC setup and `template.edit` assertion around DOCX import/autosave commits so the tripwire accepts `templates_template_version` updates. As of 2026-05-26, local lifecycle mutations are aligned with the route permission table: submit uses `template.submit`, review uses `template.review`, approve uses `template.approve`, publish uses `template.publish`, and archive uses `template.archive`.
 - Postgres tripwire: `migrations/0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version`.
 - Capabilities in seed (`migrations/0165_role_capabilities_reseed.sql`): `template.view/create/edit/submit/approve/publish` mapped to `viewer/editor/author/approver/system_admin` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â currently advisory only. See T-001.
 
@@ -380,7 +380,7 @@ Failure modes:
 
 - Repository methods take `context.Context` and call `*sql.DB.ExecContext` directly ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â **no `pgx.Tx` parameter, no transactional wrapping at the service layer**.
 - Multi-step operations (publish, approve, create) emit 3ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“5 statements as independent `ExecContext` calls. Partial-failure leaves inconsistent state and missing audit rows. See T-007.
-- Draft save optimistic locking is enforced for `SaveTemplateDraft` through `UpdateVersionDraftCAS`; the legacy `/autosave/commit` route is content-hash gated and does not carry a lock version. See T-010.
+- Draft save optimistic locking is enforced for `SaveTemplateDraft` through `UpdateVersionDraftCAS`; as of 2026-05-26 the shared `UpdateVersion` / `UpdateVersionTx` path also enforces `lock_version` compare-and-swap for lifecycle state changes so stale version transitions fail with `ErrStaleLockVersion` instead of silently clobbering newer state. The legacy `/autosave/commit` route is still content-hash gated and does not carry a lock version. See T-010.
 
 ### 8.7 Tenant scoping
 
@@ -467,6 +467,7 @@ Top 3 (by severity, then blast-radius):
 
 ## Changelog
 
+- 2026-05-26 - Wave 5 search/templates correctness: lifecycle version writes now use optimistic concurrency (`lock_version` compare-and-swap) across the shared `UpdateVersion`/`UpdateVersionTx` path, so stale review/approve/archive transitions fail closed instead of silently overwriting newer state. Local lifecycle capability checks were also aligned with the route permission table (`template.submit`, `template.review`, `template.approve`, `template.archive`).
 - 2026-05-17 - Template wizard DOCX import + permission simplification: `/templates/new` is now a four-step wizard with no template-use permissions step. `TemplateDTO` and runtime create/list behavior no longer expose or filter by creator-scoped template visibility fields. Existing DB columns are left inert for baseline/reference-data compatibility. Wizard DOCX import now creates the template, uploads the selected DOCX via autosave presign, commits the SHA-256 hash, and opens Eigenpal with the imported document rendered.
 - 2026-05-17 - DOCX import runtime repair: Docker local MinIO signing now uses a host-resolvable endpoint and MinIO CORS is enabled for the Vite origins; minio-init creates the attachments bucket. CommitAutosave and SaveTemplateDraft now run template-version writes and audit rows inside a 	emplate.edit authz transaction, fixing tripwire failures during Eigenpal .docx import.
 - 2026-05-16 - module-doc-sync (Plan 12.4 template wizard stabilization): `POST /api/v1/templates` contract now returns `data.template` + `data.version`; partial/bundled OpenAPI, backend generated API, and frontend generated API types were regenerated; placeholder catalog canonical path is `/api/v1/templates/placeholder-catalog`; template rename migration refreshes the authz tripwire function for renamed tables; startup script gained a local Windows `go run` fallback when repo-local `.exe` launch is denied.

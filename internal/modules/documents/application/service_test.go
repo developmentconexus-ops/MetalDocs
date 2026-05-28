@@ -100,14 +100,14 @@ func (f *fakeRepo) GetDocument(_ context.Context, _, _ string) (*domain.Document
 	return f.docReturn, nil
 }
 
-func (f *fakeRepo) UpdateDocumentName(_ context.Context, tenantID, docID, name string) error {
+func (f *fakeRepo) UpdateDocumentName(_ context.Context, tenantID, actorID, docID, name string) error {
 	f.renameTenantID = tenantID
 	f.renameDocID = docID
 	f.renameName = name
 	return f.renameErr
 }
 
-func (f *fakeRepo) UpdateDocumentNameTx(_ context.Context, _ *sql.Tx, tenantID, docID, name string) error {
+func (f *fakeRepo) UpdateDocumentNameTx(_ context.Context, _ *sql.Tx, tenantID, actorID, docID, name string) error {
 	f.renameTenantID = tenantID
 	f.renameDocID = docID
 	f.renameName = name
@@ -154,7 +154,7 @@ func (f *fakeRepo) StatsByArea(_ context.Context, _ string, opts application.Lis
 	return f.statsByAreaReturn, nil
 }
 
-func (f *fakeRepo) UpdateDocumentStatus(_ context.Context, _, _ string, cur, next domain.DocumentStatus, stampTime bool) error {
+func (f *fakeRepo) UpdateDocumentStatus(_ context.Context, _, _, _ string, cur, next domain.DocumentStatus, stampTime bool) error {
 	f.statusCalls++
 	f.statusCur = cur
 	f.statusNext = next
@@ -166,7 +166,7 @@ func (f *fakeRepo) AcquireSession(_ context.Context, _, _, _ string) (*domain.Se
 	return f.acquireSess, f.acquireErr
 }
 
-func (f *fakeRepo) HeartbeatSession(_ context.Context, _, _ string) error { return nil }
+func (f *fakeRepo) HeartbeatSession(_ context.Context, _, _, _ string) error { return nil }
 
 func (f *fakeRepo) ReleaseSession(_ context.Context, _, _, _ string) error { return nil }
 
@@ -174,11 +174,11 @@ func (f *fakeRepo) ForceReleaseSession(_ context.Context, _, _, _ string) error 
 
 func (f *fakeRepo) ExpireStaleSessions(_ context.Context, _ time.Time) (int, error) { return 0, nil }
 
-func (f *fakeRepo) PresignReserve(_ context.Context, _, _, _, _, _, _ string, _ time.Time) (string, error) {
+func (f *fakeRepo) PresignReserve(_ context.Context, _, _, _, _, _, _, _ string, _ time.Time) (string, error) {
 	return "pending_1", nil
 }
 
-func (f *fakeRepo) GetPendingForCommit(_ context.Context, _ string) (*application.PendingCommitMeta, error) {
+func (f *fakeRepo) GetPendingForCommit(_ context.Context, _, _ string) (*application.PendingCommitMeta, error) {
 	if f.pendingErr != nil {
 		return nil, f.pendingErr
 	}
@@ -213,18 +213,18 @@ func (f *fakeRepo) SyncCurrentRevisionArtifactMetadata(_ context.Context, tenant
 	return f.commitResult, nil
 }
 
-func (f *fakeRepo) CreateCheckpoint(_ context.Context, _, _, _ string) (*domain.Checkpoint, error) {
+func (f *fakeRepo) CreateCheckpoint(_ context.Context, _, _, _, _ string) (*domain.Checkpoint, error) {
 	if f.checkpointErr != nil {
 		return nil, f.checkpointErr
 	}
 	return f.checkpointResult, nil
 }
 
-func (f *fakeRepo) ListCheckpoints(_ context.Context, _ string) ([]domain.Checkpoint, error) {
+func (f *fakeRepo) ListCheckpoints(_ context.Context, _, _ string) ([]domain.Checkpoint, error) {
 	return f.checkpoints, nil
 }
 
-func (f *fakeRepo) RestoreCheckpoint(_ context.Context, _, _ string, _ int) (*application.RestoreResult, error) {
+func (f *fakeRepo) RestoreCheckpoint(_ context.Context, _, _, _ string, _ int) (*application.RestoreResult, error) {
 	if f.restoreErr != nil {
 		return nil, f.restoreErr
 	}
@@ -238,7 +238,7 @@ func (f *fakeRepo) IsDocumentOwner(_ context.Context, _, _, _ string) (bool, err
 	return f.ownerReturn, nil
 }
 
-func (f *fakeRepo) GetRevision(_ context.Context, _, _ string) (*domain.Revision, error) {
+func (f *fakeRepo) GetRevision(_ context.Context, _, _, _ string) (*domain.Revision, error) {
 	if f.revisionReturn == nil {
 		return nil, errors.New("revision not configured")
 	}
@@ -514,7 +514,7 @@ func TestFinalize_FromDraft_OK(t *testing.T) {
 	if repo.statusCalls != 1 {
 		t.Fatalf("expected one status update call, got %d", repo.statusCalls)
 	}
-	if repo.statusCur != domain.DocStatusDraft || repo.statusNext != domain.DocStatusFinalized || !repo.statusStamp {
+	if repo.statusCur != domain.DocStatusDraft || repo.statusNext != domain.DocStatusUnderReview || !repo.statusStamp {
 		t.Fatalf("unexpected status transition cur=%s next=%s stamp=%v", repo.statusCur, repo.statusNext, repo.statusStamp)
 	}
 }

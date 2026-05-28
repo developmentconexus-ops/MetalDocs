@@ -88,9 +88,9 @@ func (h *Handler) createProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	profile := &domain.DocumentProfile{
-		Code:                     code,
+		Code:                     domain.ProfileCode(code),
 		TenantID:                 tenantID,
-		FamilyCode:               strings.TrimSpace(req.FamilyCode),
+		FamilyCode:               domain.FamilyCode(strings.TrimSpace(req.FamilyCode)),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
 		Alias:                    alias,
@@ -118,7 +118,7 @@ func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := h.profiles.Get(r.Context(), tenantID, r.PathValue("code"))
+	profile, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code")))
 	if err != nil {
 		h.writeProfileError(w, err)
 		return
@@ -137,6 +137,10 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		httpresponse.WriteError(w, http.StatusInternalServerError, problem.CodeInternalError, "internal server error")
 		return
 	}
+	if _, err := h.profiles.Get(r.Context(), tenantID, domain.ProfileCode(r.PathValue("code"))); err != nil {
+		h.writeProfileError(w, err)
+		return
+	}
 
 	updateCode := r.PathValue("code")
 	updateAlias := strings.TrimSpace(req.Alias)
@@ -147,9 +151,9 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	profile := &domain.DocumentProfile{
-		Code:                     updateCode,
+		Code:                     domain.ProfileCode(updateCode),
 		TenantID:                 tenantID,
-		FamilyCode:               strings.TrimSpace(req.FamilyCode),
+		FamilyCode:               domain.FamilyCode(strings.TrimSpace(req.FamilyCode)),
 		Name:                     strings.TrimSpace(req.Name),
 		Description:              strings.TrimSpace(req.Description),
 		Alias:                    updateAlias,
@@ -189,16 +193,14 @@ func (h *Handler) setDefaultTemplate(w http.ResponseWriter, r *http.Request) {
 	if err := h.profiles.SetDefaultTemplate(
 		r.Context(),
 		tenantID,
-		r.PathValue("code"),
+		domain.ProfileCode(r.PathValue("code")),
 		req.TemplateVersionID,
 		actorUserID,
 	); err != nil {
 		h.writeProfileError(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("{}"))
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{})
 }
 
 func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +218,7 @@ func (h *Handler) archiveProfile(w http.ResponseWriter, r *http.Request) {
 	if err := h.profiles.Archive(
 		r.Context(),
 		tenantID,
-		r.PathValue("code"),
+		domain.ProfileCode(r.PathValue("code")),
 		actorUserID,
 	); err != nil {
 		h.writeProfileError(w, err)
@@ -239,7 +241,7 @@ func (h *Handler) writeProfileError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrProfileCodeImmutable):
 		httpresponse.WriteError(w, http.StatusBadRequest, codeTaxProfileCodeImmutable, "profile code is immutable")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, pgErr.Message)
+		httpresponse.WriteError(w, http.StatusBadRequest, problem.CodeValidationError, "request violates data constraints")
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		httpresponse.WriteError(w, http.StatusConflict, codeTaxProfileAlreadyExists, "profile code already exists")
 	case errors.As(err, &pgErr) && pgErr.Code == "23503":

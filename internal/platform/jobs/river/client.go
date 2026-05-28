@@ -15,6 +15,7 @@ type Config struct {
 }
 
 type ClientBundle struct {
+	// Driver is intentionally public for wiring; do not use outside bootstrap.
 	Driver *riverdatabasesql.Driver
 	Client *river.Client[*sql.Tx]
 }

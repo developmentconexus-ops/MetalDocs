@@ -1,0 +1,87 @@
+# golangci-lint v2 config - MetalDocs Go Backend Quality Bar v1
+# See wiki/standards/golang/README.md for rationale.
+
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - nilerr
+    - errorlint
+    - gosec
+    - gocritic
+    - revive
+    - gocyclo
+    - gocognit
+    - sqlclosecheck
+    - rowserrcheck
+    - bodyclose
+    - exhaustive
+    - contextcheck
+  settings:
+    gocyclo:
+      min-complexity: 15
+    gocognit:
+      min-complexity: 20
+    errcheck:
+      exclude-functions:
+        - (metaldocs/internal/platform/problem).Write
+    gosec:
+      excludes:
+        - G104
+    revive:
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: error-return
+        - name: error-strings
+    exhaustive:
+      default-signifies-exhaustive: true
+  exclusions:
+    generated: strict
+    rules:
+      - path: _test\.go$
+        linters:
+          - gosec
+          - gocyclo
+          - gocognit
+      - path: .*\.gen\.go$
+        linters:
+          - errcheck
+          - govet
+          - staticcheck
+          - nilerr
+          - errorlint
+          - gosec
+          - gocritic
+          - revive
+          - gocyclo
+          - gocognit
+          - sqlclosecheck
+          - rowserrcheck
+          - bodyclose
+          - exhaustive
+          - contextcheck
+      - path: internal/api/v2/types_gen\.go
+        linters:
+          - errcheck
+          - govet
+          - staticcheck
+          - nilerr
+          - errorlint
+          - gosec
+          - gocritic
+          - revive
+          - gocyclo
+          - gocognit
+          - sqlclosecheck
+          - rowserrcheck
+          - bodyclose
+          - exhaustive
+          - contextcheck
+
+run:
+  timeout: 5m

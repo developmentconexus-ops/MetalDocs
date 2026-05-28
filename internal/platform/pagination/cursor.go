@@ -1,6 +1,7 @@
 package pagination
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"strings"
 )
 
 type SortField struct {
@@ -23,37 +25,75 @@ type Cursor struct {
 	FilterHash string         `json:"filter_hash"`
 }
 
+func NewCursor(sortFields []SortField, anchor map[string]any, filterHash string) (Cursor, error) {
+	c := Cursor{
+		V:          CursorVersion,
+		Sort:       append([]SortField(nil), sortFields...),
+		Anchor:     anchor,
+		FilterHash: filterHash,
+	}
+	if len(c.Sort) == 0 {
+		return Cursor{}, fmt.Errorf("%w: sort must not be empty", ErrInvalidCursor)
+	}
+	for i, sf := range c.Sort {
+		if sf.Direction != "asc" && sf.Direction != "desc" {
+			return Cursor{}, fmt.Errorf("%w: sort[%d].dir %q must be asc or desc", ErrInvalidCursor, i, sf.Direction)
+		}
+		if sf.Field == "" {
+			return Cursor{}, fmt.Errorf("%w: sort[%d].field empty", ErrInvalidCursor, i)
+		}
+	}
+	return c, nil
+}
+
 const (
 	DefaultLimit  = 20
 	MaxLimit      = 100
 	CursorVersion = 1
+
+	MinSigningSecretLength = sha256.Size
 )
 
 var (
-	ErrInvalidCursor = errors.New("invalid cursor")
+	ErrInvalidCursor  = errors.New("invalid cursor")
 	ErrCursorMismatch = errors.New("cursor mismatch")
 )
 
-func Encode(c Cursor) (string, error) {
+func Encode(c Cursor, signingSecret string) (string, error) {
+	if len(signingSecret) < MinSigningSecretLength {
+		return "", fmt.Errorf("%w: signing secret must be at least %d bytes", ErrInvalidCursor, MinSigningSecretLength)
+	}
 	b, err := json.Marshal(c)
 	if err != nil {
 		return "", err
 	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
+	signed := append(append([]byte(nil), b...), signCursor(b, signingSecret)...)
+	return base64.RawURLEncoding.EncodeToString(signed), nil
 }
 
-func Decode(s string) (Cursor, error) {
+func Decode(s string, signingSecret string) (Cursor, error) {
 	if s == "" {
 		return Cursor{}, ErrInvalidCursor
+	}
+	if len(signingSecret) < MinSigningSecretLength {
+		return Cursor{}, fmt.Errorf("%w: signing secret must be at least %d bytes", ErrInvalidCursor, MinSigningSecretLength)
 	}
 
 	b, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return Cursor{}, fmt.Errorf("%w: %v", ErrInvalidCursor, err)
 	}
+	if len(b) <= sha256.Size {
+		return Cursor{}, fmt.Errorf("%w: missing signature", ErrInvalidCursor)
+	}
+	payload := b[:len(b)-sha256.Size]
+	signature := b[len(b)-sha256.Size:]
+	if !hmac.Equal(signature, signCursor(payload, signingSecret)) {
+		return Cursor{}, fmt.Errorf("%w: signature mismatch", ErrInvalidCursor)
+	}
 
 	var c Cursor
-	if err := json.Unmarshal(b, &c); err != nil {
+	if err := json.Unmarshal(payload, &c); err != nil {
 		return Cursor{}, fmt.Errorf("%w: %v", ErrInvalidCursor, err)
 	}
 	if c.V != CursorVersion {
@@ -69,6 +109,12 @@ func Decode(s string) (Cursor, error) {
 	}
 
 	return c, nil
+}
+
+func signCursor(payload []byte, signingSecret string) []byte {
+	mac := hmac.New(sha256.New, []byte(signingSecret))
+	_, _ = mac.Write(payload)
+	return mac.Sum(nil)
 }
 
 func ValidateMatch(c Cursor, currentSort []SortField, currentFilterHash string) error {
@@ -101,24 +147,25 @@ func HashFilters(params url.Values, allowed []string) string {
 	}
 	sort.Strings(keys)
 
-	canonical := ""
+	var canonical strings.Builder
 	for i, k := range keys {
 		vals := append([]string(nil), params[k]...)
 		sort.Strings(vals)
 
 		if i > 0 {
-			canonical += ";"
+			canonical.WriteByte(';')
 		}
-		canonical += url.QueryEscape(k) + "="
+		canonical.WriteString(url.QueryEscape(k))
+		canonical.WriteByte('=')
 		for j, v := range vals {
 			if j > 0 {
-				canonical += ","
+				canonical.WriteByte(',')
 			}
-			canonical += url.QueryEscape(v)
+			canonical.WriteString(url.QueryEscape(v))
 		}
 	}
 
-	sum := sha256.Sum256([]byte(canonical))
+	sum := sha256.Sum256([]byte(canonical.String()))
 	return hex.EncodeToString(sum[:])
 }
 

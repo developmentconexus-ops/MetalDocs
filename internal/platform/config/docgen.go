@@ -7,12 +7,15 @@ import (
 )
 
 type DocgenConfig struct {
-	Enabled               bool
-	APIURL                string
+	// immutable after Load().
+	Enabled bool
+	// immutable after Load().
+	APIURL string
+	// immutable after Load().
 	RequestTimeoutSeconds int
 }
 
-func LoadDocgenConfig() DocgenConfig {
+func LoadDocgenConfig() (DocgenConfig, error) {
 	appEnv := strings.TrimSpace(os.Getenv("APP_ENV"))
 	apiURL := strings.TrimSpace(os.Getenv("METALDOCS_DOCGEN_API_URL"))
 	if apiURL == "" && strings.EqualFold(appEnv, "local") {
@@ -22,14 +25,19 @@ func LoadDocgenConfig() DocgenConfig {
 
 	timeoutSeconds := 10
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_DOCGEN_REQUEST_TIMEOUT_SECONDS")); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
-			timeoutSeconds = parsed
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return DocgenConfig{}, err
 		}
+		timeoutSeconds = parsed
+	}
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = 30
 	}
 
 	return DocgenConfig{
 		Enabled:               enabled,
 		APIURL:                apiURL,
 		RequestTimeoutSeconds: timeoutSeconds,
-	}
+	}, nil
 }

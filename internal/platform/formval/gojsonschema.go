@@ -10,6 +10,7 @@ import (
 
 type Gojsonschema struct{}
 
+// Validator is stateless; the struct exists for interface compliance.
 func NewGojsonschema() *Gojsonschema { return &Gojsonschema{} }
 
 func (g *Gojsonschema) Validate(schemaJSON string, formData json.RawMessage) (bool, []string, error) {

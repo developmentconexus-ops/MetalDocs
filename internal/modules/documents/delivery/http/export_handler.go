@@ -68,6 +68,10 @@ func (h *ExportHandler) exportPDF(w http.ResponseWriter, r *http.Request) {
 			req.PaperSize = "A4"
 		}
 	}
+	if !isAllowedPaperSize(req.PaperSize) {
+		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
+		return
+	}
 
 	res, err := h.svc.ExportPDF(r.Context(), tenantID, userID, docID, domain.RenderOptions{
 		PaperSize:  req.PaperSize,
@@ -126,6 +130,8 @@ func (h *ExportHandler) exportDocxURL(w http.ResponseWriter, r *http.Request) {
 
 func mapExportErr(err error) (int, string) {
 	switch {
+	case errors.Is(err, domain.ErrInvalidExport):
+		return http.StatusBadRequest, "VALIDATION_ERROR"
 	case errors.Is(err, domain.ErrExportDocxMissing):
 		return http.StatusConflict, "docx_missing"
 	case errors.Is(err, domain.ErrExportGotenbergFailed):
@@ -134,5 +140,14 @@ func mapExportErr(err error) (int, string) {
 		return http.StatusNotFound, "document_not_found"
 	default:
 		return http.StatusInternalServerError, "internal"
+	}
+}
+
+func isAllowedPaperSize(value string) bool {
+	switch value {
+	case "A4", "Letter", "Legal", "A3", "Tabloid":
+		return true
+	default:
+		return false
 	}
 }

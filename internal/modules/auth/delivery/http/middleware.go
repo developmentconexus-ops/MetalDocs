@@ -2,6 +2,7 @@ package httpdelivery
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -56,11 +57,6 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if m.cfg.LegacyHeaderEnabled && strings.TrimSpace(r.Header.Get("X-User-Id")) != "" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		cookie, err := r.Cookie(m.cfg.SessionCookieName)
 		if err != nil || strings.TrimSpace(cookie.Value) == "" {
 			_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
@@ -73,6 +69,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 				_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 				return
 			}
+			log.Printf("auth resolve session failed: %v", err)
 			_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authentication failed"))
 			return
 		}

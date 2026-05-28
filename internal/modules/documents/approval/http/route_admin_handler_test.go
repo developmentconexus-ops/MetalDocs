@@ -230,12 +230,15 @@ func TestUpdateRoute_HappyPath(t *testing.T) {
 			if out.RouteID != "route-1" {
 				t.Fatalf("route_id = %q, want %q", out.RouteID, "route-1")
 			}
-			if out.NewVersion != 5 {
-				t.Fatalf("new_version = %d, want %d", out.NewVersion, 5)
+			if out.NewVersion == nil || *out.NewVersion != 5 {
+				t.Fatalf("new_version = %v, want %d", out.NewVersion, 5)
 			}
 
 			if svc.updateReq.TenantID != "tenant-1" || svc.updateReq.RouteID != "route-1" || svc.updateReq.ActorUserID != "actor-1" {
 				t.Fatalf("unexpected request mapped to service: %+v", svc.updateReq)
+			}
+			if svc.updateReq.ExpectedVersion != 4 {
+				t.Fatalf("expected version = %d, want 4", svc.updateReq.ExpectedVersion)
 			}
 			if svc.updateReq.Name != "Ops Route v2" {
 				t.Fatalf("name = %q, want %q", svc.updateReq.Name, "Ops Route v2")
@@ -321,6 +324,60 @@ func TestDeactivateRoute_HappyPath(t *testing.T) {
 			if svc.deactivateReq.TenantID != "tenant-1" || svc.deactivateReq.RouteID != "route-1" || svc.deactivateReq.ActorUserID != "actor-1" {
 				t.Fatalf("unexpected request mapped to service: %+v", svc.deactivateReq)
 			}
+			if svc.deactivateReq.ExpectedVersion != 3 {
+				t.Fatalf("expected version = %d, want 3", svc.deactivateReq.ExpectedVersion)
+			}
 		})
+	}
+}
+
+func TestUpdateRoute_RequiresIfMatch(t *testing.T) {
+	h := &Handler{routeAdmin: &fakeRouteAdminService{}}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(`{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"keep_snapshot"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusPreconditionRequired {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusPreconditionRequired)
+	}
+}
+
+func TestDeactivateRoute_RequiresIfMatch(t *testing.T) {
+	h := &Handler{routeAdmin: &fakeRouteAdminService{}}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", nil)
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusPreconditionRequired {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusPreconditionRequired)
+	}
+}
+
+func TestUpdateRoute_RejectsIfMatchV0(t *testing.T) {
+	h := &Handler{routeAdmin: &fakeRouteAdminService{}}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(`{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"keep_snapshot"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("If-Match", "v0")
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 	}
 }

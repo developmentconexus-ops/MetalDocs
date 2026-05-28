@@ -1,6 +1,6 @@
 # Current Agent Handoff
 
-> **Last verified:** 2026-05-17
+> **Last verified:** 2026-05-27
 > **Scope:** Recovery context for a fresh or reinstalled Codex session.
 > **Out of scope:** Full implementation details for each screen. Follow the linked plan/spec/backlog files for that.
 
@@ -8,7 +8,7 @@
 
 Codex Desktop became unstable and the user planned to reinstall it. This page is the durable landing document for the next session so the agent does not lose the current roadmap state, the Plan 12 screen-finalization intent, or the recovered information from an inaccessible templates review thread.
 
-Start a fresh session by reading this file after `AGENTS.md`, `CLAUDE.md`, `wiki/README.md`, and `wiki/references/ai-operating-system.md`.
+Start a fresh session by reading this file after `AGENTS.md`, `CLAUDE.md`, `wiki/README.md`, `wiki/quality/qa-operating-system.md`, and `wiki/references/ai-operating-system.md`.
 
 ## Workspace state at handoff
 
@@ -45,7 +45,7 @@ Before implementing any screen:
 3. Use `metaldocs-screen-implementation` before writing TSX/CSS for a designed screen.
 4. Use `metaldocs-tanstack-query` when touching frontend API wrappers, generated API types, query hooks, query keys, cache invalidation, or server state.
 5. Use `runtime-contract-prereq` if startup, auth/session, target route, OpenAPI/generated types, or frontend wrapper truth is not trustworthy.
-6. Use `verification-before-completion` before claiming fixed, done, green, or passing.
+6. Use the canonical QA loop before claiming fixed, done, green, or passing: static/targeted verification, code review, product QA, root-cause classification, fix by family, targeted regression, broader regression when boundary-crossing, close only with evidence.
 
 Classify every mismatch before touching code:
 
@@ -57,9 +57,11 @@ Classify every mismatch before touching code:
 | `screen-local implementation` | UI/state/query fix belongs to the screen PR. |
 | `wiki-memory drift` | Code truth changed and wiki/backlog/module docs need sync. |
 | `workflow/tooling gap` | A skill, script, or guide failed to prevent confusion. |
+| `architecture contradiction` | The required fix is redesign-grade and must stop the current implementation lane. |
 | `defer` | Desired product behavior lacks backend/runtime support and must not be faked. |
 
 Default mismatch rule: continue only if the mismatch is local to the current task boundary. Otherwise stop and surface the prerequisite first.
+Hard-stop rule: if the fix requires redesign-grade work outside the assigned boundary, stop and report the architecture contradiction and minimum prerequisite plan instead of patching local symptoms.
 
 ## Recovered inaccessible thread
 
@@ -144,7 +146,7 @@ The user stated they are changing references from `documents_v2` to `documents` 
 
 ## How to proceed in a fresh session
 
-1. Read `AGENTS.md`, `CLAUDE.md`, `wiki/README.md`, `wiki/references/ai-operating-system.md`, and this file.
+1. Read `AGENTS.md`, `CLAUDE.md`, `wiki/README.md`, `wiki/quality/qa-operating-system.md`, `wiki/references/ai-operating-system.md`, and this file.
 2. Run `git status --short` and identify current branch.
 3. Treat Plan 12.4 as closed unless fresh verification contradicts the 2026-05-17 closure checkpoint.
 4. If proceeding to Plan 12.5, create or read the Plan 12.5 execution plan and start with `metaldocs-screen-integration-audit`.

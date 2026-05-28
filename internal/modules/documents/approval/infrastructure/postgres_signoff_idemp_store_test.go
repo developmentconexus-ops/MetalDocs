@@ -10,12 +10,12 @@ import (
 func TestPostgresSignoffIdempStore_NilDB(t *testing.T) {
 	store := infrastructure.NewPostgresSignoffIdempStore(nil)
 
-	_, _, err := store.CheckReplay(context.Background(), "tenant", "actor", "key")
+	_, _, err := store.BeginDocumentReplay(context.Background(), "tenant", "actor", "key", "hash")
 	if err == nil {
 		t.Fatal("expected error when db is nil, got nil")
 	}
 
-	err = store.RecordReplay(context.Background(), "tenant", "actor", "key", "approved")
+	_, _, err = store.BeginStageReplay(context.Background(), "tenant", "actor", "key", "hash")
 	if err == nil {
 		t.Fatal("expected error when db is nil, got nil")
 	}

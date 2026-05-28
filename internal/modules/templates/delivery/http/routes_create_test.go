@@ -88,7 +88,11 @@ func (r *fakeRepo) CreateVersionTx(_ context.Context, _ *sql.Tx, v *domain.Templ
 	return r.CreateVersion(context.Background(), v)
 }
 
-func (r *fakeRepo) GetVersion(_ context.Context, templateID string, n int) (*domain.TemplateVersion, error) {
+func (r *fakeRepo) GetVersion(_ context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error) {
+	t, ok := r.templates[templateID]
+	if !ok || t.TenantID != tenantID {
+		return nil, domain.ErrNotFound
+	}
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.VersionNumber == n {
 			return v, nil
@@ -97,9 +101,13 @@ func (r *fakeRepo) GetVersion(_ context.Context, templateID string, n int) (*dom
 	return nil, domain.ErrNotFound
 }
 
-func (r *fakeRepo) GetVersionByID(_ context.Context, id string) (*domain.TemplateVersion, error) {
+func (r *fakeRepo) GetVersionByID(_ context.Context, tenantID, id string) (*domain.TemplateVersion, error) {
 	v, ok := r.versions[id]
 	if !ok {
+		return nil, domain.ErrNotFound
+	}
+	t, ok := r.templates[v.TemplateID]
+	if !ok || t.TenantID != tenantID {
 		return nil, domain.ErrNotFound
 	}
 	return v, nil
@@ -113,11 +121,11 @@ func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Temp
 	return r.UpdateTemplate(context.Background(), t)
 }
 
-func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, v *domain.TemplateVersion) error {
-	return r.UpdateVersion(context.Background(), v)
+func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, tenantID string, v *domain.TemplateVersion) error {
+	return r.UpdateVersion(context.Background(), tenantID, v)
 }
 
-func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) error {
+func (r *fakeRepo) UpdateVersion(_ context.Context, _ string, v *domain.TemplateVersion) error {
 	if _, ok := r.versions[v.ID]; !ok {
 		return domain.ErrNotFound
 	}
@@ -125,7 +133,7 @@ func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) e
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, _ string, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	v, ok := r.versions[versionID]
 	if !ok {
 		return domain.ErrNotFound
@@ -140,8 +148,8 @@ func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, ex
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return r.UpdateVersionDraftCAS(context.Background(), versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return r.UpdateVersionDraftCAS(context.Background(), tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
@@ -159,7 +167,11 @@ func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ *sql.Tx, tem
 	return r.ObsoletePreviousPublished(context.Background(), templateID, keepVersionID)
 }
 
-func (r *fakeRepo) GetApprovalConfig(_ context.Context, templateID string) (*domain.ApprovalConfig, error) {
+func (r *fakeRepo) GetApprovalConfig(_ context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
+	t, ok := r.templates[templateID]
+	if !ok || t.TenantID != tenantID {
+		return nil, domain.ErrNotFound
+	}
 	cfg, ok := r.approvalConfigs[templateID]
 	if !ok {
 		return nil, domain.ErrNotFound
@@ -185,12 +197,12 @@ func (r *fakeRepo) AppendAuditTx(_ context.Context, _ *sql.Tx, e *domain.AuditEv
 	return r.AppendAudit(context.Background(), e)
 }
 
-func (r *fakeRepo) ListAudit(_ context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
+func (r *fakeRepo) ListAudit(_ context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
 	_ = limit
 	_ = offset
 	out := make([]*domain.AuditEvent, 0, len(r.audit))
 	for _, e := range r.audit {
-		if e.TemplateID == templateID {
+		if e.TenantID == tenantID && e.TemplateID == templateID {
 			out = append(out, e)
 		}
 	}
@@ -237,6 +249,15 @@ func newMux(t *testing.T, authz tmplhttp.AuthzFunc, repo *fakeRepo) *http.ServeM
 	return mux
 }
 
+func TestNew_PanicsWithoutAuthz(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("expected New to panic when authz is nil")
+		}
+	}()
+	_ = tmplhttp.New(application.New(newFakeRepo(), fakePresigner{}, fakeClock{}, &fakeUUID{}), nil)
+}
+
 func createBody(key string) []byte {
 	req := map[string]any{
 		"key":         key,
@@ -250,8 +271,9 @@ func createBody(key string) []byte {
 func withHeaders(req *http.Request) {
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("Idempotency-Key", "11111111-1111-1111-1111-111111111111")
-	*req = *req.WithContext(tenant.WithTenantID(req.Context(), "tenant-a"))
-	*req = *req.WithContext(iamdomain.WithAuthContext(req.Context(), "user-a", []iamdomain.Role{}))
+	ctx := tenant.WithTenantID(req.Context(), "tenant-a")
+	ctx = iamdomain.WithAuthContext(ctx, "user-a", []iamdomain.Role{})
+	*req = *req.WithContext(ctx)
 }
 
 func TestCreateTemplate_Happy(t *testing.T) {

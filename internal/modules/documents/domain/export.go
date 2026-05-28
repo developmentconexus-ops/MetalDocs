@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import "errors"
 
@@ -24,4 +24,29 @@ type ExportResult struct {
 var (
 	ErrExportGotenbergFailed = errors.New("gotenberg_conversion_failed")
 	ErrExportDocxMissing     = errors.New("docx_missing")
+	ErrInvalidExport         = errors.New("invalid_export")
 )
+
+var allowedPaperSizes = map[string]struct{}{
+	"A4":      {},
+	"Letter":  {},
+	"Legal":   {},
+	"A3":      {},
+	"Tabloid": {},
+}
+
+func NewExport(documentID, revisionID string, compositeHash []byte, storageKey string, sizeBytes int64, paperSize string, landscape bool, docgenV2Ver string) (*Export, error) {
+	if _, ok := allowedPaperSizes[paperSize]; !ok {
+		return nil, ErrInvalidExport
+	}
+	return &Export{
+		DocumentID:    documentID,
+		RevisionID:    revisionID,
+		CompositeHash: compositeHash,
+		StorageKey:    storageKey,
+		SizeBytes:     sizeBytes,
+		PaperSize:     paperSize,
+		Landscape:     landscape,
+		DocgenV2Ver:   docgenV2Ver,
+	}, nil
+}

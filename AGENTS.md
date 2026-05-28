@@ -52,7 +52,9 @@ If a task crosses boundaries, compose the skills. Do not force one skill to abso
 ## MetalDocs AI Operating System
 
 Use the MetalDocs operating model for all non-trivial work.
-Canonical design: `docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md`.
+Canonical QA/close-out policy: `wiki/quality/qa-operating-system.md`.
+Path-stable operator bridge: `wiki/references/ai-operating-system.md`.
+Canonical design input: `docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md`.
 
 Truth hierarchy:
 - Runtime truth: what actually runs now.
@@ -67,6 +69,7 @@ Required classification:
 - screen-local implementation
 - wiki-memory drift
 - workflow/tooling gap
+- architecture contradiction
 - defer
 
 Default mismatch rule:
@@ -77,16 +80,35 @@ Default mismatch rule:
 
 Critical contradiction stop rule:
 Stop when contradictions affect route ownership/prefix, plan or prerequisite status, startup instructions, module ownership, API contract expectations, or verification expectations.
+Stop when the required fix is redesign-grade rather than local, including shared API redesign, cross-module auth/authz model change, storage/provider architecture redesign, workflow semantic redesign outside the assigned boundary, or large cross-screen coordinated rewrite. Do not patch around these with local symptom fixes.
 
 Default workflow order:
 1. Choose the task skill.
 2. Read the required wiki/architecture docs for that boundary.
 3. Pass the relevant gate before implementation.
 4. Implement only inside the current boundary.
-5. Verify with scripts/tests.
-6. Sync module wiki memory if code truth changed.
+5. Run static and targeted verification for the touched slice.
+6. Perform code review.
+7. Perform product QA using the canonical `wiki/quality/` checklist for the workflow class.
+8. Classify findings by root-cause family.
+9. Fix the owning family, not only the first visible symptom.
+10. Re-run targeted review, QA, and regression for the affected slice.
+11. Re-run broader regression when the change crossed boundaries.
+12. Close only with evidence and explicit bounded defers.
+13. Sync module wiki memory if code truth changed.
 
 Escalate to `runtime-contract-prereq` when startup truth, auth/session truth, target route truth, or runtime/spec/generated/frontend-wrapper alignment is not trustworthy enough to continue local feature work.
+
+For non-trivial close-out, treat these as canonical QA companions:
+- `wiki/quality/qa-operating-system.md`
+- `wiki/quality/screen-qa-checklist.md`
+- `wiki/quality/backend-api-qa-checklist.md`
+- `wiki/quality/workflow-async-qa-checklist.md`
+- `wiki/quality/release-closeout-checklist.md`
+
+Evidence rule:
+- `implemented`, `fixed`, `done`, `green`, or `looks good` are not closure states by default.
+- Record verification commands, QA outcomes, review findings disposition, and any explicit bounded defer before closing work.
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 

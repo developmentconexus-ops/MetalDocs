@@ -12,7 +12,8 @@ import (
 type JobsConfig struct {
 	Enabled     bool
 	RiverSchema string
-	Queues      map[string]river.QueueConfig
+	// Queues is configured once at startup; do not mutate after initialization.
+	Queues map[string]river.QueueConfig
 }
 
 func LoadJobsConfig() (JobsConfig, error) {

@@ -81,6 +81,7 @@ func TestWriterValidateIntegrityReportsBrokenChain(t *testing.T) {
 		AddRow(int64(2), "evt-2", "wrong", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
 
 	mock.ExpectQuery("FROM metaldocs.audit_events").
+		WithArgs(auditIntegrityValidationWindow).
 		WillReturnRows(rows)
 
 	writer := NewWriter(db)
@@ -117,6 +118,7 @@ func TestWriterValidateIntegrityAllowsRetainedFirstRow(t *testing.T) {
 	}).AddRow(int64(10), "evt-10", hash, hash, hash, hash)
 
 	mock.ExpectQuery(`ROW_NUMBER\(\) OVER`).
+		WithArgs(auditIntegrityValidationWindow).
 		WillReturnRows(rows)
 
 	writer := NewWriter(db)
@@ -126,5 +128,38 @@ func TestWriterValidateIntegrityAllowsRetainedFirstRow(t *testing.T) {
 	}
 	if len(issues) != 0 {
 		t.Fatalf("issue count = %d, want 0: %#v", len(issues), issues)
+	}
+}
+
+func TestWriterValidateIntegrityStopsCollectingAfterIssueLimit(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{
+		"audit_sequence",
+		"id",
+		"prev_hash",
+		"row_hash",
+		"expected_prev_hash",
+		"expected_row_hash",
+	})
+	for i := 0; i < auditIntegrityIssueLimit+5; i++ {
+		rows.AddRow(int64(i+1), "evt", "wrong", "bad", "expected", "expected")
+	}
+
+	mock.ExpectQuery("FROM recent").
+		WithArgs(auditIntegrityValidationWindow).
+		WillReturnRows(rows)
+
+	writer := NewWriter(db)
+	issues, err := writer.ValidateIntegrity(context.Background())
+	if err != nil {
+		t.Fatalf("ValidateIntegrity: %v", err)
+	}
+	if len(issues) != auditIntegrityIssueLimit {
+		t.Fatalf("issue count = %d, want %d", len(issues), auditIntegrityIssueLimit)
 	}
 }

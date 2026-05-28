@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/domain"
@@ -31,7 +32,7 @@ func (r *TemplatesSnapshotReader) LoadForSnapshot(ctx context.Context, tenantID,
 		  FROM templates_template_version tv
 		  JOIN templates_template tpl ON tpl.id = tv.template_id
 		 WHERE tv.id = $1::uuid
-		   AND tpl.tenant_id = $2
+		   AND tpl.tenant_id = $2::uuid
 		   AND tv.status = 'published'`,
 		templateVersionID, tenantID,
 	).Scan(&phJSON, &docxKey)
@@ -39,7 +40,7 @@ func (r *TemplatesSnapshotReader) LoadForSnapshot(ctx context.Context, tenantID,
 		return domain.TemplateSnapshot{}, domain.ErrSnapshotTemplateNotFound
 	}
 	if err != nil {
-		return domain.TemplateSnapshot{}, err
+		return domain.TemplateSnapshot{}, fmt.Errorf("templates snapshot reader: %w", err)
 	}
 
 	return domain.TemplateSnapshot{

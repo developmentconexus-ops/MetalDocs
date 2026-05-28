@@ -50,18 +50,18 @@ func TestUpsertUserAndAssignRole_PassesTenantID(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`
+SELECT
+	set_config('metaldocs.tenant_id', $1, true),
+	set_config('metaldocs.actor_id', $2, true)
+`)).
+		WithArgs(testTenant, "admin").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("actor-1"))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(testTenant))
-	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
-)`)).WithArgs("actor-1", testTenant).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	expectSystemAdminBypass(mock, "actor-1", testTenant, false)
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
   SELECT 1
@@ -109,19 +109,17 @@ func TestUpsertUserAndAssignRole_WrapsAuthzError(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
-		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
 	mock.ExpectRollback()
 
 	repo := postgres.NewRoleAdminRepository(db)
-	err = repo.UpsertUserAndAssignRole(context.Background(), "alice", "Alice", testTenant, iamdomain.Role("author"), "admin")
+	err = repo.UpsertUserAndAssignRole(context.Background(), "alice", "Alice", testTenant, iamdomain.Role("author"), "")
 	if err == nil {
 		t.Fatal("expected authz error")
 	}
 	if !errors.Is(err, authz.ErrActorContextMissing) {
 		t.Fatalf("expected ErrActorContextMissing, got %v", err)
 	}
-	if got := err.Error(); got != "require iam user.manage authorization: authz: metaldocs.actor_id GUC not set on transaction" {
+	if got := err.Error(); got != "seed iam user.manage authorization: authz: metaldocs.actor_id GUC not set on transaction" {
 		t.Fatalf("unexpected error: %q", got)
 	}
 
@@ -130,7 +128,7 @@ func TestUpsertUserAndAssignRole_WrapsAuthzError(t *testing.T) {
 	}
 }
 
-func TestReplaceUserRoles_DeleteThenInsert_OnlyLastSurvives(t *testing.T) {
+func TestReplaceUserRoles_DeleteThenInsert_PersistsSingleRole(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock: %v", err)
@@ -138,18 +136,18 @@ func TestReplaceUserRoles_DeleteThenInsert_OnlyLastSurvives(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`
+SELECT
+	set_config('metaldocs.tenant_id', $1, true),
+	set_config('metaldocs.actor_id', $2, true)
+`)).
+		WithArgs(testTenant, "admin").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("actor-1"))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(testTenant))
-	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
-)`)).WithArgs("actor-1", testTenant).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	expectSystemAdminBypass(mock, "actor-1", testTenant, false)
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
   SELECT 1
@@ -174,14 +172,16 @@ SELECT EXISTS (
 	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`)).
 		WithArgs(testTenant, "alice").
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)`)).
-		WithArgs("alice", testTenant, "approver", "admin").
+	mock.ExpectExec(regexp.QuoteMeta(`
+INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)
+VALUES ($1, $2::uuid, $3, NOW(), $4)
+`)).
+		WithArgs("alice", testTenant, "editor", "admin").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	repo := postgres.NewRoleAdminRepository(db)
-	if err := repo.ReplaceUserRoles(context.Background(), "alice", "Alice", testTenant,
-		[]iamdomain.Role{"author", "approver"}, "admin"); err != nil {
+	if err := repo.ReplaceUserRoles(context.Background(), "alice", "Alice", testTenant, iamdomain.RoleEditor, "admin"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -218,4 +218,26 @@ WHERE role_code = $1
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
 	}
+}
+
+func expectSystemAdminBypass(mock sqlmock.Sqlmock, actorID, tenantID string, exists bool) {
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
+)`)).
+		WithArgs(actorID, tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(exists))
 }

@@ -2178,12 +2178,8 @@ export interface paths {
                     documentProfile?: string;
                     documentFamily?: string;
                     processArea?: string;
-                    subject?: string;
-                    businessUnit?: string;
                     department?: string;
-                    classification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
-                    status?: "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED";
-                    tag?: string;
+                    status?: string;
                     expiryBefore?: string;
                     expiryAfter?: string;
                     limit?: number;
@@ -3705,11 +3701,14 @@ export interface components {
         };
         CurrentUser: {
             userId: string;
+            /** Format: uuid */
+            tenantId: string;
+            tenantName: string;
             username: string;
             email?: string;
             displayName: string;
             mustChangePassword: boolean;
-            roles: ("admin" | "editor" | "reviewer" | "viewer")[];
+            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
         AuthLoginResponse: {
             user: components["schemas"]["CurrentUser"];
@@ -3749,7 +3748,7 @@ export interface components {
             lockedUntil?: string;
             /** Format: date-time */
             lastLoginAt?: string;
-            roles: ("admin" | "editor" | "reviewer" | "viewer")[];
+            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -3776,7 +3775,7 @@ export interface components {
             email?: string;
             displayName: string;
             password: string;
-            roles: ("admin" | "editor" | "reviewer" | "viewer")[];
+            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
         CreateManagedUserResponse: {
             userId: string;
@@ -3807,12 +3806,12 @@ export interface components {
         ReplaceUserRolesRequest: {
             displayName: string;
             assignedBy?: string;
-            roles: ("admin" | "editor" | "reviewer" | "viewer")[];
+            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
         ReplaceUserRolesResponse: {
             userId: string;
             displayName: string;
-            roles: ("admin" | "editor" | "reviewer" | "viewer")[];
+            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
         };
         CreateDocumentRequest: {
             title: string;
@@ -4580,7 +4579,7 @@ export interface components {
         UpsertUserRoleRequest: {
             displayName?: string;
             /** @enum {string} */
-            role: "admin" | "editor" | "reviewer" | "viewer";
+            role: "system_admin" | "approver" | "author" | "editor" | "viewer";
             assignedBy?: string;
         };
         UpsertUserRoleResponse: {
@@ -4630,15 +4629,9 @@ export interface components {
             documentSequence: number;
             documentCode: string;
             processArea?: string;
-            subject?: string;
             ownerId: string;
-            businessUnit: string;
-            department: string;
-            /** @enum {string} */
-            classification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
-            /** @enum {string} */
-            status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED";
-            tags: string[];
+            department?: string;
+            status: string;
             /** Format: date-time */
             effectiveAt?: string;
             /** Format: date-time */
@@ -7736,7 +7729,10 @@ export interface operations {
     submitDocumentForApproval: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Expected revision version ETag in the form "v<N>" */
+                "If-Match": string;
+            };
             path: {
                 id: string;
             };
@@ -7744,8 +7740,8 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
-            200: {
+            /** @description created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7756,7 +7752,11 @@ export interface operations {
     recordApprovalStageSignoff: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>" */
+                "If-Match": string;
+            };
             path: {
                 instance_id: string;
                 stage_id: string;
@@ -7957,7 +7957,11 @@ export interface operations {
     recordDocumentSignoff: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Expected revision version ETag in the form "v<N>" */
+                "If-Match": string;
+            };
             path: {
                 id: string;
             };

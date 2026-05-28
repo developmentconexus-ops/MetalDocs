@@ -40,6 +40,9 @@ ON CONFLICT (tenant_id, revision_id) DO NOTHING`,
 	return nil
 }
 
+// TODO(render): thread tenant scope through the worker claim path before adding
+// a tenant_id predicate here; the current worker intentionally drains the shared
+// outbox across tenants.
 func (r *PDFOutboxRepository) ClaimPending(ctx context.Context, limit, maxAttempts int) ([]OutboxRow, error) {
 	rows, err := r.db.QueryContext(ctx, `
 WITH claimed AS (
@@ -70,26 +73,56 @@ RETURNING o.id, o.tenant_id, o.revision_id, o.content_hash, o.attempts`, limit, 
 }
 
 func (r *PDFOutboxRepository) MarkDispatched(ctx context.Context, id string) error {
-	_, err := r.db.ExecContext(ctx, `
+	res, err := r.db.ExecContext(ctx, `
 UPDATE metaldocs.pdf_dispatch_outbox
    SET status='dispatched', dispatched_at=NOW()
  WHERE id=$1::uuid`, id)
-	return err
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("mark dispatched: outbox row not found: id=%s", id)
+	}
+	return nil
 }
 
 func (r *PDFOutboxRepository) MarkFailed(ctx context.Context, id string, errStr string, nextRetryAt time.Time, finalize bool) error {
 	if finalize {
-		_, err := r.db.ExecContext(ctx, `
+		res, err := r.db.ExecContext(ctx, `
 UPDATE metaldocs.pdf_dispatch_outbox
    SET status='failed', last_error=$2, attempts=attempts+1
  WHERE id=$1::uuid`, id, errStr)
-		return err
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("mark failed finalize: outbox row not found: id=%s", id)
+		}
+		return nil
 	}
-	_, err := r.db.ExecContext(ctx, `
+	res, err := r.db.ExecContext(ctx, `
 UPDATE metaldocs.pdf_dispatch_outbox
    SET status='pending', last_error=$2, attempts=attempts+1, next_retry_at=$3, claimed_at=NULL
  WHERE id=$1::uuid`, id, errStr, nextRetryAt)
-	return err
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("mark failed retry: outbox row not found: id=%s", id)
+	}
+	return nil
 }
 
 // ReadState returns the latest status of the pdf_dispatch_outbox row for the
@@ -115,11 +148,14 @@ func (r *PDFOutboxRepository) ResetStaleClaims(ctx context.Context, olderThan ti
 	res, err := r.db.ExecContext(ctx, `
 UPDATE metaldocs.pdf_dispatch_outbox
    SET status='pending', claimed_at=NULL
- WHERE status='processing' AND claimed_at < NOW() - $1::interval`,
-		fmt.Sprintf("%d milliseconds", olderThan.Milliseconds()))
+ WHERE status='processing' AND claimed_at < NOW() - ($1 * interval '1 millisecond')`,
+		olderThan.Milliseconds())
 	if err != nil {
 		return 0, err
 	}
-	n, _ := res.RowsAffected()
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
 	return int(n), nil
 }

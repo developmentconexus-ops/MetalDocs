@@ -11,7 +11,7 @@ type fakeRegistryReader struct {
 	err    error
 }
 
-func (f fakeRegistryReader) GetControlledDocument(ctx context.Context, tenantID, controlledDocumentID string) (ControlledDocumentInfo, error) {
+func (f fakeRegistryReader) GetControlledDocument(ctx context.Context, tenantID TenantID, controlledDocumentID ControlledDocumentID) (ControlledDocumentInfo, error) {
 	return f.record, f.err
 }
 

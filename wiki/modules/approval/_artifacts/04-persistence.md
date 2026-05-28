@@ -139,6 +139,11 @@ Constraints/FKs:
 - `setAuthzGUC` writes `metaldocs.tenant_id` and `metaldocs.actor_id` with `set_config`. [internal/modules/documents/approval/application/authz_guc.go:12] [internal/modules/documents/approval/application/authz_guc.go:15]
 - Reject path (`RecordSignoff`) writes `metaldocs.cancel_in_progress` with `set_config`. [internal/modules/documents/approval/application/decision_service.go:334]
 - Cancel path (`CancelInstance`) writes `metaldocs.cancel_in_progress` with `set_config`. [internal/modules/documents/approval/application/cancel_service.go:111]
+- `ReadService.LoadInstance` now resolves the actor from request session context before writing authz GUCs; callers no longer pass `actorID` as an explicit parameter. [internal/modules/documents/approval/application/read_service.go:38] [internal/modules/documents/approval/application/read_service.go:47]
+
+## 3.1 Governance event persistence note
+
+- `sqlEmitter.Emit` now persists `governance_events.occurred_at` explicitly with `COALESCE($8::timestamptz, now())`, so approval event rows keep service-supplied timestamps when present and still fall back safely for zero values. [internal/modules/documents/approval/application/events.go:43] [internal/modules/documents/approval/application/events.go:52]
 
 ## 4) INDEXES (migration 0140)
 

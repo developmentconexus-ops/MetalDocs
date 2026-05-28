@@ -3,6 +3,7 @@ package gotenberg
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -60,7 +61,10 @@ func TestConvertDocxToPDFPostsMultipartDOCX(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
 	client.httpClient = server.Client()
 
 	pdfContent, err := client.ConvertDocxToPDF(context.Background(), docxContent)
@@ -88,7 +92,10 @@ func TestConvertHTMLToPDF_SendsMultipartToChromiumRoute(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
 	client.httpClient = server.Client()
 
 	pdf, err := client.ConvertHTMLToPDF(
@@ -143,14 +150,121 @@ func TestConvertDocxToPDFReturnsStatusErrorBody(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewClient(server.URL)
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
 	client.httpClient = server.Client()
 
-	_, err := client.ConvertDocxToPDF(context.Background(), []byte("fake-docx-content"))
+	_, err = client.ConvertDocxToPDF(context.Background(), []byte("fake-docx-content"))
 	if err == nil {
 		t.Fatalf("expected error when server returns non-200")
 	}
 	if !strings.Contains(err.Error(), "status 502: conversion failed") {
 		t.Fatalf("expected status error with response body, got %v", err)
 	}
+}
+
+func TestNewClientRequiresBaseURL(t *testing.T) {
+	client, err := NewClient("")
+	if err == nil {
+		t.Fatal("expected constructor error")
+	}
+	if client != nil {
+		t.Fatalf("expected nil client, got %#v", client)
+	}
+}
+
+func TestNewClientRejectsNonHTTPBaseURL(t *testing.T) {
+	client, err := NewClient("ftp://example.com")
+	if err == nil {
+		t.Fatal("expected constructor error")
+	}
+	if client != nil {
+		t.Fatalf("expected nil client, got %#v", client)
+	}
+}
+
+func TestConvertDocxToPDFRejectsOversizedResponse(t *testing.T) {
+	client, err := NewClient("http://gotenberg.internal")
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
+	client.httpClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(newRepeatingReader(maxPDFBodyBytes + 1)),
+			Header:     make(http.Header),
+		}, nil
+	})}
+
+	_, err = client.ConvertDocxToPDF(context.Background(), []byte("fake-docx-content"))
+	if err == nil {
+		t.Fatal("expected oversized response error")
+	}
+	if !strings.Contains(err.Error(), "body exceeds") {
+		t.Fatalf("expected body limit error, got %v", err)
+	}
+}
+
+func TestConvertHTMLToPDFReturnsReadErrorForErrorBody(t *testing.T) {
+	client, err := NewClient("http://gotenberg.internal")
+	if err != nil {
+		t.Fatalf("NewClient error: %v", err)
+	}
+	client.httpClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusBadGateway,
+			Body:       &errorReadCloser{err: errors.New("boom")},
+			Header:     make(http.Header),
+		}, nil
+	})}
+
+	_, err = client.ConvertHTMLToPDF(context.Background(), []byte("<html></html>"), nil)
+	if err == nil {
+		t.Fatal("expected read error")
+	}
+	if !strings.Contains(err.Error(), "read error response") {
+		t.Fatalf("expected read error context, got %v", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+type repeatingReader struct {
+	remaining int64
+}
+
+func newRepeatingReader(size int64) *repeatingReader {
+	return &repeatingReader{remaining: size}
+}
+
+func (r *repeatingReader) Read(p []byte) (int, error) {
+	if r.remaining == 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > r.remaining {
+		p = p[:r.remaining]
+	}
+	for i := range p {
+		p[i] = 'a'
+	}
+	r.remaining -= int64(len(p))
+	return len(p), nil
+}
+
+type errorReadCloser struct {
+	err error
+}
+
+func (r *errorReadCloser) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+func (r *errorReadCloser) Close() error {
+	return nil
 }

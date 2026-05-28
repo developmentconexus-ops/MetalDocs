@@ -75,7 +75,8 @@ func (s *ReconstructService) Reconstruct(ctx context.Context, tenantID, revision
 		EigenpalVer:      s.engine.EigenpalVer,
 		DocxtemplaterVer: s.engine.DocxtemplaterVer,
 		BytesHash:        resp.ContentHash,
-		MatchesOriginal:  resp.ContentHash == hex.EncodeToString(originalHash),
+		// Both values are lower-case hex digests of the rendered bytes.
+		MatchesOriginal: resp.ContentHash == hex.EncodeToString(originalHash),
 	}
 
 	blob, err := json.Marshal(entry)

@@ -111,3 +111,13 @@ metaldocs-jobs.exe
 
 # Loose debug logs
 debug.log
+
+# Local QA scratch (cookies, request/response captures, dev logs)
+cookies.txt
+*-payload.json
+login-response.txt
+frontend-dev.log
+frontend-dev.err.log
+
+# Claude project-root memory (local session state — not for repo)
+memory/

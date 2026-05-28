@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-21 (documents generated-wrapper mount sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -168,7 +168,8 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/application/service.go:564` | `Service.RenameDocument` | func | Validate + UPDATE + audit (T-005: not transactional) |
 | `internal/modules/documents/application/service.go:753` | `Service.UpdateDocumentStatus` | func | Status transitions; finalize tail-call lands here |
 | `internal/modules/documents/application/snapshot_service.go` | `SnapshotService` | type | Populates `placeholder_schema_snapshot` (ADR 0008) |
-| `internal/modules/documents/application/freeze_service.go` | `FreezeService` | type | `{name}` token substitution at freeze |
+| `internal/modules/documents/application/freeze_service.go` | `FreezeService` | type | `{name}` token substitution at freeze; aborts when values-hash JSON marshaling fails |
+| `internal/modules/documents/domain/values_hash.go:11` | `ComputeValuesHash` | func | Deterministic placeholder-values hash; returns marshal errors instead of hashing nil bytes |
 | `internal/modules/documents/application/fillin_service.go` | `FillinService` | type | Placeholder-value writes |
 | `internal/modules/documents/application/fillin_authz.go:9` | typed `iamdomain.Capability` consts | imports | Cross-ref iam T-001 |
 | `internal/modules/documents/application/cd_initializer.go` | `CDDocumentInitializer` | type | controlled-documents-side hook for atomic CD create |
@@ -182,6 +183,9 @@ Full enumeration in `wiki/modules/documents/_artifacts/01-surface.md` (517 expor
 | `internal/modules/documents/delivery/http/handler.go:958..1009` | `mapErr` | func | Legacy envelope mapping (T-001) |
 | `internal/modules/documents/repository/repository.go:76` | `CreateDocumentTx` impl | func | Tx-scoped CD+document insert (ADR 0011); asserts `document.create` before INSERT and `document.edit` before pointer/snapshot UPDATEs |
 | `internal/modules/documents/repository/repository.go:216` | `UpdateDocumentName` | func | UPDATE inside tx with `authz.Require(CapDocumentEdit)` (T-003 closed Plan 5) |
+| `internal/modules/documents/repository/repository.go:1368` | `MarkArchived` | func | Archive UPDATE inside tx with `authz.Require(CapDocumentEdit)` and non-zero `RowsAffected` enforcement |
+| `internal/modules/documents/repository/repository.go:1399` | `Unarchive` | func | Archive reversal UPDATE inside tx with `authz.Require(CapDocumentEdit)` and non-zero `RowsAffected` enforcement |
+| `internal/modules/documents/repository/snapshot_repository.go:55` | `SnapshotRepository.WriteSnapshot` family | funcs | Snapshot/freeze/final artifact UPDATEs enforce non-zero `RowsAffected` via `requireRowsAffected` |
 | `internal/modules/documents/repository/repository.go:343` | `ListDocumentsPaginated` | func | LIMIT/OFFSET; pageSize cap 50 |
 | `internal/modules/documents/repository/repository.go:376` | `CountDocuments` | func | Sibling COUNT(*) for list |
 | `internal/modules/documents/approval/repository/postgres_approval_repository.go:34` | `InsertInstance` | func | Tripwire-gated INSERT into `approval_instances` |
@@ -210,6 +214,7 @@ Routes registered in `internal/modules/documents/delivery/http/handler.go` and `
 | GET | `/api/v1/documents/{id}/revisions` | â€” | revisions URL handler | role |
 | POST | `/api/v1/documents/{id}/export/pdf` | â€” | `ExportHandler` | role |
 | GET | `/api/v1/documents/{id}/export/docx-url` | â€” | `ExportHandler` | role |
+| POST | `/api/v1/documents/{id}/pdf-complete` | â€” | `PDFWebhookHandler.HandlePDFComplete` (`http/pdf_webhook_handler.go`) | HMAC signature (`X-Docgen-Signature`); canonical tenant resolved server-side by `{id}` and body `tenant_id` rejected when mismatched |
 | POST | `/api/v1/documents/{id}/submit` | â€” | `ApprovalHandler` (`approval/http/router.go`) | tier-2 `document.submit` |
 | POST | `/api/v1/documents/{id}/signoff` | â€” | `ApprovalHandler` | tier-2 `document.signoff` |
 | POST | `/api/v1/documents/{id}/cancel` | â€” | `ApprovalHandler` | tier-2 |
@@ -331,7 +336,7 @@ sequenceDiagram
     C->>H: POST /api/v1/documents/{id}/finalize
     H->>H: hasAnyRole(admin|filler) â€” 403 else
     H->>H: load draft guard (status==draft else 409)
-    H->>H: resolve approval route + content hash (409 if missing)
+    H->>H: resolve approval route + content hash (empty when no revision row; 500 on DB read failure)
     H->>SS: SubmitRevisionForReview(...)
     SS->>DB: BeginTx
     SS->>DB: setAuthzGUC (actor, tenant)
@@ -393,11 +398,11 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 ## 8. Cross-cutting Concepts
 
 ### 8.1 Authentication & Authorization
-- Tier-1 (HTTP edge): role gate via `hasAnyRole(roleAdmin, roleDocumentFiller)` (`handler.go:870`) + ownership (`IsDocumentOwner` `:880`). Role strings `system_admin` / `document_filler` at `handler.go:26, :28`.
+- Tier-1 (HTTP edge): role gate via `hasAnyRole(roleAdmin, roleDocumentFiller)` (`handler.go:870`) + ownership (`IsDocumentOwner` `:880`). Role strings `system_admin` / `document_filler` at `handler.go:26, :28`. `withAdminCtx` and `hasRole` derive roles only from `iamdomain.RolesFromContext`; caller-supplied `X-User-Roles` is not trusted.
 - Tier-2 (in-tx): `authz.Require(ctx, tx, string(iamdomain.CapDocumentSubmit), areaCode)` (`submit_service.go:85`). Capability value `"document.submit"` (Plan 4: previously `"doc.submit"`, closed T-008 / iam T-001).
 - Typed capabilities: `internal/modules/documents/application/fillin_authz.go:9` consumes `iamdomain.Capability` consts. Module now uses typed namespace exclusively (T-008 closed).
 - Capability adapter: `internal/modules/documents/application/ports.go` declares `CapabilityChecker`; impl `capabilityServiceAdapter` at `apps/api/internal/wiring/documents.go:14`; `NewCapabilityChecker` factory at `:24` (ADR 0007 J2 amendment).
-- Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Plan 5 migration `0188_tripwire_extend.sql:196-199` additionally attaches `trg_require_cap_asserted` to `public.documents` (INSERT `CapDocumentCreate`; UPDATE `CapDocumentEdit`). Reads `metaldocs.asserted_caps` GUC set by `setAuthzGUC` (`approval/application/authz_guc.go:11`). **T-003 closed.**
+- Postgres tripwire: `enforce_capability_asserted` function (`migrations/0142b_role_capabilities_v2_enforce.sql:67`), triggers on `approval_instances` (`:201`) and `approval_signoffs` (`:207`). Plan 5 migration `0188_tripwire_extend.sql:196-199` additionally attaches `trg_require_cap_asserted` to `public.documents` (INSERT `CapDocumentCreate`; UPDATE `CapDocumentEdit`). Documents-owned tx paths now seed `metaldocs.tenant_id` + `metaldocs.actor_id` through `iam/authz.SeedTxIdentity(...)` before `authz.Require(...)` appends `metaldocs.asserted_caps`. **T-003 closed.**
 - Sentinel: `iamapp.ErrCapabilityDenied` imported at `handler.go:17`; `authz.ErrCapDenied` (struct) also imported (iam T-009 closed by Plan 4 â€” renamed from `authz.ErrCapabilityDenied`).
 
 ### 8.2 Error envelope
@@ -430,6 +435,7 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 - `SnapshotService` populates `placeholder_schema_snapshot` (ADR 0008; `wiki/concepts/placeholders.md`).
 - Trigger `enforce_snapshot_on_submit_trg` (`migrations/0152_*.sql:47`) blocks `documents.status='under_review'` UPDATE when snapshot is null. Fires in finalize tx (step Â§6.3 box `UPDATE documents`).
 - `FreezeService` performs `{name}` token substitution at freeze (`wiki/concepts/token-syntax.md`).
+- `ComputeValuesHash` sorts placeholder IDs and JSON-marshals every value; marshal failure is returned to `FreezeService` as `compute values_hash` instead of producing a silent hash over missing value bytes.
 - `document_placeholder_values` schema bug surfaced: `revision_id REFERENCES documents(id)` (T-009).
 
 ### 8.8 Artifact metadata
@@ -468,7 +474,9 @@ Target shape: RFC 9457 `application/problem+json` (T-001 backlog R-001).
 | Audit completeness on rename | Crash between UPDATE and audit.Write | **T-005: row mutated, no audit row** â€” fails today |
 | Replay safety on finalize | Client retries finalize with the same `Idempotency-Key` and unchanged payload | Second call replays `201 { instanceId }` with `Idempotent-Replay: true`; mismatched payload under the same key is rejected by the shared idempotency store |
 | Snapshot guard on submit | Submit with null placeholder snapshot | DB trigger `enforce_snapshot_on_submit_trg` raises; 500 surfaces as mapped error |
-| Multi-tenant isolation | Cross-tenant id guessed | Every owned table carries `tenant_id`; repo queries scope (`repository.go:343, :376`) |
+| Values-hash integrity | Placeholder value cannot be JSON-marshaled during freeze | `ComputeValuesHash` returns an error; freeze aborts before persisting `values_hash` |
+| Repository mutation outcome | Archive/unarchive or snapshot/freeze/final artifact UPDATE targets zero rows | Repository returns an error before commit/downstream success instead of silently reporting success |
+| Multi-tenant isolation | Cross-tenant session, pending upload, checkpoint, or revision id guessed | `editor_sessions.tenant_id` migration plus repository tenant filters/joins reject foreign-tenant rows |
 
 ---
 
@@ -501,7 +509,7 @@ Top 3 (by severity, then blast radius):
 | Stage instance | Row in `approval_stage_instances`; materialised approval route stages with `eligible_actor_ids` |
 | Signoff | Row in `approval_signoffs`; per-stage approve/reject |
 | Tripwire | Postgres trigger `enforce_capability_asserted` reading `metaldocs.asserted_caps` GUC |
-| `setAuthzGUC` | Helper at `approval/application/authz_guc.go:11` that primes the GUC for tripwire |
+| `SeedTxIdentity` | Shared IAM authz helper that seeds transaction-local `metaldocs.tenant_id` and `metaldocs.actor_id` before `authz.Require` appends asserted capabilities |
 | `document.submit` | Tier-2 capability string asserted at `submit_service.go:85`; renamed from `doc.submit` in Plan 4 (migration 0186) |
 
 ---
@@ -525,6 +533,12 @@ Top 3 (by severity, then blast radius):
 
 ## Changelog (this doc)
 
+- 2026-05-25 - PDF webhook tenant hardening sync: `POST /api/v1/documents/{id}/pdf-complete` now resolves canonical tenant from `documents.id` and rejects mismatched body `tenant_id` before persisting PDF metadata.
+- 2026-05-25 - Finalize C1/C2 hardening sync: `finalizeDocument` now treats `sql.ErrNoRows` from the `document_revisions` content-hash lookup as an allowed empty hash but fails closed with `500 internal_error` on real DB errors; duplicate document 500 paths no longer echo `err.Error()` in HTTP responses and now log server-side details only.
+- 2026-05-25 - IAM role-header hardening sync: documents HTTP role gates now derive admin/filler roles only from `iamdomain.RolesFromContext`; the prior `X-User-Roles` request-header fallback was removed.
+- 2026-05-25 - Editor-session tenant isolation sync: post-baseline migration `0211_editor_sessions_tenant_id.sql` adds/backfills `editor_sessions.tenant_id`; document create/acquire/presign/commit/session paths and pending/checkpoint/revision repository reads now thread tenant scope and filter by tenant.
+- 2026-05-25 - Values-hash marshal error sync: `ComputeValuesHash` now returns `(string, error)` and propagates JSON marshal failures through `FreezeService`, so unmarshalable placeholder values abort freeze instead of silently producing a hash with omitted value bytes.
+- 2026-05-25 - Repository RowsAffected hardening sync: `MarkArchived`, `Unarchive`, and the `SnapshotRepository` write methods now check `sql.Result.RowsAffected()` and return an error when zero rows are updated, preventing silent success on missing, cross-tenant, or already-target-state document writes.
 - 2026-05-21 - Generated-wrapper mount sync: documents module route mounting now uses `documentsapi.HandlerWithOptions` + `ServerInterfaceWrapper` via a legacy-delegating adapter, replacing manual generated-route enumeration while preserving existing handler behavior and rate-limit wiring.
 - 2026-05-21 - Public route cleanup sync: retired the orphaned `POST /api/v1/documents/{id}/artifact-metadata` HTTP mount from documents handler routing. Artifact metadata remains sourced through autosave commit plus document detail current-head fields; no OpenAPI/frontend contract path exists for the retired endpoint.
 - 2026-05-20 - Deep QA execution sync: canonical `/documents/:id` runtime validation now points to the dedicated wiki reference set under `wiki/references/documents-approval-deep-qa/` (`runbook.md`, `fixtures.md`, `matrix.md`) so future sessions can reuse current startup truth, evidence standards, and fixture-state guidance instead of rediscovering them manually.
@@ -553,4 +567,3 @@ Top 3 (by severity, then blast radius):
 - 2026-05-15 - Novo Documento runtime repair: `CreateDocumentTx` now asserts `document.edit` before the initial pointer/snapshot `documents` UPDATEs so the Plan 5 tripwire accepts atomic blank-template creation.
 
 - 2026-05-10 â€” Full Arc42 + C4 rewrite via `metaldocs-module-doc` skill (Phases 0â€“8). Supersedes prior FE-leaning doc; FE Key files now live under `wiki/architecture/frontend-structure.md` cross-link.
-

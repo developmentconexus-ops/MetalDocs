@@ -47,7 +47,7 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID,
 	return nil
 }
 
-func (r *RoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, roles []domain.Role, _ string) error {
+func (r *RoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, role domain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -56,10 +56,7 @@ func (r *RoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displa
 		rec = userRecord{displayName: displayName, roles: map[domain.Role]bool{}}
 	}
 	rec.displayName = displayName
-	rec.roles = map[domain.Role]bool{}
-	for _, role := range roles {
-		rec.roles[role] = true
-	}
+	rec.roles = map[domain.Role]bool{role: true}
 	r.users[userID] = rec
 	return nil
 }

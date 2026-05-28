@@ -16,9 +16,17 @@ type ConvertPDFRequest struct {
 	RenderOpts *PDFRenderOpts `json:"render_opts,omitempty"`
 }
 
+type PaperSize string
+
+const (
+	PaperSizeA4     PaperSize = "A4"
+	PaperSizeLetter PaperSize = "Letter"
+	PaperSizeLegal  PaperSize = "Legal"
+)
+
 type PDFRenderOpts struct {
-	PaperSize string `json:"paper_size,omitempty"`
-	Landscape bool   `json:"landscape,omitempty"`
+	PaperSize PaperSize `json:"paper_size,omitempty"`
+	Landscape bool      `json:"landscape,omitempty"`
 }
 
 type ConvertPDFResult struct {
@@ -41,14 +49,14 @@ func (c *DocgenV2Client) ConvertPDF(ctx context.Context, req ConvertPDFRequest) 
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/convert/pdf", bytes.NewReader(body))
 	if err != nil {
-		return zero, err
+		return zero, fmt.Errorf("docgen v2 client: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("X-Service-Token", c.token)
 
 	resp, err := c.http.Do(httpReq)
 	if err != nil {
-		return zero, err
+		return zero, fmt.Errorf("docgen v2 client: %w", err)
 	}
 	defer resp.Body.Close()
 

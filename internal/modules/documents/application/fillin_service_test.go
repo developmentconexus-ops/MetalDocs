@@ -188,3 +188,21 @@ func TestFillInService_UserPlaceholder_UnknownUser_Returns422(t *testing.T) {
 		t.Fatalf("expected ErrValidationFailed, got %v", err)
 	}
 }
+
+func TestFillInService_GetPlaceholderValues_RequiresReader(t *testing.T) {
+	svc := NewFillInServiceNoAuthz(fakeSchemaReader{}, &fakeFillInWriter{})
+
+	_, err := svc.GetPlaceholderValues(context.Background(), "tenant", "doc")
+	if err == nil {
+		t.Fatal("expected configuration error")
+	}
+}
+
+func TestFillInService_GetFillInSchema_RequiresSchemaReader(t *testing.T) {
+	svc := NewFillInServiceNoAuthz(fakeSchemaReader{}, &fakeFillInWriter{})
+
+	_, err := svc.GetFillInSchema(context.Background(), "tenant", "doc")
+	if err == nil {
+		t.Fatal("expected configuration error")
+	}
+}

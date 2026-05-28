@@ -8,7 +8,7 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 )
 
-func StartOrphanPendingSweeper(ctx context.Context, r *repository.Repository, interval time.Duration) (stop func()) {
+func StartOrphanPendingSweeper(ctx context.Context, r *repository.Repository, interval, maxAge time.Duration) (stop func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -18,7 +18,7 @@ func StartOrphanPendingSweeper(ctx context.Context, r *repository.Repository, in
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				cutoff := time.Now().Add(-24 * time.Hour)
+				cutoff := time.Now().UTC().Add(-maxAge)
 				n, err := r.DeleteExpiredPending(ctx, cutoff)
 				if err != nil {
 					log.Printf("orphan_pending_sweeper error: %v", err)

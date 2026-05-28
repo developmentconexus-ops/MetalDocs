@@ -1,11 +1,14 @@
 # Documents + Approval Deep QA
 
-**Last verified:** 2026-05-20
+> **Compatibility page**
+> **Last verified:** 2026-05-27
 
-This folder holds the execution truth for deep QA on the modern `documents + approval` flow.
+The canonical deep-QA artifact set now lives under [../../quality/deep-qa/index.md](../../quality/deep-qa/index.md).
 
-- [runbook.md](runbook.md) - operational session workflow, runtime ownership, evidence recipes, stop rules, and close-out checklist
-- [fixtures.md](fixtures.md) - reusable and consumable fixture catalog for runtime QA states
-- [matrix.md](matrix.md) - scenario coverage matrix with proof standards, ownership boundaries, and execution status fields
+Use the canonical pages there:
 
-Use this folder when a session needs to validate canonical `/documents/:id`, approval lifecycle behavior, OCC, authz, or worker-owned scheduled publish without rebuilding the QA method from memory.
+- [../../quality/deep-qa/runbook.md](../../quality/deep-qa/runbook.md)
+- [../../quality/deep-qa/fixtures.md](../../quality/deep-qa/fixtures.md)
+- [../../quality/deep-qa/matrix.md](../../quality/deep-qa/matrix.md)
+
+This folder remains path-stable for existing prompts, startup docs, and module links.

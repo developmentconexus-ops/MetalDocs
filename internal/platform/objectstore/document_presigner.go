@@ -45,7 +45,7 @@ func (p *DocumentPresigner) PresignRevisionPUT(ctx context.Context, tenantID, do
 	key := fmt.Sprintf("tenants/%s/documents/%s/revisions/%s.docx", tenantID, docID, contentHash)
 	u, err := p.signingClient.PresignedPutObject(ctx, p.bucket, key, p.ttl)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("presign: %w", err)
 	}
 	return u.String(), key, nil
 }
@@ -56,7 +56,7 @@ func (p *DocumentPresigner) PresignObjectGET(ctx context.Context, storageKey str
 	}
 	u, err := p.signingClient.PresignedGetObject(ctx, p.bucket, storageKey, p.ttl, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("presign: %w", err)
 	}
 	return u.String(), nil
 }
@@ -74,7 +74,7 @@ func (p *DocumentPresigner) AdoptTempObject(ctx context.Context, tmpKey, finalKe
 		Object: finalKey,
 	}
 	if _, err := p.client.CopyObject(ctx, dst, src); err != nil {
-		return err
+		return fmt.Errorf("presign: %w", err)
 	}
 	if err := p.client.RemoveObject(ctx, p.bucket, tmpKey, minio.RemoveObjectOptions{}); err != nil && !isNoSuchKeyErr(err) {
 		log.Printf("objectstore: adopt tmp cleanup failed for key=%s: %v", tmpKey, err)
@@ -90,7 +90,10 @@ func (p *DocumentPresigner) DeleteObject(ctx context.Context, key string) error 
 	if isNoSuchKeyErr(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("presign: %w", err)
+	}
+	return nil
 }
 
 func (p *DocumentPresigner) HashObject(ctx context.Context, key string) (string, error) {
@@ -103,7 +106,7 @@ func (p *DocumentPresigner) HashObject(ctx context.Context, key string) (string,
 		if isNoSuchKeyErr(err) {
 			return "", domain.ErrUploadMissing
 		}
-		return "", err
+		return "", fmt.Errorf("presign: %w", err)
 	}
 	defer obj.Close()
 
@@ -111,7 +114,7 @@ func (p *DocumentPresigner) HashObject(ctx context.Context, key string) (string,
 		if isNoSuchKeyErr(err) {
 			return "", domain.ErrUploadMissing
 		}
-		return "", err
+		return "", fmt.Errorf("presign: %w", err)
 	}
 
 	h := sha256.New()
@@ -124,7 +127,7 @@ func (p *DocumentPresigner) HashObject(ctx context.Context, key string) (string,
 		if isNoSuchKeyErr(err) {
 			return "", domain.ErrUploadMissing
 		}
-		return "", err
+		return "", fmt.Errorf("presign: %w", err)
 	}
 	if n > limit {
 		return "", fmt.Errorf("object exceeds max size (%d bytes)", limit)
@@ -143,7 +146,7 @@ func (p *DocumentPresigner) Exists(ctx context.Context, key string) (bool, error
 	if isNoSuchKeyErr(err) {
 		return false, nil
 	}
-	return false, err
+	return false, fmt.Errorf("presign: %w", err)
 }
 
 func isNoSuchKeyErr(err error) bool {

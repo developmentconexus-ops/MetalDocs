@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type AuditAction string
 
@@ -26,4 +29,25 @@ type AuditEvent struct {
 	Action     AuditAction
 	Details    map[string]any
 	OccurredAt time.Time
+}
+
+func NewAuditEvent(tenantID, templateID, actorID string, versionID *string, action AuditAction, details map[string]any, occurredAt time.Time) (AuditEvent, error) {
+	if tenantID == "" {
+		return AuditEvent{}, errors.New("audit event: tenantID required")
+	}
+	if templateID == "" {
+		return AuditEvent{}, errors.New("audit event: templateID required")
+	}
+	if actorID == "" {
+		return AuditEvent{}, errors.New("audit event: actorID required")
+	}
+	return AuditEvent{
+		TenantID:   tenantID,
+		TemplateID: templateID,
+		VersionID:  versionID,
+		ActorID:    actorID,
+		Action:     action,
+		Details:    details,
+		OccurredAt: occurredAt,
+	}, nil
 }

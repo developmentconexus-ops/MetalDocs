@@ -8,9 +8,9 @@ import (
 type DocumentStatus string
 
 const (
-	DocStatusDraft     DocumentStatus = "draft"
-	DocStatusFinalized DocumentStatus = "under_review" // migration 0142 removed draft→finalized; submit = under_review
-	DocStatusArchived  DocumentStatus = "archived"
+	DocStatusDraft       DocumentStatus = "draft"
+	DocStatusUnderReview DocumentStatus = "under_review" // migration 0142 removed draft→finalized; submit = under_review
+	DocStatusArchived    DocumentStatus = "archived"
 )
 
 type SessionStatus string

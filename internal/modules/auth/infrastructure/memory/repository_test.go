@@ -2,6 +2,9 @@ package memory
 
 import (
 	"context"
+	"errors"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -57,13 +60,13 @@ func TestCreateAndFindSession_PreservesRoundTrip(t *testing.T) {
 	ctx := context.Background()
 
 	session := authdomain.Session{
-		SessionID: "test-session-id",
-		UserID:    "test-user-id",
-		TenantID:  "t1",
-		CreatedAt: mustParseTime(t, "2025-05-11T08:00:00Z"),
-		ExpiresAt: mustParseTime(t, "2025-05-12T08:00:00Z"),
-		IPAddress: "192.0.2.1",
-		UserAgent: "Test Agent",
+		SessionID:  "test-session-id",
+		UserID:     "test-user-id",
+		TenantID:   "t1",
+		CreatedAt:  mustParseTime(t, "2025-05-11T08:00:00Z"),
+		ExpiresAt:  mustParseTime(t, "2025-05-12T08:00:00Z"),
+		IPAddress:  "192.0.2.1",
+		UserAgent:  "Test Agent",
 		LastSeenAt: mustParseTime(t, "2025-05-11T08:00:00Z"),
 	}
 
@@ -84,5 +87,176 @@ func TestCreateAndFindSession_PreservesRoundTrip(t *testing.T) {
 	}
 	if found.UserID != "test-user-id" {
 		t.Errorf("UserID mismatch: got %q, want %q", found.UserID, "test-user-id")
+	}
+}
+
+func TestSessionMutations_UnknownSessionReturnsNotFound(t *testing.T) {
+	repo := NewRepository()
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "touch",
+			run: func() error {
+				return repo.TouchSession(ctx, "missing-session", now)
+			},
+		},
+		{
+			name: "revoke",
+			run: func() error {
+				return repo.RevokeSession(ctx, "missing-session", now)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.run(); !errors.Is(err, authdomain.ErrSessionNotFound) {
+				t.Fatalf("expected ErrSessionNotFound, got %v", err)
+			}
+		})
+	}
+}
+
+func TestTouchSession_UsesGraceWindow(t *testing.T) {
+	repo := NewRepository()
+	ctx := context.Background()
+	created := mustParseTime(t, "2026-05-25T12:00:00Z")
+	session := authdomain.Session{
+		SessionID:  "session-1",
+		UserID:     "user-1",
+		TenantID:   "tenant-1",
+		CreatedAt:  created,
+		ExpiresAt:  created.Add(time.Hour),
+		LastSeenAt: created,
+	}
+	if err := repo.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	withinGrace := created.Add(29 * time.Second)
+	if err := repo.TouchSession(ctx, session.SessionID, withinGrace); err != nil {
+		t.Fatalf("TouchSession within grace: %v", err)
+	}
+	found, err := repo.FindSession(ctx, session.SessionID)
+	if err != nil {
+		t.Fatalf("FindSession: %v", err)
+	}
+	if !found.LastSeenAt.Equal(created) {
+		t.Fatalf("LastSeenAt updated within grace: got %v, want %v", found.LastSeenAt, created)
+	}
+
+	afterGrace := created.Add(31 * time.Second)
+	if err := repo.TouchSession(ctx, session.SessionID, afterGrace); err != nil {
+		t.Fatalf("TouchSession after grace: %v", err)
+	}
+	found, err = repo.FindSession(ctx, session.SessionID)
+	if err != nil {
+		t.Fatalf("FindSession after grace: %v", err)
+	}
+	if !found.LastSeenAt.Equal(afterGrace) {
+		t.Fatalf("LastSeenAt = %v, want %v", found.LastSeenAt, afterGrace)
+	}
+}
+
+func TestRecordFailedLogin_ConcurrentIncrementsAndLockout(t *testing.T) {
+	cases := []struct {
+		name            string
+		concurrentFails int
+		maxAttempts     int
+		wantLocked      bool
+	}{
+		{
+			name:            "below-threshold",
+			concurrentFails: 2,
+			maxAttempts:     3,
+			wantLocked:      false,
+		},
+		{
+			name:            "at-threshold",
+			concurrentFails: 4,
+			maxAttempts:     3,
+			wantLocked:      true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := NewRepository()
+			ctx := context.Background()
+			userID := "concurrent-fail-user"
+
+			if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+				UserID:       userID,
+				Username:     userID,
+				Email:        "concurrent@example.com",
+				DisplayName:  "Concurrent Fail User",
+				PasswordHash: "hash",
+				PasswordAlgo: "bcrypt",
+				IsActive:     true,
+			}); err != nil {
+				t.Fatalf("CreateUser: %v", err)
+			}
+
+			start := make(chan struct{})
+			results := make(chan int, tc.concurrentFails)
+			errs := make(chan error, tc.concurrentFails)
+			var wg sync.WaitGroup
+			for i := 0; i < tc.concurrentFails; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					<-start
+					attempts, _, err := repo.RecordFailedLogin(ctx, userID, tc.maxAttempts, 600)
+					if err != nil {
+						errs <- err
+						return
+					}
+					results <- attempts
+				}()
+			}
+			close(start)
+			wg.Wait()
+			close(results)
+			close(errs)
+
+			for err := range errs {
+				if err != nil {
+					t.Fatalf("RecordFailedLogin: %v", err)
+				}
+			}
+
+			attempts := make([]int, 0, tc.concurrentFails)
+			for attempt := range results {
+				attempts = append(attempts, attempt)
+			}
+			if len(attempts) != tc.concurrentFails {
+				t.Fatalf("expected %d successful updates, got %d", tc.concurrentFails, len(attempts))
+			}
+			sort.Ints(attempts)
+			for i, attempt := range attempts {
+				if want := i + 1; attempt != want {
+					t.Fatalf("attempt sequence mismatch: got %v, want 1..%d", attempts, tc.concurrentFails)
+				}
+			}
+
+			identity, err := repo.FindIdentityByUserID(ctx, userID)
+			if err != nil {
+				t.Fatalf("FindIdentityByUserID: %v", err)
+			}
+			if identity.FailedLoginAttempts != tc.concurrentFails {
+				t.Fatalf("failed login attempts mismatch: got %d, want %d", identity.FailedLoginAttempts, tc.concurrentFails)
+			}
+			if tc.wantLocked && identity.LockedUntil == nil {
+				t.Fatal("expected lockout to be set")
+			}
+			if !tc.wantLocked && identity.LockedUntil != nil {
+				t.Fatalf("expected no lockout, got %v", identity.LockedUntil)
+			}
+		})
 	}
 }

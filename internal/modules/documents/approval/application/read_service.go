@@ -10,6 +10,8 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // InboxView is the read-model projection for the inbox UI.
@@ -34,13 +36,34 @@ func newReadService(repo repository.ApprovalRepository) *ReadService {
 	return &ReadService{repo: repo}
 }
 
+// Read methods intentionally use default (read-write) transactions because
+// repository stage loads may use SELECT ... FOR UPDATE on approval rows.
+
 // LoadInstance loads a single approval instance by ID for the given tenant.
-func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, actorID, instanceID string) (*domain.Instance, error) {
+func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, instanceID string) (*domain.Instance, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("read load instance: begin tx: %w", err)
 	}
 	defer tx.Rollback()
+
+	actorID := iamdomain.UserIDFromContext(ctx)
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("read load instance: %w", err)
+	}
+
+	areaCode, err := loadInstanceAreaCode(ctx, tx, tenantID, instanceID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrNoActiveInstance
+		}
+		return nil, fmt.Errorf("read load instance: load area: %w", err)
+	}
+
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), areaCode); err != nil {
+		return nil, err
+	}
 
 	inst, err := s.repo.LoadInstance(ctx, tx, tenantID, instanceID)
 	if err != nil {
@@ -67,6 +90,21 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.
 	}
 	defer tx.Rollback()
 
+	actorID := iamdomain.UserIDFromContext(ctx)
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("read load instance by document: %w", err)
+	}
+
+	areaCode, err := loadDocumentAreaCode(ctx, tx, tenantID, documentID)
+	if err != nil {
+		return nil, fmt.Errorf("read load instance by document: load area: %w", err)
+	}
+
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), areaCode); err != nil {
+		return nil, err
+	}
+
 	inst, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -80,6 +118,38 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("read load instance by document: commit tx: %w", err)
+	}
+	return inst, nil
+}
+
+// LoadActiveInstanceByDocumentForMutation finds the current active approval
+// instance for a document without enforcing read-capability checks.
+// Mutation services enforce their own capability gates (e.g. signoff/cancel).
+func (s *ReadService) LoadActiveInstanceByDocumentForMutation(ctx context.Context, db *sql.DB, tenantID, documentID string) (*domain.Instance, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("mutation load instance by document: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	actorID := iamdomain.UserIDFromContext(ctx)
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("mutation load instance by document: %w", err)
+	}
+
+	inst, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrNoActiveInstance
+		}
+		return nil, err
+	}
+	if inst == nil {
+		return nil, repository.ErrNoActiveInstance
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("mutation load instance by document: commit tx: %w", err)
 	}
 	return inst, nil
 }
@@ -160,7 +230,17 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 		return nil, fmt.Errorf("list inbox: marshal actor: %w", err)
 	}
 
-	rows, err := db.QueryContext(ctx, `
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list inbox: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("list inbox: %w", err)
+	}
+
+	rows, err := tx.QueryContext(ctx, `
 		SELECT
 			ai.id,
 			ai.document_id,
@@ -181,6 +261,7 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 				FROM approval_signoffs s
 				WHERE s.approval_instance_id = ai.id
 				  AND s.stage_instance_id = asi.id
+				  AND s.actor_tenant_id = ai.tenant_id
 				  AND s.decision = 'approve'
 			), 0) AS signed
 		FROM approval_instances ai
@@ -200,7 +281,6 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 	if err != nil {
 		return nil, fmt.Errorf("list inbox: query: %w", err)
 	}
-	defer rows.Close()
 
 	var items []InboxView
 	for rows.Next() {
@@ -211,12 +291,20 @@ func (s *ReadService) ListInboxItems(ctx context.Context, db *sql.DB, tenantID, 
 			&v.AreaCode, &v.SubmittedBy, &v.SubmittedAt,
 			&v.StageLabel, &required, &signed,
 		); err != nil {
+			rows.Close()
 			return nil, fmt.Errorf("list inbox: scan: %w", err)
 		}
 		v.QuorumProgress = fmt.Sprintf("%d/%d", signed, required)
 		items = append(items, v)
 	}
-	return items, rows.Err()
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list inbox: rows: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("list inbox: commit: %w", err)
+	}
+	return items, nil
 }
 
 // CountPendingForActor returns the total number of pending approval instances
@@ -227,8 +315,18 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, db *sql.DB, tena
 		return 0, fmt.Errorf("count pending: marshal actor: %w", err)
 	}
 
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("count pending: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return 0, fmt.Errorf("count pending: %w", err)
+	}
+
 	var total int
-	err = db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		SELECT COUNT(DISTINCT ai.id)
 		FROM approval_instances ai
 		JOIN approval_stage_instances asi
@@ -243,5 +341,35 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, db *sql.DB, tena
 	if err != nil {
 		return 0, fmt.Errorf("count pending: query: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("count pending: commit: %w", err)
+	}
 	return total, nil
+}
+
+func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) (string, error) {
+	var areaCode string
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(asi.area_code_snapshot, d.process_area_code_snapshot, cd.process_area_code, 'tenant')
+		  FROM approval_instances ai
+		  JOIN documents d
+		    ON d.id = ai.document_id
+		   AND d.tenant_id = ai.tenant_id
+		  LEFT JOIN controlled_documents cd
+		    ON cd.id = d.controlled_document_id
+		  LEFT JOIN approval_stage_instances asi
+		    ON asi.approval_instance_id = ai.id
+		   AND asi.status = 'active'
+		 WHERE ai.id = $1
+		   AND ai.tenant_id = $2
+		 LIMIT 1`,
+		instanceID, tenantID,
+	).Scan(&areaCode)
+	if err != nil {
+		return "", err
+	}
+	if areaCode == "" {
+		return "tenant", nil
+	}
+	return areaCode, nil
 }

@@ -12,6 +12,12 @@ func (ApproversResolver) Key() string  { return "approvers" }
 func (ApproversResolver) Version() int { return 1 }
 
 func (ApproversResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if err := requireTenantID("approvers", in.TenantID); err != nil {
+		return ResolvedValue{}, err
+	}
+	if err := requireRevisionID("approvers", in.RevisionID); err != nil {
+		return ResolvedValue{}, err
+	}
 	approvers, err := in.WorkflowReader.GetApprovers(ctx, in.TenantID, in.RevisionID, in.ApprovalInstanceID)
 	if err != nil {
 		return ResolvedValue{}, err
@@ -31,9 +37,10 @@ func (ApproversResolver) Resolve(ctx context.Context, in ResolveInput) (Resolved
 	}
 
 	inputsHash, err := hashInputs(struct {
-		TenantID   string `json:"tenant_id"`
-		RevisionID string `json:"revision_id"`
-	}{in.TenantID, in.RevisionID})
+		TenantID           TenantID           `json:"tenant_id"`
+		RevisionID         RevisionID         `json:"revision_id"`
+		ApprovalInstanceID ApprovalInstanceID `json:"approval_instance_id"`
+	}{in.TenantID, in.RevisionID, in.ApprovalInstanceID})
 	if err != nil {
 		return ResolvedValue{}, err
 	}
