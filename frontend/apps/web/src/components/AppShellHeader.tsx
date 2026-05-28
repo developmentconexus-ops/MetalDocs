@@ -10,13 +10,14 @@ type AppShellHeaderProps = {
 
 export function AppShellHeader(props: AppShellHeaderProps) {
   const pendingNotifications = props.notifications.filter((item) => item.status !== "READ").length;
+  const tenantLabel = props.user.tenantName || props.user.tenantId || "tenant indefinido";
 
   return (
     <header className="hero">
       <div>
         <p className="eyebrow">MetalDocs Control Room</p>
         <h1>Operacao documental profissional com identidade real.</h1>
-        <p className="hero-copy">Usuario atual: {props.user.displayName} ({props.user.username}) - roles: {props.currentUserRoles.join(", ") || "sem role"}.</p>
+        <p className="hero-copy">Usuario atual: {props.user.displayName} ({props.user.username}) - tenant: {tenantLabel} - roles: {props.currentUserRoles.join(", ") || "sem role"}.</p>
       </div>
       <div className="hero-panel">
         <span>Runtime</span>

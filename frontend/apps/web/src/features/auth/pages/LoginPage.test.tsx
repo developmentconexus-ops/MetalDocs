@@ -72,7 +72,7 @@ describe('LoginPage', () => {
     useAuthStore.setState({
       authState: 'ready',
       user: {
-        userId: '1', username: 'admin', email: 'a@b.com',
+        userId: '1', tenantId: 'ffffffff-ffff-ffff-ffff-ffffffffffff', tenantName: 'System Tenant', username: 'admin', email: 'a@b.com',
         displayName: 'Admin', mustChangePassword: true, roles: [],
       },
     });
