@@ -243,10 +243,6 @@ export function Component() {
           <div className={styles.sideSection}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionTitle}>§ MURMÚRIOS</span>
-              <div className={styles.liveBadge}>
-                <span className={styles.liveDot} />
-                ao vivo
-              </div>
             </div>
             <div className={styles.activityList}>
               <span className={styles.activityLine} />
