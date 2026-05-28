@@ -96,6 +96,33 @@ Stop and report (do not patch) when a fix requires: public API redesign affectin
 - Record validation commands, runtime Preview proof, persisted/API proof, classified findings + disposition, explicit bounded defers linked to the right wiki location.
 - Update owning `wiki/modules/<module>.md` `Last verified:` when code truth changed. Dispatch `wiki-curator` for structural change.
 
+## Pipeline mode (optional — subagent delegation)
+
+Default flow is single-session: the main thread runs every gate itself. **Pipeline mode** is opt-in for screens with a large investigation/contract surface, to keep the main context clean. The main session always stays the **orchestrator** — it owns Gate 3 (the live Preview drive cannot be delegated), final classification, and closure. Subagents do bounded, returnable work only.
+
+**When to use pipeline vs single-session (lite):**
+- Lite (default): small screen, narrow surface, ≤2 files likely touched.
+- Pipeline: broad code/contract surface, multi-module suspicion, or Gate 0 contract truth is non-obvious.
+
+**Gate → agent mapping (each subagent returns a report; main verifies before acting):**
+
+| Gate / phase | Agent | Scope handed over | Returns |
+|---|---|---|---|
+| 0 scope + locate | `cavecrew-investigator` (or `Explore`) | route ownership, owning page/components, contract surface — read-only | file:line table |
+| 0/4 contract + boundary | `ecc:architect` / `ecc:code-architect` | "which boundary owns this behavior; is the fix local or shared?" — read-only | boundary verdict + minimum-fix shape |
+| 2 review | `ecc:code-reviewer` (+ `ecc:typescript-reviewer`/`react-reviewer`/`go-reviewer` by language) | the diff on the QA branch | severity-tagged findings |
+| 4 root fix (bounded) | `cavecrew-builder` | a **single, fully-specified** edit with file:line + exact change | caveman diff receipt |
+| 5 regression | `ecc:e2e-runner` only if a Playwright suite is in scope; else main runs tsc+vitest | — | pass/fail |
+
+**Non-delegable (main session only):**
+- Gate 3 Preview drive (`preview_*`) — live browser truth must be exercised by the orchestrator.
+- Final finding classification (family + severity) and disposition.
+- Closure / evidence sign-off and the wiki `Last verified:` bump.
+
+**Trust-but-verify (hard rule):** a subagent report states intent, not ground truth. Before acting on any subagent claim — especially "X is unwired / wired / already fixed / drift exists" — re-verify with a direct read or grep. A compacted or delegated summary has produced false wiki-drift claims before; never propagate one into the wiki. Builder diffs are verified by reading the actual change, not the receipt.
+
+**Hand-over rule:** never delegate understanding. Give a builder the exact file:line and change, not "fix the bug". Give an investigator the question, not prescribed steps.
+
 ## Branch + commit convention
 
 - Branch `qa/<screen-slug>` from `main`. One screen per branch.
@@ -139,5 +166,6 @@ Return this structure. Closure requires evidence, not confidence.
 - [ ] Hard-stops reported, not patched
 - [ ] Evidence recorded (commands + runtime + persisted/API)
 - [ ] Wiki `Last verified:` bumped where code truth changed
+- [ ] (pipeline mode) Every subagent claim re-verified by direct read/grep before acting; no delegated "fact" propagated unchecked
 
 Stop if `wiki/quality/qa-operating-system.md` or `wiki/quality/screen-qa-checklist.md` is missing — those are the canonical grounding.
