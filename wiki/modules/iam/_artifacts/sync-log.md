@@ -1,3 +1,13 @@
+## 2026-05-26 - Wave 2 authz tx seeding sync
+
+- **Context:** uncommitted diff for Wave 2 shared authz transaction seeding across `internal/modules/iam/{authz,application,infrastructure/postgres}` plus documents tx-owner consumers.
+- **Mode:** lite patch
+- **Affected surface scan:** `authz/context.go`; `application/area_membership_service.go`; `infrastructure/postgres/user_area_repository.go`; targeted IAM authz/application/postgres tests.
+- **Facts updated:** IAM now exposes shared `authz.SeedTxIdentity(...)` for transaction-local actor/tenant seeding; area-membership writes use it before `authz.Require(...)`; revoke now passes the acting user into repository-owned tx authz.
+- **T/R rows touched:** T-004 evidence refreshed only; no status change.
+- **Preflight/tally:** preflight attempted; Git Bash tally failed before doc edits with Windows `CreateFileMapping` error 5.
+- **Patched files:** `wiki/modules/iam.md`; `wiki/modules/iam-tech-debt.md`; `wiki/modules/iam/_artifacts/sync-log.md`.
+
 # IAM module doc - sync log
 
 One line per `metaldocs-module-doc-sync` run. Append-only.

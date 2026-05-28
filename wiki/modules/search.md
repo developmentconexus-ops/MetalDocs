@@ -1,6 +1,6 @@
 # Module: search
 
-> **Last verified:** 2026-05-13
+> **Last verified:** 2026-05-26
 > **Status:** active (limited surface)
 > **Maturity:** L2
 > **Scope:** Cross-module search across templates, controlled documents, document versions.
@@ -12,6 +12,8 @@
 ## Approach
 
 V2 reader joins source-of-truth tables on read rather than maintaining a denormalized search index. This trades a bit of query cost for zero-staleness â€” search results always reflect the live state.
+
+As of 2026-05-26, the `public.documents` reader is intentionally bounded to fields that exist in the live runtime schema and are explicitly selected/scanned by `internal/modules/search/infrastructure/v2documents/reader.go`: title, profile/type, family, process area, subject, owner, business unit, department, classification, tags, code/sequence, status, effective/expiry dates, and created-at ordering. The service now pages through SQL batches before trimming to the caller's limit so authorization filtering cannot silently drop later authorized matches just because earlier rows were denied, and area-policy evaluation continues to use the live `businessUnit:department` resource key instead of a partially hydrated surrogate.
 
 ## Indexed entities
 

@@ -1,12 +1,12 @@
 # Backlog: Novo-Documento Wizard
 
-> **Last verified:** 2026-05-14 (Plan 12.3 integration audit + screen-local sync)
+> **Last verified:** 2026-05-28 (runtime QA pass post-PC-reset; happy path live-validated for `company` + `restricted` area scope, blank template real)
 > **Scope:** Deferred items for the 4-step wizard at `/documents/new` (`NewDocumentWizardPage`). Each item corresponds to a `TODO(novo-documento:*)` comment in code.
 > **Out of scope:** Library screen deferrals (`backlog/library-screen.md`), editor deferrals (`backlog/editor.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx:146` — `handleCreate` — single-call atomic submit via `createControlledDocumentAtomic`
-> - `frontend/apps/web/src/features/documents/lib/visibilityMeta.ts:1` — visibility SSOT; top-of-file TODO notes backend prereq
-> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — blank-template disabled state
+> - `frontend/apps/web/src/features/documents/pages/NewDocumentWizardPage.tsx` — `handleCreate` + `buildVisibilityPayload` — single-call atomic submit via `createControlledDocumentAtomic`, visibility persisted
+> - `frontend/apps/web/src/features/documents/lib/visibilityMeta.ts:1` — visibility SSOT
+> - `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx:1` — blank-template real path via `blankTemplate.templateVersionId` (`/api/v1/templates/system/blank`)
 > - `frontend/apps/web/src/features/documents/components/wizard/CodePreviewBanner.tsx:1` — live preview endpoint wiring + fallback state
 
 ---
@@ -17,59 +17,65 @@
 
 ---
 
-## Integration Audit (2026-05-14)
+## Integration Audit (2026-05-28 runtime QA)
+
+Runtime evidence from 2026-05-28 live browser pass (post-PC-reset, API `:8081`, web `:4173`):
+
+- Created `PO-RH-003` (`a6bbd237-7210-42f5-9359-3e3523ba065b`, controlled-doc `4a3e9eb9-5c3c-445e-9814-a5f8c36634a6`) with `visibility=company`. Editor opened at `/documents/<id>/edit`.
+- Created `PO-RH-004` (`ec71a499-58d2-4925-a758-fab175c4b514`) with restricted-area scope `Recursos Humanos`. Editor metadata showed `Restrito a area Recursos Humanos`.
+- `GET /api/v1/controlled-documents/preview-code?profileCode=po&areaCode=rh` → `PO-RH-003`.
+- `GET /api/v1/templates/system/blank` → `templateId=00000000-0000-0000-0000-000000000101`, `templateVersionId=00000000-0000-0000-0000-000000000102` (real blank-template path).
 
 | Item | Source | Runtime/API reality | Frontend reality | Classification | Action |
 |---|---|---|---|---|---|
-| Step 1 profile cards | design + current screen | `GET /api/v1/taxonomy/profiles` exists and is already wired through `useProfilesQuery` | Real cards render from live data | implemented and aligned | keep |
+| Step 1 profile cards | design + current screen | `GET /api/v1/taxonomy/profiles` exists, wired via `useProfilesQuery` | Real cards render from live data | implemented and aligned | keep |
 | Step 1 profile count badge | design + backlog `profile-counts` | profiles response has no document-count field | UI shows `—` placeholder only | missing backend capability | keep deferred in backlog |
-| Step 2 area selector + title | design + current screen | `GET /api/v1/taxonomy/areas` exists and atomic create request accepts `processAreaCode` + `title` | Real selector/input gate progression | implemented and aligned | keep |
-| Step 2 code preview | design + backlog `sequence-preview` | `GET /api/v1/controlled-documents/preview-code` exists in runtime/spec/frontend wrapper | Step 2 banner already uses the real preview endpoint | implemented and aligned | keep closed |
-| Step 2 visibility radios | design + backlog `visibility` | no persisted `visibility` field or sharing endpoints exist on create | UI captures local state only, not submitted | missing backend capability | keep deferred in backlog |
-| Step 2 people/external subcontrols | design + backlog `visibility` | no invitee/external-share endpoints exist | rendered disabled with `Em breve` state | missing backend capability | keep deferred in backlog |
-| Step 3 template list | design + current screen | `GET /api/v1/templates?doc_type=...` exists and returns published version IDs | real list is wired and selectable | implemented and aligned | keep |
-| Step 3 per-version picker | design + backlog `template-versions` | no versions-list route is available for the wizard to enumerate template versions | wizard exposes only published-version selection | defer | preserve backlog item |
-| Step 3 blank template | design + backlog `blank-template` | atomic create still requires a valid `templateVersionId` | blank card stays disabled | missing backend capability | preserve backlog item |
-| Step 4 summary card | design + current screen | preview endpoint and selected template are available by Step 4 | summary was partially wired and needed real code/template sync | screen-local integration fix | implement in this PR |
-| Step 4 create action | design + current screen | `POST /api/v1/controlled-documents` exists, but runtime smoke returned `500 INTERNAL_ERROR` for a valid atomic-create request | wizard submits via `createControlledDocumentAtomic`; UI now surfaces the backend failure honestly | shared contract prerequisite | preserve blocker; no backend change in this PR |
-| Template query/preview disabled-key wiring | frontend-only audit | no shared contract issue; purely local TanStack Query key usage | disabled queries used sentinel-style keys | screen-local integration fix | normalize in this PR |
+| Step 2 area selector + title | design + current screen | `GET /api/v1/taxonomy/areas` + atomic create accepts `processAreaCode` + `title` | Real selector/input gate progression | implemented and aligned | keep |
+| Step 2 code preview | design + backlog `sequence-preview` | `GET /api/v1/controlled-documents/preview-code` returns real next code | Banner shows live preview | implemented and aligned | keep closed |
+| Step 2 visibility — `company` | design + backlog `visibility` | `visibility` accepted by atomic create, persisted on `controlled_documents` | submitted + persisted | implemented and aligned | move to closed |
+| Step 2 visibility — `area` / restricted-area scope | design + backlog `visibility` | atomic create accepts `visibilityAreaCodes`; restricted-area visibility persisted (editor metadata reflects it) | submitted + persisted | implemented and aligned | move to closed |
+| Step 2 visibility — `people` / external subcontrols | design + backlog `visibility` | no invitee/external-share endpoints exist | rendered with `Em breve` for unsupported subcontrols | missing backend capability | keep deferred |
+| Step 3 template list | design + current screen | `GET /api/v1/templates?doc_type=...` returns published version IDs | real list wired and selectable | implemented and aligned | keep |
+| Step 3 per-version picker | design + backlog `template-versions` | no versions-list route for the wizard | wizard exposes only published-version selection | defer | preserve backlog item |
+| Step 3 blank template | design + backlog `blank-template` | `GET /api/v1/templates/system/blank` returns real sentinel; atomic create accepts that `templateVersionId` | blank card selectable, real submit | implemented and aligned | move to closed |
+| Step 4 summary card | design + current screen | preview endpoint + selected template available by Step 4 | summary mirrors real preview code + template | implemented and aligned | keep |
+| Step 4 create action | design + current screen | `POST /api/v1/controlled-documents` returns `201` for valid atomic-create request via the real browser flow; landing redirects to `/documents/:id/edit` | wizard submits via `createControlledDocumentAtomic`, lands editor | implemented and aligned | keep |
+| Template query/preview disabled-key wiring | frontend-only audit | n/a | canonical non-sentinel keys | implemented and aligned | keep |
+
+Open caveat:
+- A raw PowerShell `POST /api/v1/controlled-documents` was observed returning `403` during direct API probing while the real browser flow succeeded. Treat as a possible auth/session/tooling nuance, not a product blocker. Investigate before reopening the screen blocker.
 
 Ready for implementation now:
-- Step 4 summary sync with real preview/template data.
-- Local query-key cleanup for wizard-owned disabled queries.
+- None outstanding for the screen happy path.
 
 Prerequisites:
-- Runtime create flow: `POST /api/v1/controlled-documents` returned `500 INTERNAL_ERROR` during smoke, so end-to-end creation remains blocked outside this screen-local scope.
-- Visibility persistence/share semantics need backend capability.
-- Blank-template creation needs backend support for `templateVersionId: null`.
+- People-invite + external-share subcontrols (`#visibility`, `#sharing`) still need backend capability.
+- Per-version template picker still needs `template-versions` list surface.
 
 Deferred:
-- Profile counts stay deferred until a counts field exists on the profiles response.
-- Per-version template picking stays deferred until a versions-list surface exists for the wizard.
+- Profile counts (`#profile-counts`).
+- Per-version template picking (`#template-versions`).
 
 Verification needed next:
 - `cd frontend/apps/web`
 - `pnpm.cmd tsc --noEmit -p tsconfig.build.json`
-- `pnpm test`
-- Runtime smoke for `/documents/new`
-- Screenshot capture for Step 1 through Step 4
+- `pnpm.cmd test -- src/features/documents/pages/NewDocumentWizardPage.test.tsx`
+- Runtime smoke for `/documents/new` (re-run after PC reset / fresh dev server)
+- Screenshot capture for Step 1 through Step 4 if running a full evidence pass
 
 ---
 
 ## Items
 
-### visibility
+### visibility {#visibility}
 
-**What:** Step 2 exposes four visibility options (area / people / company / external) via `VISIBILITY_META` in `visibilityMeta.ts`. The selected value is stored in wizard state but **not submitted** to the backend.
+**Status (2026-05-28):** PARTIALLY CLOSED — `company` and restricted-area (`area`) scopes are submitted via the atomic-create payload and persisted on `controlled_documents`. Runtime QA verified both: `PO-RH-003` (company) and `PO-RH-004` (restricted to area `rh`) survived create + reload; editor metadata shows `Restrito a area Recursos Humanos`.
 
-**Why deferred:** `controlled_documents` has no `visibility` column. The `visibility TEXT DEFAULT 'area'` column was added by migration 0164 to the now-dropped `public.documents_v2`; it was never ported to `public.documents` or `controlled_documents`.
-
-**Subcontrols that are no-op:**
-- "Apenas minha área" — no ACL enforcement
+**Still deferred:**
 - "Pessoas específicas" — no `/acl` or sharing endpoint; invitees field captured but not sent
 - "Compartilhamento externo" — no link-generation, no password/watermark/expiry endpoint
 
-**Backend prereq:** add `visibility` column to `controlled_documents` (or `documents`) + ACL/sharing endpoints.
+**Backend prereq for remaining subcontrols:** invitee ACL endpoints + external-share / password / watermark / expiry endpoints (see `#sharing`).
 
 ---
 
@@ -89,13 +95,9 @@ Verification needed next:
 
 ---
 
-### blank-template {#blank-template}
+### ~~blank-template~~ {#blank-template} — CLOSED (2026-05-28)
 
-**What:** "Em branco" (blank template option) is rendered disabled in Step 3. Selecting it has no effect.
-
-**Why deferred:** creating a document from a blank template requires a true empty-document clone path on the atomic create endpoint. The backend currently requires a valid `templateVersionId` in `POST /api/v1/controlled-documents`.
-
-**Backend prereq:** support `templateVersionId: null` in `POST /api/v1/controlled-documents` (atomic create), or seed a blank sentinel template.
+`GET /api/v1/templates/system/blank` ships a real sentinel: `templateId=00000000-0000-0000-0000-000000000101`, `templateVersionId=00000000-0000-0000-0000-000000000102`. Step 3 "Em branco" card is selectable and submits that sentinel `templateVersionId` through the standard atomic-create payload. Runtime QA verified blank-template creation ends on the real editor route.
 
 ---
 

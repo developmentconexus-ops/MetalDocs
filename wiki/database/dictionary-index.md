@@ -8,6 +8,7 @@
 | `audit_events` | `metaldocs` | audit | `wiki/database/tables/audit_events.md` |
 | `auth_identities` | `metaldocs` | auth | `wiki/database/tables/auth_identities.md` |
 | `auth_sessions` | `metaldocs` | auth | `wiki/database/tables/auth_sessions.md` |
+| `tenants` | `metaldocs` | auth/platform | `wiki/database/tables/tenants.md` |
 | `document_access_policies` | `metaldocs` | documents | `wiki/database/tables/document_access_policies.md` |
 | `document_attachments` | `metaldocs` | documents | `wiki/database/tables/document_attachments.md` |
 | `document_collaboration_presence` | `metaldocs` | documents | `wiki/database/tables/document_collaboration_presence.md` |

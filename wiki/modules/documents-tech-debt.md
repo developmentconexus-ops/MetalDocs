@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-18 (governed sidebar runtime + contract sync)
+**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync)
 
 ## Severity scale
 
@@ -117,4 +117,3 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 - Cross-deps missing in §5/§8: 0 / 25 (all 14 OUT + 11 IN edges from `_artifacts/03-deps.md` appear in §3.2 or §5).
 - State transitions missing in §6: 0 / 5 (draft → under_review → approved → published → superseded/obsolete + rejected branch all tabled).
 - Decisions without ADR link: 4 / 9 (T-004, T-005, T-007, T-009 flagged missing-ADR; T-008 closed by Plan 4).
-

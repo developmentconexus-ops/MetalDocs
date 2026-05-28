@@ -1,3 +1,17 @@
+## 2026-05-26 - Wave 2 authz tx seeding sync
+
+- **Context:** uncommitted diff for Wave 2 shared authz transaction seeding across `internal/modules/documents/{application,repository}` and `internal/modules/iam/{authz,application,infrastructure/postgres}`.
+- **Mode:** lite patch
+- **Affected-surface scan:** `documents/application/{fillin_authz,reconstruct_service,service,view_service}.go`; `documents/repository/repository.go`; `iam/authz/context.go`; `iam/application/area_membership_service.go`; `iam/infrastructure/postgres/user_area_repository.go`; targeted repository/application tests.
+- **Routes/API:** no public contract change.
+- **Runtime flows:** rename/finalize/draft session-autosave flows now seed tx-local actor+tenant identity through shared `authz.SeedTxIdentity(...)` before tier-2 `authz.Require(...)`.
+- **Persistence:** no schema change; tx-local `metaldocs.tenant_id` / `metaldocs.actor_id` seeding is now shared instead of ad hoc inline `set_config` calls on documents and IAM membership writes.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: `wiki_sync_preflight.ps1` could not run tally because Git Bash failed with `CreateFileMapping ... Win32 error 5`.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents-tech-debt.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-25 - PDF webhook tenant hardening sync
 
 - **Context:** uncommitted diff on `fix/docs-5b-webhook-tenant-c4` for C4 tenant spoofing fix in documents PDF webhook handler.

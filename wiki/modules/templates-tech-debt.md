@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/templates.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates-refactor.md`.
 
-**Last verified:** 2026-05-17 (wizard DOCX import + permission simplification)
+**Last verified:** 2026-05-26 (Wave 5 lifecycle concurrency + capability alignment)
 
 ## Items
 

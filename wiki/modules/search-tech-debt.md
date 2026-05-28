@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/search.md`. Debt only; no fix prescriptions.
 
-**Last verified:** 2026-05-13
+**Last verified:** 2026-05-26
 
 ## Items
 
