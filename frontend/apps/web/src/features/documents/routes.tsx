@@ -1,4 +1,6 @@
-import type { RouteObject } from "react-router-dom";
+import { Navigate, type RouteObject } from "react-router-dom";
+
+const RedirectToLibrary = () => <Navigate to="/documents" replace />;
 
 export const documentsRoutes: RouteObject[] = [
   {
@@ -6,46 +8,14 @@ export const documentsRoutes: RouteObject[] = [
     handle: { workspaceView: 'library' },
     lazy: () => import('./pages/LibraryPage').then((m) => ({ Component: m.default })),
   },
-  {
-    path: "documents/all",
-    handle: { workspaceView: "library" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.LibraryDocumentsPage })),
-  },
-  {
-    path: "documents/area/:areaCode",
-    handle: { workspaceView: "library" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.LibraryDocumentsPage })),
-  },
-  {
-    path: "documents/type/:profileCode",
-    handle: { workspaceView: "library" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.LibraryDocumentsPage })),
-  },
-  {
-    path: "documents/doc/:documentId",
-    handle: { workspaceView: "library" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.LibraryDocumentsPage })),
-  },
-  {
-    path: "documents/mine",
-    handle: { workspaceView: "my-docs" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.MyDocumentsPage })),
-  },
-  {
-    path: "documents/mine/*",
-    handle: { workspaceView: "my-docs" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.MyDocumentsPage })),
-  },
-  {
-    path: "documents/recent",
-    handle: { workspaceView: "recent" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.RecentDocumentsPage })),
-  },
-  {
-    path: "documents/recent/*",
-    handle: { workspaceView: "recent" },
-    lazy: () => import("./pages/DocumentsHubPage").then((module) => ({ Component: module.RecentDocumentsPage })),
-  },
+  { path: "documents/all", element: <RedirectToLibrary /> },
+  { path: "documents/area/:areaCode", element: <RedirectToLibrary /> },
+  { path: "documents/type/:profileCode", element: <RedirectToLibrary /> },
+  { path: "documents/doc/:documentId", element: <RedirectToLibrary /> },
+  { path: "documents/mine", element: <RedirectToLibrary /> },
+  { path: "documents/mine/*", element: <RedirectToLibrary /> },
+  { path: "documents/recent", element: <RedirectToLibrary /> },
+  { path: "documents/recent/*", element: <RedirectToLibrary /> },
   {
     path: "documents/:documentId/edit",
     handle: { workspaceView: "document-editor" },
