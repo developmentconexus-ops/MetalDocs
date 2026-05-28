@@ -8,3 +8,10 @@ export function statusOf(error: unknown): number | undefined {
   }
   return undefined;
 }
+
+export function codeOf(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "code" in error && typeof (error as { code?: unknown }).code === "string") {
+    return (error as { code: string }).code;
+  }
+  return undefined;
+}

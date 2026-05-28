@@ -107,6 +107,14 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked backlog row:** `backlog/auth-refactor.md#R-012`
 - **Linked ADR:** missing-ADR
 
+### T-014 · FE 401 interceptor conflated session-expiry with domain-401 — CLOSED 2026-05-28 (qa/fe-401-interceptor)
+- **Severity:** major (closed)
+- **Surface:** `frontend/apps/web/src/lib/api/client.ts` (`assertApiResponse`); consumer `frontend/apps/web/src/features/auth/useAuthSession.ts`
+- **Observation (original):** `assertApiResponse` treated **every** 401 as session-expiry — it called `dispatchAuthExpired(...)` and threw `ApiError.fromLegacy("authn.expired", 401, "Sessão expirada")` **before** parsing the `application/problem+json` body, discarding the RFC 9457 `code`. Backend already discriminates: wrong current password → `AUTH_INVALID_CREDENTIALS` (`handler.go:164-165` via `writeAuthError`), genuine unauthenticated/expired session → `AUTH_UNAUTHORIZED` (`middleware.go:62,69`, `handler.go:123,136`). The FE collapse meant a wrong-current-password during forced change surfaced "Sessão expirada" instead of a credential error (found in qa/auth-password-change as F-A; the consumer-level patch there mapped bare status 401 and masked the real interceptor root). Trigger fired: contract violation with measurable consumer impact.
+- **Fix:** interceptor now parses the problem first and only dispatches `authExpired` + throws `authn.expired` when `res.status === 401 && (!problem || problem.code === "AUTH_UNAUTHORIZED")`. Domain 401s keep their problem `code`. Consumers (`handleLogin`, `handleChangePassword`) map by `codeOf(err) === 'AUTH_INVALID_CREDENTIALS'` instead of bare status. Regression: `src/lib/api/client.test.ts` (3 cases), `src/features/auth/useAuthSession.test.tsx` (code-based + session-expiry fall-through). Live Preview proof: forced change w/ wrong current pw → `[role=alert]` "Senha atual incorreta.", stays on form, no logout.
+- **Evidence:** backend `internal/modules/auth/delivery/http/{handler.go:164-165,123,136, middleware.go:62,69}`; FE `src/lib/api/client.ts:33-46`.
+- **Linked ADR:** `wiki/architecture/api-design-system.md` (RFC 9457); `wiki/concepts/error-ux.md`
+
 ### T-013 · Login form `noValidate` makes `required` inert (FE)
 - **Severity:** minor (low)
 - **Surface:** `frontend/apps/web/src/features/auth/pages/LoginPage.tsx` (`<form noValidate>`, inputs carry inert `required`)

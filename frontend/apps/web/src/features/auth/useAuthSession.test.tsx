@@ -28,9 +28,12 @@ describe('useAuthSession.handleChangePassword', () => {
     });
   });
 
-  it('maps a 401 (wrong current password) to a credential message, not session-expired', async () => {
+  it('maps AUTH_INVALID_CREDENTIALS (wrong current password) to a credential message', async () => {
     vi.mocked(authApi.changePassword).mockRejectedValue(
-      Object.assign(new Error('Sessão expirada'), { status: 401 }),
+      Object.assign(new Error('Invalid username/email or password'), {
+        code: 'AUTH_INVALID_CREDENTIALS',
+        status: 401,
+      }),
     );
 
     const { result } = renderHook(() => useAuthSession(), { wrapper });
@@ -39,6 +42,19 @@ describe('useAuthSession.handleChangePassword', () => {
     });
 
     expect(useUiStore.getState().error).toBe('Senha atual incorreta.');
+  });
+
+  it('does NOT map a genuine session-expiry (authn.expired) to the credential message', async () => {
+    vi.mocked(authApi.changePassword).mockRejectedValue(
+      Object.assign(new Error('Sessão expirada'), { code: 'authn.expired', status: 401 }),
+    );
+
+    const { result } = renderHook(() => useAuthSession(), { wrapper });
+    await act(async () => {
+      await result.current.handleChangePassword(submitEvent());
+    });
+
+    expect(useUiStore.getState().error).toBe('Sessão expirada');
   });
 
   it('blocks submission when confirmation does not match', async () => {
