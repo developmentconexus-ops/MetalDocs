@@ -324,3 +324,29 @@
   color: var(--text-soft);
   text-decoration: none;
 }
+
+/* === RESPONSIVE: stack columns so the form stays usable on narrow viewports === */
+@media (max-width: 768px) {
+  .page {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .left {
+    flex: none;
+    min-height: 160px;
+    padding: 32px 24px;
+  }
+
+  .right {
+    flex: 1;
+    padding: 32px 24px;
+  }
+
+  .formCard {
+    width: 100%;
+    max-width: 360px;
+  }
+}
