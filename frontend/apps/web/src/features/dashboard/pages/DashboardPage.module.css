@@ -421,24 +421,6 @@
   color: var(--text-faint);
 }
 
-.liveBadge {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-faint);
-}
-
-.liveDot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--success);
-  animation: blink 1.4s ease-in-out infinite;
-}
-
 /* ─── Animations ────────────────────────────────────────────────── */
 
 @keyframes bgPan {
