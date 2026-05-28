@@ -1,19 +1,19 @@
 import { OperationsCenter } from "../../../components/OperationsCenter";
-import { useWorkspaceRouteContext } from "../../shell/pages/WorkspaceRoot";
+
+const fmtDate = (value?: string) => (value ? new Date(value).toLocaleDateString("pt-BR") : "");
+const noop = () => {};
 
 export function Component() {
-  const workspace = useWorkspaceRouteContext();
-
   return (
     <OperationsCenter
-      loadState={workspace.loadState}
-      documents={workspace.documents}
-      notifications={workspace.notifications}
-      documentProfiles={workspace.documentProfiles}
-      processAreas={workspace.processAreas}
-      formatDate={workspace.formatDate}
-      onRefreshWorkspace={workspace.onRefreshWorkspace}
-      onOpenDocument={workspace.onOpenDocument}
+      loadState="ready"
+      documents={[]}
+      notifications={[]}
+      documentProfiles={[]}
+      processAreas={[]}
+      formatDate={fmtDate}
+      onRefreshWorkspace={noop}
+      onOpenDocument={noop}
     />
   );
 }

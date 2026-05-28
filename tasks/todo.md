@@ -551,3 +551,23 @@ Area: `frontend/apps/web/src/features/documents/mddm-editor/` + `docs/superpower
 - [ ] DOCX export checks for shading parity
   - Pending: not executed in this session
 
+---
+
+## Feature: WorkspaceRoot teardown — wire real data into 4 placeholder pages (2026-05-28)
+Area: `frontend/apps/web/src/features/{audit,operations,notifications,content-builder}/`  |  Risk: medium  |  Goal: replace placeholder pages with feature-owned TanStack Query data
+
+Context
+- `features/shell/pages/WorkspaceRoot.tsx` was deleted (God-component teardown, per plan-foundation.md). It exported a dead `Component` route (router uses `AppRoot` → `AppShell`) and `useWorkspaceRouteContext`, an empty-data stub.
+- The 4 consumer pages were left as self-contained placeholders rendering empty/no-op props — routed and reachable but non-functional (no real data).
+- Each must own real data via per-feature TanStack Query hooks per `wiki/architecture/frontend-structure.md`.
+
+## Tasks
+- [ ] T1: Operations + Audit — real query hooks for documents/notifications/profiles/processAreas; wire `OperationsCenter` (today empty arrays + noops)
+- [ ] T2: Notifications — `useNotifications` query + `onMarkRead` mutation into `NotificationsPanel` (today empty + noop)
+- [ ] T3: Content Builder — confirm intended route/owner; `ContentBuilderView` is itself a legacy-removed placeholder, decide keep vs route-level removal
+- [ ] T4: Remove placeholder empty-default scaffolding from each page once real data lands
+
+## Acceptance tests
+- [ ] `cd frontend/apps/web; corepack pnpm tsc --noEmit -p tsconfig.build.json`
+- [ ] Manual: each route renders real data, no console errors
+

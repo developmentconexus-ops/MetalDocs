@@ -1,16 +1,16 @@
 import { NotificationsPanel } from "../../../components/NotificationsPanel";
-import { useWorkspaceRouteContext } from "../../shell/pages/WorkspaceRoot";
+
+const fmtDate = (value?: string) => (value ? new Date(value).toLocaleDateString("pt-BR") : "");
+const noop = () => {};
 
 export function Component() {
-  const workspace = useWorkspaceRouteContext();
-
   return (
     <NotificationsPanel
-      loadState={workspace.loadState}
-      notifications={workspace.notifications}
-      formatDate={workspace.formatDate}
-      onRefreshWorkspace={workspace.onRefreshWorkspace}
-      onMarkRead={workspace.onMarkNotificationRead}
+      loadState="ready"
+      notifications={[]}
+      formatDate={fmtDate}
+      onRefreshWorkspace={noop}
+      onMarkRead={noop}
     />
   );
 }

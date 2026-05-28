@@ -43,7 +43,7 @@ Route paths from `features/*/routes.tsx`. Owning module from `wiki/modules/`. QA
 |---|---|---|---|---|---|---|
 | 1 | Login | `/login` | `auth/pages/LoginPage.tsx` | auth | screen + authz | P0 |
 | 2 | Password change | `change-password` | `auth/pages/PasswordChangeRoutePage.tsx` | auth | screen + authz | P0 |
-| 3 | Workspace shell | layout wrapper | `shell/WorkspaceShell.tsx` | shell / frontend-primitives | screen (nav/authz gating) | P0 |
+| 3 | Workspace shell | layout wrapper | `shell/pages/AppRoot.tsx` + `shell/components/AppShell.tsx` + `shell/components/Rail.tsx` | shell / frontend-primitives | screen (nav/authz gating) | P0 |
 | 4 | Dashboard | `/` index | `dashboard/pages/DashboardPage.tsx` | dashboard | screen | P0 |
 | 5 | New Document Wizard | `documents/new` | `documents/pages/NewDocumentWizardPage.tsx` | novo-documento-wizard | screen (re-verify only) | P1 |
 | 6 | Documents Hub | `documents`, `documents/mine`, `documents/recent` | `documents/pages/DocumentsHubPage.tsx` | documents | screen | P1 |
