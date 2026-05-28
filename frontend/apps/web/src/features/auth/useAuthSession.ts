@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as api from './api/auth';
 import { useAuthStore } from '../../store/auth.store';
 import { useUiStore } from '../../store/ui.store';
-import { asMessage, statusOf } from '../shared/errors';
+import { asMessage, codeOf } from '../shared/errors';
 
 // useAuthSession — login / logout / change-password.
 // Bootstrap (me() on mount) is handled by AppRoot.
@@ -30,7 +30,7 @@ export function useAuthSession() {
       } catch (err) {
         setUser(null);
         setAuthState('idle');
-        setError(statusOf(err) === 401 ? 'Usuário ou senha inválidos.' : asMessage(err));
+        setError(codeOf(err) === 'AUTH_INVALID_CREDENTIALS' ? 'Usuário ou senha inválidos.' : asMessage(err));
       }
     },
     [loginForm, setAuthState, setError, setUser],
@@ -64,7 +64,7 @@ export function useAuthSession() {
         setAuthState('ready');
         setMessage('Senha alterada com sucesso.');
       } catch (err) {
-        setError(statusOf(err) === 401 ? 'Senha atual incorreta.' : asMessage(err));
+        setError(codeOf(err) === 'AUTH_INVALID_CREDENTIALS' ? 'Senha atual incorreta.' : asMessage(err));
       }
     },
     [passwordForm, setAuthState, setError, setMessage, setPasswordForm, setUser],

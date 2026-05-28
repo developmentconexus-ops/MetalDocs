@@ -31,13 +31,17 @@ function withDefaultHeaders(init?: ApiFetchOptions): RequestInit | undefined {
 }
 
 async function assertApiResponse(res: Response) {
-  if (res.status === 401) {
-    dispatchAuthExpired(window.location.pathname + window.location.search);
-    throw ApiError.fromLegacy("authn.expired", 401, "Sessão expirada");
-  }
-
   if (!res.ok) {
     const problem = await parseProblem(res.clone());
+
+    // Only a genuine session/authn failure (or a bodyless 401) means the session
+    // expired. Domain 401s (e.g. AUTH_INVALID_CREDENTIALS on a wrong current
+    // password) must keep their RFC 9457 code so callers can map them correctly.
+    if (res.status === 401 && (!problem || problem.code === "AUTH_UNAUTHORIZED")) {
+      dispatchAuthExpired(window.location.pathname + window.location.search);
+      throw ApiError.fromLegacy("authn.expired", 401, "Sessão expirada");
+    }
+
     if (problem) {
       throw new ApiError(problem);
     }
