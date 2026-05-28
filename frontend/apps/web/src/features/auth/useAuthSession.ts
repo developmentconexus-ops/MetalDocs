@@ -64,7 +64,7 @@ export function useAuthSession() {
         setAuthState('ready');
         setMessage('Senha alterada com sucesso.');
       } catch (err) {
-        setError(asMessage(err));
+        setError(statusOf(err) === 401 ? 'Senha atual incorreta.' : asMessage(err));
       }
     },
     [passwordForm, setAuthState, setError, setMessage, setPasswordForm, setUser],
