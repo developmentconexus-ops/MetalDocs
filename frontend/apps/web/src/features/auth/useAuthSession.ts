@@ -25,14 +25,8 @@ export function useAuthSession() {
         const response = await api.login(loginForm);
         setUser(response.user);
         setAuthState('ready');
-        if (!response.user.mustChangePassword) {
-          const returnTo = sessionStorage.getItem('auth:returnTo');
-          if (returnTo) {
-            sessionStorage.removeItem('auth:returnTo');
-            window.history.pushState({}, '', returnTo);
-            window.dispatchEvent(new PopStateEvent('popstate'));
-          }
-        }
+        // Redirect (returnTo-aware) is owned by LoginPage's declarative <Navigate>.
+        // Navigating here too would race and lose to that render-time redirect.
       } catch (err) {
         setUser(null);
         setAuthState('idle');

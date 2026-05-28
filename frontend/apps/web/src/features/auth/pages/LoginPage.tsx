@@ -1,8 +1,16 @@
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../../store/auth.store';
 import { useUiStore } from '../../../store/ui.store';
 import { useAuthSession } from '../useAuthSession';
 import styles from './LoginPage.module.css';
+
+// Snapshot the post-login destination captured on auth-expiry (AppRoot writes it).
+// Same-origin path only — blocks open-redirect via absolute or protocol-relative URLs.
+function readReturnTo(): string {
+  const stored = sessionStorage.getItem('auth:returnTo');
+  return stored && stored.startsWith('/') && !stored.startsWith('//') ? stored : '/';
+}
 
 function LeftPanel() {
   return (
@@ -129,9 +137,17 @@ function PasswordChangeForm() {
 export function LoginPage() {
   const authState = useAuthStore((state) => state.authState);
   const user = useAuthStore((state) => state.user);
+  // Snapshot once at mount (before the clear effect runs) so the value survives
+  // the post-login re-render. StrictMode double-invokes the initializer, but it is
+  // read-only and idempotent; the clear is deferred to the effect below.
+  const [returnTo] = useState(readReturnTo);
+
+  useEffect(() => {
+    sessionStorage.removeItem('auth:returnTo');
+  }, []);
 
   if (authState === 'ready' && user && !user.mustChangePassword) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   return (
