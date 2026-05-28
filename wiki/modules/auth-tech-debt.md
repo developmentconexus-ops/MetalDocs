@@ -107,6 +107,13 @@ Triggers per `templates/tech-debt-register.md`. Authn bypass, regulated audit-tr
 - **Linked backlog row:** `backlog/auth-refactor.md#R-012`
 - **Linked ADR:** missing-ADR
 
+### T-013 · Login form `noValidate` makes `required` inert (FE)
+- **Severity:** minor (low)
+- **Surface:** `frontend/apps/web/src/features/auth/pages/LoginPage.tsx` (`<form noValidate>`, inputs carry inert `required`)
+- **Observation:** The login form sets `noValidate`, so the `required` attributes on identifier/password never trigger native empty-field validation. Submitting empty fields posts to the server, which correctly rejects with a generic, non-enumerating message — so there is no security gap, only a missing client-side early-exit. Found during FE login screen QA (qa/auth-login).
+- **Evidence:** Preview-driven QA on `/login`; empty submit reaches `POST /auth/login`.
+- **Linked ADR:** n/a
+
 ---
 
 ## Coverage stats (computed at compose time)
