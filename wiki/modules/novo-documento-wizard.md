@@ -1,6 +1,6 @@
 # Novo-Documento Wizard
 
-> **Last verified:** 2026-05-15 (blank-template create runtime smoke)
+> **Last verified:** 2026-05-28 (QA light re-verify — Preview happy/error/edge paths green; submit-flow snippet + anchors corrected)
 > **Scope:** 4-step document-creation wizard at `/documents/new` Ã¢â‚¬â€ state machine, step components, new primitives (`DocPaperPreview`, `WizardFooter`), sub-controls, and helpers (`resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile`).
 
 > **Maturity:** L2
@@ -109,7 +109,7 @@ case 'selectProfile': {
 const createMutation = useMutation({
   mutationFn: async (input) => {
     return createControlledDocumentAtomic(
-      { profileCode, processAreaCode, title, ownerUserId, documentName, templateVersionId },
+      { profileCode, processAreaCode, title, ownerUserId, documentName, templateVersionId, visibility },
       input.idempotencyKey,  // POST /api/v1/controlled-documents with Idempotency-Key header
     );
   },
@@ -121,7 +121,7 @@ const createMutation = useMutation({
 });
 ```
 
-The `idempotencyKey` is generated via `crypto.randomUUID()` in `handleCreate` (`NewDocumentWizardPage.tsx:160`) immediately before the mutation call. Replay of the same key returns the stored 201 response Ã¢â‚¬â€ safe to retry on network timeout. Orphan slots are structurally impossible (CD + document commit atomically or both roll back). See ADR 0011 and `backlog/novo-documento.md#slot-rollback`.
+The `idempotencyKey` is generated via `crypto.randomUUID()` in `handleCreate` (`NewDocumentWizardPage.tsx:202`) immediately before the mutation call. Replay of the same key returns the stored 201 response Ã¢â‚¬â€ safe to retry on network timeout. Orphan slots are structurally impossible (CD + document commit atomically or both roll back). See ADR 0011 and `backlog/novo-documento.md#slot-rollback`.
 
 ---
 
