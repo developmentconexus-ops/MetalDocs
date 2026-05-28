@@ -1,6 +1,6 @@
 ﻿# Frontend Structure
 
-> **Last verified:** 2026-05-21 (post-freeze terminology sync in state/store guidance)
+> **Last verified:** 2026-05-28 (AppShell admin route guard wired to `handle.requiresAdmin`)
 > **Scope:** Canonical folder layout, naming, routing, state, API, design-system rules for `frontend/apps/web`. Comparison baseline for refactor reviews and the `metaldocs-frontend` skill.
 > **Out of scope:** Backend module layout (see `system-overview.md`), eigenpal internals (see `modules/editor-ui-eigenpal.md`).
 > **Key files:**
@@ -197,6 +197,7 @@ Route hierarchy:
 - **Public routes** (e.g., `/login`)     declared at the router root, outside `AppRoot`. No Rail, no Toolbar.
 - **Protected routes**     children of `AppRoot` (`features/shell/pages/AppRoot.tsx:28`), which handles auth guard + session bootstrap. Inside `AppRoot`, `AppShell` (`features/shell/components/AppShell.tsx:9`) renders Rail + AppToolbar + Outlet.
 - **`SectionPanel`**     rendered conditionally inside `AppShell` when a matched route's `handle.sectionPanel === true` (Library screen only).
+- **Admin route guard**     `AppShell` redirects to `/` when a matched route's `handle.requiresAdmin === true` and the current user's `roles` does not include `system_admin`. Client-side defense-in-depth/UX gate only; backend tier-1 capability middleware remains authoritative.
 
 Rules:
 - Always `createBrowserRouter` (clean URLs). Nginx fallback already wired (`frontend/apps/web/nginx.conf:9`).
