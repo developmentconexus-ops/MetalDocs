@@ -40,13 +40,13 @@ For full module documentation, maturity promotion, or rebuilding a module wiki t
 
 | Boundary you touch | Skill |
 |--------------------|-------|
-| Backend HTTP routes / OpenAPI / oapi-codegen / handler wiring / contract shape | [`metaldocs-backend-api`](.claude/skills/metaldocs-backend-api/SKILL.md) |
-| Frontend under `frontend/apps/web/src/` (screens, components, routing, state, API wiring) | [`metaldocs-frontend`](.claude/skills/metaldocs-frontend/SKILL.md) |
+| Backend HTTP routes / OpenAPI / oapi-codegen / handler wiring / contract shape | [`metaldocs-backend-api`](.agents/skills/metaldocs-backend-api/SKILL.md) |
+| Frontend under `frontend/apps/web/src/` (screens, components, routing, state, API wiring) | [`metaldocs-frontend`](.agents/skills/metaldocs-frontend/SKILL.md) |
 | FE API calls / TanStack Query hooks / query keys / cache invalidation / generated FE types | [`metaldocs-tanstack-query`](.agents/skills/metaldocs-tanstack-query/SKILL.md) |
-| Designed screens under `frontend/apps/web/design-source/<slug>/` | `metaldocs-frontend` + [`metaldocs-screen-implementation`](.claude/skills/metaldocs-screen-implementation/SKILL.md) |
-| Real-capability mapping for mock-era widgets, legacy wrappers, deferred items | [`metaldocs-screen-integration-audit`](.claude/skills/metaldocs-screen-integration-audit/SKILL.md) |
-| DB migrations / bootstrap / curated baseline / seeds / dictionary / extensions / grants / triggers | [`metaldocs-database`](.claude/skills/metaldocs-database/SKILL.md) |
-| Runtime/auth/route/contract drift, prerequisite repair | [`runtime-contract-prereq`](.claude/skills/runtime-contract-prereq/SKILL.md) |
+| Designed screens under `frontend/apps/web/design-source/<slug>/` | `metaldocs-frontend` + [`metaldocs-screen-implementation`](.agents/skills/metaldocs-screen-implementation/SKILL.md) |
+| Real-capability mapping for mock-era widgets, legacy wrappers, deferred items | [`metaldocs-screen-integration-audit`](.agents/skills/metaldocs-screen-integration-audit/SKILL.md) |
+| DB migrations / bootstrap / curated baseline / seeds / dictionary / extensions / grants / triggers | [`metaldocs-database`](.agents/skills/metaldocs-database/SKILL.md) |
+| Runtime/auth/route/contract drift, prerequisite repair | [`runtime-contract-prereq`](.agents/skills/runtime-contract-prereq/SKILL.md) |
 | Module wiki rebuild / sync | `metaldocs-module-doc` / `-sync` |
 
 ### Frontend rules (non-negotiable)
@@ -68,7 +68,8 @@ Source of truth: [`wiki/database/`](wiki/database/) (schema ownership, dictionar
 ## 4. Mandatory Gates
 
 Canonical design: [`docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md`](docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md).
-Operator guide: [`wiki/references/ai-operating-system.md`](wiki/references/ai-operating-system.md).
+Canonical QA/close-out policy: [`wiki/quality/qa-operating-system.md`](wiki/quality/qa-operating-system.md).
+Path-stable operator bridge: [`wiki/references/ai-operating-system.md`](wiki/references/ai-operating-system.md).
 
 **Before screen work:**
 1. Fresh build truth
@@ -92,7 +93,28 @@ Operator guide: [`wiki/references/ai-operating-system.md`](wiki/references/ai-op
 4. No hidden drift left in the repaired boundary
 5. Skill/runbook/instruction updated if the failure exposed a workflow gap
 
+**Hard-stop rule:** do not continue through redesign-grade issues. If the required fix implies shared API redesign, cross-module auth/authz model change, storage/provider architecture redesign, workflow semantic redesign outside the assigned boundary, or large coordinated rewrite, stop and report the architecture boundary and minimum prerequisite plan instead of symptom patching.
+
 **Stop rule:** do not continue feature work through a failing prerequisite boundary. If startup, auth/session, target route, or shared contract truth fails → switch to `runtime-contract-prereq`, repair the boundary, rerun the checkpoint, return to original task.
+
+**Default close-out loop for non-trivial work:**
+1. Implement inside the bounded task
+2. Run static and targeted verification for the touched slice
+3. Run code review
+4. Run product QA using the canonical checklist for the workflow class
+5. Classify findings by root-cause family
+6. Fix by family, not by scattered symptom patching
+7. Rerun targeted review, QA, and regression
+8. Rerun broader regression when the change crossed boundaries
+9. Close only with evidence and explicit bounded defers
+
+**Evidence rule:** `implemented`, `fixed`, `done`, `green`, or `looks good` are not sufficient closure by default. Record the verification commands, QA outcomes, review findings disposition, and any remaining bounded defer before claiming completion.
+
+**Canonical QA checklists:**
+- [`wiki/quality/screen-qa-checklist.md`](wiki/quality/screen-qa-checklist.md)
+- [`wiki/quality/backend-api-qa-checklist.md`](wiki/quality/backend-api-qa-checklist.md)
+- [`wiki/quality/workflow-async-qa-checklist.md`](wiki/quality/workflow-async-qa-checklist.md)
+- [`wiki/quality/release-closeout-checklist.md`](wiki/quality/release-closeout-checklist.md)
 
 ## 5. Behavioral Guidelines
 
