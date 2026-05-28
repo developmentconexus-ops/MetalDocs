@@ -13,9 +13,11 @@
 > - `internal/modules/auth/application/service.go:37`     `AllowDevTenantFallback` config flag
 > - `internal/modules/auth/delivery/http/middleware.go:83-88`     injects `tenant.WithTenantID`; strips `X-Tenant-ID` header
 > - `internal/modules/auth/domain/model.go:26`     `Session.TenantID` (persisted in `auth_sessions`)
-> - `internal/modules/auth/domain/model.go:95`     `CurrentUser.TenantID`
+> - `internal/modules/auth/domain/model.go:95`     `CurrentUser.TenantID` / `CurrentUser.TenantName`
 > - `internal/modules/auth/domain/errors.go:18`     `ErrTenantNotPermitted`
 > - `internal/modules/auth/domain/errors.go:21`     `ErrTenantClaimRequired`
+> - `internal/modules/auth/infrastructure/postgres/repository.go:115`     `GetTenantByID`
+> - `db/migrations/0214_tenants_master_table.sql`     canonical `metaldocs.tenants` master table + `auth_sessions.tenant_id` UUID conversion
 > - `migrations/0184_auth_sessions_tenant_id.sql`     adds `tenant_id` column to `auth_sessions`
 > - `migrations/0185_revoke_ambiguous_sessions.sql`     revokes pre-migration sessions without a tenant binding
 
@@ -28,7 +30,7 @@ Before Plan 3, every module read the `X-Tenant-ID` HTTP request header to determ
 Plan 3 moves tenant binding to **login time**:
 
 1. At login, the auth service resolves which tenant the user belongs to (`resolveLoginTenant`).
-2. That tenant ID is stored in `auth_sessions.tenant_id` (migration 0184).
+2. That tenant ID is stored in `auth_sessions.tenant_id` (migration 0184; UUID-aligned in migration 0214).
 3. On every subsequent request, the auth middleware reads the session's `tenant_id` and injects it into the request context via `tenant.WithTenantID`.
 4. The middleware **strips** the `X-Tenant-ID` header so no downstream handler can read it.
 5. All handlers call `tenant.FromContext`     they get the session-verified tenant or an error.
@@ -89,7 +91,7 @@ Rules (in order):
 | `claimedTenantID` empty AND user has 0 tenants AND `AllowDevTenantFallback=true` | `DevTenantID` |
 | `claimedTenantID` empty AND user has multiple tenants | `ErrTenantClaimRequired`     403 `AUTH_TENANT_REQUIRED` |
 
-The selected tenant ID is stored in `auth_sessions.tenant_id` (migration 0184). `GetUserTenants` reads `iam_user_roles` to determine which tenants a user has any role in (`domain/port.go:23`).
+The selected tenant ID is stored in `auth_sessions.tenant_id` (migration 0184; UUID-aligned in 0214). `GetUserTenants` reads `iam_user_roles` to determine which tenants a user has any role in (`domain/port.go:23`). `GetTenantByID` resolves the session-bound tenant to a canonical `metaldocs.tenants` row so auth responses can expose `tenantName` alongside `tenantId`.
 
 ### 3.1 `AllowDevTenantFallback`
 
@@ -165,6 +167,7 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 |---|---|
 | `0184_auth_sessions_tenant_id.sql` | Adds `tenant_id UUID NOT NULL DEFAULT '...'` column to `metaldocs.auth_sessions` |
 | `0185_revoke_ambiguous_sessions.sql` | Marks all pre-existing sessions as revoked (they carry no valid `tenant_id`) |
+| `0214_tenants_master_table.sql` | Creates `metaldocs.tenants`, converts `auth_sessions.tenant_id` to UUID on upgrade paths, and adds auth/IAM tenant FKs |
 
 ---
 
@@ -177,5 +180,4 @@ All of the following now call `tenant.FromContext` (or a thin wrapper over it) i
 - `wiki/modules/templates-tech-debt.md#T-003`     templates header-trust (T-003 resolved)
 - `wiki/concepts/authz-tiers.md`     how tenant context feeds into tier-1 and tier-2 authz
 - `wiki/backlog/roadmap.md`     Plan 3 entry
-
 

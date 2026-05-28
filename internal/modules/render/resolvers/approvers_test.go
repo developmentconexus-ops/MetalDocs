@@ -16,14 +16,14 @@ type fakeWorkflowReader struct {
 	err                 error
 }
 
-func (f fakeWorkflowReader) GetApprovers(_ context.Context, _, _, instanceID string) ([]ApproverInfo, error) {
+func (f fakeWorkflowReader) GetApprovers(_ context.Context, _ TenantID, _ RevisionID, instanceID ApprovalInstanceID) ([]ApproverInfo, error) {
 	if f.approversByInstance != nil {
-		return f.approversByInstance[instanceID], f.err
+		return f.approversByInstance[string(instanceID)], f.err
 	}
 	return f.approvers, f.err
 }
 
-func (f fakeWorkflowReader) GetFinalApprovalDate(ctx context.Context, tenantID, revisionID string) (time.Time, error) {
+func (f fakeWorkflowReader) GetFinalApprovalDate(ctx context.Context, tenantID TenantID, revisionID RevisionID) (time.Time, error) {
 	return f.finalApprovalDate, f.err
 }
 

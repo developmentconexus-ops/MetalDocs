@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -15,22 +16,24 @@ type FeatureFlagsConfig struct {
 	MDDMNativeExportRolloutPercent int
 }
 
+var ErrInvalidPercentage = errors.New("invalid percentage")
+
 // LoadFeatureFlagsConfig reads feature flag config from environment variables.
-func LoadFeatureFlagsConfig() FeatureFlagsConfig {
+func LoadFeatureFlagsConfig() (FeatureFlagsConfig, error) {
 	pct := 0
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_MDDM_NATIVE_EXPORT_ROLLOUT_PCT")); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil {
-			if parsed < 0 {
-				parsed = 0
-			} else if parsed > 100 {
-				parsed = 100
-			}
-			pct = parsed
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			return FeatureFlagsConfig{}, err
 		}
+		if parsed < 0 || parsed > 100 {
+			return FeatureFlagsConfig{}, ErrInvalidPercentage
+		}
+		pct = parsed
 	}
 	return FeatureFlagsConfig{
 		MDDMNativeExportRolloutPercent: pct,
-	}
+	}, nil
 }
 
 func envBool(key string) bool {

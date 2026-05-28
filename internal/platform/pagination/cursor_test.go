@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+const testSigningSecret = "0123456789abcdef0123456789abcdef"
+
 func equalSort(a, b []SortField) bool {
 	if len(a) != len(b) {
 		return false
@@ -56,24 +58,26 @@ func equalCursor(a, b Cursor) bool {
 
 func TestCursor(t *testing.T) {
 	t.Run("round-trip", func(t *testing.T) {
-		in := Cursor{
-			V: CursorVersion,
-			Sort: []SortField{
+		in, err := NewCursor(
+			[]SortField{
 				{Field: "updated_at", Direction: "desc"},
 				{Field: "id", Direction: "asc"},
 			},
-			Anchor: map[string]any{
+			map[string]any{
 				"updated_at": "2026-05-10T14:30:00Z",
 				"id":         "550e8400-abc",
 			},
-			FilterHash: "abc123",
+			"abc123",
+		)
+		if err != nil {
+			t.Fatalf("NewCursor error: %v", err)
 		}
 
-		enc, err := Encode(in)
+		enc, err := Encode(in, testSigningSecret)
 		if err != nil {
 			t.Fatalf("Encode error: %v", err)
 		}
-		out, err := Decode(enc)
+		out, err := Decode(enc, testSigningSecret)
 		if err != nil {
 			t.Fatalf("Decode error: %v", err)
 		}
@@ -83,32 +87,72 @@ func TestCursor(t *testing.T) {
 	})
 
 	t.Run("tampered base64", func(t *testing.T) {
-		enc, err := Encode(Cursor{V: CursorVersion, Sort: []SortField{{Field: "id", Direction: "asc"}}, Anchor: map[string]any{"id": "1"}, FilterHash: "h"})
+		enc, err := Encode(Cursor{V: CursorVersion, Sort: []SortField{{Field: "id", Direction: "asc"}}, Anchor: map[string]any{"id": "1"}, FilterHash: "h"}, testSigningSecret)
 		if err != nil {
 			t.Fatalf("Encode error: %v", err)
 		}
 		r := []rune(enc)
 		r[len(r)/2] = '!'
-		_, err = Decode(string(r))
+		_, err = Decode(string(r), testSigningSecret)
 		if err == nil {
 			t.Fatal("expected error for tampered base64")
 		}
 	})
 
+	t.Run("tampered payload signature mismatch", func(t *testing.T) {
+		enc, err := Encode(Cursor{V: CursorVersion, Sort: []SortField{{Field: "id", Direction: "asc"}}, Anchor: map[string]any{"id": "1"}, FilterHash: "h"}, testSigningSecret)
+		if err != nil {
+			t.Fatalf("Encode error: %v", err)
+		}
+		raw, err := base64.RawURLEncoding.DecodeString(enc)
+		if err != nil {
+			t.Fatalf("DecodeString error: %v", err)
+		}
+		raw[10] ^= 0x01
+
+		_, err = Decode(base64.RawURLEncoding.EncodeToString(raw), testSigningSecret)
+		if !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor, got: %v", err)
+		}
+	})
+
+	t.Run("wrong signing secret", func(t *testing.T) {
+		enc, err := Encode(Cursor{V: CursorVersion, Sort: []SortField{{Field: "id", Direction: "asc"}}, Anchor: map[string]any{"id": "1"}, FilterHash: "h"}, testSigningSecret)
+		if err != nil {
+			t.Fatalf("Encode error: %v", err)
+		}
+		_, err = Decode(enc, "abcdef0123456789abcdef0123456789")
+		if !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor, got: %v", err)
+		}
+	})
+
+	t.Run("short signing secret", func(t *testing.T) {
+		cursor := Cursor{V: CursorVersion, Sort: []SortField{{Field: "id", Direction: "asc"}}, Anchor: map[string]any{"id": "1"}, FilterHash: "h"}
+		if _, err := Encode(cursor, "short"); !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor from Encode, got: %v", err)
+		}
+		if _, err := Decode("abc", "short"); !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor from Decode, got: %v", err)
+		}
+	})
+
 	t.Run("bad inner JSON", func(t *testing.T) {
-		s := base64.RawURLEncoding.EncodeToString([]byte("not-json"))
-		_, err := Decode(s)
+		payload := []byte("not-json")
+		signed := append(append([]byte(nil), payload...), signCursor(payload, testSigningSecret)...)
+		s := base64.RawURLEncoding.EncodeToString(signed)
+		_, err := Decode(s, testSigningSecret)
 		if err == nil {
 			t.Fatal("expected error")
 		}
 	})
 
 	t.Run("wrong version", func(t *testing.T) {
-		enc, err := Encode(Cursor{V: 2, Sort: []SortField{{Field: "id", Direction: "asc"}}, Anchor: map[string]any{"id": "1"}, FilterHash: "h"})
+		enc, err := Encode(Cursor{V: 2, Sort: []SortField{{Field: "id", Direction: "asc"}}, Anchor: map[string]any{"id": "1"}, FilterHash: "h"}, testSigningSecret)
 		if err != nil {
 			t.Fatalf("Encode error: %v", err)
 		}
-		_, err = Decode(enc)
+		_, err = Decode(enc, testSigningSecret)
 		if !errors.Is(err, ErrInvalidCursor) {
 			t.Fatalf("expected ErrInvalidCursor, got: %v", err)
 		}
@@ -222,6 +266,15 @@ func TestCursor(t *testing.T) {
 					t.Fatalf("got=%+v want=%+v", got, tc.want)
 				}
 			})
+		}
+	})
+
+	t.Run("NewCursor validates sort", func(t *testing.T) {
+		if _, err := NewCursor(nil, nil, "h"); !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor for empty sort, got %v", err)
+		}
+		if _, err := NewCursor([]SortField{{Field: "id", Direction: "sideways"}}, nil, "h"); !errors.Is(err, ErrInvalidCursor) {
+			t.Fatalf("expected ErrInvalidCursor for bad direction, got %v", err)
 		}
 	})
 }

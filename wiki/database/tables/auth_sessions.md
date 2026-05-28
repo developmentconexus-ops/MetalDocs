@@ -19,7 +19,7 @@ Current curated-baseline table owned by `auth`. See the owning module wiki and r
 | `ip_address` | `text` | yes | Baseline column. |
 | `user_agent` | `text` | yes | Baseline column. |
 | `last_seen_at` | `timestamp with time zone` | no | Baseline column. |
-| `tenant_id` | `text` | no | Baseline column. |
+| `tenant_id` | `uuid` | no | Session-bound tenant selected at login; FK to `metaldocs.tenants(id)`. |
 
 ## Baseline Definition
 
@@ -33,7 +33,7 @@ session_id text NOT NULL,
     ip_address text,
     user_agent text,
     last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
-    tenant_id text NOT NULL
+    tenant_id uuid NOT NULL
 );
 ```
 
@@ -48,3 +48,6 @@ Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001
 ## Notes and Debt
 
 Curated baseline table in the `metaldocs` schema.
+
+- `tenant_id` is the authoritative active-tenant binding for the authenticated session.
+- Since migration `0214_tenants_master_table.sql`, the session tenant must resolve through `metaldocs.tenants` so auth responses can surface the human-readable tenant name.

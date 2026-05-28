@@ -8,6 +8,7 @@ import (
 )
 
 type PostgresConfig struct {
+	// DSN is set once at startup; do not mutate after initialization.
 	DSN string
 }
 
@@ -27,7 +28,7 @@ func LoadPostgresConfig() (PostgresConfig, error) {
 	pass := os.Getenv("PGPASSWORD")
 	sslMode := strings.TrimSpace(os.Getenv("PGSSLMODE"))
 	if sslMode == "" {
-		sslMode = "disable"
+		sslMode = "require"
 	}
 
 	if host == "" || db == "" || user == "" || pass == "" {

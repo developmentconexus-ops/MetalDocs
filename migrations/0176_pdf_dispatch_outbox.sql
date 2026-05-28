@@ -1,4 +1,6 @@
 -- 0176_pdf_dispatch_outbox.sql
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS metaldocs.pdf_dispatch_outbox (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id       UUID NOT NULL,
@@ -22,3 +24,5 @@ CREATE INDEX IF NOT EXISTS ix_pdf_dispatch_outbox_pending
 INSERT INTO public.schema_migrations (version, description)
 VALUES ('0176', 'add metaldocs.pdf_dispatch_outbox transactional outbox table')
 ON CONFLICT (version) DO NOTHING;
+
+COMMIT;

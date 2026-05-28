@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -25,7 +26,7 @@ type Handler struct {
 
 func New(svc *application.Service, authz AuthzFunc) *Handler {
 	if authz == nil {
-		authz = func(*http.Request, string, string, string) error { return nil }
+		panic("templates http: authz function is required")
 	}
 	return &Handler{svc: svc, authz: authz}
 }
@@ -105,7 +106,9 @@ func userIDFromReq(r *http.Request) string {
 }
 
 func writeErr(w http.ResponseWriter, status int, code problem.Code, message string) {
-	_ = problem.Write(w, problem.New(status, code, message))
+	if err := problem.Write(w, problem.New(status, code, message)); err != nil {
+		slog.Warn("templates http: problem write failed", "err", err, "status", status, "code", code)
+	}
 }
 
 var friendlyMsg = map[problem.Code]string{

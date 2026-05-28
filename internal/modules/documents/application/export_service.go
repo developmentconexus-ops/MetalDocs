@@ -12,7 +12,7 @@ import (
 
 type ExportRepo interface {
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
-	GetRevision(ctx context.Context, docID, revID string) (*domain.Revision, error)
+	GetRevision(ctx context.Context, tenantID, docID, revID string) (*domain.Revision, error)
 	InsertExport(ctx context.Context, e *domain.Export) (*domain.Export, error)
 	GetExportByHash(ctx context.Context, documentID string, compositeHash []byte) (*domain.Export, error)
 }
@@ -56,7 +56,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 		return nil, domain.ErrExportDocxMissing
 	}
 
-	rev, err := s.repo.GetRevision(ctx, documentID, doc.CurrentRevisionID)
+	rev, err := s.repo.GetRevision(ctx, tenantID, documentID, doc.CurrentRevisionID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 			DocxKey:   rev.StorageKey,
 			OutputKey: storageKey,
 			RenderOpts: &servicebus.PDFRenderOpts{
-				PaperSize: opts.PaperSize,
+				PaperSize: servicebus.PaperSize(opts.PaperSize),
 				Landscape: opts.LandscapeP,
 			},
 		})
@@ -105,16 +105,12 @@ func (s *ExportService) ExportPDF(ctx context.Context, tenantID, userID, documen
 		return nil, err
 	}
 
-	exp, err := s.repo.InsertExport(ctx, &domain.Export{
-		DocumentID:    documentID,
-		RevisionID:    rev.ID,
-		CompositeHash: compositeHash,
-		StorageKey:    storageKey,
-		SizeBytes:     sizeBytes,
-		PaperSize:     opts.PaperSize,
-		Landscape:     opts.LandscapeP,
-		DocgenV2Ver:   s.docgenVer,
-	})
+	exportRow, err := domain.NewExport(documentID, rev.ID, compositeHash, storageKey, sizeBytes, opts.PaperSize, opts.LandscapeP, s.docgenVer)
+	if err != nil {
+		return nil, err
+	}
+
+	exp, err := s.repo.InsertExport(ctx, exportRow)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +136,7 @@ func (s *ExportService) SignedDocxURL(ctx context.Context, tenantID, userID, doc
 		return "", domain.ErrExportDocxMissing
 	}
 
-	rev, err := s.repo.GetRevision(ctx, documentID, doc.CurrentRevisionID)
+	rev, err := s.repo.GetRevision(ctx, tenantID, documentID, doc.CurrentRevisionID)
 	if err != nil {
 		return "", err
 	}

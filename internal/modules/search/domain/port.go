@@ -3,6 +3,6 @@ package domain
 import "context"
 
 type Reader interface {
-	ListDocuments(ctx context.Context) ([]Document, error)
+	ListDocuments(ctx context.Context, query Query, limit, offset int) ([]Document, error)
 	ListAccessPolicies(ctx context.Context, resourceScope, resourceID string) ([]AccessPolicy, error)
 }

@@ -2,7 +2,7 @@
 
 > Companion to [wiki/modules/controlled-documents.md](controlled-documents.md). Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in [wiki/backlog/controlled-documents-refactor.md](../backlog/controlled-documents-refactor.md).
 
-**Last verified:** 2026-05-21 (spec-review convergence sync)
+**Last verified:** 2026-05-25 (backend medium quality-bar sync)
 
 ## Severity scale
 
@@ -123,7 +123,7 @@ The category names are useful only when paired with concrete triggers. Use the t
 ### T-012    Exported symbols mostly without Go doc comments
 - **Severity:** minor
 - **Surface:** `internal/modules/controlleddocuments/**/*.go`
-- **Observation:** Surface scan recorded 90 exported symbols. Doc comments present on ~11 (notably `CreateResult` `service.go:63`, `WithDocumentInitializer` `:99`, `PreviewCode` `:279`, `PeekSeq` `:289`, `CreateRevision` `:330`, `CloneTemplateRequest` `document_initializer.go:11`, `DocumentRef` `:20`, `DocumentInitializer` `:30`, `EnsureCounter` `repository.go:208`, `Peek` `:224`, `NextAndIncrement` `:239`). 79 exports lack doc comments. Latent     readability + IDE tooling impact.
+- **Observation:** Surface scan recorded 94 exported symbols after the 2026-05-25 constructor additions. Doc comments present on ~15 (notably `CreateResult`, `WithDocumentInitializer`, `PreviewCode`, `PeekSeq`, `CreateRevision`, `CloneTemplateRequest`, `NewCloneTemplateRequest`, `DocumentRef`, `NewDocumentRef`, `DocumentInitializer`, `EnsureCounter`, `Peek`, `NextAndIncrement`). 79 exports lack doc comments. Latent     readability + IDE tooling impact.
 - **Evidence:** `_artifacts/01-surface.md`   2
 - **Linked backlog row:** [`backlog/controlled-documents-refactor.md#R-012`](../backlog/controlled-documents-refactor.md)
 - **Linked ADR:** missing-ADR
@@ -132,11 +132,10 @@ The category names are useful only when paired with concrete triggers. Use the t
 
 ## Coverage stats (computed at compose time)
 
-- Public symbols undocumented: 79 / 90
+- Public symbols undocumented: 79 / 94
 - Operations missing C4 placement: 0 / 8
 - Cross-deps missing in   5/  8: 0 / 19
 - State transitions missing in   6: 0 / 2
 - Decisions without ADR link: 9 / 12
-
 
 

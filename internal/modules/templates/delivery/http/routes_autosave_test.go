@@ -12,6 +12,7 @@ import (
 
 func TestUpdateSchemas_Happy(t *testing.T) {
 	repo := newFakeRepo()
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
 	repo.versions["ver-1"] = &domain.TemplateVersion{
 		ID:            "ver-1",
 		TemplateID:    "11111111-1111-1111-1111-111111111111",
@@ -30,6 +31,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 	body := map[string]any{
 		"metadata_schema": map[string]any{
 			"doc_code_pattern": "ABC-###",
+			"retention_days":   1,
 		},
 		"placeholder_schema": []map[string]any{
 			{"id": "ph-1", "label": "Signer", "type": "select", "options": []string{"a", "b"}},
@@ -183,4 +185,3 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 		t.Fatalf("expected error.code=content_hash_mismatch, got %q", out.Code)
 	}
 }
-

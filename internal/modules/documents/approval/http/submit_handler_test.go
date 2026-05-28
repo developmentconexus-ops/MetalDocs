@@ -46,6 +46,7 @@ func TestSubmitHandler(t *testing.T) {
 	tests := []struct {
 		name           string
 		ifMatch        string
+		idempotencyKey string
 		body           string
 		svcErr         error
 		wantStatus     int
@@ -55,6 +56,7 @@ func TestSubmitHandler(t *testing.T) {
 		{
 			name:           "happy path",
 			ifMatch:        "\"v3\"",
+			idempotencyKey: "",
 			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
 			svcErr:         nil,
 			wantStatus:     http.StatusCreated,
@@ -62,43 +64,49 @@ func TestSubmitHandler(t *testing.T) {
 			wantETag:       "\"v4\"",
 		},
 		{
-			name:       "missing if-match",
-			ifMatch:    "",
-			body:       `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			wantStatus: http.StatusPreconditionRequired,
+			name:           "missing if-match",
+			ifMatch:        "",
+			idempotencyKey: "",
+			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			wantStatus:     http.StatusPreconditionRequired,
 		},
 		{
-			name:       "malformed if-match",
-			ifMatch:    "oops",
-			body:       `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			wantStatus: http.StatusBadRequest,
+			name:           "malformed if-match",
+			ifMatch:        "oops",
+			idempotencyKey: "",
+			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			wantStatus:     http.StatusBadRequest,
 		},
 		{
-			name:       "validate fails",
-			ifMatch:    "\"v1\"",
-			body:       `{"route_id":"","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			wantStatus: http.StatusBadRequest,
+			name:           "validate fails",
+			ifMatch:        "\"v1\"",
+			idempotencyKey: "",
+			body:           `{"route_id":"","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			wantStatus:     http.StatusBadRequest,
 		},
 		{
-			name:       "service stale revision",
-			ifMatch:    "\"v2\"",
-			body:       `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			svcErr:     repository.ErrStaleRevision,
-			wantStatus: http.StatusConflict,
+			name:           "service stale revision",
+			ifMatch:        "\"v2\"",
+			idempotencyKey: "",
+			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			svcErr:         repository.ErrStaleRevision,
+			wantStatus:     http.StatusConflict,
 		},
 		{
-			name:       "service capability denied",
-			ifMatch:    "\"v2\"",
-			body:       `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			svcErr:     authz.ErrCapDenied{Capability: "doc.submit", AreaCode: "tenant", ActorID: "actor-1"},
-			wantStatus: http.StatusForbidden,
+			name:           "service capability denied",
+			ifMatch:        "\"v2\"",
+			idempotencyKey: "",
+			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			svcErr:         authz.ErrCapDenied{Capability: "doc.submit", AreaCode: "tenant", ActorID: "actor-1"},
+			wantStatus:     http.StatusForbidden,
 		},
 		{
-			name:       "service generic error",
-			ifMatch:    "\"v2\"",
-			body:       `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
-			svcErr:     errors.New("boom"),
-			wantStatus: http.StatusInternalServerError,
+			name:           "service generic error",
+			ifMatch:        "\"v2\"",
+			idempotencyKey: "",
+			body:           `{"route_id":"11111111-1111-1111-1111-111111111111","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+			svcErr:         errors.New("boom"),
+			wantStatus:     http.StatusInternalServerError,
 		},
 	}
 
@@ -112,7 +120,9 @@ func TestSubmitHandler(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-			req.Header.Set("Idempotency-Key", "idem-1")
+			if tt.idempotencyKey != "" {
+				req.Header.Set("Idempotency-Key", tt.idempotencyKey)
+			}
 			req.Header.Set("X-Request-ID", "req-123")
 			if tt.ifMatch != "" {
 				req.Header.Set("If-Match", tt.ifMatch)

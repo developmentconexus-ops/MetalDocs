@@ -34,6 +34,7 @@ schedule_generation BIGINT NOT NULL DEFAULT 0
 ```sql
 -- public.editor_sessions (migrations/0110_docx_v2_documents.sql:34)
 id UUID NOT NULL PRIMARY KEY
+tenant_id UUID NOT NULL -- added by db/migrations/0211_editor_sessions_tenant_id.sql
 document_id UUID NOT NULL REFERENCES documents(id)
 user_id UUID NOT NULL
 last_acknowledged_revision_id UUID NOT NULL
@@ -202,12 +203,14 @@ status TEXT NOT NULL
 | `CreateDocumentTx` (`repository.go:76`) | Yes | `document.create` before INSERT; `document.edit` before pointer/snapshot UPDATEs; area=`tenant` | INSERT/UPDATE | `documents` |
 | `UpdateDocumentName` (`repository.go:216`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `documents` |
 | `UpdateDocumentStatus` (`repository.go:428`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `documents` |
-| `MarkArchived` (`repository.go:1071`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `public.documents` |
-| `Unarchive` (`repository.go:1082`) | No | (unclear: no `authz.Require` call in file) | UPDATE | `public.documents` |
+| `MarkArchived` (`repository.go:1368`) | Yes | `document.edit`; area=`tenant` | UPDATE + non-zero `RowsAffected` required | `public.documents` |
+| `Unarchive` (`repository.go:1399`) | Yes | `document.edit`; area=`tenant` | UPDATE + non-zero `RowsAffected` required | `public.documents` |
 
 Tripwire rule evaluation facts:
 - `approval_instances` / `approval_signoffs` writes above have no `authz.Require` call in the scanned repository files; DB tripwire trigger exists in `0142b_role_capabilities_v2_enforce.sql:201-209`.
 - `CreateDocumentTx` now asserts `document.create` and `document.edit` in order inside the caller-owned transaction; the remaining `documents` rows in this audit are pre-existing scanned findings outside this sync scope.
+- `MarkArchived` and `Unarchive` now fail when the scoped UPDATE affects zero rows; this prevents silent archive/unarchive success for missing, cross-tenant, or already-target-state documents.
+- `SnapshotRepository` document UPDATE writers (`WriteSnapshot`, `WriteFreeze`, `WriteFinalDocx`, `WritePDF`, `AppendReconstruction`) now share `requireRowsAffected` and fail when no document row is updated.
 - Reads were not audited per rule.
 
 ## 6. Migration History
@@ -245,3 +248,4 @@ Tripwire rule evaluation facts:
 | 30 | 0182_cd_sequence_per_area.sql | DROP old counter; CREATE `cd_sequence_counters` | (unclear: filename has no date) |
 | 31 | 0183_documents_name_not_empty.sql | UPDATE + ALTER `documents` NOT NULL/CHECK name | (unclear: filename has no date) |
 | 32 | 0208_documents_schedule_generation.sql | ALTER `public.documents` add `schedule_generation` discriminator for scheduled publish jobs | (unclear: filename has no date) |
+| 33 | 0211_editor_sessions_tenant_id.sql | ALTER `public.editor_sessions` add/backfill `tenant_id`; index for tenant-scoped session updates | (unclear: filename has no date) |

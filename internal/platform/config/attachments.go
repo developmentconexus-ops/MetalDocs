@@ -8,14 +8,25 @@ import (
 )
 
 const (
-	StorageProviderMemory = "memory"
-	StorageProviderLocal  = "local"
-	StorageProviderMinIO  = "minio"
+	StorageProviderMemory StorageProvider = "memory"
+	StorageProviderLocal  StorageProvider = "local"
+	StorageProviderMinIO  StorageProvider = "minio"
+)
+
+type StorageProvider string
+
+type AppEnv string
+
+const (
+	AppEnvLocal      AppEnv = "local"
+	AppEnvDev        AppEnv = "dev"
+	AppEnvStaging    AppEnv = "staging"
+	AppEnvProduction AppEnv = "production"
 )
 
 type AttachmentsConfig struct {
-	Provider              string
-	AppEnv                string
+	Provider              StorageProvider
+	AppEnv                AppEnv
 	RootPath              string
 	DownloadSecret        string
 	DownloadTTLSeconds    int
@@ -31,10 +42,10 @@ type AttachmentsConfig struct {
 func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
 	if appEnv == "" {
-		appEnv = "local"
+		appEnv = string(AppEnvLocal)
 	}
 
-	provider := strings.ToLower(strings.TrimSpace(os.Getenv("METALDOCS_STORAGE_PROVIDER")))
+	provider := StorageProvider(strings.ToLower(strings.TrimSpace(os.Getenv("METALDOCS_STORAGE_PROVIDER"))))
 	if provider == "" {
 		provider = StorageProviderLocal
 	}
@@ -68,7 +79,7 @@ func LoadAttachmentsConfig() (AttachmentsConfig, error) {
 
 	cfg := AttachmentsConfig{
 		Provider:           provider,
-		AppEnv:             appEnv,
+		AppEnv:             AppEnv(appEnv),
 		RootPath:           root,
 		DownloadSecret:     secret,
 		DownloadTTLSeconds: ttlSeconds,

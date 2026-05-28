@@ -1,5 +1,54 @@
 # Sync log - approval
 
+## 2026-05-25 - approval 5c + 5d medium sweep sync
+
+- **Context:** current uncommitted Phase 11 medium-sweep diff scoped to `internal/modules/documents/approval/**`.
+- **Mode:** structural refresh
+- **Anchors moved:** none.
+- **Public surface:** `ReadService.LoadInstance` no longer accepts `actorID`; `application.SignoffRequest.Decision` is now typed as `domain.Decision`; approval contract DTOs now use typed quorum/drift/status/decision/signature aliases and `RouteResponse.NewVersion` is a pointer field.
+- **Routes/API:** no route or OpenAPI ownership change; HTTP contract validation is stricter and now wraps a typed `contracts.ErrValidation` sentinel.
+- **Runtime flows:** signoff seeds `authz.WithCapCache` before authz GUC setup; publish/cancel set authz context before repository reads; scheduler logs all three nil-return skip reasons; doc-signoff handlers parse boundary decisions into `domain.Decision`.
+- **Persistence:** governance events now persist `occurred_at`; active-instance lookup orders by `submitted_at DESC, id DESC`; repository scan failures now include approval-instance context; cancel area snapshot scan now tolerates SQL NULL with `sql.NullString`.
+- **Dependencies:** none beyond existing approval/http/authz/repository surfaces.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** unchanged from prior row (Critical=2 Major=4 Minor=6; missing-ADR=10).
+- **Tally gate:** FAIL pre-existing/environment: module-doc-sync preflight Git Bash step still aborts with `CreateFileMapping ... Win32 error 5`.
+- **Patched files:** `wiki/modules/approval.md`; `wiki/modules/approval-tech-debt.md`; `wiki/backlog/approval-refactor.md`; `wiki/modules/approval/_artifacts/sync-log.md`.
+
+## 2026-05-25 - residual Phase 7 highs sync (5c-H12 / 5d-H5 / 5d-H6)
+
+- **Context:** current uncommitted residual-highs hardening diff scoped to `internal/modules/documents/approval/**`.
+- **Mode:** lite patch
+- **Anchors moved:** none.
+- **Public surface:** `jobs.ScheduledPublishWorker` dependencies are now constructor-injected/private (`NewScheduledPublishWorker`), preserving `Work` nil guards.
+- **Routes/API:** none.
+- **Runtime flows:** unchanged business behavior; worker still delegates to `SchedulerService.RunScheduledPublishJob`.
+- **Persistence:** none.
+- **Dependencies:** `infrastructure/signature.PasswordReauthProvider` now requires an explicit `AuthFailureRateLimiter` dependency and fails closed when unconfigured; in-memory limiter kept as explicit local implementation (`NewInMemoryAuthFailureRateLimiter`) for test/dev usage.
+- **Residual IDs touched:** `5c-H12` documented as intentional (read-service keeps read-write tx because repository reads may lock with `FOR UPDATE`); `5d-H5` mitigated with explicit fail-closed limiter dependency; `5d-H6` closed with private fields + constructor.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** unchanged from prior row (Critical=2 Major=4 Minor=6; missing-ADR=10).
+- **Tally gate:** FAIL pre-existing/environment: Git Bash unavailable in this environment (`CreateFileMapping ... Win32 error 5`) during module-doc-sync preflight.
+- **Patched files:** `internal/modules/documents/approval/application/read_service.go`; `internal/modules/documents/approval/infrastructure/signature/password_reauth.go`; `internal/modules/documents/approval/infrastructure/signature/password_reauth_test.go`; `internal/modules/documents/approval/jobs/scheduled_publish_job.go`; `internal/modules/documents/approval/jobs/scheduled_publish_job_test.go`; `wiki/modules/approval/_artifacts/sync-log.md`.
+
+## 2026-05-25 - approval 5c high hardening sync
+
+- **Context:** current uncommitted Worker 7F approval application/repository diff.
+- **Mode:** structural refresh
+- **Anchors moved:** none.
+- **Public surface:** no exported symbols added or removed; `RecordSignoff` now requires non-empty `StageInstanceID`.
+- **Routes/API:** no HTTP route, OpenAPI, or generated API change.
+- **Runtime flows:** signoff now applies live eligibility drift for non-`keep_snapshot` policies; cancel and cutover now use stronger transaction/authz context.
+- **Persistence:** tenant-scoped cancel stage UPDATE; tenant-scoped route-stage/signoff/display-name reads; checked `RowsAffected`/`json.Marshal` error paths; scheduler rollback now owned by transaction defer.
+- **Dependencies:** `cutover_service.go` now imports `iam/authz` for system-bypassed RLS context.
+- **T-NNN touched:** T-006 closed with cancel/cutover authz/RLS evidence.
+- **R-NNN touched:** R-006 closed.
+- **Counts after:** Critical=2 Major=4 (T-004/T-005 open; T-003/T-006 closed) Minor=6; missing-ADR=10.
+- **Tally gate:** FAIL pre-existing/environment: Git Bash in preflight failed with Win32 error 5 before wiki edits.
+- **Patched files:** `wiki/modules/approval.md`; `wiki/modules/approval-tech-debt.md`; `wiki/backlog/approval-refactor.md`; `wiki/modules/approval/_artifacts/sync-log.md`.
+
 ## 2026-05-21 - approval wrapper-mounted routing sync
 
 - **Context:** uncommitted Phase 3 backend-platform-freeze slice to move approval runtime mounting from raw per-route handler registration to generated `approvalapi.ServerInterfaceWrapper`.

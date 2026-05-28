@@ -20,8 +20,8 @@ func TestGetTemplate_Happy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetTemplate returned error: %v", err)
 	}
-	if got != tpl {
-		t.Fatalf("expected template pointer %p, got %p", tpl, got)
+	if got.ID != tpl.ID || got.TenantID != tpl.TenantID {
+		t.Fatalf("expected template %+v, got %+v", tpl, got)
 	}
 }
 
@@ -51,8 +51,8 @@ func TestGetVersion_Happy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetVersion returned error: %v", err)
 	}
-	if got != ver {
-		t.Fatalf("expected version pointer %p, got %p", ver, got)
+	if got.ID != ver.ID || got.TemplateID != ver.TemplateID || got.VersionNumber != ver.VersionNumber {
+		t.Fatalf("expected version %+v, got %+v", ver, got)
 	}
 }
 

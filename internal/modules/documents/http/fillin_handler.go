@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -62,13 +63,13 @@ func (h *FillInHandler) GetFillInSchema(w http.ResponseWriter, r *http.Request) 
 
 func (h *FillInHandler) ListPlaceholderValues(w http.ResponseWriter, r *http.Request) {
 	docID := r.PathValue("id")
-	tenantID, err := tenantID(r)
+	tid, err := tenantID(r)
 	if err != nil {
 		writeFillInError(w, requestID(r), err)
 		return
 	}
 
-	vals, err := h.service.GetPlaceholderValues(r.Context(), tenantID, docID)
+	vals, err := h.service.GetPlaceholderValues(r.Context(), tid, docID)
 	if err != nil {
 		writeFillInError(w, requestID(r), err)
 		return
@@ -127,6 +128,8 @@ type fillInErrorBody struct {
 	Message string `json:"message"`
 }
 
+var ErrBadContentType = errors.New("content-type must be application/json")
+
 func mapFillInError(err error) (int, fillInErrorResponse) {
 	status := http.StatusInternalServerError
 	code := "internal.unknown"
@@ -150,6 +153,9 @@ func mapFillInError(err error) (int, fillInErrorResponse) {
 	case errors.Is(err, io.EOF):
 		status = http.StatusBadRequest
 		code = "validation.empty_body"
+	case errors.Is(err, ErrBadContentType):
+		status = http.StatusUnsupportedMediaType
+		code = "validation.bad_content_type"
 	case looksLikeDecodeError(err):
 		status = http.StatusBadRequest
 		code = "validation.json_decode"
@@ -181,9 +187,9 @@ func writeFillInJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func decodeJSON(r *http.Request, out any) error {
-	if strings.TrimSpace(r.Header.Get("Content-Type")) != "" &&
-		!strings.Contains(strings.ToLower(r.Header.Get("Content-Type")), "application/json") {
-		return fmt.Errorf("content-type must be application/json")
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		return ErrBadContentType
 	}
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()

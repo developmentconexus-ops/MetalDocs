@@ -175,7 +175,7 @@ func (s *submitTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "current_setting('metaldocs.actor_id'") {
 		return &submitSingleValueRows{value: s.conn.actorID}, nil
 	}
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil
 	}
 	if strings.Contains(q, "approval_route_stages") {

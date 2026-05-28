@@ -1,6 +1,7 @@
 package idempotency_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -40,6 +41,70 @@ func TestBeginReplay_FirstCall_ReturnsHandle(t *testing.T) {
 	}
 	if err := s.FailReplay(handle, nil); err != nil {
 		t.Fatalf("FailReplay: %v", err)
+	}
+}
+
+func TestBeginReplay_InFlightRowAllowsNullResponseColumns(t *testing.T) {
+	db := pgtest.OpenAndMigrate(t)
+	s := idempotency.New(db, "POST /tp/{id}")
+	ctx := context.Background()
+	key := uniqueKey("in-flight")
+
+	handle, replay, err := s.BeginReplay(ctx, twoPhaseTenant, twoPhaseActor, key, "hash-a")
+	if err != nil {
+		t.Fatalf("BeginReplay: %v", err)
+	}
+	if replay != nil {
+		t.Fatalf("first call should not return a replay")
+	}
+
+	var (
+		status                string
+		responseStatusIsNull  bool
+		responseBodyIsNull    bool
+		completedResponseCode int
+		completedResponseBody []byte
+	)
+	err = db.QueryRowContext(ctx, `
+		SELECT status, response_status IS NULL, response_body IS NULL
+		  FROM metaldocs.idempotency_keys
+		 WHERE tenant_id = $1
+		   AND actor_user_id = $2
+		   AND route_template = $3
+		   AND key = $4`,
+		twoPhaseTenant, twoPhaseActor, "POST /tp/{id}", key,
+	).Scan(&status, &responseStatusIsNull, &responseBodyIsNull)
+	if err != nil {
+		t.Fatalf("query in_flight row: %v", err)
+	}
+	if status != "in_flight" || !responseStatusIsNull || !responseBodyIsNull {
+		t.Fatalf("want in_flight row with null response fields, got status=%q status_null=%v body_null=%v", status, responseStatusIsNull, responseBodyIsNull)
+	}
+
+	if err := s.CompleteReplay(handle, 201, []byte(`{"ok":true}`)); err != nil {
+		t.Fatalf("CompleteReplay: %v", err)
+	}
+
+	err = db.QueryRowContext(ctx, `
+		SELECT status, response_status, response_body
+		  FROM metaldocs.idempotency_keys
+		 WHERE tenant_id = $1
+		   AND actor_user_id = $2
+		   AND route_template = $3
+		   AND key = $4`,
+		twoPhaseTenant, twoPhaseActor, "POST /tp/{id}", key,
+	).Scan(&status, &completedResponseCode, &completedResponseBody)
+	if err != nil {
+		t.Fatalf("query completed row: %v", err)
+	}
+	if status != "completed" {
+		t.Fatalf("want completed row, got %q", status)
+	}
+	if completedResponseCode != 201 {
+		t.Fatalf("response_status = %d, want 201", completedResponseCode)
+	}
+	if !bytes.Equal(completedResponseBody, []byte(`{"ok":true}`)) {
+		t.Fatalf("response_body = %q, want stored bytes", completedResponseBody)
 	}
 }
 

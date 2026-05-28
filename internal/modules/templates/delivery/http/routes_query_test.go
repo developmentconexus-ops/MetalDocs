@@ -1,6 +1,7 @@
 package http_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,3 +45,27 @@ func TestGetSystemBlankTemplate_RequiresTemplateViewAuthz(t *testing.T) {
 	}
 }
 
+func TestListTemplates_LimitOver200Rejected(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a", Name: "Template"}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/templates?limit=201", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "invalid_limit" {
+		t.Fatalf("expected error.code=invalid_limit, got %q", out.Code)
+	}
+}

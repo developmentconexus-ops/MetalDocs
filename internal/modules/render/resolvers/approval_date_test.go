@@ -33,3 +33,17 @@ func TestApprovalDateResolver_Resolve(t *testing.T) {
 		t.Fatal("expected stable hash across repeated resolves")
 	}
 }
+
+func TestApprovalDateResolver_ZeroDateReturnsError(t *testing.T) {
+	r := ApprovalDateResolver{}
+	in := ResolveInput{
+		TenantID:   "tenant-a",
+		RevisionID: "rev-1",
+		WorkflowReader: fakeWorkflowReader{
+			finalApprovalDate: time.Time{},
+		},
+	}
+	if _, err := r.Resolve(context.Background(), in); err == nil {
+		t.Fatal("expected error when final approval date is zero")
+	}
+}

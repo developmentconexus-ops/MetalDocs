@@ -1,7 +1,9 @@
 package taxonomy
 
 import (
+	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
@@ -24,16 +26,21 @@ type Dependencies struct {
 func New(deps Dependencies) *Module {
 	profileRepo := infrastructure.NewProfileRepository(deps.DB)
 	areaRepo := infrastructure.NewAreaRepository(deps.DB)
+	tplChecker := deps.TplChecker
+	if tplChecker == nil {
+		tplChecker = infrastructure.NewTemplateVersionChecker(deps.DB)
+	}
 	var govLogger domain.GovernanceLogger
 	if deps.AuditWriter != nil {
 		govLogger = application.NewAuditGovernanceAdapter(deps.AuditWriter)
 	} else {
+		slog.WarnContext(context.Background(), "taxonomy audit writer missing; using legacy DB governance logger")
 		govLogger = application.NewDBGovernanceLogger(deps.DB)
 	}
 
 	familyRepo := infrastructure.NewFamilyRepository(deps.DB)
 
-	profileService := application.NewProfileService(profileRepo, deps.TplChecker, govLogger)
+	profileService := application.NewProfileService(profileRepo, tplChecker, govLogger)
 	areaService := application.NewAreaService(areaRepo, govLogger)
 	familyService := application.NewFamilyService(familyRepo, govLogger)
 	handler := thttp.NewHandler(profileService, areaService, familyService)

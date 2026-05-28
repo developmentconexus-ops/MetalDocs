@@ -133,6 +133,9 @@ func (s *phase5Stmt) Exec(_ []driver.Value) (driver.Result, error) {
 func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 
+	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
+		return &submitSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
 	}
@@ -156,7 +159,7 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	}
 
 	// Submit: approval_routes SELECT
-	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") {
+	if strings.Contains(q, "approval_routes") && strings.Contains(q, "where") && !strings.Contains(q, "approval_route_stages") {
 		return &routeRows{}, nil // reuse submit_service_test.go's routeRows
 	}
 	// Submit: approval_route_stages SELECT

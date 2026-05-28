@@ -53,11 +53,11 @@ func (h *Handler) createArea(w http.ResponseWriter, r *http.Request) {
 	}
 
 	area := &domain.ProcessArea{
-		Code:                strings.TrimSpace(req.Code),
+		Code:                domain.AreaCode(strings.TrimSpace(req.Code)),
 		TenantID:            tenantID,
 		Name:                strings.TrimSpace(req.Name),
 		Description:         strings.TrimSpace(req.Description),
-		ParentCode:          req.ParentCode,
+		ParentCode:          areaCodePtr(req.ParentCode),
 		OwnerUserID:         req.OwnerUserID,
 		DefaultApproverRole: req.DefaultApproverRole,
 	}
@@ -80,7 +80,7 @@ func (h *Handler) getArea(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	area, err := h.areas.Get(r.Context(), tenantID, r.PathValue("code"))
+	area, err := h.areas.Get(r.Context(), tenantID, domain.AreaCode(r.PathValue("code")))
 	if err != nil {
 		h.writeAreaError(w, err)
 		return
@@ -99,13 +99,17 @@ func (h *Handler) updateArea(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
 		return
 	}
+	if _, err := h.areas.Get(r.Context(), tenantID, domain.AreaCode(r.PathValue("code"))); err != nil {
+		h.writeAreaError(w, err)
+		return
+	}
 
 	area := &domain.ProcessArea{
-		Code:                r.PathValue("code"),
+		Code:                domain.AreaCode(r.PathValue("code")),
 		TenantID:            tenantID,
 		Name:                strings.TrimSpace(req.Name),
 		Description:         strings.TrimSpace(req.Description),
-		ParentCode:          req.ParentCode,
+		ParentCode:          areaCodePtr(req.ParentCode),
 		OwnerUserID:         req.OwnerUserID,
 		DefaultApproverRole: req.DefaultApproverRole,
 	}
@@ -131,13 +135,21 @@ func (h *Handler) archiveArea(w http.ResponseWriter, r *http.Request) {
 	if err := h.areas.Archive(
 		r.Context(),
 		tenantID,
-		r.PathValue("code"),
+		domain.AreaCode(r.PathValue("code")),
 		actorUserID,
 	); err != nil {
 		h.writeAreaError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func areaCodePtr(v *string) *domain.AreaCode {
+	if v == nil {
+		return nil
+	}
+	code := domain.AreaCode(*v)
+	return &code
 }
 
 func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
@@ -149,10 +161,12 @@ func (h *Handler) writeAreaError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "AREA_ARCHIVED", "process area is archived")
 	case errors.Is(err, domain.ErrAreaParentCycle):
 		writeError(w, http.StatusBadRequest, "AREA_PARENT_CYCLE", "area parent assignment creates cycle")
+	case errors.Is(err, domain.ErrAreaParentCodeRequired):
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "parentCode is required")
 	case errors.Is(err, domain.ErrAreaCodeImmutable):
 		writeError(w, http.StatusBadRequest, "AREA_CODE_IMMUTABLE", "area code is immutable")
 	case errors.As(err, &pgErr) && pgErr.Code == "23514":
-		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", pgErr.Message)
+		writeError(w, http.StatusBadRequest, "VALIDATION_ERROR", "request violates data constraints")
 	case errors.As(err, &pgErr) && pgErr.Code == "23505":
 		writeError(w, http.StatusConflict, "AREA_ALREADY_EXISTS", "area code already exists")
 	default:

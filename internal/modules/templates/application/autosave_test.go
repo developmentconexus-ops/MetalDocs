@@ -82,6 +82,40 @@ func TestPresignAutosave_NonDraft(t *testing.T) {
 	}
 }
 
+func TestPresignTemplateUpload_IgnoresCallerStorageKey(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{
+		ID:       "tpl-1",
+		TenantID: "tenant-a",
+	}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  1,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/1.docx",
+	}
+	presigner := &fakePresigner{}
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
+
+	got, err := svc.PresignTemplateUpload(context.Background(), application.PresignTemplateUploadCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "user-a",
+		TemplateID:    "tpl-1",
+		VersionNumber: 1,
+		StorageKey:    "templates/other-tenant/versions/1.docx",
+	})
+	if err != nil {
+		t.Fatalf("PresignTemplateUpload returned error: %v", err)
+	}
+	if got.StorageKey != "templates/tpl-1/versions/1.docx" {
+		t.Fatalf("expected server-derived storage key, got %q", got.StorageKey)
+	}
+	if len(presigner.PutKeys) != 1 || presigner.PutKeys[0] != "templates/tpl-1/versions/1.docx" {
+		t.Fatalf("unexpected presign keys: %v", presigner.PutKeys)
+	}
+}
+
 func TestCommitAutosave_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["tpl-1"] = &domain.Template{
@@ -198,6 +232,35 @@ func TestCommitAutosave_HashMismatch(t *testing.T) {
 	}
 	if presigner.DeleteCalled != 1 {
 		t.Fatalf("expected DeleteCalled 1, got %d", presigner.DeleteCalled)
+	}
+}
+
+func TestCommitAutosave_HashMismatchReturnsDeleteError(t *testing.T) {
+	repo := newFakeRepo()
+	repo.templates["tpl-1"] = &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:             "ver-1",
+		TemplateID:     "tpl-1",
+		VersionNumber:  2,
+		Status:         domain.VersionStatusDraft,
+		DocxStorageKey: "templates/tpl-1/versions/2.docx",
+	}
+	deleteErr := errors.New("delete failed")
+	presigner := &fakePresigner{HeadResult: "hash_actual", DeleteErr: deleteErr}
+	svc := application.New(repo, presigner, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
+		TenantID:            "tenant-a",
+		ActorUserID:         "user-a",
+		TemplateID:          "tpl-1",
+		VersionNumber:       2,
+		ExpectedContentHash: "hash_expected",
+	})
+	if !errors.Is(err, domain.ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
+	}
+	if !errors.Is(err, deleteErr) {
+		t.Fatalf("expected delete error to be returned, got %v", err)
 	}
 }
 
@@ -321,10 +384,20 @@ func expectTemplateEditAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
 )`)).
 		WithArgs(actorID, tenantID).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))

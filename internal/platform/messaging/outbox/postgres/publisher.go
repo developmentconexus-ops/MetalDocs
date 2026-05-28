@@ -26,6 +26,7 @@ func (p *Publisher) Publish(ctx context.Context, event messaging.Event) error {
 	}
 
 	const q = `
+-- TODO(phase11): event_id/idempotency_key are still TEXT-backed in the current schema; tighten column bounds in the pending DB migration.
 INSERT INTO metaldocs.outbox_events (
   event_id, event_type, aggregate_type, aggregate_id, occurred_at, version,
   idempotency_key, producer, trace_id, payload, published_at
@@ -43,15 +44,15 @@ ON CONFLICT (idempotency_key) DO NOTHING
 	if _, err := p.db.ExecContext(
 		ctx,
 		q,
-		strings.TrimSpace(event.EventID),
-		strings.TrimSpace(event.EventType),
-		strings.TrimSpace(event.AggregateType),
-		strings.TrimSpace(event.AggregateID),
+		strings.TrimSpace(string(event.EventID)),
+		strings.TrimSpace(string(event.EventType)),
+		strings.TrimSpace(string(event.AggregateType)),
+		strings.TrimSpace(string(event.AggregateID)),
 		occurredAt,
 		event.Version,
-		strings.TrimSpace(event.IdempotencyKey),
+		strings.TrimSpace(string(event.IdempotencyKey)),
 		strings.TrimSpace(event.Producer),
-		strings.TrimSpace(event.TraceID),
+		strings.TrimSpace(string(event.TraceID)),
 		string(payloadJSON),
 	); err != nil {
 		return fmt.Errorf("insert outbox event: %w", err)

@@ -16,7 +16,6 @@ var (
 	ErrContentType  = errors.New("content-type must be application/json")
 	ErrBodyTooLarge = errors.New("request body too large (max 64 KB)")
 	ErrEmptyBody    = errors.New("request body must not be empty")
-	ErrDuplicateKey = errors.New("request body contains duplicate JSON keys")
 )
 
 // Decode decodes JSON from r.Body into dst with strict validation.
@@ -41,7 +40,6 @@ func Decode(r *http.Request, dst any) error {
 		return ErrEmptyBody
 	}
 
-	// TODO: duplicate key detection requires token-level scanning.
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {

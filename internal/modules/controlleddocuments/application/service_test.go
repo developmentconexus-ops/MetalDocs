@@ -17,6 +17,43 @@ import (
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 )
 
+func TestNewControlledDocumentService_PanicsOnNilRequiredDependencies(t *testing.T) {
+	validRepo := newFakeControlledDocumentRepository()
+	validSeq := &fakeSequenceAllocator{next: 1}
+	validTpl := &fakeTemplateVersionChecker{}
+	validProfiles := &fakeProfileReader{}
+	validAreas := &fakeAreaReader{}
+	validLogger := &fakeGovernanceLogger{}
+	assertPanic := func(name string, fn func()) {
+		t.Helper()
+		defer func() {
+			if recover() == nil {
+				t.Fatalf("%s: expected panic", name)
+			}
+		}()
+		fn()
+	}
+
+	assertPanic("nil repository", func() {
+		NewControlledDocumentService(nil, nil, validSeq, validTpl, validProfiles, validAreas, validLogger, nil)
+	})
+	assertPanic("nil sequence allocator", func() {
+		NewControlledDocumentService(nil, validRepo, nil, validTpl, validProfiles, validAreas, validLogger, nil)
+	})
+	assertPanic("nil template checker", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, nil, validProfiles, validAreas, validLogger, nil)
+	})
+	assertPanic("nil profile reader", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, validTpl, nil, validAreas, validLogger, nil)
+	})
+	assertPanic("nil area reader", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, validTpl, validProfiles, nil, validLogger, nil)
+	})
+	assertPanic("nil governance logger", func() {
+		NewControlledDocumentService(nil, validRepo, validSeq, validTpl, validProfiles, validAreas, nil, nil)
+	})
+}
+
 func TestCreate_AutoCode(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	logger := &fakeGovernanceLogger{}
@@ -118,6 +155,22 @@ func TestCreate_ManualCode_ShortReason(t *testing.T) {
 	})
 	if !errors.Is(err, controlleddocumentsdomain.ErrManualCodeReasonRequired) {
 		t.Fatalf("expected ErrManualCodeReasonRequired, got %v", err)
+	}
+}
+
+func TestCreate_UsesControlledDocumentConstructorValidation(t *testing.T) {
+	svc := NewControlledDocumentService(nil, newFakeControlledDocumentRepository(), &fakeSequenceAllocator{next: 1}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, newInvariantReadyDocumentInitializer())
+	_, err := svc.Create(context.Background(), CreateControlledDocumentCmd{
+		TenantID:        "tenant-a",
+		ProfileCode:     "po",
+		ProcessAreaCode: "quality",
+		Title:           " ",
+		OwnerUserID:     "owner-1",
+		ActorUserID:     "actor-1",
+		VisibilityScope: "company",
+	})
+	if !errors.Is(err, controlleddocumentsdomain.ErrCDTitleRequired) {
+		t.Fatalf("expected ErrCDTitleRequired, got %v", err)
 	}
 }
 
@@ -225,15 +278,18 @@ func TestCreate_AreaArchived(t *testing.T) {
 
 type fakeControlledDocumentRepository struct {
 	codeExists     bool
+	canRead        bool
 	created        *controlleddocumentsdomain.ControlledDocument
+	getByIDCalls   int
 	lastListFilter controlleddocumentsdomain.CDFilter
 }
 
 func newFakeControlledDocumentRepository() *fakeControlledDocumentRepository {
-	return &fakeControlledDocumentRepository{}
+	return &fakeControlledDocumentRepository{canRead: true}
 }
 
 func (f *fakeControlledDocumentRepository) GetByID(_ context.Context, _, _ string) (*controlleddocumentsdomain.ControlledDocument, error) {
+	f.getByIDCalls++
 	if f.created == nil {
 		return nil, controlleddocumentsdomain.ErrCDNotFound
 	}
@@ -254,7 +310,7 @@ func (f *fakeControlledDocumentRepository) List(_ context.Context, _ string, fil
 	return nil, nil
 }
 func (f *fakeControlledDocumentRepository) CanRead(_ context.Context, _, _, _ string) (bool, error) {
-	return true, nil
+	return f.canRead, nil
 }
 
 func (f *fakeControlledDocumentRepository) Create(_ context.Context, doc *controlleddocumentsdomain.ControlledDocument) error {
@@ -263,7 +319,7 @@ func (f *fakeControlledDocumentRepository) Create(_ context.Context, doc *contro
 	return nil
 }
 
-func (f *fakeControlledDocumentRepository) CreateTx(_ context.Context, _ *sql.Tx, doc *controlleddocumentsdomain.ControlledDocument) error {
+func (f *fakeControlledDocumentRepository) CreateTx(_ context.Context, _ controlleddocumentsdomain.DBTX, doc *controlleddocumentsdomain.ControlledDocument) error {
 	copy := *doc
 	f.created = &copy
 	return nil
@@ -273,7 +329,7 @@ func (f *fakeControlledDocumentRepository) UpdateStatus(_ context.Context, _, _ 
 	return nil
 }
 
-func (f *fakeControlledDocumentRepository) UpdateStatusTx(_ context.Context, _ *sql.Tx, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
+func (f *fakeControlledDocumentRepository) UpdateStatusTx(_ context.Context, _ controlleddocumentsdomain.DBTX, _, _ string, _ controlleddocumentsdomain.CDStatus, _ time.Time) error {
 	return nil
 }
 
@@ -281,7 +337,7 @@ type fakeSequenceAllocator struct {
 	next int
 }
 
-func (f *fakeSequenceAllocator) NextAndIncrement(_ context.Context, _ controlleddocumentsdomain.DBExecutor, _, _, _ string) (int, error) {
+func (f *fakeSequenceAllocator) NextAndIncrement(_ context.Context, _ controlleddocumentsdomain.DBTX, _, _, _ string) (int, error) {
 	v := f.next
 	f.next++
 	return v, nil
@@ -304,7 +360,7 @@ type fakeTemplateVersionChecker struct {
 	byID map[string]templateVersionState
 }
 
-func (f *fakeTemplateVersionChecker) GetTemplateVersionState(_ context.Context, templateVersionID string) (*string, string, error) {
+func (f *fakeTemplateVersionChecker) GetTemplateVersionState(_ context.Context, _ string, templateVersionID string) (*string, string, error) {
 	if f.byID == nil {
 		return nil, "", nil
 	}
@@ -321,7 +377,7 @@ type fakeProfileReader struct {
 
 func (f *fakeProfileReader) GetByCode(_ context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
 	if f.item == nil {
-		return &taxonomydomain.DocumentProfile{Code: code, TenantID: tenantID}, nil
+		return &taxonomydomain.DocumentProfile{Code: taxonomydomain.ProfileCode(code), TenantID: tenantID}, nil
 	}
 	copy := *f.item
 	return &copy, nil
@@ -333,7 +389,7 @@ type fakeAreaReader struct {
 
 func (f *fakeAreaReader) GetByCode(_ context.Context, tenantID, code string) (*taxonomydomain.ProcessArea, error) {
 	if f.item == nil {
-		return &taxonomydomain.ProcessArea{Code: code, TenantID: tenantID}, nil
+		return &taxonomydomain.ProcessArea{Code: taxonomydomain.AreaCode(code), TenantID: tenantID}, nil
 	}
 	copy := *f.item
 	return &copy, nil
@@ -437,8 +493,8 @@ func TestControlledDocumentService_Create_AtomicWithDocument(t *testing.T) {
 	if !docInit.called {
 		t.Fatalf("expected docInit.CloneTemplate to be called")
 	}
-	if docInit.gotReq.Name != "HR Policy v1" {
-		t.Fatalf("expected DocumentName forwarded, got %q", docInit.gotReq.Name)
+	if docInit.gotReq.Name() != "HR Policy v1" {
+		t.Fatalf("expected DocumentName forwarded, got %q", docInit.gotReq.Name())
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sqlmock expectations: %v", err)
@@ -663,6 +719,28 @@ func TestControlledDocumentService_PreviewCode_ReturnsFormatted(t *testing.T) {
 	}
 }
 
+func TestPeekSeq_ProfileTenantValidationError(t *testing.T) {
+	svc := NewControlledDocumentService(
+		nil,
+		newFakeControlledDocumentRepository(),
+		&fakeSequenceAllocator{next: 7},
+		&fakeTemplateVersionChecker{},
+		&fakeProfileReader{item: nil},
+		&fakeAreaReader{},
+		&fakeGovernanceLogger{},
+		nil,
+	)
+	profileErr := taxonomydomain.ErrProfileNotFound
+	svc.profiles = profileReaderFunc(func(context.Context, string, string) (*taxonomydomain.DocumentProfile, error) {
+		return nil, profileErr
+	})
+
+	_, err := svc.PeekSeq(context.Background(), "tenant-a", "DC", "RH")
+	if !errors.Is(err, profileErr) {
+		t.Fatalf("expected profile error, got %v", err)
+	}
+}
+
 func TestList_MissingActorContextReturnsErrActorMissing(t *testing.T) {
 	repo := newFakeControlledDocumentRepository()
 	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, nil)
@@ -729,6 +807,34 @@ func TestCreateRevision_MissingActorContextReturnsErrActorMissing(t *testing.T) 
 	})
 	if !errors.Is(err, ErrActorMissing) {
 		t.Fatalf("CreateRevision: expected ErrActorMissing, got %v", err)
+	}
+}
+
+func TestCreateRevision_HiddenDocumentReturnsNotFoundBeforeLookup(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	repo.canRead = false
+	repo.created = &controlleddocumentsdomain.ControlledDocument{
+		ID:              "cd-1",
+		TenantID:        "tenant-a",
+		ProfileCode:     "pop",
+		ProcessAreaCode: "general",
+		Code:            "POP-GENERAL-014",
+		Status:          controlleddocumentsdomain.CDStatusActive,
+		OwnerUserID:     "owner-1",
+	}
+	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, &fakeDocumentInitializer{})
+
+	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
+	_, err := svc.CreateRevision(ctx, CreateRevisionCmd{
+		TenantID: "tenant-a",
+		CDID:     "cd-1",
+		Name:     "Hidden revision",
+	})
+	if !errors.Is(err, controlleddocumentsdomain.ErrCDNotFound) {
+		t.Fatalf("expected ErrCDNotFound, got %v", err)
+	}
+	if repo.getByIDCalls != 0 {
+		t.Fatalf("expected GetByID to be skipped for hidden document, got %d calls", repo.getByIDCalls)
 	}
 }
 
@@ -830,18 +936,38 @@ func expectRegistryCreateAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(actorID))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
-	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
-)`)).
-		WithArgs(actorID, tenantID).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	expectSystemAdminBypass(mock, actorID, tenantID, true)
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(nil))
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
 		WithArgs(sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+}
+
+func expectSystemAdminBypass(mock sqlmock.Sqlmock, actorID, tenantID string, exists bool) {
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
+)`)).
+		WithArgs(actorID, tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(exists))
+}
+
+type profileReaderFunc func(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)
+
+func (f profileReaderFunc) GetByCode(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error) {
+	return f(ctx, tenantID, code)
 }

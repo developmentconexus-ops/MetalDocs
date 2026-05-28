@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"strings"
 	"sync"
 
@@ -61,5 +62,7 @@ func (w *Writer) ListEvents(_ context.Context, query domain.ListEventsQuery) ([]
 }
 
 func (w *Writer) ValidateIntegrity(context.Context) ([]domain.IntegrityIssue, error) {
-	return nil, nil
+	// TODO(audit): implement checksum validation if the memory writer becomes
+	// part of integrity-sensitive tests instead of a lightweight append stub.
+	return nil, errors.New("integrity validation not supported by memory writer")
 }

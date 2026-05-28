@@ -2,7 +2,10 @@ package application
 
 import (
 	"context"
+	"fmt"
 
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/templates/domain"
 )
 
@@ -16,7 +19,7 @@ type UpsertApprovalConfigCmd struct {
 func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalConfigCmd) (*domain.ApprovalConfig, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
-		return nil, err
+		return nil, wrapAppErr("templates approval config: get template", err)
 	}
 	if template.TenantID != cmd.TenantID {
 		return nil, domain.ErrNotFound
@@ -43,30 +46,56 @@ func (s *Service) UpsertApprovalConfig(ctx context.Context, cmd UpsertApprovalCo
 		return nil, domain.ErrInvalidApprovalConfig
 	}
 
-	config := &domain.ApprovalConfig{
-		TemplateID:   cmd.TemplateID,
-		ReviewerRole: cmd.ReviewerRole,
-		ApproverRole: cmd.ApproverRole,
-	}
-
-	if err := s.repo.UpsertApprovalConfig(ctx, config); err != nil {
+	config, err := domain.NewApprovalConfig(cmd.TemplateID, cmd.ApproverRole, cmd.ReviewerRole)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: cmd.TemplateID,
-		VersionID:  nil,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditApprovalConfigUpdated,
-		Details: map[string]any{
+	audit, err := newAuditEvent(
+		cmd.TenantID,
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		nil,
+		domain.AuditApprovalConfigUpdated,
+		map[string]any{
 			"reviewer_role": cmd.ReviewerRole,
 			"approver_role": cmd.ApproverRole,
 		},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
+		s.clock.Now(),
+	)
+	if err != nil {
 		return nil, err
 	}
 
-	return config, nil
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("templates approval config: begin tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates approval config: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return nil, fmt.Errorf("templates approval config: authz: %w", err)
+		}
+		if err := s.repo.UpsertApprovalConfigTx(ctx, tx, &config); err != nil {
+			return nil, wrapAppErr("templates approval config: upsert", err)
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
+			return nil, wrapAppErr("templates approval config: append audit", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.repo.UpsertApprovalConfig(ctx, &config); err != nil {
+			return nil, wrapAppErr("templates approval config: upsert", err)
+		}
+		if err := s.repo.AppendAudit(ctx, audit); err != nil {
+			return nil, wrapAppErr("templates approval config: append audit", err)
+		}
+	}
+
+	return &config, nil
 }

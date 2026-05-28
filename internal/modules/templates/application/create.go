@@ -27,8 +27,10 @@ type CreateTemplateResult struct {
 }
 
 func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*CreateTemplateResult, error) {
-	if _, err := s.repo.GetTemplateByKey(ctx, cmd.TenantID, cmd.Key); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := s.repo.GetTemplateByKey(ctx, cmd.TenantID, cmd.Key); err == nil {
 		return nil, domain.ErrKeyConflict
+	} else if !errors.Is(err, domain.ErrNotFound) {
+		return nil, err
 	}
 
 	template := &domain.Template{
@@ -44,20 +46,18 @@ func (s *Service) CreateTemplate(ctx context.Context, cmd CreateTemplateCmd) (*C
 		CreatedAt:          s.clock.Now(),
 	}
 
-	version := &domain.TemplateVersion{
-		ID:                  s.uuid.New(),
-		TemplateID:          template.ID,
-		VersionNumber:       1,
-		Status:              domain.VersionStatusDraft,
-		DocxStorageKey:      fmt.Sprintf("templates/%s/versions/1.docx", template.ID),
-		ContentHash:         "",
-		MetadataSchema:      domain.MetadataSchema{},
-		PlaceholderSchema:   []domain.Placeholder{},
-		AuthorID:            cmd.ActorUserID,
-		PendingApproverRole: cmd.ApproverRole,
-		PendingReviewerRole: cmd.ReviewerRole,
-		CreatedAt:           s.clock.Now(),
-	}
+	version := domain.NewTemplateVersionDraft(
+		s.uuid.New(),
+		template.ID,
+		cmd.ActorUserID,
+		fmt.Sprintf("templates/%s/versions/1.docx", template.ID),
+		1,
+		domain.MetadataSchema{},
+		[]domain.Placeholder{},
+		s.clock.Now(),
+	)
+	version.PendingApproverRole = cmd.ApproverRole
+	version.PendingReviewerRole = cmd.ReviewerRole
 
 	if s.db != nil {
 		tx, err := s.db.BeginTx(ctx, nil)
@@ -151,7 +151,7 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 
 	var source *domain.TemplateVersion
 	if template.PublishedVersionID != nil {
-		source, err = s.repo.GetVersionByID(ctx, *template.PublishedVersionID)
+		source, err = s.repo.GetVersionByID(ctx, cmd.TenantID, *template.PublishedVersionID)
 		if err != nil {
 			return nil, err
 		}
@@ -160,45 +160,76 @@ func (s *Service) CreateNextVersion(ctx context.Context, cmd CreateVersionCmd) (
 			return nil, domain.ErrNotFound
 		}
 	} else {
-		source, err = s.repo.GetVersion(ctx, template.ID, template.LatestVersion)
+		source, err = s.repo.GetVersion(ctx, cmd.TenantID, template.ID, template.LatestVersion)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	newNum := template.LatestVersion + 1
-	version := &domain.TemplateVersion{
-		ID:                s.uuid.New(),
-		TemplateID:        cmd.TemplateID,
-		VersionNumber:     newNum,
-		Status:            domain.VersionStatusDraft,
-		DocxStorageKey:    fmt.Sprintf("templates/%s/versions/%d.docx", cmd.TemplateID, newNum),
-		ContentHash:       "",
-		MetadataSchema:    cloneMetadataSchema(source.MetadataSchema),
-		PlaceholderSchema: clonePlaceholders(source.PlaceholderSchema),
-		AuthorID:          cmd.ActorUserID,
-		CreatedAt:         s.clock.Now(),
-	}
+	version := domain.NewTemplateVersionDraft(
+		s.uuid.New(),
+		cmd.TemplateID,
+		cmd.ActorUserID,
+		fmt.Sprintf("templates/%s/versions/%d.docx", cmd.TemplateID, newNum),
+		newNum,
+		cloneMetadataSchema(source.MetadataSchema),
+		clonePlaceholders(source.PlaceholderSchema),
+		s.clock.Now(),
+	)
 
-	if err := s.repo.CreateVersion(ctx, version); err != nil {
-		return nil, err
-	}
-
-	template.LatestVersion = newNum
-	if err := s.repo.UpdateTemplate(ctx, template); err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
-		TenantID:   cmd.TenantID,
-		TemplateID: template.ID,
-		VersionID:  &version.ID,
-		ActorID:    cmd.ActorUserID,
-		Action:     domain.AuditCreated,
-		Details:    map[string]any{},
-		OccurredAt: s.clock.Now(),
-	}); err != nil {
-		return nil, err
+	if s.db != nil {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("templates create next version: begin tx: %w", err)
+		}
+		defer func() { _ = tx.Rollback() }()
+		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
+			return nil, fmt.Errorf("templates create next version: setAuthzGUC: %w", err)
+		}
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+			return nil, fmt.Errorf("templates create next version: authz: %w", err)
+		}
+		if err := s.repo.CreateVersionTx(ctx, tx, version); err != nil {
+			return nil, err
+		}
+		template.LatestVersion = newNum
+		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAuditTx(ctx, tx, &domain.AuditEvent{
+			TenantID:   cmd.TenantID,
+			TemplateID: template.ID,
+			VersionID:  &version.ID,
+			ActorID:    cmd.ActorUserID,
+			Action:     domain.AuditCreated,
+			Details:    map[string]any{},
+			OccurredAt: s.clock.Now(),
+		}); err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.repo.CreateVersion(ctx, version); err != nil {
+			return nil, err
+		}
+		template.LatestVersion = newNum
+		if err := s.repo.UpdateTemplate(ctx, template); err != nil {
+			return nil, err
+		}
+		if err := s.repo.AppendAudit(ctx, &domain.AuditEvent{
+			TenantID:   cmd.TenantID,
+			TemplateID: template.ID,
+			VersionID:  &version.ID,
+			ActorID:    cmd.ActorUserID,
+			Action:     domain.AuditCreated,
+			Details:    map[string]any{},
+			OccurredAt: s.clock.Now(),
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return version, nil

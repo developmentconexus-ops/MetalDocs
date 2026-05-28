@@ -62,11 +62,14 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 	}
 
 	// Step 3: compute idempotency key.
-	idempotencyKey := ComputeIdempotencyKey(IdempotencyInput{
+	idempotencyKey, err := ComputeIdempotencyKey(IdempotencyInput{
 		ActorUserID: req.SubmittedBy,
 		DocumentID:  req.DocumentID,
 		Timestamp:   s.clock.Now(),
 	})
+	if err != nil {
+		return SubmitResult{}, fmt.Errorf("submit: idempotency key: %w", err)
+	}
 
 	// Step 4: begin transaction.
 	tx, err := db.BeginTx(ctx, nil)
@@ -194,7 +197,12 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 		_ = tx.Rollback()
 		return SubmitResult{}, fmt.Errorf("submit: transition document to under_review: %w", err)
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	n, err := res.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return SubmitResult{}, fmt.Errorf("submit: rows affected: %w", err)
+	}
+	if n == 0 {
 		_ = tx.Rollback()
 		return SubmitResult{}, repository.ErrStaleRevision
 	}
@@ -258,7 +266,7 @@ func (s *SubmitService) loadRoute(ctx context.Context, tx *sql.Tx, tenantID, rou
 	err := tx.QueryRowContext(ctx, `
 		SELECT id, tenant_id, profile_code, version
 		FROM approval_routes
-		WHERE id = $1 AND tenant_id = $2`,
+		WHERE id = $1 AND tenant_id = $2 AND active = TRUE`,
 		routeID, tenantID,
 	).Scan(&route.ID, &route.TenantID, &route.ProfileCode, &route.Version)
 	if err != nil {
@@ -269,12 +277,15 @@ func (s *SubmitService) loadRoute(ctx context.Context, tx *sql.Tx, tenantID, rou
 	}
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT stage_order, name, required_role, required_capability,
-		       area_code, quorum, quorum_m, on_eligibility_drift
-		FROM approval_route_stages
-		WHERE route_id = $1
-		ORDER BY stage_order ASC`,
-		routeID,
+		SELECT ars.stage_order, ars.name, ars.required_role, ars.required_capability,
+		       ars.area_code, ars.quorum, ars.quorum_m, ars.on_eligibility_drift
+		  FROM approval_route_stages ars
+		  JOIN approval_routes ar
+		    ON ar.id = ars.route_id
+		   AND ar.tenant_id = $2
+		 WHERE ars.route_id = $1
+		 ORDER BY ars.stage_order ASC`,
+		routeID, tenantID,
 	)
 	if err != nil {
 		return domain.Route{}, err

@@ -3,27 +3,50 @@ package domain
 import "context"
 
 type ProfileRepository interface {
-	GetByCode(ctx context.Context, tenantID, code string) (*DocumentProfile, error)
+	GetByCode(ctx context.Context, tenantID string, code ProfileCode) (*DocumentProfile, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID string, code ProfileCode) (*DocumentProfile, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]DocumentProfile, error)
 	Create(ctx context.Context, p *DocumentProfile) error
 	Update(ctx context.Context, p *DocumentProfile) error
+	UpdateTx(ctx context.Context, tx FamilyTx, p *DocumentProfile) error
+	BeginTx(ctx context.Context) (FamilyTx, error)
 }
 
 type AreaRepository interface {
-	GetByCode(ctx context.Context, tenantID, code string) (*ProcessArea, error)
+	GetByCode(ctx context.Context, tenantID string, code AreaCode) (*ProcessArea, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, tenantID string, code AreaCode) (*ProcessArea, error)
 	List(ctx context.Context, tenantID string, includeArchived bool) ([]ProcessArea, error)
 	Create(ctx context.Context, a *ProcessArea) error
 	Update(ctx context.Context, a *ProcessArea) error
-	ListAncestors(ctx context.Context, tenantID, code string) ([]string, error)
+	ListAncestors(ctx context.Context, tenantID string, code AreaCode) ([]AreaCode, error)
+	ListAncestorsTx(ctx context.Context, tx FamilyTx, tenantID string, code AreaCode) ([]AreaCode, error)
+	UpdateTx(ctx context.Context, tx FamilyTx, a *ProcessArea) error
+	BeginTx(ctx context.Context) (FamilyTx, error)
 }
 
 type GovernanceLogger interface {
 	Log(ctx context.Context, e GovernanceEvent) error
 }
 
+type GovernanceEventType string
+
+const (
+	GovernanceEventTypeProfileCreated               GovernanceEventType = "profile.created"
+	GovernanceEventTypeProfileUpdated               GovernanceEventType = "profile.updated"
+	GovernanceEventTypeProfileDefaultTemplateChange GovernanceEventType = "profile.default_template_change"
+	GovernanceEventTypeProfileArchived              GovernanceEventType = "profile.archived"
+	GovernanceEventTypeAreaCreated                  GovernanceEventType = "area.created"
+	GovernanceEventTypeAreaUpdated                  GovernanceEventType = "area.updated"
+	GovernanceEventTypeAreaParentChanged            GovernanceEventType = "area.parent_changed"
+	GovernanceEventTypeAreaArchived                 GovernanceEventType = "area.archived"
+	GovernanceEventTypeFamilyCreated                GovernanceEventType = "family.created"
+	GovernanceEventTypeFamilyUpdated                GovernanceEventType = "family.updated"
+	GovernanceEventTypeFamilyDeactivated            GovernanceEventType = "family.deactivated"
+)
+
 type GovernanceEvent struct {
 	TenantID     string
-	EventType    string
+	EventType    GovernanceEventType
 	ActorUserID  string
 	ResourceType string
 	ResourceID   string
@@ -36,14 +59,18 @@ type FamilyTx interface {
 	Rollback() error
 }
 
+// FamilyTx intentionally stays minimal so services do not depend on *sql.Tx
+// directly; repository adapters perform the concrete type assertion internally.
 type FamilyRepository interface {
-	GetByCode(ctx context.Context, code string) (*DocumentFamily, error)
+	GetByCode(ctx context.Context, code FamilyCode) (*DocumentFamily, error)
 	List(ctx context.Context, includeInactive bool) ([]DocumentFamily, error)
 	Create(ctx context.Context, f *DocumentFamily) error
 	Update(ctx context.Context, f *DocumentFamily) error
-	HasActiveProfiles(ctx context.Context, tenantID, familyCode string) (bool, error)
+	HasActiveProfiles(ctx context.Context, tenantID string, familyCode FamilyCode) (bool, error)
 	BeginTx(ctx context.Context) (FamilyTx, error)
-	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, code string) (*DocumentFamily, error)
-	HasActiveProfilesTx(ctx context.Context, tx FamilyTx, tenantID, familyCode string) (bool, error)
+	GetByCodeForUpdate(ctx context.Context, tx FamilyTx, code FamilyCode) (*DocumentFamily, error)
+	HasActiveProfilesTx(ctx context.Context, tx FamilyTx, tenantID string, familyCode FamilyCode) (bool, error)
+	// Tx methods intentionally mirror the non-tx methods so services can stage
+	// lock/read/write flows without leaking transaction details into callers.
 	UpdateTx(ctx context.Context, tx FamilyTx, f *DocumentFamily) error
 }

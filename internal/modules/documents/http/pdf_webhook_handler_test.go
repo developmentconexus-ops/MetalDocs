@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +23,8 @@ type fakePDFWriter struct {
 	hash        []byte
 	generatedAt time.Time
 	err         error
+	tenantByDoc string
+	tenantErr   error
 }
 
 func (f *fakePDFWriter) WritePDF(_ context.Context, tenant, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error {
@@ -36,6 +40,16 @@ func (f *fakePDFWriter) WritePDF(_ context.Context, tenant, docID, s3Key string,
 	return nil
 }
 
+func (f *fakePDFWriter) ResolveTenantByDocumentID(_ context.Context, _ string) (string, error) {
+	if f.tenantErr != nil {
+		return "", f.tenantErr
+	}
+	if f.tenantByDoc == "" {
+		return "tenant-db", nil
+	}
+	return f.tenantByDoc, nil
+}
+
 func sign(body []byte, secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
@@ -46,7 +60,7 @@ func TestPDFWebhookHandler_ValidSignaturePersists(t *testing.T) {
 	writer := &fakePDFWriter{}
 	h := NewPDFWebhookHandler(writer, "shh")
 
-	body := `{"tenant_id":"t-1","final_pdf_s3_key":"final/r.docx.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"final/r.docx.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
 	req.SetPathValue("id", "doc-1")
 	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
@@ -60,7 +74,7 @@ func TestPDFWebhookHandler_ValidSignaturePersists(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d", writer.calls)
 	}
-	if writer.tenant != "t-1" || writer.docID != "doc-1" || writer.s3Key != "final/r.docx.pdf" {
+	if writer.tenant != "tenant-db" || writer.docID != "doc-1" || writer.s3Key != "final/r.docx.pdf" {
 		t.Fatalf("wrong fields: %+v", writer)
 	}
 	if hex.EncodeToString(writer.hash) != "abcd" {
@@ -110,6 +124,76 @@ func TestPDFWebhookHandler_MalformedBodyRejected400(t *testing.T) {
 	req.SetPathValue("id", "doc-1")
 	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
 	rec := httptest.NewRecorder()
+	h.HandlePDFComplete(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d, want 400", rec.Code)
+	}
+}
+
+func TestPDFWebhookHandler_TenantMismatchRejected400(t *testing.T) {
+	writer := &fakePDFWriter{tenantByDoc: "tenant-db"}
+	h := NewPDFWebhookHandler(writer, "shh")
+
+	body := `{"tenant_id":"tenant-attacker","final_pdf_s3_key":"final/r.docx.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
+	req.SetPathValue("id", "doc-1")
+	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
+	rec := httptest.NewRecorder()
+
+	h.HandlePDFComplete(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d, want 400", rec.Code)
+	}
+	if writer.calls != 0 {
+		t.Fatalf("writer calls = %d, want 0", writer.calls)
+	}
+}
+
+func TestPDFWebhookHandler_DocumentNotFoundRejected404(t *testing.T) {
+	writer := &fakePDFWriter{tenantErr: sql.ErrNoRows}
+	h := NewPDFWebhookHandler(writer, "shh")
+
+	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"final/r.docx.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
+	req.SetPathValue("id", "doc-1")
+	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
+	rec := httptest.NewRecorder()
+
+	h.HandlePDFComplete(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d, want 404", rec.Code)
+	}
+}
+
+func TestPDFWebhookHandler_ResolveTenantFailureRejected500(t *testing.T) {
+	writer := &fakePDFWriter{tenantErr: errors.New("boom")}
+	h := NewPDFWebhookHandler(writer, "shh")
+
+	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"final/r.docx.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
+	req.SetPathValue("id", "doc-1")
+	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
+	rec := httptest.NewRecorder()
+
+	h.HandlePDFComplete(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d, want 500", rec.Code)
+	}
+}
+
+func TestPDFWebhookHandler_InvalidFinalPDFS3KeyRejected400(t *testing.T) {
+	h := NewPDFWebhookHandler(&fakePDFWriter{}, "shh")
+
+	body := `{"tenant_id":"tenant-db","final_pdf_s3_key":"../escape.pdf","pdf_hash":"abcd","pdf_generated_at":"2026-04-23T19:00:00Z"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/pdf-complete", strings.NewReader(body))
+	req.SetPathValue("id", "doc-1")
+	req.Header.Set("X-Docgen-Signature", sign([]byte(body), "shh"))
+	rec := httptest.NewRecorder()
+
 	h.HandlePDFComplete(rec, req)
 
 	if rec.Code != http.StatusBadRequest {

@@ -21,6 +21,7 @@ type fakeRepo struct {
 	ignoreTenantOnGetTemplate bool
 	lockVersions              map[string]int
 	failCreateVersion         bool
+	getTemplateByKeyErr       error
 }
 
 func newFakeRepo() *fakeRepo {
@@ -50,6 +51,9 @@ func (r *fakeRepo) GetTemplate(_ context.Context, tenantID, id string) (*domain.
 }
 
 func (r *fakeRepo) GetTemplateByKey(_ context.Context, tenantID, key string) (*domain.Template, error) {
+	if r.getTemplateByKeyErr != nil {
+		return nil, r.getTemplateByKeyErr
+	}
 	for _, t := range r.templates {
 		if t.TenantID == tenantID && t.Key == key {
 			return t, nil
@@ -77,7 +81,8 @@ func (r *fakeRepo) UpdateTemplate(_ context.Context, t *domain.Template) error {
 	if _, ok := r.templates[t.ID]; !ok {
 		return domain.ErrNotFound
 	}
-	r.templates[t.ID] = t
+	clone := *t
+	r.templates[t.ID] = &clone
 	return nil
 }
 
@@ -86,9 +91,10 @@ func (r *fakeRepo) CreateVersion(_ context.Context, v *domain.TemplateVersion) e
 		return errors.New("forced create version failure")
 	}
 	if _, ok := r.lockVersions[v.ID]; !ok {
-		r.lockVersions[v.ID] = 0
+		r.lockVersions[v.ID] = v.LockVersion
 	}
-	r.versions[v.ID] = v
+	clone := *v
+	r.versions[v.ID] = &clone
 	return nil
 }
 
@@ -96,32 +102,50 @@ func (r *fakeRepo) CreateVersionTx(_ context.Context, _ *sql.Tx, v *domain.Templ
 	return r.CreateVersion(context.Background(), v)
 }
 
-func (r *fakeRepo) GetVersion(_ context.Context, templateID string, n int) (*domain.TemplateVersion, error) {
+func (r *fakeRepo) GetVersion(_ context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error) {
+	t, ok := r.templates[templateID]
+	if !ok || t.TenantID != tenantID {
+		return nil, domain.ErrNotFound
+	}
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.VersionNumber == n {
-			return v, nil
+			clone := *v
+			return &clone, nil
 		}
 	}
 	return nil, domain.ErrNotFound
 }
 
-func (r *fakeRepo) GetVersionByID(_ context.Context, id string) (*domain.TemplateVersion, error) {
+func (r *fakeRepo) GetVersionByID(_ context.Context, tenantID, id string) (*domain.TemplateVersion, error) {
 	v, ok := r.versions[id]
 	if !ok {
 		return nil, domain.ErrNotFound
 	}
-	return v, nil
+	t, ok := r.templates[v.TemplateID]
+	if !ok || t.TenantID != tenantID {
+		return nil, domain.ErrNotFound
+	}
+	clone := *v
+	return &clone, nil
 }
 
-func (r *fakeRepo) UpdateVersion(_ context.Context, v *domain.TemplateVersion) error {
+func (r *fakeRepo) UpdateVersion(_ context.Context, _ string, v *domain.TemplateVersion) error {
 	if _, ok := r.versions[v.ID]; !ok {
 		return domain.ErrNotFound
 	}
-	r.versions[v.ID] = v
+	current := r.lockVersions[v.ID]
+	if current != v.LockVersion {
+		return domain.ErrStaleLockVersion
+	}
+	clone := *v
+	clone.LockVersion++
+	r.lockVersions[v.ID] = clone.LockVersion
+	r.versions[v.ID] = &clone
+	v.LockVersion = clone.LockVersion
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, _ string, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
 	v, ok := r.versions[versionID]
 	if !ok {
 		return domain.ErrNotFound
@@ -136,8 +160,8 @@ func (r *fakeRepo) UpdateVersionDraftCAS(_ context.Context, versionID string, ex
 	return nil
 }
 
-func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
-	return r.UpdateVersionDraftCAS(context.Background(), versionID, expectedLockVersion, docxStorageKey, docxContentHash)
+func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
+	return r.UpdateVersionDraftCAS(context.Background(), tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
 func (r *fakeRepo) CreateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Template) error {
@@ -148,8 +172,8 @@ func (r *fakeRepo) UpdateTemplateTx(_ context.Context, _ *sql.Tx, t *domain.Temp
 	return r.UpdateTemplate(context.Background(), t)
 }
 
-func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, v *domain.TemplateVersion) error {
-	return r.UpdateVersion(context.Background(), v)
+func (r *fakeRepo) UpdateVersionTx(_ context.Context, _ *sql.Tx, tenantID string, v *domain.TemplateVersion) error {
+	return r.UpdateVersion(context.Background(), tenantID, v)
 }
 
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
@@ -174,7 +198,11 @@ func (r *fakeRepo) ObsoletePreviousPublishedTx(_ context.Context, _ *sql.Tx, tem
 	return r.ObsoletePreviousPublished(context.Background(), templateID, keepVersionID)
 }
 
-func (r *fakeRepo) GetApprovalConfig(_ context.Context, templateID string) (*domain.ApprovalConfig, error) {
+func (r *fakeRepo) GetApprovalConfig(_ context.Context, tenantID, templateID string) (*domain.ApprovalConfig, error) {
+	t, ok := r.templates[templateID]
+	if !ok || t.TenantID != tenantID {
+		return nil, domain.ErrNotFound
+	}
 	c, ok := r.approvalConfigs[templateID]
 	if !ok {
 		return nil, domain.ErrNotFound
@@ -200,10 +228,10 @@ func (r *fakeRepo) AppendAuditTx(_ context.Context, _ *sql.Tx, e *domain.AuditEv
 	return r.AppendAudit(context.Background(), e)
 }
 
-func (r *fakeRepo) ListAudit(_ context.Context, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
+func (r *fakeRepo) ListAudit(_ context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
 	matched := make([]*domain.AuditEvent, 0, len(r.audit))
 	for _, e := range r.audit {
-		if e.TemplateID == templateID {
+		if e.TenantID == tenantID && e.TemplateID == templateID {
 			matched = append(matched, e)
 		}
 	}
@@ -223,10 +251,13 @@ func (r *fakeRepo) ListAudit(_ context.Context, templateID string, limit, offset
 type fakePresigner struct {
 	HeadResult   string
 	HeadErr      error
+	DeleteErr    error
 	DeleteCalled int
+	PutKeys      []string
 }
 
 func (p *fakePresigner) PresignPUT(_ context.Context, key string, _ time.Duration) (string, error) {
+	p.PutKeys = append(p.PutKeys, key)
 	return "https://presigned/put/" + key, nil
 }
 
@@ -243,7 +274,7 @@ func (p *fakePresigner) HeadContentHash(_ context.Context, _ string) (string, er
 
 func (p *fakePresigner) Delete(_ context.Context, _ string) error {
 	p.DeleteCalled++
-	return nil
+	return p.DeleteErr
 }
 
 type fakeClock struct{}
@@ -298,8 +329,12 @@ func newService(repo *fakeRepo, opts ...serviceOption) *application.Service {
 
 func updateCmdWithComputed(phID, resolverKey string) application.UpdateSchemasCmd {
 	return application.UpdateSchemasCmd{
+		TenantID:      "tenant-a",
 		TemplateID:    "tpl-1",
 		VersionNumber: 1,
+		MetadataSchema: domain.MetadataSchema{
+			RetentionDays: 1,
+		},
 		PlaceholderSchema: []domain.Placeholder{
 			{
 				ID:          phID,

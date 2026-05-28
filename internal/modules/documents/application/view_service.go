@@ -48,7 +48,7 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 	defer func() { _ = tx.Rollback() }()
 
 	ctx = authz.WithCapCache(ctx)
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return documentshttp.ViewResult{}, err
 	}
 

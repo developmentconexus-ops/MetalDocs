@@ -3,9 +3,12 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
 )
@@ -23,14 +26,24 @@ func (r *Repository) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx,
 }
 
 func (r *Repository) FindIdentityByIdentifier(ctx context.Context, identifier string) (authdomain.Identity, error) {
+	needle := strings.ToLower(strings.TrimSpace(identifier))
 	const q = `
 SELECT i.user_id, i.username, COALESCE(i.email, ''), i.display_name, i.password_hash, i.password_algo,
        i.must_change_password, i.last_login_at, i.failed_login_attempts, i.locked_until, i.is_active,
        i.created_at, i.updated_at
 FROM metaldocs.auth_identities i
-WHERE lower(i.username) = lower($1) OR lower(COALESCE(i.email, '')) = lower($1)
+WHERE lower(i.username) = $1
+UNION ALL
+SELECT i.user_id, i.username, COALESCE(i.email, ''), i.display_name, i.password_hash, i.password_algo,
+       i.must_change_password, i.last_login_at, i.failed_login_attempts, i.locked_until, i.is_active,
+       i.created_at, i.updated_at
+FROM metaldocs.auth_identities i
+WHERE i.email IS NOT NULL
+  AND lower(i.email) = $1
+  AND lower(i.username) <> $1
+LIMIT 1
 `
-	return r.loadIdentity(ctx, q, identifier)
+	return r.loadIdentity(ctx, q, needle)
 }
 
 func (r *Repository) FindIdentityByUserID(ctx context.Context, userID string) (authdomain.Identity, error) {
@@ -47,7 +60,7 @@ WHERE i.user_id = $1
 func (r *Repository) CreateSession(ctx context.Context, session authdomain.Session) error {
 	const q = `
 INSERT INTO metaldocs.auth_sessions (session_id, user_id, tenant_id, created_at, expires_at, revoked_at, ip_address, user_agent, last_seen_at)
-VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8)
+VALUES ($1, $2, $3::uuid, $4, $5, NULL, $6, $7, $8)
 `
 	_, err := r.db.ExecContext(ctx, q, session.SessionID, session.UserID, session.TenantID, session.CreatedAt, session.ExpiresAt, session.IPAddress, session.UserAgent, session.LastSeenAt)
 	if err != nil {
@@ -58,7 +71,7 @@ VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8)
 
 func (r *Repository) FindSession(ctx context.Context, sessionID string) (authdomain.Session, error) {
 	const q = `
-SELECT session_id, user_id, COALESCE(tenant_id, ''), created_at, expires_at, revoked_at, COALESCE(ip_address, ''), COALESCE(user_agent, ''), last_seen_at
+SELECT session_id, user_id, tenant_id::text, created_at, expires_at, revoked_at, COALESCE(ip_address, ''), COALESCE(user_agent, ''), last_seen_at
 FROM metaldocs.auth_sessions
 WHERE session_id = $1
 `
@@ -74,7 +87,7 @@ WHERE session_id = $1
 		&session.UserAgent,
 		&session.LastSeenAt,
 	); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return authdomain.Session{}, authdomain.ErrSessionNotFound
 		}
 		return authdomain.Session{}, fmt.Errorf("select auth session: %w", err)
@@ -84,9 +97,10 @@ WHERE session_id = $1
 
 func (r *Repository) GetUserTenants(ctx context.Context, userID string) ([]string, error) {
 	const q = `
-SELECT DISTINCT tenant_id
+SELECT DISTINCT tenant_id::text
 FROM metaldocs.iam_user_roles
 WHERE user_id = $1
+ORDER BY tenant_id
 `
 	rows, err := r.db.QueryContext(ctx, q, userID)
 	if err != nil {
@@ -104,15 +118,46 @@ WHERE user_id = $1
 	return tenants, rows.Err()
 }
 
+func (r *Repository) GetTenantByID(ctx context.Context, tenantID string) (authdomain.Tenant, error) {
+	const q = `
+SELECT id::text, name, slug
+FROM metaldocs.tenants
+WHERE id = $1::uuid
+`
+	var tenant authdomain.Tenant
+	if err := r.db.QueryRowContext(ctx, q, tenantID).Scan(&tenant.ID, &tenant.Name, &tenant.Slug); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return authdomain.Tenant{}, authdomain.ErrTenantNotFound
+		}
+		return authdomain.Tenant{}, fmt.Errorf("select tenant: %w", err)
+	}
+	return tenant, nil
+}
+
 func (r *Repository) TouchSession(ctx context.Context, sessionID string, seenAt time.Time) error {
+	// TODO: consider updating only expired/grace-window-stale sessions to reduce write amplification further.
 	const q = `
 UPDATE metaldocs.auth_sessions
 SET last_seen_at = $2
 WHERE session_id = $1
+  AND last_seen_at < (($2)::timestamptz - INTERVAL '30 seconds')
 `
-	_, err := r.db.ExecContext(ctx, q, sessionID, seenAt)
+	res, err := r.db.ExecContext(ctx, q, sessionID, seenAt)
 	if err != nil {
 		return fmt.Errorf("touch auth session: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("touch auth session rows affected: %w", err)
+	}
+	if n == 0 {
+		var exists bool
+		if err := r.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM metaldocs.auth_sessions WHERE session_id = $1)`, sessionID).Scan(&exists); err != nil {
+			return fmt.Errorf("touch auth session exists: %w", err)
+		}
+		if !exists {
+			return authdomain.ErrSessionNotFound
+		}
 	}
 	return nil
 }
@@ -123,9 +168,16 @@ UPDATE metaldocs.auth_sessions
 SET revoked_at = $2
 WHERE session_id = $1
 `
-	_, err := r.db.ExecContext(ctx, q, sessionID, revokedAt)
+	res, err := r.db.ExecContext(ctx, q, sessionID, revokedAt)
 	if err != nil {
 		return fmt.Errorf("revoke auth session: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("revoke auth session rows affected: %w", err)
+	}
+	if n == 0 {
+		return authdomain.ErrSessionNotFound
 	}
 	return nil
 }
@@ -160,19 +212,27 @@ WHERE user_id = $1
 	return nil
 }
 
-func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, failedAttempts int, lockedUntil *time.Time) error {
+func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int) (int, *time.Time, error) {
 	const q = `
 UPDATE metaldocs.auth_identities
-SET failed_login_attempts = $2,
-    locked_until = $3,
+SET failed_login_attempts = failed_login_attempts + 1,
+    locked_until = CASE WHEN failed_login_attempts + 1 >= $2
+                        THEN NOW() + ($3 * INTERVAL '1 second')
+                        ELSE locked_until END,
     updated_at = NOW()
 WHERE user_id = $1
+RETURNING failed_login_attempts, locked_until
 `
-	_, err := r.db.ExecContext(ctx, q, userID, failedAttempts, lockedUntil)
-	if err != nil {
-		return fmt.Errorf("update failed login: %w", err)
+	var attempts int
+	var lockedUntil sql.NullTime
+	if err := r.db.QueryRowContext(ctx, q, userID, maxAttempts, lockDurationSeconds).Scan(&attempts, &lockedUntil); err != nil {
+		return 0, nil, fmt.Errorf("update failed login: %w", err)
 	}
-	return nil
+	if !lockedUntil.Valid {
+		return attempts, nil, nil
+	}
+	locked := lockedUntil.Time.UTC()
+	return attempts, &locked, nil
 }
 
 func (r *Repository) CreateUser(ctx context.Context, params authdomain.CreateUserParams) error {
@@ -193,15 +253,14 @@ func (r *Repository) CreateUser(ctx context.Context, params authdomain.CreateUse
 }
 
 func (r *Repository) CreateUserTx(ctx context.Context, tx *sql.Tx, params authdomain.CreateUserParams) error {
-	if err := ensureUniqueIdentity(ctx, tx, params.UserID, params.Username, params.Email); err != nil {
-		return err
-	}
-
 	const insertIdentity = `
 INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
 VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
 `
 	if _, err := tx.ExecContext(ctx, insertIdentity, params.UserID, params.Username, params.Email, params.DisplayName, params.IsActive, params.PasswordHash, params.PasswordAlgo, params.MustChangePassword); err != nil {
+		if isUniqueViolation(err) {
+			return authdomain.ErrUserAlreadyExists
+		}
 		return fmt.Errorf("insert auth identity: %w", err)
 	}
 	return nil
@@ -246,19 +305,21 @@ ORDER BY i.created_at DESC
 	return items, nil
 }
 
-func (r *Repository) ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error) {
+func (r *Repository) ListOnlineUsers(ctx context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error) {
+	// TODO: use monotonic heartbeat or session token expiry instead of wall-clock comparison.
 	const q = `
 SELECT s.user_id, i.username, i.display_name, MAX(s.last_seen_at)
 FROM metaldocs.auth_sessions s
 JOIN metaldocs.auth_identities i ON i.user_id = s.user_id
-WHERE s.revoked_at IS NULL
+WHERE s.tenant_id = $1::uuid
+  AND s.revoked_at IS NULL
   AND s.expires_at > NOW()
-  AND s.last_seen_at >= $1
+  AND s.last_seen_at >= $2
   AND i.is_active = true
 GROUP BY s.user_id, i.username, i.display_name
 ORDER BY MAX(s.last_seen_at) DESC
 `
-	rows, err := r.db.QueryContext(ctx, q, activeSince.UTC())
+	rows, err := r.db.QueryContext(ctx, q, tenantID, activeSince.UTC())
 	if err != nil {
 		return nil, fmt.Errorf("list online users: %w", err)
 	}
@@ -284,31 +345,38 @@ ORDER BY MAX(s.last_seen_at) DESC
 }
 
 func (r *Repository) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams) error {
+	if !hasMutableUserUpdates(params) {
+		return r.ensureIdentityExists(ctx, params.UserID)
+	}
+
+	// Keep profile and credential updates in one transaction so mixed update
+	// requests stay atomic even though each branch may issue its own statement.
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin update user tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	updated := false
 
 	if params.DisplayName != nil || params.IsActive != nil {
-		if _, err := tx.ExecContext(ctx, `
+		res, err := tx.ExecContext(ctx, `
 UPDATE metaldocs.auth_identities
 SET display_name = COALESCE($2, display_name),
     is_active = COALESCE($3, is_active),
     updated_at = NOW()
 WHERE user_id = $1
-`, params.UserID, nullableText(params.DisplayName), nullableBool(params.IsActive)); err != nil {
+`, params.UserID, nullableText(params.DisplayName), nullableBool(params.IsActive))
+		if err != nil {
 			return fmt.Errorf("update auth identity profile: %w", err)
 		}
+		if err := expectRowsAffected(res, authdomain.ErrIdentityNotFound); err != nil {
+			return err
+		}
+		updated = true
 	}
 
 	if params.Email != nil || params.NewPasswordHash != nil || params.MustChangePassword != nil || params.ResetLockState {
-		if params.Email != nil {
-			if err := ensureUniqueIdentity(ctx, tx, params.UserID, "", strings.TrimSpace(*params.Email)); err != nil {
-				return err
-			}
-		}
-		if _, err := tx.ExecContext(ctx, `
+		res, err := tx.ExecContext(ctx, `
 UPDATE metaldocs.auth_identities
 SET email = COALESCE($2, email),
     password_hash = COALESCE($3, password_hash),
@@ -318,13 +386,41 @@ SET email = COALESCE($2, email),
     locked_until = CASE WHEN $3 IS NOT NULL OR $5 THEN NULL ELSE locked_until END,
     updated_at = NOW()
 WHERE user_id = $1
-`, params.UserID, nullableText(params.Email), nullableText(params.NewPasswordHash), nullableBool(params.MustChangePassword), params.ResetLockState); err != nil {
+`, params.UserID, nullableText(params.Email), nullablePasswordHash(params.NewPasswordHash), nullableBool(params.MustChangePassword), params.ResetLockState)
+		if err != nil {
+			if isUniqueViolation(err) {
+				return authdomain.ErrUserAlreadyExists
+			}
 			return fmt.Errorf("update auth identity: %w", err)
 		}
+		if err := expectRowsAffected(res, authdomain.ErrIdentityNotFound); err != nil {
+			return err
+		}
+		updated = true
+	}
+
+	if !updated {
+		return authdomain.ErrIdentityNotFound
 	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit update user tx: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ensureIdentityExists(ctx context.Context, userID string) error {
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, `
+SELECT EXISTS (
+	SELECT 1
+	FROM metaldocs.auth_identities
+	WHERE user_id = $1
+)`, userID).Scan(&exists); err != nil {
+		return fmt.Errorf("check auth identity exists: %w", err)
+	}
+	if !exists {
+		return authdomain.ErrIdentityNotFound
 	}
 	return nil
 }
@@ -336,28 +432,26 @@ func (r *Repository) BootstrapAdmin(ctx context.Context, params authdomain.Boots
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := ensureUniqueIdentity(ctx, tx, params.UserID, params.Username, params.Email); err != nil {
-		return false, err
-	}
-	if _, err := tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
 VALUES ($1, $2, NULLIF($3, ''), $4, TRUE, $5, $6, $7, NULL, 0, NULL, NOW(), NOW())
 ON CONFLICT (user_id)
-DO UPDATE SET username = EXCLUDED.username,
-              email = EXCLUDED.email,
-              display_name = EXCLUDED.display_name,
-              is_active = TRUE,
-              password_hash = EXCLUDED.password_hash,
-              password_algo = EXCLUDED.password_algo,
-              must_change_password = EXCLUDED.must_change_password,
-              updated_at = NOW()
-`, params.UserID, params.Username, params.Email, params.DisplayName, params.PasswordHash, params.PasswordAlgo, params.MustChangePassword); err != nil {
+DO NOTHING
+`, params.UserID, params.Username, params.Email, params.DisplayName, params.PasswordHash, params.PasswordAlgo, params.MustChangePassword)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return false, authdomain.ErrUserAlreadyExists
+		}
 		return false, fmt.Errorf("bootstrap auth identity: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("bootstrap auth identity rows affected: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return false, fmt.Errorf("commit bootstrap admin tx: %w", err)
 	}
-	return true, nil
+	return rows > 0, nil
 }
 
 func (r *Repository) loadIdentity(ctx context.Context, query string, arg string) (authdomain.Identity, error) {
@@ -377,7 +471,7 @@ func (r *Repository) loadIdentity(ctx context.Context, query string, arg string)
 		&identity.CreatedAt,
 		&identity.UpdatedAt,
 	); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return authdomain.Identity{}, authdomain.ErrIdentityNotFound
 		}
 		return authdomain.Identity{}, fmt.Errorf("load auth identity: %w", err)
@@ -385,37 +479,9 @@ func (r *Repository) loadIdentity(ctx context.Context, query string, arg string)
 	return identity, nil
 }
 
-func ensureUniqueIdentity(ctx context.Context, tx *sql.Tx, userID, username, email string) error {
-	if strings.TrimSpace(username) != "" {
-		var otherUserID string
-		err := tx.QueryRowContext(ctx, `
-SELECT user_id
-FROM metaldocs.auth_identities
-WHERE lower(username) = lower($1)
-`, username).Scan(&otherUserID)
-		if err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("check username uniqueness: %w", err)
-		}
-		if err == nil && otherUserID != strings.TrimSpace(userID) {
-			return authdomain.ErrUserAlreadyExists
-		}
-	}
-
-	if strings.TrimSpace(email) != "" {
-		var otherUserID string
-		err := tx.QueryRowContext(ctx, `
-SELECT user_id
-FROM metaldocs.auth_identities
-WHERE lower(email) = lower($1)
-`, email).Scan(&otherUserID)
-		if err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("check email uniqueness: %w", err)
-		}
-		if err == nil && otherUserID != strings.TrimSpace(userID) {
-			return authdomain.ErrUserAlreadyExists
-		}
-	}
-	return nil
+func isUniqueViolation(err error) bool {
+	var pgErr *pq.Error
+	return errors.As(err, &pgErr) && string(pgErr.Code) == "23505"
 }
 
 func nullableText(value *string) any {
@@ -425,9 +491,36 @@ func nullableText(value *string) any {
 	return strings.TrimSpace(*value)
 }
 
+func nullablePasswordHash(value *authdomain.PasswordHash) any {
+	if value == nil {
+		return nil
+	}
+	return strings.TrimSpace(string(*value))
+}
+
 func nullableBool(value *bool) any {
 	if value == nil {
 		return nil
 	}
 	return *value
+}
+
+func expectRowsAffected(res sql.Result, notFound error) error {
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read rows affected: %w", err)
+	}
+	if rows == 0 {
+		return notFound
+	}
+	return nil
+}
+
+func hasMutableUserUpdates(params authdomain.UpdateUserParams) bool {
+	return params.DisplayName != nil ||
+		params.Email != nil ||
+		params.IsActive != nil ||
+		params.NewPasswordHash != nil ||
+		params.MustChangePassword != nil ||
+		params.ResetLockState
 }

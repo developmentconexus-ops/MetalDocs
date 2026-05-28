@@ -123,6 +123,10 @@ function Wait-ForReady {
     $lastBody = $null
     $successCount = 0
     do {
+        if ($StartupProcess -and $StartupProcess.HasExited) {
+            throw "startup process exited before readiness (exit=$($StartupProcess.ExitCode))"
+        }
+
         try {
             $response = Invoke-CheckedRequest -Client $Client -Method Get -Route '/api/v1/health/ready'
             if ($response.IsSuccessStatusCode) {
@@ -173,26 +177,19 @@ try {
         }
 
         if (-not $reuseRunningApi) {
-            Write-Host "Starting API via scripts/start-api.ps1 -NoWorker"
+            Write-Host "Starting API via scripts/dev-api.ps1"
             Normalize-ProcessPathEnvironment
-            $startupProcess = Start-Process `
-                -FilePath (Join-Path $PSHOME "powershell.exe") `
-                -ArgumentList @(
-                    '-NoProfile',
-                    '-ExecutionPolicy',
-                    'Bypass',
-                    '-File',
-                    (Join-Path $PSScriptRoot 'start-api.ps1'),
-                    '-NoWorker'
-                ) `
-                -WorkingDirectory $root `
-                -PassThru `
-                -WindowStyle Hidden
+            & (Join-Path $PSHOME "powershell.exe") `
+                -NoProfile `
+                -ExecutionPolicy Bypass `
+                -File (Join-Path $PSScriptRoot 'dev-api.ps1') | Out-Host
 
-            $readyResponse = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 720
-            Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) after start-api.ps1"
-            Start-Sleep -Seconds 2
-            $null = Wait-ForReady -Client $client -StartupProcess $startupProcess -TimeoutSeconds 30 -ConsecutiveSuccesses 1
+            if ($LASTEXITCODE -ne 0) {
+                Fail-Checkpoint -Name 'startup' -Message 'scripts/dev-api.ps1 failed before readiness'
+            }
+
+            $readyResponse = Wait-ForReady -Client $client -TimeoutSeconds 30 -ConsecutiveSuccesses 1
+            Pass-Checkpoint -Name 'startup' -Message "/api/v1/health/ready returned HTTP $([int]$readyResponse.StatusCode) after dev-api.ps1"
         }
     }
 

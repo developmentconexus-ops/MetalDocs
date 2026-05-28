@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"metaldocs/internal/modules/iam/authz"
@@ -22,9 +23,9 @@ func NewUserAreaRepository(db *sql.DB) *UserAreaRepository {
 func (r *UserAreaRepository) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]iamdomain.UserProcessArea, error) {
 	const q = `
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
-FROM user_process_areas
+FROM public.user_process_areas
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND effective_from <= $3
   AND (effective_to IS NULL OR effective_to > $3)
 ORDER BY area_code ASC, effective_from DESC
@@ -54,19 +55,24 @@ func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.Us
 	if err != nil {
 		return fmt.Errorf("begin insert area tx: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer rollbackTx("insert_user_process_area", tx)
 
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, membership.TenantID, grantedByActor(membership.GrantedBy)); err != nil {
+		return fmt.Errorf("iam: seed authz Insert area: %w", err)
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
 		return fmt.Errorf("iam: authz check Insert area: %w", err)
 	}
 
 	const q = `
-INSERT INTO user_process_areas
+INSERT INTO public.user_process_areas
   (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
 VALUES
   ($1, $2::uuid, $3, $4, $5, $6, $7)
 `
-	if _, err := tx.ExecContext(
+	// TODO: migration 0136 hangs these FKs off a non-PK unique key on iam_users; keep caller identity writes aligned with iam_users uniqueness.
+	result, err := tx.ExecContext(
 		ctx, q,
 		membership.UserID,
 		membership.TenantID,
@@ -75,33 +81,66 @@ VALUES
 		membership.EffectiveFrom,
 		membership.EffectiveTo,
 		membership.GrantedBy,
-	); err != nil {
+	)
+	if err != nil {
 		return fmt.Errorf("insert user process area: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("insert user process area rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "insert",
+			"user_id", membership.UserID,
+			"tenant_id", membership.TenantID,
+			"area_code", membership.AreaCode,
+			"role", membership.Role,
+		)
+		return fmt.Errorf("insert user process area: no rows inserted")
 	}
 	return tx.Commit()
 }
 
-func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time) error {
+func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin close area tx: %w", err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer rollbackTx("close_active_user_process_area", tx)
 
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		return fmt.Errorf("iam: seed authz CloseActive area: %w", err)
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
 		return fmt.Errorf("iam: authz check CloseActive area: %w", err)
 	}
 
 	const q = `
-UPDATE user_process_areas
+UPDATE public.user_process_areas
 SET effective_to = $4
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND area_code = $3
   AND effective_to IS NULL
 `
-	if _, err := tx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo); err != nil {
+	result, err := tx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo)
+	if err != nil {
 		return fmt.Errorf("close active user process area: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("close active user process area rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "close_active",
+			"user_id", userID,
+			"tenant_id", tenantID,
+			"area_code", areaCode,
+		)
+		return fmt.Errorf("close active user process area: no rows updated")
 	}
 	return tx.Commit()
 }
@@ -111,19 +150,21 @@ func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, new
 	if err != nil {
 		return fmt.Errorf("begin grant transaction: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
+	defer rollbackTx("grant_atomic_user_process_area", tx)
 
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, newMembership.TenantID, grantedByActor(newMembership.GrantedBy)); err != nil {
+		return fmt.Errorf("iam: seed authz GrantAtomic: %w", err)
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
 		return fmt.Errorf("iam: authz check GrantAtomic: %w", err)
 	}
 
 	const closeQ = `
-UPDATE user_process_areas
+UPDATE public.user_process_areas
 SET effective_to = $5
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND area_code = $3
   AND effective_from = $4
   AND effective_to IS NULL
@@ -145,15 +186,22 @@ WHERE user_id = $1
 		return fmt.Errorf("read affected rows for close active membership: %w", err)
 	}
 	if rowsAffected == 0 {
+		slog.Warn("iam user area zero rows",
+			"action", "grant_atomic_close",
+			"user_id", oldMembership.UserID,
+			"tenant_id", oldMembership.TenantID,
+			"area_code", oldMembership.AreaCode,
+		)
 		return fmt.Errorf("close active membership in grant transaction: no rows updated")
 	}
 
 	const insertQ = `
-INSERT INTO user_process_areas
+INSERT INTO public.user_process_areas
   (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by)
 VALUES
   ($1, $2::uuid, $3, $4, $5, $6, $7)
 `
+	// TODO: migration 0136 hangs these FKs off a non-PK unique key on iam_users; keep caller identity writes aligned with iam_users uniqueness.
 	if _, err := tx.ExecContext(
 		ctx,
 		insertQ,
@@ -177,9 +225,9 @@ VALUES
 func (r *UserAreaRepository) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*iamdomain.UserProcessArea, error) {
 	const q = `
 SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
-FROM user_process_areas
+FROM public.user_process_areas
 WHERE user_id = $1
-  AND tenant_id::text = $2
+  AND tenant_id = $2::uuid
   AND area_code = $3
   AND effective_from <= $4
   AND (effective_to IS NULL OR effective_to > $4)
@@ -225,4 +273,17 @@ func scanUserProcessArea(s scanner) (iamdomain.UserProcessArea, error) {
 		item.GrantedBy = &value
 	}
 	return item, nil
+}
+
+func rollbackTx(action string, tx *sql.Tx) {
+	if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
+		slog.Warn("iam tx rollback failed", "action", action, "error", err)
+	}
+}
+
+func grantedByActor(actorID *string) string {
+	if actorID == nil {
+		return ""
+	}
+	return *actorID
 }

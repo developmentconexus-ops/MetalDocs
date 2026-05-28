@@ -13,6 +13,7 @@ import (
 	"time"
 
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
+	documentsapi "metaldocs/internal/modules/documents/api"
 	"metaldocs/internal/modules/documents/application"
 	approvalapp "metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/domain"
@@ -179,7 +180,8 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 	isAdmin := hasRole(r, roleAdmin)
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, err.Error())
+		log.Printf("documents listDocuments invalid query params: %v", err)
+		httpErr(w, http.StatusBadRequest, "bad_request")
 		return
 	}
 
@@ -213,7 +215,8 @@ func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
 	isAdmin := hasRole(r, roleAdmin)
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, err.Error())
+		log.Printf("documents documentStats invalid query params: %v", err)
+		httpErr(w, http.StatusBadRequest, "bad_request")
 		return
 	}
 
@@ -266,6 +269,9 @@ func parseListOptions(r *http.Request, callerUserID string, isAdmin bool) (appli
 			for _, split := range strings.Split(raw, ",") {
 				s := strings.TrimSpace(split)
 				if s != "" {
+					if !isKnownDocumentStatus(s) {
+						return opts, "", fmt.Errorf("invalid status %q", s)
+					}
 					statuses = append(statuses, s)
 				}
 			}
@@ -392,6 +398,10 @@ func (h *Handler) renameDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	if !isValidBoundedText(req.Name, 255) {
+		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
 
@@ -556,12 +566,16 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 
 	// Retrieve the latest content hash from the most recent autosaved revision.
 	var contentHash string
-	_ = h.db.QueryRowContext(r.Context(),
+	if err := h.db.QueryRowContext(r.Context(),
 		`SELECT COALESCE(content_hash, '') FROM document_revisions
 		  WHERE document_id = $1
-		  ORDER BY created_at DESC LIMIT 1`,
+		  ORDER BY created_at DESC, id DESC LIMIT 1`,
 		docID,
-	).Scan(&contentHash)
+	).Scan(&contentHash); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("documents finalize load content hash error: doc_id=%s tenant_id=%s err=%v", docID, tenantID, err)
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 
 	result, err := h.submitSvc.SubmitRevisionForReview(r.Context(), h.db, approvalapp.SubmitRequest{
 		TenantID:        tenantID,
@@ -580,7 +594,11 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	respBody := map[string]string{"instanceId": result.InstanceID}
 	if idempStore != nil && idempHandle != nil {
-		body, _ := json.Marshal(respBody)
+		body, err := json.Marshal(respBody)
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, "internal_error")
+			return
+		}
 		if err := idempStore.CompleteReplay(idempHandle, http.StatusCreated, body); err != nil {
 			log.Printf("documents finalize idempotency complete error: %v", err)
 		}
@@ -617,7 +635,8 @@ func (h *Handler) duplicateDocument(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		status, msg := mapErr(err)
 		if status == http.StatusInternalServerError {
-			http.Error(w, `{"error":"`+msg+`","detail":"`+err.Error()+`"}`, status)
+			log.Printf("documents duplicate failed: doc_id=%s tenant_id=%s actor_id=%s err=%v", docID, tenantID, userID, err)
+			httpErr(w, status, msg)
 			return
 		}
 		httpErr(w, status, msg)
@@ -807,7 +826,7 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("documents.commit_autosave failed: doc_id=%s tenant_id=%s actor_id=%s session_id=%s pending_upload_id=%s err=%v",
-			docID, tenantID, userID, req.SessionID, req.PendingUploadID, err)
+			docID, tenantID, userID, redactID(req.SessionID), redactID(req.PendingUploadID), err)
 		status, msg := mapErr(err)
 		httpErr(w, status, msg)
 		return
@@ -934,6 +953,10 @@ func (h *Handler) createCheckpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpErr(w, http.StatusBadRequest, "invalid_body")
+		return
+	}
+	if !isValidBoundedText(req.Label, 255) {
+		httpErr(w, http.StatusBadRequest, "VALIDATION_ERROR")
 		return
 	}
 
@@ -1162,15 +1185,11 @@ func withAdminCtx(r *http.Request) *http.Request {
 		return r
 	}
 
-	roles := rolesFromHeader(r.Header.Get("X-User-Roles"))
+	roles := iamdomain.RolesFromContext(r.Context())
 	if len(roles) == 0 {
 		return r
 	}
-	ctxRoles := make([]iamdomain.Role, 0, len(roles))
-	for _, role := range roles {
-		ctxRoles = append(ctxRoles, iamdomain.Role(role))
-	}
-	ctx := iamdomain.WithAuthContext(r.Context(), userID, ctxRoles)
+	ctx := iamdomain.WithAuthContext(r.Context(), userID, roles)
 	return r.WithContext(ctx)
 }
 
@@ -1184,32 +1203,12 @@ func hasAnyRole(r *http.Request, want ...string) bool {
 }
 
 func hasRole(r *http.Request, want string) bool {
-	for _, role := range rolesFromHeader(r.Header.Get("X-User-Roles")) {
-		if role == want {
-			return true
-		}
-	}
 	for _, role := range iamdomain.RolesFromContext(r.Context()) {
 		if string(role) == want {
 			return true
 		}
 	}
 	return false
-}
-
-func rolesFromHeader(header string) []string {
-	if strings.TrimSpace(header) == "" {
-		return nil
-	}
-	parts := strings.Split(header, ",")
-	roles := make([]string, 0, len(parts))
-	for _, part := range parts {
-		role := strings.ToLower(strings.TrimSpace(part))
-		if role != "" {
-			roles = append(roles, role)
-		}
-	}
-	return roles
 }
 
 func tenantIDFromReq(r *http.Request) (string, error) {
@@ -1279,4 +1278,35 @@ func mapErr(err error) (int, string) {
 
 func httpErr(w http.ResponseWriter, status int, msg string) {
 	_ = problem.Write(w, problem.New(status, problem.Code(msg), msg))
+}
+
+func isKnownDocumentStatus(status string) bool {
+	switch documentsapi.DocumentSummaryStatus(status) {
+	case documentsapi.Approved,
+		documentsapi.Draft,
+		documentsapi.Obsolete,
+		documentsapi.Published,
+		documentsapi.Rejected,
+		documentsapi.Scheduled,
+		documentsapi.Superseded,
+		documentsapi.UnderReview:
+		return true
+	default:
+		return status == string(domain.DocStatusArchived)
+	}
+}
+
+func isValidBoundedText(value string, max int) bool {
+	trimmed := strings.TrimSpace(value)
+	return trimmed != "" && len(trimmed) <= max
+}
+
+func redactID(value string) string {
+	if value == "" {
+		return ""
+	}
+	if len(value) <= 8 {
+		return "..."
+	}
+	return value[:8] + "..."
 }

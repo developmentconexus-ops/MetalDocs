@@ -13,6 +13,8 @@ function normalizeRoles(value: unknown): UserRole[] {
 function normalizeCurrentUser(value: CurrentUser): CurrentUser {
   return {
     userId: value?.userId ?? "",
+    tenantId: value?.tenantId ?? "",
+    tenantName: value?.tenantName ?? "",
     username: value?.username ?? "",
     email: value?.email ?? "",
     displayName: value?.displayName ?? value?.username ?? "",

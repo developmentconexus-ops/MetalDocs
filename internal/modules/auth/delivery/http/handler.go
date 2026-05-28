@@ -1,8 +1,11 @@
 package httpdelivery
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -15,11 +18,13 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/requesttrace"
 )
 
 type Handler struct {
 	service *authapp.Service
 	audit   auditdomain.Writer
+	now     func() time.Time
 }
 
 type loginRequest struct {
@@ -32,8 +37,16 @@ type changePasswordRequest struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+func (r loginRequest) String() string {
+	return fmt.Sprintf("{identifier:%s}", strings.TrimSpace(r.Identifier))
+}
+
+func (r changePasswordRequest) String() string {
+	return "changePasswordRequest{redacted}"
+}
+
 func NewHandler(service *authapp.Service) *Handler {
-	return &Handler{service: service}
+	return &Handler{service: service, now: time.Now}
 }
 
 func (h *Handler) WithAudit(w auditdomain.Writer) *Handler {
@@ -55,7 +68,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 
@@ -63,6 +76,10 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("auth login failed for %q: %v", strings.TrimSpace(req.Identifier), err)
 		http.SetCookie(w, h.service.ExpiredSessionCookie())
+		identifierHash := hashIdentifier(req.Identifier)
+		h.recordAudit(r, "", "auth.login.failed", identifierHash, map[string]any{
+			"identifier_sha256": identifierHash,
+		})
 		h.writeAuthError(w, err)
 		return
 	}
@@ -82,10 +99,14 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if cookie, err := r.Cookie(h.service.SessionCookieName()); err == nil {
-		if err := h.service.Logout(r.Context(), cookie.Value); err == nil {
-			if user, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
-				h.recordAudit(r, user.UserID, "auth.logout", user.UserID, map[string]any{})
-			}
+		if err := h.service.Logout(r.Context(), cookie.Value); err != nil {
+			log.Printf("auth logout failed: %v", err)
+			http.SetCookie(w, h.service.ExpiredSessionCookie())
+			h.writeAuthError(w, err)
+			return
+		}
+		if user, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
+			h.recordAudit(r, user.UserID, "auth.logout", user.UserID, map[string]any{})
 		}
 	}
 	http.SetCookie(w, h.service.ExpiredSessionCookie())
@@ -99,7 +120,7 @@ func (h *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, user)
@@ -112,13 +133,13 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := authdomain.CurrentUserFromContext(r.Context())
 	if !ok {
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 		return
 	}
 
 	var req changePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
 	if err := h.service.ChangePasswordForUser(r.Context(), user, req.CurrentPassword, req.NewPassword); err != nil {
@@ -128,7 +149,7 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	currentUser, err := h.service.CurrentUser(r.Context(), user.UserID, user.TenantID)
 	if err != nil {
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
 		return
 	}
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
@@ -141,21 +162,21 @@ func (h *Handler) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeAuthError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrInvalidCredentials):
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_INVALID_CREDENTIALS", "Invalid username/email or password"))
 	case errors.Is(err, authdomain.ErrIdentityLocked):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_LOCKED", "Account is temporarily locked"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_LOCKED", "Account is temporarily locked"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		_ = problem.Write(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 	case errors.Is(err, authdomain.ErrIdentityInactive):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_ACCOUNT_INACTIVE", "User account is inactive"))
 	case errors.Is(err, authdomain.ErrTenantNotPermitted):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_TENANT_FORBIDDEN", "User has no role in the requested tenant"))
 	case errors.Is(err, authdomain.ErrTenantClaimRequired):
-		_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required"))
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_TENANT_REQUIRED", "Tenant selection required"))
 	default:
-		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error"))
 	}
 }
 
@@ -163,18 +184,19 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	if h.audit == nil {
 		return
 	}
-	raw, _ := json.Marshal(payload)
-	traceID := "trace-local"
-	if v := strings.TrimSpace(r.Header.Get("X-Trace-Id")); v != "" {
-		traceID = v
+	raw, marshalErr := json.Marshal(payload)
+	if marshalErr != nil {
+		log.Printf("auth audit payload marshal failed action=%s actor=%s: %v", action, actorID, marshalErr)
+		return
 	}
+	traceID := requesttrace.Resolve(r.Context())
 	tenantID := ""
 	if sess, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
 		tenantID = sess.TenantID
 	}
 	if err := h.audit.Record(r.Context(), auditdomain.Event{
 		ID:           uuid.NewString(),
-		OccurredAt:   time.Now().UTC(),
+		OccurredAt:   h.now().UTC(),
 		ActorID:      actorID,
 		Action:       action,
 		ResourceType: "user",
@@ -185,4 +207,15 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 	}); err != nil {
 		log.Printf("auth audit write failed action=%s actor=%s: %v", action, actorID, err)
 	}
+}
+
+func (h *Handler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
+	if err := problem.Write(w, p); err != nil {
+		log.Printf("auth problem write failed: %v", err)
+	}
+}
+
+func hashIdentifier(identifier string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(identifier)))
+	return hex.EncodeToString(sum[:])
 }

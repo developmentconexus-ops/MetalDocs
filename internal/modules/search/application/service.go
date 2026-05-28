@@ -2,9 +2,8 @@ package application
 
 import (
 	"context"
-	"sort"
+	"errors"
 	"strings"
-	"time"
 
 	"metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/authn"
@@ -22,6 +21,8 @@ const (
 	searchScopeArea         = "area"
 )
 
+var ErrTenantRequired = errors.New("search: tenant id required")
+
 type Service struct {
 	reader domain.Reader
 }
@@ -31,101 +32,52 @@ func NewService(reader domain.Reader) *Service {
 }
 
 func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain.Document, error) {
-	docs, err := s.reader.ListDocuments(ctx)
+	normalized, err := domain.NewQuery(q)
 	if err != nil {
+		if errors.Is(err, domain.ErrQueryTenantEmpty) {
+			return nil, ErrTenantRequired
+		}
 		return nil, err
 	}
+	limit := effectiveLimit(q.Limit)
 
-	text := strings.ToLower(strings.TrimSpace(q.Text))
-	documentType := strings.ToLower(strings.TrimSpace(q.DocumentType))
-	documentProfile := strings.ToLower(strings.TrimSpace(q.DocumentProfile))
-	documentFamily := strings.ToLower(strings.TrimSpace(q.DocumentFamily))
-	processArea := strings.ToLower(strings.TrimSpace(q.ProcessArea))
-	subject := strings.ToLower(strings.TrimSpace(q.Subject))
-	ownerID := strings.TrimSpace(q.OwnerID)
-	businessUnit := strings.TrimSpace(q.BusinessUnit)
-	department := strings.TrimSpace(q.Department)
-	classification := strings.ToUpper(strings.TrimSpace(q.Classification))
-	status := strings.ToUpper(strings.TrimSpace(q.Status))
-	tag := strings.ToLower(strings.TrimSpace(q.Tag))
-
-	filtered := make([]domain.Document, 0, len(docs))
-	for _, doc := range docs {
-		allowed, err := s.canView(ctx, doc)
+	normalized.Limit = q.Limit
+	filtered := make([]domain.Document, 0, limit)
+	offset := 0
+	for len(filtered) < limit {
+		docs, err := s.reader.ListDocuments(ctx, normalized, limit, offset)
 		if err != nil {
 			return nil, err
 		}
-		if !allowed {
-			continue
+		if len(docs) == 0 {
+			break
 		}
-		if text != "" && !strings.Contains(strings.ToLower(doc.Title), text) {
-			continue
-		}
-		if documentType != "" && strings.ToLower(doc.DocumentType) != documentType {
-			continue
-		}
-		if documentProfile != "" && strings.ToLower(doc.DocumentProfile) != documentProfile {
-			continue
-		}
-		if documentFamily != "" && strings.ToLower(doc.DocumentFamily) != documentFamily {
-			continue
-		}
-		if processArea != "" && strings.ToLower(doc.ProcessArea) != processArea {
-			continue
-		}
-		if subject != "" && strings.ToLower(doc.Subject) != subject {
-			continue
-		}
-		if ownerID != "" && doc.OwnerID != ownerID {
-			continue
-		}
-		if businessUnit != "" && doc.BusinessUnit != businessUnit {
-			continue
-		}
-		if department != "" && doc.Department != department {
-			continue
-		}
-		if classification != "" && strings.ToUpper(doc.Classification) != classification {
-			continue
-		}
-		if status != "" && strings.ToUpper(doc.Status) != status {
-			continue
-		}
-		if tag != "" && !hasTag(doc.Tags, tag) {
-			continue
-		}
-		if q.ExpiryBefore != nil {
-			if doc.ExpiryAt == nil || doc.ExpiryAt.After(q.ExpiryBefore.UTC()) {
+		for _, doc := range docs {
+			allowed, err := s.canView(ctx, doc)
+			if err != nil {
+				return nil, err
+			}
+			if !allowed {
 				continue
 			}
-		}
-		if q.ExpiryAfter != nil {
-			if doc.ExpiryAt == nil || doc.ExpiryAt.Before(q.ExpiryAfter.UTC()) {
-				continue
+			filtered = append(filtered, doc)
+			if len(filtered) == limit {
+				break
 			}
 		}
-		filtered = append(filtered, doc)
-	}
-
-	sort.Slice(filtered, func(i, j int) bool {
-		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
-	})
-
-	limit := q.Limit
-	if limit <= 0 {
-		limit = defaultLimit
-	}
-	if limit > maxLimit {
-		limit = maxLimit
-	}
-	if len(filtered) > limit {
-		filtered = filtered[:limit]
+		if len(docs) < limit {
+			break
+		}
+		offset += len(docs)
 	}
 
 	return filtered, nil
 }
 
 func (s *Service) canView(ctx context.Context, doc domain.Document) (bool, error) {
+	if _, hasUser := authn.UserIDFromContext(ctx); !hasUser {
+		return false, nil
+	}
 	if shouldBypassPolicy(ctx) {
 		return true, nil
 	}
@@ -144,7 +96,15 @@ func (s *Service) policiesForDocument(ctx context.Context, doc domain.Document) 
 	}{
 		{scope: searchScopeDocument, id: doc.ID},
 		{scope: searchScopeDocumentType, id: doc.DocumentProfile},
-		{scope: searchScopeArea, id: areaResourceID(doc.BusinessUnit, doc.Department)},
+	}
+	for _, areaID := range areaPolicyResourceIDs(doc) {
+		scopes = append(scopes, struct {
+			scope string
+			id    string
+		}{
+			scope: searchScopeArea,
+			id:    areaID,
+		})
 	}
 
 	var out []domain.AccessPolicy
@@ -166,11 +126,17 @@ func (s *Service) policiesForDocument(ctx context.Context, doc domain.Document) 
 }
 
 func shouldBypassPolicy(ctx context.Context) bool {
-	// Policy: explicit bypass. Internal background callers (no IAM context
-	// installed) deliberately skip access-policy enforcement here; HTTP
-	// entrypoints are gated upstream by IAM middleware.
-	_, hasUser := authn.UserIDFromContext(ctx)
-	return !hasUser && len(authn.RolesFromContext(ctx)) == 0
+	return false
+}
+
+func effectiveLimit(limit int) int {
+	if limit <= 0 {
+		return defaultLimit
+	}
+	if limit > maxLimit {
+		return maxLimit
+	}
+	return limit
 }
 
 func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
@@ -184,7 +150,7 @@ func decidePolicies(ctx context.Context, items []domain.AccessPolicy) bool {
 	roles := authn.RolesFromContext(ctx)
 	rolesSet := map[string]struct{}{}
 	for _, role := range roles {
-		rolesSet[strings.ToLower(strings.TrimSpace(role))] = struct{}{}
+		rolesSet[strings.ToLower(strings.TrimSpace(string(role)))] = struct{}{}
 	}
 
 	for _, item := range items {
@@ -212,22 +178,28 @@ func matchesPolicySubject(item domain.AccessPolicy, userID string, rolesSet map[
 }
 
 func areaResourceID(businessUnit, department string) string {
-	return strings.TrimSpace(businessUnit) + ":" + strings.TrimSpace(department)
+	normalizedBusinessUnit := strings.TrimSpace(businessUnit)
+	normalizedDepartment := strings.TrimSpace(department)
+	if normalizedBusinessUnit == "" || normalizedDepartment == "" {
+		return ""
+	}
+	return normalizedBusinessUnit + ":" + normalizedDepartment
 }
 
-func hasTag(tags []string, expected string) bool {
-	for _, tag := range tags {
-		if strings.EqualFold(strings.TrimSpace(tag), expected) {
-			return true
+func areaPolicyResourceIDs(doc domain.Document) []string {
+	candidates := []string{doc.BusinessUnit, doc.ProcessArea}
+	out := make([]string, 0, len(candidates))
+	seen := map[string]struct{}{}
+	for _, candidate := range candidates {
+		id := areaResourceID(candidate, doc.Department)
+		if id == "" {
+			continue
 		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
 	}
-	return false
-}
-
-func cloneOptionalUTC(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	cloned := value.UTC()
-	return &cloned
+	return out
 }

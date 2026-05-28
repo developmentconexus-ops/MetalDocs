@@ -1,3 +1,79 @@
+## 2026-05-26 - Wave 2 authz tx seeding sync
+
+- **Context:** uncommitted diff for Wave 2 shared authz transaction seeding across `internal/modules/documents/{application,repository}` and `internal/modules/iam/{authz,application,infrastructure/postgres}`.
+- **Mode:** lite patch
+- **Affected-surface scan:** `documents/application/{fillin_authz,reconstruct_service,service,view_service}.go`; `documents/repository/repository.go`; `iam/authz/context.go`; `iam/application/area_membership_service.go`; `iam/infrastructure/postgres/user_area_repository.go`; targeted repository/application tests.
+- **Routes/API:** no public contract change.
+- **Runtime flows:** rename/finalize/draft session-autosave flows now seed tx-local actor+tenant identity through shared `authz.SeedTxIdentity(...)` before tier-2 `authz.Require(...)`.
+- **Persistence:** no schema change; tx-local `metaldocs.tenant_id` / `metaldocs.actor_id` seeding is now shared instead of ad hoc inline `set_config` calls on documents and IAM membership writes.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: `wiki_sync_preflight.ps1` could not run tally because Git Bash failed with `CreateFileMapping ... Win32 error 5`.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents-tech-debt.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
+## 2026-05-25 - PDF webhook tenant hardening sync
+
+- **Context:** uncommitted diff on `fix/docs-5b-webhook-tenant-c4` for C4 tenant spoofing fix in documents PDF webhook handler.
+- **Mode:** lite patch
+- **Affected-surface scan:** `internal/modules/documents/http/pdf_webhook_handler.go`; `internal/modules/documents/http/pdf_webhook_handler_test.go`; `internal/modules/documents/repository/snapshot_repository.go`.
+- **Routes/API:** no public contract change; existing `POST /api/v1/documents/{id}/pdf-complete` now resolves tenant from `documents.id` and validates optional body `tenant_id` against canonical tenant.
+- **Runtime flows:** webhook persistence now uses DB-derived tenant only; mismatched body tenant is rejected.
+- **Persistence:** tenant lookup read added before `WritePDF`; no schema changes.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: `wiki_sync_preflight.ps1` could not run tally because Git Bash failed with `CreateFileMapping ... Win32 error 5`.
+- **Patched files:** `internal/modules/documents/http/pdf_webhook_handler.go`; `internal/modules/documents/http/pdf_webhook_handler_test.go`; `internal/modules/documents/repository/snapshot_repository.go`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
+## 2026-05-25 - editor-session tenant isolation sync
+
+- **Context:** uncommitted diff on `fix/docs-5a-tenant-isolation-c3-c4-c5-c6-c7-c8` for 5a-C3..C8.
+- **Mode:** structural refresh
+- **Anchors moved:** repository tenant-scoped methods now include tenant parameters around `HeartbeatSession`, `GetPendingForCommit`, `CreateCheckpoint`, `ListCheckpoints`, `GetRevision`, and `RestoreCheckpoint`.
+- **Public surface:** application repository/export interfaces now pass tenant scope to revision, pending upload, checkpoint, and session repository methods; HTTP service interface unchanged.
+- **Routes/API:** none.
+- **Runtime flows:** document create/acquire/presign/commit/session heartbeat, checkpoint list/create/restore, pending metadata read, and revision URL/export reads now reject cross-tenant rows through explicit tenant filters or joins.
+- **Persistence:** new post-baseline migration `db/migrations/0211_editor_sessions_tenant_id.sql` adds/backfills `public.editor_sessions.tenant_id` and indexes it.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** module tally not rerun; previous runs failed from Git Bash `CreateFileMapping ... Win32 error 5`. Database dictionary coverage passed.
+- **Patched files:** `internal/modules/documents/repository/repository.go`; `internal/modules/documents/repository/repository_tenant_isolation_test.go`; `internal/modules/documents/application/service.go`; `internal/modules/documents/application/service_test.go`; `internal/modules/documents/application/export_service.go`; `internal/modules/documents/application/export_service_test.go`; `tests/integration/testdb/fixtures.go`; `db/migrations/0211_editor_sessions_tenant_id.sql`; `wiki/database/tables/editor_sessions.md`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
+## 2026-05-25 - values-hash marshal error sync
+
+- **Context:** uncommitted diff on `fix/docs-5a-values-hash-c9` for 5a-C9.
+- **Mode:** lite patch
+- **Anchors moved:** `ComputeValuesHash` -> `domain/values_hash.go:11`.
+- **Public surface:** `ComputeValuesHash` now returns `(string, error)`; `FreezeService` propagates hash computation errors.
+- **Routes/API:** none.
+- **Runtime flows:** freeze now aborts before `WriteFreeze` when placeholder values cannot be JSON-marshaled for `values_hash`.
+- **Persistence:** no schema change; prevents persisting a `values_hash` derived from silently omitted value bytes.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: Git Bash terminated with `CreateFileMapping ... Win32 error 5` during `wiki_sync_preflight.ps1`.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/01-surface.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
+## 2026-05-25 - repository RowsAffected hardening sync
+
+- **Context:** uncommitted diff on `fix/docs-5a-rows-affected-c1-c2` for 5a-C1/C2.
+- **Mode:** lite patch
+- **Anchors moved:** `MarkArchived` -> `repository.go:1368`; `Unarchive` -> `repository.go:1399`; snapshot writer anchor -> `snapshot_repository.go:55`.
+- **Public surface:** no API/handler surface changed; repository method behavior now fails zero-row archive/unarchive and snapshot/freeze/final artifact writes.
+- **Routes/API:** none.
+- **Runtime flows:** no route flow changed; repository write flows now stop on zero-row `RowsAffected`.
+- **Persistence:** `public.documents` archive/unarchive and snapshot/freeze/final artifact UPDATEs now require at least one affected row.
+- **Dependencies:** none.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Counts after:** Critical=1 Major=7 Minor=4; missing-ADR=8 (pre-existing).
+- **Tally gate:** FAIL pre-existing/tooling: Git Bash terminated with `CreateFileMapping ... Win32 error 5` during `wiki_sync_preflight.ps1`.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/04-persistence.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
 ## 2026-05-21 - documents generated-wrapper mount sync
 
 - **Context:** uncommitted Phase 3 backend-platform-freeze slice to migrate documents module public route mounting to generated boundary ownership.
@@ -242,3 +318,27 @@
 - **Counts after:** Critical=1 Major=7 Minor=4
 - **Tally gate:** PASS
 - **Patched files:** `frontend/apps/web/src/features/documents/pages/DocumentPublishedPage.tsx`; `frontend/apps/web/src/features/documents/pages/DocumentPublishedPage.test.tsx`; `frontend/apps/web/src/features/documents/queries/useDocumentDetailQuery.ts`; `frontend/apps/web/src/features/documents/queries/useDocumentRevisionHistoryQuery.ts`; `frontend/apps/web/src/features/documents/queries/useControlledDocumentActiveDocumentQuery.ts`; `wiki/architecture/frontend-structure.md`; `.agents/skills/metaldocs-tanstack-query/SKILL.md`; `.agents/skills/metaldocs-frontend/SKILL.md`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`
+
+## 2026-05-25 - IAM role-header hardening sync
+
+- **Context:** branch `fix/docs-5b-header-roles-c3`; documents handler removed `X-User-Roles` fallback from `withAdminCtx`/`hasRole`, and IAM middleware strips `X-User-Roles` with `X-User-ID`.
+- **Affected modules:** documents, iam.
+- **Mode:** structural refresh.
+- **Affected-surface scan:** Documents authz/runtime-flow behavior changed; no route, OpenAPI, persistence, dependency, public exported surface, debt, or backlog change.
+- **Facts updated:** documents tier-1 role source now `iamdomain.RolesFromContext` only; caller-supplied role headers are not trusted.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Tally gate:** preflight/tally blocked by Git Bash `CreateFileMapping` Win32 error 5; treated as pre-existing tooling failure, not an edit-caused doc failure.
+- **Patched files:** `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.
+
+## 2026-05-25 - finalize C1/C2 error-path sync
+
+- **Context:** branch `fix/docs-5b-finalize-c1-c2`; targeted handler hardening for Track 3B Step 2B C1/C2 in `internal/modules/documents/delivery/http/handler.go`.
+- **Affected modules:** documents.
+- **Mode:** lite patch.
+- **Affected-surface scan:** finalize runtime error path and duplicate 500 response behavior changed; no route, OpenAPI/codegen, persistence schema, dependency graph, or public exported surface change.
+- **Facts updated:** finalize content-hash lookup now distinguishes `sql.ErrNoRows` (allowed empty hash) from real query errors (500 + server log); duplicate internal errors now use `httpErr` without leaking raw `err.Error()` payload details.
+- **T-NNN touched:** none.
+- **R-NNN touched:** none.
+- **Tally gate:** preflight/tally blocked by Git Bash `CreateFileMapping` Win32 error 5; treated as pre-existing tooling failure, not an edit-caused doc failure.
+- **Patched files:** `internal/modules/documents/delivery/http/handler.go`; `internal/modules/documents/delivery/http/handler_test.go`; `wiki/modules/documents.md`; `wiki/modules/documents/_artifacts/sync-log.md`.

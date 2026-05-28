@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"metaldocs/internal/modules/templates/application"
 	"metaldocs/internal/modules/templates/domain"
 )
@@ -573,6 +574,119 @@ func TestArchiveTemplate_Idempotent(t *testing.T) {
 	}
 }
 
+func TestReview_UsesTemplateReviewCapability(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	reviewerRole := "reviewer"
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusInReview,
+		AuthorID:            "author-1",
+		PendingReviewerRole: &reviewerRole,
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+	mock.ExpectBegin()
+	expectTemplateAuthz(mock, "reviewer-1", "tenant-a", "template.review")
+	mock.ExpectCommit()
+
+	_, err = svc.Review(context.Background(), application.ReviewCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "reviewer-1",
+		ActorRoles:    []string{"reviewer"},
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Accept:        false,
+		Reason:        "changes requested",
+	})
+	if err != nil {
+		t.Fatalf("Review: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestArchiveTemplate_UsesTemplateArchiveCapability(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	repo.templates[template.ID] = template
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+	mock.ExpectBegin()
+	expectTemplateAuthz(mock, "user-1", "tenant-a", "template.archive")
+	mock.ExpectCommit()
+
+	_, err = svc.ArchiveTemplate(context.Background(), application.ArchiveCmd{
+		TenantID:    "tenant-a",
+		ActorUserID: "user-1",
+		TemplateID:  template.ID,
+	})
+	if err != nil {
+		t.Fatalf("ArchiveTemplate: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestApproveRejectReturnsStaleLockVersionWhenVersionMoved(t *testing.T) {
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a"}
+	reviewerRole := "reviewer"
+	submittedAt := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	reviewedAt := time.Date(2026, 4, 20, 11, 0, 0, 0, time.UTC)
+	approvedAt := time.Date(2026, 4, 20, 11, 30, 0, 0, time.UTC)
+	version := &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          template.ID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusApproved,
+		AuthorID:            "author-1",
+		PendingReviewerRole: &reviewerRole,
+		PendingApproverRole: "approver",
+		ReviewerID:          strPtr("reviewer-1"),
+		SubmittedAt:         &submittedAt,
+		ReviewedAt:          &reviewedAt,
+		ApprovedAt:          &approvedAt,
+		LockVersion:         0,
+	}
+	repo.templates[template.ID] = template
+	repo.versions[version.ID] = version
+	repo.lockVersions[version.ID] = 1
+
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.Approve(context.Background(), application.ApproveCmd{
+		TenantID:      "tenant-a",
+		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
+		TemplateID:    template.ID,
+		VersionNumber: 1,
+		Accept:        false,
+		Reason:        "stale review",
+	})
+	if !errors.Is(err, domain.ErrStaleLockVersion) {
+		t.Fatalf("expected ErrStaleLockVersion, got %v", err)
+	}
+}
+
 func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 	repo := newFakeRepo()
 	repo.failCreateVersion = true
@@ -606,7 +720,10 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected publish to fail when creating next draft fails")
 	}
-	if version.Status != domain.VersionStatusPublished {
-		t.Fatalf("expected non-tx path to leave published state after failure, got %q", version.Status)
+	if !errors.Is(err, domain.ErrTransactionRequired) {
+		t.Fatalf("expected ErrTransactionRequired, got %v", err)
+	}
+	if version.Status != domain.VersionStatusDraft {
+		t.Fatalf("expected version status to remain draft, got %q", version.Status)
 	}
 }

@@ -83,3 +83,5 @@ Tripwire pairing: N/A — login is unauthenticated; auth tables not in tripwire 
 - Idempotency: no.
 - Pagination: no.
 - Audit log emission: NO — only `log.Printf` in login failure path at `internal/modules/auth/delivery/http/handler.go:56`.
+
+Phase 11 update: success emits `auth.login`; failure emits `auth.login.failed` with `identifier_sha256` derived from the trimmed identifier. `recordAudit` always stamps a server-generated UUID trace ID and ignores client-provided `X-Trace-Id` values.

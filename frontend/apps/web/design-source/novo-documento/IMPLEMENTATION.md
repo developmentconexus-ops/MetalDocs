@@ -2,11 +2,11 @@
 
 > **Slug:** novo-documento
 > **Owning feature:** features/documents
-> **Target route:** /documents-v2/new
+> **Target route:** /documents/new
 > **Reference:** ./NOTES.md + ../novo-perfil/novo-perfil.html + ../novo-area-codigo-visibilidade/novo-area-codigo-visibilidade.html + ../novo-template/novo-template.html + ../novo-confirmacao/novo-confirmacao.html
 > **Skill version:** 1.0
 > **Started:** 2026-05-06
-> **Completed:** —
+> **Completed:** 2026-05-28 (runtime QA happy-path verified — visibility company + restricted area persisted, blank template real)
 
 ---
 
@@ -176,8 +176,8 @@ Mock fallback strategy:
 - [x] `SelectableCard` primitive committed (`components/ui/SelectableCard.tsx` + `.module.css`)
 - [x] `visibilityMeta.ts` committed (`features/documents/lib/visibilityMeta.ts`)
 - [x] TanStack Query hooks committed (`useProfilesQuery`, `useAreasQuery`, `useTemplatesByProfileQuery` in `features/documents/queries/`)
-- [x] Route stub registered: `documents-v2/new` → `NewDocumentWizardPage` (replaces existing `DocumentCreatePage`)
-- [x] LibrarySidebar broken-link fix `/documents/new` → `/documents-v2/new` (`features/documents/components/LibrarySidebar.tsx:59`)
+- [x] Route stub registered: `documents/new` → `NewDocumentWizardPage` (replaces existing `DocumentCreatePage`)
+- [x] LibrarySidebar broken-link fix `/documents/new` → `/documents/new` (`features/documents/components/LibrarySidebar.tsx:59`)
 
 ---
 
@@ -363,7 +363,7 @@ Sources: `design-source/selected-wizard.jsx` (Stepper, WizardShell, Footer, Step
 - [x] Reducer dispatches: `selectProfile`, `setArea`, `setTitle`, `setVisibility`, `addInvitee` / `removeInvitee` / `setExternal`, `selectTemplate`, `setConsent`, `goToStep`, `submitStart` / `submitError` / `submitSuccess`
 - [x] URL `?step=N` sync — `useSearchParams` driving reducer
 - [x] Pre-fill from URL params (`?profile=POP`) on mount
-- [x] Submit flow: `createControlledDocument` → on success `createDocument` → `navigate(/documents-v2/:id)` editor
+- [x] Submit flow: `createControlledDocument` → on success `createDocument` → `navigate(/documents/:id)` editor
 - [x] Error UX: `ApiError` + `resolveErrorMessage(code, msg)` + `role="alert"` rendering. Slot-already-created surfaces inline retry on doc POST.
 - [x] Disabled CTAs: `disabled aria-disabled="true" title="Em breve"` for "Em branco" + templates without published version
 - [x] Loading states: skeletons on profiles / areas / templates lists
@@ -390,14 +390,14 @@ pnpm test
 
 Smoke steps:
 
-1. Click "Novo documento" CTA from Library sidebar → lands on `/documents-v2/new?step=1`
+1. Click "Novo documento" CTA from Library sidebar → lands on `/documents/new?step=1`
 2. Step 1: pick profile (e.g. POP) → "Avançar" enables → click → `?step=2`
 3. Step 2: pick area, type title, see code preview update, change visibility, fill people invite, → "Avançar" enables only with area+title → click → `?step=3`
 4. Step 3: see template list filtered by profile, only published version selectable on each card, "Em branco" grayed, → "Avançar" enables on selection → click → `?step=4`
 5. Step 4: summary card shows all selections, check consent → "Criar documento" enables → click → 2-call POST → editor opens
 6. Refresh on `?step=2` retains step but resets state (no persistence in v1) — verify graceful behavior (redirect to step=1)
 7. Back-button from `?step=3` → `?step=2` retains state via reducer (browser back nav)
-8. Pre-fill: navigate to `/documents-v2/new?profile=POP` → wizard opens at step=1 with POP pre-selected (forward-pass)
+8. Pre-fill: navigate to `/documents/new?profile=POP` → wizard opens at step=1 with POP pre-selected (forward-pass)
 
 ---
 

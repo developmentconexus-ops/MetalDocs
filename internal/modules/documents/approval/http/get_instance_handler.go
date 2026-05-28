@@ -2,16 +2,16 @@ package approvalhttp
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/lib/pq"
+
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
@@ -20,7 +20,6 @@ func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	actorID := iamdomain.UserIDFromContext(r.Context())
 	instanceID := r.PathValue("instance_id")
 
 	if h.readSvc == nil {
@@ -28,7 +27,7 @@ func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inst, err := h.readSvc.LoadInstance(r.Context(), h.db, tenantID, actorID, instanceID)
+	inst, err := h.readSvc.LoadInstance(r.Context(), h.db, tenantID, instanceID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
 			WriteError(w, repository.ErrNoActiveInstance)
@@ -43,7 +42,7 @@ func (h *Handler) GetInstanceHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	w.Header().Set("ETag", "\"v1\"")
+	w.Header().Set("ETag", resp.ETag)
 	WriteJSON(w, http.StatusOK, resp)
 }
 
@@ -70,9 +69,9 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 			recs = append(recs, contracts.SignoffRecord{
 				ID:              sig.ID(),
 				ActorUserID:     name,
-				Decision:        string(sig.Decision()),
+				Decision:        contracts.SignoffDecision(sig.Decision()),
 				Reason:          sig.Comment(),
-				SignatureMethod: sig.SignatureMethod(),
+				SignatureMethod: contracts.SignatureMethod(sig.SignatureMethod()),
 				SignedAt:        sig.SignedAt().UTC().Format(time.RFC3339),
 			})
 		}
@@ -91,12 +90,12 @@ func (h *Handler) mapInstanceResponse(ctx context.Context, tenantID string, inst
 		DocumentID:  inst.DocumentID,
 		RouteID:     inst.RouteID,
 		TenantID:    inst.TenantID,
-		Status:      string(inst.Status),
+		Status:      contracts.InstanceStatus(inst.Status),
 		SubmittedBy: inst.SubmittedBy,
 		SubmittedAt: inst.SubmittedAt.UTC().Format(time.RFC3339),
 		CompletedAt: completedAt,
 		Stages:      stages,
-		ETag:        "\"v1\"",
+		ETag:        instanceETag(inst.RevisionVersion),
 	}, nil
 }
 
@@ -112,29 +111,48 @@ func (h *Handler) resolveEligibleActorNames(ctx context.Context, tenantID string
 	if h.db == nil {
 		return names, nil
 	}
+	actorSet := make(map[string]struct{})
 	for _, stage := range inst.Stages {
 		for _, actorID := range stage.EligibleActorIDs {
 			if _, ok := names[actorID]; ok {
 				continue
 			}
-			var displayName string
-			err := h.db.QueryRowContext(
-				ctx,
-				`SELECT COALESCE(NULLIF(display_name, ''), user_id)
-				   FROM metaldocs.iam_users
-				  WHERE tenant_id = $1::uuid
-				    AND user_id = $2`,
-				tenantID,
-				actorID,
-			).Scan(&displayName)
-			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					names[actorID] = actorID
-					continue
-				}
-				return nil, fmt.Errorf("resolve eligible actor %s: %w", actorID, err)
-			}
-			names[actorID] = displayName
+			actorSet[actorID] = struct{}{}
+		}
+	}
+	if len(actorSet) == 0 {
+		return names, nil
+	}
+	actorIDs := make([]string, 0, len(actorSet))
+	for actorID := range actorSet {
+		actorIDs = append(actorIDs, actorID)
+	}
+	rows, err := h.db.QueryContext(
+		ctx,
+		`SELECT user_id, COALESCE(NULLIF(display_name, ''), user_id)
+		   FROM metaldocs.iam_users
+		  WHERE tenant_id = $1::uuid
+		    AND user_id = ANY($2)`,
+		tenantID,
+		pq.Array(actorIDs),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("resolve eligible actors: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var actorID, displayName string
+		if err := rows.Scan(&actorID, &displayName); err != nil {
+			return nil, fmt.Errorf("resolve eligible actor row: %w", err)
+		}
+		names[actorID] = displayName
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("resolve eligible actors rows: %w", err)
+	}
+	for _, actorID := range actorIDs {
+		if _, ok := names[actorID]; !ok {
+			names[actorID] = actorID
 		}
 	}
 	return names, nil
@@ -144,7 +162,7 @@ func buildStageActors(stage domain.StageInstance, eligibleNames map[string]strin
 	actors := make([]contracts.StageActor, 0, len(stage.Signoffs)+len(stage.EligibleActorIDs))
 	seen := make(map[string]struct{}, len(stage.Signoffs))
 	for _, sig := range stage.Signoffs {
-		decision := string(sig.Decision())
+		decision := contracts.SignoffDecision(sig.Decision())
 		status := "approved"
 		if sig.Decision() == domain.DecisionReject {
 			status = "rejected"

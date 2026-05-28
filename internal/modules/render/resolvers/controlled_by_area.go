@@ -12,14 +12,17 @@ func (ControlledByAreaResolver) Key() string { return "controlled_by_area" }
 func (ControlledByAreaResolver) Version() int { return 2 }
 
 func (ControlledByAreaResolver) Resolve(ctx context.Context, in ResolveInput) (ResolvedValue, error) {
+	if err := requireTenantID("controlled_by_area", in.TenantID); err != nil {
+		return ResolvedValue{}, err
+	}
 	value := in.AreaNameSnapshot
 	if value == "" {
 		value = in.AreaCodeSnapshot
 	}
 	inputsHash, err := hashInputs(struct {
-		TenantID         string `json:"tenant_id"`
-		AreaNameSnapshot string `json:"area_name_snapshot"`
-		AreaCodeFallback string `json:"area_code_fallback,omitempty"`
+		TenantID         TenantID `json:"tenant_id"`
+		AreaNameSnapshot string   `json:"area_name_snapshot"`
+		AreaCodeFallback string   `json:"area_code_fallback,omitempty"`
 	}{
 		TenantID:         in.TenantID,
 		AreaNameSnapshot: in.AreaNameSnapshot,

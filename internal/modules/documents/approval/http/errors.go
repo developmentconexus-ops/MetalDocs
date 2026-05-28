@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 
 	approvalapi "metaldocs/internal/modules/documents/approval/api"
 	"metaldocs/internal/modules/documents/approval/application"
@@ -52,15 +51,27 @@ const (
 	approvalCodeApprovalUnresolved       problem.Code = "approval.unresolved_comments"
 	approvalCodeValidationReasonRequired problem.Code = "validation.reason_required"
 	approvalCodeNotFoundRoute            problem.Code = "not_found.route"
+	approvalCodeStateRouteInactive       problem.Code = "state.route_inactive"
 	approvalCodeTimeout                  problem.Code = "timeout"
 	approvalCodeValidationJSONDecode     problem.Code = "validation.json_decode"
 	approvalCodeValidationJSONTypeError  problem.Code = "validation.json_type_error"
 	approvalCodeValidationEmptyBody      problem.Code = "validation.empty_body"
 	approvalCodeValidationContentType    problem.Code = "validation.content_type"
 	approvalCodeValidationBodyTooLarge   problem.Code = "validation.body_too_large"
-	approvalCodeValidationDuplicateKey   problem.Code = "validation.duplicate_key"
 	approvalCodeValidationRequestInvalid problem.Code = "validation.request_invalid"
 )
+
+type ValidationError struct {
+	msg string
+}
+
+func NewValidationError(msg string) *ValidationError {
+	return &ValidationError{msg: msg}
+}
+
+func (e *ValidationError) Error() string {
+	return e.msg
+}
 
 func MapErrorToResponse(err error) *problem.Problem {
 	statusCode := http.StatusInternalServerError
@@ -131,6 +142,7 @@ func MapErrorToResponse(err error) *problem.Problem {
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError
 		var typeErr *json.UnmarshalTypeError
+		var validationErr *ValidationError
 		var invalidParamErr *approvalapi.InvalidParamFormatError
 		var unmarshalParamErr *approvalapi.UnmarshalingParamError
 		var requiredParamErr *approvalapi.RequiredParamError
@@ -138,6 +150,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 		var tooManyValuesErr *approvalapi.TooManyValuesForParamError
 
 		switch {
+		case errors.As(err, &validationErr):
+			statusCode = http.StatusBadRequest
+			code = approvalCodeValidationRequestInvalid
 		case errors.As(err, &invalidParamErr):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationParamFormat
@@ -162,9 +177,18 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, application.ErrReasonRequired):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationReasonRequired
+		case errors.Is(err, application.ErrInvalidObsoleteSource):
+			statusCode = http.StatusBadRequest
+			code = approvalCodeValidationRequestInvalid
+		case errors.Is(err, application.ErrEffectiveDateInPast):
+			statusCode = http.StatusBadRequest
+			code = approvalCodeValidationRequestInvalid
 		case errors.Is(err, application.ErrRouteNotFound):
 			statusCode = http.StatusNotFound
 			code = approvalCodeNotFoundRoute
+		case errors.Is(err, application.ErrRouteAlreadyInactive):
+			statusCode = http.StatusConflict
+			code = approvalCodeStateRouteInactive
 		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 			statusCode = http.StatusGatewayTimeout
 			code = approvalCodeTimeout
@@ -189,10 +213,7 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, contracts.ErrEmptyBody):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationEmptyBody
-		case errors.Is(err, contracts.ErrDuplicateKey):
-			statusCode = http.StatusBadRequest
-			code = approvalCodeValidationDuplicateKey
-		case looksLikeValidationError(err):
+		case errors.Is(err, contracts.ErrValidation):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationRequestInvalid
 		}
@@ -212,7 +233,10 @@ func WriteJSON(w http.ResponseWriter, status int, body any) {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		fallback := problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage)
-		payload, _ = json.Marshal(fallback)
+		payload, err = json.Marshal(fallback)
+		if err != nil {
+			payload = []byte(`{"status":500,"title":"internal error"}`)
+		}
 		status = http.StatusInternalServerError
 	}
 
@@ -229,15 +253,4 @@ func responseTitle(err error, statusCode int) string {
 		return internalErrorMessage
 	}
 	return err.Error()
-}
-
-func looksLikeValidationError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, " is required") ||
-		strings.Contains(msg, " must be ") ||
-		strings.Contains(msg, " must not be ") ||
-		strings.HasPrefix(msg, "json: unknown field")
 }

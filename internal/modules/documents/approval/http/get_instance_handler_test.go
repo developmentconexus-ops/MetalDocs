@@ -47,3 +47,25 @@ func TestBuildStageActors_ExpandsSignedAndPendingActors(t *testing.T) {
 		t.Fatalf("second actor = %+v", actors[1])
 	}
 }
+
+func TestMapInstanceResponse_UsesRevisionVersionETag(t *testing.T) {
+	h := &Handler{}
+	inst := &domain.Instance{
+		ID:              "inst-1",
+		DocumentID:      "doc-1",
+		RouteID:         "route-1",
+		TenantID:        "tenant-1",
+		Status:          domain.InstanceInProgress,
+		SubmittedBy:     "actor-1",
+		SubmittedAt:     time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC),
+		RevisionVersion: 8,
+	}
+
+	resp, err := h.mapInstanceResponse(t.Context(), "tenant-1", inst)
+	if err != nil {
+		t.Fatalf("map response: %v", err)
+	}
+	if resp.ETag != "\"v8\"" {
+		t.Fatalf("etag = %q, want %q", resp.ETag, "\"v8\"")
+	}
+}

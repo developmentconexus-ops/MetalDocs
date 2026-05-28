@@ -27,13 +27,9 @@ var ErrReasonRequired = errors.New("cancel: reason must not be empty")
 type CancelInput struct {
 	TenantID                string
 	InstanceID              string
-	ExpectedRevisionVersion int    // OCC guard on the document
+	ExpectedRevisionVersion int // OCC guard on the document
 	ActorUserID             string
 	Reason                  string
-	// BypassAuthz, when true, sets metaldocs.bypass_authz inside the cancel
-	// transaction before the authz check. Used by system jobs (e.g. watchdog)
-	// that must act without a user capability claim.
-	BypassAuthz bool
 }
 
 // CancelResult is returned on a successful cancellation.
@@ -45,6 +41,16 @@ type CancelResult struct {
 // active/pending stages to cancelled, and reverts the document to draft.
 // Requires the workflow.instance.cancel capability for the document's area.
 func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in CancelInput) (CancelResult, error) {
+	return s.cancelInstance(ctx, db, in, false)
+}
+
+// SystemCancelInstance cancels an in-progress approval instance for internal
+// scheduler/watchdog callers using system authz bypass.
+func (s *CancelService) SystemCancelInstance(ctx context.Context, db *sql.DB, in CancelInput) (CancelResult, error) {
+	return s.cancelInstance(ctx, db, in, true)
+}
+
+func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in CancelInput, system bool) (CancelResult, error) {
 	// Guard: reason required.
 	if in.Reason == "" {
 		return CancelResult{}, ErrReasonRequired
@@ -54,19 +60,32 @@ func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in Cance
 	if err != nil {
 		return CancelResult{}, fmt.Errorf("cancel: begin tx: %w", err)
 	}
+	rollback := func() { _ = tx.Rollback() }
+
+	if system {
+		if err := authz.BypassSystem(ctx, tx); err != nil {
+			rollback()
+			return CancelResult{}, fmt.Errorf("cancel: system authz bypass: %w", err)
+		}
+	} else {
+		if err = setAuthzGUC(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
+			rollback()
+			return CancelResult{}, fmt.Errorf("cancel: %w", err)
+		}
+	}
 
 	// Load instance to get document ID and verify not already terminal.
 	inst, err := s.repo.LoadInstance(ctx, tx, in.TenantID, in.InstanceID)
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: load instance: %w", err)
 	}
 	if inst == nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, repository.ErrNoActiveInstance
 	}
 	if inst.Status != domain.InstanceInProgress {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, repository.ErrInstanceCompleted
 	}
 
@@ -74,36 +93,23 @@ func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in Cance
 
 	// Fetch document area_code for authz check. FOR UPDATE locks the document row
 	// to prevent concurrent area_code changes between authz decision and status update.
-	var areaCode string
+	var areaCode sql.NullString
 	err = tx.QueryRowContext(ctx,
 		`SELECT process_area_code_snapshot FROM documents WHERE id = $1 AND tenant_id = $2 FOR UPDATE`,
 		docID, in.TenantID,
 	).Scan(&areaCode)
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: fetch area_code: %w", err)
 	}
 
-	// If caller is a system job bypassing user authz, set GUC inside this tx.
-	if in.BypassAuthz {
-		if _, err = tx.ExecContext(ctx,
-			`SELECT set_config('metaldocs.bypass_authz', 'system', true)`,
-		); err != nil {
-			tx.Rollback()
-			return CancelResult{}, fmt.Errorf("cancel: set bypass_authz GUC: %w", err)
-		}
-	} else {
-		if err = setAuthzGUC(ctx, tx, in.TenantID, in.ActorUserID); err != nil {
-			tx.Rollback()
-			return CancelResult{}, fmt.Errorf("cancel: %w", err)
-		}
-	}
-
 	// Authz gate: require workflow.instance.cancel capability.
-	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, "workflow.instance.cancel", areaCode); err != nil {
-		tx.Rollback()
-		return CancelResult{}, err
+	if !system {
+		ctx = authz.WithCapCache(ctx)
+		if err := authz.Require(ctx, tx, "workflow.instance.cancel", areaCode.String); err != nil {
+			rollback()
+			return CancelResult{}, err
+		}
 	}
 
 	// SET LOCAL cancel GUC — authorises under_review→draft transition in trigger.
@@ -111,7 +117,7 @@ func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in Cance
 		`SELECT set_config('metaldocs.cancel_in_progress', $1, true)`,
 		in.InstanceID,
 	); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: set cancel GUC: %w", err)
 	}
 
@@ -119,19 +125,22 @@ func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in Cance
 	now := s.clock.Now()
 	if err = s.repo.UpdateInstanceStatus(ctx, tx, in.TenantID, in.InstanceID,
 		domain.InstanceCancelled, domain.InstanceInProgress, &now); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: update instance status: %w", err)
 	}
 
 	// Cancel all active and pending stage instances.
 	if _, err = tx.ExecContext(ctx, `
-		UPDATE approval_stage_instances
+		UPDATE approval_stage_instances asi
 		   SET status = 'cancelled'
-		 WHERE approval_instance_id = $1
-		   AND status IN ('active','pending')`,
-		in.InstanceID,
+		  FROM approval_instances ai
+		 WHERE asi.approval_instance_id = ai.id
+		   AND asi.approval_instance_id = $1
+		   AND ai.tenant_id = $2
+		   AND asi.status IN ('active','pending')`,
+		in.InstanceID, in.TenantID,
 	); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: cancel stages: %w", err)
 	}
 
@@ -147,27 +156,31 @@ func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in Cance
 		docID, in.TenantID, in.ExpectedRevisionVersion,
 	)
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: revert doc to draft: %w", err)
 	}
 	rows, err := res.RowsAffected()
 	if err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: rows affected: %w", err)
 	}
 	if rows == 0 {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, repository.ErrStaleRevision
 	}
 
 	// Emit governance event.
-	payload, _ := json.Marshal(map[string]any{
+	payload, err := json.Marshal(map[string]any{
 		"instance_id": in.InstanceID,
 		"reason":      in.Reason,
 	})
+	if err != nil {
+		rollback()
+		return CancelResult{}, fmt.Errorf("cancel: marshal event payload: %w", err)
+	}
 	if err = s.emitter.Emit(ctx, tx, GovernanceEvent{
 		TenantID:     in.TenantID,
-		EventType:    "approval.instance_cancelled",
+		EventType:    EventTypeApprovalInstanceCancelled,
 		ActorUserID:  in.ActorUserID,
 		ResourceType: "document",
 		ResourceID:   docID,
@@ -175,7 +188,7 @@ func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in Cance
 		PayloadJSON:  payload,
 		OccurredAt:   now,
 	}); err != nil {
-		tx.Rollback()
+		rollback()
 		return CancelResult{}, fmt.Errorf("cancel: emit event: %w", err)
 	}
 
@@ -185,8 +198,7 @@ func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in Cance
 	return CancelResult{DocumentID: docID}, nil
 }
 
-// newCancelService constructs a CancelService (wired by NewServices).
+// newCancelService constructs a CancelService.
 func newCancelService(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock) *CancelService {
 	return &CancelService{repo: repo, emitter: emitter, clock: clock}
 }
-

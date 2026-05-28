@@ -5,12 +5,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"metaldocs/internal/modules/templates/domain"
 )
 
 func TestPlaceholderCatalog_Returns7Entries(t *testing.T) {
 	repo := newFakeRepo()
 	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
 	req := httptest.NewRequest("GET", "/api/v1/templates/placeholder-catalog", nil)
+	withHeaders(req)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -41,3 +44,22 @@ func TestPlaceholderCatalog_Returns7Entries(t *testing.T) {
 	}
 }
 
+func TestPlaceholderCatalog_RequiresTemplateViewAuthz(t *testing.T) {
+	repo := newFakeRepo()
+	var gotAction string
+	mux := newMux(t, func(_ *http.Request, _, _, action string) error {
+		gotAction = action
+		return domain.ErrForbidden
+	}, repo)
+	req := httptest.NewRequest("GET", "/api/v1/templates/placeholder-catalog", nil)
+	withHeaders(req)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 body=%s", rec.Code, rec.Body.String())
+	}
+	if gotAction != "template.view" {
+		t.Fatalf("authz action = %q, want template.view", gotAction)
+	}
+}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -41,6 +40,10 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userI
 		return fmt.Errorf("begin iam tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, assignedBy); err != nil {
+		return fmt.Errorf("seed iam user.manage authorization: %w", err)
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
 		return fmt.Errorf("require iam user.manage authorization: %w", err)
 	}
@@ -56,6 +59,7 @@ DO UPDATE SET display_name = EXCLUDED.display_name, is_active = TRUE, updated_at
 	}
 
 	if _, err := tx.ExecContext(ctx,
+		// TODO: migration 0002 uses cascading FKs from iam_user_roles; keep role replacement explicit and review any future hard-delete path carefully.
 		`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`,
 		tenantID, userID); err != nil {
 		return fmt.Errorf("delete prior iam roles: %w", err)
@@ -74,22 +78,24 @@ VALUES ($1, $2::uuid, $3, NOW(), $4)
 	return nil
 }
 
-// ReplaceUserRoles writes the user+role assignment. The schema constraint
-// UNIQUE(tenant_id, user_id) means at most ONE role row per user per tenant.
-// If the input slice has multiple roles, only the last one is written.
-func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
+// ReplaceUserRoles writes the user+role assignments.
+func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin iam replace tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := r.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, roles, assignedBy); err != nil {
+	if err := r.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, role, assignedBy); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func (r *RoleAdminRepository) ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
+func (r *RoleAdminRepository) ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, assignedBy); err != nil {
+		return fmt.Errorf("seed iam user.manage authorization: %w", err)
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
 		return fmt.Errorf("require iam user.manage authorization: %w", err)
 	}
@@ -105,25 +111,16 @@ DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
 	}
 
 	if _, err := tx.ExecContext(ctx,
+		// TODO: migration 0002 uses cascading FKs from iam_user_roles; keep role replacement explicit and review any future hard-delete path carefully.
 		`DELETE FROM metaldocs.iam_user_roles WHERE tenant_id = $1::uuid AND user_id = $2`,
 		tenantID, userID); err != nil {
 		return fmt.Errorf("delete prior iam roles: %w", err)
 	}
 
-	var lastRole string
-	for _, role := range roles {
-		if code := strings.TrimSpace(string(role)); code != "" {
-			lastRole = code
-		}
-	}
-	if lastRole == "" {
-		return nil
-	}
-
 	if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)
 VALUES ($1, $2::uuid, $3, NOW(), $4)
-`, userID, tenantID, lastRole, assignedBy); err != nil {
+`, userID, tenantID, string(role), assignedBy); err != nil {
 		return fmt.Errorf("insert iam role: %w", err)
 	}
 	return nil

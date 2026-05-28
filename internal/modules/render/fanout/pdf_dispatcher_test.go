@@ -40,19 +40,23 @@ func TestPDFDispatcher_Dispatch_PublishesEvent(t *testing.T) {
 	if e.EventType != "docgen_v2_pdf" {
 		t.Errorf("event_type = %q, want docgen_v2_pdf", e.EventType)
 	}
-	if e.Payload["tenant_id"] != "tenant-1" {
-		t.Errorf("payload tenant_id = %v", e.Payload["tenant_id"])
+	payload, ok := e.Payload.(messaging.PDFConvertPayload)
+	if !ok {
+		t.Fatalf("payload type = %T, want messaging.PDFConvertPayload", e.Payload)
 	}
-	if e.Payload["revision_id"] != "rev-1" {
-		t.Errorf("payload revision_id = %v", e.Payload["revision_id"])
+	if payload.TenantID != "tenant-1" {
+		t.Errorf("payload tenant_id = %v", payload.TenantID)
 	}
-	if e.Payload["final_docx_s3_key"] != "final/rev-1.docx" {
-		t.Errorf("payload final_docx_s3_key = %v", e.Payload["final_docx_s3_key"])
+	if payload.RevisionID != "rev-1" {
+		t.Errorf("payload revision_id = %v", payload.RevisionID)
+	}
+	if payload.FinalDocxS3Key != "final/rev-1.docx" {
+		t.Errorf("payload final_docx_s3_key = %v", payload.FinalDocxS3Key)
 	}
 	if e.EventID == "" {
 		t.Error("EventID must be non-empty")
 	}
-	wantKey := "docgen_v2_pdf:rev-1"
+	wantKey := messaging.IdempotencyKey("docgen_v2_pdf:tenant-1:rev-1")
 	if e.IdempotencyKey != wantKey {
 		t.Errorf("IdempotencyKey = %q, want %q", e.IdempotencyKey, wantKey)
 	}

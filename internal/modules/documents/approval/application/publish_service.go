@@ -28,9 +28,10 @@ var ErrInstanceNotApproved = errors.New("approval: instance is not in approved s
 
 // PublishRequest carries all inputs for PublishApproved.
 type PublishRequest struct {
-	TenantID    string
-	InstanceID  string
-	PublishedBy string // user_id triggering publish
+	TenantID                string
+	InstanceID              string
+	PublishedBy             string // user_id triggering publish
+	ExpectedRevisionVersion int
 }
 
 // PublishResult is returned on successful publish.
@@ -50,6 +51,11 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		return PublishResult{}, fmt.Errorf("publishApproved: begin tx: %w", err)
 	}
 
+	if err := setAuthzGUC(ctx, tx, req.TenantID, req.PublishedBy); err != nil {
+		_ = tx.Rollback()
+		return PublishResult{}, fmt.Errorf("publishApproved: %w", err)
+	}
+
 	// Step 2: load the approval instance.
 	instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 	if err != nil {
@@ -63,16 +69,15 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		_ = tx.Rollback()
 		return PublishResult{}, repository.ErrNoActiveInstance
 	}
+	if req.ExpectedRevisionVersion > 0 && req.ExpectedRevisionVersion != instance.RevisionVersion {
+		_ = tx.Rollback()
+		return PublishResult{}, repository.ErrStaleRevision
+	}
 
 	// Verify instance is in approved state.
 	if instance.Status != domain.InstanceApproved {
 		_ = tx.Rollback()
 		return PublishResult{}, ErrInstanceNotApproved
-	}
-
-	if err := setAuthzGUC(ctx, tx, req.TenantID, req.PublishedBy); err != nil {
-		_ = tx.Rollback()
-		return PublishResult{}, fmt.Errorf("publishApproved: %w", err)
 	}
 
 	areaCode, err := loadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
@@ -99,8 +104,9 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		       revision_version = revision_version + 1
 		 WHERE id        = $1
 		   AND tenant_id = $2
-		   AND status    = 'approved'`,
-		instance.DocumentID, req.TenantID,
+		   AND status    = 'approved'
+		   AND revision_version = $3`,
+		instance.DocumentID, req.TenantID, instance.RevisionVersion,
 	)
 	if err != nil {
 		_ = tx.Rollback()
@@ -129,7 +135,7 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 	}
 	event := GovernanceEvent{
 		TenantID:     req.TenantID,
-		EventType:    "document_published",
+		EventType:    EventTypeDocumentPublished,
 		ActorUserID:  req.PublishedBy,
 		ResourceType: "document",
 		ResourceID:   instance.DocumentID,
@@ -191,6 +197,11 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: begin tx: %w", err)
 	}
 
+	if err := setAuthzGUC(ctx, tx, req.TenantID, req.ScheduledBy); err != nil {
+		_ = tx.Rollback()
+		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: %w", err)
+	}
+
 	// Step 3: load the approval instance.
 	instance, err := s.repo.LoadInstance(ctx, tx, req.TenantID, req.InstanceID)
 	if err != nil {
@@ -213,11 +224,6 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 	if instance.Status != domain.InstanceApproved {
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, ErrInstanceNotApproved
-	}
-
-	if err := setAuthzGUC(ctx, tx, req.TenantID, req.ScheduledBy); err != nil {
-		_ = tx.Rollback()
-		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: %w", err)
 	}
 
 	areaCode, err := loadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
@@ -305,7 +311,7 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 	}
 	event := GovernanceEvent{
 		TenantID:     req.TenantID,
-		EventType:    "publish_scheduled",
+		EventType:    EventTypePublishScheduled,
 		ActorUserID:  req.ScheduledBy,
 		ResourceType: "document",
 		ResourceID:   instance.DocumentID,

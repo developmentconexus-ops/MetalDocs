@@ -1,16 +1,19 @@
 ﻿# MetalDocs AI Operating System
 
-> **Last verified:** 2026-05-13
-> **Scope:** Compact operating model for safe agentic work in MetalDocs.
-> **Out of scope:** Detailed module docs, API contract mechanics, and startup script implementation details.
+> **Last verified:** 2026-05-27
+> **Scope:** Path-stable compatibility bridge for safe agentic work in MetalDocs.
+> **Out of scope:** Canonical QA policy, detailed module docs, API contract mechanics, and startup script implementation details.
 > **Key files:**
 > - `docs/superpowers/specs/2026-05-13-metaldocs-ai-operating-system-design.md` - canonical design for the operating model
 > - `scripts/start-api.ps1` - startup script truth boundary
 > - `scripts/check-system-runnable.ps1` - runnable preflight checkpoint
+> - `wiki/quality/qa-operating-system.md` - canonical QA loop, hard-stop policy, evidence rules, and close-out contract
 
 ## What this is
 
-This is a compact workflow for keeping MetalDocs reliable during agentic development. It tells us which truth to trust for each kind of question, how to classify drift before we absorb it into feature work, and where we must stop instead of guessing.
+This page stays path-stable because repo instructions and handoff docs still point here directly. It is a compact compatibility bridge, not a second canonical operating system.
+
+Use it to understand truth hierarchy, classification, and prerequisite gates. For the mandatory QA loop, hard-stop behavior, and closure evidence rules, follow `wiki/quality/qa-operating-system.md`.
 
 ## The four truths
 
@@ -21,7 +24,7 @@ This is a compact workflow for keeping MetalDocs reliable during agentic develop
 
 A common failure mode is treating wiki truth as if it proves runtime truth. It does not. Wiki memory helps us work faster, but runnable evidence wins when they disagree.
 
-## The seven classifications
+## The eight classifications
 
 - `runtime prerequisite` - startup, migration, auth/session, binary freshness, or dependency drift that makes local runtime untrustworthy.
 - `shared contract prerequisite` - runtime, spec, generated code, or frontend wrapper drift that affects more than the task in front of us.
@@ -29,6 +32,7 @@ A common failure mode is treating wiki truth as if it proves runtime truth. It d
 - `screen-local implementation` - a bounded screen change that does not require shared runtime or contract repair.
 - `wiki-memory drift` - docs or governed memory need updating after code truth changed.
 - `workflow/tooling gap` - the failure exposed a missing or weak script, skill gate, or verification rule.
+- `architecture contradiction` - the local task uncovered redesign-grade work that must stop the current implementation lane.
 - `defer` - the task found a larger product or architecture gap that should be captured, not silently implemented.
 
 ## The five hard gates
@@ -63,6 +67,31 @@ If a task spans multiple boundaries, compose the skills rather than forcing one 
 - If implementation exposed startup or contract drift, stop feature work and switch to `runtime-contract-prereq`.
 - If the code change touched an already documented module, finish with `metaldocs-module-doc-sync`.
 - If the module wiki is missing, stale beyond repair, or needs full structure, use `metaldocs-module-doc` instead of sync.
+
+## Default delivery loop
+
+This reference page is path-stable for agent instructions, but the canonical QA close-out policy now lives under `wiki/quality/`.
+
+For every non-trivial task, the default loop is:
+
+1. implement inside the bounded task
+2. run static and targeted verification for the touched slice
+3. perform code review
+4. perform product QA
+5. classify findings by root cause
+6. fix by family
+7. rerun targeted review, QA, and regression
+8. rerun broader regression when the change crossed boundaries
+9. close only with evidence and explicit bounded defers
+
+This loop is mandatory by default for autonomous work. `implemented`, `fixed`, `done`, `green`, or `looks good` are not sufficient close-out states without evidence.
+
+Default reusable checklists:
+
+- `wiki/quality/screen-qa-checklist.md`
+- `wiki/quality/backend-api-qa-checklist.md`
+- `wiki/quality/workflow-async-qa-checklist.md`
+- `wiki/quality/release-closeout-checklist.md`
 
 ## How to start work safely
 
@@ -110,6 +139,16 @@ Use these as defaults.
 
 Keep going only when the mismatch is local to the current task boundary. Stop when the mismatch changes shared runtime or contract behavior.
 
+Stop immediately when the required fix is redesign-grade rather than local, including:
+
+- shared API redesign affecting multiple consumers
+- cross-module auth/authz model change
+- storage or provider architecture redesign
+- worker or workflow semantic redesign outside the assigned boundary
+- large cross-screen or frontend-backend coordinated rewrite not included in the task
+
+When stopped, report the wrong boundary, what remains locally fixable, and the minimum prerequisite or redesign plan needed before resuming.
+
 Example: runtime route exists but the frontend wrapper and generated types still reflect an older contract. Even if the backend endpoint responds, this is not a screen-local fix. The runtime/spec/frontend mismatch is a `shared contract prerequisite` because other callers could be wrong too. Stop the screen task, repair the shared contract surfaces, then resume feature work.
 
 Example: during a screen task, you discover the backend endpoint the design expects does not exist at all. Do not stub around it and pretend the screen is done. Classify it as a prerequisite or `defer`, capture the missing backend work, and stop the screen implementation unless the assignment explicitly includes that backend slice.
@@ -122,7 +161,10 @@ The normal sequence is:
 2. pass the relevant gate
 3. implement inside the correct boundary
 4. verify with scripts and tests
-5. sync the wiki if code truth changed
+5. run code review and QA using the canonical quality loop
+6. classify and fix findings by family
+7. rerun targeted and broader regression as required
+8. sync the wiki if code truth changed
 
 Typical chains:
 
@@ -147,3 +189,9 @@ Example: if a contract change touches `templates` but also changes a shared rout
 5. If the incident exposed a workflow gap, update the script, skill, or runbook before resuming feature work.
 
 Once the failed checkpoint passes again, re-enter the original task at the same boundary instead of reopening discovery from scratch.
+
+## Explicit classification of the current split
+
+- `wiki/quality/qa-operating-system.md` is `canonical wiki content` for the QA loop, evidence rules, and close-out contract.
+- `wiki/references/ai-operating-system.md` is a `reference/archive content` + `compatibility bridge` page used because repo instructions still point here directly.
+- This split is intentional for path stability right now. It should not be treated as two competing operating systems, and this page must defer to the canonical QA operating system whenever close-out behavior is in question.

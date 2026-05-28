@@ -2,6 +2,23 @@
 
 > Append-only log of `metaldocs-module-doc-sync` runs against this module. Newest at top.
 
+## 2026-05-25 - backend medium quality-bar sync
+
+- **Context:** uncommitted diff on `fix/phase10-controlleddocs` for Worker 10A, scoped to `internal/modules/controlleddocuments/`
+- **Mode:** lite patch
+- **Affected modules:** controlled-documents only
+- **Affected-surface scan:** public domain/repository interfaces changed (`DBTX`, clone-template/document-ref constructors); application/repository error handling and warning logging changed; routes, OpenAPI/codegen, DB schema/migrations, persistence tables, and runtime route ownership unchanged
+- **Public surface:** added `NewCloneTemplateRequest`, `NewDocumentRef`, `ErrCloneTemplateNameRequired`, `ErrDocumentRefIDRequired`; repository Tx methods now accept `controlleddocumentsdomain.DBTX`
+- **Routes/API:** none
+- **Runtime flows:** no route or lifecycle flow changes; error context/logging only
+- **Persistence:** no schema/query-shape changes beyond error wrapping and existing RowsAffected checks
+- **Dependencies:** no module dependency changes
+- **T-NNN touched:** T-012 count refreshed for constructor additions; no debt row closed
+- **R-NNN touched:** none
+- **Counts after:** Critical=2 Major=6 Minor=4; public symbols undocumented=79/94
+- **Tally gate:** BLOCKED by Git Bash/Windows access error during preflight (`CreateFileMapping ... Win32 error 5`)
+- **Patched files:** `wiki/modules/controlled-documents.md`; `wiki/modules/controlled-documents-tech-debt.md`; `wiki/modules/controlled-documents/_artifacts/sync-log.md`
+
 ## 2026-05-21 - generated boundary mount + freeze workflow sync
 
 - **Context:** uncommitted diff in this thread (controlled-documents runtime mount canonicalization + freeze workflow docs/skills hardening)

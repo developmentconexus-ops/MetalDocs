@@ -164,7 +164,10 @@ func (s *FreezeService) Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisi
 			valMap[p.ID] = *v.ValueText
 		}
 	}
-	hashHex := v2dom.ComputeValuesHash(valMap)
+	hashHex, err := v2dom.ComputeValuesHash(valMap)
+	if err != nil {
+		return fmt.Errorf("compute values_hash: %w", err)
+	}
 	hashBytes, err := hex.DecodeString(hashHex)
 	if err != nil {
 		return fmt.Errorf("decode values_hash: %w", err)

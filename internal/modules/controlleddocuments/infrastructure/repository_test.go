@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"testing"
 	"time"
@@ -60,6 +61,28 @@ ORDER BY user_id`)).
 	}
 	if got := doc.Visibility.UserIDs; len(got) != 1 || got[0] != "user-2" {
 		t.Fatalf("user grants = %#v, want [user-2]", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sql expectations: %v", err)
+	}
+}
+
+func TestPostgresControlledDocumentRepository_UpdateStatus_RowsAffectedError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := NewPostgresControlledDocumentRepository(db)
+	rowsErr := errors.New("rows affected failed")
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE controlled_documents SET status = $1, updated_at = $2 WHERE tenant_id = $3 AND id = $4`)).
+		WithArgs("obsolete", sqlmock.AnyArg(), "tenant-1", "cd-1").
+		WillReturnResult(sqlmock.NewErrorResult(rowsErr))
+
+	err = repo.UpdateStatus(context.Background(), "tenant-1", "cd-1", "obsolete", time.Now().UTC())
+	if !errors.Is(err, rowsErr) {
+		t.Fatalf("expected rows affected error, got %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sql expectations: %v", err)

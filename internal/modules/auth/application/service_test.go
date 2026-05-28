@@ -2,18 +2,21 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
-	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/auth/infrastructure/memory"
 	authpostgres "metaldocs/internal/modules/auth/infrastructure/postgres"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampostgres "metaldocs/internal/modules/iam/infrastructure/postgres"
 	"metaldocs/internal/platform/tenant"
 
@@ -23,10 +26,14 @@ import (
 // mockRoleProvider implements iamdomain.RoleProvider for testing.
 type mockRoleProvider struct {
 	roles map[string][]iamdomain.Role
+	errs  map[string]error
 }
 
 func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID string) ([]iamdomain.Role, error) {
 	key := userID + ":" + tenantID
+	if err, ok := m.errs[key]; ok {
+		return nil, err
+	}
 	roles, ok := m.roles[key]
 	if !ok {
 		return nil, iamdomain.ErrUserNotFound
@@ -37,6 +44,7 @@ func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID str
 func newMockRoleProvider() *mockRoleProvider {
 	return &mockRoleProvider{
 		roles: map[string][]iamdomain.Role{},
+		errs:  map[string]error{},
 	}
 }
 
@@ -62,9 +70,9 @@ func (m *mockRoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, use
 	return nil
 }
 
-func (m *mockRoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
+func (m *mockRoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	key := userID + ":" + tenantID
-	m.roles[key] = append([]iamdomain.Role(nil), roles...)
+	m.roles[key] = []iamdomain.Role{role}
 	return nil
 }
 
@@ -74,13 +82,36 @@ func newMockRoleAdminRepository() *mockRoleAdminRepository {
 	}
 }
 
-func mustHashPassword(t *testing.T, password string) string {
+const testSessionSecret = "0123456789abcdef0123456789abcdef"
+
+func mustHashPassword(t *testing.T, password string) authdomain.PasswordHash {
 	t.Helper()
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		t.Fatalf("GenerateFromPassword: %v", err)
 	}
-	return string(hash)
+	return authdomain.PasswordHash(string(hash))
+}
+
+func mustNewService(t *testing.T, repo authdomain.Repository, roleProvider iamdomain.RoleProvider, roleAdmin iamdomain.RoleAdminRepository, cfg Config) *Service {
+	t.Helper()
+	svc, err := NewService(repo, roleProvider, roleAdmin, cfg)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	return svc
+}
+
+func TestNewService_RejectsShortSessionSecret(t *testing.T) {
+	svc, err := NewService(memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
+		SessionSecret: "too-short",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if svc != nil {
+		t.Fatalf("expected nil service, got %#v", svc)
+	}
 }
 
 // TestAuthenticate_DevFallback_NoTenantClaim verifies that when a user has no
@@ -115,10 +146,10 @@ func TestAuthenticate_DevFallback_NoTenantClaim(t *testing.T) {
 	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
 
 	// Service with AllowDevTenantFallback=true
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -136,6 +167,116 @@ func TestAuthenticate_DevFallback_NoTenantClaim(t *testing.T) {
 	// Verify TenantID is set to dev tenant
 	if session.CurrentUser.TenantID != tenant.DevTenantID {
 		t.Errorf("TenantID mismatch: got %q, want %q", session.CurrentUser.TenantID, tenant.DevTenantID)
+	}
+	if session.CurrentUser.TenantName != "System Tenant" {
+		t.Errorf("TenantName mismatch: got %q, want %q", session.CurrentUser.TenantName, "System Tenant")
+	}
+}
+
+func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	userID := "space-user"
+	password := " secret "
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "space@example.com",
+		DisplayName:  "Space User",
+		PasswordHash: mustHashPassword(t, password),
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      1,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+	})
+
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+	if _, err := svc.Authenticate(ctx, userID, strings.TrimSpace(password), req); !errors.Is(err, authdomain.ErrInvalidCredentials) {
+		t.Fatalf("trimmed password error = %v, want ErrInvalidCredentials", err)
+	}
+	if _, err := svc.Authenticate(ctx, userID, password, req); err != nil {
+		t.Fatalf("Authenticate with exact password: %v", err)
+	}
+}
+
+func TestHashPassword_UsesCost12(t *testing.T) {
+	svc := mustNewService(t, memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
+		SessionSecret: testSessionSecret,
+	})
+	hash, err := svc.hashPassword("Password123!")
+	if err != nil {
+		t.Fatalf("hashPassword: %v", err)
+	}
+	cost, err := bcrypt.Cost([]byte(hash))
+	if err != nil {
+		t.Fatalf("bcrypt cost: %v", err)
+	}
+	if cost != bcryptCost {
+		t.Fatalf("cost = %d, want %d", cost, bcryptCost)
+	}
+}
+
+func TestSessionCookiesUseStrictSameSite(t *testing.T) {
+	svc := mustNewService(t, memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
+		SessionCookieName: "session",
+		SessionSecret:     testSessionSecret,
+	})
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	if got := svc.SessionCookie("raw", expiresAt).SameSite; got != http.SameSiteStrictMode {
+		t.Fatalf("SessionCookie SameSite = %v, want %v", got, http.SameSiteStrictMode)
+	}
+	if got := svc.ExpiredSessionCookie().SameSite; got != http.SameSiteStrictMode {
+		t.Fatalf("ExpiredSessionCookie SameSite = %v, want %v", got, http.SameSiteStrictMode)
+	}
+}
+
+func TestConfig_RedactsBootstrapPassword(t *testing.T) {
+	cfg := Config{SessionSecret: testSessionSecret, BootstrapAdminPassword: "secret"}
+	rendered := cfg.String()
+	if strings.Contains(rendered, "secret") || !strings.Contains(rendered, "***") {
+		t.Fatalf("String() did not redact password: %s", rendered)
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("MarshalJSON: %v", err)
+	}
+	if strings.Contains(string(raw), "secret") || !strings.Contains(string(raw), "***") {
+		t.Fatalf("MarshalJSON did not redact password: %s", raw)
+	}
+}
+
+func TestBootstrapLocalAdmin_ClearsPlaintextPassword(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionSecret:          testSessionSecret,
+		BootstrapAdminEnabled:  true,
+		BootstrapAdminUserID:   "admin",
+		BootstrapAdminUsername: "admin",
+		BootstrapAdminEmail:    "admin@example.com",
+		BootstrapAdminPassword: " secret ",
+		BootstrapAdminName:     "Admin",
+	})
+
+	if err := svc.BootstrapLocalAdmin(context.Background()); err != nil {
+		t.Fatalf("BootstrapLocalAdmin: %v", err)
+	}
+	if svc.cfg.BootstrapAdminPassword != "" {
+		t.Fatalf("BootstrapAdminPassword retained plaintext")
 	}
 }
 
@@ -171,10 +312,10 @@ func TestResolveSession_ReadsTenantFromSession(t *testing.T) {
 	roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
 
 	// Service with AllowDevTenantFallback=true so user can login without X-Tenant-ID
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -206,6 +347,9 @@ func TestResolveSession_ReadsTenantFromSession(t *testing.T) {
 	if resolved.TenantID != tenant.DevTenantID {
 		t.Errorf("TenantID mismatch: got %q, want %q", resolved.TenantID, tenant.DevTenantID)
 	}
+	if resolved.TenantName != "System Tenant" {
+		t.Errorf("TenantName mismatch: got %q, want %q", resolved.TenantName, "System Tenant")
+	}
 	if resolved.UserID != userID {
 		t.Errorf("UserID mismatch: got %q, want %q", resolved.UserID, userID)
 	}
@@ -235,10 +379,10 @@ func TestAuthenticate_InvalidCredentials(t *testing.T) {
 		t.Fatalf("CreateUser: %v", err)
 	}
 
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -276,10 +420,10 @@ func TestAuthenticate_TenantClaimRequired(t *testing.T) {
 	}
 	repo.SeedUserTenants(userID, []string{"tenant-a", "tenant-b"})
 
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -316,10 +460,10 @@ func TestAuthenticate_TenantNotPermitted(t *testing.T) {
 	}
 	repo.SeedUserTenants(userID, []string{"tenant-a"})
 
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
 		SessionTTL:             24 * time.Hour,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
@@ -334,6 +478,121 @@ func TestAuthenticate_TenantNotPermitted(t *testing.T) {
 	}
 }
 
+func TestListUsers_FiltersByTenantMembership(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	for _, user := range []string{"alice", "bob", "carol"} {
+		if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+			UserID:       user,
+			Username:     user,
+			Email:        user + "@example.com",
+			DisplayName:  user,
+			PasswordHash: mustHashPassword(t, "Password123!"),
+			PasswordAlgo: "bcrypt",
+			IsActive:     true,
+		}); err != nil {
+			t.Fatalf("CreateUser(%s): %v", user, err)
+		}
+	}
+	roleProvider.roles["alice:tenant-a"] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.errs["carol:tenant-a"] = iamdomain.ErrNoRolesAssigned
+
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		CookieSecure:           false,
+	})
+
+	items, err := svc.ListUsers(ctx, "tenant-a")
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 users in tenant-a, got %d", len(items))
+	}
+	byUserID := map[string]authdomain.ManagedUser{}
+	for _, item := range items {
+		byUserID[item.UserID] = item
+	}
+	alice, ok := byUserID["alice"]
+	if !ok {
+		t.Fatal("expected alice in tenant-a listing")
+	}
+	if len(alice.Roles) != 1 || alice.Roles[0] != iamdomain.RoleViewer {
+		t.Fatalf("alice roles = %v, want [viewer]", alice.Roles)
+	}
+	carol, ok := byUserID["carol"]
+	if !ok {
+		t.Fatal("expected carol in tenant-a listing")
+	}
+	if len(carol.Roles) != 0 {
+		t.Fatalf("carol roles = %v, want empty", carol.Roles)
+	}
+}
+
+func TestCreateUserWithInput_DefaultsUserIDFromUsername(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		SessionSecret:          testSessionSecret,
+		SessionTTL:             24 * time.Hour,
+		SessionCookieName:      "session",
+		CookieSecure:           false,
+	})
+
+	err := svc.CreateUserWithInput(context.Background(), authdomain.CreateUserInput{
+		Username: "new-user",
+		Password: authdomain.PlainPassword("Password123!"),
+		Roles:    []iamdomain.Role{iamdomain.RoleViewer},
+	})
+	if err != nil {
+		t.Fatalf("CreateUserWithInput: %v", err)
+	}
+
+	identity, err := repo.FindIdentityByUserID(context.Background(), "new-user")
+	if err != nil {
+		t.Fatalf("FindIdentityByUserID: %v", err)
+	}
+	if identity.Username != "new-user" {
+		t.Fatalf("username = %q, want new-user", identity.Username)
+	}
+}
+
+func TestCreateUserWithInput_RejectsMultipleRoles(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		SessionSecret:          testSessionSecret,
+		SessionTTL:             24 * time.Hour,
+		SessionCookieName:      "session",
+		CookieSecure:           false,
+	})
+
+	err := svc.CreateUserWithInput(context.Background(), authdomain.CreateUserInput{
+		Username: "new-user",
+		Password: authdomain.PlainPassword("Password123!"),
+		Roles:    []iamdomain.Role{iamdomain.RoleViewer, iamdomain.RoleEditor},
+	})
+	if !errors.Is(err, iamdomain.ErrInvalidRole) {
+		t.Fatalf("CreateUserWithInput error = %v, want ErrInvalidRole", err)
+	}
+}
+
 func TestCreateUser_RollbackWhenReplaceUserRolesFails(t *testing.T) {
 	const tenantID = "11111111-1111-1111-1111-111111111111"
 	db, mock, err := sqlmock.New()
@@ -343,25 +602,18 @@ func TestCreateUser_RollbackWhenReplaceUserRolesFails(t *testing.T) {
 	defer db.Close()
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT user_id
-FROM metaldocs.auth_identities
-WHERE lower(username) = lower($1)
-`)).
-		WithArgs("alice").
-		WillReturnRows(sqlmock.NewRows([]string{"user_id"}))
-	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT user_id
-FROM metaldocs.auth_identities
-WHERE lower(email) = lower($1)
-`)).
-		WithArgs("alice@example.com").
-		WillReturnRows(sqlmock.NewRows([]string{"user_id"}))
 	mock.ExpectExec(regexp.QuoteMeta(`
 INSERT INTO metaldocs.auth_identities (user_id, username, email, display_name, is_active, password_hash, password_algo, must_change_password, last_login_at, failed_login_attempts, locked_until, created_at, updated_at)
 VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
 `)).
 		WithArgs("alice", "alice", "alice@example.com", "Alice", true, sqlmock.AnyArg(), "bcrypt", true).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+SELECT
+	set_config('metaldocs.tenant_id', $1, true),
+	set_config('metaldocs.actor_id', $2, true)
+`)).
+		WithArgs(tenantID, "admin").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("admin"))
@@ -369,10 +621,20 @@ VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
 )`)).
 		WithArgs("admin", tenantID).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
@@ -409,11 +671,11 @@ SELECT EXISTS (
 	repo := authpostgres.NewRepository(db)
 	roleProvider := newMockRoleProvider()
 	roleAdmin := iampostgres.NewRoleAdminRepository(db)
-	svc := NewService(repo, roleProvider, roleAdmin, Config{
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		PasswordMinLength:      8,
 		LoginMaxFailedAttempts: 5,
 		LoginLockDuration:      15 * time.Minute,
-		SessionSecret:          "test-secret-key-32-bytes-long!!",
+		SessionSecret:          testSessionSecret,
 		SessionTTL:             24 * time.Hour,
 		SessionCookieName:      "session",
 		CookieSecure:           false,
@@ -429,5 +691,18 @@ SELECT EXISTS (
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestLogout_EmptyAndMalformedTokenReturnError(t *testing.T) {
+	svc := mustNewService(t, memory.NewRepository(), newMockRoleProvider(), newMockRoleAdminRepository(), Config{
+		SessionSecret: testSessionSecret,
+	})
+
+	if err := svc.Logout(context.Background(), ""); !errors.Is(err, authdomain.ErrSessionNotFound) {
+		t.Fatalf("Logout(empty) error = %v, want ErrSessionNotFound", err)
+	}
+	if err := svc.Logout(context.Background(), "not-a-valid-cookie"); !errors.Is(err, authdomain.ErrSessionNotFound) {
+		t.Fatalf("Logout(malformed) error = %v, want ErrSessionNotFound", err)
 	}
 }

@@ -180,7 +180,10 @@ func newFakeSchedulerDB(t *testing.T, state *fakeSchedulerDB) *sql.DB {
 }
 
 func newTestScheduler(db *sql.DB) *Scheduler {
-	s := New(db, "test-leader")
+	s, err := New(db, "test-leader")
+	if err != nil {
+		panic(err)
+	}
 	s.heartbeatEvery = 5 * time.Millisecond
 	s.drainWait = 200 * time.Millisecond
 	s.forceWait = 100 * time.Millisecond
@@ -198,6 +201,12 @@ func waitUntil(t *testing.T, timeout time.Duration, cond func() bool) {
 		time.Sleep(2 * time.Millisecond)
 	}
 	t.Fatalf("condition was not met within %v", timeout)
+}
+
+func TestNew_LeaderIDRequired(t *testing.T) {
+	if _, err := New(nil, ""); err == nil || err.Error() != "leaderID required" {
+		t.Fatalf("New(nil, \"\") error = %v, want leaderID required", err)
+	}
 }
 
 func TestScheduler_LeaseAcquired_JobRuns(t *testing.T) {
@@ -366,7 +375,7 @@ func TestScheduler_BackpressureSkip(t *testing.T) {
 	if got := runs.Load(); got != 2 {
 		t.Fatalf("runs = %d; want 2 (ticks 3+4 skipped once hysteresis threshold met)", got)
 	}
-	if got := s.Metrics.SkipsTotal["bp-skip"]; got < 1 {
+	if got := s.MetricsSnapshot().SkipsTotal["bp-skip"]; got < 1 {
 		t.Fatalf("SkipsTotal = %d; want >= 1", got)
 	}
 }
@@ -454,7 +463,43 @@ func TestScheduler_Metrics_IncrementOnRun(t *testing.T) {
 
 	s.Start(ctx)
 
-	if got := s.Metrics.RunsTotal["metrics"]; got != 1 {
+	if got := s.MetricsSnapshot().RunsTotal["metrics"]; got != 1 {
 		t.Fatalf("RunsTotal[metrics] = %d; want 1", got)
+	}
+}
+
+func TestScheduler_MetricsSnapshot_IsolatedFromMutation(t *testing.T) {
+	state := &fakeSchedulerDB{
+		acquireResults:  []leaseAcquireResult{{acquired: true, epoch: 13}},
+		pressureResults: []pressureSample{{active: 1, max: 100}},
+	}
+	db := newFakeSchedulerDB(t, state)
+	s := newTestScheduler(db)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.Register(JobConfig{
+		Name:     "snapshot",
+		Interval: 5 * time.Millisecond,
+		Policy:   SkipOnPressure,
+		Fn: func(_ context.Context, _ int64) error {
+			cancel()
+			return nil
+		},
+	})
+
+	s.Start(ctx)
+
+	snapshot := s.MetricsSnapshot()
+	snapshot.RunsTotal["snapshot"] = 99
+	snapshot.SkipsTotal["new"] = 77
+
+	after := s.MetricsSnapshot()
+	if got := after.RunsTotal["snapshot"]; got != 1 {
+		t.Fatalf("RunsTotal[snapshot] = %d, want 1", got)
+	}
+	if got := after.SkipsTotal["new"]; got != 0 {
+		t.Fatalf("SkipsTotal[new] = %d, want 0", got)
 	}
 }

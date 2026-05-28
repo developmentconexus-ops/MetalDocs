@@ -98,6 +98,24 @@ func TestCreateTemplate_KeyConflict(t *testing.T) {
 	}
 }
 
+func TestCreateTemplate_KeyLookupInfraError(t *testing.T) {
+	repo := newFakeRepo()
+	repo.getTemplateByKeyErr = errors.New("db unavailable")
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
+
+	_, err := svc.CreateTemplate(context.Background(), application.CreateTemplateCmd{
+		TenantID:     "tenant-a",
+		ActorUserID:  "user-a",
+		DocTypeCode:  "CONTRACT",
+		Key:          "contract-default",
+		Name:         "Contract Template",
+		ApproverRole: "approver",
+	})
+	if err == nil || errors.Is(err, domain.ErrKeyConflict) {
+		t.Fatalf("expected infra error passthrough, got %v", err)
+	}
+}
+
 func TestCreateTemplate_WithDBSetsAuthzContext(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -232,11 +250,45 @@ func TestCreateNextVersion_Archived(t *testing.T) {
 	}
 }
 
+func TestCreateNextVersion_WithDB_UsesTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repo := newFakeRepo()
+	template := &domain.Template{ID: "tpl-1", TenantID: "tenant-a", LatestVersion: 1}
+	v1 := &domain.TemplateVersion{ID: "v1", TemplateID: template.ID, VersionNumber: 1, Status: domain.VersionStatusDraft}
+	repo.templates[template.ID] = template
+	repo.versions[v1.ID] = v1
+	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{}).WithDB(db)
+
+	mock.ExpectBegin()
+	expectTemplateAuthz(mock, "user-b", "tenant-a", "template.edit")
+	mock.ExpectCommit()
+
+	if _, err := svc.CreateNextVersion(context.Background(), application.CreateVersionCmd{
+		TenantID:    "tenant-a",
+		ActorUserID: "user-b",
+		TemplateID:  template.ID,
+	}); err != nil {
+		t.Fatalf("CreateNextVersion returned error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
 func strPtr(v string) *string {
 	return &v
 }
 
 func expectTemplateCreateAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
+	expectTemplateAuthz(mock, actorID, tenantID, "template.create")
+}
+
+func expectTemplateAuthz(mock sqlmock.Sqlmock, actorID, tenantID, capability string) {
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.tenant_id', $1, true)")).
 		WithArgs(tenantID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -249,16 +301,26 @@ func expectTemplateCreateAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
 )`)).
 		WithArgs(actorID, tenantID).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(""))
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
-		WithArgs(`[{"area":"tenant","cap":"template.create"}]`).
+		WithArgs(`[{"area":"tenant","cap":"` + capability + `"}]`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 }

@@ -21,6 +21,20 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+type fakeSupersedeService struct {
+	gotReq application.SupersedeRequest
+	result application.SupersedeResult
+	err    error
+}
+
+func (f *fakeSupersedeService) PublishSuperseding(_ context.Context, _ *sql.DB, req application.SupersedeRequest) (application.SupersedeResult, error) {
+	f.gotReq = req
+	if f.err != nil {
+		return application.SupersedeResult{}, f.err
+	}
+	return f.result, nil
+}
+
 // supersedeIntRows returns a single int64 row.
 type supersedeIntRows struct {
 	value int64
@@ -40,8 +54,8 @@ func (r *supersedeIntRows) Next(dest []driver.Value) error {
 
 type supersedeTestStmt struct{ value int64 }
 
-func (s *supersedeTestStmt) Close() error                               { return nil }
-func (s *supersedeTestStmt) NumInput() int                              { return -1 }
+func (s *supersedeTestStmt) Close() error                                 { return nil }
+func (s *supersedeTestStmt) NumInput() int                                { return -1 }
 func (s *supersedeTestStmt) Exec(_ []driver.Value) (driver.Result, error) { return nil, nil }
 func (s *supersedeTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	return &supersedeIntRows{value: s.value}, nil
@@ -83,11 +97,6 @@ func supersedeTestMux(h *Handler) *http.ServeMux {
 }
 
 func TestSupersedeHandler(t *testing.T) {
-	origPublishSuperseding := publishSuperseding
-	t.Cleanup(func() {
-		publishSuperseding = origPublishSuperseding
-	})
-
 	tests := []struct {
 		name       string
 		svcErr     error
@@ -116,16 +125,12 @@ func TestSupersedeHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var gotReq application.SupersedeRequest
-			publishSuperseding = func(_ *Handler, _ context.Context, _ *sql.DB, req application.SupersedeRequest) (application.SupersedeResult, error) {
-				gotReq = req
-				if tt.svcErr != nil {
-					return application.SupersedeResult{}, tt.svcErr
-				}
-				return application.SupersedeResult{
+			fakeSvc := &fakeSupersedeService{
+				err: tt.svcErr,
+				result: application.SupersedeResult{
 					NewDocumentStatus:   "published",
 					PriorDocumentStatus: "superseded",
-				}, nil
+				},
 			}
 
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-2/supersede", strings.NewReader(`{"superseded_document_id":"11111111-1111-1111-1111-111111111111"}`))
@@ -136,17 +141,17 @@ func TestSupersedeHandler(t *testing.T) {
 			req.Header.Set("If-Match", "\"v5\"")
 
 			rr := httptest.NewRecorder()
-			supersedeTestMux(&Handler{db: newSupersedeTestDB(t, 5)}).ServeHTTP(rr, req)
+			supersedeTestMux(&Handler{db: newSupersedeTestDB(t, 5), supersedeSvc: fakeSvc}).ServeHTTP(rr, req)
 
 			if rr.Code != tt.wantStatus {
 				t.Fatalf("status = %d, want %d", rr.Code, tt.wantStatus)
 			}
 
-			if gotReq.TenantID != "tenant-1" || gotReq.NewDocumentID != "doc-2" || gotReq.PriorDocumentID != "11111111-1111-1111-1111-111111111111" || gotReq.SupersededBy != "actor-1" {
-				t.Fatalf("unexpected service request: %+v", gotReq)
+			if fakeSvc.gotReq.TenantID != "tenant-1" || fakeSvc.gotReq.NewDocumentID != "doc-2" || fakeSvc.gotReq.PriorDocumentID != "11111111-1111-1111-1111-111111111111" || fakeSvc.gotReq.SupersededBy != "actor-1" {
+				t.Fatalf("unexpected service request: %+v", fakeSvc.gotReq)
 			}
-			if gotReq.NewRevisionVersion != 5 || gotReq.PriorRevisionVersion != 5 {
-				t.Fatalf("unexpected revision mapping: %+v", gotReq)
+			if fakeSvc.gotReq.NewRevisionVersion != 5 || fakeSvc.gotReq.PriorRevisionVersion != 0 {
+				t.Fatalf("unexpected revision mapping: %+v", fakeSvc.gotReq)
 			}
 
 			if tt.wantStatus == http.StatusOK {

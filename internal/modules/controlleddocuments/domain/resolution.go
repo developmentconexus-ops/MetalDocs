@@ -29,31 +29,34 @@ var (
 
 func Resolve(in TemplateResolutionInput) (TemplateResolutionResult, error) {
 	if in.OverrideTemplate != nil {
-		o := in.OverrideTemplate
-		if o.Status == nil {
-			return TemplateResolutionResult{}, ErrOverrideTemplateDeleted
-		}
-		if *o.Status != "published" {
-			return TemplateResolutionResult{}, ErrOverrideNotPublished
-		}
-		if o.ProfileCode != in.ProfileCode {
-			return TemplateResolutionResult{}, ErrTemplateProfileMismatch
-		}
-		return TemplateResolutionResult{TemplateVersionID: o.ID, Source: "override"}, nil
+		return resolveOverrideTemplate(in.ProfileCode, in.OverrideTemplate)
 	}
 
-	if in.DefaultTemplate == nil {
+	return resolveDefaultTemplate(in.DefaultTemplate)
+}
+
+func resolveOverrideTemplate(profileCode string, candidate *TemplateVersionCandidate) (TemplateResolutionResult, error) {
+	if candidate.Status == nil {
+		return TemplateResolutionResult{}, ErrOverrideTemplateDeleted
+	}
+	if *candidate.Status != "published" {
+		return TemplateResolutionResult{}, ErrOverrideNotPublished
+	}
+	if candidate.ProfileCode != profileCode {
+		return TemplateResolutionResult{}, ErrTemplateProfileMismatch
+	}
+	return TemplateResolutionResult{TemplateVersionID: candidate.ID, Source: "override"}, nil
+}
+
+func resolveDefaultTemplate(candidate *TemplateVersionCandidate) (TemplateResolutionResult, error) {
+	if candidate == nil || candidate.Status == nil {
 		return TemplateResolutionResult{}, ErrProfileHasNoDefaultTemplate
 	}
-	d := in.DefaultTemplate
-	if d.Status == nil {
-		return TemplateResolutionResult{}, ErrProfileHasNoDefaultTemplate
-	}
-	if *d.Status == "obsolete" {
+	if *candidate.Status == "obsolete" {
 		return TemplateResolutionResult{}, ErrDefaultObsolete
 	}
-	if *d.Status != "published" {
+	if *candidate.Status != "published" {
 		return TemplateResolutionResult{}, ErrProfileHasNoDefaultTemplate
 	}
-	return TemplateResolutionResult{TemplateVersionID: d.ID, Source: "default"}, nil
+	return TemplateResolutionResult{TemplateVersionID: candidate.ID, Source: "default"}, nil
 }

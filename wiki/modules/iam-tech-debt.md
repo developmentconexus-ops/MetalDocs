@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-05-12 (Plan 7)
+**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync)
 
 ## Severity scale
 

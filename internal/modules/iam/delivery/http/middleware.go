@@ -1,9 +1,10 @@
 package httpdelivery
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"net/http"
-	"strings"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
@@ -66,60 +67,108 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Del("X-User-ID")
+		r.Header.Del("X-User-Roles")
 
+		// C3: nil resolver is a misconfiguration — fail closed, never pass unauthenticated.
 		if m.resolver == nil {
-			next.ServeHTTP(w, r)
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Permission resolver not configured"))
 			return
 		}
 		capability, visibility := m.resolver(r.Method, r.URL.Path)
-		if visibility != VisibilityPermissionGuarded {
+		switch visibility {
+		case VisibilityPublic, VisibilitySessionRequired, VisibilityPermissionGuarded:
+		default:
+			slog.Warn("iam: unknown route visibility", "method", r.Method, "path", r.URL.Path, "visibility", visibility)
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Permission resolver returned unknown visibility"))
+			return
+		}
+
+		// VisibilityPublic: no auth checks at all.
+		if visibility == VisibilityPublic {
 			next.ServeHTTP(w, r)
 			return
 		}
 
+		// C1: userID must come from the authenticated session context only.
+		// Legacy X-User-Id header fallback removed — trusting a client-supplied
+		// header bypasses cookie/HMAC/revocation/expiry/tenant checks entirely.
 		userID := iamdomain.UserIDFromContext(r.Context())
-		if userID == "" && m.legacyHeader {
-			userID = strings.TrimSpace(r.Header.Get("X-User-Id"))
-		}
 		if userID == "" {
-			_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+			m.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 			return
 		}
 
+		// C7: tenantID must come from the authenticated session context only.
+		// Fallback to X-Tenant-ID header or DevTenantID removed — both are
+		// client-controllable and allow cross-tenant access.
 		tenantID, err := tenant.FromContext(r.Context())
 		if err != nil {
-			tenantID = strings.TrimSpace(r.Header.Get("X-Tenant-ID"))
-			if tenantID == "" {
-				tenantID = tenant.DevTenantID
-			}
+			m.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+			return
 		}
 
-		if m.caps != nil {
-			if err := m.caps.CanDo(r.Context(), userID, tenantID, string(capability)); err != nil {
-				_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+		// C4: VisibilitySessionRequired — session is verified above; skip capability
+		// check but still enrich context with roles for downstream handlers.
+		if visibility == VisibilitySessionRequired {
+			ctx, ok := m.resolveRoles(w, r, userID, tenantID)
+			if !ok {
 				return
 			}
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
 		}
 
-		ctx := r.Context()
-		if _, ok := authdomain.CurrentUserFromContext(ctx); !ok {
-			var roles []iamdomain.Role
-			if m.roleProvider != nil {
-				resolvedRoles, err := m.roleProvider.RolesByUserID(r.Context(), userID, tenantID)
-				if errors.Is(err, iamdomain.ErrUserNotFound) || errors.Is(err, iamdomain.ErrUserInactive) {
-					_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "User is not authorized"))
-					return
-				}
-				if err != nil {
-					_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authorization lookup failed"))
-					return
-				}
-				roles = resolvedRoles
-			}
-			ctx = iamdomain.WithAuthContext(ctx, userID, roles)
+		// VisibilityPermissionGuarded: full capability check required.
+
+		// C8: nil caps is a misconfiguration — fail closed, never silently skip check.
+		if m.caps == nil {
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Capability service not configured"))
+			return
 		}
 
+		if err := m.caps.CanDo(r.Context(), userID, tenantID, string(capability)); err != nil {
+			m.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			return
+		}
+
+		ctx, ok := m.resolveRoles(w, r, userID, tenantID)
+		if !ok {
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
+// resolveRoles enriches the request context with the user's IAM roles when no
+// CurrentUser is already present. Returns the updated context and true on
+// success, or writes an error response and returns false on failure.
+func (m *Middleware) resolveRoles(w http.ResponseWriter, r *http.Request, userID, tenantID string) (context.Context, bool) {
+	rctx := r.Context()
+	if _, hasUser := authdomain.CurrentUserFromContext(rctx); hasUser {
+		return rctx, true //nolint:nilerr
+	}
+	var roles []iamdomain.Role
+	if m.roleProvider != nil {
+		resolvedRoles, err := m.roleProvider.RolesByUserID(r.Context(), userID, tenantID)
+		if errors.Is(err, iamdomain.ErrUserNotFound) || errors.Is(err, iamdomain.ErrUserInactive) {
+			m.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "User is not authorized"))
+			return nil, false
+		}
+		if errors.Is(err, iamdomain.ErrNoRolesAssigned) {
+			m.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			return nil, false
+		}
+		if err != nil {
+			m.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authorization lookup failed"))
+			return nil, false
+		}
+		roles = resolvedRoles
+	}
+	return iamdomain.WithAuthContext(rctx, userID, roles), true
+}
+
+func (m *Middleware) writeProblem(w http.ResponseWriter, p *problem.Problem) {
+	if err := problem.Write(w, p); err != nil {
+		slog.Warn("iam: write response failed", "err", err)
+	}
+}

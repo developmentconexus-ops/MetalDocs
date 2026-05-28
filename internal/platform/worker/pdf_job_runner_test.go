@@ -33,28 +33,28 @@ type fakePDFPersister struct {
 }
 
 type pdfPersistCall struct {
-	tenant      string
-	docID       string
-	s3Key       string
+	tenant      TenantID
+	docID       DocumentID
+	s3Key       StorageKey
 	pdfHash     []byte
 	generatedAt time.Time
 }
 
-func (f *fakePDFPersister) WritePDF(_ context.Context, tenant, docID, s3Key string, pdfHash []byte, generatedAt time.Time) error {
+func (f *fakePDFPersister) WritePDF(_ context.Context, req PDFWriteRequest) error {
 	f.calls = append(f.calls, pdfPersistCall{
-		tenant:      tenant,
-		docID:       docID,
-		s3Key:       s3Key,
-		pdfHash:     append([]byte(nil), pdfHash...),
-		generatedAt: generatedAt,
+		tenant:      req.TenantID,
+		docID:       req.DocumentID,
+		s3Key:       req.StorageKey,
+		pdfHash:     append([]byte(nil), req.PDFHash...),
+		generatedAt: req.GeneratedAt,
 	})
 	return f.err
 }
 
-func makePDFEvent(payload map[string]any) messaging.Event {
+func makePDFEvent(payload messaging.PDFConvertPayload) messaging.Event {
 	return messaging.Event{
 		EventID:   "event-1",
-		EventType: "docgen_v2_pdf",
+		EventType: messaging.EventTypePDFConvert,
 		Payload:   payload,
 	}
 }
@@ -70,10 +70,10 @@ func TestPDFJobRunner_Handle_Success(t *testing.T) {
 	persister := &fakePDFPersister{}
 	runner := NewPDFJobRunner(converter, persister)
 
-	err := runner.Handle(context.Background(), makePDFEvent(map[string]any{
-		"tenant_id":         "tenant-1",
-		"revision_id":       "rev-1",
-		"final_docx_s3_key": "tenants/tenant-1/revisions/rev-1/final.docx",
+	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
+		TenantID:       "tenant-1",
+		RevisionID:     "rev-1",
+		FinalDocxS3Key: "tenants/tenant-1/revisions/rev-1/final.docx",
 	}))
 	if err != nil {
 		t.Fatalf("Handle: %v", err)
@@ -93,7 +93,7 @@ func TestPDFJobRunner_Handle_Success(t *testing.T) {
 		t.Fatalf("WritePDF calls = %d, want 1", len(persister.calls))
 	}
 	call := persister.calls[0]
-	if call.tenant != "tenant-1" || call.docID != "rev-1" || call.s3Key != converter.result.OutputKey {
+	if call.tenant != "tenant-1" || call.docID != "rev-1" || call.s3Key != StorageKey(converter.result.OutputKey) {
 		t.Fatalf("WritePDF args = tenant %q docID %q s3Key %q", call.tenant, call.docID, call.s3Key)
 	}
 	wantHash, err := hex.DecodeString(hash)
@@ -116,10 +116,10 @@ func TestPDFJobRunner_Handle_MissingPayloadFields(t *testing.T) {
 	persister := &fakePDFPersister{}
 	runner := NewPDFJobRunner(converter, persister)
 
-	err := runner.Handle(context.Background(), makePDFEvent(map[string]any{
-		"tenant_id":         "tenant-1",
-		"revision_id":       "",
-		"final_docx_s3_key": "tenants/tenant-1/revisions/rev-1/final.docx",
+	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
+		TenantID:       "tenant-1",
+		RevisionID:     "",
+		FinalDocxS3Key: "tenants/tenant-1/revisions/rev-1/final.docx",
 	}))
 	if err == nil {
 		t.Fatalf("Handle error = nil, want error")
@@ -138,10 +138,10 @@ func TestPDFJobRunner_Handle_ConvertError(t *testing.T) {
 	persister := &fakePDFPersister{}
 	runner := NewPDFJobRunner(converter, persister)
 
-	err := runner.Handle(context.Background(), makePDFEvent(map[string]any{
-		"tenant_id":         "tenant-1",
-		"revision_id":       "rev-1",
-		"final_docx_s3_key": "tenants/tenant-1/revisions/rev-1/final.docx",
+	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
+		TenantID:       "tenant-1",
+		RevisionID:     "rev-1",
+		FinalDocxS3Key: "tenants/tenant-1/revisions/rev-1/final.docx",
 	}))
 	if !errors.Is(err, convertErr) {
 		t.Fatalf("Handle error = %v, want wrapped convert error", err)
@@ -162,10 +162,10 @@ func TestPDFJobRunner_Handle_PersistError(t *testing.T) {
 	persister := &fakePDFPersister{err: persistErr}
 	runner := NewPDFJobRunner(converter, persister)
 
-	err := runner.Handle(context.Background(), makePDFEvent(map[string]any{
-		"tenant_id":         "tenant-1",
-		"revision_id":       "rev-1",
-		"final_docx_s3_key": "tenants/tenant-1/revisions/rev-1/final.docx",
+	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
+		TenantID:       "tenant-1",
+		RevisionID:     "rev-1",
+		FinalDocxS3Key: "tenants/tenant-1/revisions/rev-1/final.docx",
 	}))
 	if !errors.Is(err, persistErr) {
 		t.Fatalf("Handle error = %v, want wrapped persist error", err)

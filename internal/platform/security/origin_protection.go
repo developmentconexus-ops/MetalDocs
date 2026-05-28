@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const traceLocalOrigin = "trace-local"
+
 type OriginProtectionConfig struct {
 	Enabled           bool
 	SessionCookieName string
@@ -150,5 +152,5 @@ func normalizeOrigin(origin string) string {
 }
 
 func writeOriginError(w http.ResponseWriter) {
-	writeAPIError(w, http.StatusForbidden, "AUTH_INVALID_ORIGIN", "Cross-site session request blocked", "trace-local")
+	writeAPIError(w, http.StatusForbidden, "AUTH_INVALID_ORIGIN", "Cross-site session request blocked", traceLocalOrigin)
 }

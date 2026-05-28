@@ -17,6 +17,7 @@ import (
 	"metaldocs/internal/modules/documents/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	templatesdomain "metaldocs/internal/modules/templates/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 // Type aliases so handlers depend only on application types.
@@ -30,31 +31,31 @@ type Repository interface {
 	CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
 	SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
-	UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error
-	UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, docID, name string) error
+	UpdateDocumentName(ctx context.Context, tenantID, actorID, docID, name string) error
+	UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, docID, name string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
 	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error)
 	CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error)
 	StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
-	UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error
+	UpdateDocumentStatus(ctx context.Context, tenantID, actorID, id string, cur, next domain.DocumentStatus, stampTime bool) error
 	MarkArchived(ctx context.Context, tenantID, docID, actorID string) error
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, error)
-	HeartbeatSession(ctx context.Context, sessionID, userID string) error
+	HeartbeatSession(ctx context.Context, tenantID, sessionID, userID string) error
 	ReleaseSession(ctx context.Context, tenantID, sessionID, userID string) error
 	ForceReleaseSession(ctx context.Context, tenantID, adminID, sessionID string) error
 	ExpireStaleSessions(ctx context.Context, now time.Time) (int, error)
-	PresignReserve(ctx context.Context, sessionID, userID, docID, baseRev, contentHash, storageKey string, expiresAt time.Time) (string, error)
-	GetPendingForCommit(ctx context.Context, pendingID string) (*PendingCommitMeta, error)
+	PresignReserve(ctx context.Context, tenantID, sessionID, userID, docID, baseRev, contentHash, storageKey string, expiresAt time.Time) (string, error)
+	GetPendingForCommit(ctx context.Context, tenantID, pendingID string) (*PendingCommitMeta, error)
 	CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error)
 	SyncCurrentRevisionArtifactMetadata(ctx context.Context, tenantID, sessionID, userID, docID string, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error)
-	CreateCheckpoint(ctx context.Context, docID, actorUserID, label string) (*domain.Checkpoint, error)
-	ListCheckpoints(ctx context.Context, docID string) ([]domain.Checkpoint, error)
+	CreateCheckpoint(ctx context.Context, tenantID, docID, actorUserID, label string) (*domain.Checkpoint, error)
+	ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error)
 	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
-	RestoreCheckpoint(ctx context.Context, docID, actorUserID string, versionNum int) (*RestoreResult, error)
-	GetRevision(ctx context.Context, docID, revID string) (*domain.Revision, error)
+	RestoreCheckpoint(ctx context.Context, tenantID, docID, actorUserID string, versionNum int) (*RestoreResult, error)
+	GetRevision(ctx context.Context, tenantID, docID, revID string) (*domain.Revision, error)
 	DeleteExpiredPending(ctx context.Context, olderThan time.Time) (int, error)
 	CreateComment(ctx context.Context, tenantID, documentID, authorID string, in domain.CommentCreateInput) (*domain.Comment, error)
 	ListComments(ctx context.Context, tenantID, documentID string) ([]domain.Comment, error)
@@ -611,7 +612,7 @@ func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, n
 		return domain.ErrInvalidStateTransition
 	}
 	if s.db == nil {
-		if err := s.repo.UpdateDocumentName(ctx, tenantID, docID, name); err != nil {
+		if err := s.repo.UpdateDocumentName(ctx, tenantID, userID, docID, name); err != nil {
 			return err
 		}
 		s.audit.Write(ctx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name})
@@ -622,7 +623,7 @@ func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, n
 		return fmt.Errorf("rename document: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := s.repo.UpdateDocumentNameTx(ctx, tx, tenantID, docID, name); err != nil {
+	if err := s.repo.UpdateDocumentNameTx(ctx, tx, tenantID, userID, docID, name); err != nil {
 		return err
 	}
 	if err := s.audit.WriteTx(ctx, tx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name}); err != nil {
@@ -694,7 +695,7 @@ func (s *Service) PresignAutosave(ctx context.Context, cmd PresignAutosaveCmd) (
 		return nil, err
 	}
 	expiresAt := time.Now().Add(15 * time.Minute)
-	pendingID, err := s.repo.PresignReserve(ctx, cmd.SessionID, cmd.ActorUserID, cmd.DocumentID, cmd.BaseRevisionID, cmd.ContentHash, storageKey, expiresAt)
+	pendingID, err := s.repo.PresignReserve(ctx, cmd.TenantID, cmd.SessionID, cmd.ActorUserID, cmd.DocumentID, cmd.BaseRevisionID, cmd.ContentHash, storageKey, expiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -724,7 +725,7 @@ func (s *Service) CommitAutosave(ctx context.Context, cmd CommitAutosaveCmd) (*C
 	if doc.Status != domain.DocStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
 	}
-	meta, err := s.repo.GetPendingForCommit(ctx, cmd.PendingUploadID)
+	meta, err := s.repo.GetPendingForCommit(ctx, cmd.TenantID, cmd.PendingUploadID)
 	if err != nil {
 		return nil, err
 	}
@@ -789,7 +790,7 @@ func (s *Service) SyncArtifactMetadata(ctx context.Context, cmd SyncArtifactMeta
 		return nil, domain.ErrNotFound
 	}
 
-	revision, err := s.repo.GetRevision(ctx, cmd.DocumentID, doc.CurrentRevisionID)
+	revision, err := s.repo.GetRevision(ctx, cmd.TenantID, cmd.DocumentID, doc.CurrentRevisionID)
 	if err != nil {
 		return nil, err
 	}
@@ -830,7 +831,11 @@ func (s *Service) AcquireSession(ctx context.Context, tenantID, docID, userID st
 }
 
 func (s *Service) HeartbeatSession(ctx context.Context, sessionID, userID string) error {
-	return s.repo.HeartbeatSession(ctx, sessionID, userID)
+	tenantID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return s.repo.HeartbeatSession(ctx, tenantID, sessionID, userID)
 }
 
 func (s *Service) ReleaseSession(ctx context.Context, tenantID, sessionID, userID, docID string) error {
@@ -850,7 +855,7 @@ func (s *Service) ForceReleaseSession(ctx context.Context, tenantID, adminID, se
 }
 
 func (s *Service) CreateCheckpoint(ctx context.Context, tenantID, docID, actorID, label string) (*domain.Checkpoint, error) {
-	cp, err := s.repo.CreateCheckpoint(ctx, docID, actorID, label)
+	cp, err := s.repo.CreateCheckpoint(ctx, tenantID, docID, actorID, label)
 	if err != nil {
 		return nil, err
 	}
@@ -859,7 +864,7 @@ func (s *Service) CreateCheckpoint(ctx context.Context, tenantID, docID, actorID
 }
 
 func (s *Service) ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error) {
-	return s.repo.ListCheckpoints(ctx, docID)
+	return s.repo.ListCheckpoints(ctx, tenantID, docID)
 }
 
 func (s *Service) ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error) {
@@ -867,7 +872,7 @@ func (s *Service) ListRevisionHistory(ctx context.Context, tenantID, docID strin
 }
 
 func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*RestoreResult, error) {
-	res, err := s.repo.RestoreCheckpoint(ctx, docID, actorID, versionNum)
+	res, err := s.repo.RestoreCheckpoint(ctx, tenantID, docID, actorID, versionNum)
 	if err != nil {
 		return nil, err
 	}
@@ -882,7 +887,7 @@ func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorI
 }
 
 func (s *Service) Finalize(ctx context.Context, tenantID, docID, actorID string) error {
-	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, docID, domain.DocStatusDraft, domain.DocStatusFinalized, true); err != nil {
+	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, actorID, docID, domain.DocStatusDraft, domain.DocStatusUnderReview, true); err != nil {
 		return err
 	}
 	s.audit.Write(ctx, tenantID, actorID, "document.finalized", docID, nil)
@@ -898,7 +903,7 @@ func (s *Service) Archive(ctx context.Context, tenantID, docID, actorID string) 
 }
 
 func (s *Service) SignedRevisionURL(ctx context.Context, tenantID, docID, revID string) (string, error) {
-	rev, err := s.repo.GetRevision(ctx, docID, revID)
+	rev, err := s.repo.GetRevision(ctx, tenantID, docID, revID)
 	if err != nil {
 		return "", err
 	}

@@ -1,15 +1,30 @@
 package approvalhttp
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
 )
+
+type mutationByDocumentReadService interface {
+	LoadActiveInstanceByDocumentForMutation(ctx context.Context, db *sql.DB, tenantID, documentID string) (*domain.Instance, error)
+}
+
+func (h *Handler) loadActiveInstanceByDocumentForMutation(r *http.Request, tenantID, docID string) (*domain.Instance, error) {
+	mutationLookup, ok := h.readSvc.(mutationByDocumentReadService)
+	if !ok {
+		return nil, errors.New("mutation lookup service not configured")
+	}
+	return mutationLookup.LoadActiveInstanceByDocumentForMutation(r.Context(), h.db, tenantID, docID)
+}
 
 // GetInstanceByDocumentHandler handles GET /api/v1/documents/{id}/approval-instance.
 // It looks up the active approval instance for the document and returns it.
@@ -41,7 +56,7 @@ func (h *Handler) GetInstanceByDocumentHandler(w http.ResponseWriter, r *http.Re
 		WriteError(w, err)
 		return
 	}
-	w.Header().Set("ETag", "\"v1\"")
+	w.Header().Set("ETag", resp.ETag)
 	WriteJSON(w, http.StatusOK, resp)
 }
 
@@ -69,6 +84,11 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
+	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if h.decisionSvc == nil || h.readSvc == nil {
 		WriteError(w, errors.New("services not configured"))
 		return
@@ -79,34 +99,19 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		WriteError(w, err)
 		return
 	}
-	if body.Decision != "approve" && body.Decision != "reject" {
-		WriteError(w, errors.New("decision must be one of: approve, reject"))
+	contractReq := contracts.SignoffRequest{
+		Decision:      contracts.Decision(strings.TrimSpace(body.Decision)),
+		Reason:        strings.TrimSpace(body.Reason),
+		PasswordToken: strings.TrimSpace(body.Password),
+		ContentHash:   strings.TrimSpace(body.ContentHash),
+	}
+	if err := contractReq.Validate(); err != nil {
+		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
-	if body.Decision == "reject" && strings.TrimSpace(body.Reason) == "" {
-		WriteError(w, errors.New("reason is required for reject"))
-		return
-	}
-	if strings.TrimSpace(body.Password) == "" {
-		WriteError(w, errors.New("password is required"))
-		return
-	}
+	decision := domain.Decision(contractReq.Decision)
 
-	// Check idempotency store before loading active instance so replays after
-	// instance close return was_replay:true instead of 404/500.
-	if h.idempStore != nil {
-		found, outcome, err := h.idempStore.CheckReplay(r.Context(), tenantID, actorID, idempKey)
-		if err != nil {
-			WriteError(w, err)
-			return
-		}
-		if found {
-			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{WasReplay: true, Outcome: outcome})
-			return
-		}
-	}
-
-	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, docID)
+	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
 			WriteError(w, repository.ErrNoActiveInstance)
@@ -121,26 +126,52 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		WriteError(w, repository.ErrInstanceCompleted)
 		return
 	}
+	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
+		WriteError(w, err)
+		return
+	}
+
+	payloadHash := signoffPayloadHash(docID, inst.ID, activeStage.ID, decision, contractReq.Reason, contractReq.ContentHash)
+	var replayHandle interface {
+		Complete(outcome string) error
+		Fail(cause error) error
+	}
+	if h.idempStore != nil {
+		handle, replay, err := h.idempStore.BeginDocumentReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		if replay != nil {
+			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{WasReplay: true, Outcome: replay.Outcome})
+			return
+		}
+		replayHandle = handle
+	}
 
 	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
-		TenantID:         tenantID,
-		InstanceID:       inst.ID,
-		StageInstanceID:  activeStage.ID,
-		ActorUserID:      actorID,
-		Decision:         body.Decision,
-		Comment:          body.Reason,
-		SignatureMethod:  "password_reauth",
-		SignaturePayload: map[string]any{"password_token": body.Password},
-		ContentFormData:  map[string]any{"_content_hash": body.ContentHash},
+		TenantID:                tenantID,
+		InstanceID:              inst.ID,
+		StageInstanceID:         activeStage.ID,
+		ActorUserID:             actorID,
+		Decision:                decision,
+		Comment:                 contractReq.Reason,
+		SignatureMethod:         "password_reauth",
+		SignaturePayload:        map[string]any{"password_token": contractReq.PasswordToken},
+		ContentFormData:         map[string]any{"_content_hash": contractReq.ContentHash},
+		ExpectedRevisionVersion: expectedRevisionVersion,
 	})
 	if err != nil {
+		if replayHandle != nil {
+			_ = replayHandle.Fail(err)
+		}
 		WriteError(w, err)
 		return
 	}
 
 	outcome := signoffOutcome(result)
-	if h.idempStore != nil {
-		if err := h.idempStore.RecordReplay(r.Context(), tenantID, actorID, idempKey, outcome); err != nil {
+	if replayHandle != nil {
+		if err := replayHandle.Complete(outcome); err != nil {
 			log.Printf("WARN signoff idempotency record failed (non-fatal): %v", err)
 		}
 	}
@@ -167,6 +198,11 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
+	expectedRevisionVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if h.readSvc == nil {
 		WriteError(w, errors.New("read service not configured"))
 		return
@@ -178,11 +214,11 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := body.Validate(); err != nil {
-		WriteError(w, err)
+		WriteError(w, NewValidationError(err.Error()))
 		return
 	}
 
-	inst, err := h.readSvc.LoadActiveInstanceByDocument(r.Context(), h.db, tenantID, docID)
+	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
 	if err != nil {
 		if errors.Is(err, repository.ErrNoActiveInstance) {
 			WriteError(w, repository.ErrNoActiveInstance)
@@ -192,10 +228,10 @@ func (h *Handler) CancelByDocumentHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	result, err := cancelInstance(h, r.Context(), h.db, application.CancelInput{
+	result, err := h.cancelInstance(r.Context(), h.db, application.CancelInput{
 		TenantID:                tenantID,
 		InstanceID:              inst.ID,
-		ExpectedRevisionVersion: 0,
+		ExpectedRevisionVersion: expectedRevisionVersion,
 		ActorUserID:             actorID,
 		Reason:                  body.Reason,
 	})

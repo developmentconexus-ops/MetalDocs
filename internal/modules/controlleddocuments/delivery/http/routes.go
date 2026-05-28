@@ -22,6 +22,9 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+const maxControlledDocumentsJSONBodyBytes int64 = 1 << 20 // 1 MiB
+var errTenantIDInvalid = errors.New("controlled_documents: tenant id invalid")
+
 func (h *Handler) ListControlledDocuments(w http.ResponseWriter, r *http.Request, params controlleddocumentsapi.ListControlledDocumentsParams) {
 	filter, err := filterFromListParams(params)
 	if err != nil {
@@ -55,6 +58,7 @@ func (h *Handler) AtomicCreateControlledDocument(w http.ResponseWriter, r *http.
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var req controlleddocumentsapi.CreateAtomicRequest
 	if err := decodeStrictJSON(r, &req); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -182,6 +186,7 @@ func (h *Handler) CreateControlledDocumentRevision(w http.ResponseWriter, r *htt
 		return
 	}
 	cdID := r.PathValue("id")
+	r.Body = http.MaxBytesReader(w, r.Body, maxControlledDocumentsJSONBodyBytes)
 	var body controlleddocumentsapi.CreateRevisionRequest
 	if err := decodeStrictJSON(r, &body); err != nil {
 		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
@@ -250,6 +255,57 @@ func (h *Handler) GetActiveDocument(w http.ResponseWriter, r *http.Request, id o
 		return
 	}
 	cdID := r.PathValue("id")
+	actorUserID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		h.writeDomainError(w, application.ErrActorMissing)
+		return
+	}
+
+	var canRead bool
+	if err := h.db.QueryRowContext(r.Context(), `
+SELECT EXISTS (
+  SELECT 1
+    FROM controlled_documents cd
+   WHERE cd.tenant_id = $1
+     AND cd.id = $2::uuid
+     AND (
+          cd.visibility_scope = 'company'
+       OR cd.owner_user_id = $3
+       OR (
+            cd.visibility_scope = 'restricted'
+            AND (
+                 EXISTS (
+                   SELECT 1
+                     FROM controlled_document_area_grants cdag
+                    WHERE cdag.tenant_id = cd.tenant_id
+                      AND cdag.controlled_document_id = cd.id
+                      AND EXISTS (
+                        SELECT 1
+                          FROM user_process_areas upa
+                         WHERE upa.tenant_id = cd.tenant_id
+                           AND upa.user_id = $3
+                           AND upa.area_code = cdag.area_code
+                           AND upa.effective_to IS NULL
+                      )
+                 )
+                 OR EXISTS (
+                   SELECT 1
+                     FROM controlled_document_user_grants cdug
+                    WHERE cdug.tenant_id = cd.tenant_id
+                      AND cdug.controlled_document_id = cd.id
+                      AND cdug.user_id = $3
+                 )
+            )
+       )
+     )
+)`, tenantID, cdID, actorUserID).Scan(&canRead); err != nil {
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error")
+		return
+	}
+	if !canRead {
+		httpresponse.WriteError(w, http.StatusNotFound, "NO_ACTIVE_INSTANCE", "no active document instance for this controlled document")
+		return
+	}
 
 	// FULL OUTER JOIN so we get a row whenever either an active doc or a published
 	// doc exists for this controlled document.  If neither exists the query returns
@@ -492,7 +548,9 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, application.ErrTemplateArtifactInvariantUnconfigured):
 		httpresponse.WriteError(w, http.StatusInternalServerError, "template.artifact_invariant_unconfigured", "template artifact invariant not configured")
 	case errors.Is(err, application.ErrActorMissing):
-		slog.Error("controlled-documents request missing authenticated actor",
+		httpresponse.WriteError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "authentication required")
+	case errors.Is(err, errTenantIDInvalid):
+		slog.Error("controlled-documents request has invalid tenant id in context",
 			"route", "controlledDocuments.writeDomainError",
 			"error", err,
 		)
@@ -519,7 +577,14 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 }
 
 func tenantIDFromRequest(r *http.Request) (string, error) {
-	return tenant.FromContext(r.Context())
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		return "", err
+	}
+	if strings.EqualFold(strings.TrimSpace(tenantID), uuid.Nil.String()) {
+		return "", errTenantIDInvalid
+	}
+	return tenantID, nil
 }
 
 func filterFromListParams(params controlleddocumentsapi.ListControlledDocumentsParams) (application.CDFilter, error) {

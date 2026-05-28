@@ -5,44 +5,80 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"metaldocs/internal/platform/idempotency"
 )
 
-const signoffRouteTemplate = "POST /api/v1/documents/{id}/signoff"
+const (
+	documentSignoffRouteTemplate = "POST /api/v1/documents/{id}/signoff"
+	stageSignoffRouteTemplate    = "POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs"
+)
+
+type SignoffReplay struct {
+	Outcome string `json:"outcome"`
+}
+
+type SignoffReplayHandle struct {
+	store  *idempotency.Store
+	handle *idempotency.ReplayHandle
+}
+
+func (h *SignoffReplayHandle) Complete(outcome string) error {
+	if h == nil || h.store == nil || h.handle == nil {
+		return errors.New("idempotency store not configured")
+	}
+	body, err := json.Marshal(SignoffReplay{Outcome: outcome})
+	if err != nil {
+		return fmt.Errorf("signoff idempotency: marshal replay response: %w", err)
+	}
+	return h.store.CompleteReplay(h.handle, 200, body)
+}
+
+func (h *SignoffReplayHandle) Fail(cause error) error {
+	if h == nil || h.store == nil || h.handle == nil {
+		return nil
+	}
+	return h.store.FailReplay(h.handle, cause)
+}
 
 type PostgresSignoffIdempStore struct {
-	inner *idempotency.Store
+	document *idempotency.Store
+	stage    *idempotency.Store
 }
 
 func NewPostgresSignoffIdempStore(db *sql.DB) *PostgresSignoffIdempStore {
 	if db == nil {
-		return &PostgresSignoffIdempStore{inner: nil}
+		return &PostgresSignoffIdempStore{}
 	}
-	return &PostgresSignoffIdempStore{inner: idempotency.New(db, signoffRouteTemplate)}
+	return &PostgresSignoffIdempStore{
+		document: idempotency.New(db, documentSignoffRouteTemplate),
+		stage:    idempotency.New(db, stageSignoffRouteTemplate),
+	}
 }
 
-func (s *PostgresSignoffIdempStore) CheckReplay(ctx context.Context, tenantID, actorID, idempKey string) (bool, string, error) {
-	if s.inner == nil {
-		return false, "", errors.New("idempotency store database not configured")
+func (s *PostgresSignoffIdempStore) BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*SignoffReplayHandle, *SignoffReplay, error) {
+	return s.beginReplay(ctx, s.document, tenantID, actorID, idempKey, payloadHash)
+}
+
+func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*SignoffReplayHandle, *SignoffReplay, error) {
+	return s.beginReplay(ctx, s.stage, tenantID, actorID, idempKey, payloadHash)
+}
+
+func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (*SignoffReplayHandle, *SignoffReplay, error) {
+	if store == nil {
+		return nil, nil, errors.New("idempotency store database not configured")
 	}
-	replay, err := s.inner.CheckReplay(ctx, tenantID, actorID, idempKey, "")
+	handle, replay, err := store.BeginReplay(ctx, tenantID, actorID, idempKey, payloadHash)
 	if err != nil || replay == nil {
-		return false, "", err
+		if err != nil || handle == nil {
+			return nil, nil, err
+		}
+		return &SignoffReplayHandle{store: store, handle: handle}, nil, nil
 	}
-	var envelope struct {
-		Outcome string `json:"outcome"`
-	}
+	var envelope SignoffReplay
 	if err := json.Unmarshal(replay.Body, &envelope); err != nil {
-		return false, "", err
+		return nil, nil, err
 	}
-	return true, envelope.Outcome, nil
-}
-
-func (s *PostgresSignoffIdempStore) RecordReplay(ctx context.Context, tenantID, actorID, idempKey, outcome string) error {
-	if s.inner == nil {
-		return errors.New("idempotency store database not configured")
-	}
-	body, _ := json.Marshal(map[string]string{"outcome": outcome})
-	return s.inner.RecordReplay(ctx, tenantID, actorID, idempKey, "", 200, body)
+	return nil, &envelope, nil
 }

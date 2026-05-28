@@ -16,21 +16,42 @@ type cacheEntry struct {
 
 // CachedRoleProvider wraps a RoleProvider with TTL cache and explicit invalidation.
 type CachedRoleProvider struct {
-	base  domain.RoleProvider
-	ttl   time.Duration
-	mu    sync.RWMutex
+	base domain.RoleProvider
+	ttl  time.Duration
+	mu   sync.RWMutex
+	// TODO: add TTL-based eviction or a max-size limit so the cache cannot grow without bound.
 	items map[string]cacheEntry
 }
 
-func NewCachedRoleProvider(base domain.RoleProvider, ttl time.Duration) *CachedRoleProvider {
+func NewCachedRoleProvider(ctx context.Context, base domain.RoleProvider, ttl time.Duration) *CachedRoleProvider {
 	if ttl <= 0 {
 		ttl = 30 * time.Second
 	}
-	return &CachedRoleProvider{
+	provider := &CachedRoleProvider{
 		base:  base,
 		ttl:   ttl,
 		items: map[string]cacheEntry{},
 	}
+	go func() {
+		ticker := time.NewTicker(ttl)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-ticker.C:
+				cutoff := now.UTC()
+				provider.mu.Lock()
+				for key, entry := range provider.items {
+					if !cutoff.Before(entry.expiresAt) {
+						delete(provider.items, key)
+					}
+				}
+				provider.mu.Unlock()
+			}
+		}
+	}()
+	return provider
 }
 
 func roleCacheKey(userID, tenantID string) string {
@@ -55,6 +76,7 @@ func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID, tenantID
 	}
 
 	c.mu.Lock()
+	// TODO: invalidate cache entries on out-of-band role assignment/revocation paths too, not just the admin service.
 	c.items[key] = cacheEntry{roles: cloneRoles(roles), expiresAt: now.Add(c.ttl)}
 	c.mu.Unlock()
 
@@ -72,9 +94,19 @@ func (c *CachedRoleProvider) InvalidateUser(userID string) {
 	c.mu.Unlock()
 }
 
+func (c *CachedRoleProvider) InvalidateUserTenant(userID, tenantID string) {
+	c.evict(userID, tenantID)
+}
+
 func (c *CachedRoleProvider) InvalidateAll() {
 	c.mu.Lock()
 	c.items = map[string]cacheEntry{}
+	c.mu.Unlock()
+}
+
+func (c *CachedRoleProvider) evict(userID, tenantID string) {
+	c.mu.Lock()
+	delete(c.items, roleCacheKey(userID, tenantID))
 	c.mu.Unlock()
 }
 

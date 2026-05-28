@@ -9,13 +9,15 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+const NoActor = ""
+
 func setAuthzGUC(ctx context.Context, tx *sql.Tx) error {
 	tenantID, err := tenant.FromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("taxonomy: tenant context: %w", err)
 	}
 	actorID := iamdomain.UserIDFromContext(ctx)
-	if actorID == "" {
+	if actorID == NoActor {
 		return fmt.Errorf("taxonomy: actor context missing")
 	}
 	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {

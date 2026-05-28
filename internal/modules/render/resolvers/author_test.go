@@ -28,11 +28,11 @@ func TestAuthorResolver_Resolve(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	author, ok := v1.Value.(AuthorInfo)
+	author, ok := v1.Value.(string)
 	if !ok {
-		t.Fatalf("expected AuthorInfo value, got %T", v1.Value)
+		t.Fatalf("expected string value, got %T", v1.Value)
 	}
-	if author.UserID != "u-1" || author.DisplayName != "Jane Doe" {
+	if author != "Jane Doe" {
 		t.Fatalf("unexpected author: %#v", author)
 	}
 	if !bytes.Equal(v1.InputsHash, v2.InputsHash) {

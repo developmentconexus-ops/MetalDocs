@@ -19,10 +19,10 @@ type SubmitRequest struct {
 
 func (r SubmitRequest) Validate() error {
 	if err := validateUUID("route_id", r.RouteID); err != nil {
-		return err
+		return wrapValidation(err)
 	}
 	if err := validateSHA256Hex("content_hash", r.ContentHash); err != nil {
-		return err
+		return wrapValidation(err)
 	}
 	return nil
 }

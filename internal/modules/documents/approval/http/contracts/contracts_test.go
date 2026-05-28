@@ -172,6 +172,12 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 	if err := badOrder.Validate(); err == nil {
 		t.Fatalf("expected error for invalid order")
 	}
+
+	badCapability := valid
+	badCapability.Stages[0].RequiredCapability = "doc_signoff"
+	if err := badCapability.Validate(); err == nil {
+		t.Fatalf("expected error for non-namespaced required_capability")
+	}
 }
 
 func TestUpdateRouteRequestValidate(t *testing.T) {
