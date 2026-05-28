@@ -4,9 +4,9 @@
 
 > **Audit envelope note.** `GET /api/v1/audit/events` emits the same legacy `{error:{code,message,details,trace_id}}` envelope on errors (audit T-002 in [`modules/audit-tech-debt.md`](../modules/audit-tech-debt.md)). The success body is `{"items":[...]}` — not a `data` wrapper. See [`modules/audit.md §8.2`](../modules/audit.md) for the full envelope spec.
 
-> **Last verified:** 2026-05-10
+> **Last verified:** 2026-05-28 (qa/fe-401-interceptor: 401 discrimination by problem.code)
 > **Branch:** `phase-e-error-ux` (merged into main)
-> **Bugs fixed:** E2, E3, E4
+> **Bugs fixed:** E2, E3, E4; T-014 (401 session-expiry vs domain-401 conflation)
 
 ---
 
@@ -39,8 +39,11 @@ Before this work, error handling was fragmented across features: each had its ow
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T>
 ```
 
-- On 401: calls `dispatchAuthExpired(returnTo)`, throws `ApiError('authn.expired', 401, ...)`
-- On non-ok: parses `{ error: { code, message } }` envelope, throws `ApiError(code, status, message)`
+- On non-ok: parses the `application/problem+json` body **first** (`parseProblem`).
+- 401 discrimination (T-014): only a **session/authn** 401 means the session expired. When `res.status === 401 && (!problem || problem.code === "AUTH_UNAUTHORIZED")` → calls `dispatchAuthExpired(returnTo)` and throws `ApiError('authn.expired', 401, "Sessão expirada")`. A **domain 401** (e.g. `AUTH_INVALID_CREDENTIALS` on a wrong current password) keeps its RFC 9457 `code` and throws `new ApiError(problem)` — **no** auth-bus dispatch, so the caller surfaces a credential error instead of logging the user out.
+- On other non-ok with a problem body: throws `new ApiError(problem)`.
+- On non-ok with the legacy `{ error: { code, message } }` envelope: throws `ApiError.fromLegacy(code, status, message)`.
+- Consumers map domain 401s by `code`, not bare status: `useAuthSession.handleLogin` / `handleChangePassword` use `codeOf(err) === 'AUTH_INVALID_CREDENTIALS'`.
 - On 204: returns `undefined as T`
 - No `init` argument: calls `fetch(url)` without second arg (preserves spy assertion semantics)
 
