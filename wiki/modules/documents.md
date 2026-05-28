@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-28 (QA `qa/documents-hub`: legacy `DocumentsHubPage` stub routes — `/documents/{all,mine,recent,area/:areaCode,type/:profileCode,doc/:documentId}` — now `<Navigate to="/documents" replace />` redirects to LibraryPage. Stub `DocumentsHubView` + co-located test retained as bounded defer.) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
