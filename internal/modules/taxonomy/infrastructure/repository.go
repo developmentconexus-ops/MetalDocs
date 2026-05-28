@@ -247,6 +247,12 @@ func (r *ProfileRepository) GetByCodeForUpdate(ctx context.Context, tx domain.Fa
 	if !ok {
 		return nil, fmt.Errorf("invalid taxonomy tx type %T", tx)
 	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return nil, fmt.Errorf("query profile for update %q: %w", code, err)
+	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check Get profile for update: %w", err)
+	}
 	const q = `
 SELECT code, tenant_id, family_code, name, description, alias, review_interval_days,
        default_template_version_id, owner_user_id, editable_by_role, archived_at, created_at
@@ -518,6 +524,12 @@ func (r *AreaRepository) GetByCodeForUpdate(ctx context.Context, tx domain.Famil
 	sqlTx, ok := tx.(taxonomyTx)
 	if !ok {
 		return nil, fmt.Errorf("invalid taxonomy tx type %T", tx)
+	}
+	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
+		return nil, fmt.Errorf("query area for update %q: %w", code, err)
+	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check Get area for update: %w", err)
 	}
 	const q = `
 SELECT code, tenant_id, name, description, parent_code, owner_user_id, default_approver_role, archived_at, created_at

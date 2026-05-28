@@ -124,6 +124,7 @@ func Require(store *Store, actorFromCtx func(context.Context) (string, string), 
 			}
 			if replay != nil {
 				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("Idempotent-Replay", "true")
 				w.WriteHeader(replay.Status)
 				_, _ = w.Write(replay.Body)
 				return

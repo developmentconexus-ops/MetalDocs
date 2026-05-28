@@ -39,13 +39,14 @@ func ParseRole(raw string) (Role, error) {
 type Capability string
 
 const (
-	CapDocumentView    Capability = "document.view"
-	CapDocumentCreate  Capability = "document.create"
-	CapDocumentEdit    Capability = "document.edit"
-	CapDocumentSubmit  Capability = "document.submit"
-	CapDocumentSignoff Capability = "document.signoff"
-	CapWorkflowReview  Capability = "workflow.review"
-	CapWorkflowApprove Capability = "workflow.approve"
+	CapDocumentView      Capability = "document.view"
+	CapDocumentCreate    Capability = "document.create"
+	CapDocumentEdit      Capability = "document.edit"
+	CapDocumentSubmit    Capability = "document.submit"
+	CapDocumentSignoff   Capability = "document.signoff"
+	CapDocumentSupersede Capability = "doc.supersede"
+	CapWorkflowReview    Capability = "workflow.review"
+	CapWorkflowApprove   Capability = "workflow.approve"
 
 	CapTemplateView    Capability = "template.view"
 	CapTemplateCreate  Capability = "template.create"
@@ -71,6 +72,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapDocumentEdit:                {},
 	CapDocumentSubmit:              {},
 	CapDocumentSignoff:             {},
+	CapDocumentSupersede:           {},
 	CapWorkflowReview:              {},
 	CapWorkflowApprove:             {},
 	CapTemplateView:                {},

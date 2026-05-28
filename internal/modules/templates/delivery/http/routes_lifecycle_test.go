@@ -70,6 +70,43 @@ func TestSubmitForReview_Happy(t *testing.T) {
 	}
 }
 
+func TestSubmitForReview_UsesTemplateSubmitCapability(t *testing.T) {
+	repo := newFakeRepo()
+	reviewerRole := "reviewer"
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:            "ver-1",
+		TemplateID:    "11111111-1111-1111-1111-111111111111",
+		VersionNumber: 1,
+		Status:        domain.VersionStatusDraft,
+		ContentHash:   "deadbeef",
+		AuthorID:      "author-1",
+	}
+	repo.approvalConfigs["11111111-1111-1111-1111-111111111111"] = &domain.ApprovalConfig{
+		TemplateID:   "11111111-1111-1111-1111-111111111111",
+		ReviewerRole: &reviewerRole,
+		ApproverRole: "approver",
+	}
+
+	var gotAction string
+	mux := newMux(t, func(_ *http.Request, _, _, action string) error {
+		gotAction = action
+		return nil
+	}, repo)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/submit", nil)
+	withHeaders(req)
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+	if gotAction != "template.submit" {
+		t.Fatalf("authz action = %q, want template.submit", gotAction)
+	}
+}
+
 func TestSubmitForReview_NonDraft(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}

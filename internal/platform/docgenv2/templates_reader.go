@@ -27,7 +27,7 @@ func (r *TemplatesTemplateReader) GetPublishedVersion(ctx context.Context, tenan
 		FROM templates_template_version tv
 		JOIN templates_template tpl ON tpl.id = tv.template_id
 		WHERE tv.id = $1
-		  AND (tpl.tenant_id = $2 OR tpl.tenant_id = $3)
+		  AND (tpl.tenant_id = $2::uuid OR tpl.tenant_id = $3::uuid)
 		  AND tv.status = 'published'`,
 		templateVersionID, tenantID, systemTemplateTenantID,
 	).Scan(&docxKey)

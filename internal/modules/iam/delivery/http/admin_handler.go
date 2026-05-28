@@ -23,7 +23,7 @@ import (
 
 type UserAdminService interface {
 	ListUsers(ctx context.Context, tenantID string) ([]authdomain.ManagedUser, error)
-	ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error)
+	ListOnlineUsers(ctx context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error)
 	CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamdomain.Role, createdBy string) error
 	UpdateUser(ctx context.Context, params authdomain.UpdateUserParams, newPassword string) error
 	AdminResetPassword(ctx context.Context, userID, newPassword string) error
@@ -122,7 +122,7 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
 		return
 	}
-	onlineUsers, err := h.authService.ListOnlineUsers(r.Context(), activeSince)
+	onlineUsers, err := h.authService.ListOnlineUsers(r.Context(), tenantID, activeSince)
 	if err != nil {
 		log.Printf("iam admin: list online users failed: %v", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list online users"))
@@ -271,9 +271,9 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
-	roles, ok := parseRoles(req.Roles)
-	if !ok {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles"))
+	role, err := parseExactlyOneRole(req.Roles)
+	if err != nil {
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
@@ -282,7 +282,7 @@ func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	assignedBy := authenticatedActor(r)
-	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, tenantID, roles, assignedBy); err != nil {
+	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, tenantID, []iamdomain.Role{role}, assignedBy); err != nil {
 		h.writeAuthError(w, err)
 		return
 	}
@@ -379,9 +379,9 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	roles, ok := parseRoles(req.Roles)
-	if !ok {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid roles"))
+	role, err := parseExactlyOneRole(req.Roles)
+	if err != nil {
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
 		return
 	}
 
@@ -395,22 +395,18 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, roles, assignedBy); err != nil {
+	if err := h.service.ReplaceUserRoles(r.Context(), userID, req.DisplayName, replaceTenantID, role, assignedBy); err != nil {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to replace user roles"))
 		return
 	}
 
-	roleStrings := make([]string, 0, len(roles))
-	for _, role := range roles {
-		roleStrings = append(roleStrings, string(role))
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"userId":      userID,
 		"displayName": strings.TrimSpace(req.DisplayName),
-		"roles":       roleStrings,
+		"roles":       []string{string(role)},
 	})
 	h.recordAudit(r, userID, "iam.user.roles.replaced", map[string]any{
-		"roles": roleStrings,
+		"roles": []string{string(role)},
 	})
 }
 
@@ -511,6 +507,17 @@ func parseRoles(items []string) ([]iamdomain.Role, bool) {
 		return nil, false
 	}
 	return out, true
+}
+
+func parseExactlyOneRole(items []string) (iamdomain.Role, error) {
+	roles, ok := parseRoles(items)
+	if !ok {
+		return "", errors.New("Invalid roles")
+	}
+	if len(roles) != 1 {
+		return "", errors.New("Exactly one role is required")
+	}
+	return roles[0], nil
 }
 
 func authenticatedActor(r *http.Request) string {

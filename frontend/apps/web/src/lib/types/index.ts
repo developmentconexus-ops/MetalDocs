@@ -26,6 +26,8 @@ export type DocumentContentSource = "native" | "docx_upload" | "browser_editor";
 
 export interface CurrentUser {
   userId: string;
+  tenantId: string;
+  tenantName: string;
   username: string;
   email?: string;
   displayName: string;

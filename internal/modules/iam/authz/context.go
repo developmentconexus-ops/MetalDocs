@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrActorContextMissing indicates the metaldocs.actor_id GUC was not set on the
@@ -40,4 +41,26 @@ func MustTenantID(ctx context.Context, tx *sql.Tx) (string, error) {
 		return "", ErrTenantContextMissing
 	}
 	return v, nil
+}
+
+// SeedTxIdentity sets the transaction-local actor and tenant GUCs required by
+// Require. Both values must be non-empty.
+func SeedTxIdentity(ctx context.Context, tx *sql.Tx, tenantID, actorID string) error {
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" {
+		return ErrTenantContextMissing
+	}
+	actorID = strings.TrimSpace(actorID)
+	if actorID == "" {
+		return ErrActorContextMissing
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+SELECT
+	set_config('metaldocs.tenant_id', $1, true),
+	set_config('metaldocs.actor_id', $2, true)
+`, tenantID, actorID); err != nil {
+		return fmt.Errorf("seed authz tx identity: %w", err)
+	}
+	return nil
 }

@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"metaldocs/internal/platform/bootstrap"
 )
 
 // TestShutdownServer_ServerErrorJoinsScheduler reproduces the C3 regression:
@@ -102,5 +104,47 @@ func TestShutdownServer_ContextCancellation(t *testing.T) {
 	}
 	if !workerJoined.Load() {
 		t.Fatal("worker goroutine was not joined before shutdownServer returned")
+	}
+}
+
+func TestBuildTemplatesModuleFailsWhenCapabilityServiceMissing(t *testing.T) {
+	t.Parallel()
+
+	_, err := buildTemplatesModule(bootstrap.APIDependencies{}, nil)
+	if err == nil {
+		t.Fatal("expected error for nil capability service")
+	}
+}
+
+func TestRequirePostgresRepositoryModeRejectsMemory(t *testing.T) {
+	t.Parallel()
+
+	err := requirePostgresRepositoryMode("memory")
+	if err == nil {
+		t.Fatal("expected memory mode to be rejected")
+	}
+}
+
+func TestRequirePostgresRepositoryModeAllowsPostgres(t *testing.T) {
+	t.Parallel()
+
+	if err := requirePostgresRepositoryMode("postgres"); err != nil {
+		t.Fatalf("postgres mode should be allowed: %v", err)
+	}
+}
+
+func TestRequireApprovalRuntimeSupport_RejectsMissingFanoutURL(t *testing.T) {
+	t.Parallel()
+
+	if err := requireApprovalRuntimeSupport(""); err == nil {
+		t.Fatal("expected missing fanout URL to be rejected")
+	}
+}
+
+func TestRequireApprovalRuntimeSupport_AllowsConfiguredFanoutURL(t *testing.T) {
+	t.Parallel()
+
+	if err := requireApprovalRuntimeSupport("http://fanout.internal"); err != nil {
+		t.Fatalf("configured fanout URL should be allowed: %v", err)
 	}
 }

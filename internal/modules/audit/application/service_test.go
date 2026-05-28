@@ -18,6 +18,30 @@ func (r *captureReader) ListEvents(_ context.Context, query domain.ListEventsQue
 	return nil, nil
 }
 
+func TestNewServicePanicsWithoutReader(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("expected panic for nil reader")
+		}
+	}()
+
+	_ = application.NewService(nil)
+}
+
+func TestListEventsFailsWhenServiceReaderMissing(t *testing.T) {
+	t.Parallel()
+
+	service := &application.Service{}
+
+	_, err := service.ListEvents(context.Background(), domain.ListEventsQuery{TenantID: "tenant-a"})
+
+	if !errors.Is(err, application.ErrReaderRequired) {
+		t.Fatalf("expected ErrReaderRequired, got %v", err)
+	}
+}
+
 func TestListEventsRequiresTenantID(t *testing.T) {
 	t.Parallel()
 

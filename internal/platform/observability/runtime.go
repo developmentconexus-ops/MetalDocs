@@ -51,13 +51,16 @@ func (p *StaticRuntimeStatusProvider) Live(_ context.Context) (int, map[string]a
 
 func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
 	// TODO: gate behind admin auth before exposing to external traffic.
-	return 200, map[string]any{
-		"status": "ready",
-		"checks": p.applyDependencyChecks(ctx, []map[string]any{
-			{"name": "repository", "status": "up"},
-			{"name": "storage", "status": "up"},
-			{"name": "auth", "status": "up"},
-		}, nil, nil),
+	status := "ready"
+	code := 200
+	checks := p.applyDependencyChecks(ctx, []map[string]any{
+		{"name": "repository", "status": "up"},
+		{"name": "storage", "status": "up"},
+		{"name": "auth", "status": "up"},
+	}, &status, &code)
+	return code, map[string]any{
+		"status": status,
+		"checks": checks,
 	}
 }
 
@@ -130,7 +133,7 @@ func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[str
 
 	statusPtr := &status
 	codePtr := &code
-	checks = p.applyDependencyChecks(ctx, checks, statusPtr, codePtr)
+	checks = p.applyDependencyChecks(readyCtx, checks, statusPtr, codePtr)
 	status = *statusPtr
 	code = *codePtr
 
@@ -169,10 +172,8 @@ func (p *PostgresRuntimeStatusProvider) RuntimeMetrics(ctx context.Context) map[
 	sessions := sessionStats{}
 	outbox := outboxStats{}
 
-	statsCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	authErr := p.db.QueryRowContext(statsCtx, `
+	authErr := queryRuntimeMetric(ctx, 3*time.Second, func(queryCtx context.Context) error {
+		return p.db.QueryRowContext(queryCtx, `
 SELECT
   COUNT(*) FILTER (WHERE is_active = TRUE),
   COUNT(*) FILTER (WHERE is_active = FALSE),
@@ -180,41 +181,58 @@ SELECT
   COUNT(*) FILTER (WHERE locked_until IS NOT NULL AND locked_until > NOW())
 FROM metaldocs.auth_identities
 `).Scan(&auth.active, &auth.inactive, &auth.mustChangePassword, &auth.locked)
-	sessionErr := p.db.QueryRowContext(statsCtx, `
+	})
+	sessionErr := queryRuntimeMetric(ctx, 3*time.Second, func(queryCtx context.Context) error {
+		return p.db.QueryRowContext(queryCtx, `
 SELECT
   COUNT(*) FILTER (WHERE revoked_at IS NULL AND expires_at > NOW()),
   COUNT(*) FILTER (WHERE expires_at <= NOW()),
   COUNT(*) FILTER (WHERE revoked_at IS NOT NULL)
 FROM metaldocs.auth_sessions
 `).Scan(&sessions.active, &sessions.expired, &sessions.revoked)
-	outboxErr := p.db.QueryRowContext(statsCtx, `
+	})
+	outboxErr := queryRuntimeMetric(ctx, 3*time.Second, func(queryCtx context.Context) error {
+		return p.db.QueryRowContext(queryCtx, `
 SELECT
   COUNT(*) FILTER (WHERE published_at IS NULL AND dead_lettered_at IS NULL AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())),
   COUNT(*) FILTER (WHERE published_at IS NULL AND dead_lettered_at IS NULL),
   COUNT(*) FILTER (WHERE dead_lettered_at IS NOT NULL)
 FROM metaldocs.outbox_events
 `).Scan(&outbox.claimable, &outbox.pending, &outbox.deadLettered)
+	})
 
 	metrics["repositoryStatus"] = "up"
-	metrics["auth"] = map[string]any{
-		"users": map[string]any{
+	authMetrics := map[string]any{}
+	if authErr == nil {
+		authMetrics["users"] = map[string]any{
 			"active":             auth.active,
 			"inactive":           auth.inactive,
 			"mustChangePassword": auth.mustChangePassword,
 			"locked":             auth.locked,
-		},
-		"sessions": map[string]any{
+		}
+	}
+	if sessionErr == nil {
+		authMetrics["sessions"] = map[string]any{
 			"active":  sessions.active,
 			"expired": sessions.expired,
 			"revoked": sessions.revoked,
-		},
+		}
 	}
-	metrics["worker"] = map[string]any{
-		"outbox": map[string]any{
-			"claimable":    outbox.claimable,
-			"pending":      outbox.pending,
-			"deadLettered": outbox.deadLettered,
-		},
+	if len(authMetrics) > 0 {
+		metrics["auth"] = authMetrics
+	} else {
+		delete(metrics, "auth")
+	}
+	if outboxErr == nil {
+		metrics["worker"] = map[string]any{
+			"outbox": map[string]any{
+				"claimable":    outbox.claimable,
+				"pending":      outbox.pending,
+				"deadLettered": outbox.deadLettered,
+			},
+		}
+	} else {
+		delete(metrics, "worker")
 	}
 
 	errors := map[string]string{}
@@ -244,6 +262,12 @@ func truncateReadinessError(err error) string {
 		return msg[:160]
 	}
 	return msg
+}
+
+func queryRuntimeMetric(ctx context.Context, timeout time.Duration, query func(context.Context) error) error {
+	queryCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return query(queryCtx)
 }
 
 func (p *StaticRuntimeStatusProvider) applyDependencyChecks(ctx context.Context, checks []map[string]any, status *string, code *int) []map[string]any {

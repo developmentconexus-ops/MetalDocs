@@ -74,6 +74,11 @@ func (r *Repository) CreateDocument(ctx context.Context, d *domain.Document, ini
 // storage_key with a rendered key) must do so after tx.Commit() via
 // SetRevisionStorageKey.
 func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error) {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, d.TenantID, d.CreatedBy); err != nil {
+		return "", "", "", err
+	}
+
 	// Serialise revision_number allocation per (tenant, controlled_document).
 	// pg_advisory_xact_lock auto-releases at COMMIT/ROLLBACK.
 	if d.ControlledDocumentID != nil && *d.ControlledDocumentID != "" {
@@ -246,13 +251,17 @@ func (r *Repository) GetDocument(ctx context.Context, tenantID, id string) (*dom
 	return &d, nil
 }
 
-func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error {
+func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, actorID, docID, name string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
 		return fmt.Errorf("update document name: authz check: %w", err)
 	}
@@ -270,7 +279,10 @@ func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, docID, na
 	return tx.Commit()
 }
 
-func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, docID, name string) error {
+func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, docID, name string) error {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
 		return fmt.Errorf("update document name: authz check: %w", err)
 	}
@@ -485,7 +497,7 @@ func (r *Repository) StatsByArea(ctx context.Context, tenantID string, opts List
 	return out, rows.Err()
 }
 
-func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error {
+func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, actorID, id string, cur, next domain.DocumentStatus, stampTime bool) error {
 	col := ""
 	if stampTime {
 		if next == domain.DocStatusArchived {
@@ -499,6 +511,10 @@ func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, id stri
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
 		return fmt.Errorf("update document status: authz check: %w", err)
 	}
@@ -526,13 +542,10 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 		return nil, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", userID); err != nil {
-		return nil, err
-	}
 	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
+		return nil, err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
 		return nil, fmt.Errorf("acquire session: authz check: %w", err)
 	}
@@ -608,10 +621,8 @@ func (r *Repository) ReleaseSession(ctx context.Context, tenantID, sessionID, us
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", userID); err != nil {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return err
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
@@ -639,10 +650,8 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID,
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", adminID); err != nil {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, adminID); err != nil {
 		return err
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
@@ -804,25 +813,14 @@ func (r *Repository) GetPendingForCommit(ctx context.Context, tenantID, pendingI
 // method is called; `serverComputedHash` is the hash the service streamed from
 // S3 and therefore trusted. CommitUpload still compares it to pending.content_hash
 // under FOR UPDATE to catch TOCTOU races.
-func (r *Repository) setAuthzGUC(ctx context.Context, tx *sql.Tx, stmt, tenantID, actorID string) error {
-	if _, err := tx.ExecContext(ctx, stmt, tenantID, actorID); err != nil {
-		return fmt.Errorf("set authz guc: %w", err)
-	}
-	return nil
-}
-
 func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, userID, docID, pendingID, serverComputedHash string, formDataSnapshot []byte, fileSizeBytes int64, pageCount *int, pageCountSource *string) (*CommitResult, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	authzGUCStmt := `
-		SELECT
-			set_config('metaldocs.tenant_id', $1, true),
-			set_config('metaldocs.actor_id', $2, true)
-	`
-	if err := r.setAuthzGUC(ctx, tx, authzGUCStmt, tenantID, userID); err != nil {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
@@ -958,12 +956,8 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 		return nil, err
 	}
 	defer tx.Rollback()
-	authzGUCStmt := `
-		SELECT
-			set_config('metaldocs.tenant_id', $1, true),
-			set_config('metaldocs.actor_id', $2, true)
-	`
-	if err := r.setAuthzGUC(ctx, tx, authzGUCStmt, tenantID, userID); err != nil {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
 	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
@@ -1406,13 +1400,16 @@ type commentScanner interface {
 // MarkArchived sets archived_at on a document without changing its status.
 // Idempotent: WHERE archived_at IS NULL means double-call is a no-op.
 func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID string) error {
-	_ = actorID // reserved for future audit column; audit via Service layer
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
 		return fmt.Errorf("mark archived: authz check: %w", err)
 	}
@@ -1437,13 +1434,16 @@ func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID 
 
 // Unarchive clears archived_at, restoring the document to active queries.
 func (r *Repository) Unarchive(ctx context.Context, tenantID, docID, actorID string) error {
-	_ = actorID
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
+		return err
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
 		return fmt.Errorf("unarchive: authz check: %w", err)
 	}

@@ -77,7 +77,8 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
-	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
+	expectedVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -99,11 +100,12 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := routeAdminSvc.Update(r.Context(), h.db, application.UpdateRouteInput{
-		TenantID:    tenantID,
-		RouteID:     routeID,
-		Name:        req.Name,
-		ActorUserID: actorID,
-		Stages:      mapStageRequests(req.Stages),
+		TenantID:        tenantID,
+		RouteID:         routeID,
+		Name:            req.Name,
+		ActorUserID:     actorID,
+		ExpectedVersion: expectedVersion,
+		Stages:          mapStageRequests(req.Stages),
 	})
 	if err != nil {
 		WriteError(w, err)
@@ -129,7 +131,8 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		WriteError(w, ErrIdempotencyRequired)
 		return
 	}
-	if _, err := parseIfMatch(r.Header.Get("If-Match")); err != nil {
+	expectedVersion, err := parseIfMatch(r.Header.Get("If-Match"))
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -141,9 +144,10 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	result, err := routeAdminSvc.Deactivate(r.Context(), h.db, application.DeactivateRouteInput{
-		TenantID:    tenantID,
-		RouteID:     routeID,
-		ActorUserID: actorID,
+		TenantID:        tenantID,
+		RouteID:         routeID,
+		ActorUserID:     actorID,
+		ExpectedVersion: expectedVersion,
 	})
 	if err != nil {
 		WriteError(w, err)

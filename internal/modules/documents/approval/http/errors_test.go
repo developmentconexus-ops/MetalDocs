@@ -149,6 +149,13 @@ func TestMapErrorToResponse(t *testing.T) {
 			wantTitle:  application.ErrRouteNotFound.Error(),
 		},
 		{
+			name:       "application route already inactive",
+			err:        application.ErrRouteAlreadyInactive,
+			wantStatus: http.StatusConflict,
+			wantCode:   "state.route_inactive",
+			wantTitle:  application.ErrRouteAlreadyInactive.Error(),
+		},
+		{
 			name:       "context deadline exceeded",
 			err:        context.DeadlineExceeded,
 			wantStatus: http.StatusGatewayTimeout,

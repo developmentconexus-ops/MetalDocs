@@ -26,10 +26,14 @@ import (
 // mockRoleProvider implements iamdomain.RoleProvider for testing.
 type mockRoleProvider struct {
 	roles map[string][]iamdomain.Role
+	errs  map[string]error
 }
 
 func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID string) ([]iamdomain.Role, error) {
 	key := userID + ":" + tenantID
+	if err, ok := m.errs[key]; ok {
+		return nil, err
+	}
 	roles, ok := m.roles[key]
 	if !ok {
 		return nil, iamdomain.ErrUserNotFound
@@ -40,6 +44,7 @@ func (m *mockRoleProvider) RolesByUserID(_ context.Context, userID, tenantID str
 func newMockRoleProvider() *mockRoleProvider {
 	return &mockRoleProvider{
 		roles: map[string][]iamdomain.Role{},
+		errs:  map[string]error{},
 	}
 }
 
@@ -65,9 +70,9 @@ func (m *mockRoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, use
 	return nil
 }
 
-func (m *mockRoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
+func (m *mockRoleAdminRepository) ReplaceUserRoles(_ context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	key := userID + ":" + tenantID
-	m.roles[key] = append([]iamdomain.Role(nil), roles...)
+	m.roles[key] = []iamdomain.Role{role}
 	return nil
 }
 
@@ -162,6 +167,9 @@ func TestAuthenticate_DevFallback_NoTenantClaim(t *testing.T) {
 	// Verify TenantID is set to dev tenant
 	if session.CurrentUser.TenantID != tenant.DevTenantID {
 		t.Errorf("TenantID mismatch: got %q, want %q", session.CurrentUser.TenantID, tenant.DevTenantID)
+	}
+	if session.CurrentUser.TenantName != "System Tenant" {
+		t.Errorf("TenantName mismatch: got %q, want %q", session.CurrentUser.TenantName, "System Tenant")
 	}
 }
 
@@ -339,6 +347,9 @@ func TestResolveSession_ReadsTenantFromSession(t *testing.T) {
 	if resolved.TenantID != tenant.DevTenantID {
 		t.Errorf("TenantID mismatch: got %q, want %q", resolved.TenantID, tenant.DevTenantID)
 	}
+	if resolved.TenantName != "System Tenant" {
+		t.Errorf("TenantName mismatch: got %q, want %q", resolved.TenantName, "System Tenant")
+	}
 	if resolved.UserID != userID {
 		t.Errorf("UserID mismatch: got %q, want %q", resolved.UserID, userID)
 	}
@@ -473,7 +484,7 @@ func TestListUsers_FiltersByTenantMembership(t *testing.T) {
 	roleAdmin := newMockRoleAdminRepository()
 	ctx := context.Background()
 
-	for _, user := range []string{"alice", "bob"} {
+	for _, user := range []string{"alice", "bob", "carol"} {
 		if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
 			UserID:       user,
 			Username:     user,
@@ -487,6 +498,7 @@ func TestListUsers_FiltersByTenantMembership(t *testing.T) {
 		}
 	}
 	roleProvider.roles["alice:tenant-a"] = []iamdomain.Role{iamdomain.RoleViewer}
+	roleProvider.errs["carol:tenant-a"] = iamdomain.ErrNoRolesAssigned
 
 	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
 		SessionCookieName:      "session",
@@ -502,11 +514,26 @@ func TestListUsers_FiltersByTenantMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListUsers: %v", err)
 	}
-	if len(items) != 1 {
-		t.Fatalf("expected 1 user in tenant-a, got %d", len(items))
+	if len(items) != 2 {
+		t.Fatalf("expected 2 users in tenant-a, got %d", len(items))
 	}
-	if items[0].UserID != "alice" {
-		t.Fatalf("expected alice, got %q", items[0].UserID)
+	byUserID := map[string]authdomain.ManagedUser{}
+	for _, item := range items {
+		byUserID[item.UserID] = item
+	}
+	alice, ok := byUserID["alice"]
+	if !ok {
+		t.Fatal("expected alice in tenant-a listing")
+	}
+	if len(alice.Roles) != 1 || alice.Roles[0] != iamdomain.RoleViewer {
+		t.Fatalf("alice roles = %v, want [viewer]", alice.Roles)
+	}
+	carol, ok := byUserID["carol"]
+	if !ok {
+		t.Fatal("expected carol in tenant-a listing")
+	}
+	if len(carol.Roles) != 0 {
+		t.Fatalf("carol roles = %v, want empty", carol.Roles)
 	}
 }
 
@@ -542,6 +569,30 @@ func TestCreateUserWithInput_DefaultsUserIDFromUsername(t *testing.T) {
 	}
 }
 
+func TestCreateUserWithInput_RejectsMultipleRoles(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      15 * time.Minute,
+		SessionSecret:          testSessionSecret,
+		SessionTTL:             24 * time.Hour,
+		SessionCookieName:      "session",
+		CookieSecure:           false,
+	})
+
+	err := svc.CreateUserWithInput(context.Background(), authdomain.CreateUserInput{
+		Username: "new-user",
+		Password: authdomain.PlainPassword("Password123!"),
+		Roles:    []iamdomain.Role{iamdomain.RoleViewer, iamdomain.RoleEditor},
+	})
+	if !errors.Is(err, iamdomain.ErrInvalidRole) {
+		t.Fatalf("CreateUserWithInput error = %v, want ErrInvalidRole", err)
+	}
+}
+
 func TestCreateUser_RollbackWhenReplaceUserRolesFails(t *testing.T) {
 	const tenantID = "11111111-1111-1111-1111-111111111111"
 	db, mock, err := sqlmock.New()
@@ -557,16 +608,33 @@ VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6, $7, $8, NULL, 0, NULL, NOW(), NOW())
 `)).
 		WithArgs("alice", "alice", "alice@example.com", "Alice", true, sqlmock.AnyArg(), "bcrypt", true).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(`
+SELECT
+	set_config('metaldocs.tenant_id', $1, true),
+	set_config('metaldocs.actor_id', $2, true)
+`)).
+		WithArgs(tenantID, "admin").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.actor_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("admin"))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
 )`)).
 		WithArgs("admin", tenantID).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))

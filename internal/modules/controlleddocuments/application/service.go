@@ -568,6 +568,18 @@ type CreateRevisionCmd struct {
 // CreateRevision creates a new document revision for an existing controlled
 // document. It requires a DocumentInitializer to be wired (see WithDocumentInitializer).
 func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd CreateRevisionCmd) (*controlleddocumentsdomain.DocumentRef, error) {
+	actorUserID, ok := authn.UserIDFromContext(ctx)
+	if !ok {
+		return nil, ErrActorMissing
+	}
+	canRead, err := s.docs.CanRead(ctx, cmd.TenantID, cmd.CDID, actorUserID)
+	if err != nil {
+		return nil, fmt.Errorf("controlled_documents: check read access before revision create: %w", err)
+	}
+	if !canRead {
+		return nil, controlleddocumentsdomain.ErrCDNotFound
+	}
+
 	cd, err := s.docs.GetByID(ctx, cmd.TenantID, cmd.CDID)
 	if err != nil {
 		return nil, fmt.Errorf("controlled_documents: get controlled document for revision: %w", err)
@@ -589,12 +601,6 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 			_ = tx.Rollback()
 		}
 	}()
-
-	actorUserID, ok := authn.UserIDFromContext(ctx)
-	if !ok {
-		txErr = ErrActorMissing
-		return nil, txErr
-	}
 	if txErr = setAuthzGUC(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {
 		return nil, fmt.Errorf("controlled_documents: set authz guc for create revision: %w", txErr)
 	}

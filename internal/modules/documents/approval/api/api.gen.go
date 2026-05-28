@@ -470,6 +470,28 @@ type Problem struct {
 	Type     string        `json:"type"`
 }
 
+// RecordApprovalStageSignoffParams defines parameters for RecordApprovalStageSignoff.
+type RecordApprovalStageSignoffParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>"
+	IfMatch string `json:"If-Match"`
+}
+
+// RecordDocumentSignoffParams defines parameters for RecordDocumentSignoff.
+type RecordDocumentSignoffParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected revision version ETag in the form "v<N>"
+	IfMatch string `json:"If-Match"`
+}
+
+// SubmitDocumentForApprovalParams defines parameters for SubmitDocumentForApproval.
+type SubmitDocumentForApprovalParams struct {
+	// IfMatch Expected revision version ETag in the form "v<N>"
+	IfMatch string `json:"If-Match"`
+}
+
 // AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
 func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
 	var body DocumentTemplatePageNodeResponse
@@ -722,7 +744,7 @@ type ServerInterface interface {
 	CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 
 	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
-	RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID)
+	RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params RecordApprovalStageSignoffParams)
 
 	// (GET /api/v1/approval/routes)
 	ListApprovalRoutes(w http.ResponseWriter, r *http.Request)
@@ -752,10 +774,10 @@ type ServerInterface interface {
 	ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (POST /api/v1/documents/{id}/signoff)
-	RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordDocumentSignoffParams)
 
 	// (POST /api/v1/documents/{id}/submit)
-	SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SubmitDocumentForApprovalParams)
 
 	// (POST /api/v1/documents/{id}/supersede)
 	SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -860,8 +882,59 @@ func (siw *ServerInterfaceWrapper) RecordApprovalStageSignoff(w http.ResponseWri
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RecordApprovalStageSignoffParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RecordApprovalStageSignoff(w, r, instanceId, stageId)
+		siw.Handler.RecordApprovalStageSignoff(w, r, instanceId, stageId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1096,8 +1169,59 @@ func (siw *ServerInterfaceWrapper) RecordDocumentSignoff(w http.ResponseWriter, 
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RecordDocumentSignoffParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RecordDocumentSignoff(w, r, id)
+		siw.Handler.RecordDocumentSignoff(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1122,8 +1246,36 @@ func (siw *ServerInterfaceWrapper) SubmitDocumentForApproval(w http.ResponseWrit
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SubmitDocumentForApprovalParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SubmitDocumentForApproval(w, r, id)
+		siw.Handler.SubmitDocumentForApproval(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1369,6 +1521,7 @@ func (response CancelApprovalInstance200Response) VisitCancelApprovalInstanceRes
 type RecordApprovalStageSignoffRequestObject struct {
 	InstanceId openapi_types.UUID `json:"instance_id"`
 	StageId    openapi_types.UUID `json:"stage_id"`
+	Params     RecordApprovalStageSignoffParams
 }
 
 type RecordApprovalStageSignoffResponseObject interface {
@@ -1546,7 +1699,8 @@ func (response ScheduleDocumentPublish200Response) VisitScheduleDocumentPublishR
 }
 
 type RecordDocumentSignoffRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params RecordDocumentSignoffParams
 }
 
 type RecordDocumentSignoffResponseObject interface {
@@ -1562,18 +1716,19 @@ func (response RecordDocumentSignoff200Response) VisitRecordDocumentSignoffRespo
 }
 
 type SubmitDocumentForApprovalRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params SubmitDocumentForApprovalParams
 }
 
 type SubmitDocumentForApprovalResponseObject interface {
 	VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error
 }
 
-type SubmitDocumentForApproval200Response struct {
+type SubmitDocumentForApproval201Response struct {
 }
 
-func (response SubmitDocumentForApproval200Response) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
+func (response SubmitDocumentForApproval201Response) VisitSubmitDocumentForApprovalResponse(w http.ResponseWriter) error {
+	w.WriteHeader(201)
 	return nil
 }
 
@@ -1751,11 +1906,12 @@ func (sh *strictHandler) CancelApprovalInstance(w http.ResponseWriter, r *http.R
 }
 
 // RecordApprovalStageSignoff operation middleware
-func (sh *strictHandler) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID) {
+func (sh *strictHandler) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params RecordApprovalStageSignoffParams) {
 	var request RecordApprovalStageSignoffRequestObject
 
 	request.InstanceId = instanceId
 	request.StageId = stageId
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.RecordApprovalStageSignoff(ctx, request.(RecordApprovalStageSignoffRequestObject))
@@ -2008,10 +2164,11 @@ func (sh *strictHandler) ScheduleDocumentPublish(w http.ResponseWriter, r *http.
 }
 
 // RecordDocumentSignoff operation middleware
-func (sh *strictHandler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordDocumentSignoffParams) {
 	var request RecordDocumentSignoffRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.RecordDocumentSignoff(ctx, request.(RecordDocumentSignoffRequestObject))
@@ -2034,10 +2191,11 @@ func (sh *strictHandler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Re
 }
 
 // SubmitDocumentForApproval operation middleware
-func (sh *strictHandler) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SubmitDocumentForApprovalParams) {
 	var request SubmitDocumentForApprovalRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.SubmitDocumentForApproval(ctx, request.(SubmitDocumentForApprovalRequestObject))
@@ -2090,46 +2248,47 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"P/wnAAD//w==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

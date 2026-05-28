@@ -19,6 +19,12 @@ func (id UserID) String() string    { return string(id) }
 func (id SessionID) String() string { return string(id) }
 func (id TenantID) String() string  { return string(id) }
 
+type Tenant struct {
+	ID   string
+	Name string
+	Slug string
+}
+
 type Identity struct {
 	UserID   string
 	Username string
@@ -128,6 +134,7 @@ type BootstrapAdminParams struct {
 type CurrentUser struct {
 	UserID             string           `json:"userId"`
 	TenantID           string           `json:"tenantId"`
+	TenantName         string           `json:"tenantName"`
 	Username           string           `json:"username"`
 	Email              string           `json:"email,omitempty"`
 	DisplayName        string           `json:"displayName"`

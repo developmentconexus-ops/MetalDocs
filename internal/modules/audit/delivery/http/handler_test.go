@@ -1,6 +1,7 @@
 package httpdelivery_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -126,6 +127,54 @@ func TestAuditHandler_ListEventsIsTenantScoped(t *testing.T) {
 	if body.Items[0].ID != "evt-a" {
 		t.Fatalf("expected tenant-a event, got %q", body.Items[0].ID)
 	}
+}
+
+func TestAuditHandler_InvalidStoredPayloadFailsHonestly(t *testing.T) {
+	t.Parallel()
+
+	handler := httpdelivery.NewHandler(fakeAuditQuerier{
+		items: []domain.Event{{
+			ID:           "evt-bad",
+			OccurredAt:   time.Now().UTC(),
+			ActorID:      "actor-a",
+			Action:       "audit.test",
+			ResourceType: "document",
+			ResourceID:   "doc-a",
+			PayloadJSON:  "{bad json",
+			TraceID:      "trace-a",
+			TenantID:     "tenant-a",
+		}},
+	})
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+
+	req := authenticatedAuditRequest(http.MethodGet, "/api/v1/audit/events", "tenant-a")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, rec.Code)
+	}
+
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body.Code != "INTERNAL_ERROR" {
+		t.Fatalf("expected code INTERNAL_ERROR, got %q", body.Code)
+	}
+}
+
+type fakeAuditQuerier struct {
+	items []domain.Event
+	err   error
+}
+
+func (f fakeAuditQuerier) ListEvents(context.Context, domain.ListEventsQuery) ([]domain.Event, error) {
+	return f.items, f.err
 }
 
 func authenticatedAuditRequest(method, target, tenantID string) *http.Request {

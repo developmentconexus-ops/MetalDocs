@@ -2,6 +2,7 @@ package approvalhttp
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 var (
 	ErrIdempotencyRequired = errors.New("idempotency: Idempotency-Key header required on mutating requests")
 
-	ErrContentHashMismatch = errors.New("approval: content hash mismatch")
+	ErrContentHashMismatch = application.ErrContentHashMismatch
 )
 
 func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,6 +59,27 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	payloadHash := signoffPayloadHash("", instanceID, stageID, decision, body.Reason, body.ContentHash)
+	var replayHandle interface {
+		Complete(outcome string) error
+		Fail(cause error) error
+	}
+	if h.idempStore != nil {
+		handle, replay, err := h.idempStore.BeginStageReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		if replay != nil {
+			WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
+				WasReplay: true,
+				Outcome:   replay.Outcome,
+			})
+			return
+		}
+		replayHandle = handle
+	}
+
 	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
 		TenantID:                tenantID,
 		InstanceID:              instanceID,
@@ -71,14 +93,24 @@ func (h *Handler) SignoffHandler(w http.ResponseWriter, r *http.Request) {
 		ExpectedRevisionVersion: expectedRevisionVersion,
 	})
 	if err != nil {
+		if replayHandle != nil {
+			_ = replayHandle.Fail(err)
+		}
 		WriteError(w, err)
 		return
+	}
+
+	outcome := signoffOutcome(result)
+	if replayHandle != nil {
+		if err := replayHandle.Complete(outcome); err != nil {
+			log.Printf("WARN signoff idempotency record failed (non-fatal): %v", err)
+		}
 	}
 
 	WriteJSON(w, http.StatusOK, contracts.SignoffResponse{
 		SignoffID: "",
 		WasReplay: false,
-		Outcome:   signoffOutcome(result),
+		Outcome:   outcome,
 	})
 }
 

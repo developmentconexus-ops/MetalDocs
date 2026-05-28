@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -38,6 +39,9 @@ type EventResponse struct {
 }
 
 func NewHandler(service AuditQuerier) *Handler {
+	if service == nil {
+		panic("audit: service is required")
+	}
 	return &Handler{service: service}
 }
 
@@ -87,11 +91,28 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	responseItems, err := buildEventResponses(items)
+	if err != nil {
+		slog.Error("audit payload decode failed", "error", err)
+		if writeErr := problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Stored audit payload is invalid")); writeErr != nil {
+			slog.Warn("write problem response failed", "error", writeErr)
+		}
+		return
+	}
+
+	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
+		"items": responseItems,
+	})
+}
+
+func buildEventResponses(items []domain.Event) ([]EventResponse, error) {
 	responseItems := make([]EventResponse, 0, len(items))
 	for _, item := range items {
 		payload := map[string]any{}
-		if strings.TrimSpace(item.PayloadJSON) != "" {
-			_ = json.Unmarshal([]byte(item.PayloadJSON), &payload)
+		if raw := strings.TrimSpace(item.PayloadJSON); raw != "" {
+			if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+				return nil, fmt.Errorf("decode payload for event %s: %w", item.ID, err)
+			}
 		}
 		responseItems = append(responseItems, EventResponse{
 			ID:           item.ID,
@@ -104,10 +125,7 @@ func (h *Handler) handleEvents(w http.ResponseWriter, r *http.Request) {
 			TraceID:      item.TraceID,
 		})
 	}
-
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"items": responseItems,
-	})
+	return responseItems, nil
 }
 
 func auditTenantFromRequest(w http.ResponseWriter, r *http.Request) (string, bool) {

@@ -11,11 +11,12 @@ import (
 )
 
 type Repository struct {
-	mu       sync.Mutex
-	users    map[string]authdomain.Identity
-	byLogin  map[string]string
-	sessions map[string]authdomain.Session
-	tenants  map[string][]string
+	mu            sync.Mutex
+	users         map[string]authdomain.Identity
+	byLogin       map[string]string
+	sessions      map[string]authdomain.Session
+	tenants       map[string][]string
+	tenantCatalog map[string]authdomain.Tenant
 }
 
 func NewRepository() *Repository {
@@ -24,6 +25,13 @@ func NewRepository() *Repository {
 		byLogin:  map[string]string{},
 		sessions: map[string]authdomain.Session{},
 		tenants:  map[string][]string{},
+		tenantCatalog: map[string]authdomain.Tenant{
+			"ffffffff-ffff-ffff-ffff-ffffffffffff": {
+				ID:   "ffffffff-ffff-ffff-ffff-ffffffffffff",
+				Name: "System Tenant",
+				Slug: "system",
+			},
+		},
 	}
 }
 
@@ -210,7 +218,7 @@ func (r *Repository) ListUsers(_ context.Context) ([]authdomain.ManagedUser, err
 	return out, nil
 }
 
-func (r *Repository) ListOnlineUsers(_ context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error) {
+func (r *Repository) ListOnlineUsers(_ context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -218,6 +226,9 @@ func (r *Repository) ListOnlineUsers(_ context.Context, activeSince time.Time) (
 	latestByUser := map[string]time.Time{}
 	for _, session := range r.sessions {
 		if session.RevokedAt != nil {
+			continue
+		}
+		if tenantID != "" && session.TenantID != tenantID {
 			continue
 		}
 		if session.ExpiresAt.Before(time.Now().UTC()) {
@@ -334,7 +345,7 @@ func (r *Repository) RolesByUserID(_ context.Context, userID, _ string) ([]iamdo
 		return nil, iamdomain.ErrUserInactive
 	}
 	if len(identity.Roles) == 0 {
-		return nil, iamdomain.ErrUserNotFound
+		return nil, iamdomain.ErrNoRolesAssigned
 	}
 	return append([]iamdomain.Role(nil), identity.Roles...), nil
 }
@@ -382,7 +393,7 @@ func (r *Repository) HasAnyRole(_ context.Context, role iamdomain.Role, _ string
 	return false, nil
 }
 
-func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, roles []iamdomain.Role, _ string) error {
+func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ string, role iamdomain.Role, _ string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -402,7 +413,7 @@ func (r *Repository) ReplaceUserRoles(_ context.Context, userID, displayName, _ 
 	if strings.TrimSpace(displayName) != "" {
 		identity.DisplayName = strings.TrimSpace(displayName)
 	}
-	identity.Roles = append([]iamdomain.Role(nil), roles...)
+	identity.Roles = []iamdomain.Role{role}
 	identity.IsActive = true
 	identity.UpdatedAt = time.Now().UTC()
 	r.users[userID] = identity
@@ -415,6 +426,9 @@ func (r *Repository) SeedUserTenants(userID string, tenantIDs []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.tenants[userID] = append([]string(nil), tenantIDs...)
+	for _, tenantID := range tenantIDs {
+		r.ensureTenantLocked(strings.TrimSpace(tenantID))
+	}
 }
 
 func (r *Repository) GetUserTenants(_ context.Context, userID string) ([]string, error) {
@@ -422,6 +436,16 @@ func (r *Repository) GetUserTenants(_ context.Context, userID string) ([]string,
 	defer r.mu.Unlock()
 	tenants := r.tenants[strings.TrimSpace(userID)]
 	return append([]string(nil), tenants...), nil
+}
+
+func (r *Repository) GetTenantByID(_ context.Context, tenantID string) (authdomain.Tenant, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tenant, ok := r.tenantCatalog[strings.TrimSpace(tenantID)]
+	if !ok {
+		return authdomain.Tenant{}, authdomain.ErrTenantNotFound
+	}
+	return tenant, nil
 }
 
 func cloneIdentity(identity authdomain.Identity) authdomain.Identity {
@@ -436,4 +460,18 @@ func containsRole(roles []iamdomain.Role, want iamdomain.Role) bool {
 		}
 	}
 	return false
+}
+
+func (r *Repository) ensureTenantLocked(tenantID string) {
+	if tenantID == "" {
+		return
+	}
+	if _, ok := r.tenantCatalog[tenantID]; ok {
+		return
+	}
+	r.tenantCatalog[tenantID] = authdomain.Tenant{
+		ID:   tenantID,
+		Name: "Tenant " + tenantID,
+		Slug: strings.ToLower(strings.ReplaceAll(tenantID, "-", "")),
+	}
 }

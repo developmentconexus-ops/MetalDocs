@@ -4,13 +4,14 @@ import (
 	"net/http"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
+	approvalapi "metaldocs/internal/modules/documents/approval/api"
 )
 
-func (h *Handler) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.SubmitDocumentForApprovalParams) {
 	h.SubmitHandler(w, r)
 }
 
-func (h *Handler) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID) {
+func (h *Handler) RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params approvalapi.RecordApprovalStageSignoffParams) {
 	h.SignoffHandler(w, r)
 }
 
@@ -46,7 +47,7 @@ func (h *Handler) ListApprovalInbox(w http.ResponseWriter, r *http.Request) {
 	h.InboxHandler(w, r)
 }
 
-func (h *Handler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.RecordDocumentSignoffParams) {
 	h.SignoffByDocumentHandler(w, r)
 }
 

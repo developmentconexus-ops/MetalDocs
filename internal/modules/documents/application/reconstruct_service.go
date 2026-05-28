@@ -30,7 +30,7 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 	defer func() { _ = tx.Rollback() }()
 
 	ctx = authz.WithCapCache(ctx)
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return fanout.ReconstructionEntry{}, err
 	}
 

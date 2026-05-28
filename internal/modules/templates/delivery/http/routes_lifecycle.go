@@ -22,7 +22,7 @@ func (h *Handler) submitForReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.authz(r, tenantID, "*", "template.edit"); err != nil {
+	if err := h.authz(r, tenantID, "*", "template.submit"); err != nil {
 		writeMappedErr(w, err)
 		return
 	}

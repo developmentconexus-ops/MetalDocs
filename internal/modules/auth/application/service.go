@@ -98,7 +98,7 @@ type createUserTxRepository interface {
 }
 
 type replaceUserRolesTxRepository interface {
-	ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error
+	ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error
 }
 
 type beginTxRepository interface {
@@ -353,6 +353,11 @@ func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.
 			if errors.Is(roleErr, iamdomain.ErrUserNotFound) {
 				continue
 			}
+			if errors.Is(roleErr, iamdomain.ErrNoRolesAssigned) {
+				items[i].Roles = []iamdomain.Role{}
+				filtered = append(filtered, items[i])
+				continue
+			}
 			return nil, roleErr
 		}
 		items[i].Roles = roles
@@ -361,8 +366,8 @@ func (s *Service) ListUsers(ctx context.Context, tenantID string) ([]authdomain.
 	return filtered, nil
 }
 
-func (s *Service) ListOnlineUsers(ctx context.Context, activeSince time.Time) ([]authdomain.OnlineUser, error) {
-	return s.repo.ListOnlineUsers(ctx, activeSince)
+func (s *Service) ListOnlineUsers(ctx context.Context, tenantID string, activeSince time.Time) ([]authdomain.OnlineUser, error) {
+	return s.repo.ListOnlineUsers(ctx, tenantID, activeSince)
 }
 
 func (s *Service) CreateUser(ctx context.Context, userID, username, email, displayName, password, tenantID string, roles []iamdomain.Role, createdBy string) error {
@@ -407,7 +412,7 @@ func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.Crea
 			}
 			return err
 		}
-		if err := roleTx.ReplaceUserRolesTx(ctx, tx, fields.userID, fields.displayName, fields.tenantID, fields.roles, fields.createdBy); err != nil {
+		if err := roleTx.ReplaceUserRolesTx(ctx, tx, fields.userID, fields.displayName, fields.tenantID, fields.role, fields.createdBy); err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil && !errors.Is(rollbackErr, sql.ErrTxDone) {
 				return fmt.Errorf("replace user roles tx: %w (rollback failed: %v)", err, rollbackErr)
 			}
@@ -422,7 +427,7 @@ func (s *Service) CreateUserWithInput(ctx context.Context, input authdomain.Crea
 	if err := s.repo.CreateUser(ctx, params); err != nil {
 		return err
 	}
-	return s.roleAdmin.ReplaceUserRoles(ctx, fields.userID, fields.displayName, fields.tenantID, fields.roles, fields.createdBy)
+	return s.roleAdmin.ReplaceUserRoles(ctx, fields.userID, fields.displayName, fields.tenantID, fields.role, fields.createdBy)
 }
 
 func (s *Service) UpdateUser(ctx context.Context, params authdomain.UpdateUserParams, newPassword string) error {
@@ -515,6 +520,10 @@ func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string)
 	if err != nil {
 		return authdomain.CurrentUser{}, err
 	}
+	tenantRow, err := s.repo.GetTenantByID(ctx, tenantID)
+	if err != nil {
+		return authdomain.CurrentUser{}, err
+	}
 	roles, err := s.roleProvider.RolesByUserID(ctx, userID, tenantID)
 	if err != nil {
 		return authdomain.CurrentUser{}, err
@@ -522,6 +531,7 @@ func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string)
 	return authdomain.CurrentUser{
 		UserID:             identity.UserID,
 		TenantID:           tenantID,
+		TenantName:         tenantRow.Name,
 		Username:           identity.Username,
 		Email:              identity.Email,
 		DisplayName:        identity.DisplayName,
@@ -556,7 +566,7 @@ type createUserFields struct {
 	displayName string
 	password    string
 	tenantID    string
-	roles       []iamdomain.Role
+	role        iamdomain.Role
 	createdBy   string
 }
 
@@ -568,7 +578,6 @@ func (s *Service) normalizeCreateUserInput(input authdomain.CreateUserInput) (cr
 		displayName: strings.TrimSpace(input.DisplayName),
 		password:    string(input.Password),
 		tenantID:    strings.TrimSpace(input.TenantID.String()),
-		roles:       input.Roles,
 		createdBy:   strings.TrimSpace(input.CreatedBy),
 	}
 	if fields.userID == "" {
@@ -583,6 +592,13 @@ func (s *Service) normalizeCreateUserInput(input authdomain.CreateUserInput) (cr
 	if fields.createdBy == "" {
 		fields.createdBy = "system"
 	}
+	if len(input.Roles) != 1 {
+		return createUserFields{}, iamdomain.ErrInvalidRole
+	}
+	if !iamdomain.IsValidRole(input.Roles[0]) {
+		return createUserFields{}, iamdomain.ErrInvalidRole
+	}
+	fields.role = input.Roles[0]
 	if err := s.validatePassword(fields.password); err != nil {
 		return createUserFields{}, err
 	}

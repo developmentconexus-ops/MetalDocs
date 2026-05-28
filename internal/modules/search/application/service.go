@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"errors"
-	"sort"
 	"strings"
 
 	"metaldocs/internal/modules/search/domain"
@@ -43,90 +42,33 @@ func (s *Service) SearchDocuments(ctx context.Context, q domain.Query) ([]domain
 	limit := effectiveLimit(q.Limit)
 
 	normalized.Limit = q.Limit
-	docs, err := s.reader.ListDocuments(ctx, normalized, limit)
-	if err != nil {
-		return nil, err
-	}
-	// TODO(search): push filtering into the DB reader so tenant-sized result sets
-	// do not require a full in-memory scan before authz and limit trimming.
-
-	text := strings.ToLower(strings.TrimSpace(normalized.Text))
-	documentType := strings.ToLower(strings.TrimSpace(normalized.DocumentType))
-	documentProfile := strings.ToLower(strings.TrimSpace(normalized.DocumentProfile))
-	documentFamily := strings.ToLower(strings.TrimSpace(normalized.DocumentFamily))
-	processArea := strings.ToLower(strings.TrimSpace(normalized.ProcessArea))
-	subject := strings.ToLower(strings.TrimSpace(normalized.Subject))
-	ownerID := strings.TrimSpace(normalized.OwnerID)
-	businessUnit := strings.TrimSpace(normalized.BusinessUnit)
-	department := strings.TrimSpace(normalized.Department)
-	classification := strings.ToUpper(strings.TrimSpace(string(normalized.Classification)))
-	status := strings.ToUpper(strings.TrimSpace(string(normalized.Status)))
-	tag := strings.ToLower(strings.TrimSpace(normalized.Tag))
-
-	filtered := make([]domain.Document, 0, len(docs))
-	for _, doc := range docs {
-		allowed, err := s.canView(ctx, doc)
+	filtered := make([]domain.Document, 0, limit)
+	offset := 0
+	for len(filtered) < limit {
+		docs, err := s.reader.ListDocuments(ctx, normalized, limit, offset)
 		if err != nil {
 			return nil, err
 		}
-		if !allowed {
-			continue
+		if len(docs) == 0 {
+			break
 		}
-		if text != "" && !strings.Contains(strings.ToLower(doc.Title), text) {
-			continue
-		}
-		if documentType != "" && strings.ToLower(doc.DocumentType) != documentType {
-			continue
-		}
-		if documentProfile != "" && strings.ToLower(doc.DocumentProfile) != documentProfile {
-			continue
-		}
-		if documentFamily != "" && strings.ToLower(doc.DocumentFamily) != documentFamily {
-			continue
-		}
-		if processArea != "" && strings.ToLower(doc.ProcessArea) != processArea {
-			continue
-		}
-		if subject != "" && strings.ToLower(doc.Subject) != subject {
-			continue
-		}
-		if ownerID != "" && doc.OwnerID != ownerID {
-			continue
-		}
-		if businessUnit != "" && doc.BusinessUnit != businessUnit {
-			continue
-		}
-		if department != "" && doc.Department != department {
-			continue
-		}
-		if classification != "" && strings.ToUpper(string(doc.Classification)) != classification {
-			continue
-		}
-		if status != "" && strings.ToUpper(string(doc.Status)) != status {
-			continue
-		}
-		if tag != "" && !hasTag(doc.Tags, tag) {
-			continue
-		}
-		if normalized.ExpiryBefore != nil {
-			if doc.ExpiryAt == nil || doc.ExpiryAt.After(normalized.ExpiryBefore.UTC()) {
+		for _, doc := range docs {
+			allowed, err := s.canView(ctx, doc)
+			if err != nil {
+				return nil, err
+			}
+			if !allowed {
 				continue
 			}
-		}
-		if normalized.ExpiryAfter != nil {
-			if doc.ExpiryAt == nil || doc.ExpiryAt.Before(normalized.ExpiryAfter.UTC()) {
-				continue
+			filtered = append(filtered, doc)
+			if len(filtered) == limit {
+				break
 			}
 		}
-		filtered = append(filtered, doc)
-	}
-
-	sort.Slice(filtered, func(i, j int) bool {
-		return filtered[i].CreatedAt.After(filtered[j].CreatedAt)
-	})
-
-	if len(filtered) > limit {
-		filtered = filtered[:limit]
+		if len(docs) < limit {
+			break
+		}
+		offset += len(docs)
 	}
 
 	return filtered, nil
@@ -154,7 +96,15 @@ func (s *Service) policiesForDocument(ctx context.Context, doc domain.Document) 
 	}{
 		{scope: searchScopeDocument, id: doc.ID},
 		{scope: searchScopeDocumentType, id: doc.DocumentProfile},
-		{scope: searchScopeArea, id: areaResourceID(doc.BusinessUnit, doc.Department)},
+	}
+	for _, areaID := range areaPolicyResourceIDs(doc) {
+		scopes = append(scopes, struct {
+			scope string
+			id    string
+		}{
+			scope: searchScopeArea,
+			id:    areaID,
+		})
 	}
 
 	var out []domain.AccessPolicy
@@ -228,14 +178,28 @@ func matchesPolicySubject(item domain.AccessPolicy, userID string, rolesSet map[
 }
 
 func areaResourceID(businessUnit, department string) string {
-	return strings.TrimSpace(businessUnit) + ":" + strings.TrimSpace(department)
+	normalizedBusinessUnit := strings.TrimSpace(businessUnit)
+	normalizedDepartment := strings.TrimSpace(department)
+	if normalizedBusinessUnit == "" || normalizedDepartment == "" {
+		return ""
+	}
+	return normalizedBusinessUnit + ":" + normalizedDepartment
 }
 
-func hasTag(tags []string, expected string) bool {
-	for _, tag := range tags {
-		if strings.EqualFold(strings.TrimSpace(tag), expected) {
-			return true
+func areaPolicyResourceIDs(doc domain.Document) []string {
+	candidates := []string{doc.BusinessUnit, doc.ProcessArea}
+	out := make([]string, 0, len(candidates))
+	seen := map[string]struct{}{}
+	for _, candidate := range candidates {
+		id := areaResourceID(candidate, doc.Department)
+		if id == "" {
+			continue
 		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
 	}
-	return false
+	return out
 }

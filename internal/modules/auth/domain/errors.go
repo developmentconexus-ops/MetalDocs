@@ -19,4 +19,5 @@ var (
 	// ErrTenantClaimRequired is returned when the user belongs to multiple tenants
 	// and no X-Tenant-ID claim was provided at login.
 	ErrTenantClaimRequired = errors.New("auth tenant claim required")
+	ErrTenantNotFound      = errors.New("auth tenant not found")
 )

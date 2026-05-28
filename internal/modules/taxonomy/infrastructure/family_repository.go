@@ -193,6 +193,9 @@ func (r *FamilyRepository) GetByCodeForUpdate(ctx context.Context, tx domain.Fam
 	if err := setAuthzGUC(ctx, sqlTx.tx); err != nil {
 		return nil, fmt.Errorf("query family for update %q: %w", code, err)
 	}
+	if err := authz.Require(ctx, sqlTx.tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+		return nil, fmt.Errorf("taxonomy: authz check Get family for update: %w", err)
+	}
 	const q = `
 SELECT code, name, description, is_active, created_at
 FROM metaldocs.document_families

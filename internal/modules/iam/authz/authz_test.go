@@ -16,6 +16,7 @@ import (
 
 type authzTestState struct {
 	granted         bool
+	isAdmin         bool
 	actorID         string
 	tenantID        string
 	assertedCaps    string
@@ -63,7 +64,12 @@ func (c *authzTestConn) ExecContext(_ context.Context, query string, args []driv
 
 func (c *authzTestConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
 	switch {
-	case strings.Contains(query, "SELECT EXISTS"):
+	case strings.Contains(query, "SELECT EXISTS") && strings.Contains(query, "role_code = 'system_admin'"):
+		return &authzTestRows{
+			columns: []string{"exists"},
+			rows:    [][]driver.Value{{c.state.isAdmin}},
+		}, nil
+	case strings.Contains(query, "SELECT EXISTS") && strings.Contains(query, "role_capabilities"):
 		c.state.requireQueries++
 		return &authzTestRows{
 			columns: []string{"exists"},
@@ -198,6 +204,64 @@ func TestRequire_CacheHit(t *testing.T) {
 	}
 	if state.requireQueries != 1 {
 		t.Fatalf("require query count = %d, want 1", state.requireQueries)
+	}
+}
+
+func TestRequire_CacheScopedPerTxActorAndTenant(t *testing.T) {
+	state := &authzTestState{
+		granted:      true,
+		actorID:      "actor-1",
+		tenantID:     tenant.DevTenantID,
+		assertedCaps: `[]`,
+	}
+	db, tx1 := openAuthzTestDB(t, state)
+	ctx := WithCapCache(context.Background())
+
+	if err := Require(ctx, tx1, "doc.signoff", "AREA3"); err != nil {
+		t.Fatalf("first Require: %v", err)
+	}
+
+	state.granted = false
+	state.actorID = "actor-2"
+	state.tenantID = "00000000-0000-0000-0000-000000000042"
+
+	tx2, err := db.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("BeginTx tx2: %v", err)
+	}
+	t.Cleanup(func() { _ = tx2.Rollback() })
+
+	err = Require(ctx, tx2, "doc.signoff", "AREA3")
+	if err == nil {
+		t.Fatal("second Require returned nil, want ErrCapDenied")
+	}
+	var denied ErrCapDenied
+	if !errors.As(err, &denied) {
+		t.Fatalf("second Require error = %T %v, want ErrCapDenied", err, err)
+	}
+	if denied.ActorID != "actor-2" {
+		t.Fatalf("denied actor = %q, want actor-2", denied.ActorID)
+	}
+	if state.requireQueries != 2 {
+		t.Fatalf("require query count = %d, want 2", state.requireQueries)
+	}
+}
+
+func TestRequire_GroupSystemAdminBypasses(t *testing.T) {
+	state := &authzTestState{
+		granted:      false,
+		isAdmin:      true,
+		actorID:      "actor-admin",
+		tenantID:     tenant.DevTenantID,
+		assertedCaps: `[]`,
+	}
+	_, tx := openAuthzTestDB(t, state)
+
+	if err := Require(WithCapCache(context.Background()), tx, "does.not.exist", "AREA9"); err != nil {
+		t.Fatalf("group system_admin bypass returned error: %v", err)
+	}
+	if state.requireQueries != 0 {
+		t.Fatalf("require query count = %d, want 0 when bypassed before capability query", state.requireQueries)
 	}
 }
 

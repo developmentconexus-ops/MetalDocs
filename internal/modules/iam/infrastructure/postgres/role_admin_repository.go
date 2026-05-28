@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -41,6 +40,10 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(ctx context.Context, userI
 		return fmt.Errorf("begin iam tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, assignedBy); err != nil {
+		return fmt.Errorf("seed iam user.manage authorization: %w", err)
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
 		return fmt.Errorf("require iam user.manage authorization: %w", err)
 	}
@@ -76,19 +79,23 @@ VALUES ($1, $2::uuid, $3, NOW(), $4)
 }
 
 // ReplaceUserRoles writes the user+role assignments.
-func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
+func (r *RoleAdminRepository) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin iam replace tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := r.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, roles, assignedBy); err != nil {
+	if err := r.ReplaceUserRolesTx(ctx, tx, userID, displayName, tenantID, role, assignedBy); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func (r *RoleAdminRepository) ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, roles []iamdomain.Role, assignedBy string) error {
+func (r *RoleAdminRepository) ReplaceUserRolesTx(ctx context.Context, tx *sql.Tx, userID, displayName, tenantID string, role iamdomain.Role, assignedBy string) error {
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, assignedBy); err != nil {
+		return fmt.Errorf("seed iam user.manage authorization: %w", err)
+	}
 	if err := authz.Require(ctx, tx, string(iamdomain.CapUserManage), "tenant"); err != nil {
 		return fmt.Errorf("require iam user.manage authorization: %w", err)
 	}
@@ -110,29 +117,11 @@ DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = NOW()
 		return fmt.Errorf("delete prior iam roles: %w", err)
 	}
 
-	roleCodes := make([]string, 0, len(roles))
-	seen := map[string]struct{}{}
-	for _, role := range roles {
-		if code := strings.TrimSpace(string(role)); code != "" {
-			if _, ok := seen[code]; ok {
-				continue
-			}
-			seen[code] = struct{}{}
-			roleCodes = append(roleCodes, code)
-		}
-	}
-	if len(roleCodes) == 0 {
-		return nil
-	}
-
-	for _, roleCode := range roleCodes {
-		if _, err := tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 INSERT INTO metaldocs.iam_user_roles (user_id, tenant_id, role_code, assigned_at, assigned_by)
 VALUES ($1, $2::uuid, $3, NOW(), $4)
-ON CONFLICT (user_id, role_code) DO NOTHING
-`, userID, tenantID, roleCode, assignedBy); err != nil {
-			return fmt.Errorf("insert iam role: %w", err)
-		}
+`, userID, tenantID, string(role), assignedBy); err != nil {
+		return fmt.Errorf("insert iam role: %w", err)
 	}
 	return nil
 }

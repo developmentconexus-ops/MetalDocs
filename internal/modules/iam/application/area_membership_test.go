@@ -16,6 +16,7 @@ type userAreaWriteRepoStub struct {
 	insertCalls      int
 	grantAtomicCalls int
 	closedAt         time.Time
+	closedActorID    string
 	inserted         domain.UserProcessArea
 	atomicOld        domain.UserProcessArea
 	atomicNew        domain.UserProcessArea
@@ -38,12 +39,13 @@ func (s *userAreaWriteRepoStub) Insert(ctx context.Context, membership domain.Us
 	return nil
 }
 
-func (s *userAreaWriteRepoStub) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time) error {
+func (s *userAreaWriteRepoStub) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	if s.closeActiveErr != nil {
 		return s.closeActiveErr
 	}
 	s.closeCalls++
 	s.closedAt = effectiveTo
+	s.closedActorID = actorID
 	return nil
 }
 

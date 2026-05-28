@@ -34,11 +34,11 @@ type SearchDocumentResponse struct {
 	ProcessArea      string   `json:"processArea,omitempty"`
 	Subject          string   `json:"subject,omitempty"`
 	OwnerID          string   `json:"ownerId"`
-	BusinessUnit     string   `json:"businessUnit"`
-	Department       string   `json:"department"`
-	Classification   string   `json:"classification"`
+	BusinessUnit     string   `json:"businessUnit,omitempty"`
+	Department       string   `json:"department,omitempty"`
+	Classification   string   `json:"classification,omitempty"`
 	Status           string   `json:"status"`
-	Tags             []string `json:"tags"`
+	Tags             []string `json:"tags,omitempty"`
 	EffectiveAt      string   `json:"effectiveAt,omitempty"`
 	ExpiryAt         string   `json:"expiryAt,omitempty"`
 	CreatedAt        string   `json:"createdAt"`

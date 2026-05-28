@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/repository"
@@ -45,6 +46,8 @@ type ScheduledPublishJobInput struct {
 type ScheduledPublishEnqueuer interface {
 	EnqueueScheduledPublishTx(ctx context.Context, tx *sql.Tx, input ScheduledPublishJobInput) error
 }
+
+var ErrContentHashMismatch = errors.New("approval: content hash mismatch")
 
 // NewServices constructs a fully wired Services value.
 func NewServices(repo repository.ApprovalRepository, emitter EventEmitter, clock Clock) *Services {

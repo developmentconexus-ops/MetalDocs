@@ -32,7 +32,7 @@ func (r *TemplatesSnapshotReader) LoadForSnapshot(ctx context.Context, tenantID,
 		  FROM templates_template_version tv
 		  JOIN templates_template tpl ON tpl.id = tv.template_id
 		 WHERE tv.id = $1::uuid
-		   AND tpl.tenant_id = $2
+		   AND tpl.tenant_id = $2::uuid
 		   AND tv.status = 'published'`,
 		templateVersionID, tenantID,
 	).Scan(&phJSON, &docxKey)

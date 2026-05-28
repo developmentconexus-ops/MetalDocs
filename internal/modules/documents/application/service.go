@@ -31,15 +31,15 @@ type Repository interface {
 	CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain.Document, initialContentHash, initialStorageKey string, requiredPlaceholders []templatesdomain.Placeholder) (docID, revID, sessionID string, err error)
 	SetRevisionStorageKey(ctx context.Context, revID, storageKey string) error
 	GetDocument(ctx context.Context, tenantID, id string) (*domain.Document, error)
-	UpdateDocumentName(ctx context.Context, tenantID, docID, name string) error
-	UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, docID, name string) error
+	UpdateDocumentName(ctx context.Context, tenantID, actorID, docID, name string) error
+	UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenantID, actorID, docID, name string) error
 	ListDocuments(ctx context.Context, tenantID string) ([]domain.Document, error)
 	ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error)
 	ListDocumentsPaginated(ctx context.Context, tenantID string, opts ListOptions) ([]*domain.Document, error)
 	CountDocuments(ctx context.Context, tenantID string, opts ListOptions) (int64, error)
 	StatsByStatus(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
 	StatsByArea(ctx context.Context, tenantID string, opts ListOptions) (map[string]int64, error)
-	UpdateDocumentStatus(ctx context.Context, tenantID, id string, cur, next domain.DocumentStatus, stampTime bool) error
+	UpdateDocumentStatus(ctx context.Context, tenantID, actorID, id string, cur, next domain.DocumentStatus, stampTime bool) error
 	MarkArchived(ctx context.Context, tenantID, docID, actorID string) error
 	IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error)
 	AcquireSession(ctx context.Context, tenantID, docID, userID string) (*domain.Session, error)
@@ -612,7 +612,7 @@ func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, n
 		return domain.ErrInvalidStateTransition
 	}
 	if s.db == nil {
-		if err := s.repo.UpdateDocumentName(ctx, tenantID, docID, name); err != nil {
+		if err := s.repo.UpdateDocumentName(ctx, tenantID, userID, docID, name); err != nil {
 			return err
 		}
 		s.audit.Write(ctx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name})
@@ -623,7 +623,7 @@ func (s *Service) RenameDocument(ctx context.Context, tenantID, userID, docID, n
 		return fmt.Errorf("rename document: begin tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := s.repo.UpdateDocumentNameTx(ctx, tx, tenantID, docID, name); err != nil {
+	if err := s.repo.UpdateDocumentNameTx(ctx, tx, tenantID, userID, docID, name); err != nil {
 		return err
 	}
 	if err := s.audit.WriteTx(ctx, tx, tenantID, userID, "document.renamed", docID, map[string]any{"name": name}); err != nil {
@@ -887,7 +887,7 @@ func (s *Service) RestoreCheckpoint(ctx context.Context, tenantID, docID, actorI
 }
 
 func (s *Service) Finalize(ctx context.Context, tenantID, docID, actorID string) error {
-	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, docID, domain.DocStatusDraft, domain.DocStatusUnderReview, true); err != nil {
+	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, actorID, docID, domain.DocStatusDraft, domain.DocStatusUnderReview, true); err != nil {
 		return err
 	}
 	s.audit.Write(ctx, tenantID, actorID, "document.finalized", docID, nil)

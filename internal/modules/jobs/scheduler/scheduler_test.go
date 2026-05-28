@@ -375,7 +375,7 @@ func TestScheduler_BackpressureSkip(t *testing.T) {
 	if got := runs.Load(); got != 2 {
 		t.Fatalf("runs = %d; want 2 (ticks 3+4 skipped once hysteresis threshold met)", got)
 	}
-	if got := s.Metrics.SkipsTotal["bp-skip"]; got < 1 {
+	if got := s.MetricsSnapshot().SkipsTotal["bp-skip"]; got < 1 {
 		t.Fatalf("SkipsTotal = %d; want >= 1", got)
 	}
 }
@@ -463,7 +463,43 @@ func TestScheduler_Metrics_IncrementOnRun(t *testing.T) {
 
 	s.Start(ctx)
 
-	if got := s.Metrics.RunsTotal["metrics"]; got != 1 {
+	if got := s.MetricsSnapshot().RunsTotal["metrics"]; got != 1 {
 		t.Fatalf("RunsTotal[metrics] = %d; want 1", got)
+	}
+}
+
+func TestScheduler_MetricsSnapshot_IsolatedFromMutation(t *testing.T) {
+	state := &fakeSchedulerDB{
+		acquireResults:  []leaseAcquireResult{{acquired: true, epoch: 13}},
+		pressureResults: []pressureSample{{active: 1, max: 100}},
+	}
+	db := newFakeSchedulerDB(t, state)
+	s := newTestScheduler(db)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s.Register(JobConfig{
+		Name:     "snapshot",
+		Interval: 5 * time.Millisecond,
+		Policy:   SkipOnPressure,
+		Fn: func(_ context.Context, _ int64) error {
+			cancel()
+			return nil
+		},
+	})
+
+	s.Start(ctx)
+
+	snapshot := s.MetricsSnapshot()
+	snapshot.RunsTotal["snapshot"] = 99
+	snapshot.SkipsTotal["new"] = 77
+
+	after := s.MetricsSnapshot()
+	if got := after.RunsTotal["snapshot"]; got != 1 {
+		t.Fatalf("RunsTotal[snapshot] = %d, want 1", got)
+	}
+	if got := after.SkipsTotal["new"]; got != 0 {
+		t.Fatalf("SkipsTotal[new] = %d, want 0", got)
 	}
 }

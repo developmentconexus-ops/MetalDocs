@@ -301,10 +301,20 @@ func expectTemplateAuthz(mock sqlmock.Sqlmock, actorID, tenantID, capability str
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
 )`)).
 		WithArgs(actorID, tenantID).
 		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))

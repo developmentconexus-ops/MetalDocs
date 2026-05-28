@@ -2,6 +2,7 @@ package httpdelivery
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 
@@ -68,6 +69,7 @@ func (m *Middleware) Wrap(next http.Handler) http.Handler {
 				_ = problem.Write(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
 				return
 			}
+			log.Printf("auth resolve session failed: %v", err)
 			_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Authentication failed"))
 			return
 		}

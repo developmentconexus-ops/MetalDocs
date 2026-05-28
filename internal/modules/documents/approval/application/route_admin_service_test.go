@@ -63,6 +63,9 @@ func (s *routeAdminStmt) Exec(_ []driver.Value) (driver.Result, error) {
 		if s.conn.deactivateErr != nil {
 			return nil, s.conn.deactivateErr
 		}
+		if s.conn.deactivateNoRows {
+			return routeAdminResult{rowsAffected: 0}, nil
+		}
 		return routeAdminResult{rowsAffected: 1}, nil
 	}
 	return routeAdminResult{rowsAffected: 1}, nil
@@ -100,16 +103,19 @@ func (s *routeAdminStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	}
 	if strings.Contains(lower, "from approval_routes") && strings.Contains(lower, "for update") {
 		if !s.conn.routeExists {
-			return routeAdminEmptyRows{cols: []string{"id"}}, nil
+			return routeAdminEmptyRows{cols: []string{"id", "version", "active"}}, nil
 		}
 		return &routeAdminRows{
-			cols:   []string{"id"},
-			values: []driver.Value{s.conn.lockedRouteID},
+			cols:   []string{"id", "version", "active"},
+			values: []driver.Value{s.conn.lockedRouteID, int64(s.conn.lockedRouteVersion), s.conn.lockedRouteActive},
 		}, nil
 	}
 	if strings.Contains(lower, "update approval_routes") && strings.Contains(lower, "returning version") {
 		if s.conn.updateErr != nil {
 			return nil, s.conn.updateErr
+		}
+		if s.conn.updateNoRows {
+			return routeAdminEmptyRows{cols: []string{"version"}}, nil
 		}
 		return &routeAdminRows{
 			cols:   []string{"version"},
@@ -120,15 +126,20 @@ func (s *routeAdminStmt) Query(_ []driver.Value) (driver.Rows, error) {
 }
 
 type routeAdminConn struct {
-	authzGranted   bool
-	actorID        string
-	tenantID       string
-	createdRouteID string
-	lockedRouteID  string
-	routeExists    bool
-	newVersion     int
-	updateErr      error
-	deactivateErr  error
+	authzGranted        bool
+	actorID             string
+	tenantID            string
+	createdRouteID      string
+	lockedRouteID       string
+	lockedRouteVersion  int
+	lockedRouteActive   bool
+	lockedRouteStateSet bool
+	routeExists         bool
+	newVersion          int
+	updateErr           error
+	deactivateErr       error
+	updateNoRows        bool
+	deactivateNoRows    bool
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -156,6 +167,12 @@ func newRouteAdminTestDB(t *testing.T, conn *routeAdminConn) *sql.DB {
 	}
 	if conn.lockedRouteID == "" {
 		conn.lockedRouteID = "route-1"
+	}
+	if conn.lockedRouteVersion == 0 {
+		conn.lockedRouteVersion = 2
+	}
+	if !conn.lockedRouteStateSet {
+		conn.lockedRouteActive = true
 	}
 	if conn.newVersion == 0 {
 		conn.newVersion = 2
@@ -283,11 +300,12 @@ func TestRouteAdminUpdate_HappyPath(t *testing.T) {
 	}
 
 	out, err := svc.Update(context.Background(), db, UpdateRouteInput{
-		TenantID:    "tenant-1",
-		RouteID:     "route-1",
-		Name:        "PO Route v2",
-		ActorUserID: "user-1",
-		Stages:      validRouteStages(),
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		Name:            "PO Route v2",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 3,
+		Stages:          validRouteStages(),
 	})
 	if err != nil {
 		t.Fatalf("Update: unexpected error: %v", err)
@@ -320,11 +338,12 @@ func TestRouteAdminUpdate_RouteInUse(t *testing.T) {
 	}
 
 	_, err := svc.Update(context.Background(), db, UpdateRouteInput{
-		TenantID:    "tenant-1",
-		RouteID:     "route-1",
-		Name:        "PO Route v2",
-		ActorUserID: "user-1",
-		Stages:      validRouteStages(),
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		Name:            "PO Route v2",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 3,
+		Stages:          validRouteStages(),
 	})
 	if !errors.Is(err, repository.ErrRouteInUse) {
 		t.Fatalf("expected ErrRouteInUse; got %v", err)
@@ -345,9 +364,10 @@ func TestRouteAdminDeactivate_HappyPath(t *testing.T) {
 	}
 
 	out, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
-		TenantID:    "tenant-1",
-		RouteID:     "route-1",
-		ActorUserID: "user-1",
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 2,
 	})
 	if err != nil {
 		t.Fatalf("Deactivate: unexpected error: %v", err)
@@ -357,5 +377,81 @@ func TestRouteAdminDeactivate_HappyPath(t *testing.T) {
 	}
 	if len(emitter.Events) != 1 || emitter.Events[0].EventType != "route.config.deactivated" {
 		t.Errorf("expected 1 route.config.deactivated event; got %v", emitter.Events)
+	}
+}
+
+func TestRouteAdminUpdate_StaleVersion(t *testing.T) {
+	conn := &routeAdminConn{
+		authzGranted: true,
+		routeExists:  true,
+		updateNoRows: true,
+	}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Update(context.Background(), db, UpdateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		Name:            "PO Route v2",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 9,
+		Stages:          validRouteStages(),
+	})
+	if !errors.Is(err, repository.ErrStaleRevision) {
+		t.Fatalf("expected ErrStaleRevision; got %v", err)
+	}
+}
+
+func TestRouteAdminDeactivate_StaleVersion(t *testing.T) {
+	conn := &routeAdminConn{
+		authzGranted:     true,
+		routeExists:      true,
+		deactivateNoRows: true,
+	}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 5,
+	})
+	if !errors.Is(err, repository.ErrStaleRevision) {
+		t.Fatalf("expected ErrStaleRevision; got %v", err)
+	}
+}
+
+func TestRouteAdminDeactivate_AlreadyInactive(t *testing.T) {
+	conn := &routeAdminConn{
+		authzGranted:        true,
+		routeExists:         true,
+		lockedRouteVersion:  5,
+		lockedRouteActive:   false,
+		lockedRouteStateSet: true,
+	}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 5,
+	})
+	if !errors.Is(err, ErrRouteAlreadyInactive) {
+		t.Fatalf("expected ErrRouteAlreadyInactive; got %v", err)
 	}
 }

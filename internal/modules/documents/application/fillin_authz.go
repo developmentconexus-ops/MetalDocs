@@ -22,7 +22,7 @@ func requireDocEditDraft(ctx context.Context, db *sql.DB, tenantID, actorID, doc
 
 	ctx = authz.WithCapCache(ctx)
 
-	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
 	areaCode, err := loadDocumentAreaCode(ctx, tx, tenantID, docID)
@@ -30,16 +30,6 @@ func requireDocEditDraft(ctx context.Context, db *sql.DB, tenantID, actorID, doc
 		return fmt.Errorf("fillin authz: load area: %w", err)
 	}
 	return authz.Require(ctx, tx, "doc.edit_draft", areaCode)
-}
-
-func setAuthzGUC(ctx context.Context, tx *sql.Tx, tenantID, actorID string) error {
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
-		return fmt.Errorf("set tenant GUC: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", actorID); err != nil {
-		return fmt.Errorf("set actor GUC: %w", err)
-	}
-	return nil
 }
 
 func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	authdomain "metaldocs/internal/modules/auth/domain"
+	"metaldocs/internal/platform/requesttrace"
 )
 
 type routeMetrics struct {
@@ -57,6 +58,12 @@ func NewHTTPObservability(runtimeProvider ...RuntimeStatusProvider) *HTTPObserva
 
 func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traceID, ok := requesttrace.Normalize(r.Header.Get("X-Trace-Id"))
+		if !ok {
+			traceID = requesttrace.Resolve(nil)
+		}
+		r = r.WithContext(requesttrace.WithTraceID(r.Context(), traceID))
+
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
@@ -79,10 +86,6 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 		atomic.AddUint64(&m.durationMs, durationMs)
 		m.record(durationMs)
 
-		traceID := strings.TrimSpace(r.Header.Get("X-Trace-Id"))
-		if traceID == "" {
-			traceID = "trace-local"
-		}
 		userID := "anonymous"
 		if currentUser, ok := authdomain.CurrentUserFromContext(r.Context()); ok && strings.TrimSpace(currentUser.UserID) != "" {
 			userID = currentUser.UserID

@@ -24,7 +24,7 @@ func (f fakeUserAreaWriteRepository) Insert(ctx context.Context, membership iamd
 	return nil
 }
 
-func (f fakeUserAreaWriteRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time) error {
+func (f fakeUserAreaWriteRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
 	return nil
 }
 

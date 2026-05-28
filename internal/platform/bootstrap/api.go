@@ -59,10 +59,12 @@ type bucketEnsurer interface {
 }
 
 func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg config.AttachmentsConfig) (APIDependencies, error) {
-	gotenbergCfg := config.LoadGotenbergConfig()
+	gotenbergCfg, err := config.LoadGotenbergConfig()
+	if err != nil {
+		return APIDependencies{}, fmt.Errorf("load gotenberg config: %w", err)
+	}
 	var gotenbergClient *gotenberg.Client
 	if gotenbergCfg.Enabled {
-		var err error
 		gotenbergClient, err = gotenberg.NewClient(gotenbergCfg.URL)
 		if err != nil {
 			return APIDependencies{}, err

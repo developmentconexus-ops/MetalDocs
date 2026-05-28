@@ -22,6 +22,9 @@ type RouteAdminService struct {
 // ErrRouteNotFound is returned when a route does not exist for the tenant.
 var ErrRouteNotFound = errors.New("route_admin: route not found")
 
+// ErrRouteAlreadyInactive is returned when the route is already inactive.
+var ErrRouteAlreadyInactive = errors.New("route_admin: route already inactive")
+
 // CreateRouteInput carries all inputs for Create.
 type CreateRouteInput struct {
 	TenantID    string
@@ -38,11 +41,12 @@ type CreateRouteResult struct {
 
 // UpdateRouteInput carries all inputs for Update.
 type UpdateRouteInput struct {
-	TenantID    string
-	RouteID     string
-	Name        string
-	ActorUserID string
-	Stages      []domain.Stage
+	TenantID        string
+	RouteID         string
+	Name            string
+	ActorUserID     string
+	ExpectedVersion int
+	Stages          []domain.Stage
 }
 
 // UpdateRouteResult is returned on successful route update.
@@ -53,9 +57,10 @@ type UpdateRouteResult struct {
 
 // DeactivateRouteInput carries all inputs for Deactivate.
 type DeactivateRouteInput struct {
-	TenantID    string
-	RouteID     string
-	ActorUserID string
+	TenantID        string
+	RouteID         string
+	ActorUserID     string
+	ExpectedVersion int
 }
 
 // DeactivateRouteResult is returned on successful route deactivation.
@@ -155,7 +160,7 @@ func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRou
 		return UpdateRouteResult{}, err
 	}
 
-	if err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID); err != nil {
+	if _, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID); err != nil {
 		_ = tx.Rollback()
 		return UpdateRouteResult{}, err
 	}
@@ -177,11 +182,15 @@ func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRou
 		       version = version + 1
 		 WHERE id = $2
 		   AND tenant_id = $3
+		   AND ($4 = 0 OR version = $4)
 		RETURNING version`,
-		in.Name, in.RouteID, in.TenantID,
+		in.Name, in.RouteID, in.TenantID, in.ExpectedVersion,
 	).Scan(&newVersion)
 	if err != nil {
 		_ = tx.Rollback()
+		if errors.Is(err, sql.ErrNoRows) {
+			return UpdateRouteResult{}, repository.ErrStaleRevision
+		}
 		mapped := repository.MapPgError(err, repository.MapHints{})
 		if errors.Is(mapped, repository.ErrRouteInUse) {
 			return UpdateRouteResult{}, mapped
@@ -248,24 +257,46 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 		return DeactivateRouteResult{}, err
 	}
 
-	if err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID); err != nil {
+	lockedRoute, err := lockRouteForUpdate(ctx, tx, in.TenantID, in.RouteID)
+	if err != nil {
 		_ = tx.Rollback()
 		return DeactivateRouteResult{}, err
 	}
+	if !lockedRoute.Active {
+		if in.ExpectedVersion > 0 && lockedRoute.Version != in.ExpectedVersion {
+			_ = tx.Rollback()
+			return DeactivateRouteResult{}, repository.ErrStaleRevision
+		}
+		_ = tx.Rollback()
+		return DeactivateRouteResult{}, ErrRouteAlreadyInactive
+	}
 
-	if _, err := tx.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 		UPDATE approval_routes
-		   SET active = FALSE
+		   SET active = FALSE,
+		       version = version + 1
 		 WHERE id = $1
-		   AND tenant_id = $2`,
-		in.RouteID, in.TenantID,
-	); err != nil {
+		   AND tenant_id = $2
+		   AND active = TRUE
+		   AND ($3 = 0 OR version = $3)`,
+		in.RouteID, in.TenantID, in.ExpectedVersion,
+	)
+	if err != nil {
 		_ = tx.Rollback()
 		mapped := repository.MapPgError(err, repository.MapHints{})
 		if errors.Is(mapped, repository.ErrRouteInUse) {
 			return DeactivateRouteResult{}, mapped
 		}
 		return DeactivateRouteResult{}, fmt.Errorf("route_admin: deactivate route: %w", mapped)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return DeactivateRouteResult{}, fmt.Errorf("route_admin: deactivate route rows affected: %w", err)
+	}
+	if rows == 0 {
+		_ = tx.Rollback()
+		return DeactivateRouteResult{}, repository.ErrStaleRevision
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -295,23 +326,29 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 	return DeactivateRouteResult{RouteID: in.RouteID}, nil
 }
 
-func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID string) error {
-	var lockedID string
+type lockedRouteState struct {
+	ID      string
+	Version int
+	Active  bool
+}
+
+func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID string) (lockedRouteState, error) {
+	var state lockedRouteState
 	err := tx.QueryRowContext(ctx, `
-		SELECT id
+		SELECT id, version, active
 		  FROM approval_routes
 		 WHERE id = $1
 		   AND tenant_id = $2
 		 FOR UPDATE`,
 		routeID, tenantID,
-	).Scan(&lockedID)
+	).Scan(&state.ID, &state.Version, &state.Active)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrRouteNotFound
+			return lockedRouteState{}, ErrRouteNotFound
 		}
-		return fmt.Errorf("route_admin: lock route: %w", err)
+		return lockedRouteState{}, fmt.Errorf("route_admin: lock route: %w", err)
 	}
-	return nil
+	return state, nil
 }
 
 func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages []domain.Stage) error {

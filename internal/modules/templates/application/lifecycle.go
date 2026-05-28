@@ -139,7 +139,7 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 		version.ReviewerID = &cmd.ActorUserID
 		version.ReviewedAt = &now
 
-		if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateEdit)); err != nil {
+		if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateReview)); err != nil {
 			return nil, err
 		}
 		audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditReviewed, nil, s.clock.Now())
@@ -158,7 +158,7 @@ func (s *Service) Review(ctx context.Context, cmd ReviewCmd) (*domain.TemplateVe
 	version.Status = domain.VersionStatusDraft
 	version.SubmittedAt = nil
 
-	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateEdit)); err != nil {
+	if err := s.updateVersionWithAuthz(ctx, cmd.TenantID, cmd.ActorUserID, version, string(iamdomain.CapTemplateReview)); err != nil {
 		return nil, err
 	}
 	audit, err := newAuditEvent(
@@ -449,7 +449,7 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 			return nil, fmt.Errorf("templates archive: setAuthzGUC: %w", err)
 		}
-		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
+		if err := authz.Require(ctx, tx, "template.archive", "tenant"); err != nil {
 			return nil, fmt.Errorf("templates archive: authz: %w", err)
 		}
 		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {

@@ -81,7 +81,8 @@ func (r *fakeRepo) UpdateTemplate(_ context.Context, t *domain.Template) error {
 	if _, ok := r.templates[t.ID]; !ok {
 		return domain.ErrNotFound
 	}
-	r.templates[t.ID] = t
+	clone := *t
+	r.templates[t.ID] = &clone
 	return nil
 }
 
@@ -90,9 +91,10 @@ func (r *fakeRepo) CreateVersion(_ context.Context, v *domain.TemplateVersion) e
 		return errors.New("forced create version failure")
 	}
 	if _, ok := r.lockVersions[v.ID]; !ok {
-		r.lockVersions[v.ID] = 0
+		r.lockVersions[v.ID] = v.LockVersion
 	}
-	r.versions[v.ID] = v
+	clone := *v
+	r.versions[v.ID] = &clone
 	return nil
 }
 
@@ -107,7 +109,8 @@ func (r *fakeRepo) GetVersion(_ context.Context, tenantID, templateID string, n 
 	}
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.VersionNumber == n {
-			return v, nil
+			clone := *v
+			return &clone, nil
 		}
 	}
 	return nil, domain.ErrNotFound
@@ -122,14 +125,23 @@ func (r *fakeRepo) GetVersionByID(_ context.Context, tenantID, id string) (*doma
 	if !ok || t.TenantID != tenantID {
 		return nil, domain.ErrNotFound
 	}
-	return v, nil
+	clone := *v
+	return &clone, nil
 }
 
 func (r *fakeRepo) UpdateVersion(_ context.Context, _ string, v *domain.TemplateVersion) error {
 	if _, ok := r.versions[v.ID]; !ok {
 		return domain.ErrNotFound
 	}
-	r.versions[v.ID] = v
+	current := r.lockVersions[v.ID]
+	if current != v.LockVersion {
+		return domain.ErrStaleLockVersion
+	}
+	clone := *v
+	clone.LockVersion++
+	r.lockVersions[v.ID] = clone.LockVersion
+	r.versions[v.ID] = &clone
+	v.LockVersion = clone.LockVersion
 	return nil
 }
 

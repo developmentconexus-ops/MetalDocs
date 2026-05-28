@@ -1377,34 +1377,12 @@ paths:
           required: false
           schema:
             type: string
-        - name: subject
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: businessUnit
-          in: query
-          required: false
-          schema:
-            type: string
         - name: department
           in: query
           required: false
           schema:
             type: string
-        - name: classification
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED]
         - name: status
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [DRAFT, IN_REVIEW, APPROVED, PUBLISHED, ARCHIVED]
-        - name: tag
           in: query
           required: false
           schema:
@@ -2941,8 +2919,10 @@ paths:
     post:
       tags: [approval]
       operationId: submitDocumentForApproval
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok } }
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
+      responses: { '201': { description: created } }
   /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs:
     post:
       tags: [approval]
@@ -2950,6 +2930,8 @@ paths:
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/publish:
     post:
@@ -3026,7 +3008,10 @@ paths:
     post:
       tags: [approval]
       operationId: recordDocumentSignoff
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/cancel:
     post:
@@ -3074,9 +3059,14 @@ components:
           type: string
     CurrentUser:
       type: object
-      required: [userId, username, displayName, mustChangePassword, roles]
+      required: [userId, tenantId, tenantName, username, displayName, mustChangePassword, roles]
       properties:
         userId:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+        tenantName:
           type: string
         username:
           type: string
@@ -3090,7 +3080,7 @@ components:
           type: array
           items:
             type: string
-            enum: [admin, editor, reviewer, viewer]
+            enum: [system_admin, approver, author, editor, viewer]
     AuthLoginResponse:
       type: object
       required: [user, expiresAt]
@@ -3171,7 +3161,7 @@ components:
           type: array
           items:
             type: string
-            enum: [admin, editor, reviewer, viewer]
+            enum: [system_admin, approver, author, editor, viewer]
         createdAt:
           type: string
           format: date-time
@@ -3231,9 +3221,11 @@ components:
           type: string
         roles:
           type: array
+          minItems: 1
+          maxItems: 1
           items:
             type: string
-            enum: [admin, editor, reviewer, viewer]
+            enum: [system_admin, approver, author, editor, viewer]
     CreateManagedUserResponse:
       type: object
       required: [userId]
@@ -3296,9 +3288,10 @@ components:
         roles:
           type: array
           minItems: 1
+          maxItems: 1
           items:
             type: string
-            enum: [admin, editor, reviewer, viewer]
+            enum: [system_admin, approver, author, editor, viewer]
     ReplaceUserRolesResponse:
       type: object
       required: [userId, displayName, roles]
@@ -3311,7 +3304,7 @@ components:
           type: array
           items:
             type: string
-            enum: [admin, editor, reviewer, viewer]
+            enum: [system_admin, approver, author, editor, viewer]
     CreateDocumentRequest:
       type: object
       required:
@@ -4832,7 +4825,7 @@ components:
           type: string
         role:
           type: string
-          enum: [admin, editor, reviewer, viewer]
+          enum: [system_admin, approver, author, editor, viewer]
         assignedBy:
           type: string
     UpsertUserRoleResponse:
@@ -4910,7 +4903,7 @@ components:
             $ref: '#/components/schemas/WorkflowApprovalItem'
     SearchDocumentItem:
       type: object
-      required: [documentId, title, documentType, documentProfile, documentFamily, documentSequence, documentCode, ownerId, businessUnit, department, classification, status, tags, createdAt]
+      required: [documentId, title, documentType, documentProfile, documentFamily, documentSequence, documentCode, ownerId, status, createdAt]
       properties:
         documentId:
           type: string
@@ -4929,24 +4922,12 @@ components:
           type: string
         processArea:
           type: string
-        subject:
-          type: string
         ownerId:
-          type: string
-        businessUnit:
           type: string
         department:
           type: string
-        classification:
-          type: string
-          enum: [PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED]
         status:
           type: string
-          enum: [DRAFT, IN_REVIEW, APPROVED, PUBLISHED, ARCHIVED]
-        tags:
-          type: array
-          items:
-            type: string
         effectiveAt:
           type: string
           format: date-time
@@ -5363,4 +5344,3 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
-

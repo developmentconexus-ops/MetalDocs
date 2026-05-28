@@ -100,14 +100,14 @@ func (f *fakeRepo) GetDocument(_ context.Context, _, _ string) (*domain.Document
 	return f.docReturn, nil
 }
 
-func (f *fakeRepo) UpdateDocumentName(_ context.Context, tenantID, docID, name string) error {
+func (f *fakeRepo) UpdateDocumentName(_ context.Context, tenantID, actorID, docID, name string) error {
 	f.renameTenantID = tenantID
 	f.renameDocID = docID
 	f.renameName = name
 	return f.renameErr
 }
 
-func (f *fakeRepo) UpdateDocumentNameTx(_ context.Context, _ *sql.Tx, tenantID, docID, name string) error {
+func (f *fakeRepo) UpdateDocumentNameTx(_ context.Context, _ *sql.Tx, tenantID, actorID, docID, name string) error {
 	f.renameTenantID = tenantID
 	f.renameDocID = docID
 	f.renameName = name
@@ -154,7 +154,7 @@ func (f *fakeRepo) StatsByArea(_ context.Context, _ string, opts application.Lis
 	return f.statsByAreaReturn, nil
 }
 
-func (f *fakeRepo) UpdateDocumentStatus(_ context.Context, _, _ string, cur, next domain.DocumentStatus, stampTime bool) error {
+func (f *fakeRepo) UpdateDocumentStatus(_ context.Context, _, _, _ string, cur, next domain.DocumentStatus, stampTime bool) error {
 	f.statusCalls++
 	f.statusCur = cur
 	f.statusNext = next

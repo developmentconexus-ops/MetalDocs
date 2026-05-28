@@ -10,6 +10,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
+	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/tenant"
@@ -59,10 +60,10 @@ var (
 )
 
 // signoffIdempStore backs idempotent replay for SignoffByDocumentHandler.
-// Keyed by (tenantID, actorID, idempotency key); outcome is the signoff outcome string.
+// Keyed by (tenantID, actorID, route template, idempotency key, payload hash).
 type signoffIdempStore interface {
-	CheckReplay(ctx context.Context, tenantID, actorID, idempKey string) (found bool, outcome string, err error)
-	RecordReplay(ctx context.Context, tenantID, actorID, idempKey string, outcome string) error
+	BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*approvalinfra.SignoffReplayHandle, *approvalinfra.SignoffReplay, error)
+	BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*approvalinfra.SignoffReplayHandle, *approvalinfra.SignoffReplay, error)
 }
 
 type Handler struct {
@@ -127,7 +128,7 @@ func parseIfMatch(header string) (int, error) {
 	}
 
 	version, err := strconv.Atoi(strings.TrimPrefix(value, "v"))
-	if err != nil || version < 0 {
+	if err != nil || version <= 0 {
 		return -1, ErrIfMatchMalformed
 	}
 	return version, nil

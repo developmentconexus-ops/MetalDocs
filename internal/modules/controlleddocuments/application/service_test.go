@@ -278,15 +278,18 @@ func TestCreate_AreaArchived(t *testing.T) {
 
 type fakeControlledDocumentRepository struct {
 	codeExists     bool
+	canRead        bool
 	created        *controlleddocumentsdomain.ControlledDocument
+	getByIDCalls   int
 	lastListFilter controlleddocumentsdomain.CDFilter
 }
 
 func newFakeControlledDocumentRepository() *fakeControlledDocumentRepository {
-	return &fakeControlledDocumentRepository{}
+	return &fakeControlledDocumentRepository{canRead: true}
 }
 
 func (f *fakeControlledDocumentRepository) GetByID(_ context.Context, _, _ string) (*controlleddocumentsdomain.ControlledDocument, error) {
+	f.getByIDCalls++
 	if f.created == nil {
 		return nil, controlleddocumentsdomain.ErrCDNotFound
 	}
@@ -307,7 +310,7 @@ func (f *fakeControlledDocumentRepository) List(_ context.Context, _ string, fil
 	return nil, nil
 }
 func (f *fakeControlledDocumentRepository) CanRead(_ context.Context, _, _, _ string) (bool, error) {
-	return true, nil
+	return f.canRead, nil
 }
 
 func (f *fakeControlledDocumentRepository) Create(_ context.Context, doc *controlleddocumentsdomain.ControlledDocument) error {
@@ -807,6 +810,34 @@ func TestCreateRevision_MissingActorContextReturnsErrActorMissing(t *testing.T) 
 	}
 }
 
+func TestCreateRevision_HiddenDocumentReturnsNotFoundBeforeLookup(t *testing.T) {
+	repo := newFakeControlledDocumentRepository()
+	repo.canRead = false
+	repo.created = &controlleddocumentsdomain.ControlledDocument{
+		ID:              "cd-1",
+		TenantID:        "tenant-a",
+		ProfileCode:     "pop",
+		ProcessAreaCode: "general",
+		Code:            "POP-GENERAL-014",
+		Status:          controlleddocumentsdomain.CDStatusActive,
+		OwnerUserID:     "owner-1",
+	}
+	svc := NewControlledDocumentService(nil, repo, &fakeSequenceAllocator{}, &fakeTemplateVersionChecker{}, &fakeProfileReader{}, &fakeAreaReader{}, &fakeGovernanceLogger{}, &fakeDocumentInitializer{})
+
+	ctx := iamdomain.WithAuthContext(context.Background(), "actor-1", []iamdomain.Role{"system_admin"})
+	_, err := svc.CreateRevision(ctx, CreateRevisionCmd{
+		TenantID: "tenant-a",
+		CDID:     "cd-1",
+		Name:     "Hidden revision",
+	})
+	if !errors.Is(err, controlleddocumentsdomain.ErrCDNotFound) {
+		t.Fatalf("expected ErrCDNotFound, got %v", err)
+	}
+	if repo.getByIDCalls != 0 {
+		t.Fatalf("expected GetByID to be skipped for hidden document, got %d calls", repo.getByIDCalls)
+	}
+}
+
 func TestCreateRevision_SetsAuthzContextBeforeClone(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -905,20 +936,34 @@ func expectRegistryCreateAuthz(mock sqlmock.Sqlmock, actorID, tenantID string) {
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(actorID))
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.tenant_id', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(tenantID))
-	mock.ExpectQuery(regexp.QuoteMeta(`
-SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
-)`)).
-		WithArgs(actorID, tenantID).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+	expectSystemAdminBypass(mock, actorID, tenantID, true)
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('metaldocs.asserted_caps', true)")).
 		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow(nil))
 	mock.ExpectExec(regexp.QuoteMeta("SELECT set_config('metaldocs.asserted_caps', $1, true)")).
 		WithArgs(sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+}
+
+func expectSystemAdminBypass(mock sqlmock.Sqlmock, actorID, tenantID string, exists bool) {
+	mock.ExpectQuery(regexp.QuoteMeta(`
+SELECT EXISTS (
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
+)`)).
+		WithArgs(actorID, tenantID).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(exists))
 }
 
 type profileReaderFunc func(ctx context.Context, tenantID, code string) (*taxonomydomain.DocumentProfile, error)

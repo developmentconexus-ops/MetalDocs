@@ -90,6 +90,21 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.
 	}
 	defer tx.Rollback()
 
+	actorID := iamdomain.UserIDFromContext(ctx)
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("read load instance by document: %w", err)
+	}
+
+	areaCode, err := loadDocumentAreaCode(ctx, tx, tenantID, documentID)
+	if err != nil {
+		return nil, fmt.Errorf("read load instance by document: load area: %w", err)
+	}
+
+	ctx = authz.WithCapCache(ctx)
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), areaCode); err != nil {
+		return nil, err
+	}
+
 	inst, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -103,6 +118,38 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("read load instance by document: commit tx: %w", err)
+	}
+	return inst, nil
+}
+
+// LoadActiveInstanceByDocumentForMutation finds the current active approval
+// instance for a document without enforcing read-capability checks.
+// Mutation services enforce their own capability gates (e.g. signoff/cancel).
+func (s *ReadService) LoadActiveInstanceByDocumentForMutation(ctx context.Context, db *sql.DB, tenantID, documentID string) (*domain.Instance, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("mutation load instance by document: begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	actorID := iamdomain.UserIDFromContext(ctx)
+	if err := setAuthzGUC(ctx, tx, tenantID, actorID); err != nil {
+		return nil, fmt.Errorf("mutation load instance by document: %w", err)
+	}
+
+	inst, err := s.repo.LoadActiveInstanceByDocument(ctx, tx, tenantID, documentID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, repository.ErrNoActiveInstance
+		}
+		return nil, err
+	}
+	if inst == nil {
+		return nil, repository.ErrNoActiveInstance
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("mutation load instance by document: commit tx: %w", err)
 	}
 	return inst, nil
 }

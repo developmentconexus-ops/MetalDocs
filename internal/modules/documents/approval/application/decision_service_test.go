@@ -502,6 +502,48 @@ func TestRecordSignoff_ContentHashUsesPersistedDocumentFormData(t *testing.T) {
 	}
 }
 
+func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
+	const (
+		instanceID = "inst-hash-mismatch"
+		stageID    = "stage-hash-mismatch"
+		actorID    = "approver-hash-mismatch"
+		authorID   = "author-hash-mismatch"
+	)
+
+	inst := buildTwoApproverInstance(instanceID, stageID, authorID, []string{actorID, "approver-2"})
+	conn := &decisionTestConn{
+		authzGranted: true,
+		areaCode:     "QA",
+		actorID:      actorID,
+		formDataJSON: `{"title":"Persisted"}`,
+	}
+	repo := &fakeDecisionRepo{instance: inst}
+	svc := &DecisionService{
+		repo:          repo,
+		emitter:       &MemoryEmitter{},
+		clock:         fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)},
+		freezeInvoker: &fakeFreezeInvoker{},
+		pdfDispatcher: &fakePDFDispatchInvoker{},
+	}
+	db := newDecisionTestDB(t, conn)
+
+	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignaturePayload: map[string]any{},
+		ContentFormData:  map[string]any{"_content_hash": validContentHash},
+	})
+	if !errors.Is(err, ErrContentHashMismatch) {
+		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
+	}
+	if repo.insertedSignoff != nil {
+		t.Fatal("signoff must not be persisted on client/server content hash mismatch")
+	}
+}
+
 // TestRecordSignoff_RejectPath: single actor rejects on any_1_of stage.
 // Expect InstanceRejected=true, StageCompleted=false (stage is rejected_here, not completed),
 // and a single "signoff_recorded" governance event emitted.

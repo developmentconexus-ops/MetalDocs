@@ -15,6 +15,7 @@ import (
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/requesttrace"
 )
 
 func TestAuthHandler_UnauthorizedIsProblemJSON(t *testing.T) {
@@ -77,20 +78,32 @@ func TestRecordAudit_AuditFailureDoesNotPanic(t *testing.T) {
 	h.recordAudit(req, "u-1", "auth.logout", "u-1", map[string]any{})
 }
 
-func TestRecordAudit_GeneratesServerTraceID(t *testing.T) {
+func TestRecordAudit_ReusesRequestTraceID(t *testing.T) {
 	audit := &captureAuditWriter{}
 	h := &Handler{
 		audit: audit,
 		now:   func() time.Time { return time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC) },
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
-	req.Header.Set("X-Trace-Id", "trace\r\npoison")
+	req = req.WithContext(requesttrace.WithTraceID(req.Context(), "trace-123"))
 
 	h.recordAudit(req, "u-1", "auth.logout", "u-1", map[string]any{})
 
-	if audit.event.TraceID == "trace\r\npoison" {
-		t.Fatal("unsafe trace id was accepted")
+	if audit.event.TraceID != "trace-123" {
+		t.Fatalf("trace id = %q, want %q", audit.event.TraceID, "trace-123")
 	}
+}
+
+func TestRecordAudit_GeneratesServerTraceIDWhenContextMissing(t *testing.T) {
+	audit := &captureAuditWriter{}
+	h := &Handler{
+		audit: audit,
+		now:   func() time.Time { return time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC) },
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+
+	h.recordAudit(req, "u-1", "auth.logout", "u-1", map[string]any{})
+
 	if _, err := uuid.Parse(audit.event.TraceID); err != nil {
 		t.Fatalf("trace id = %q, want generated uuid: %v", audit.event.TraceID, err)
 	}

@@ -49,10 +49,6 @@ func WithCapCache(ctx context.Context) context.Context {
 // Pass areaCode = "tenant" to skip the area filter (degenerates to a tier-1
 // equivalent inside the transaction).
 func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error {
-	if cacheGranted(ctx, capability, areaCode) {
-		return appendAssertedCap(ctx, tx, capability, areaCode)
-	}
-
 	actorID, err := MustActorID(ctx, tx)
 	if err != nil {
 		return err
@@ -61,20 +57,33 @@ func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error
 	if err != nil {
 		return err
 	}
+	if cacheGranted(ctx, tx, actorID, tenantID, capability, areaCode) {
+		return appendAssertedCap(ctx, tx, capability, areaCode)
+	}
 
 	// system_admin bypass — check before capability query
 	var isAdmin bool
 	if err := tx.QueryRowContext(ctx, `
 SELECT EXISTS (
-  SELECT 1 FROM metaldocs.iam_user_roles
-   WHERE user_id   = $1
-     AND tenant_id = $2::uuid
-     AND role_code = 'system_admin'
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
 )`, actorID, tenantID).Scan(&isAdmin); err != nil {
 		return fmt.Errorf("authz: system_admin check: %w", err)
 	}
 	if isAdmin {
-		storeGranted(ctx, capability, areaCode)
+		storeGranted(ctx, tx, actorID, tenantID, capability, areaCode)
 		return appendAssertedCap(ctx, tx, capability, areaCode)
 	}
 
@@ -99,7 +108,7 @@ SELECT EXISTS (
 		return ErrCapDenied{Capability: capability, AreaCode: areaCode, ActorID: actorID}
 	}
 
-	storeGranted(ctx, capability, areaCode)
+	storeGranted(ctx, tx, actorID, tenantID, capability, areaCode)
 	return appendAssertedCap(ctx, tx, capability, areaCode)
 }
 
@@ -108,7 +117,7 @@ func BypassSystem(ctx context.Context, tx *sql.Tx) error {
 	return err
 }
 
-func cacheGranted(ctx context.Context, capability, areaCode string) bool {
+func cacheGranted(ctx context.Context, tx *sql.Tx, actorID, tenantID, capability, areaCode string) bool {
 	cache, ok := ctx.Value(capCacheKey{}).(*capCache)
 	if !ok || cache == nil {
 		return false
@@ -117,10 +126,10 @@ func cacheGranted(ctx context.Context, capability, areaCode string) bool {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	return cache.granted[cacheKey(capability, areaCode)]
+	return cache.granted[grantCacheKey(tx, actorID, tenantID, capability, areaCode)]
 }
 
-func storeGranted(ctx context.Context, capability, areaCode string) {
+func storeGranted(ctx context.Context, tx *sql.Tx, actorID, tenantID, capability, areaCode string) {
 	cache, ok := ctx.Value(capCacheKey{}).(*capCache)
 	if !ok || cache == nil {
 		return
@@ -129,11 +138,15 @@ func storeGranted(ctx context.Context, capability, areaCode string) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
-	cache.granted[cacheKey(capability, areaCode)] = true
+	cache.granted[grantCacheKey(tx, actorID, tenantID, capability, areaCode)] = true
 }
 
 func cacheKey(capability, areaCode string) string {
 	return capability + "\x00" + areaCode
+}
+
+func grantCacheKey(tx *sql.Tx, actorID, tenantID, capability, areaCode string) string {
+	return fmt.Sprintf("%p\x00%s\x00%s\x00%s", tx, actorID, tenantID, cacheKey(capability, areaCode))
 }
 
 func appendAssertedCap(ctx context.Context, tx *sql.Tx, capability, areaCode string) error {

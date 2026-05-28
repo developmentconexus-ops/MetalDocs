@@ -69,6 +69,7 @@ import (
 	"metaldocs/internal/platform/migrate"
 	"metaldocs/internal/platform/objectstore"
 	"metaldocs/internal/platform/observability"
+	"metaldocs/internal/platform/requesttrace"
 	"metaldocs/internal/platform/security"
 	e2etest "metaldocs/internal/test"
 )
@@ -145,6 +146,9 @@ func main() {
 	repoMode, err := config.RepositoryMode()
 	if err != nil {
 		log.Fatalf("invalid repository mode: %v", err)
+	}
+	if err := requirePostgresRepositoryMode(repoMode); err != nil {
+		log.Fatal(err)
 	}
 	rateCfg, err := config.LoadRateLimitConfig()
 	if err != nil {
@@ -258,14 +262,8 @@ func main() {
 	// Fanout/eigenpal client — enabled when METALDOCS_FANOUT_URL is set.
 	fanoutCfg := fanoutComponents{}
 	fanoutURL := strings.TrimSpace(os.Getenv("METALDOCS_FANOUT_URL"))
-	if fanoutURL == "" {
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("METALDOCS_REQUIRE_FANOUT")), "true") {
-			log.Fatalf("METALDOCS_FANOUT_URL is required but not set")
-		}
-		// Optional integration: local and test setups are allowed to run without
-		// fanout/docgen, so missing config remains non-fatal unless
-		// METALDOCS_REQUIRE_FANOUT=true explicitly tightens startup.
-		slog.Warn("METALDOCS_FANOUT_URL not set; document approval will fail at freeze step")
+	if err := requireApprovalRuntimeSupport(fanoutURL); err != nil {
+		log.Fatal(err)
 	}
 	serviceToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCGEN_V2_SERVICE_TOKEN"))
 	if fanoutURL != "" && serviceToken == "" {
@@ -354,9 +352,8 @@ func main() {
 		}
 		approvalServices.WithScheduledPublishEnqueuer(approvaljobs.NewScheduledPublishEnqueuer(riverBundle.Client))
 	}
-	var effectiveFreezeInvoker approvalapp.FreezeInvoker = noopFreezeInvoker{}
-	if fanoutCfg.freezeService != nil {
-		effectiveFreezeInvoker = fanoutCfg.freezeService
+	if fanoutCfg.freezeService == nil {
+		log.Fatal("approval runtime requires configured freeze service")
 	}
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
 	pdfOutboxWorker := fanout.NewPDFOutboxWorker(pdfOutboxRepo, deps.Publisher, slog.Default())
@@ -389,7 +386,7 @@ func main() {
 		}
 	}()
 	approvalServices.Decision = approvalapp.NewDecisionService(
-		approvalRepo, approvalEmitter, approvalapp.RealClock{}, effectiveFreezeInvoker, fanoutCfg.pdfDispatchAdapter,
+		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService, fanoutCfg.pdfDispatchAdapter,
 	).WithPDFOutbox(pdfOutboxRepo)
 	docDeps.SubmitSvc = approvalServices.Submit
 
@@ -402,7 +399,11 @@ func main() {
 	// needs ControlledDocumentDuplicator), hence the post-construction setter.
 	controlledDocumentsModule.Service().WithDocumentInitializer(docapp.NewCDDocumentInitializer(docMod.Service))
 
-	buildTemplatesModule(deps, capabilityService).Register(mux)
+	templatesModule, err := buildTemplatesModule(deps, capabilityService)
+	if err != nil {
+		log.Fatalf("build templates module: %v", err)
+	}
+	templatesModule.Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
@@ -557,6 +558,13 @@ func shutdownServer(
 	return exitCode
 }
 
+func requirePostgresRepositoryMode(repoMode string) error {
+	if repoMode != config.RepositoryPostgres {
+		return fmt.Errorf("metaldocs api requires %q repository mode; got %q", config.RepositoryPostgres, repoMode)
+	}
+	return nil
+}
+
 func buildTaxonomyModule(deps bootstrap.APIDependencies) *taxonomy.Module {
 	return taxonomy.New(taxonomy.Dependencies{
 		DB:          deps.SQLDB,
@@ -573,26 +581,27 @@ func buildControlledDocumentsModule(deps bootstrap.APIDependencies) *controlledd
 	})
 }
 
-func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService) *templateshttp.Handler {
+func buildTemplatesModule(deps bootstrap.APIDependencies, capabilityService *iamapp.CapabilityService) (*templateshttp.Handler, error) {
+	if capabilityService == nil {
+		return nil, errors.New("templates capability service is required")
+	}
 	templatesPresigner := objectstore.NewTemplatesPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 25*1024*1024)
 	templatesSvc := templatesapp.New(templatesrepo.New(deps.SQLDB).WithAudit(deps.AuditWriter), templatesPresigner, realClock{}, realUUIDGen{}).WithDB(deps.SQLDB)
 	templatesAuthzFn := func(r *http.Request, tenantID, _ string, action string) error {
 		userID := iamdomain.UserIDFromContext(r.Context())
 		return capabilityService.CanDo(r.Context(), userID, tenantID, action)
 	}
-	return templateshttp.New(templatesSvc, templatesAuthzFn)
+	return templateshttp.New(templatesSvc, templatesAuthzFn), nil
 }
 
 type realClock struct{}
 
 func (realClock) Now() time.Time { return time.Now().UTC() }
 
-// noopFreezeInvoker is used when METALDOCS_FANOUT_URL is unset.
-// Approval completes locally without calling the fanout service.
-type noopFreezeInvoker struct{}
-
-func (noopFreezeInvoker) Freeze(_ context.Context, _ *sql.Tx, _, _ string, _ docapp.ApproverContext) error {
-	slog.Warn("freeze skipped: METALDOCS_FANOUT_URL not configured")
+func requireApprovalRuntimeSupport(fanoutURL string) error {
+	if strings.TrimSpace(fanoutURL) == "" {
+		return errors.New("approval runtime requires METALDOCS_FANOUT_URL; startup without freeze support is not allowed")
+	}
 	return nil
 }
 
@@ -658,10 +667,8 @@ func (a *documentsAuditAdapter) Write(ctx context.Context, tenantID, actorID, ac
 	}
 }
 
-func traceIDFromContext(_ context.Context) string {
-	// TODO(trace): plumb the request trace identifier through context so document
-	// audit events can reuse the server-generated trace instead of a synthetic ID.
-	return uuid.NewString()
+func traceIDFromContext(ctx context.Context) string {
+	return requesttrace.Resolve(ctx)
 }
 
 func jobEnabled(envName string) bool {

@@ -19,6 +19,7 @@ import (
 )
 
 var versionRE = regexp.MustCompile(`^(\d{4})_`)
+var trailingTxnTokenRE = regexp.MustCompile(`(?is)\bcommit\b\s*;?\s*$`)
 
 const migrateLockKey int64 = 0x4D444D4947528000
 
@@ -80,6 +81,9 @@ func Apply(ctx context.Context, db *sql.DB, dir string, log *slog.Logger) (retEr
 		if err != nil {
 			return fmt.Errorf("read %s: %w", f.name, err)
 		}
+		if err := requireExplicitTransactionGuard(string(body)); err != nil {
+			return fmt.Errorf("apply %s: %w", f.name, err)
+		}
 		log.Info("applying migration", "version", f.version, "file", f.name)
 		if _, err := conn.ExecContext(ctx, string(body)); err != nil {
 			return fmt.Errorf("apply %s: %w", f.name, err)
@@ -117,4 +121,37 @@ func loadApplied(ctx context.Context, db queryer) (map[string]bool, error) {
 		return nil, fmt.Errorf("iterate schema_migrations versions: %w", err)
 	}
 	return out, nil
+}
+
+func requireExplicitTransactionGuard(body string) error {
+	normalized := trimLeadingSQLComments(body)
+	if !strings.HasPrefix(strings.ToUpper(normalized), "BEGIN") {
+		return errors.New("migration must start with explicit BEGIN")
+	}
+	if !trailingTxnTokenRE.MatchString(normalized) {
+		return errors.New("migration must end with explicit COMMIT")
+	}
+	return nil
+}
+
+func trimLeadingSQLComments(body string) string {
+	remaining := strings.TrimSpace(strings.TrimPrefix(body, "\uFEFF"))
+	for {
+		switch {
+		case strings.HasPrefix(remaining, "--"):
+			if idx := strings.IndexByte(remaining, '\n'); idx >= 0 {
+				remaining = strings.TrimSpace(remaining[idx+1:])
+				continue
+			}
+			return ""
+		case strings.HasPrefix(remaining, "/*"):
+			if idx := strings.Index(remaining, "*/"); idx >= 0 {
+				remaining = strings.TrimSpace(remaining[idx+2:])
+				continue
+			}
+			return ""
+		default:
+			return remaining
+		}
+	}
 }

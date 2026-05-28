@@ -16,8 +16,14 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		logger = slog.Default()
 	}
 
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire backfill connection: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
 	var locked bool
-	if err := db.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, controlledDocumentsBackfillAdvisoryLock).Scan(&locked); err != nil {
+	if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, controlledDocumentsBackfillAdvisoryLock).Scan(&locked); err != nil {
 		return fmt.Errorf("acquire backfill advisory lock: %w", err)
 	}
 	if !locked {
@@ -25,14 +31,14 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 		return nil
 	}
 	defer func() {
-		_, _ = db.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, controlledDocumentsBackfillAdvisoryLock)
+		_, _ = conn.ExecContext(context.Background(), `SELECT pg_advisory_unlock($1)`, controlledDocumentsBackfillAdvisoryLock)
 	}()
 
 	processed := 0
 	skipped := 0
 	errorsCount := 0
 	for {
-		rows, err := db.QueryContext(ctx, `
+		rows, err := conn.QueryContext(ctx, `
 			SELECT id::text, tenant_id::text
 			FROM documents
 			WHERE controlled_document_id IS NULL
@@ -54,7 +60,7 @@ func BackfillLegacyDocuments(ctx context.Context, db *sql.DB, logger *slog.Logge
 				continue
 			}
 
-			tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+			tx, err := conn.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 			if err != nil {
 				errorsCount++
 				logger.Error("controlled-documents backfill begin tx failed", "event", "backfill", "document_id", docID, "tenant_id", tenantID, "error", err)

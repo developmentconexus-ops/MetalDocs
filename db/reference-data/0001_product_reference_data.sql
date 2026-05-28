@@ -7,6 +7,13 @@ INSERT INTO public.schema_migrations (version, description)
 VALUES ('baseline-2026-05-14', 'curated current-state database baseline')
 ON CONFLICT (version) DO NOTHING;
 
+INSERT INTO metaldocs.tenants (id, name, slug)
+VALUES ('ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid, 'System Tenant', 'system')
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  slug = EXCLUDED.slug,
+  updated_at = now();
+
 -- Canonical runtime capability matrix.
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'document.create', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'document.edit', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;

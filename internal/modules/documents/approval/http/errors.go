@@ -51,6 +51,7 @@ const (
 	approvalCodeApprovalUnresolved       problem.Code = "approval.unresolved_comments"
 	approvalCodeValidationReasonRequired problem.Code = "validation.reason_required"
 	approvalCodeNotFoundRoute            problem.Code = "not_found.route"
+	approvalCodeStateRouteInactive       problem.Code = "state.route_inactive"
 	approvalCodeTimeout                  problem.Code = "timeout"
 	approvalCodeValidationJSONDecode     problem.Code = "validation.json_decode"
 	approvalCodeValidationJSONTypeError  problem.Code = "validation.json_type_error"
@@ -141,6 +142,7 @@ func MapErrorToResponse(err error) *problem.Problem {
 		var capabilityDenied authz.ErrCapDenied
 		var syntaxErr *json.SyntaxError
 		var typeErr *json.UnmarshalTypeError
+		var validationErr *ValidationError
 		var invalidParamErr *approvalapi.InvalidParamFormatError
 		var unmarshalParamErr *approvalapi.UnmarshalingParamError
 		var requiredParamErr *approvalapi.RequiredParamError
@@ -148,6 +150,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 		var tooManyValuesErr *approvalapi.TooManyValuesForParamError
 
 		switch {
+		case errors.As(err, &validationErr):
+			statusCode = http.StatusBadRequest
+			code = approvalCodeValidationRequestInvalid
 		case errors.As(err, &invalidParamErr):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationParamFormat
@@ -181,6 +186,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, application.ErrRouteNotFound):
 			statusCode = http.StatusNotFound
 			code = approvalCodeNotFoundRoute
+		case errors.Is(err, application.ErrRouteAlreadyInactive):
+			statusCode = http.StatusConflict
+			code = approvalCodeStateRouteInactive
 		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 			statusCode = http.StatusGatewayTimeout
 			code = approvalCodeTimeout

@@ -55,7 +55,7 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, db *sql.DB, r
 		_ = tx.Rollback()
 		return SupersedeResult{}, fmt.Errorf("publishSuperseding: load document area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, "doc.supersede", areaCode); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentSupersede), areaCode); err != nil {
 		_ = tx.Rollback()
 		return SupersedeResult{}, err
 	}

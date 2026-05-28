@@ -64,7 +64,7 @@ INSERT INTO templates_template (
 	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
 	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6, '{}'::text[], 'public',
+	$1, $2::uuid, $3, $4, $5, $6, '{}'::text[], 'public',
 	'{}'::text[], $7, $8, $9, $10, $11, $12
 )`
 	_, err := r.db.ExecContext(ctx, q,
@@ -84,10 +84,10 @@ INSERT INTO templates_template (
 func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description,
+	id::text, tenant_id::text, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_template
-WHERE id = $1 AND tenant_id = $2`
+WHERE id = $1 AND tenant_id = $2::uuid`
 
 	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, id, tenantID))
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
@@ -102,10 +102,10 @@ WHERE id = $1 AND tenant_id = $2`
 func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description,
+	id::text, tenant_id::text, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_template
-WHERE tenant_id = $1 AND key = $2`
+WHERE tenant_id = $1::uuid AND key = $2`
 
 	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, tenantID, key))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -120,10 +120,10 @@ WHERE tenant_id = $1 AND key = $2`
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id, doc_type_code, key, name, description,
+	id::text, tenant_id::text, doc_type_code, key, name, description,
 	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
 FROM templates_template
-WHERE tenant_id = $1
+WHERE tenant_id = $1::uuid
   AND system_owned = false
   AND ($2::text IS NULL OR doc_type_code = $2)
 ORDER BY created_at DESC
@@ -165,7 +165,7 @@ SET
 	published_version_id = $8,
 	system_owned = $9,
 	archived_at = $10
-WHERE id = $1 AND tenant_id = $2`
+WHERE id = $1 AND tenant_id = $2::uuid`
 
 	res, err := r.db.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
@@ -280,6 +280,38 @@ WHERE v.id = $1 AND t.tenant_id = $2::uuid`
 }
 
 func (r *Repository) UpdateVersion(ctx context.Context, tenantID string, v *domain.TemplateVersion) error {
+	return updateVersion(ctx, r.db, tenantID, v)
+}
+
+func (r *Repository) CreateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
+	const q = `
+INSERT INTO templates_template (
+	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
+	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
+) VALUES (
+	$1, $2::uuid, $3, $4, $5, $6, '{}'::text[], 'public',
+	'{}'::text[], $7, $8, $9, $10, $11, $12
+)`
+	_, err := tx.ExecContext(ctx, q,
+		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
+		t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
+	)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return domain.ErrKeyConflict
+		}
+		return err
+	}
+	return nil
+}
+
+type versionUpdateExecutor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func updateVersion(ctx context.Context, db versionUpdateExecutor, tenantID string, v *domain.TemplateVersion) error {
 	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
 	if err != nil {
 		return err
@@ -302,14 +334,15 @@ SET
 	approved_at = $13,
 	published_at = $14,
 	obsoleted_at = $15,
-	lock_version = $16
+	lock_version = lock_version + 1
 WHERE id = $1
   AND EXISTS (
     SELECT 1 FROM templates_template t
     WHERE t.id = templates_template_version.template_id
       AND t.tenant_id = $17::uuid
-  )`
-	res, err := r.db.ExecContext(ctx, q,
+  )
+  AND lock_version = $16`
+	res, err := db.ExecContext(ctx, q,
 		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
@@ -322,33 +355,26 @@ WHERE id = $1
 	if err != nil {
 		return err
 	}
-	if n == 0 {
-		return domain.ErrNotFound
+	if n > 0 {
+		v.LockVersion++
+		return nil
 	}
-	return nil
-}
 
-func (r *Repository) CreateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
-	const q = `
-INSERT INTO templates_template (
-	id, tenant_id, doc_type_code, key, name, description, areas, visibility,
-	specific_areas, latest_version, published_version_id, created_by, system_owned, created_at, archived_at
-) VALUES (
-	$1, $2, $3, $4, $5, $6, '{}'::text[], 'public',
-	'{}'::text[], $7, $8, $9, $10, $11, $12
-)`
-	_, err := tx.ExecContext(ctx, q,
-		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
-		t.LatestVersion, t.PublishedVersionID, t.CreatedBy, t.SystemOwned, t.CreatedAt, t.ArchivedAt,
-	)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return domain.ErrKeyConflict
-		}
+	var exists bool
+	if err := db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM templates_template_version v
+  JOIN templates_template t ON t.id = v.template_id
+  WHERE v.id = $1
+    AND t.tenant_id = $2::uuid
+)`, v.ID, tenantID).Scan(&exists); err != nil {
 		return err
 	}
-	return nil
+	if !exists {
+		return domain.ErrNotFound
+	}
+	return domain.ErrStaleLockVersion
 }
 
 func (r *Repository) UpdateTemplateTx(ctx context.Context, tx *sql.Tx, t *domain.Template) error {
@@ -363,7 +389,7 @@ SET
 	published_version_id = $8,
 	system_owned = $9,
 	archived_at = $10
-WHERE id = $1 AND tenant_id = $2`
+WHERE id = $1 AND tenant_id = $2::uuid`
 	res, err := tx.ExecContext(ctx, q,
 		t.ID, t.TenantID, t.DocTypeCode, t.Key, t.Name, t.Description,
 		t.LatestVersion, t.PublishedVersionID, t.SystemOwned, t.ArchivedAt,
@@ -382,52 +408,7 @@ WHERE id = $1 AND tenant_id = $2`
 }
 
 func (r *Repository) UpdateVersionTx(ctx context.Context, tx *sql.Tx, tenantID string, v *domain.TemplateVersion) error {
-	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
-	if err != nil {
-		return err
-	}
-
-	const q = `
-UPDATE templates_template_version
-SET
-	status = $2,
-	docx_storage_key = $3,
-	content_hash = $4,
-	metadata_schema = $5,
-	placeholder_schema = $6,
-	pending_reviewer_role = $7,
-	pending_approver_role = $8,
-	reviewer_id = $9,
-	approver_id = $10,
-	submitted_at = $11,
-	reviewed_at = $12,
-	approved_at = $13,
-	published_at = $14,
-	obsoleted_at = $15,
-	lock_version = $16
-WHERE id = $1
-  AND EXISTS (
-    SELECT 1 FROM templates_template t
-    WHERE t.id = templates_template_version.template_id
-      AND t.tenant_id = $17::uuid
-  )`
-	res, err := tx.ExecContext(ctx, q,
-		v.ID, string(v.Status), v.DocxStorageKey, v.ContentHash,
-		metadataJSON, placeholderJSON,
-		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
-		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, tenantID,
-	)
-	if err != nil {
-		return err
-	}
-	n, err := rowsAffected(res)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return domain.ErrNotFound
-	}
-	return nil
+	return updateVersion(ctx, tx, tenantID, v)
 }
 
 func (r *Repository) UpdateVersionDraftCAS(ctx context.Context, tenantID, versionID string, expectedLockVersion int, docxStorageKey, docxContentHash string) error {
@@ -620,7 +601,7 @@ func (r *Repository) auditEvent(ctx context.Context, entry *domain.AuditEvent) (
 
 func (r *Repository) ListAudit(ctx context.Context, tenantID, templateID string, limit, offset int) ([]*domain.AuditEvent, error) {
 	const q = `
-SELECT tenant_id, template_id::text, version_id::text, actor_id, action, details, occurred_at
+SELECT tenant_id::text, template_id::text, version_id::text, actor_id, action, details, occurred_at
 FROM templates_audit_log
 WHERE template_id = $1
   AND tenant_id = $2::uuid

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -156,6 +157,10 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	if err != nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
+	}
+	if clientContentHash, ok := clientContentHash(req.ContentFormData); ok && clientContentHash != contentHash {
+		_ = tx.Rollback()
+		return SignoffResult{}, ErrContentHashMismatch
 	}
 
 	// Step 5: identify active stage.
@@ -642,6 +647,25 @@ func hasUnresolvedComments(ctx context.Context, tx *sql.Tx, tenantID, documentID
 		return false, err
 	}
 	return unresolvedCount > 0, nil
+}
+
+func clientContentHash(formData map[string]any) (string, bool) {
+	if len(formData) == 0 {
+		return "", false
+	}
+	raw, ok := formData["_content_hash"]
+	if !ok {
+		return "", false
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", false
+	}
+	return value, true
 }
 
 func loadCurrentDocumentFormData(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (map[string]any, error) {

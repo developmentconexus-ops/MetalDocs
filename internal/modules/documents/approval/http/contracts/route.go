@@ -21,7 +21,10 @@ const (
 	DriftPolicyKindKeepSnapshot DriftPolicyKind = "keep_snapshot"
 )
 
-var routeCodePattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
+var (
+	routeCodePattern          = regexp.MustCompile(`^[a-z0-9_-]+$`)
+	requiredCapabilityPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*\.[a-z0-9._]*[a-z0-9]$`)
+)
 
 type StageRequest struct {
 	Order              int             `json:"order"`
@@ -93,7 +96,7 @@ func validateStages(stages []StageRequest) error {
 		if err := validateRequired(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
 			return err
 		}
-		if err := validateRouteCode(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
+		if err := validateRequiredCapability(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
 			return err
 		}
 		if err := validateRequired(fmt.Sprintf("stages[%d].area_code", i), stage.AreaCode); err != nil {
@@ -132,6 +135,16 @@ func validateRouteCode(field, value string) error {
 	}
 	if !routeCodePattern.MatchString(value) {
 		return fmt.Errorf("%s must match [a-z0-9_-]+", field)
+	}
+	return nil
+}
+
+func validateRequiredCapability(field, value string) error {
+	if len(value) > 64 {
+		return fmt.Errorf("%s must be at most 64 characters", field)
+	}
+	if !requiredCapabilityPattern.MatchString(value) {
+		return fmt.Errorf("%s must match <namespace>.<action> using [a-z0-9_.]", field)
 	}
 	return nil
 }

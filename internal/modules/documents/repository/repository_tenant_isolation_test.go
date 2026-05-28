@@ -43,7 +43,7 @@ func TestCheckpointAndRevisionQueriesIncludeTenantScope(t *testing.T) {
 		fn     string
 		nextFn string
 	}{
-		{name: "GetPendingForCommit", fn: "GetPendingForCommit", nextFn: "setAuthzGUC"},
+		{name: "GetPendingForCommit", fn: "GetPendingForCommit", nextFn: "CommitUpload"},
 		{name: "CreateCheckpoint", fn: "CreateCheckpoint", nextFn: "ListCheckpoints"},
 		{name: "ListCheckpoints", fn: "ListCheckpoints", nextFn: "ListRevisionHistory"},
 		{name: "GetRevision", fn: "GetRevision", nextFn: "RestoreCheckpoint"},

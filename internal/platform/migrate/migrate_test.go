@@ -23,16 +23,16 @@ func TestApply_IgnoresNonNumericBaselineMarker(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	dir := t.TempDir()
-	writeMigrationFile(t, dir, "0001_first.sql", "SELECT 1;")
-	writeMigrationFile(t, dir, "0002_second.sql", "SELECT 2;")
+	writeMigrationFile(t, dir, "0001_first.sql", "BEGIN;\nSELECT 1;\nCOMMIT;\n")
+	writeMigrationFile(t, dir, "0002_second.sql", "BEGIN;\nSELECT 2;\nCOMMIT;\n")
 
 	mock.ExpectExec(`SELECT pg_advisory_lock\(\$1\)`).
 		WithArgs(migrateLockKey).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(`SELECT version FROM public\.schema_migrations`).
 		WillReturnRows(sqlmock.NewRows([]string{"version"}).AddRow("baseline_marker"))
-	mock.ExpectExec("SELECT 1;").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("SELECT 2;").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("BEGIN;\nSELECT 1;\nCOMMIT;\n").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("BEGIN;\nSELECT 2;\nCOMMIT;\n").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(`SELECT pg_advisory_unlock\(\$1\)`).
 		WithArgs(migrateLockKey).
 		WillReturnResult(sqlmock.NewResult(0, 0))
@@ -55,17 +55,17 @@ func TestApply_SkipsOnlyAppliedVersions(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	dir := t.TempDir()
-	writeMigrationFile(t, dir, "0001_first.sql", "SELECT 1;")
-	writeMigrationFile(t, dir, "0002_second.sql", "SELECT 2;")
-	writeMigrationFile(t, dir, "0003_third.sql", "SELECT 3;")
+	writeMigrationFile(t, dir, "0001_first.sql", "BEGIN;\nSELECT 1;\nCOMMIT;\n")
+	writeMigrationFile(t, dir, "0002_second.sql", "BEGIN;\nSELECT 2;\nCOMMIT;\n")
+	writeMigrationFile(t, dir, "0003_third.sql", "BEGIN;\nSELECT 3;\nCOMMIT;\n")
 
 	mock.ExpectExec(`SELECT pg_advisory_lock\(\$1\)`).
 		WithArgs(migrateLockKey).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery(`SELECT version FROM public\.schema_migrations`).
 		WillReturnRows(sqlmock.NewRows([]string{"version"}).AddRow("0002"))
-	mock.ExpectExec("SELECT 1;").WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec("SELECT 3;").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("BEGIN;\nSELECT 1;\nCOMMIT;\n").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("BEGIN;\nSELECT 3;\nCOMMIT;\n").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(`SELECT pg_advisory_unlock\(\$1\)`).
 		WithArgs(migrateLockKey).
 		WillReturnResult(sqlmock.NewResult(0, 0))
@@ -124,6 +124,45 @@ func TestLoadApplied_PropagatesQueryErrors(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestApply_RejectsMigrationWithoutExplicitTransactionGuard(t *testing.T) {
+	t.Parallel()
+
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	dir := t.TempDir()
+	writeMigrationFile(t, dir, "0001_first.sql", "SELECT 1;")
+
+	mock.ExpectExec(`SELECT pg_advisory_lock\(\$1\)`).
+		WithArgs(migrateLockKey).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(`SELECT version FROM public\.schema_migrations`).
+		WillReturnRows(sqlmock.NewRows([]string{"version"}))
+	mock.ExpectExec(`SELECT pg_advisory_unlock\(\$1\)`).
+		WithArgs(migrateLockKey).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	err = Apply(context.Background(), db, dir, slog.Default())
+	if err == nil || !strings.Contains(err.Error(), "explicit BEGIN") {
+		t.Fatalf("Apply error = %v, want explicit BEGIN failure", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("sqlmock expectations: %v", err)
+	}
+}
+
+func TestRequireExplicitTransactionGuard_AllowsCommentPrefixedTransaction(t *testing.T) {
+	t.Parallel()
+
+	body := "-- heading\n/* block */\nBEGIN;\nSELECT 1;\nCOMMIT;\n"
+	if err := requireExplicitTransactionGuard(body); err != nil {
+		t.Fatalf("requireExplicitTransactionGuard returned error: %v", err)
 	}
 }
 

@@ -62,6 +62,31 @@ func (m *Metrics) incSkip(job string) {
 	m.mu.Unlock()
 }
 
+func (m *Metrics) Snapshot() MetricsSnapshot {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return MetricsSnapshot{
+		RunsTotal:   cloneMetricMap(m.RunsTotal),
+		ErrorsTotal: cloneMetricMap(m.ErrorsTotal),
+		SkipsTotal:  cloneMetricMap(m.SkipsTotal),
+	}
+}
+
+type MetricsSnapshot struct {
+	RunsTotal   map[string]int64
+	ErrorsTotal map[string]int64
+	SkipsTotal  map[string]int64
+}
+
+func cloneMetricMap(src map[string]int64) map[string]int64 {
+	dst := make(map[string]int64, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
 type inFlightJob struct {
 	job    string
 	epoch  int64
@@ -78,7 +103,7 @@ type Scheduler struct {
 	inPressure    bool
 	quietCount    int
 
-	Metrics Metrics
+	metrics Metrics
 
 	mu             sync.Mutex
 	inFlight       map[*inFlightJob]struct{}
@@ -97,7 +122,7 @@ func New(db *sql.DB, leaderID string) (*Scheduler, error) {
 	return &Scheduler{
 		db:             db,
 		leaderID:       leaderID,
-		Metrics:        newMetrics(),
+		metrics:        newMetrics(),
 		inFlight:       map[*inFlightJob]struct{}{},
 		heartbeatEvery: time.Minute,
 		drainWait:      30 * time.Second,
@@ -182,7 +207,7 @@ func (s *Scheduler) runJobLoop(ctx context.Context, cfg JobConfig) {
 				}
 				if shouldSkip {
 					skipStreak++
-					s.Metrics.incSkip(cfg.Name)
+					s.metrics.incSkip(cfg.Name)
 					s.logger.Warn("scheduler_job_skipped", "job", cfg.Name, "reason", "backpressure", "streak", skipStreak)
 					if skipStreak >= s.maxSkipStreak {
 						s.logger.Warn("scheduler_backpressure_skip_streak_max", "job", cfg.Name, "streak", skipStreak)
@@ -222,10 +247,10 @@ func (s *Scheduler) runJobLoop(ctx context.Context, cfg JobConfig) {
 			err = cfg.Fn(jobCtx, epoch)
 			duration := time.Since(started)
 			if err != nil {
-				s.Metrics.incError(cfg.Name)
+				s.metrics.incError(cfg.Name)
 				s.logger.Error("scheduler_job_failed", "job", cfg.Name, "epoch", epoch, "duration", duration, "error", err)
 			}
-			s.Metrics.incRun(cfg.Name)
+			s.metrics.incRun(cfg.Name)
 			s.logger.Info("scheduler_job_completed", "job", cfg.Name, "epoch", epoch, "duration", duration)
 
 			close(hbStop)
@@ -243,6 +268,10 @@ func (s *Scheduler) runJobLoop(ctx context.Context, cfg JobConfig) {
 			s.removeInFlight(inFlight)
 		}
 	}
+}
+
+func (s *Scheduler) MetricsSnapshot() MetricsSnapshot {
+	return s.metrics.Snapshot()
 }
 
 func (s *Scheduler) heartbeatLoop(ctx context.Context, cancel context.CancelFunc, job, leader string, epoch int64, stop <-chan struct{}) {

@@ -44,7 +44,7 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 		)
 	}
 
-	consumer := outboxpg.NewConsumer(db, time.Duration(workerCfg.RetryBaseSeconds)*time.Second)
+	consumer := outboxpg.NewConsumer(db, workerClaimLease(workerCfg))
 
 	return WorkerDependencies{
 		Consumer:       consumer,
@@ -52,4 +52,14 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 		SQLDB:          db,
 		Cleanup:        func() { _ = closeDB(db) },
 	}, nil
+}
+
+func workerClaimLease(cfg config.WorkerConfig) time.Duration {
+	const minClaimLease = 5 * time.Minute
+
+	lease := time.Duration(cfg.RetryMaxSeconds) * time.Second
+	if lease < minClaimLease {
+		return minClaimLease
+	}
+	return lease
 }

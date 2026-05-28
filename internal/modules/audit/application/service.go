@@ -9,18 +9,22 @@ import (
 )
 
 var ErrTenantRequired = errors.New("audit: tenant id is required")
+var ErrReaderRequired = errors.New("audit: reader is required")
 
 type Service struct {
 	reader domain.Reader
 }
 
 func NewService(reader domain.Reader) *Service {
+	if reader == nil {
+		panic(ErrReaderRequired.Error())
+	}
 	return &Service{reader: reader}
 }
 
 func (s *Service) ListEvents(ctx context.Context, query domain.ListEventsQuery) ([]domain.Event, error) {
 	if s == nil || s.reader == nil {
-		return []domain.Event{}, nil
+		return nil, ErrReaderRequired
 	}
 
 	normalized := domain.ListEventsQuery{

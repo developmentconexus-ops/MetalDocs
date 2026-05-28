@@ -88,8 +88,11 @@ func TestBuildAPIDependenciesMarksGotenbergDownWhenHealthCheckFails(t *testing.T
 	}
 
 	statusCode, payload := deps.StatusProvider.Ready(context.Background())
-	if statusCode != http.StatusOK {
-		t.Fatalf("Ready() statusCode = %d, want %d", statusCode, http.StatusOK)
+	if statusCode != http.StatusServiceUnavailable {
+		t.Fatalf("Ready() statusCode = %d, want %d", statusCode, http.StatusServiceUnavailable)
+	}
+	if got := payload["status"]; got != "degraded" {
+		t.Fatalf("Ready() status = %v, want degraded", got)
 	}
 
 	check := findCheck(t, payload, "gotenberg")

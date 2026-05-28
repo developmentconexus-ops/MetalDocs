@@ -17,7 +17,7 @@ var (
 type UserAreaWriteRepository interface {
 	ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)
 	Insert(ctx context.Context, membership domain.UserProcessArea) error
-	CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time) error
+	CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
 	GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error
 	GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error)
 }
@@ -113,7 +113,7 @@ func (s *AreaMembershipService) Revoke(
 		return ErrMembershipNotFound
 	}
 
-	if err := s.repo.CloseActive(ctx, userID, tenantID, areaCode, now); err != nil {
+	if err := s.repo.CloseActive(ctx, userID, tenantID, areaCode, now, revokedBy); err != nil {
 		return fmt.Errorf("close active membership: %w", err)
 	}
 

@@ -18,6 +18,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	"metaldocs/internal/platform/httpresponse"
 	"metaldocs/internal/platform/problem"
+	"metaldocs/internal/platform/requesttrace"
 )
 
 type Handler struct {
@@ -188,7 +189,7 @@ func (h *Handler) recordAudit(r *http.Request, actorID, action, resourceID strin
 		log.Printf("auth audit payload marshal failed action=%s actor=%s: %v", action, actorID, marshalErr)
 		return
 	}
-	traceID := uuid.NewString()
+	traceID := requesttrace.Resolve(r.Context())
 	tenantID := ""
 	if sess, ok := authdomain.CurrentUserFromContext(r.Context()); ok {
 		tenantID = sess.TenantID

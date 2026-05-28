@@ -5,7 +5,10 @@ import "testing"
 func TestLoadGotenbergConfigDisabledWhenURLMissing(t *testing.T) {
 	t.Setenv("METALDOCS_GOTENBERG_URL", "")
 
-	cfg := LoadGotenbergConfig()
+	cfg, err := LoadGotenbergConfig()
+	if err != nil {
+		t.Fatalf("LoadGotenbergConfig error: %v", err)
+	}
 
 	if cfg.Enabled {
 		t.Fatalf("expected disabled config when env var is empty")
@@ -18,12 +21,24 @@ func TestLoadGotenbergConfigDisabledWhenURLMissing(t *testing.T) {
 func TestLoadGotenbergConfigEnabledWhenURLPresent(t *testing.T) {
 	t.Setenv("METALDOCS_GOTENBERG_URL", "http://localhost:3000")
 
-	cfg := LoadGotenbergConfig()
+	cfg, err := LoadGotenbergConfig()
+	if err != nil {
+		t.Fatalf("LoadGotenbergConfig error: %v", err)
+	}
 
 	if !cfg.Enabled {
 		t.Fatalf("expected enabled config when env var is set")
 	}
 	if cfg.URL != "http://localhost:3000" {
 		t.Fatalf("expected URL %q, got %q", "http://localhost:3000", cfg.URL)
+	}
+}
+
+func TestLoadGotenbergConfigRejectsInvalidURL(t *testing.T) {
+	t.Setenv("METALDOCS_GOTENBERG_URL", "ftp://localhost:3000")
+
+	_, err := LoadGotenbergConfig()
+	if err == nil {
+		t.Fatal("expected invalid URL error")
 	}
 }

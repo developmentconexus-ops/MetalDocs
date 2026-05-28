@@ -2,13 +2,36 @@ package application
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+
+	"metaldocs/internal/modules/documents/approval/domain"
+	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
+
+type readServiceRepoSpy struct {
+	repository.ApprovalRepository
+	called bool
+	inst   *domain.Instance
+}
+
+func (s *readServiceRepoSpy) LoadInstance(context.Context, *sql.Tx, string, string) (*domain.Instance, error) {
+	return nil, nil
+}
+
+func (s *readServiceRepoSpy) LoadActiveInstanceByDocument(_ context.Context, _ *sql.Tx, _, _ string) (*domain.Instance, error) {
+	s.called = true
+	return s.inst, nil
+}
 
 func TestReadService_LoadsLockedApprovalInstancesOutsideReadOnlyTransactions(t *testing.T) {
 	source, err := os.ReadFile("read_service.go")
@@ -151,6 +174,90 @@ func TestCountPendingForActor_ReturnsTotal(t *testing.T) {
 	}
 	if total != 7 {
 		t.Errorf("total = %d, want 7", total)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestLoadActiveInstanceByDocument_RequiresDocumentViewBeforeRepoLoad(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repoSpy := &readServiceRepoSpy{inst: &domain.Instance{ID: "inst-1"}}
+	svc := &ReadService{repo: repoSpy}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
+		WithArgs("actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(`SELECT COALESCE\(d\.process_area_code_snapshot`).
+		WithArgs("doc-1", "tenant-1").
+		WillReturnRows(sqlmock.NewRows([]string{"area_code"}).AddRow("qa"))
+	mock.ExpectQuery(`SELECT current_setting\('metaldocs\.actor_id', true\)`).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("actor-1"))
+	mock.ExpectQuery(`SELECT current_setting\('metaldocs\.tenant_id', true\)`).
+		WillReturnRows(sqlmock.NewRows([]string{"current_setting"}).AddRow("tenant-1"))
+	mock.ExpectQuery(`SELECT EXISTS \([\s\S]*iam_user_roles`).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	mock.ExpectQuery(`SELECT EXISTS \([\s\S]*role_capabilities`).
+		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
+	mock.ExpectRollback()
+
+	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
+	_, err = svc.LoadActiveInstanceByDocument(ctx, db, "tenant-1", "doc-1")
+	if err == nil {
+		t.Fatal("expected authz denial")
+	}
+	var denied authz.ErrCapDenied
+	if !errors.As(err, &denied) {
+		t.Fatalf("expected ErrCapDenied, got %v", err)
+	}
+	if repoSpy.called {
+		t.Fatal("repo must not be called when document.view is denied")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}
+
+func TestLoadActiveInstanceByDocumentForMutation_DoesNotRequireDocumentView(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer db.Close()
+
+	repoSpy := &readServiceRepoSpy{inst: &domain.Instance{ID: "inst-1"}}
+	svc := &ReadService{repo: repoSpy}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.tenant_id'`).
+		WithArgs("tenant-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(`SELECT set_config\('metaldocs\.actor_id'`).
+		WithArgs("actor-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	ctx = iamdomain.WithAuthContext(ctx, "actor-1", nil)
+	inst, err := svc.LoadActiveInstanceByDocumentForMutation(ctx, db, "tenant-1", "doc-1")
+	if err != nil {
+		t.Fatalf("LoadActiveInstanceByDocumentForMutation: %v", err)
+	}
+	if inst == nil || inst.ID != "inst-1" {
+		t.Fatalf("instance = %#v, want inst-1", inst)
+	}
+	if !repoSpy.called {
+		t.Fatal("repo must be called on mutation lookup")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unmet expectations: %v", err)
