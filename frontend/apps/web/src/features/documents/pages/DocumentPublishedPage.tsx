@@ -609,13 +609,10 @@ export function DocumentPublishedPage() {
             {/* Coverage side card — shell only; fanout/read-tracking API not built.
                 See wiki/backlog/documento-publicado.md. */}
             <aside className={styles.coverageCard}>
-              <div className={styles.coverageCardHeader}>
-                <span className={styles.coverageCardLabel}>Cobertura</span>
-                <span className={styles.sectionAside}>em breve</span>
-              </div>
-              <div className={styles.coverageCardEmpty}>
-                Acompanhamento de leitura por destinatário ainda não está disponível.
-              </div>
+              <div className={styles.coverageCardLabel}>Cobertura</div>
+              <div className={styles.coverageCardStat}>—%</div>
+              <div className={styles.coverageCardBar} role="progressbar" aria-valuenow={0} aria-valuemin={0} aria-valuemax={100} />
+              <div className={styles.coverageCardMeta}>de — destinatários · — pendentes</div>
               <button
                 type="button"
                 className={`btn btn-sm ${styles.coverageCardAction}`}
