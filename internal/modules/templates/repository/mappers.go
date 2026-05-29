@@ -14,18 +14,24 @@ type rowScanner interface {
 
 func scanTemplate(row rowScanner) (*domain.Template, error) {
 	var (
-		t                  domain.Template
-		publishedVersionID sql.NullString
-		archivedAt         sql.NullTime
+		t                      domain.Template
+		publishedVersionID     sql.NullString
+		publishedVersionNumber sql.NullInt32
+		archivedAt             sql.NullTime
 	)
 	if err := row.Scan(
 		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description,
-		&t.LatestVersion, &publishedVersionID, &t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &archivedAt,
+		&t.LatestVersion, &publishedVersionID, &publishedVersionNumber,
+		&t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &archivedAt,
 	); err != nil {
 		return nil, err
 	}
 	if publishedVersionID.Valid {
 		t.PublishedVersionID = &publishedVersionID.String
+	}
+	if publishedVersionNumber.Valid {
+		n := int(publishedVersionNumber.Int32)
+		t.PublishedVersionNumber = &n
 	}
 	if archivedAt.Valid {
 		t.ArchivedAt = &archivedAt.Time
