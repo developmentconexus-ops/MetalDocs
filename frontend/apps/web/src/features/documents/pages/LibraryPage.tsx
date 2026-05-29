@@ -201,7 +201,7 @@ export default function LibraryPage(): JSX.Element {
               <span className={styles.metaCell}>{d.ProcessAreaCodeSnapshot ?? '–'}</span>
               <StatusPill status={d.Status} />
               <AuthorCell name={d.CreatedBy} />
-              <span className={styles.monoCell}>v{d.RevisionVersion}</span>
+              <span className={styles.monoCell}>REV{String(d.RevisionNumber).padStart(2, '0')}</span>
               <button
                 type="button"
                 className={styles.moreBtn}
