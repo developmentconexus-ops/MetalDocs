@@ -43,24 +43,3 @@ export function filterToStatus(filter: LibraryFilter): DocumentStatus | undefine
   if (filter === 'todos') return undefined;
   return LIBRARY_STATUSES.find((entry) => entry.filter === filter)?.status;
 }
-
-const KNOWN_STATUSES: ReadonlySet<DocumentStatus> = new Set<DocumentStatus>([
-  'draft',
-  'review',
-  'under_review',
-  'approved',
-  'frozen',
-  'rejected',
-  'archived',
-  'finalized',
-  'scheduled',
-  'published',
-  'superseded',
-  'obsolete',
-]);
-
-export function toDocumentStatus(value: string | undefined | null): DocumentStatus {
-  return value && KNOWN_STATUSES.has(value as DocumentStatus)
-    ? (value as DocumentStatus)
-    : 'draft';
-}

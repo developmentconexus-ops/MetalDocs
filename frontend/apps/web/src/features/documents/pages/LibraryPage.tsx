@@ -9,7 +9,7 @@ import { PageSizeSelector } from '../components/PageSizeSelector';
 import { Pagination } from '../components/Pagination';
 import { useLibraryQuery } from '../queries/useLibraryQuery';
 import { useLibraryStatsQuery } from '../queries/useLibraryStatsQuery';
-import { filterToStatus, toDocumentStatus, type LibraryFilter } from '../lib/libraryStatus';
+import { filterToStatus, type LibraryFilter } from '../lib/libraryStatus';
 import { StatusPill } from '../../../components/ui/StatusPill';
 import { ApiError, resolveErrorMessage } from '../../../lib/api/errors';
 import { useDebouncedValue } from '../../../lib/hooks/useDebouncedValue';
@@ -199,7 +199,7 @@ export default function LibraryPage(): JSX.Element {
               <span className={styles.codeLink}>{d.Code}</span>
               <span className={styles.nameCell}>{d.Name}</span>
               <span className={styles.metaCell}>{d.ProcessAreaCodeSnapshot ?? '–'}</span>
-              <StatusPill status={toDocumentStatus(d.Status)} />
+              <StatusPill status={d.Status} />
               <AuthorCell name={d.CreatedBy} />
               <span className={styles.monoCell}>v{d.RevisionVersion}</span>
               <button
