@@ -806,7 +806,7 @@ func (r *Repository) GetPendingForCommit(ctx context.Context, tenantID, pendingI
 		return nil, domain.ErrPendingNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get pending for commit: %w", err)
 	}
 	return &m, nil
 }
