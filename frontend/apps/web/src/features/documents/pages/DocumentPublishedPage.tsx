@@ -495,7 +495,8 @@ export function DocumentPublishedPage() {
       {/* Content area */}
       <div className={styles.content}>
 
-        {/* KPI strip */}
+        {/* KPI strip — 4 cells. Cobertura/Próxima revisão/Páginas show em-breve placeholders until backend lands.
+            See wiki/backlog/documento-publicado.md for endpoint contracts. */}
         <div className={styles.kpiStrip}>
           <div className={styles.kpiCell}>
             <div className={styles.kpiLabel}>Versão atual</div>
@@ -506,7 +507,25 @@ export function DocumentPublishedPage() {
                 : statusPresentation.ownerMeta}
             </div>
           </div>
-          {/* "Cobertura", "Próxima revisão", "Páginas" KPIs intentionally omitted — backend endpoints not built (fanout/read-tracking, review-date, page count). */}
+          <button
+            type="button"
+            className={`${styles.kpiCell} ${styles.kpiCellLink}`}
+            onClick={() => navigate('/distribution')}
+          >
+            <div className={styles.kpiLabel}>Cobertura</div>
+            <div className={styles.kpiValuePlaceholder}>em breve</div>
+            <div className={styles.kpiHint}>abrir fanout →</div>
+          </button>
+          <div className={styles.kpiCell}>
+            <div className={styles.kpiLabel}>Próxima revisão</div>
+            <div className={styles.kpiValuePlaceholder}>em breve</div>
+            <div className={styles.kpiHint}>definido na criação</div>
+          </div>
+          <div className={styles.kpiCell}>
+            <div className={styles.kpiLabel}>Páginas</div>
+            <div className={styles.kpiValuePlaceholder}>em breve</div>
+            <div className={styles.kpiHint}>metadado do arquivo</div>
+          </div>
         </div>
 
         {/* Section: Sobre */}
@@ -545,8 +564,57 @@ export function DocumentPublishedPage() {
                     <div className={styles.factValue}>{areaLabel}</div>
                   </div>
                 </div>
+                <div className={styles.factCell}>
+                  <div className={styles.factIcon}>
+                    <Icon name="calendar" size={14} />
+                  </div>
+                  <div className={styles.factContent}>
+                    <div className={styles.factLabel}>Vigente desde</div>
+                    <div className={styles.factValue}>
+                      {sinceDateHint !== '—' ? sinceDateHint : 'em breve'}
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.factCell}>
+                  <div className={styles.factIcon}>
+                    <Icon name="calendar" size={14} />
+                  </div>
+                  <div className={styles.factContent}>
+                    <div className={styles.factLabel}>Próxima revisão</div>
+                    <div className={styles.factValue}>em breve</div>
+                  </div>
+                </div>
+                <div className={styles.factCell}>
+                  <div className={styles.factIcon}>
+                    <Icon name="docs" size={14} />
+                  </div>
+                  <div className={styles.factContent}>
+                    <div className={styles.factLabel}>Tamanho</div>
+                    <div className={styles.factValue}>em breve</div>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Coverage side card — shell only; fanout/read-tracking API not built.
+                See wiki/backlog/documento-publicado.md. */}
+            <aside className={styles.coverageCard}>
+              <div className={styles.coverageCardHeader}>
+                <span className={styles.coverageCardLabel}>Cobertura</span>
+                <span className={styles.sectionAside}>em breve</span>
+              </div>
+              <div className={styles.coverageCardEmpty}>
+                Acompanhamento de leitura por destinatário ainda não está disponível.
+              </div>
+              <button
+                type="button"
+                className={`btn btn-sm ${styles.coverageCardAction}`}
+                onClick={() => navigate('/distribution')}
+              >
+                Abrir Fanout
+                <Icon name="chevron-right" size={14} />
+              </button>
+            </aside>
           </div>
         </section>
 
