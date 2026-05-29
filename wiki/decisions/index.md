@@ -12,5 +12,6 @@
 - [0010-soft-archive-via-timestamp.md](0010-soft-archive-via-timestamp.md)
 - [0011-cd-atomic-create.md](0011-cd-atomic-create.md)
 - [0012-contract-first-api.md](0012-contract-first-api.md)
+- [0013-template-revision-labels.md](0013-template-revision-labels.md) — **Proposed** (awaiting ratification)
 
 Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.
