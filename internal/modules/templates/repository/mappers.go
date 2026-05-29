@@ -14,14 +14,15 @@ type rowScanner interface {
 
 func scanTemplate(row rowScanner) (*domain.Template, error) {
 	var (
-		t                      domain.Template
-		publishedVersionID     sql.NullString
-		publishedVersionNumber sql.NullInt32
-		archivedAt             sql.NullTime
+		t                       domain.Template
+		publishedVersionID      sql.NullString
+		publishedVersionNumber  sql.NullInt32
+		currentRevisionNumber   sql.NullInt32
+		archivedAt              sql.NullTime
 	)
 	if err := row.Scan(
 		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description,
-		&t.LatestVersion, &publishedVersionID, &publishedVersionNumber,
+		&t.LatestVersion, &publishedVersionID, &publishedVersionNumber, &currentRevisionNumber,
 		&t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &archivedAt,
 	); err != nil {
 		return nil, err
@@ -32,6 +33,10 @@ func scanTemplate(row rowScanner) (*domain.Template, error) {
 	if publishedVersionNumber.Valid {
 		n := int(publishedVersionNumber.Int32)
 		t.PublishedVersionNumber = &n
+	}
+	if currentRevisionNumber.Valid {
+		n := int(currentRevisionNumber.Int32)
+		t.CurrentRevisionNumber = &n
 	}
 	if archivedAt.Valid {
 		t.ArchivedAt = &archivedAt.Time
@@ -55,7 +60,7 @@ func scanTemplateVersion(row rowScanner) (*domain.TemplateVersion, error) {
 		obsoletedAt         sql.NullTime
 	)
 	if err := row.Scan(
-		&v.ID, &v.TemplateID, &v.VersionNumber, &status, &v.DocxStorageKey, &v.ContentHash,
+		&v.ID, &v.TemplateID, &v.VersionNumber, &v.RevisionNumber, &status, &v.DocxStorageKey, &v.ContentHash,
 		&metadataJSON, &placeholderJSON, &v.AuthorID,
 		&pendingReviewerRole, &v.PendingApproverRole, &reviewerID, &approverID,
 		&submittedAt, &reviewedAt, &approvedAt, &publishedAt, &obsoletedAt, &v.LockVersion, &v.CreatedAt,

@@ -5,6 +5,7 @@ import { WorkspaceHeroHeader } from "../../components/ui/WorkspaceHeroHeader";
 import { TemplateCard } from "./components/TemplateCard";
 import { useTemplatesQuery } from "./queries/useTemplatesQuery";
 import { resolveQueryError } from "../../lib/api/resolveQueryError";
+import { formatRevisionCode } from "../../lib/labels/revisionCode";
 import styles from "./TemplatesListPage.module.css";
 
 export type TemplatesListPageProps = {
@@ -49,12 +50,12 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
         : "draft";
     const timestamp = isValidIsoDate(dto.created_at) ? dto.created_at : new Date().toISOString();
 
+    // ADR 0013: chip reads canonical `current_revision_number` from the contract.
+    // Drafts (never-published templates) render no REV code — honesty rule.
     const versionLabel =
-      status === "published" && dto.published_version_number != null
-        ? `v${dto.published_version_number}`
-        : status === "draft"
-          ? `Rascunho v${dto.latest_version}`
-          : `v${dto.latest_version}`;
+      dto.current_revision_number != null
+        ? formatRevisionCode(dto.current_revision_number)
+        : null;
 
     return {
       id: dto.id,

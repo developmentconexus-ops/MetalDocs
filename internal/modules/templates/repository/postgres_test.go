@@ -94,7 +94,7 @@ func TestGetVersionMatchesUUIDTenantID(t *testing.T) {
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT
-	v.id::text, v.template_id::text, v.version_number, v.status, v.docx_storage_key, v.content_hash,
+	v.id::text, v.template_id::text, v.version_number, v.revision_number, v.status, v.docx_storage_key, v.content_hash,
 	v.metadata_schema, v.placeholder_schema, v.author_id,
 	v.pending_reviewer_role, v.pending_approver_role, v.reviewer_id, v.approver_id,
 	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at
@@ -103,12 +103,12 @@ JOIN templates_template t ON t.id = v.template_id
 WHERE v.template_id = $1 AND v.version_number = $2 AND t.tenant_id = $3::uuid`)).
 		WithArgs("tpl-1", 1, "tenant-a").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "template_id", "version_number", "status", "docx_storage_key", "content_hash",
+			"id", "template_id", "version_number", "revision_number", "status", "docx_storage_key", "content_hash",
 			"metadata_schema", "placeholder_schema", "author_id",
 			"pending_reviewer_role", "pending_approver_role", "reviewer_id", "approver_id",
 			"submitted_at", "reviewed_at", "approved_at", "published_at", "obsoleted_at", "lock_version", "created_at",
 		}).AddRow(
-			"ver-1", "tpl-1", 1, "published", "system/templates/blank.docx", "hash-1",
+			"ver-1", "tpl-1", 1, 0, "published", "system/templates/blank.docx", "hash-1",
 			`{}`, `[]`, "admin",
 			nil, "system", nil, nil,
 			nil, nil, nil, time.Date(2026, 5, 27, 19, 0, 0, 0, time.UTC), nil, 0, time.Date(2026, 5, 27, 19, 0, 0, 0, time.UTC),

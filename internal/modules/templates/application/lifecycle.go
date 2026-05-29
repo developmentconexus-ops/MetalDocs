@@ -234,6 +234,10 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 		template.PublishedVersionID = &version.ID
 		approvedNum := version.VersionNumber
 		template.PublishedVersionNumber = &approvedNum
+		// ADR 0013: surface the 0-based regulated revision code alongside the
+		// 1-based lifecycle counter. FE renders REV{nn} directly from this field.
+		approvedRev := version.RevisionNumber
+		template.CurrentRevisionNumber = &approvedRev
 
 		if s.db != nil {
 			tx, err := s.db.BeginTx(ctx, nil)
@@ -373,6 +377,9 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	template.PublishedVersionID = &version.ID
 	publishedNum := version.VersionNumber
 	template.PublishedVersionNumber = &publishedNum
+	// ADR 0013: see Approve Accept branch.
+	publishedRev := version.RevisionNumber
+	template.CurrentRevisionNumber = &publishedRev
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
