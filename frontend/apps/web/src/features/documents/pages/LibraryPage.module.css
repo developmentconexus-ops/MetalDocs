@@ -133,13 +133,14 @@
   border: 1px solid var(--border);
   border-radius: var(--r-5);
   background: var(--surface);
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: var(--shadow-1);
 }
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 110px 120px 130px 56px 36px;
+  grid-template-columns: 120px minmax(180px, 1fr) 100px 110px 120px 56px 36px;
+  min-width: 760px;
   gap: var(--sp-4);
   align-items: center;
   padding: var(--sp-3) var(--sp-5);
@@ -154,7 +155,8 @@
 
 .row {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 110px 120px 130px 56px 36px;
+  grid-template-columns: 120px minmax(180px, 1fr) 100px 110px 120px 56px 36px;
+  min-width: 760px;
   gap: var(--sp-4);
   align-items: center;
   padding: var(--sp-3) var(--sp-5);
@@ -205,6 +207,10 @@
 .metaCell {
   color: var(--text-soft);
   font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .monoCell {

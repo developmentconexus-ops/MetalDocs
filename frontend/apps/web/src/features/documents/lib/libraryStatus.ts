@@ -13,7 +13,9 @@ export type LibraryFilter =
   | 'rascunhos'
   | 'em_revisao'
   | 'aprovados'
+  | 'agendados'
   | 'publicados'
+  | 'substituidos'
   | 'rejeitados'
   | 'obsoletos';
 
@@ -27,15 +29,38 @@ type StatusEntry = {
 };
 
 export const LIBRARY_STATUSES: readonly StatusEntry[] = [
-  { status: 'draft',         filter: 'rascunhos',  label: 'Rascunhos'   },
-  { status: 'under_review',  filter: 'em_revisao', label: 'Em Revisão'  },
-  { status: 'approved',      filter: 'aprovados',  label: 'Aprovados'   },
-  { status: 'published',     filter: 'publicados', label: 'Publicados'  },
-  { status: 'rejected',      filter: 'rejeitados', label: 'Rejeitados'  },
-  { status: 'obsolete',      filter: 'obsoletos',  label: 'Obsoletos'   },
+  { status: 'draft',         filter: 'rascunhos',    label: 'Rascunhos'   },
+  { status: 'under_review',  filter: 'em_revisao',   label: 'Em Revisão'  },
+  { status: 'approved',      filter: 'aprovados',    label: 'Aprovados'   },
+  { status: 'scheduled',     filter: 'agendados',    label: 'Agendados'   },
+  { status: 'published',     filter: 'publicados',   label: 'Publicados'  },
+  { status: 'superseded',    filter: 'substituidos', label: 'Substituídos' },
+  { status: 'rejected',      filter: 'rejeitados',   label: 'Rejeitados'  },
+  { status: 'obsolete',      filter: 'obsoletos',    label: 'Obsoletos'   },
 ] as const;
 
 export function filterToStatus(filter: LibraryFilter): DocumentStatus | undefined {
   if (filter === 'todos') return undefined;
   return LIBRARY_STATUSES.find((entry) => entry.filter === filter)?.status;
+}
+
+const KNOWN_STATUSES: ReadonlySet<DocumentStatus> = new Set<DocumentStatus>([
+  'draft',
+  'review',
+  'under_review',
+  'approved',
+  'frozen',
+  'rejected',
+  'archived',
+  'finalized',
+  'scheduled',
+  'published',
+  'superseded',
+  'obsolete',
+]);
+
+export function toDocumentStatus(value: string | undefined | null): DocumentStatus {
+  return value && KNOWN_STATUSES.has(value as DocumentStatus)
+    ? (value as DocumentStatus)
+    : 'draft';
 }
