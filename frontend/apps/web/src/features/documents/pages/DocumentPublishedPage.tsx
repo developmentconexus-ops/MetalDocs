@@ -10,10 +10,19 @@ import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { useApprovalInstanceQuery } from '../queries/useApprovalInstanceQuery';
 import { useControlledDocumentActiveDocumentQuery } from '../queries/useControlledDocumentActiveDocumentQuery';
 import { useDocumentRevisionHistoryQuery } from '../queries/useDocumentRevisionHistoryQuery';
+import { useAreasQuery } from '../queries/useAreasQuery';
+import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import { createRevision } from '../../controlled-documents/api/controlledDocuments';
 import { SupersedePublishDialog } from '../../approval/components/SupersedePublishDialog';
 import { useAuthStore } from '../../../store/auth.store';
-import { formatPublishedAt, formatRevisionCode, formatSignedAt, formatShortDate } from '../lib/documentDetailMeta';
+import {
+  formatPublishedAt,
+  formatRevisionCode,
+  formatSignedAt,
+  formatShortDate,
+  resolveAreaLabel,
+  resolveProfileLabel,
+} from '../lib/documentDetailMeta';
 import styles from './DocumentPublishedPage.module.css';
 
 const ACTIVE_SIBLING_STATES = ['draft', 'under_review', 'approved', 'scheduled', 'rejected'] as const;
@@ -109,23 +118,6 @@ function getDocumentStatusPresentation(status: string, publishedAt: string): Doc
       };
   }
 }
-// TODO(backlog): wire relationship model — GET /api/v1/documents/:id/relationships
-// See wiki/backlog/documento-publicado.md
-const PLACEHOLDER_RELATED = [
-  { code: 'IT-EHS-021', title: 'Inspeção de cadeados e travas', type: 'Instrução', rel: 'referenciado por' },
-  { code: 'FR-EHS-008', title: 'Ficha de bloqueio individual', type: 'Formulário', rel: 'anexo obrigatório' },
-  { code: 'PR-MAN-103', title: 'Manutenção preventiva CCM-04', type: 'Procedimento', rel: 'invoca este PR' },
-];
-
-// TODO(backlog): wire GET /api/v1/documents/:id/display-comments — architecture brainstorm needed
-// See wiki/backlog/documento-publicado.md
-const PLACEHOLDER_COMMENTS = [
-  { who: 'Marcos Lima', role: 'Gerente Industrial', when: '13 mar · 09:42',
-    text: 'Equipes de Pomerode já alinhadas. Treinamento iniciado para CCM-04 na próxima segunda.' },
-  { who: 'Renata Souza', role: 'Coord. SSMA', when: '14 mar · 11:08',
-    text: 'Adicionei FR-EHS-008 como anexo de referência para os supervisores de turno.' },
-];
-
 export function DocumentPublishedPage() {
   const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
@@ -147,6 +139,8 @@ export function DocumentPublishedPage() {
   const revisionHistoryQuery = useDocumentRevisionHistoryQuery(documentId, {
     refetchInterval: shouldPollScheduledLifecycle ? scheduledLifecycleRefetchInterval : false,
   });
+  const areasQuery = useAreasQuery();
+  const profilesQuery = useProfilesQuery();
   const activeDocument = activeDocumentQuery.data ?? null;
 
   const [linkCopied, setLinkCopied] = useState(false);
@@ -193,6 +187,10 @@ export function DocumentPublishedPage() {
     ? (user.displayName ?? createdByRaw)
     : createdByRaw;
   const versionLabel = formatRevisionCode(doc.RevisionNumber);
+  const areaCode = doc.ProcessAreaCodeSnapshot ?? '';
+  const profileCode = doc.ProfileCodeSnapshot ?? '';
+  const areaLabel = areaCode ? resolveAreaLabel(areaCode, areasQuery.data ?? []) : '—';
+  const profileLabel = profileCode ? resolveProfileLabel(profileCode, profilesQuery.data ?? []) : '—';
 
   // Approval completion is the only lifecycle timestamp currently exposed on
   // the canonical document detail payload.
@@ -342,17 +340,15 @@ export function DocumentPublishedPage() {
       <DocumentHero
         breadcrumbItems={[
           { label: 'Biblioteca', href: '/documents' },
-          { label: '—' },
+          ...(areaLabel !== '—' ? [{ label: areaLabel }] : []),
           { label: code },
         ]}
         docCard={
           <div className={styles.docCard}>
-            {/* TODO(backlog): show area label once DocumentResponse includes area_code */}
-            <div className={styles.docCardHeader}>—</div>
+            <div className={styles.docCardHeader}>{areaLabel}</div>
             <div className={styles.docCardBody}>
               <div className={styles.docCardCode}>{code}</div>
-              {/* TODO(backlog): show profile label once DocumentResponse includes profile_code */}
-              <div className={styles.docCardType}>—</div>
+              <div className={styles.docCardType}>{profileLabel}</div>
               <div className={styles.docCardSpacer} />
               <div className={styles.docCardDivider} />
               <div className={styles.docCardFooter}>
@@ -369,8 +365,7 @@ export function DocumentPublishedPage() {
               <span className={styles.vigenteDot} />
               {versionLabel} · {statusPresentation.badgeLabel}
             </span>
-            {/* TODO(backlog): resolve profile_code → human label once DocumentResponse includes profile_code */}
-            <span className={styles.typeLabel}>—</span>
+            <span className={styles.typeLabel}>{profileLabel}</span>
           </>
         }
         title={docName ?? code}
@@ -542,8 +537,7 @@ export function DocumentPublishedPage() {
                   </div>
                   <div className={styles.factContent}>
                     <div className={styles.factLabel}>Tipo</div>
-                    {/* TODO(backlog): resolve from profile_code once DocumentResponse includes it */}
-                    <div className={styles.factValue}>—</div>
+                    <div className={styles.factValue}>{profileLabel}</div>
                   </div>
                 </div>
                 <div className={styles.factCell}>
@@ -552,8 +546,7 @@ export function DocumentPublishedPage() {
                   </div>
                   <div className={styles.factContent}>
                     <div className={styles.factLabel}>Área</div>
-                    {/* TODO(backlog): resolve from area_code once DocumentResponse includes it */}
-                    <div className={styles.factValue}>—</div>
+                    <div className={styles.factValue}>{areaLabel}</div>
                   </div>
                 </div>
               </div>
@@ -640,68 +633,31 @@ export function DocumentPublishedPage() {
           )}
         </section>
 
-        {/* Section: Documentos relacionados — TODO(backlog): wire relationship model */}
+        {/* Section: Documentos relacionados — backend não disponível, defer rastreado em wiki/backlog/documento-publicado.md */}
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <div>
               <div className={styles.sectionKicker}>04 · Referências</div>
               <h2 className={styles.sectionTitle}>Documentos relacionados</h2>
             </div>
+            <span className={styles.sectionAside}>em breve</span>
           </div>
-          <div className={styles.relatedGrid}>
-            {PLACEHOLDER_RELATED.map((r) => (
-              <div key={r.code} className={styles.relatedCard}>
-                <div className={styles.relatedCardTop}>
-                  <div className={styles.relatedCardIcon}>
-                    <Icon name="docs" size={14} />
-                  </div>
-                  <span className={styles.relatedCardRel}>{r.rel}</span>
-                </div>
-                <div className={styles.relatedCardTitle}>{r.title}</div>
-                <div className={styles.relatedCardFooter}>
-                  <span className={styles.relatedCardCode}>{r.code}</span>
-                  <span className={styles.relatedCardType}>{r.type}</span>
-                </div>
-              </div>
-            ))}
+          <div className={styles.signoffEmpty}>
+            O modelo de relacionamentos entre documentos ainda não está disponível.
           </div>
         </section>
 
-        {/* Section: Comentários — TODO(backlog): wire display-side comments */}
+        {/* Section: Comentários — backend não disponível, defer rastreado em wiki/backlog/documento-publicado.md */}
         <section className={styles.section}>
           <div className={styles.sectionHead}>
             <div>
               <div className={styles.sectionKicker}>05 · Discussão interna</div>
-              <h2 className={styles.sectionTitle}>Comentários ({PLACEHOLDER_COMMENTS.length})</h2>
+              <h2 className={styles.sectionTitle}>Comentários</h2>
             </div>
+            <span className={styles.sectionAside}>em breve</span>
           </div>
-          <div className={styles.commentsCard}>
-            {PLACEHOLDER_COMMENTS.map((c, i) => (
-              <div
-                key={i}
-                className={`${styles.commentRow} ${i < PLACEHOLDER_COMMENTS.length - 1 ? styles.commentRowBorder : ''}`}
-              >
-                <Avatar name={c.who} size="md" />
-                <div className={styles.commentContent}>
-                  <div className={styles.commentMeta}>
-                    <span className={styles.commentAuthor}>{c.who}</span>
-                    <span className={styles.commentRole}>· {c.role}</span>
-                    <span className={styles.commentWhen}>{c.when}</span>
-                  </div>
-                  <div className={styles.commentText}>{c.text}</div>
-                </div>
-              </div>
-            ))}
-            {/* Reply box shell — TODO(backlog): wire comment submission */}
-            <div className={styles.replyRow}>
-              <Avatar name={user?.displayName ?? 'Você'} size="md" />
-              <div className={styles.replyBox}>
-                <span className={styles.replyPlaceholder}>Adicionar um comentário…</span>
-                <button className="btn btn-sm btn-primary" type="button" aria-disabled="true" title="Em breve">
-                  Comentar
-                </button>
-              </div>
-            </div>
+          <div className={styles.signoffEmpty}>
+            Comentários de exibição ainda não estão disponíveis para este documento.
           </div>
         </section>
 

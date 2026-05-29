@@ -1,23 +1,16 @@
 # Backlog: Documento Publicado screen (`/documents/:id`)
 
-> Last updated: 2026-05-08 (Phase 3c complete)
+> Last updated: 2026-05-29 (QA `qa/documents-detail`: area/profile snapshot fields resolved + mock related/comments replaced with honest em-breve)
 
 ---
 
 ## Phase 3c gaps — require backend changes
 
-### `DocumentResponse` missing area_code, profile_code, created_at
+### ~~`DocumentResponse` missing area_code, profile_code, created_at~~ — RESOLVED 2026-05-29
 
-`GET /api/v1/documents/:id` currently returns: `id`, `code`, `name`, `status`, `created_by`, `current_revision_id`, `revision_version`, `form_data`.
+**Resolved**. `GET /api/v1/documents/:id` already returns `ProcessAreaCodeSnapshot`, `ProfileCodeSnapshot`, and `CreatedAt` on `DocumentResponse` (verified against live payload for `c1bb2112-21ea-46fc-ac1f-719d04994d41`: `ProcessAreaCodeSnapshot: "rh"`, `ProfileCodeSnapshot: "po"`, `CreatedAt: "2026-05-28T20:01:07.859403-03:00"`). Wiki backlog claim was stale.
 
-Missing fields needed by this screen:
-- `area_code` — to show area label in breadcrumb, DocCardMini header, and facts grid "Área"
-- `profile_code` — to show type label in DocCardMini, badge, and facts grid "Tipo"
-- `created_at` — to show "publicou em DD mon YYYY · HH:MM" in owner banner
-
-Backend fix: add these three fields to the `getDocumentByID` handler SELECT. They exist on the underlying document row.
-
-**Frontend impact:** Once added, wire `resolveAreaLabel` + `resolveProfileLabel` from `lib/documentDetailMeta.ts` in the page.
+Frontend now wires both via `resolveAreaLabel` + `resolveProfileLabel` (existing `documentDetailMeta.ts`) → fills breadcrumb middle slot, DocCardMini header + type, hero `typeLabel` badge, and the Identificação e responsabilidade facts grid (`Tipo` + `Área`).
 
 ---
 
@@ -69,6 +62,8 @@ Backend: implement list endpoint returning `[{ revision_id, version_num, created
 
 No related-documents relationship model in the backend. Needs design + backend work before frontend.
 
+**Frontend (2026-05-29):** mock `PLACEHOLDER_RELATED` array removed. Section now renders honest "em breve" empty state. Re-wire grid once endpoint + relationship model land.
+
 ---
 
 ### CommentsCard — display-side architecture
@@ -80,7 +75,7 @@ Decide:
 2. Separate `display_comments` table with plain-text content
 3. Reply threading UX (parent_library_id is present but UX not designed)
 
-**Frontend:** `PLACEHOLDER_COMMENTS` ready; Avatar + layout done. Wire once architecture decided.
+**Frontend (2026-05-29):** mock `PLACEHOLDER_COMMENTS` array + reply-box shell removed. Section now renders honest "em breve" empty state. Re-wire once display-side architecture is decided.
 
 ---
 
