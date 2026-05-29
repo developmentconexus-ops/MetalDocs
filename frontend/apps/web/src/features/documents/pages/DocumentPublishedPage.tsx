@@ -83,11 +83,29 @@ function getDocumentStatusPresentation(status: string, publishedAt: string): Doc
         subtitle: hasPublishedAt ? `obsoleto após publicação em ${publishedAt}` : 'Documento obsoleto',
         ownerMeta: hasPublishedAt ? `obsoleto · publicado em ${publishedAt}` : 'obsoleto',
       };
+    case 'draft':
+      return {
+        badgeLabel: 'rascunho',
+        subtitle: 'Rascunho — ainda não publicado',
+        ownerMeta: 'rascunho',
+      };
+    case 'under_review':
+      return {
+        badgeLabel: 'em revisão',
+        subtitle: 'Aguardando decisão de aprovação',
+        ownerMeta: 'em revisão',
+      };
+    case 'rejected':
+      return {
+        badgeLabel: 'rejeitado',
+        subtitle: 'Revisão rejeitada',
+        ownerMeta: 'rejeitado',
+      };
     default:
       return {
-        badgeLabel: 'vigente',
+        badgeLabel: status || 'sem status',
         subtitle: hasPublishedAt ? `publicado em ${publishedAt}` : null,
-        ownerMeta: hasPublishedAt ? `publicado em ${publishedAt}` : 'publicado',
+        ownerMeta: hasPublishedAt ? `publicado em ${publishedAt}` : (status || '—'),
       };
   }
 }
@@ -400,7 +418,7 @@ export function DocumentPublishedPage() {
                   : activeSiblingDocumentId
                     ? 'Já existe uma revisão ativa para este documento controlado'
                   : !isPublished
-                    ? 'Documento controlado indisponível para iniciar revisão'
+                    ? 'Apenas documentos publicados podem iniciar uma nova revisão'
                     : undefined
               }
               onClick={activeSiblingDocumentId ? handleContinueActiveRevision : handleStartRevision}
