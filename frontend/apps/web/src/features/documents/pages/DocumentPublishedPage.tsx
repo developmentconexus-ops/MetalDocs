@@ -593,6 +593,16 @@ export function DocumentPublishedPage() {
                     <div className={styles.factValue}>em breve</div>
                   </div>
                 </div>
+                {/* TODO(backlog): wire confidentiality field when added to DocumentResponse */}
+                <div className={styles.factCell}>
+                  <div className={styles.factIcon}>
+                    <Icon name="shield" size={14} />
+                  </div>
+                  <div className={styles.factContent}>
+                    <div className={styles.factLabel}>Classificação</div>
+                    <div className={styles.factValue}>em breve</div>
+                  </div>
+                </div>
               </div>
             </div>
 
