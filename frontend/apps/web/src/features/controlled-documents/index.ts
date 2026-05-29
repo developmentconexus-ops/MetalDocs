@@ -1,1 +1,0 @@
-export { ControlledDocumentListPage } from './ControlledDocumentListPage';

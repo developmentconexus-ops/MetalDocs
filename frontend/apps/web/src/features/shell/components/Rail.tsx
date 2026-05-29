@@ -15,7 +15,6 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'home',     label: 'Início',     path: '/' },
   { icon: 'library',  label: 'Documentos', path: '/documents' },
   { icon: 'template', label: 'Templates',  path: '/templates' },
-  { icon: 'registry', label: 'Registro',   path: '/controlled-documents' },
   { icon: 'inbox',    label: 'Aprovações', path: '/approvals' },
   { icon: 'audit',    label: 'Auditoria',  path: '/audit' },
 ];
