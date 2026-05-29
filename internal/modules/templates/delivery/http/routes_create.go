@@ -94,17 +94,18 @@ func toTemplateResponse(t *domain.Template) map[string]any {
 	}
 
 	return map[string]any{
-		"id":                   t.ID,
-		"tenant_id":            t.TenantID,
-		"doc_type_code":        t.DocTypeCode,
-		"key":                  t.Key,
-		"name":                 t.Name,
-		"description":          t.Description,
-		"latest_version":       t.LatestVersion,
-		"published_version_id": t.PublishedVersionID,
-		"created_by":           t.CreatedBy,
-		"created_at":           t.CreatedAt.UTC().Format(time.RFC3339),
-		"archived_at":          timePtrRFC3339(t.ArchivedAt),
+		"id":                       t.ID,
+		"tenant_id":                t.TenantID,
+		"doc_type_code":            t.DocTypeCode,
+		"key":                      t.Key,
+		"name":                     t.Name,
+		"description":              t.Description,
+		"latest_version":           t.LatestVersion,
+		"published_version_id":     t.PublishedVersionID,
+		"published_version_number": t.PublishedVersionNumber,
+		"created_by":               t.CreatedBy,
+		"created_at":               t.CreatedAt.UTC().Format(time.RFC3339),
+		"archived_at":              timePtrRFC3339(t.ArchivedAt),
 	}
 }
 

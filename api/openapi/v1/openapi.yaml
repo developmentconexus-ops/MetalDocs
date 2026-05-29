@@ -1707,15 +1707,7 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  required: [id, key, name, latest_version]
-                  properties:
-                    id: { type: string, format: uuid }
-                    key: { type: string }
-                    name: { type: string }
-                    description: { type: string }
-                    latest_version: { type: integer, minimum: 1 }
-                    updated_at: { type: string, format: date-time }
+                  $ref: '#/components/schemas/TemplateDTO'
         '403': { description: forbidden }
     post:
       summary: Create template (docx)
@@ -5075,6 +5067,7 @@ components:
         description: { type: string, nullable: true }
         latest_version: { type: integer, minimum: 1 }
         published_version_id: { type: string, format: uuid, nullable: true }
+        published_version_number: { type: integer, nullable: true, minimum: 1 }
         created_by: { type: string }
         created_at: { type: string, format: date-time }
         archived_at: { type: string, format: date-time, nullable: true }

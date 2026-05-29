@@ -4732,6 +4732,7 @@ export interface components {
             latest_version: number;
             /** Format: uuid */
             published_version_id?: string | null;
+            published_version_number?: number | null;
             created_by: string;
             /** Format: date-time */
             created_at: string;
@@ -5561,16 +5562,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        key: string;
-                        name: string;
-                        description?: string;
-                        latest_version: number;
-                        /** Format: date-time */
-                        updated_at?: string;
-                    }[];
+                    "application/json": components["schemas"]["TemplateDTO"][];
                 };
             };
             /** @description forbidden */

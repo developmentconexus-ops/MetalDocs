@@ -46,10 +46,17 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
       ? maybeUpdatedAt
       : dto.created_at;
 
+    const versionLabel =
+      status === "published" && dto.published_version_number != null
+        ? `v${dto.published_version_number}`
+        : status === "draft"
+          ? `Rascunho v${dto.latest_version}`
+          : `v${dto.latest_version}`;
+
     return {
       id: dto.id,
       title: dto.name || "Sem nome",
-      version: `v${dto.latest_version}`,
+      version: versionLabel,
       status,
       author: dto.created_by || "Usuario",
       updated: formatRelative(updatedAt),

@@ -232,6 +232,8 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 		version.PublishedAt = &now
 
 		template.PublishedVersionID = &version.ID
+		approvedNum := version.VersionNumber
+		template.PublishedVersionNumber = &approvedNum
 
 		if s.db != nil {
 			tx, err := s.db.BeginTx(ctx, nil)
@@ -369,6 +371,8 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	version.PublishedAt = &now
 	version.ApprovedAt = &now
 	template.PublishedVersionID = &version.ID
+	publishedNum := version.VersionNumber
+	template.PublishedVersionNumber = &publishedNum
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
