@@ -1,57 +1,69 @@
+import { useParams } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import { DocumentHero } from '../components/DocumentHero';
 import { DocRefCard } from '../components/distribution/DocRefCard';
-import { KPIStrip } from '../components/distribution/KPIStrip';
-import { DonutCard } from '../components/distribution/DonutCard';
-import { DistributionFacts } from '../components/distribution/DistributionFacts';
-import { CoverageByArea } from '../components/distribution/CoverageByArea';
-import { TimelineCard } from '../components/distribution/TimelineCard';
-import { RecipientsCard } from '../components/distribution/RecipientsCard';
+import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
+import { formatRevisionCode } from '../lib/documentDetailMeta';
 import styles from './DocumentDistributionPage.module.css';
 
-function SectionHeader({
-  kicker,
-  title,
-  aside,
-}: {
-  kicker: string;
-  title: string;
-  aside?: React.ReactNode;
-}) {
-  return (
-    <div className={styles.sectionHeader}>
-      <div>
-        <div className={styles.sectionKicker}>{kicker}</div>
-        <h2 className={styles.sectionTitle}>{title}</h2>
-      </div>
-      {aside && <div className={styles.sectionAside}>{aside}</div>}
-    </div>
-  );
-}
+const EM_DASH = '—';
+
+const PLANNED_CAPABILITIES = [
+  { title: 'Cobertura de leitura', desc: 'Percentual de destinatários que leram e reconheceram o documento.' },
+  { title: 'Cobertura por área', desc: 'Onde está a pendência, ranqueado pela menor adesão.' },
+  { title: 'Curva de adoção', desc: 'Linha do tempo de leituras e reconhecimentos desde a publicação.' },
+  { title: 'Lista de destinatários', desc: 'Quem leu, reconheceu ou está em atraso, com ações de lembrete.' },
+];
 
 export function DocumentDistributionPage() {
+  const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
+  const documentId = rawDocumentId ?? '';
+  const docQuery = useDocumentDetailQuery(documentId);
+
+  if (docQuery.isLoading) {
+    return (
+      <div className={styles.stateLoading} role="status" aria-live="polite">
+        <Icon name="docs" size={24} className={styles.stateIcon} />
+        <span>Carregando documento…</span>
+      </div>
+    );
+  }
+
+  if (docQuery.isError || !docQuery.data) {
+    return (
+      <div className={styles.stateError} role="alert">
+        <Icon name="x" size={20} className={styles.stateIcon} />
+        <span>Documento não encontrado ou sem permissão de acesso.</span>
+        <button className="btn btn-sm" type="button" onClick={() => docQuery.refetch()}>
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+
+  const doc = docQuery.data;
+  const code = doc.Code ?? EM_DASH;
+  const docName = doc.Name;
+  const versionLabel = formatRevisionCode(doc.RevisionNumber);
+
   return (
     <div className={styles.page}>
       <DocumentHero
         breadcrumbItems={[
-          { label: 'Biblioteca', href: '#' },
-          { label: 'SSMA', href: '#' },
-          { label: 'PR-EHS-014', href: '#' },
+          { label: 'Biblioteca', href: '/documents' },
+          { label: EM_DASH },
+          { label: code, href: `/documents/${documentId}` },
           { label: 'Distribuição' },
         ]}
-        docCard={<DocRefCard />}
+        docCard={<DocRefCard areaLabel={EM_DASH} code={code} typeLabel={EM_DASH} versionLabel={versionLabel} />}
         badges={
           <>
-            <span className={styles.codeBadge}>PR-EHS-014 · v3.2</span>
-            <span className={styles.deadlineBadge}>
-              <span className={styles.deadlineDot} />
-              Vence em 8 dias
-            </span>
-            <span className={styles.sectionBadge}>§03.05 · Fanout</span>
+            <span className={styles.codeBadge}>{code} · {versionLabel}</span>
+            <span className={styles.soonBadge}>Em breve</span>
           </>
         }
         title="Distribuição & cobertura de leitura"
-        subtitle="Procedimento de Bloqueio e Etiquetagem (LOTO) · publicado em 12 mar 2026 · 14:32. Reconhecimento obrigatório por assinatura para todas as 248 pessoas alcançadas."
+        subtitle={<span>{docName ?? code}</span>}
         actions={
           <>
             <button type="button" aria-disabled="true" title="Em breve" className={styles.ctaDisabled}>
@@ -74,54 +86,25 @@ export function DocumentDistributionPage() {
         }
       />
 
-      {/* Main content */}
       <main className={styles.main}>
-        <KPIStrip />
-
-        {/* §01 — Cobertura geral + detalhes */}
-        <section className={styles.section}>
-          <SectionHeader
-            kicker="01 · Status"
-            title="Cobertura geral e detalhes da distribuição"
-          />
-          <div className={styles.twoCol}>
-            <DonutCard />
-            <DistributionFacts />
-          </div>
-        </section>
-
-        {/* §02 — Por área */}
-        <section className={styles.section}>
-          <SectionHeader
-            kicker="02 · Por área"
-            title="Onde está a pendência"
-            aside={
-              <a href="#" className={styles.sectionAside}>
-                Lembrar todas as áreas críticas →
-              </a>
-            }
-          />
-          <CoverageByArea />
-        </section>
-
-        {/* §03 — Linha do tempo */}
-        <section className={styles.section}>
-          <SectionHeader
-            kicker="03 · Linha do tempo"
-            title="Curva de adoção desde a publicação"
-            aside={<span>últimos 8 dias</span>}
-          />
-          <TimelineCard />
-        </section>
-
-        {/* §04 — Destinatários */}
-        <section className={styles.section}>
-          <SectionHeader
-            kicker="04 · Destinatários"
-            title="Lista detalhada"
-            aside={<span>selecione para ações em massa</span>}
-          />
-          <RecipientsCard />
+        <section className={styles.empty} aria-labelledby="distribution-soon-title">
+          <Icon name="users" size={28} className={styles.emptyIcon} />
+          <h2 id="distribution-soon-title" className={styles.emptyTitle}>
+            Distribuição e cobertura de leitura — em breve
+          </h2>
+          <p className={styles.emptyText}>
+            O rastreamento de leitura e o fanout de distribuição ainda não estão
+            disponíveis. Quando o backend de distribuição entrar no ar, esta página
+            exibirá métricas reais para <strong>{docName ?? code}</strong>.
+          </p>
+          <ul className={styles.emptyList}>
+            {PLANNED_CAPABILITIES.map((cap) => (
+              <li key={cap.title} className={styles.emptyItem}>
+                <span className={styles.emptyItemTitle}>{cap.title}</span>
+                <span className={styles.emptyItemDesc}>{cap.desc}</span>
+              </li>
+            ))}
+          </ul>
         </section>
       </main>
     </div>
