@@ -439,6 +439,10 @@
   background: var(--surface-2);
 }
 
+.coverageCardHeader .kpiLabel {
+  margin: 0;
+}
+
 .coverageCardBody {
   flex: 1;
   display: flex;
