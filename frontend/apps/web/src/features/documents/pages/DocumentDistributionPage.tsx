@@ -2,18 +2,46 @@ import { useParams } from 'react-router-dom';
 import { Icon } from '../../../components/ui/Icon';
 import { DocumentHero } from '../components/DocumentHero';
 import { DocRefCard } from '../components/distribution/DocRefCard';
+import { KPIStrip } from '../components/distribution/KPIStrip';
+import { DonutCard } from '../components/distribution/DonutCard';
+import { DistributionFacts } from '../components/distribution/DistributionFacts';
+import { CoverageByArea } from '../components/distribution/CoverageByArea';
+import { TimelineCard } from '../components/distribution/TimelineCard';
+import { RecipientsCard } from '../components/distribution/RecipientsCard';
 import { useDocumentDetailQuery } from '../queries/useDocumentDetailQuery';
 import { formatRevisionCode } from '../lib/documentDetailMeta';
 import styles from './DocumentDistributionPage.module.css';
 
 const EM_DASH = '—';
 
-const PLANNED_CAPABILITIES = [
-  { title: 'Cobertura de leitura', desc: 'Percentual de destinatários que leram e reconheceram o documento.' },
-  { title: 'Cobertura por área', desc: 'Onde está a pendência, ranqueado pela menor adesão.' },
-  { title: 'Curva de adoção', desc: 'Linha do tempo de leituras e reconhecimentos desde a publicação.' },
-  { title: 'Lista de destinatários', desc: 'Quem leu, reconheceu ou está em atraso, com ações de lembrete.' },
-];
+function SectionHeader({
+  kicker,
+  title,
+  aside,
+}: {
+  kicker: string;
+  title: string;
+  aside?: React.ReactNode;
+}) {
+  return (
+    <div className={styles.sectionHeader}>
+      <div>
+        <div className={styles.sectionKicker}>{kicker}</div>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+      </div>
+      {aside && <div className={styles.sectionAside}>{aside}</div>}
+    </div>
+  );
+}
+
+function IllustrativeBlock({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={styles.illustrative} aria-hidden="true">
+      <div className={styles.illustrativeWatermark}>Dados ilustrativos · Em breve</div>
+      <div className={styles.illustrativeBody}>{children}</div>
+    </div>
+  );
+}
 
 export function DocumentDistributionPage() {
   const { documentId: rawDocumentId } = useParams<{ documentId: string }>();
@@ -55,10 +83,19 @@ export function DocumentDistributionPage() {
           { label: code, href: `/documents/${documentId}` },
           { label: 'Distribuição' },
         ]}
-        docCard={<DocRefCard areaLabel={EM_DASH} code={code} typeLabel={EM_DASH} versionLabel={versionLabel} />}
+        docCard={
+          <DocRefCard
+            areaLabel={EM_DASH}
+            code={code}
+            typeLabel={EM_DASH}
+            versionLabel={versionLabel}
+          />
+        }
         badges={
           <>
-            <span className={styles.codeBadge}>{code} · {versionLabel}</span>
+            <span className={styles.codeBadge}>
+              {code} · {versionLabel}
+            </span>
             <span className={styles.soonBadge}>Em breve</span>
           </>
         }
@@ -87,24 +124,53 @@ export function DocumentDistributionPage() {
       />
 
       <main className={styles.main}>
-        <section className={styles.empty} aria-labelledby="distribution-soon-title">
-          <Icon name="users" size={28} className={styles.emptyIcon} />
-          <h2 id="distribution-soon-title" className={styles.emptyTitle}>
-            Distribuição e cobertura de leitura — em breve
-          </h2>
-          <p className={styles.emptyText}>
-            O rastreamento de leitura e o fanout de distribuição ainda não estão
-            disponíveis. Quando o backend de distribuição entrar no ar, esta página
-            exibirá métricas reais para <strong>{docName ?? code}</strong>.
-          </p>
-          <ul className={styles.emptyList}>
-            {PLANNED_CAPABILITIES.map((cap) => (
-              <li key={cap.title} className={styles.emptyItem}>
-                <span className={styles.emptyItemTitle}>{cap.title}</span>
-                <span className={styles.emptyItemDesc}>{cap.desc}</span>
-              </li>
-            ))}
-          </ul>
+        <div className={styles.banner} role="note">
+          <Icon name="users" size={18} className={styles.bannerIcon} />
+          <div className={styles.bannerBody}>
+            <strong>Distribuição & cobertura de leitura — em breve.</strong>{' '}
+            O rastreamento de leitura e o fanout ainda não estão disponíveis no
+            backend. O layout abaixo é a previsão visual da tela; todos os números,
+            áreas e pessoas exibidos são <em>ilustrativos</em> e não refletem dados
+            reais de <strong>{docName ?? code}</strong>.
+          </div>
+        </div>
+
+        <IllustrativeBlock>
+          <KPIStrip />
+        </IllustrativeBlock>
+
+        <section className={styles.section}>
+          <SectionHeader kicker="01 · Status" title="Cobertura geral e detalhes da distribuição" />
+          <IllustrativeBlock>
+            <div className={styles.twoCol}>
+              <DonutCard />
+              <DistributionFacts />
+            </div>
+          </IllustrativeBlock>
+        </section>
+
+        <section className={styles.section}>
+          <SectionHeader kicker="02 · Por área" title="Onde está a pendência" />
+          <IllustrativeBlock>
+            <CoverageByArea />
+          </IllustrativeBlock>
+        </section>
+
+        <section className={styles.section}>
+          <SectionHeader
+            kicker="03 · Linha do tempo"
+            title="Curva de adoção desde a publicação"
+          />
+          <IllustrativeBlock>
+            <TimelineCard />
+          </IllustrativeBlock>
+        </section>
+
+        <section className={styles.section}>
+          <SectionHeader kicker="04 · Destinatários" title="Lista detalhada" />
+          <IllustrativeBlock>
+            <RecipientsCard />
+          </IllustrativeBlock>
         </section>
       </main>
     </div>

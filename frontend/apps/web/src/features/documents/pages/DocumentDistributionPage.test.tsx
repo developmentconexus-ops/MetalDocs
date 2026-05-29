@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DocumentDistributionPage } from './DocumentDistributionPage';
@@ -88,14 +88,15 @@ describe('DocumentDistributionPage', () => {
     expect(screen.getAllByText(/REV03/).length).toBeGreaterThan(0);
     expect(screen.getByRole('heading', { name: /Distribuição & cobertura de leitura/ })).toBeInTheDocument();
 
-    // No fabricated identity leaking through
-    expect(screen.queryByText(/PR-EHS-014/)).toBeNull();
-    expect(screen.queryByText(/LOTO/)).toBeNull();
-    expect(screen.queryByText(/Vence em 8 dias/)).toBeNull();
-    expect(screen.queryByText(/248 pessoas/)).toBeNull();
+    // The hardcoded LOTO identity must NOT appear in the live (non-illustrative)
+    // hero / breadcrumb / DocRefCard. (It MAY still appear inside the
+    // aria-hidden illustrative scaffolding — that's intentional design preview.)
+    const liveBanner = screen.getByRole('note');
+    expect(within(liveBanner).queryByText(/PR-EHS-014/)).toBeNull();
+    expect(within(liveBanner).queryByText(/LOTO/)).toBeNull();
   });
 
-  it('shows the "em breve" empty state instead of fabricated metrics', () => {
+  it('renders the em-breve banner above the illustrative scaffolding', () => {
     vi.mocked(useDocumentDetailQuery).mockReturnValue({
       isLoading: false,
       isError: false,
@@ -105,17 +106,30 @@ describe('DocumentDistributionPage', () => {
 
     render(<DocumentDistributionPage />);
 
-    expect(
-      screen.getByRole('heading', { name: /Distribuição e cobertura de leitura — em breve/ }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/Cobertura de leitura/)).toBeInTheDocument();
-    expect(screen.getByText(/Curva de adoção/)).toBeInTheDocument();
-    expect(screen.getByText(/Lista de destinatários/)).toBeInTheDocument();
+    const banner = screen.getByRole('note');
+    expect(banner).toHaveTextContent(/em breve/i);
+    expect(banner).toHaveTextContent(/ilustrativos/i);
+    // Banner names the real document — proves identity flows into the message
+    expect(banner).toHaveTextContent(/Procedimento Distribuído/);
+  });
 
-    // None of the fabricated mock numbers should be present
-    expect(screen.queryByText(/182\b/)).toBeNull();
-    expect(screen.queryByText(/156\b/)).toBeNull();
-    expect(screen.queryByText(/Manutenção/)).toBeNull();
+  it('marks every illustrative section with the "Dados ilustrativos · Em breve" watermark and aria-hidden', () => {
+    vi.mocked(useDocumentDetailQuery).mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: baseDoc,
+      refetch: vi.fn(),
+    } as never);
+
+    render(<DocumentDistributionPage />);
+
+    const watermarks = screen.getAllByText(/Dados ilustrativos · Em breve/);
+    // 5 scaffolded blocks: KPIStrip, Donut+Facts, CoverageByArea, Timeline, Recipients
+    expect(watermarks.length).toBe(5);
+    for (const wm of watermarks) {
+      const illustrative = wm.parentElement;
+      expect(illustrative?.getAttribute('aria-hidden')).toBe('true');
+    }
   });
 
   it('hero CTAs remain disabled with the "Em breve" affordance', () => {

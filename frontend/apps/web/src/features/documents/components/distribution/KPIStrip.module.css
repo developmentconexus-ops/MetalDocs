@@ -1,0 +1,56 @@
+/* ── KPI Strip — 5-cell metrics bar ─────────────────────── */
+.strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+
+.cell {
+  padding: 18px var(--sp-5);
+}
+
+.cellBorder {
+  border-right: 1px solid var(--border);
+}
+
+/* .kicker is the global kicker class; this overrides font-size only */
+.kicker {
+  font-size: var(--font-size-2xs);
+  margin-bottom: var(--sp-2);
+}
+
+.value {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+}
+
+.valueDanger {
+  color: var(--danger);
+}
+
+.progressTrack {
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--success);
+  transition: width 0.3s ease-out;
+}
+
+.sub {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}

@@ -1,0 +1,222 @@
+/* ── RecipientsCard — paginated recipient list ──────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+}
+
+/* Filter bar */
+.filterBar {
+  padding: 14px var(--sp-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+/* Disabled CTA inside filter bar */
+.ctaDisabled {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  height: 28px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-2);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Column header row */
+.headerRow {
+  display: grid;
+  grid-template-columns: 32px 1.6fr 1.1fr 1fr 130px 130px 90px;
+  gap: 14px;
+  padding: 10px var(--sp-5);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--font-size-2xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  align-items: center;
+}
+
+/* Column aliases (shared with rows) */
+.colCheck    { display: flex; align-items: center; }
+.colRecipient { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.colArea     { font-size: 12px; color: var(--text-soft); }
+.colStatus   { }
+.colLastActivity { font-size: 12px; color: var(--text-soft); }
+.colWhen     { font-size: var(--font-size-xs); color: var(--text-muted); font-family: var(--font-mono); }
+.colActions  { display: flex; gap: 4px; justify-content: flex-end; }
+
+/* Checkbox — reset global leakage just in case */
+.checkbox {
+  width: auto;
+  border: none;
+  background: transparent;
+  padding: 0;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+/* Data rows */
+.recipientRow {
+  display: grid;
+  grid-template-columns: 32px 1.6fr 1.1fr 1fr 130px 130px 90px;
+  gap: 14px;
+  align-items: center;
+  padding: var(--sp-3) var(--sp-5);
+  transition: background 0.12s;
+}
+
+.recipientRowBorder {
+  border-bottom: 1px solid var(--border);
+}
+
+/* Recipient name + role */
+.recipientInfo {
+  min-width: 0;
+}
+
+.recipientName {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recipientRole {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+/* "Nunca abriu" danger color for last activity */
+.lastActivityDanger {
+  color: var(--danger);
+}
+
+/* Status pill */
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 var(--sp-2);
+  font-size: 10.5px;
+  font-weight: 500;
+  border-radius: var(--r-pill);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.statusAck {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.statusRead {
+  background: var(--brand-pale);
+  color: var(--brand);
+}
+
+.statusPending {
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.statusOverdue {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.statusDot {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Row action buttons */
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-1);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.actionBtn:hover {
+  background: var(--surface-3);
+  color: var(--text-soft);
+}
+
+/* Pagination footer */
+.paginationFooter {
+  padding: var(--sp-3) var(--sp-5);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.paginationCount strong {
+  color: var(--text);
+}
+
+.paginationNav {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.paginationBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-1);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.paginationBtn:hover {
+  background: var(--surface-3);
+}
+
+.paginationPages {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
