@@ -13,7 +13,9 @@ export type LibraryFilter =
   | 'rascunhos'
   | 'em_revisao'
   | 'aprovados'
+  | 'agendados'
   | 'publicados'
+  | 'substituidos'
   | 'rejeitados'
   | 'obsoletos';
 
@@ -27,12 +29,14 @@ type StatusEntry = {
 };
 
 export const LIBRARY_STATUSES: readonly StatusEntry[] = [
-  { status: 'draft',         filter: 'rascunhos',  label: 'Rascunhos'   },
-  { status: 'under_review',  filter: 'em_revisao', label: 'Em Revisão'  },
-  { status: 'approved',      filter: 'aprovados',  label: 'Aprovados'   },
-  { status: 'published',     filter: 'publicados', label: 'Publicados'  },
-  { status: 'rejected',      filter: 'rejeitados', label: 'Rejeitados'  },
-  { status: 'obsolete',      filter: 'obsoletos',  label: 'Obsoletos'   },
+  { status: 'draft',         filter: 'rascunhos',    label: 'Rascunhos'   },
+  { status: 'under_review',  filter: 'em_revisao',   label: 'Em Revisão'  },
+  { status: 'approved',      filter: 'aprovados',    label: 'Aprovados'   },
+  { status: 'scheduled',     filter: 'agendados',    label: 'Agendados'   },
+  { status: 'published',     filter: 'publicados',   label: 'Publicados'  },
+  { status: 'superseded',    filter: 'substituidos', label: 'Substituídos' },
+  { status: 'rejected',      filter: 'rejeitados',   label: 'Rejeitados'  },
+  { status: 'obsolete',      filter: 'obsoletos',    label: 'Obsoletos'   },
 ] as const;
 
 export function filterToStatus(filter: LibraryFilter): DocumentStatus | undefined {

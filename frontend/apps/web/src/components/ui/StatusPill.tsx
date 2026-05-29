@@ -30,12 +30,12 @@ const STATUS_CONFIG: Record<DocumentStatus, { label: string; pillClass: string }
 };
 
 type StatusPillProps = {
-  status: DocumentStatus;
+  status: DocumentStatus | (string & {});
   className?: string;
 };
 
 export function StatusPill({ status, className }: StatusPillProps) {
-  const config = STATUS_CONFIG[status] ?? { label: status, pillClass: 'pill' };
+  const config = STATUS_CONFIG[status as DocumentStatus] ?? { label: status, pillClass: 'pill' };
   return (
     <span className={`${config.pillClass} ${styles.pill}${className ? ` ${className}` : ''}`}>
       <span className={styles.dot} />
