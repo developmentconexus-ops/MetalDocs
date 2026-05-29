@@ -15,6 +15,12 @@ export type TemplatesListPageProps = {
 type TabKey = "all" | "published" | "draft" | "archived";
 type TemplateStatus = "published" | "draft" | "archived";
 
+const EMPTY_STATE_LABEL: Record<Exclude<TabKey, "all">, string> = {
+  published: "publicado",
+  draft: "em rascunho",
+  archived: "arquivado",
+};
+
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -41,10 +47,7 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
       : dto.published_version_id
         ? "published"
         : "draft";
-    const maybeUpdatedAt = (dto as { updated_at?: unknown }).updated_at;
-    const updatedAt = typeof maybeUpdatedAt === "string" && isValidIsoDate(maybeUpdatedAt)
-      ? maybeUpdatedAt
-      : dto.created_at;
+    const timestamp = isValidIsoDate(dto.created_at) ? dto.created_at : new Date().toISOString();
 
     const versionLabel =
       status === "published" && dto.published_version_number != null
@@ -59,7 +62,7 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
       version: versionLabel,
       status,
       author: dto.created_by || "Usuario",
-      updated: formatRelative(updatedAt),
+      updated: formatRelative(timestamp),
       latestVersion: dto.latest_version,
     };
   });
@@ -116,7 +119,7 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
 
         {!isLoading && !isError && filtered.length === 0 && (
           <div className={styles.empty}>
-            Nenhum template{activeTab !== "all" ? ` ${activeTab}` : ""} encontrado.
+            Nenhum template{activeTab !== "all" ? ` ${EMPTY_STATE_LABEL[activeTab]}` : ""} encontrado.
           </div>
         )}
 
