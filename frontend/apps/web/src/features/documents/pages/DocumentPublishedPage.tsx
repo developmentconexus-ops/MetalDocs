@@ -610,9 +610,11 @@ export function DocumentPublishedPage() {
                 See wiki/backlog/documento-publicado.md. */}
             <aside className={styles.coverageCard}>
               <div className={styles.kpiLabel}>Cobertura</div>
-              <div className={styles.kpiValue}>—%</div>
-              <div className={styles.coverageCardBar} role="progressbar" aria-valuenow={0} aria-valuemin={0} aria-valuemax={100} />
-              <div className={styles.kpiHint}>de — destinatários · — pendentes</div>
+              <div className={styles.coverageCardBody}>
+                <div className={styles.kpiValue}>—%</div>
+                <div className={styles.coverageCardBar} role="progressbar" aria-valuenow={0} aria-valuemin={0} aria-valuemax={100} />
+                <div className={styles.kpiHint}>de — destinatários · — pendentes</div>
+              </div>
               <button
                 type="button"
                 className={`btn btn-sm ${styles.coverageCardAction}`}

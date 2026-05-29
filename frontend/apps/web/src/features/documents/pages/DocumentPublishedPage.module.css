@@ -428,6 +428,16 @@
   padding: 1.125rem 1.375rem;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+}
+
+.coverageCardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4) 0;
 }
 
 .coverageCardLabel {
