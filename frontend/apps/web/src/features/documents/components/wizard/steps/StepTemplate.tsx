@@ -99,7 +99,7 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                   <div className={styles.templateMain}>
                     <div className={styles.templateLabelRow}>
                       <span className={styles.templateLabel}>{template.name}</span>
-                      <span className="pill mono">v{template.latest_version}</span>
+                      <span className="pill mono">v{template.published_version_number ?? template.latest_version}</span>
                       {selectable ? (
                         <span className="pill pill-frozen">
                           <span className={styles.publishedDot} aria-hidden="true" />
