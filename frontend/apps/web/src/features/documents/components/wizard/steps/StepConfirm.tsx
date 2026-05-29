@@ -65,7 +65,7 @@ export function StepConfirm(props: StepConfirmProps): JSX.Element {
   const templateLabel = isBlankTemplateSelected
     ? blankTemplateName
     : template
-      ? `${template.name} v${template.latest_version} (publicada)`
+      ? `${template.name} v${template.published_version_number ?? template.latest_version} (publicada)`
       : '—';
   const createdAtLabel = formatDateTime(createdAt);
 

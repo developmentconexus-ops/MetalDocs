@@ -45,6 +45,12 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	if got.Template.LatestVersion != 1 {
 		t.Fatalf("expected LatestVersion 1, got %d", got.Template.LatestVersion)
 	}
+	if got.Template.PublishedVersionID != nil {
+		t.Fatalf("expected PublishedVersionID nil on create, got %v", *got.Template.PublishedVersionID)
+	}
+	if got.Template.PublishedVersionNumber != nil {
+		t.Fatalf("expected PublishedVersionNumber nil on create, got %v", *got.Template.PublishedVersionNumber)
+	}
 	if got.Version.VersionNumber != 1 {
 		t.Fatalf("expected VersionNumber 1, got %d", got.Version.VersionNumber)
 	}

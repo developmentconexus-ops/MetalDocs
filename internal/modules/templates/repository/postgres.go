@@ -84,28 +84,32 @@ INSERT INTO templates_template (
 func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id::text, doc_type_code, key, name, description,
-	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
-FROM templates_template
-WHERE id = $1 AND tenant_id = $2::uuid`
+	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
+	t.latest_version, t.published_version_id::text, pv.version_number,
+	t.created_by, t.system_owned, t.created_at, t.archived_at
+FROM templates_template t
+LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
+WHERE t.id = $1 AND t.tenant_id = $2::uuid`
 
-	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, id, tenantID))
+	tmpl, err := scanTemplate(r.db.QueryRowContext(ctx, q, id, tenantID))
 	if errors.Is(err, sql.ErrNoRows) || isInvalidUUID(err) {
 		return nil, domain.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	return t, nil
+	return tmpl, nil
 }
 
 func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string) (*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id::text, doc_type_code, key, name, description,
-	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
-FROM templates_template
-WHERE tenant_id = $1::uuid AND key = $2`
+	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
+	t.latest_version, t.published_version_id::text, pv.version_number,
+	t.created_by, t.system_owned, t.created_at, t.archived_at
+FROM templates_template t
+LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
+WHERE t.tenant_id = $1::uuid AND t.key = $2`
 
 	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, tenantID, key))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -120,13 +124,15 @@ WHERE tenant_id = $1::uuid AND key = $2`
 func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter) ([]*domain.Template, error) {
 	const q = `
 SELECT
-	id::text, tenant_id::text, doc_type_code, key, name, description,
-	latest_version, published_version_id::text, created_by, system_owned, created_at, archived_at
-FROM templates_template
-WHERE tenant_id = $1::uuid
-  AND system_owned = false
-  AND ($2::text IS NULL OR doc_type_code = $2)
-ORDER BY created_at DESC
+	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
+	t.latest_version, t.published_version_id::text, pv.version_number,
+	t.created_by, t.system_owned, t.created_at, t.archived_at
+FROM templates_template t
+LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
+WHERE t.tenant_id = $1::uuid
+  AND t.system_owned = false
+  AND ($2::text IS NULL OR t.doc_type_code = $2)
+ORDER BY t.created_at DESC
 LIMIT $3 OFFSET $4`
 
 	rows, err := r.db.QueryContext(

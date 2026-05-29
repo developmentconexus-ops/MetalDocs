@@ -12,9 +12,10 @@ type Template struct {
 	Key                string
 	Name               string
 	Description        string
-	LatestVersion      int
-	PublishedVersionID *string
-	CreatedBy          string
+	LatestVersion          int
+	PublishedVersionID     *string
+	PublishedVersionNumber *int
+	CreatedBy              string
 	SystemOwned        bool
 	CreatedAt          time.Time
 	ArchivedAt         *time.Time

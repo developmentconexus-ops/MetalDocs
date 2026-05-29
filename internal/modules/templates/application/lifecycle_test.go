@@ -364,6 +364,9 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	if template.PublishedVersionID == nil || *template.PublishedVersionID != version.ID {
 		t.Fatalf("expected PublishedVersionID %q, got %v", version.ID, template.PublishedVersionID)
 	}
+	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
+		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
+	}
 	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
 		t.Fatalf("expected one %q audit event, got %v", domain.AuditPublished, repo.audit)
 	}
@@ -402,6 +405,9 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	}
 	if template.PublishedVersionID == nil || *template.PublishedVersionID != version.ID {
 		t.Fatalf("expected PublishedVersionID %q, got %v", version.ID, template.PublishedVersionID)
+	}
+	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
+		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
 	}
 }
 

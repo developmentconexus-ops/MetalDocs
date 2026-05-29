@@ -328,6 +328,13 @@ func TestCreateTemplate_Happy(t *testing.T) {
 	if out.Data.Version.VersionNumber != 1 {
 		t.Fatalf("expected version.version_number=1, got %d", out.Data.Version.VersionNumber)
 	}
+	pvnField, ok := out.Data.Template["published_version_number"]
+	if !ok {
+		t.Fatal("expected published_version_number field present on template response")
+	}
+	if pvnField != nil {
+		t.Fatalf("expected published_version_number=null on freshly created template, got %v", pvnField)
+	}
 }
 
 func TestCreateTemplate_RejectUnknownField(t *testing.T) {
