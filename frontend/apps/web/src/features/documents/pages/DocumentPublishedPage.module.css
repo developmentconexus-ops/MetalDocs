@@ -312,7 +312,7 @@
 
 .kpiStrip {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-3);
@@ -322,10 +322,42 @@
 .kpiCell {
   padding: 1.125rem 1.375rem;
   border-right: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
 .kpiCell:last-child {
   border-right: none;
+}
+
+.kpiCellLink {
+  appearance: none;
+  background: none;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  border-radius: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.kpiCellLink:hover,
+.kpiCellLink:focus-visible {
+  background: var(--surface-2);
+}
+
+.kpiValuePlaceholder {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-style: italic;
+  letter-spacing: 0;
+  line-height: 1.2;
+  font-family: var(--font-sans, inherit);
+  margin-bottom: var(--sp-1);
 }
 
 .kpiLabel {
@@ -387,7 +419,55 @@
 
 .aboutLayout {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--sp-4);
+}
+
+.coverageCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.coverageCardHeader {
+  display: flex;
+  align-items: center;
+  min-height: 4.1rem;
+  padding: 1.125rem 1.375rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.coverageCardHeader .kpiLabel {
+  margin: 0;
+}
+
+.coverageCardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4) 1.375rem;
+}
+
+.coverageCardBar {
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.coverageCardFooter {
+  padding: 1rem 1.375rem;
+  border-top: 1px solid var(--border);
+}
+
+.coverageCardAction {
+  width: 100%;
 }
 
 .aboutCard {
@@ -431,10 +511,15 @@
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 .factCell:nth-child(odd) {
   border-right: 1px solid var(--border);
+}
+
+.factCell:nth-child(-n+2) {
+  border-top: none;
 }
 
 .factIcon {
@@ -888,9 +973,24 @@
     align-items: stretch;
   }
 
-  /* Desktop already uses 2 columns; mobile keeps the same grid since only 2 cells render. */
-  .kpiCell:nth-child(2) {
+  .kpiStrip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .kpiCell {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .kpiCell:nth-child(2n) {
     border-right: none;
+  }
+
+  .kpiCell:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+
+  .aboutLayout {
+    grid-template-columns: 1fr;
   }
 
   .signoffGrid {
