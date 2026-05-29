@@ -431,6 +431,9 @@
 }
 
 .coverageCardHeader {
+  display: flex;
+  align-items: center;
+  min-height: 4.1rem;
   padding: 1.125rem 1.375rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
