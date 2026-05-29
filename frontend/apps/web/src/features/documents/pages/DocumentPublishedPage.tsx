@@ -501,16 +501,12 @@ export function DocumentPublishedPage() {
             <div className={styles.kpiLabel}>Versão atual</div>
             <div className={styles.kpiValue}>{currentVersionLabel}</div>
             <div className={styles.kpiHint}>
-              {currentVersionHint !== '—' ? `desde ${currentVersionHint}` : '—'}
+              {currentVersionHint !== '—'
+                ? `desde ${currentVersionHint}`
+                : statusPresentation.ownerMeta}
             </div>
           </div>
-          {/* TODO(backlog): wire fanout coverage API */}
-          <div className={styles.kpiCell}>
-            <div className={styles.kpiLabel}>Cobertura</div>
-            <div className={styles.kpiValue}>—</div>
-            <div className={styles.kpiHint}>em breve</div>
-          </div>
-          {/* "Próxima revisão" and "Páginas" KPIs intentionally omitted — CUT in NOTES.md (no review-date field, no page count). */}
+          {/* "Cobertura", "Próxima revisão", "Páginas" KPIs intentionally omitted — backend endpoints not built (fanout/read-tracking, review-date, page count). */}
         </div>
 
         {/* Section: Sobre */}
