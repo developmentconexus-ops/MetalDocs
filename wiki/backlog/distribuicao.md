@@ -4,22 +4,25 @@
 > **Scope:** Deferred items for the Distribuição & Cobertura de Leitura screen (`/documents/:documentId/distribution`).
 > **Out of scope:** Published view deferred items (see `backlog/documento-publicado.md`), fanout render pipeline (see `modules/render-fanout.md`).
 > **Key files:**
-> - `frontend/apps/web/src/features/documents/pages/DocumentDistributionPage.tsx` — page entry; wires real document identity via `useDocumentDetailQuery`, renders honest "em breve" empty state for everything backend cannot yet serve
+> - `frontend/apps/web/src/features/documents/pages/DocumentDistributionPage.tsx` — page entry; wires real document identity via `useDocumentDetailQuery`, wraps the full mock design as illustrative scaffolding under aria-hidden + watermark blocks with a role=note em-breve banner above
 > - `frontend/apps/web/src/features/documents/components/distribution/DocRefCard.tsx` — 3-D doc card primitive (props-driven, no mock identity)
-> - `frontend/apps/web/src/features/documents/pages/DocumentDistributionPage.test.tsx` — locks honesty invariants (real identity rendered, no fabricated PR-EHS-014/LOTO/numbers, em-breve panel, CTAs disabled)
+> - `frontend/apps/web/src/features/documents/components/distribution/{KPIStrip,DonutCard,DistributionFacts,CoverageByArea,TimelineCard,RecipientsCard}.tsx` — design scaffolding sourcing `MOCK_DISTRIBUTION` from `lib/distributionMeta.ts`; rendered only inside `IllustrativeBlock`
+> - `frontend/apps/web/src/features/documents/lib/distributionMeta.ts` — mock data (PR-EHS-014/LOTO) used exclusively for design preview; isolated to scaffolded blocks
+> - `frontend/apps/web/src/features/documents/pages/DocumentDistributionPage.test.tsx` — locks the scaffolding pattern (real identity in live banner, 5 watermarks + aria-hidden, 4 CTAs disabled, banner names doc)
 
 ---
 
 ## QA 2026-05-29 — `qa/documents-distribution`
 
-Removed all fabricated distribution UI (KPIStrip, DonutCard, DistributionFacts, CoverageByArea, TimelineCard, RecipientsCard, `lib/distributionMeta.ts` mock constants). The page now:
+**Design-scaffolding pattern.** Mock distribution UI (KPIStrip, DonutCard, DistributionFacts, CoverageByArea, TimelineCard, RecipientsCard, `lib/distributionMeta.ts`) preserved as a *visual blueprint* for the unbuilt fanout/read-tracking feature. Future implementation has a concrete reference for what each block should render.
 
-- Wires real document identity (Code, RevisionNumber, Name) via `useDocumentDetailQuery` — same TanStack pattern as `DocumentPublishedPage`.
-- Renders an "Em breve" empty-state panel listing the 4 planned capabilities (Cobertura de leitura, Cobertura por área, Curva de adoção, Lista de destinatários).
-- Keeps the 4 hero CTAs (Lembrete em massa / Exportar relatório / Adicionar destinatários / Política de fanout) with `aria-disabled="true" title="Em breve"`.
-- Mirrors loading + error states from `DocumentPublishedPage` (role=status / role=alert + retry button).
+- Real document identity (Code, RevisionNumber, Name) wired via `useDocumentDetailQuery` at the honest surfaces: hero breadcrumb, hero badges, `DocRefCard`, and the em-breve banner body.
+- Every illustrative section wrapped in `IllustrativeBlock`: `aria-hidden="true"` + `Dados ilustrativos · Em breve` watermark + `pointer-events: none` + `user-select: none` + saturate(0.85) + diagonal-stripe overlay. AT users skip the scaffolding; sighted users see it muted.
+- `role="note"` banner above the scaffolding explicitly states numbers/areas/people are illustrative and do not reflect real data for `${docName}`.
+- 4 hero CTAs kept with `aria-disabled="true" title="Em breve"`.
+- Loading + error states mirror `DocumentPublishedPage` (role=status / role=alert + retry).
 
-Gate 3 Preview proof (document `c1bb2112-21ea-46fc-ac1f-719d04994d41` / `PO-RH-002` / `REV00` / `DC_Template_Descricao_Cargo`): identity rendered honestly; no fabricated PR-EHS-014 / LOTO / 248 leaks; bogus uuid renders error state cleanly; only `GET /api/v1/documents/:id` is called — zero calls to non-existent distribution endpoints; no console errors.
+Gate 3 Preview proof (document `c1bb2112-21ea-46fc-ac1f-719d04994d41` / `PO-RH-002` / `REV00` / `DC_Template_Descricao_Cargo`): identity correct on every honest surface; scaffolding visible and aria-hidden; only `GET /api/v1/documents/:id` is called — zero calls to non-existent distribution endpoints; no console errors. Vitest 6/6 green.
 
 ---
 
