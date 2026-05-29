@@ -37,6 +37,14 @@ vi.mock('../queries/useDocumentRevisionHistoryQuery', () => ({
   useDocumentRevisionHistoryQuery: vi.fn(),
 }));
 
+vi.mock('../queries/useAreasQuery', () => ({
+  useAreasQuery: vi.fn(() => ({ data: [{ code: 'general', name: 'Geral' }], isLoading: false })),
+}));
+
+vi.mock('../../taxonomy/queries/useProfilesQuery', () => ({
+  useProfilesQuery: vi.fn(() => ({ data: [{ code: 'pop', name: 'Procedimento Operacional' }], isLoading: false })),
+}));
+
 vi.mock('../../controlled-documents/api/controlledDocuments', () => ({
   createRevision: vi.fn(),
 }));
