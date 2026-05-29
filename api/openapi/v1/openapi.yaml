@@ -3550,7 +3550,7 @@ components:
           type: string
     DocumentSummary:
       type: object
-      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, Code]
+      required: [ID, TenantID, TemplateVersionID, Name, Status, FormDataJSON, CurrentRevisionID, RevisionVersion, RevisionNumber, ActiveSessionID, CreatedAt, UpdatedAt, CreatedBy, Code]
       properties:
         ID:
           type: string
@@ -3569,6 +3569,9 @@ components:
         CurrentRevisionID:
           type: string
         RevisionVersion:
+          type: integer
+          format: int64
+        RevisionNumber:
           type: integer
           format: int64
         ActiveSessionID:

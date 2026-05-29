@@ -10,7 +10,7 @@ import { Pagination } from '../components/Pagination';
 import { useLibraryQuery } from '../queries/useLibraryQuery';
 import { useLibraryStatsQuery } from '../queries/useLibraryStatsQuery';
 import { filterToStatus, type LibraryFilter } from '../lib/libraryStatus';
-import { StatusPill, type DocumentStatus } from '../../../components/ui/StatusPill';
+import { StatusPill } from '../../../components/ui/StatusPill';
 import { ApiError, resolveErrorMessage } from '../../../lib/api/errors';
 import { useDebouncedValue } from '../../../lib/hooks/useDebouncedValue';
 import styles from './LibraryPage.module.css';
@@ -199,9 +199,9 @@ export default function LibraryPage(): JSX.Element {
               <span className={styles.codeLink}>{d.Code}</span>
               <span className={styles.nameCell}>{d.Name}</span>
               <span className={styles.metaCell}>{d.ProcessAreaCodeSnapshot ?? '–'}</span>
-              <StatusPill status={d.Status as DocumentStatus} />
+              <StatusPill status={d.Status} />
               <AuthorCell name={d.CreatedBy} />
-              <span className={styles.monoCell}>v{d.RevisionVersion}</span>
+              <span className={styles.monoCell}>REV{String(d.RevisionNumber).padStart(2, '0')}</span>
               <button
                 type="button"
                 className={styles.moreBtn}

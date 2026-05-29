@@ -3953,6 +3953,8 @@ export interface components {
             CurrentRevisionID: string;
             /** Format: int64 */
             RevisionVersion: number;
+            /** Format: int64 */
+            RevisionNumber: number;
             ActiveSessionID: string;
             /** Format: date-time */
             ValuesFrozenAt?: string | null;

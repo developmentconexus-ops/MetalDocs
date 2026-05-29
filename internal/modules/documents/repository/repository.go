@@ -420,7 +420,9 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 	q := fmt.Sprintf(`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
 			coalesce(current_revision_id::text, ''), coalesce(active_session_id::text, ''),
 			archived_at, created_at, updated_at, created_by,
-			controlled_document_id, coalesce(code,'')
+			controlled_document_id, coalesce(code,''),
+			profile_code_snapshot, process_area_code_snapshot,
+			revision_version, revision_number
 		FROM documents
 		WHERE %s
 		ORDER BY updated_at DESC
@@ -437,7 +439,9 @@ func (r *Repository) ListDocumentsPaginated(ctx context.Context, tenantID string
 		var d domain.Document
 		if err := rows.Scan(&d.ID, &d.TenantID, &d.TemplateVersionID, &d.Name, &d.Status, &d.FormDataJSON,
 			&d.CurrentRevisionID, &d.ActiveSessionID, &d.ArchivedAt,
-			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code); err != nil {
+			&d.CreatedAt, &d.UpdatedAt, &d.CreatedBy, &d.ControlledDocumentID, &d.Code,
+			&d.ProfileCodeSnapshot, &d.ProcessAreaCodeSnapshot,
+			&d.RevisionVersion, &d.RevisionNumber); err != nil {
 			return nil, err
 		}
 		out = append(out, &d)
