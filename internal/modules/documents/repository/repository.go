@@ -795,8 +795,8 @@ type RestoreResult struct {
 func (r *Repository) GetPendingForCommit(ctx context.Context, tenantID, pendingID string) (*PendingCommitMeta, error) {
 	var m PendingCommitMeta
 	err := r.db.QueryRowContext(ctx,
-		`SELECT session_id::text, document_id::text, base_revision_id::text,
-		        content_hash, storage_key, expires_at, consumed_at
+		`SELECT p.session_id::text, p.document_id::text, p.base_revision_id::text,
+		        p.content_hash, p.storage_key, p.expires_at, p.consumed_at
 		 FROM autosave_pending_uploads p
 		 JOIN documents d ON d.id = p.document_id
 		 WHERE p.id=$1 AND d.tenant_id=$2::uuid`, pendingID, tenantID,
@@ -806,7 +806,7 @@ func (r *Repository) GetPendingForCommit(ctx context.Context, tenantID, pendingI
 		return nil, domain.ErrPendingNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get pending for commit: %w", err)
 	}
 	return &m, nil
 }

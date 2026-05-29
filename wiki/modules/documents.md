@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-28 (QA `qa/documents-library`: `ListDocumentsPaginated` SELECT/Scan extended with `profile_code_snapshot, process_area_code_snapshot, revision_version, revision_number`; OpenAPI `DocumentSummary` gained required `RevisionNumber`; codegen + FE types regenerated; Library REV column now renders governed `REV{nn}`. Previous: `qa/documents-hub` redirect of legacy stub routes to `/documents`.) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-05-29 (QA `qa/documents-editor`: `Repository.GetPendingForCommit` SELECT qualified ambiguous `content_hash` (and other p.* cols) with `p.` prefix — autosave commit was 500-ing on every save because `documents.content_hash` collided with `autosave_pending_uploads.content_hash` in the JOIN. Preview-driven repro: edit → `Erro ao salvar`; pg log: `column reference "content_hash" is ambiguous`. After fix: `Salvando → Salvo`, new `document_revisions` row with matching `content_hash` + `file_size_bytes`, `autosave_pending_uploads.consumed_at` set. Previous: 2026-05-28 `qa/documents-library` REV column work.) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
