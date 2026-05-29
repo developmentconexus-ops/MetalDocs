@@ -332,6 +332,12 @@
 }
 
 .kpiCellLink {
+  appearance: none;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   transition: background 120ms ease;
 }
