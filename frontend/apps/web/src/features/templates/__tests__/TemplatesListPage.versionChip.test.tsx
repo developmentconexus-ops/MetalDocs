@@ -5,10 +5,11 @@ import { TemplatesListPage } from '../TemplatesListPage';
 import type { TemplateDTO } from '../api/templates';
 
 // ADR 0013 — Template Revision Labels.
+// Chip shows published revision when present, else latest working revision.
 // Fixtures cover the 4 chip states:
-//   1. Never published                                       → no REV chip
-//   2. Published v1 + auto-spawned v2 draft (current_revision_number=0) → REV00
-//   3. Published v1, no further draft (current_revision_number=0)       → REV00
+//   1. Never published (latest_revision_number=0)                       → REV00 (working)
+//   2. Published v1 + auto-spawned v2 draft (current_revision_number=0) → REV00 (published)
+//   3. Published v1, no further draft (current_revision_number=0)       → REV00 (published)
 //   4. Archived with current_revision_number=1                          → REV01
 
 vi.mock('../queries/useTemplatesQuery', () => ({
@@ -29,6 +30,7 @@ const fixtures: TemplateDTO[] = [
     doc_type_code: null,
     description: null,
     latest_version: 1,
+    latest_revision_number: 0,
     published_version_id: null,
     published_version_number: null,
     current_revision_number: null,
@@ -44,6 +46,7 @@ const fixtures: TemplateDTO[] = [
     doc_type_code: null,
     description: null,
     latest_version: 2,
+    latest_revision_number: 1,
     published_version_id: 'ver-1',
     published_version_number: 1,
     current_revision_number: 0,
@@ -59,6 +62,7 @@ const fixtures: TemplateDTO[] = [
     doc_type_code: null,
     description: null,
     latest_version: 1,
+    latest_revision_number: 0,
     published_version_id: 'ver-x',
     published_version_number: 1,
     current_revision_number: 0,
@@ -74,6 +78,7 @@ const fixtures: TemplateDTO[] = [
     doc_type_code: null,
     description: null,
     latest_version: 3,
+    latest_revision_number: 2,
     published_version_id: 'ver-y',
     published_version_number: 2,
     current_revision_number: 1,
@@ -93,19 +98,19 @@ function renderPage() {
 }
 
 describe('TemplatesListPage version chip', () => {
-  it('renders no REV chip for never-published template (draft honesty rule)', () => {
+  it('renders REV00 for never-published template (falls back to working revision)', () => {
     renderPage();
     const card = screen.getByLabelText('Abrir template Never Published');
     expect(card).toBeTruthy();
-    // No REV?? chip rendered for templates without a published revision.
-    expect(within(card).queryByText(/^REV\d{2}$/)).toBeNull();
+    // Draft shows its working revision REV00, mirroring Documents.
+    expect(within(card).getByText('REV00')).toBeTruthy();
   });
 
   it('renders REV00 for v1-published-with-v2-draft (chip ignores draft v2)', () => {
     renderPage();
     expect(screen.getByText('Published With Draft')).toBeTruthy();
-    // REV00 appears for both v1-published rows below.
-    expect(screen.getAllByText('REV00').length).toBeGreaterThanOrEqual(2);
+    // REV00 appears for never-published + both v1-published rows.
+    expect(screen.getAllByText('REV00').length).toBeGreaterThanOrEqual(3);
   });
 
   it('renders REV00 when v1 published with no further draft', () => {

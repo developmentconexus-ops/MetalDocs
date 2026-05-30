@@ -101,6 +101,7 @@ func toTemplateResponse(t *domain.Template) map[string]any {
 		"name":                     t.Name,
 		"description":              t.Description,
 		"latest_version":           t.LatestVersion,
+		"latest_revision_number":   t.LatestRevisionNumber,
 		"published_version_id":     t.PublishedVersionID,
 		"published_version_number": t.PublishedVersionNumber,
 		"current_revision_number":  t.CurrentRevisionNumber,

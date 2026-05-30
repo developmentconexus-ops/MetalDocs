@@ -20,6 +20,7 @@ import {
 } from '../../shared/components/editor-chrome';
 import { StatusPill, type DocumentStatus } from '../../../components/ui';
 import { ApiError, resolveErrorMessage } from '../../../lib/api';
+import { formatRevisionCode } from '../../../lib/labels/revisionCode';
 import styles from './styles/TemplateEditorPage.module.css';
 
 export type TemplateEditorPageProps = {
@@ -209,6 +210,13 @@ export function TemplateEditorPage({
     return <div role="alert" className={styles.error}>{schemaState.error}</div>;
   }
 
+  // ADR 0013: render backend-canonical REV{nn} from the version's revision_number,
+  // mirroring documents. No FE lifecycle-counter math.
+  const revisionBadge =
+    currentVersion?.revision_number != null
+      ? formatRevisionCode(currentVersion.revision_number)
+      : null;
+
   const versionStatus: DocumentStatus | null = (() => {
     const s = currentVersion?.status;
     if (!s) return null;
@@ -282,7 +290,7 @@ export function TemplateEditorPage({
                 </span>
                 <span className={editorChromeStyles.docSep}>·</span>
                 <span className={editorChromeStyles.docMeta}>Template</span>
-                <VersionBadge>{`v${versionNum}`}</VersionBadge>
+                {revisionBadge && <VersionBadge>{revisionBadge}</VersionBadge>}
                 {versionStatus && <StatusPill status={versionStatus} />}
               </>
             }

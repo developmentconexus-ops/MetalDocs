@@ -157,6 +157,14 @@ current_revision_number:
   description: >
     Regulated revision number of the currently published template version.
     0-based (REV00, REV01, ...). Null when the template has never been published.
+latest_revision_number:
+  type: integer
+  format: int32
+  minimum: 0
+  description: >
+    Regulated revision number of the template's latest (working) version.
+    0-based, always present. Fallback chip label for never-published drafts.
+    See Amendment 2026-05-30.
 ```
 
 Optional: also add `revision_number` to the `TemplateVersionDTO` schema if/when that DTO is consumed by the FE. (Out of scope for this ADR unless a screen needs it.)
@@ -171,14 +179,14 @@ Optional: also add `revision_number` to the `TemplateVersionDTO` schema if/when 
 2. Update three sites to render directly from `current_revision_number`:
 
 ```tsx
-// TemplatesListPage chip
+// TemplatesListPage chip — SUPERSEDED by Amendment 2026-05-30, kept for history
 const revisionLabel =
   dto.current_revision_number != null
     ? formatRevisionCode(dto.current_revision_number)
     : null; // draft / never-published: no REV code (see D-8.4)
 ```
 
-3. **Strict draft policy (resolves Open Question #1).** When `current_revision_number` is `null` (template has never been published), the chip renders **no REV code**. The "RASCUNHO" status pill already communicates draft state — fabricating a `REV??` label from `latest_version` would imply a regulated-revision identity the template does not yet have. Honesty rule from PR #33 extends to label naming: no value, no label. The FE renders `null`/empty string in the version-code slot for drafts and lets layout collapse, or shows only the status pill if no other content exists.
+3. ~~**Strict draft policy (resolves Open Question #1).** When `current_revision_number` is `null` (template has never been published), the chip renders **no REV code**.~~ **Superseded by Amendment 2026-05-30** — drafts now render their working revision (`latest_revision_number`, REV00), matching the Documents module which always shows `REV{nn}` for every row. See the amendment at the bottom of this ADR for the current rule.
 
 4. Wizard pills (`StepTemplate.tsx:102`, `StepConfirm.tsx:68`) read `current_revision_number` and render via the helper. If `null`, the pill is omitted entirely (the template selector should not show un-published templates in this context anyway — to be confirmed during implementation).
 
@@ -193,7 +201,7 @@ const revisionLabel =
 
 | Fixture state | New expectation |
 |---|---|
-| Never-published v1 (`current_revision_number` null) | **no REV chip** (only "RASCUNHO" status pill) |
+| Never-published v1 (`current_revision_number` null, `latest_revision_number=0`) | `REV00` (working revision, see Amendment 2026-05-30) |
 | Published v1 + auto-draft v2 (`current_revision_number=0`) | `REV00` |
 | Published v1 only (`current_revision_number=0`) | `REV00` |
 | Archived latest_version=3, published_version_number=2 (`current_revision_number=1`) | `REV01` |
@@ -306,9 +314,31 @@ Live preview drive of all four chip states; capture snapshots under `.qa-reports
 
 ## Open Questions
 
-1. ~~**Draft revision rendering.**~~ **Resolved 2026-05-29 (user):** drafts render **no REV code**. Honesty rule — no published revision exists, so no `REV??` label is fabricated. Encoded in D-8.3.
+1. ~~**Draft revision rendering.**~~ **Resolved 2026-05-29 (user):** drafts render **no REV code**. **Reversed 2026-05-30 — see Amendment below.** Drafts now render their working revision (REV00), matching Documents.
 2. **Audit-log row renderer scope.** Update in this PR or separate sweep?
 3. **Feature flag.** Roll out behind `templates.rev_labels = on` for safe rollback?
+
+---
+
+## Amendment 2026-05-30 — Drafts show working revision (Documents parity)
+
+**Decision (user):** the version chip must always render a `REV{nn}` code, including for never-published drafts — matching the Documents module, where `LibraryPage.tsx` renders `REV{nn}` for every row regardless of lifecycle state. The original "honesty rule" (D-8.3, Open Question #1) that hid the chip on never-published drafts is **reversed**.
+
+**Rule:** chip label = published revision when one exists, else the latest working revision.
+
+```tsx
+// TemplatesListPage chip (current)
+const versionLabel = formatRevisionCode(
+  dto.current_revision_number ?? dto.latest_revision_number,
+);
+```
+
+- For a **published template with an auto-spawned newer draft**, the chip shows the **published** revision (`current_revision_number`), not the draft's working revision.
+- For a **never-published draft**, it falls back to `latest_revision_number` (the working version's 0-based revision → REV00).
+
+**Contract:** `TemplateDTO` gains `latest_revision_number` (int32, min 0, **always present**, `required`). Sourced in the repo SELECTs by joining the latest version on `(template_id, version_number = t.latest_version)` and reading its `revision_number`. Domain field `Template.LatestRevisionNumber`.
+
+**TemplateCard** `version` prop is now `string` (no longer `string | null`); the chip always renders.
 
 ---
 

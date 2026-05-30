@@ -13,6 +13,7 @@ type Template struct {
 	Name               string
 	Description        string
 	LatestVersion          int
+	LatestRevisionNumber   int
 	PublishedVersionID     *string
 	PublishedVersionNumber *int
 	CurrentRevisionNumber  *int

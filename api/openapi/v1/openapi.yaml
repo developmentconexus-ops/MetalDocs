@@ -5057,7 +5057,7 @@ components:
         name: { type: string }
     TemplateDTO:
       type: object
-      required: [id, tenant_id, key, name, latest_version, created_by, created_at]
+      required: [id, tenant_id, key, name, latest_version, latest_revision_number, created_by, created_at]
       properties:
         id: { type: string, format: uuid }
         tenant_id: { type: string, format: uuid }
@@ -5066,6 +5066,14 @@ components:
         name: { type: string }
         description: { type: string, nullable: true }
         latest_version: { type: integer, minimum: 1 }
+        latest_revision_number:
+          type: integer
+          format: int32
+          minimum: 0
+          description: >
+            Regulated revision number of the template's latest (working) version.
+            0-based (REV00, REV01, ...). Always present. Used as the fallback
+            revision label for never-published drafts, mirroring Documents. ADR 0013.
         published_version_id: { type: string, format: uuid, nullable: true }
         published_version_number: { type: integer, nullable: true, minimum: 1 }
         current_revision_number:

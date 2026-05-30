@@ -85,10 +85,11 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*dom
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, t.published_version_id::text, pv.version_number, pv.revision_number,
+	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
 	t.created_by, t.system_owned, t.created_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
+LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
 WHERE t.id = $1 AND t.tenant_id = $2::uuid`
 
 	tmpl, err := scanTemplate(r.db.QueryRowContext(ctx, q, id, tenantID))
@@ -105,10 +106,11 @@ func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string)
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, t.published_version_id::text, pv.version_number, pv.revision_number,
+	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
 	t.created_by, t.system_owned, t.created_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
+LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
 WHERE t.tenant_id = $1::uuid AND t.key = $2`
 
 	t, err := scanTemplate(r.db.QueryRowContext(ctx, q, tenantID, key))
@@ -125,10 +127,11 @@ func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, t.published_version_id::text, pv.version_number, pv.revision_number,
+	t.latest_version, lv.revision_number, t.published_version_id::text, pv.version_number, pv.revision_number,
 	t.created_by, t.system_owned, t.created_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
+LEFT JOIN templates_template_version lv ON lv.template_id = t.id AND lv.version_number = t.latest_version
 WHERE t.tenant_id = $1::uuid
   AND t.system_owned = false
   AND ($2::text IS NULL OR t.doc_type_code = $2)

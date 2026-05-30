@@ -50,12 +50,11 @@ export function TemplatesListPage(props: TemplatesListPageProps) {
         : "draft";
     const timestamp = isValidIsoDate(dto.created_at) ? dto.created_at : new Date().toISOString();
 
-    // ADR 0013: chip reads canonical `current_revision_number` from the contract.
-    // Drafts (never-published templates) render no REV code — honesty rule.
-    const versionLabel =
-      dto.current_revision_number != null
-        ? formatRevisionCode(dto.current_revision_number)
-        : null;
+    // ADR 0013: chip shows the published revision when one exists, else falls back
+    // to the latest working revision — so drafts render REV00, mirroring Documents.
+    const versionLabel = formatRevisionCode(
+      dto.current_revision_number ?? dto.latest_revision_number,
+    );
 
     return {
       id: dto.id,

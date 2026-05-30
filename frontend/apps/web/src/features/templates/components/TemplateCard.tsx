@@ -6,9 +6,8 @@ import styles from "./TemplateCard.module.css";
 
 type TemplateCardProps = {
   title: string;
-  // ADR 0013: null when the template has no published revision yet.
-  // The CodeChip is omitted in that case — the StatusPill carries draft state.
-  version: string | null;
+  // ADR 0013: always present — published revision, else latest working revision (REV00 for drafts).
+  version: string;
   status: Extract<DocumentStatus, "published" | "draft" | "archived">;
   author: string;
   updated: string;
@@ -36,7 +35,7 @@ export function TemplateCard({ title, version, status, author, updated, onClick 
         <MiniDocPreview />
         <div className={styles.badges}>
           <StatusPill status={status} />
-          {version && <CodeChip>{version}</CodeChip>}
+          <CodeChip>{version}</CodeChip>
         </div>
       </div>
       <div className={styles.body}>
