@@ -25,6 +25,11 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  /* Stretch to fill the recap field's grid row so the shorter Versão box
+     matches the taller Escopo box height; align-items:center then visually
+     centers REV00 against the Escopo chip. */
+  flex: 1;
+  min-height: 0;
 }
 
 .recapMeta {
