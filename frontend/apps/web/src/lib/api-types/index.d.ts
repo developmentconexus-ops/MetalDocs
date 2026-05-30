@@ -4730,6 +4730,11 @@ export interface components {
             name: string;
             description?: string | null;
             latest_version: number;
+            /**
+             * Format: int32
+             * @description Regulated revision number of the template's latest (working) version. 0-based (REV00, REV01, ...). Always present. Used as the fallback revision label for never-published drafts, mirroring Documents. ADR 0013.
+             */
+            latest_revision_number: number;
             /** Format: uuid */
             published_version_id?: string | null;
             published_version_number?: number | null;

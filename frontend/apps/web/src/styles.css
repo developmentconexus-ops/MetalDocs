@@ -1094,6 +1094,22 @@ td small {
 .status-pill.is-archived { background: var(--brand-pale); color: var(--muted); }
 .status-pill.is-archived::before { background: var(--muted); }
 
+.code-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--r-1);
+  background: var(--brand-deep);
+  color: var(--brand-pale);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .mono {
   font-family: "DM Mono", Consolas, monospace;
 }

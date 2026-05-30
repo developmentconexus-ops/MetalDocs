@@ -15,6 +15,7 @@ type rowScanner interface {
 func scanTemplate(row rowScanner) (*domain.Template, error) {
 	var (
 		t                       domain.Template
+		latestRevisionNumber    sql.NullInt32
 		publishedVersionID      sql.NullString
 		publishedVersionNumber  sql.NullInt32
 		currentRevisionNumber   sql.NullInt32
@@ -22,10 +23,13 @@ func scanTemplate(row rowScanner) (*domain.Template, error) {
 	)
 	if err := row.Scan(
 		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description,
-		&t.LatestVersion, &publishedVersionID, &publishedVersionNumber, &currentRevisionNumber,
+		&t.LatestVersion, &latestRevisionNumber, &publishedVersionID, &publishedVersionNumber, &currentRevisionNumber,
 		&t.CreatedBy, &t.SystemOwned, &t.CreatedAt, &archivedAt,
 	); err != nil {
 		return nil, err
+	}
+	if latestRevisionNumber.Valid {
+		t.LatestRevisionNumber = int(latestRevisionNumber.Int32)
 	}
 	if publishedVersionID.Valid {
 		t.PublishedVersionID = &publishedVersionID.String
