@@ -84,9 +84,9 @@ export function StepIdentity({
             <div className={styles.recapField}>
               <span className="kicker">Versão inicial</span>
               <div className={styles.recapBox}>
-                <span className={`mono ${styles.versionLabel}`}>v1.0</span>
+                <span className={`mono ${styles.versionLabel}`}>REV00</span>
                 <span className={styles.versionHint}>
-                  Atribuída automaticamente · incrementa em cada publicação
+                  Rascunho inicial · revisão incrementa a cada publicação
                 </span>
               </div>
             </div>
@@ -141,7 +141,7 @@ export function StepIdentity({
 
       {/* Honest key preview. Next-code sequencing remains deferred in the backlog. */}
       <div className={styles.codePreview}>
-        <div className={`kicker ${styles.codePreviewKicker}`}>Identificador tecnico</div>
+        <div className={`kicker ${styles.codePreviewKicker}`}>Identificador técnico</div>
         <div className={`mono ${styles.codePreviewValue}`}>{templateKey || 'preencha-o-nome'}</div>
         <div className={styles.codePreviewHint}>
           Gerado a partir do nome nesta versão. A prévia de código sequencial permanece no backlog.

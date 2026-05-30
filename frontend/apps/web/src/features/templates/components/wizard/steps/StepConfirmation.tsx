@@ -63,7 +63,7 @@ export function StepConfirmation({
       <div className={styles.previewCard}>
         <div className={styles.thumb}>
           <div className={styles.thumbHeader} />
-          <div className={styles.thumbCode}>{keyValue} v1.0</div>
+          <div className={styles.thumbCode}>{keyValue} REV00</div>
           {Array.from({ length: 11 }, (_, index) => (
             <div
               key={index}
@@ -78,7 +78,7 @@ export function StepConfirmation({
           <div className={styles.headerRow}>
             <span className="code-chip mono">{keyValue}</span>
             <StatusPill status="draft" />
-            <span className="pill mono">v1.0</span>
+            <span className="pill mono">REV00</span>
           </div>
           <div className={styles.templateName}>{name}</div>
           <div className={styles.metaGrid}>
