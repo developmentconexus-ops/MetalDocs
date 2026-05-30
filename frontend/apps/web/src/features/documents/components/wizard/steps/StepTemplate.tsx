@@ -1,6 +1,7 @@
 import { SelectableCard } from '../../../../../components/ui/SelectableCard';
 import { Icon } from '../../../../../components/ui/Icon';
 import { resolveQueryError } from '../../../../../lib/api';
+import { formatRevisionCode } from '../../../../../lib/labels/revisionCode';
 import type { TemplateDTO } from '../../../../templates';
 import { DocPaperPreview } from '../DocPaperPreview';
 import { WizardFooter } from '../../../../shared/components/wizard/WizardFooter';
@@ -99,7 +100,10 @@ export function StepTemplate(props: StepTemplateProps): JSX.Element {
                   <div className={styles.templateMain}>
                     <div className={styles.templateLabelRow}>
                       <span className={styles.templateLabel}>{template.name}</span>
-                      <span className="pill mono">v{template.published_version_number ?? template.latest_version}</span>
+                      {/* ADR 0013: render REV{nn} from the canonical contract field. */}
+                      {template.current_revision_number != null && (
+                        <span className="pill mono">{formatRevisionCode(template.current_revision_number)}</span>
+                      )}
                       {selectable ? (
                         <span className="pill pill-frozen">
                           <span className={styles.publishedDot} aria-hidden="true" />

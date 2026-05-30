@@ -23,7 +23,7 @@
 
 ## Status
 
-Proposed — 2026-05-29
+Accepted — 2026-05-29 (implemented on `feat/templates-rev-labels`)
 
 Awaiting ratification. Implementation lives on `feat/templates-rev-labels` (not yet opened).
 

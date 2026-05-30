@@ -205,6 +205,15 @@ components:
         latest_version: { type: integer, minimum: 1 }
         published_version_id: { type: string, format: uuid, nullable: true }
         published_version_number: { type: integer, nullable: true, minimum: 1 }
+        current_revision_number:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 0
+          description: >
+            Regulated revision number of the currently published template version.
+            0-based (REV00, REV01, ...). Null when the template has never been
+            published. ADR 0013.
         created_by: { type: string }
         created_at: { type: string, format: date-time }
         archived_at: { type: string, format: date-time, nullable: true }
@@ -215,6 +224,13 @@ components:
         id: { type: string, format: uuid }
         template_id: { type: string, format: uuid }
         version_number: { type: integer, minimum: 1 }
+        revision_number:
+          type: integer
+          format: int32
+          minimum: 0
+          description: >
+            0-based regulated revision counter. REV{nn} = revision_number,
+            zero-padded. ADR 0013.
         status: { type: string, enum: [draft, in_review, approved, published, obsolete] }
         docx_storage_key: { type: string, nullable: true }
         content_hash: { type: string, nullable: true }

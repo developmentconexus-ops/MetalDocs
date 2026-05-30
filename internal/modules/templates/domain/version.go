@@ -19,6 +19,7 @@ type TemplateVersion struct {
 	ID                  string
 	TemplateID          string
 	VersionNumber       int
+	RevisionNumber      int
 	Status              VersionStatus
 	DocxStorageKey      string
 	ContentHash         string

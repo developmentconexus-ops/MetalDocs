@@ -75,10 +75,9 @@ export function resolveAreaLabel(code: string, areas: Array<{ code: string; name
   return areas.find((a) => a.code === code)?.name ?? code;
 }
 
-export function formatRevisionCode(revisionNumber: number | null | undefined): string {
-  const safeRevisionNumber = typeof revisionNumber === 'number' && Number.isFinite(revisionNumber) ? revisionNumber : 0;
-  return `REV${String(Math.max(safeRevisionNumber, 0)).padStart(2, '0')}`;
-}
+// ADR 0013: canonical implementation lifted to `lib/labels/revisionCode.ts`.
+// Re-exported here to keep existing documents-side imports working.
+export { formatRevisionCode } from '../../../lib/labels/revisionCode';
 
 export function displayRevisionTitle(title: string | null | undefined, revisionCode: string): string {
   const trimmed = title?.trim();
