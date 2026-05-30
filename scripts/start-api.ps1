@@ -244,7 +244,8 @@ $binary = Join-Path $root "metaldocs-api.exe"
 $workerBinary = Join-Path $root "metaldocs-worker.exe"
 $jobsBinary = Join-Path $root "metaldocs-jobs.exe"
 
-$held = netstat -ano 2>$null | Select-String ":8081 " | ForEach-Object { ($_ -split '\s+')[5] } | Select-Object -First 1
+$held = Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty OwningProcess -First 1
 if ($held) {
     $heldId = [int]$held
     $heldProcess = Get-ProcessEvidence -ProcessId $heldId
