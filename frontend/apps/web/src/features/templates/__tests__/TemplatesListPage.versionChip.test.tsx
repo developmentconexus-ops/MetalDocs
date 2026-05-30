@@ -1,8 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TemplatesListPage } from '../TemplatesListPage';
 import type { TemplateDTO } from '../api/templates';
+
+// ADR 0013 — Template Revision Labels.
+// Fixtures cover the 4 chip states:
+//   1. Never published                                       → no REV chip
+//   2. Published v1 + auto-spawned v2 draft (current_revision_number=0) → REV00
+//   3. Published v1, no further draft (current_revision_number=0)       → REV00
+//   4. Archived with current_revision_number=1                          → REV01
 
 vi.mock('../queries/useTemplatesQuery', () => ({
   useTemplatesQuery: () => ({
@@ -24,6 +31,7 @@ const fixtures: TemplateDTO[] = [
     latest_version: 1,
     published_version_id: null,
     published_version_number: null,
+    current_revision_number: null,
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: null,
@@ -38,6 +46,7 @@ const fixtures: TemplateDTO[] = [
     latest_version: 2,
     published_version_id: 'ver-1',
     published_version_number: 1,
+    current_revision_number: 0,
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: null,
@@ -52,6 +61,7 @@ const fixtures: TemplateDTO[] = [
     latest_version: 1,
     published_version_id: 'ver-x',
     published_version_number: 1,
+    current_revision_number: 0,
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: null,
@@ -66,6 +76,7 @@ const fixtures: TemplateDTO[] = [
     latest_version: 3,
     published_version_id: 'ver-y',
     published_version_number: 2,
+    current_revision_number: 1,
     created_by: 'u1',
     created_at: new Date().toISOString(),
     archived_at: new Date().toISOString(),
@@ -82,28 +93,29 @@ function renderPage() {
 }
 
 describe('TemplatesListPage version chip', () => {
-  it('renders Rascunho v1 for never-published template', () => {
+  it('renders no REV chip for never-published template (draft honesty rule)', () => {
     renderPage();
-    const card = screen.getByText('Never Published').closest('article, [role="button"], div');
+    const card = screen.getByLabelText('Abrir template Never Published');
     expect(card).toBeTruthy();
-    expect(screen.getByText('Rascunho v1')).toBeTruthy();
+    // No REV?? chip rendered for templates without a published revision.
+    expect(within(card).queryByText(/^REV\d{2}$/)).toBeNull();
   });
 
-  it('renders v1 (not v2) when v1 published with v2 draft auto-spawned', () => {
+  it('renders REV00 for v1-published-with-v2-draft (chip ignores draft v2)', () => {
     renderPage();
     expect(screen.getByText('Published With Draft')).toBeTruthy();
-    const chips = screen.getAllByText('v1');
-    expect(chips.length).toBeGreaterThanOrEqual(2);
+    // REV00 appears for both v1-published rows below.
+    expect(screen.getAllByText('REV00').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('renders v1 when published with no further draft', () => {
+  it('renders REV00 when v1 published with no further draft', () => {
     renderPage();
     expect(screen.getByText('Published No Draft')).toBeTruthy();
   });
 
-  it('renders latest_version label for archived template', () => {
+  it('renders REV01 for archived template whose published version was v2', () => {
     renderPage();
     expect(screen.getByText('Archived')).toBeTruthy();
-    expect(screen.getByText('v3')).toBeTruthy();
+    expect(screen.getByText('REV01')).toBeTruthy();
   });
 });

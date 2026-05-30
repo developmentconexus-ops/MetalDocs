@@ -85,7 +85,7 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (*dom
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, t.published_version_id::text, pv.version_number,
+	t.latest_version, t.published_version_id::text, pv.version_number, pv.revision_number,
 	t.created_by, t.system_owned, t.created_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
@@ -105,7 +105,7 @@ func (r *Repository) GetTemplateByKey(ctx context.Context, tenantID, key string)
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, t.published_version_id::text, pv.version_number,
+	t.latest_version, t.published_version_id::text, pv.version_number, pv.revision_number,
 	t.created_by, t.system_owned, t.created_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
@@ -125,7 +125,7 @@ func (r *Repository) ListTemplates(ctx context.Context, f application.ListFilter
 	const q = `
 SELECT
 	t.id::text, t.tenant_id::text, t.doc_type_code, t.key, t.name, t.description,
-	t.latest_version, t.published_version_id::text, pv.version_number,
+	t.latest_version, t.published_version_id::text, pv.version_number, pv.revision_number,
 	t.created_by, t.system_owned, t.created_at, t.archived_at
 FROM templates_template t
 LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id
@@ -196,25 +196,37 @@ func (r *Repository) CreateVersion(ctx context.Context, v *domain.TemplateVersio
 		return err
 	}
 
+	// ADR 0013: revision_number allocated atomically per template_id, mirroring
+	// documents.revision_number (internal/modules/documents/repository/repository.go).
+	// COALESCE(MAX(rn)+1, 0) yields 0 for the first version of a template and
+	// increments thereafter. The DEFAULT 0 in the schema is a safety floor.
 	const q = `
 INSERT INTO templates_template_version (
-	id, template_id, version_number, status, docx_storage_key, content_hash,
+	id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6,
+	$1, $2, $3,
+	COALESCE((SELECT MAX(rn.revision_number) + 1
+	            FROM templates_template_version rn
+	           WHERE rn.template_id = $2), 0),
+	$4, $5, $6,
 	$7, $8, $9,
 	$10, $11, $12, $13,
 	$14, $15, $16, $17, $18, $19, $20
-)`
-	_, err = r.db.ExecContext(ctx, q,
+)
+RETURNING revision_number`
+	row := r.db.QueryRowContext(ctx, q,
 		v.ID, v.TemplateID, v.VersionNumber, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON, v.AuthorID,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
 		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
 	)
-	return err
+	if err = row.Scan(&v.RevisionNumber); err != nil {
+		return fmt.Errorf("templates repository create version: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) CreateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.TemplateVersion) error {
@@ -222,31 +234,40 @@ func (r *Repository) CreateVersionTx(ctx context.Context, tx *sql.Tx, v *domain.
 	if err != nil {
 		return err
 	}
+	// ADR 0013: see CreateVersion comment.
 	const q = `
 INSERT INTO templates_template_version (
-	id, template_id, version_number, status, docx_storage_key, content_hash,
+	id, template_id, version_number, revision_number, status, docx_storage_key, content_hash,
 	metadata_schema, placeholder_schema, author_id,
 	pending_reviewer_role, pending_approver_role, reviewer_id, approver_id,
 	submitted_at, reviewed_at, approved_at, published_at, obsoleted_at, lock_version, created_at
 ) VALUES (
-	$1, $2, $3, $4, $5, $6,
+	$1, $2, $3,
+	COALESCE((SELECT MAX(rn.revision_number) + 1
+	            FROM templates_template_version rn
+	           WHERE rn.template_id = $2), 0),
+	$4, $5, $6,
 	$7, $8, $9,
 	$10, $11, $12, $13,
 	$14, $15, $16, $17, $18, $19, $20
-)`
-	_, err = tx.ExecContext(ctx, q,
+)
+RETURNING revision_number`
+	row := tx.QueryRowContext(ctx, q,
 		v.ID, v.TemplateID, v.VersionNumber, string(v.Status), v.DocxStorageKey, v.ContentHash,
 		metadataJSON, placeholderJSON, v.AuthorID,
 		v.PendingReviewerRole, v.PendingApproverRole, v.ReviewerID, v.ApproverID,
 		v.SubmittedAt, v.ReviewedAt, v.ApprovedAt, v.PublishedAt, v.ObsoletedAt, v.LockVersion, v.CreatedAt,
 	)
-	return err
+	if err := row.Scan(&v.RevisionNumber); err != nil {
+		return fmt.Errorf("templates repository create version tx: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) GetVersion(ctx context.Context, tenantID, templateID string, n int) (*domain.TemplateVersion, error) {
 	const q = `
 SELECT
-	v.id::text, v.template_id::text, v.version_number, v.status, v.docx_storage_key, v.content_hash,
+	v.id::text, v.template_id::text, v.version_number, v.revision_number, v.status, v.docx_storage_key, v.content_hash,
 	v.metadata_schema, v.placeholder_schema, v.author_id,
 	v.pending_reviewer_role, v.pending_approver_role, v.reviewer_id, v.approver_id,
 	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at
@@ -267,7 +288,7 @@ WHERE v.template_id = $1 AND v.version_number = $2 AND t.tenant_id = $3::uuid`
 func (r *Repository) GetVersionByID(ctx context.Context, tenantID, id string) (*domain.TemplateVersion, error) {
 	const q = `
 SELECT
-	v.id::text, v.template_id::text, v.version_number, v.status, v.docx_storage_key, v.content_hash,
+	v.id::text, v.template_id::text, v.version_number, v.revision_number, v.status, v.docx_storage_key, v.content_hash,
 	v.metadata_schema, v.placeholder_schema, v.author_id,
 	v.pending_reviewer_role, v.pending_approver_role, v.reviewer_id, v.approver_id,
 	v.submitted_at, v.reviewed_at, v.approved_at, v.published_at, v.obsoleted_at, v.lock_version, v.created_at

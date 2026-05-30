@@ -4733,6 +4733,11 @@ export interface components {
             /** Format: uuid */
             published_version_id?: string | null;
             published_version_number?: number | null;
+            /**
+             * Format: int32
+             * @description Regulated revision number of the currently published template version. 0-based (REV00, REV01, ...). Null when the template has never been published. ADR 0013.
+             */
+            current_revision_number?: number | null;
             created_by: string;
             /** Format: date-time */
             created_at: string;
@@ -4745,6 +4750,11 @@ export interface components {
             /** Format: uuid */
             template_id: string;
             version_number: number;
+            /**
+             * Format: int32
+             * @description 0-based regulated revision counter. REV{nn} = revision_number, zero-padded. ADR 0013.
+             */
+            revision_number?: number;
             /** @enum {string} */
             status: "draft" | "in_review" | "approved" | "published" | "obsolete";
             docx_storage_key?: string | null;

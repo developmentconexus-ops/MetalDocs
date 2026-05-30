@@ -15,6 +15,7 @@ type Template struct {
 	LatestVersion          int
 	PublishedVersionID     *string
 	PublishedVersionNumber *int
+	CurrentRevisionNumber  *int
 	CreatedBy              string
 	SystemOwned        bool
 	CreatedAt          time.Time

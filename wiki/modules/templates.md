@@ -4,16 +4,21 @@
 >
 > **Naming note:** module dir is `internal/modules/templates/` and routes still mount under `/api/v1/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates-refactor.md#R-101`).
 
-**Last verified:** 2026-05-29 (bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`) | **Maturity:** L3
+**Last verified:** 2026-05-29 (feat/templates-rev-labels: ADR 0013 — first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
 
 ### Version chip source-of-truth (2026-05-29)
 
-`latest_version` advances on every draft spawn (including the auto-spawned `vN+1` draft after publish). The list-page chip must read from `published_version_number` (LEFT JOIN onto the published version row in `ListTemplates` / `GetTemplate` / `GetTemplateByKey`) when status is `published`, and fall back to `latest_version` for draft / archived states. See:
+`latest_version` advances on every draft spawn (including the auto-spawned `vN+1` draft after publish). Per **ADR 0013**, the chip is rendered from a **persisted, backend-canonical `revision_number` column** on `templates_template_version`. `TemplateDTO.current_revision_number` mirrors the published version's `revision_number` (null when nothing is published yet). FE never computes the value — it formats via `formatRevisionCode(n)` → `REV{nn}`. Draft-only templates render **no REV chip** (honesty rule). See:
 
-- `internal/modules/templates/domain/template.go` — `PublishedVersionNumber *int`
-- `internal/modules/templates/repository/postgres.go` — `LEFT JOIN templates_template_version pv ON pv.id = t.published_version_id`
-- `internal/modules/templates/application/lifecycle.go` — setter at both publish paths (`PublishTemplateVersion`, `Approve` Accept branch)
-- `frontend/apps/web/src/features/templates/TemplatesListPage.tsx` — state-aware chip
+- `migrations/0208_templates_revision_number.sql` — column + backfill (`version_number - 1`) + `ux_templates_version_revision` unique index per template
+- `internal/modules/templates/domain/version.go` — `TemplateVersion.RevisionNumber int`
+- `internal/modules/templates/domain/template.go` — `Template.CurrentRevisionNumber *int`, `PublishedVersionNumber *int`
+- `internal/modules/templates/repository/postgres.go` — INSERT atomic allocation `COALESCE(MAX(rn)+1, 0)`; SELECT projection includes `pv.revision_number`
+- `internal/modules/templates/application/lifecycle.go` — sets `CurrentRevisionNumber` at both publish paths (`PublishTemplateVersion`, `Approve` Accept branch)
+- `api/openapi/v1/partials/templates.yaml` — `TemplateDTO.current_revision_number`, `VersionDTO.revision_number`
+- `frontend/apps/web/src/lib/labels/revisionCode.ts` — shared formatter (documents + templates)
+- `frontend/apps/web/src/features/templates/TemplatesListPage.tsx` — chip composition
+- `frontend/apps/web/src/features/documents/components/wizard/steps/StepTemplate.tsx` + `StepConfirm.tsx` — wizard chip rendering
 - `frontend/apps/web/src/features/templates/__tests__/TemplatesListPage.versionChip.test.tsx` — 4-state fixture coverage
 
 > **Plan 12.4 route truth:** `api/openapi/v1/openapi.yaml`, `internal/modules/templates/api/api.gen.go`, and `frontend/apps/web/src/lib/api-types/index.d.ts` include the mounted template route set, including typed `GET /api/v1/templates/placeholder-catalog`. Several generated methods still delegate to existing internal handler bodies.
