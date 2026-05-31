@@ -193,7 +193,20 @@ type ApproveCmd struct {
 	Reason                string
 }
 
-func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.TemplateVersion, error) {
+// ApproveResult mirrors PublishTemplateVersionResult so that lifecycle
+// transitions that terminate as publish return both the now-published
+// version and the freshly spawned v(n+1) draft in one round-trip.
+// NextDraft is nil when the transition does not publish (reject path,
+// or reviewer path that only flips to approved awaiting a separate
+// publish call — currently unreachable because Approve with reviewer
+// publishes immediately, but the field stays nullable for forward
+// compatibility with that future split).
+type ApproveResult struct {
+	Version   *domain.TemplateVersion
+	NextDraft *domain.TemplateVersion
+}
+
+func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*ApproveResult, error) {
 	template, err := s.repo.GetTemplate(ctx, cmd.TenantID, cmd.TemplateID)
 	if err != nil {
 		return nil, err
@@ -240,6 +253,15 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 		approvedRev := version.RevisionNumber
 		template.CurrentRevisionNumber = &approvedRev
 
+		// Mirror PublishTemplateVersion: spawn v(n+1) draft in the same tx so
+		// the caller can navigate without a list refetch.
+		nextNum := template.LatestVersion + 1
+		if version.VersionNumber >= nextNum {
+			nextNum = version.VersionNumber + 1
+		}
+		next := s.buildNextDraftVersion(cmd.TemplateID, cmd.ActorUserID, nextNum, version)
+		template.LatestVersion = nextNum
+
 		if s.db != nil {
 			tx, err := s.db.BeginTx(ctx, nil)
 			if err != nil {
@@ -259,6 +281,9 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 				return nil, err
 			}
 			if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+				return nil, err
+			}
+			if err := s.repo.CreateVersionTx(ctx, tx, next); err != nil {
 				return nil, err
 			}
 			audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, nil, s.clock.Now())
@@ -281,6 +306,9 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 			if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
 				return nil, err
 			}
+			if err := s.repo.CreateVersion(ctx, next); err != nil {
+				return nil, err
+			}
 			audit, err := newAuditEvent(cmd.TenantID, cmd.TemplateID, cmd.ActorUserID, &version.ID, domain.AuditPublished, nil, s.clock.Now())
 			if err != nil {
 				return nil, err
@@ -289,7 +317,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 				return nil, wrapAppErr("templates approve: append audit", err)
 			}
 		}
-		return version, nil
+		return &ApproveResult{Version: version, NextDraft: next}, nil
 	}
 
 	if err := version.CanTransition(domain.VersionStatusDraft, hasReviewer); err != nil {
@@ -322,7 +350,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 		return nil, wrapAppErr("templates approve: append audit", err)
 	}
 
-	return version, nil
+	return &ApproveResult{Version: version}, nil
 }
 
 type ArchiveCmd struct {
