@@ -718,6 +718,7 @@ func TestPublishTemplateVersion_RollbackOnNextDraftFailure(t *testing.T) {
 	_, err := svc.PublishTemplateVersion(context.Background(), application.PublishTemplateVersionCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
+		ActorRoles:    []string{"approver"},
 		TemplateID:    template.ID,
 		VersionNumber: 1,
 		DocxKey:       "templates/tpl-1/versions/1.docx",

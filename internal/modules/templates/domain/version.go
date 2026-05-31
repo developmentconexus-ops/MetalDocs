@@ -54,6 +54,27 @@ func NewTemplateVersionDraft(id, templateID, authorID, docxStorageKey string, ve
 	}
 }
 
+// RoleBindingFor returns the role name required to perform the given lifecycle
+// transition on this version, or "" when no binding is configured (in which
+// case the capability tier remains the sole gate).
+//
+// Callers must treat the empty-string result as "permit if capability passes".
+// In production this branch is only reachable on a version that has never gone
+// through SubmitForReview (which always populates PendingApproverRole from the
+// template's ApprovalConfig). Callers that need a stricter "binding required"
+// posture should assert the field is non-empty separately.
+func (v *TemplateVersion) RoleBindingFor(transition VersionStatus) string {
+	switch transition {
+	case VersionStatusInReview, VersionStatusApproved:
+		if v.PendingReviewerRole != nil {
+			return *v.PendingReviewerRole
+		}
+	case VersionStatusPublished:
+		return v.PendingApproverRole
+	}
+	return ""
+}
+
 func (v *TemplateVersion) CanTransition(next VersionStatus, hasReviewer bool) error {
 	switch v.Status {
 	case VersionStatusDraft:

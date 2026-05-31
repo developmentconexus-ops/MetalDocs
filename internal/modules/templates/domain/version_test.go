@@ -151,3 +151,29 @@ func TestNewTemplateVersionDraft(t *testing.T) {
 		t.Fatalf("unexpected identity fields: %+v", v)
 	}
 }
+
+func TestRoleBindingFor(t *testing.T) {
+	reviewer := "reviewer-role"
+	cases := []struct {
+		name       string
+		version    domain.TemplateVersion
+		transition domain.VersionStatus
+		want       string
+	}{
+		{"published_returns_approver_when_set", domain.TemplateVersion{PendingApproverRole: "approver-role"}, domain.VersionStatusPublished, "approver-role"},
+		{"published_empty_when_unset", domain.TemplateVersion{}, domain.VersionStatusPublished, ""},
+		{"in_review_returns_reviewer_when_set", domain.TemplateVersion{PendingReviewerRole: &reviewer}, domain.VersionStatusInReview, reviewer},
+		{"in_review_empty_when_nil", domain.TemplateVersion{}, domain.VersionStatusInReview, ""},
+		{"approved_returns_reviewer_when_set", domain.TemplateVersion{PendingReviewerRole: &reviewer}, domain.VersionStatusApproved, reviewer},
+		{"draft_has_no_binding", domain.TemplateVersion{PendingApproverRole: "x", PendingReviewerRole: &reviewer}, domain.VersionStatusDraft, ""},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.version.RoleBindingFor(tc.transition)
+			if got != tc.want {
+				t.Fatalf("RoleBindingFor(%q) = %q, want %q", tc.transition, got, tc.want)
+			}
+		})
+	}
+}

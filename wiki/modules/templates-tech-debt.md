@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/templates.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/templates-refactor.md`.
 
-**Last verified:** 2026-05-26 (Wave 5 lifecycle concurrency + capability alignment)
+**Last verified:** 2026-05-31 (fix/templates-publish-role-binding — T-004 fully closed; `PublishTemplateVersion` now enforces `pending_approver_role` binding parity with `Service.Approve`, denied attempts audited via `publish_forbidden_role`)
 
 ## Items
 
@@ -31,14 +31,14 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-003` (can be closed)
 - **Linked ADR:** `wiki/architecture/tenant-context.md`
 
-### T-004 · `PublishTemplateVersion` bypasses approval lifecycle (no SoD, no role check, no content_hash gate) — PARTIALLY CLOSED 2026-05-11 (Plan 5)
-- **Severity:** critical → **partially resolved**
-- **Surface (resolved):** `internal/modules/templates/application/lifecycle.go:320` — `content_hash != ""` guard added (`ErrContentHashMismatch` on empty hash). `lifecycle.go:325` — `domain.CheckSegregation("approver", ...)` now called (SoD gate). `lifecycle.go:345` — `authz.Require(CapTemplatePublish)` called inside a new tx when `s.db != nil`.
-- **Surface (residual):** `PublishTemplateVersion` still does not verify `pending_approver_role` against `cmd.ActorUserID`'s roles (role-binding check). The `Approve` path enforces this; the direct publish path does not. ISO 9001 §7.5 identity traceability gap remains for `POST /publish`.
-- **Observation (original):** Parallel publish path to `Service.Approve`. Transitions a version directly `draft → published` without SoD, role check, or `content_hash` gate.
-- **Evidence:** `_artifacts/02-flow-publish.md`, `_artifacts/05-industry.md` IP-004.
-- **Linked backlog row:** `backlog/templates-refactor.md#R-004`
-- **Linked ADR:** missing-ADR
+### T-004 · `PublishTemplateVersion` bypasses approval lifecycle (no SoD, no role check, no content_hash gate) — CLOSED 2026-05-31 (`fix/templates-publish-role-binding`)
+- **Severity:** critical (closed)
+- **Surface (resolved 2026-05-11 Plan 5):** `internal/modules/templates/application/lifecycle.go` — `content_hash != ""` guard, `domain.CheckSegregation("approver", ...)` SoD gate, `authz.Require(CapTemplatePublish)` capability assertion inside the same tx.
+- **Surface (resolved 2026-05-31):** `lifecycle.go` `PublishTemplateVersion` now calls `version.RoleBindingFor(VersionStatusPublished)` (new helper on `domain/version.go`) and returns `domain.ErrForbiddenRole` → RFC 9457 `code: "forbidden_role"` 403 when the actor's roles do not satisfy `pending_approver_role`. Denied attempts emit `AuditPublishForbiddenRole` to the canonical audit sink. `Service.Approve` was refactored to consume the same helper — single source of truth for role-binding semantics.
+- **Observation (original):** Parallel publish path to `Service.Approve`. Transitioned a version directly `draft → published` without SoD, role check, or `content_hash` gate.
+- **Evidence:** `_artifacts/02-flow-publish.md`, `_artifacts/05-industry.md` IP-004; `go test ./internal/modules/templates/...` PASS (race build unavailable on this host — no gcc); `internal/modules/templates/application/lifecycle_publish_role_test.go` (3-case table-driven service test); `internal/modules/templates/delivery/http/routes_lifecycle_test.go::TestPublishTemplateVersion_ForbiddenRoleRFC9457`.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-004` (closed)
+- **Linked ADR:** `wiki/decisions/0007-two-tier-authz.md`
 
 ### T-005 · Legacy error envelope — RFC 9457 Problem+JSON not adopted — CLOSED 2026-05-12 (Plan 7)
 - **Severity:** major (closed)
