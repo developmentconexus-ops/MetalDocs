@@ -36,7 +36,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 		"placeholder_schema": []map[string]any{
 			{"id": "ph-1", "label": "Signer", "type": "select", "options": []string{"a", "b"}},
 		},
-		"expected_content_hash": "hash_abc",
+		"expected_lock_version": 0,
 	}
 	raw, _ := json.Marshal(body)
 

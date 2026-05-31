@@ -30,10 +30,18 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		MetadataSchema      domain.MetadataSchema `json:"metadata_schema"`
 		PlaceholderSchema   []domain.Placeholder  `json:"placeholder_schema"`
-		ExpectedContentHash string                `json:"expected_content_hash"`
+		ExpectedLockVersion *int                  `json:"expected_lock_version"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
+		return
+	}
+	if req.ExpectedLockVersion == nil {
+		writeErr(w, http.StatusBadRequest, "invalid_body", "expected_lock_version is required")
+		return
+	}
+	if *req.ExpectedLockVersion < 0 {
+		writeErr(w, http.StatusBadRequest, "invalid_body", "expected_lock_version must be >= 0")
 		return
 	}
 
@@ -44,7 +52,7 @@ func (h *Handler) updateSchemas(w http.ResponseWriter, r *http.Request) {
 		VersionNumber:       versionNum,
 		MetadataSchema:      req.MetadataSchema,
 		PlaceholderSchema:   req.PlaceholderSchema,
-		ExpectedContentHash: req.ExpectedContentHash,
+		ExpectedLockVersion: *req.ExpectedLockVersion,
 	})
 	if err != nil {
 		writeMappedErr(w, err)

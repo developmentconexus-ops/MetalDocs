@@ -152,6 +152,30 @@ func (r *fakeRepo) UpdateVersionDraftCASTx(_ context.Context, _ *sql.Tx, tenantI
 	return r.UpdateVersionDraftCAS(context.Background(), tenantID, versionID, expectedLockVersion, docxStorageKey, docxContentHash)
 }
 
+func (r *fakeRepo) UpdateVersionSchemaCAS(_ context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+	stored, ok := r.versions[v.ID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	t, ok := r.templates[stored.TemplateID]
+	if !ok || t.TenantID != tenantID {
+		return domain.ErrNotFound
+	}
+	current := r.lockVersions[v.ID]
+	if current != expectedLockVersion {
+		return domain.ErrStaleLockVersion
+	}
+	stored.MetadataSchema = v.MetadataSchema
+	stored.PlaceholderSchema = v.PlaceholderSchema
+	r.lockVersions[v.ID] = current + 1
+	v.LockVersion = current + 1
+	return nil
+}
+
+func (r *fakeRepo) UpdateVersionSchemaCASTx(_ context.Context, _ *sql.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+	return r.UpdateVersionSchemaCAS(context.Background(), tenantID, v, expectedLockVersion)
+}
+
 func (r *fakeRepo) ObsoletePreviousPublished(_ context.Context, templateID, keepVersionID string) error {
 	for _, v := range r.versions {
 		if v.TemplateID == templateID && v.Status == domain.VersionStatusPublished && v.ID != keepVersionID {

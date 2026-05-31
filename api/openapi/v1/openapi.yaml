@@ -1893,7 +1893,46 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
-      responses: { '200': { description: ok } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [placeholder_schema, metadata_schema, expected_lock_version]
+              additionalProperties: false
+              properties:
+                placeholder_schema:
+                  type: array
+                  items: { type: object, additionalProperties: true }
+                metadata_schema:
+                  type: object
+                  additionalProperties: true
+                expected_lock_version:
+                  type: integer
+                  format: int32
+                  minimum: 0
+                  description: >
+                    Last-seen `VersionDTO.lock_version`. Server compare-and-swaps;
+                    on mismatch returns HTTP 412 with code `stale_lock_version`.
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [version]
+                    properties:
+                      version: { $ref: '#/components/schemas/VersionDTO' }
+        '400': { description: invalid_request }
+        '409': { description: invalid_state_transition }
+        '412': { description: stale_lock_version }
+        '422': { description: placeholder_validation_error }
   /api/v1/templates/{id}/versions/{n}/autosave/presign:
     post:
       tags: [templates]
@@ -5117,6 +5156,15 @@ components:
         approved_at: { type: string, format: date-time, nullable: true }
         published_at: { type: string, format: date-time, nullable: true }
         obsoleted_at: { type: string, format: date-time, nullable: true }
+        lock_version:
+          type: integer
+          format: int32
+          minimum: 0
+          description: >
+            Optimistic-concurrency token. Increments on every successful write
+            to the version row. Clients must echo the last-seen value back via
+            `expected_lock_version` on PUT .../schema and PUT .../draft. A
+            mismatch yields HTTP 412 with code `stale_lock_version`.
         created_at: { type: string, format: date-time }
     CreateTemplateResponse:
       type: object
