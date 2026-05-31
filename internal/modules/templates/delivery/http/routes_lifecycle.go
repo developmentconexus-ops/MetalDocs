@@ -122,7 +122,7 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v, err := h.svc.Approve(r.Context(), application.ApproveCmd{
+	res, err := h.svc.Approve(r.Context(), application.ApproveCmd{
 		TenantID:      tenantID,
 		ActorUserID:   actorID,
 		ActorRoles:    actorRolesFromReq(r),
@@ -136,11 +136,17 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"version": toVersionResponse(v),
-		},
-	})
+	data := map[string]any{
+		"version":    toVersionResponse(res.Version),
+		"next_draft": nil,
+	}
+	if res.NextDraft != nil {
+		data["next_draft"] = map[string]any{
+			"id":             res.NextDraft.ID,
+			"version_number": res.NextDraft.VersionNumber,
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": data})
 }
 
 func (h *Handler) archiveTemplate(w http.ResponseWriter, r *http.Request) {
