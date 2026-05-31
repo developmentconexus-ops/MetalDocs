@@ -218,6 +218,7 @@ func (h *Handler) PublishTemplateVersion(w http.ResponseWriter, r *http.Request,
 	res, err := h.svc.PublishTemplateVersion(r.Context(), application.PublishTemplateVersionCmd{
 		TenantID:      tenantID,
 		ActorUserID:   actorID,
+		ActorRoles:    actorRolesFromReq(r),
 		TemplateID:    id,
 		VersionNumber: n,
 		DocxKey:       strings.TrimSpace(req.DocxKey),

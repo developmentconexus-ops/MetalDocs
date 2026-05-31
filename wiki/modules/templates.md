@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates/` and routes still mount under `/api/v1/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates-refactor.md#R-101`).
 
-**Last verified:** 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS — `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch — multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 — first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
+**Last verified:** 2026-05-31 (fix/templates-publish-role-binding — `PublishTemplateVersion` now enforces `pending_approver_role` Tier 2 binding alongside the Tier 1 `template.publish` capability; T-004 fully closed; `Service.Approve` refactored to share new `domain.TemplateVersion.RoleBindingFor` helper; denied-attempt audit emitted) | prior: 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS — `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch — multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 — first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
 
 ### Version chip source-of-truth (2026-05-29)
 
@@ -310,7 +310,7 @@ State transitions on `templates_template_version.status`:
 | in_review | draft | `POST .../review` (Reject) | `template.approve` / bypassed | ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â |
 | approved | published | `POST .../approve` (Accept, hasReviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, reviewer)` ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ |
 | in_review | published | `POST .../approve` (Accept, no reviewer) | `template.approve` / bypassed | `CheckSegregation("approver", actor, author, nil)` ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“ |
-| draft | published | `POST .../publish` (`PublishTemplateVersion`) | `template.publish` / bypassed | **NONE ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â author can self-publish (T-004)** |
+| draft | published | `POST .../publish` (`PublishTemplateVersion`) | `template.publish` (Tier 1) + `pending_approver_role` binding (Tier 2, since 2026-05-31) | CheckSegregation(approver, actor, author, reviewer) + role-binding (T-004 CLOSED) |
 | approved | draft | `POST .../approve` (Reject) | `template.approve` / bypassed | ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â |
 | published | obsolete | side-effect of `Approve(Accept)` or `PublishTemplateVersion` (`ObsoletePreviousPublished`) | implicit | ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â |
 | any | (template.archived_at NOT NULL) | `POST .../archive` | `template.edit` / bypassed | ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â |
@@ -330,7 +330,7 @@ sequenceDiagram
     S->>R: GetTemplate(tenant, id)
     S->>R: GetVersion(id, n) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â no tenant arg
     Note over S: if status != draft ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ 409
-    Note over S: NO CheckSegregation (T-004); NO content_hash check
+    Note over S: CheckSegregation(approver) + content_hash gate + RoleBindingFor(Published) + authz.Require(template.publish) — all enforced (T-004 CLOSED 2026-05-31)
     S->>R: ObsoletePreviousPublished(template_id, new_version_id)
     R->>DB: UPDATE templates_template_version SET status='obsolete' WHERE ...
     Note over S,DB: NOT in same tx (T-007) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â race window for concurrent publish
@@ -419,10 +419,10 @@ Failure modes:
 | Eigenpal as DOCX editor | `wiki/decisions/0001-eigenpal-adoption.md` |
 | `{name}` single-brace token syntax | `wiki/decisions/0003-token-syntax-migration.md` |
 | Fixed 7-token placeholder catalog | `wiki/decisions/0008-placeholder-fixed-catalog.md` |
-| Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â applied Plan 5 (T-001 closed); `PublishTemplateVersion` role-binding check still absent (T-004 partial) |
+| Two-tier authz | `wiki/decisions/0007-two-tier-authz.md` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â applied Plan 5 (T-001 closed); `PublishTemplateVersion` role-binding check added 2026-05-31 (T-004 CLOSED) |
 | Contract-first via oapi-codegen | `wiki/decisions/0012-contract-first-api.md` (PARTIAL ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â T-006) |
 | Hexagonal layer split (`domain/application/delivery/repository`) | tech-debt: missing-ADR (T-014) |
-| Two parallel publish paths (`Approve` vs `PublishTemplateVersion`) | tech-debt: missing-ADR (T-004) |
+| Two parallel publish paths (`Approve` vs `PublishTemplateVersion`) | tech-debt: covered by ADR 0007 (two-tier authz); T-004 CLOSED 2026-05-31 |
 | Module-local audit sink (`templates_audit_log`) instead of canonical `metaldocs.audit_events` | tech-debt: missing-ADR (T-013) |
 
 ---
@@ -433,7 +433,7 @@ Failure modes:
 |---|---|---|
 | Tenant isolation | Authn'd user from tenant A calls `GET /api/v1/templates/{id-from-tenant-B}/versions/1` with a known version_id | 404 not found (currently: 200 with the row ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â T-002) |
 | Authz enforcement | Authn'd user without `template.publish` calls `POST /publish` | 403 with Problem `metaldocs.authz.forbidden` (currently: 200 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â T-001) |
-| Approval SoD | Author calls `POST /publish` on own draft | 409 with `{"code":"sod_violation"}` (currently: 200 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â T-004) |
+| Approval SoD | Author calls `POST /publish` on own draft | 403 with `{"code":"sod_violation"}` (T-004 CLOSED 2026-05-31; combined with role-binding gate) |
 | Placeholder injection | Template author saves schema with `{type:"computed", resolver_key:"; DROP TABLE ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"}` | 422 invalid resolver_key (currently: 204 saved ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â T-008) |
 | Idempotency | Client retries a generated POST route with same `Idempotency-Key` | second response equals first; one audit row/state transition (create path header covered; replay audit still open - T-009) |
 
@@ -451,7 +451,7 @@ Top 3 (by severity, then blast-radius):
 
 1. **T-001 closed Plan 5, autosave extension 2026-05-17** — `authz.Require` wired through `WithDB`; DOCX import/autosave commit now asserts `template.edit` before updating `templates_template_version`; tripwire on both templates tables (migration 0188).
 2. **Tenant sourced from `tenant.FromContext`** (`handler.go:83`) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Plan 3 closed the header-trust gap (T-003 resolved).
-3. **`PublishTemplateVersion` partially hardened Plan 5** (`lifecycle.go:320-347`) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â `content_hash` gate + SoD check + `authz.Require(CapTemplatePublish)` added. Residual: `pending_approver_role` vs actor-role binding check still absent (T-004 partially open). ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â see tech-debt Ãƒâ€šÃ‚Â§T-004
+3. **`PublishTemplateVersion` partially hardened Plan 5** (`lifecycle.go:320-347`) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â `content_hash` gate + SoD check + `authz.Require(CapTemplatePublish)` added. Residual closed 2026-05-31 — `pending_approver_role` binding now enforced via `version.RoleBindingFor(VersionStatusPublished)` (T-004 CLOSED). ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â see tech-debt Ãƒâ€šÃ‚Â§T-004
 
 ---
 
