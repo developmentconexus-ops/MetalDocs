@@ -92,7 +92,7 @@ describe('problem', () => {
     expect(resolveErrorMessage(err)).toBe('Há campos inválidos. Revise os dados informados.');
   });
 
-  it('resolveErrorMessage returns detail for unknown code when ApiError has detail', () => {
+  it('resolveErrorMessage returns actionable PT-BR fallback for unmapped ApiError code', () => {
     const err = new ApiError({
       code: 'CUSTOM_UNKNOWN_CODE',
       title: 'Fallback title',
@@ -100,7 +100,7 @@ describe('problem', () => {
       detail: 'Detalhe específico',
     });
 
-    expect(resolveErrorMessage(err)).toBe('Detalhe específico');
+    expect(resolveErrorMessage(err)).toBe('Não foi possível concluir a ação. Código: CUSTOM_UNKNOWN_CODE');
   });
 
   it("resolveErrorMessage falls back to 'Erro inesperado.' for non-Error input", () => {

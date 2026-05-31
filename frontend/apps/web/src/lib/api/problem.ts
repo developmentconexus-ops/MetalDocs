@@ -16,30 +16,7 @@ export type Problem = {
   errors?: FieldError[];
 };
 
-const extraMessages: Record<string, string> = {
-  VALIDATION_ERROR: 'Há campos inválidos. Revise os dados informados.',
-  UNKNOWN_FIELD: 'A requisição contém um campo desconhecido.',
-  UNKNOWN_FILTER: 'Foi informado um filtro não suportado para esta consulta.',
-  INVALID_SORT_FIELD: 'O campo de ordenação informado não é válido.',
-  INVALID_CURSOR: 'O cursor informado é inválido ou expirou.',
-  INCLUDE_NOT_SUPPORTED: 'O include informado não é suportado para este endpoint.',
-  UNAUTHENTICATED: 'Você precisa se autenticar para continuar.',
-  FORBIDDEN_CAPABILITY: 'Você não tem permissão para executar esta ação.',
-  FORBIDDEN_AREA: 'Você não tem permissão para atuar nesta área.',
-  NOT_FOUND: 'O recurso solicitado não foi encontrado.',
-  ALREADY_EXISTS: 'O recurso informado já existe.',
-  STATE_TRANSITION_INVALID: 'A transição de estado solicitada não é permitida.',
-  CONCURRENT_MODIFICATION: 'O recurso foi alterado por outro usuário. Atualize e tente novamente.',
-  IDEMPOTENCY_KEY_REUSED: 'A chave de idempotência já foi usada com outro conteúdo.',
-  IDEMPOTENCY_REPLAY: 'A requisição foi processada anteriormente e a resposta foi reaproveitada.',
-  RATE_LIMITED: 'Muitas requisições em sequência. Tente novamente em instantes.',
-  INTERNAL_ERROR: 'Ocorreu um erro interno. Tente novamente.',
-};
-
-const mergedMessages: Record<string, string> = {
-  ...errorMessages,
-  ...extraMessages,
-};
+const mergedMessages: Record<string, string> = errorMessages;
 
 function isFieldError(value: unknown): value is FieldError {
   if (!value || typeof value !== 'object') return false;
@@ -152,19 +129,32 @@ export class ApiError extends Error {
   }
 }
 
+function unmappedFallback(code: string): string {
+  return `Não foi possível concluir a ação. Código: ${code}`;
+}
+
+function reportUnmapped(code: string, context: string): void {
+  // Breadcrumb so unmapped codes surface in observability. The PT-BR
+  // fallback above keeps the UI usable, but the code must reach the team.
+  console.warn('[api] unmapped error code', { code, context });
+}
+
 export function resolveErrorMessage(err: unknown): string;
 export function resolveErrorMessage(code: string | undefined, backendMessage?: string): string;
 export function resolveErrorMessage(errOrCode: unknown, backendMessage?: string): string {
   if (errOrCode instanceof ApiError) {
     const mapped = mergedMessages[errOrCode.code];
     if (mapped) return mapped;
-    return errOrCode.detail || errOrCode.title || 'Erro inesperado.';
+    reportUnmapped(errOrCode.code, errOrCode.instance ?? 'ApiError');
+    return unmappedFallback(errOrCode.code);
   }
 
   if (typeof errOrCode === 'string' || errOrCode === undefined) {
     if (typeof errOrCode === 'string') {
       const mapped = mergedMessages[errOrCode];
       if (mapped) return mapped;
+      reportUnmapped(errOrCode, 'resolveErrorMessage(code)');
+      return backendMessage ?? unmappedFallback(errOrCode);
     }
 
     if (backendMessage) return backendMessage;

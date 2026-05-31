@@ -55,9 +55,9 @@ async function assertApiResponse(res: Response) {
     }
 
     const code = body?.error?.code ?? `http_${res.status}`;
-    const message = body?.error?.message ?? "Erro interno";
+    const message = body?.error?.message ?? `Não foi possível concluir a ação. Código: ${code}`;
 
-    console.warn("[api] legacy error envelope from", res.url);
+    console.warn("[api] legacy error envelope from", res.url, "code=", code);
     throw ApiError.fromLegacy(code, res.status, message, body?.error?.details);
   }
 }

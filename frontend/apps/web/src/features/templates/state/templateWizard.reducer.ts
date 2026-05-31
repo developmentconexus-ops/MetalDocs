@@ -115,6 +115,7 @@ export function selectMaxReachableStep(
   if (state.scopeType === 'profile' && state.profileCode === null) return 1;
   if (state.name.trim().length < 3) return 2;
   if (slugifyTemplateName(state.name.trim()).length === 0) return 2;
+  if (state.description.trim().length < 3) return 2;
   if (state.startingPoint === null) return 3;
   if (state.startingPoint === 'docx' && state.selectedDocxFile === null) return 3;
   return 4;

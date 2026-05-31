@@ -206,6 +206,9 @@ func main() {
 	var capabilityService *iamapp.CapabilityService
 	if deps.SQLDB != nil {
 		capabilityService = iamapp.NewCapabilityService(deps.SQLDB)
+		// Wire optional capability hint into /auth/me + login responses.
+		// Backend remains sole authz enforcer — FE consumes for UX hints only.
+		authService.WithCapabilityProvider(capabilityService)
 	}
 	cachedProvider := iamapp.NewCachedRoleProvider(ctx, deps.RoleProvider, authn.CacheTTL())
 	// permResolver is the single authoritative source of truth for route

@@ -39,6 +39,7 @@ function makeUser(roles: UserRole[]): CurrentUser {
     displayName: 'U',
     mustChangePassword: false,
     roles,
+    capabilities: [],
   };
 }
 
