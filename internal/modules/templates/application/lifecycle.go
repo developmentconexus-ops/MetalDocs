@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -214,7 +215,7 @@ func (s *Service) Approve(ctx context.Context, cmd ApproveCmd) (*domain.Template
 		return nil, domain.ErrInvalidStateTransition
 	}
 
-	if !containsRole(cmd.ActorRoles, version.PendingApproverRole) {
+	if role := version.RoleBindingFor(domain.VersionStatusPublished); role != "" && !containsRole(cmd.ActorRoles, role) {
 		return nil, domain.ErrForbiddenRole
 	}
 	if err := domain.CheckSegregation(domain.SegregationRoleApprover, cmd.ActorUserID, version.AuthorID, version.ReviewerID); err != nil {
@@ -330,6 +331,7 @@ type ArchiveCmd struct {
 
 type PublishTemplateVersionCmd struct {
 	TenantID, ActorUserID, TemplateID string
+	ActorRoles                        []string
 	VersionNumber                     int
 	DocxKey                           string
 	SchemaKey                         string
@@ -364,6 +366,34 @@ func (s *Service) PublishTemplateVersion(ctx context.Context, cmd PublishTemplat
 	// T-004: SoD — publisher must not be the author or the reviewer.
 	if err := domain.CheckSegregation(domain.SegregationRoleApprover, cmd.ActorUserID, version.AuthorID, version.ReviewerID); err != nil {
 		return nil, err
+	}
+	// T-004 (residual): Tier 2 authz — actor must hold the version's pending
+	// approver role binding, mirroring Service.Approve. Capability (Tier 1) is
+	// enforced inside the tx below; both must pass for the publish to commit.
+	if role := version.RoleBindingFor(domain.VersionStatusPublished); role != "" && !containsRole(cmd.ActorRoles, role) {
+		denied, auditErr := newAuditEvent(
+			cmd.TenantID,
+			cmd.TemplateID,
+			cmd.ActorUserID,
+			&version.ID,
+			domain.AuditPublishForbiddenRole,
+			map[string]any{
+				"required_role": role,
+				"actor_roles":   cmd.ActorRoles,
+			},
+			s.clock.Now(),
+		)
+		if auditErr != nil {
+			return nil, wrapAppErr("templates publish: build denied audit", auditErr)
+		}
+		// Audit infrastructure errors must not swallow the security denial:
+		// the caller (and the HTTP layer) must always observe ErrForbiddenRole
+		// so the actor sees a stable 403 forbidden_role response. A failed
+		// audit append is best-effort observability and logged separately.
+		if appendErr := s.repo.AppendAudit(ctx, denied); appendErr != nil {
+			log.Printf("templates publish: append denied audit failed: %v", appendErr)
+		}
+		return nil, domain.ErrForbiddenRole
 	}
 	if s.db == nil {
 		return nil, domain.ErrTransactionRequired

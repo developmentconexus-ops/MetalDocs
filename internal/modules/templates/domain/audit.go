@@ -19,6 +19,7 @@ const (
 	AuditArchived              AuditAction = "archived"
 	AuditRestored              AuditAction = "restored"
 	AuditApprovalConfigUpdated AuditAction = "approval_config_updated"
+	AuditPublishForbiddenRole  AuditAction = "publish_forbidden_role"
 )
 
 type AuditEvent struct {

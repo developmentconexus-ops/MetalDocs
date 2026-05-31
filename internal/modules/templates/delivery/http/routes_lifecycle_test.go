@@ -349,6 +349,60 @@ func TestArchiveTemplate_SystemOwnedTemplateImmutable(t *testing.T) {
 	}
 }
 
+// TestPublishTemplateVersion_ForbiddenRoleRFC9457 verifies that POST /publish
+// rejects an actor who holds the template.publish capability but lacks the
+// version's PendingApproverRole binding, returning RFC 9457 problem+json with
+// `code: "forbidden_role"` and HTTP 403. Closes residual T-004 contract gap.
+func TestPublishTemplateVersion_ForbiddenRoleRFC9457(t *testing.T) {
+	repo := newFakeRepo()
+	templateID := "11111111-1111-1111-1111-111111111111"
+	repo.templates[templateID] = &domain.Template{ID: templateID, TenantID: "tenant-a", LatestVersion: 1}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          templateID,
+		VersionNumber:       1,
+		Status:              domain.VersionStatusDraft,
+		DocxStorageKey:      "templates/" + templateID + "/versions/1.docx",
+		ContentHash:         "hash_ok",
+		AuthorID:            "author-1",
+		PendingApproverRole: "approver",
+	}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	body, _ := json.Marshal(map[string]any{
+		"docx_key":   "templates/" + templateID + "/versions/1.docx",
+		"schema_key": "templates/" + templateID + "/versions/1.schema.json",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/"+templateID+"/versions/1/publish", bytes.NewReader(body))
+	withHeaders(req)
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "publisher-1", []iamdomain.Role{}))
+	withActorRoles(req, "editor") // capability holder, NOT the required approver role
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Code != "forbidden_role" {
+		t.Fatalf("expected error.code=forbidden_role, got %q (body=%s)", out.Code, rr.Body.String())
+	}
+
+	stored := repo.versions["ver-1"]
+	if stored.Status != domain.VersionStatusDraft {
+		t.Fatalf("expected version status unchanged (draft), got %q", stored.Status)
+	}
+	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublishForbiddenRole {
+		t.Fatalf("expected one publish_forbidden_role audit event, got %+v", repo.audit)
+	}
+}
+
 func TestUpsertApprovalConfig_Happy(t *testing.T) {
 	repo := newFakeRepo()
 	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a", CreatedBy: "user-a"}
