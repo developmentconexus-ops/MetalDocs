@@ -33,6 +33,9 @@ export interface CurrentUser {
   displayName: string;
   mustChangePassword: boolean;
   roles: UserRole[];
+  // UX hint only — backend remains the sole authz enforcer.
+  // wiki/concepts/authz-tiers.md
+  capabilities: string[];
 }
 
 export interface ManagedUserItem {

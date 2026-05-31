@@ -3051,7 +3051,7 @@ components:
           type: string
     CurrentUser:
       type: object
-      required: [userId, tenantId, tenantName, username, displayName, mustChangePassword, roles]
+      required: [userId, tenantId, tenantName, username, displayName, mustChangePassword, roles, capabilities]
       properties:
         userId:
           type: string
@@ -3073,6 +3073,15 @@ components:
           items:
             type: string
             enum: [system_admin, approver, author, editor, viewer]
+        capabilities:
+          type: array
+          description: |
+            Capability codes the actor holds in the active tenant. UX hint only —
+            backend remains the sole authorization boundary (see
+            wiki/concepts/authz-tiers.md). May be empty when no capability
+            provider is wired (in-memory dev modes).
+          items:
+            type: string
     AuthLoginResponse:
       type: object
       required: [user, expiresAt]

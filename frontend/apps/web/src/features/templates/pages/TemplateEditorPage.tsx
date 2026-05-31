@@ -9,6 +9,8 @@ import { useTemplateSchemas } from '../hooks/useTemplateSchemas';
 import { VersionActionPanel } from '../VersionActionPanel';
 import { PlaceholderCatalogPanel } from '../PlaceholderCatalogPanel';
 import { TemplateOutlinePanel } from '../TemplateOutlinePanel';
+import { canSubmit, type ActorContext } from '../lib/canActOnVersion';
+import { useAuthStore } from '../../../store/auth.store';
 import { readHeadings, type Heading } from '../lib/readHeadings';
 import { fetchPlaceholderCatalog, type PlaceholderCatalogEntry } from '../api/catalog';
 import {
@@ -86,6 +88,12 @@ export function TemplateEditorPage({
 
   const currentVersion = liveVersion ?? draft.version ?? null;
   const isDraft = currentVersion?.status === 'draft';
+
+  const user = useAuthStore((s) => s.user);
+  const actor: ActorContext = user
+    ? { roles: user.roles ?? [], capabilities: user.capabilities ?? [] }
+    : { roles: [], capabilities: [] };
+  const submitGate = currentVersion ? canSubmit(currentVersion, actor) : null;
 
   const syncPlaceholdersFromDocument = useCallback(() => {
     if (!isDraft) return;
@@ -318,7 +326,8 @@ export function TemplateEditorPage({
                       type="button"
                       className={editorChromeStyles.primaryBtn}
                       onClick={() => void handleSubmitForReview()}
-                      disabled={submitting}
+                      disabled={submitting || !(submitGate?.allowed ?? false)}
+                      title={submitGate && !submitGate.allowed ? submitGate.reason : undefined}
                     >
                       {submitting ? 'Enviando...' : 'Submeter para revisão'}
                     </button>

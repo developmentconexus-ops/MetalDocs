@@ -3,7 +3,17 @@ package domain
 import (
 	"context"
 	"time"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
+
+// CapabilityProvider resolves the effective capability codes a user holds in a
+// tenant. Optional dependency for the auth Service: when wired, CurrentUser
+// responses carry a capabilities[] hint for the frontend defense-in-depth gate.
+// Backend remains the sole enforcer (wiki/concepts/authz-tiers.md).
+type CapabilityProvider interface {
+	CapsByUserID(ctx context.Context, userID, tenantID string) ([]iamdomain.Capability, error)
+}
 
 type Repository interface {
 	FindIdentityByIdentifier(ctx context.Context, identifier string) (Identity, error)

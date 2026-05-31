@@ -89,8 +89,17 @@ type Service struct {
 	repo         authdomain.Repository
 	roleProvider iamdomain.RoleProvider
 	roleAdmin    iamdomain.RoleAdminRepository
+	capProvider  authdomain.CapabilityProvider
 	cfg          Config
 	now          func() time.Time
+}
+
+// WithCapabilityProvider wires an optional CapabilityProvider so /auth/me and
+// login responses can include a capabilities[] UX hint. Backend remains the
+// sole authorization boundary.
+func (s *Service) WithCapabilityProvider(p authdomain.CapabilityProvider) *Service {
+	s.capProvider = p
+	return s
 }
 
 type createUserTxRepository interface {
@@ -528,6 +537,19 @@ func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string)
 	if err != nil {
 		return authdomain.CurrentUser{}, err
 	}
+	// Always emit a slice (never nil) so the JSON response satisfies the
+	// "required: [capabilities]" contract with an empty array when no provider
+	// is wired or the user holds none.
+	caps := []iamdomain.Capability{}
+	if s.capProvider != nil {
+		resolved, capErr := s.capProvider.CapsByUserID(ctx, userID, tenantID)
+		if capErr != nil {
+			return authdomain.CurrentUser{}, fmt.Errorf("resolve capabilities: %w", capErr)
+		}
+		if resolved != nil {
+			caps = resolved
+		}
+	}
 	return authdomain.CurrentUser{
 		UserID:             identity.UserID,
 		TenantID:           tenantID,
@@ -537,6 +559,7 @@ func (s *Service) buildCurrentUser(ctx context.Context, userID, tenantID string)
 		DisplayName:        identity.DisplayName,
 		MustChangePassword: identity.MustChangePassword,
 		Roles:              roles,
+		Capabilities:       caps,
 	}, nil
 }
 

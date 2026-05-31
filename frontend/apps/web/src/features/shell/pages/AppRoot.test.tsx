@@ -82,6 +82,7 @@ describe('AppRoot', () => {
       displayName: 'Admin',
       mustChangePassword: false,
       roles: [],
+      capabilities: [],
     });
 
     render(<AppRoot />, { wrapper });
@@ -101,6 +102,7 @@ describe('AppRoot', () => {
       displayName: 'Admin',
       mustChangePassword: false,
       roles: [],
+      capabilities: [],
     });
 
     render(<AppRoot />, { wrapper });
