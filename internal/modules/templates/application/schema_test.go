@@ -38,7 +38,7 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 		PlaceholderSchema: []domain.Placeholder{
 			{ID: "ph-1", Name: "doc_code", Label: "Doc Code", Type: domain.PHComputed, Computed: true, ResolverKey: func() *string { s := "doc_code"; return &s }()},
 		},
-		ExpectedContentHash: "hash-1",
+		ExpectedLockVersion: 0,
 	})
 	if err != nil {
 		t.Fatalf("UpdateSchemas returned error: %v", err)
@@ -51,6 +51,9 @@ func TestUpdateSchemas_Happy(t *testing.T) {
 	}
 	if len(got.PlaceholderSchema) != 1 || got.PlaceholderSchema[0].ID != "ph-1" {
 		t.Fatalf("expected placeholder schema to be updated, got %v", got.PlaceholderSchema)
+	}
+	if got.LockVersion != 1 {
+		t.Fatalf("expected lock_version bumped to 1, got %d", got.LockVersion)
 	}
 	if len(repo.audit) != 1 {
 		t.Fatalf("expected 1 audit event, got %d", len(repo.audit))
@@ -79,21 +82,23 @@ func TestUpdateSchemas_NonDraft(t *testing.T) {
 	}
 }
 
-func TestUpdateSchemas_StaleHash(t *testing.T) {
+func TestUpdateSchemas_StaleLockVersion(t *testing.T) {
 	repo := newFakeRepo()
 	seedSchemaVersion(repo, domain.VersionStatusDraft, "hash-1")
+	repo.lockVersions["v1"] = 3
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
 	_, err := svc.UpdateSchemas(context.Background(), application.UpdateSchemasCmd{
 		TenantID:            "tenant-a",
+		ActorUserID:         "user-a",
 		TemplateID:          "tpl-1",
 		VersionNumber:       1,
-		ExpectedContentHash: "hash-2",
+		ExpectedLockVersion: 1,
 		MetadataSchema:      domain.MetadataSchema{RetentionDays: 1},
 		PlaceholderSchema:   []domain.Placeholder{{ID: "ph-1", Type: domain.PHText}},
 	})
-	if !errors.Is(err, domain.ErrStaleBase) {
-		t.Fatalf("expected ErrStaleBase, got %v", err)
+	if !errors.Is(err, domain.ErrStaleLockVersion) {
+		t.Fatalf("expected ErrStaleLockVersion, got %v", err)
 	}
 }
 

@@ -119,6 +119,39 @@ paths:
         - { in: query, name: key, required: true, schema: { type: string } }
       responses:
         '302': { description: redirect }
+  /api/v1/templates/{id}/versions/{n}/schema:
+    put:
+      summary: Save placeholder + metadata schema (CAS via expected_lock_version)
+      tags: [templates]
+      operationId: updateTemplateSchema
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string } }
+        - { in: path, name: n, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [placeholder_schema, metadata_schema, expected_lock_version]
+              additionalProperties: false
+              properties:
+                placeholder_schema:
+                  type: array
+                  items: { type: object, additionalProperties: true }
+                metadata_schema:
+                  type: object
+                  additionalProperties: true
+                expected_lock_version:
+                  type: integer
+                  format: int32
+                  minimum: 0
+      responses:
+        '200': { description: ok }
+        '400': { description: invalid_request }
+        '409': { description: invalid_state_transition }
+        '412': { description: stale_lock_version }
+        '422': { description: placeholder_validation_error }
   /api/v1/templates/{id}/versions/{n}/draft:
     put:
       summary: Save draft (CAS via expected_lock_version)
@@ -254,6 +287,14 @@ components:
         approved_at: { type: string, format: date-time, nullable: true }
         published_at: { type: string, format: date-time, nullable: true }
         obsoleted_at: { type: string, format: date-time, nullable: true }
+        lock_version:
+          type: integer
+          format: int32
+          minimum: 0
+          description: >
+            Optimistic-concurrency token. Echo on PUT .../schema and
+            PUT .../draft via `expected_lock_version`; CAS miss = 412
+            `stale_lock_version`.
         created_at: { type: string, format: date-time }
     CreateTemplateResponse:
       type: object

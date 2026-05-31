@@ -497,6 +497,62 @@ SELECT EXISTS (
 	return domain.ErrStaleLockVersion
 }
 
+func (r *Repository) UpdateVersionSchemaCAS(ctx context.Context, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+	return updateVersionSchemaCAS(ctx, r.db, tenantID, v, expectedLockVersion)
+}
+
+func (r *Repository) UpdateVersionSchemaCASTx(ctx context.Context, tx *sql.Tx, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+	return updateVersionSchemaCAS(ctx, tx, tenantID, v, expectedLockVersion)
+}
+
+func updateVersionSchemaCAS(ctx context.Context, db draftCASExecutor, tenantID string, v *domain.TemplateVersion, expectedLockVersion int) error {
+	metadataJSON, placeholderJSON, err := marshalVersionSchemas(v)
+	if err != nil {
+		return err
+	}
+	const q = `
+UPDATE templates_template_version
+SET
+	metadata_schema = $3,
+	placeholder_schema = $4,
+	lock_version = lock_version + 1
+WHERE id = $1
+  AND EXISTS (
+    SELECT 1 FROM templates_template t
+    WHERE t.id = templates_template_version.template_id
+      AND t.tenant_id = $5::uuid
+  )
+  AND lock_version = $2`
+	res, err := db.ExecContext(ctx, q, v.ID, expectedLockVersion, metadataJSON, placeholderJSON, tenantID)
+	if err != nil {
+		return err
+	}
+	n, err := rowsAffected(res)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		v.LockVersion = expectedLockVersion + 1
+		return nil
+	}
+
+	var exists bool
+	if err := db.QueryRowContext(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM templates_template_version v
+  JOIN templates_template t ON t.id = v.template_id
+  WHERE v.id = $1
+    AND t.tenant_id = $2::uuid
+)`, v.ID, tenantID).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return domain.ErrNotFound
+	}
+	return domain.ErrStaleLockVersion
+}
+
 func (r *Repository) ObsoletePreviousPublished(ctx context.Context, templateID, keepVersionID string) error {
 	const q = `
 UPDATE templates_template_version

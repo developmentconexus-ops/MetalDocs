@@ -4785,6 +4785,11 @@ export interface components {
             published_at?: string | null;
             /** Format: date-time */
             obsoleted_at?: string | null;
+            /**
+             * Format: int32
+             * @description Optimistic-concurrency token. Increments on every successful write to the version row. Clients must echo the last-seen value back via `expected_lock_version` on PUT .../schema and PUT .../draft. A mismatch yields HTTP 412 with code `stale_lock_version`.
+             */
+            lock_version?: number;
             /** Format: date-time */
             created_at: string;
         };
@@ -5873,10 +5878,60 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    placeholder_schema: {
+                        [key: string]: unknown;
+                    }[];
+                    metadata_schema: {
+                        [key: string]: unknown;
+                    };
+                    /**
+                     * Format: int32
+                     * @description Last-seen `VersionDTO.lock_version`. Server compare-and-swaps; on mismatch returns HTTP 412 with code `stale_lock_version`.
+                     */
+                    expected_lock_version: number;
+                };
+            };
+        };
         responses: {
             /** @description ok */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            version: components["schemas"]["VersionDTO"];
+                        };
+                    };
+                };
+            };
+            /** @description invalid_request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description invalid_state_transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description stale_lock_version */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description placeholder_validation_error */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

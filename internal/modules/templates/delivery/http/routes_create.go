@@ -136,6 +136,7 @@ func toVersionResponse(v *domain.TemplateVersion) map[string]any {
 		"approved_at":           timePtrRFC3339(v.ApprovedAt),
 		"published_at":          timePtrRFC3339(v.PublishedAt),
 		"obsoleted_at":          timePtrRFC3339(v.ObsoletedAt),
+		"lock_version":          v.LockVersion,
 		"created_at":            v.CreatedAt.UTC().Format(time.RFC3339),
 	}
 }
