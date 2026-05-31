@@ -84,9 +84,9 @@ export function StepIdentity({
             <div className={styles.recapField}>
               <span className="kicker">Versão inicial</span>
               <div className={styles.recapBox}>
-                <span className={`mono ${styles.versionLabel}`}>v1.0</span>
+                <span className={`mono ${styles.versionLabel}`}>REV00</span>
                 <span className={styles.versionHint}>
-                  Atribuída automaticamente · incrementa em cada publicação
+                  Rascunho inicial · revisão incrementa a cada publicação
                 </span>
               </div>
             </div>
@@ -126,7 +126,7 @@ export function StepIdentity({
       {/* Description */}
       <div className={styles.field}>
         <label htmlFor="tpl-description" className="kicker">
-          Descrição
+          Descrição *
         </label>
         <textarea
           id="tpl-description"
@@ -136,12 +136,18 @@ export function StepIdentity({
           onChange={(e) => onChangeDescription(e.target.value)}
           placeholder="Resumo do que este template cobre."
           maxLength={500}
+          required
+          aria-required="true"
+          aria-describedby="tpl-description-hint"
         />
+        <span id="tpl-description-hint" className={styles.fieldHint}>
+          Obrigatório · ajuda autores a entenderem quando usar este template.
+        </span>
       </div>
 
       {/* Honest key preview. Next-code sequencing remains deferred in the backlog. */}
       <div className={styles.codePreview}>
-        <div className={`kicker ${styles.codePreviewKicker}`}>Identificador tecnico</div>
+        <div className={`kicker ${styles.codePreviewKicker}`}>Identificador técnico</div>
         <div className={`mono ${styles.codePreviewValue}`}>{templateKey || 'preencha-o-nome'}</div>
         <div className={styles.codePreviewHint}>
           Gerado a partir do nome nesta versão. A prévia de código sequencial permanece no backlog.
@@ -151,7 +157,7 @@ export function StepIdentity({
       <WizardFooter
         stepLabel={
           advanceDisabled
-            ? 'Etapa 2 de 4 · Informe o nome para continuar'
+            ? 'Etapa 2 de 4 · Informe nome e descrição para continuar'
             : 'Etapa 2 de 4 · Pronto para avançar'
         }
         showBack

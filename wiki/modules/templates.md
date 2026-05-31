@@ -374,6 +374,8 @@ Failure modes:
 - Postgres tripwire: `migrations/0188_tripwire_extend.sql:226-233` attaches `trg_require_cap_asserted` to `public.templates_template` and `public.templates_template_version`.
 - Capabilities in seed (`migrations/0165_role_capabilities_reseed.sql`): `template.view/create/edit/submit/approve/publish` mapped to `viewer/editor/author/approver/system_admin` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â currently advisory only. See T-001.
 
+- **Frontend defense-in-depth gate (2026-05-31, Workstream 4)**: `frontend/apps/web/src/features/templates/lib/canActOnVersion.ts` exposes `canSubmit/canReview/canApprove/canPublish` returning `{ allowed, reason }`. `TemplateEditorPage` (Submeter) and `VersionActionPanel` (Approve/Reject/Publish) consume the gate via `disabled + title` so users see why a button is unavailable (status / capability / role-binding mismatch). Backend remains the sole enforcer (`wiki/concepts/authz-tiers.md`); the FE hint is fed by `CurrentUser.capabilities` (added to `/api/v1/auth/me` + `/login`) — `iamapp.CapabilityService.CapsByUserID` resolves the union of direct + group role capabilities, with `system_admin` short-circuiting to `iamdomain.AllCapabilities()`.
+
 ### 8.2 Error envelope
 
 - All non-2xx responses: legacy `{"error":{"code","message"}}` via `httpresponse.WriteJSON` (`delivery/http/handler.go:95-102`). RFC 9457 Problem+JSON not adopted. See T-005.

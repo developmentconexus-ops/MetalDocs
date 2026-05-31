@@ -12,6 +12,7 @@ function readyState(overrides: Partial<TemplateWizardState> = {}): TemplateWizar
     ...initialTemplateWizardState,
     scopeType: 'generic',
     name: 'Procedimento Operacional',
+    description: 'Template padrão para procedimentos.',
     startingPoint: 'blank',
     ...overrides,
   };

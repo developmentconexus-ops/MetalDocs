@@ -97,6 +97,16 @@ func IsValidCapability(cap Capability) bool {
 	return ok
 }
 
+// AllCapabilities returns every known capability. Used by callers that need
+// to express a "holds everything" set (e.g. system_admin bypass).
+func AllCapabilities() []Capability {
+	out := make([]Capability, 0, len(validCapabilities))
+	for cap := range validCapabilities {
+		out = append(out, cap)
+	}
+	return out
+}
+
 func MustCapability(raw string) Capability {
 	capability := Capability(raw)
 	if !IsValidCapability(capability) {

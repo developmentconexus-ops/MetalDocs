@@ -10,6 +10,13 @@ function normalizeRoles(value: unknown): UserRole[] {
   return value.filter((item): item is UserRole => typeof item === "string" && allowedRoles.has(item as UserRole));
 }
 
+function normalizeCapabilities(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === "string");
+}
+
 function normalizeCurrentUser(value: CurrentUser): CurrentUser {
   return {
     userId: value?.userId ?? "",
@@ -20,6 +27,7 @@ function normalizeCurrentUser(value: CurrentUser): CurrentUser {
     displayName: value?.displayName ?? value?.username ?? "",
     mustChangePassword: Boolean(value?.mustChangePassword),
     roles: normalizeRoles(value?.roles),
+    capabilities: normalizeCapabilities((value as { capabilities?: unknown })?.capabilities),
   };
 }
 

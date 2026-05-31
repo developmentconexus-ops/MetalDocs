@@ -14,6 +14,7 @@ const READY_USER = {
   displayName: 'Admin',
   mustChangePassword: false,
   roles: [],
+  capabilities: [],
 };
 
 vi.mock('../../../lib/api/client', () => ({ request: vi.fn(), default: vi.fn() }));
@@ -96,7 +97,7 @@ describe('LoginPage', () => {
       authState: 'ready',
       user: {
         userId: '1', tenantId: 'ffffffff-ffff-ffff-ffff-ffffffffffff', tenantName: 'System Tenant', username: 'admin', email: 'a@b.com',
-        displayName: 'Admin', mustChangePassword: true, roles: [],
+        displayName: 'Admin', mustChangePassword: true, roles: [], capabilities: [],
       },
     });
     renderPage();

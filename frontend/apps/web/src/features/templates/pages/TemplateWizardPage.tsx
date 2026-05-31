@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProfilesQuery } from '../../taxonomy/queries/useProfilesQuery';
 import {
@@ -19,6 +19,15 @@ import { StepConfirmation } from '../components/wizard/steps/StepConfirmation';
 
 const EMPTY_SLUG_ERROR = 'Informe um nome com letras ou números para gerar o identificador técnico.';
 
+function mapTemplateCreateError(err: unknown): string {
+  if (!(err instanceof Error)) return 'Não foi possível criar o template. Tente novamente.';
+  const msg = err.message;
+  if (/key_conflict/i.test(msg)) return 'Já existe um template com este identificador técnico. Escolha outro nome.';
+  if (/forbidden|authz|unauthorized/i.test(msg)) return 'Você não tem permissão para criar templates.';
+  if (/validation|invalid/i.test(msg)) return 'Os dados informados são inválidos. Revise os campos e tente novamente.';
+  return msg || 'Não foi possível criar o template. Tente novamente.';
+}
+
 const TPL_STEPS: StepperStep[] = [
   { id: '1', label: 'Perfil' },
   { id: '2', label: 'Identidade' },
@@ -37,6 +46,14 @@ export function TemplateWizardPage(): JSX.Element {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Stable idempotency key for the wizard's create-template call. Regenerating
+  // per click would defeat the backend's idempotency guard and let double-clicks
+  // create duplicate templates.
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
+  // Remembers the template+version produced by a successful POST so that retries
+  // after a DOCX import failure do NOT re-create the template (which would 409
+  // on key_conflict and orphan the first row).
+  const createdRef = useRef<{ templateId: string; versionNumber: number } | null>(null);
   const [state, dispatch] = useReducer(templateWizardReducer, undefined, () => {
     // Initial state has no scope chosen. Clamp deep-links beyond Step 1
     // to Step 1 - avoids a one-frame paint of placeholder content before
@@ -98,28 +115,38 @@ export function TemplateWizardPage(): JSX.Element {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const { template, version } = await createTemplate({
-        key: templateKey,
-        name: state.name,
-        description: state.description.trim() || undefined,
-        doc_type_code: state.scopeType === 'profile' ? state.profileCode ?? undefined : undefined,
-        idempotencyKey: crypto.randomUUID(),
-      });
+      let templateId: string;
+      let versionNumber: number;
+      if (createdRef.current) {
+        templateId = createdRef.current.templateId;
+        versionNumber = createdRef.current.versionNumber;
+      } else {
+        const { template, version } = await createTemplate({
+          key: templateKey,
+          name: state.name,
+          description: state.description.trim() || undefined,
+          doc_type_code: state.scopeType === 'profile' ? state.profileCode ?? undefined : undefined,
+          idempotencyKey: idempotencyKeyRef.current,
+        });
+        templateId = template.id;
+        versionNumber = version.version_number;
+        createdRef.current = { templateId, versionNumber };
+      }
       if (state.startingPoint === 'docx') {
         try {
           if (!state.selectedDocxFile) {
             throw new Error('Selecione um arquivo .docx antes de criar o template.');
           }
-          await importTemplateDocx(template.id, version.version_number, state.selectedDocxFile);
+          await importTemplateDocx(templateId, versionNumber, state.selectedDocxFile);
         } catch {
           setSubmitError('Template criado, mas a importação do DOCX falhou. Tente novamente antes de abrir o editor.');
           setIsSubmitting(false);
           return;
         }
       }
-      navigate(`/templates/${template.id}/versions/${version.version_number}`);
+      navigate(`/templates/${templateId}/versions/${versionNumber}`);
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Erro ao criar template.');
+      setSubmitError(mapTemplateCreateError(err));
       setIsSubmitting(false);
     }
   }
@@ -139,7 +166,7 @@ export function TemplateWizardPage(): JSX.Element {
       description={
         <>
           Templates publicados ficam disponíveis para autores criarem novos documentos. Use placeholders{' '}
-          <span className="mono">{'{{campo}}'}</span> para campos dinâmicos.
+          <span className="mono">{'{campo}'}</span> para campos dinâmicos.
         </>
       }
       steps={TPL_STEPS}

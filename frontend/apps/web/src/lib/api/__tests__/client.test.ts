@@ -71,7 +71,7 @@ describe("apiFetch", () => {
     await expect(apiFetch("/api/documents")).rejects.toMatchObject({
       code: "http_500",
       status: 500,
-      message: "Erro interno",
+      message: "Não foi possível concluir a ação. Código: http_500",
     });
   });
 

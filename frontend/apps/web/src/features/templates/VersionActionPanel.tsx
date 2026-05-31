@@ -1,16 +1,35 @@
 import { useState, type CSSProperties } from 'react';
 import { type VersionDTO, approveVersion, reviewVersion } from './api/templates';
+import { useAuthStore } from '../../store/auth.store';
+import {
+  canApprove,
+  canPublish,
+  canReview,
+  type ActorContext,
+  type VersionActionGate,
+} from './lib/canActOnVersion';
 
 type Props = {
   version: VersionDTO;
   onVersionUpdate: (v: VersionDTO) => void;
 };
 
+const EMPTY_ACTOR: ActorContext = { roles: [], capabilities: [] };
+
+function tooltipFor(gate: VersionActionGate): string | undefined {
+  return gate.allowed ? undefined : gate.reason;
+}
+
 export function VersionActionPanel({ version, onVersionUpdate }: Props) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const user = useAuthStore((s) => s.user);
+  const actor: ActorContext = user
+    ? { roles: user.roles ?? [], capabilities: user.capabilities ?? [] }
+    : EMPTY_ACTOR;
 
   async function act(fn: () => Promise<VersionDTO>, successMsg: string) {
     setBusy(true);
@@ -30,6 +49,8 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
   if (version.status === 'in_review') {
     const hasReviewer = version.pending_reviewer_role != null;
     const acceptLabel = hasReviewer ? 'Approve Review' : 'Publish';
+    const acceptGate = hasReviewer ? canReview(version, actor) : canPublish(version, actor);
+    const rejectGate = acceptGate;
     const acceptAction = hasReviewer
       ? () => act(() => reviewVersion(version.template_id, version.version_number, true, reason), 'Review approved')
       : () => act(() => approveVersion(version.template_id, version.version_number, true, reason), 'Published');
@@ -52,14 +73,16 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={acceptAction}
-            disabled={busy}
+            disabled={busy || !acceptGate.allowed}
+            title={tooltipFor(acceptGate)}
             style={{ ...btnStyle, background: hasReviewer ? '#16a34a' : '#2563eb', color: '#fff' }}
           >
             {acceptLabel}
           </button>
           <button
             onClick={rejectAction}
-            disabled={busy}
+            disabled={busy || !rejectGate.allowed}
+            title={tooltipFor(rejectGate)}
             style={{ ...btnStyle, background: '#fff', color: '#dc2626', border: '1px solid #dc2626' }}
           >
             Reject
@@ -70,6 +93,7 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
   }
 
   if (version.status === 'approved') {
+    const approveGate = canApprove(version, actor);
     return (
       <div style={panelStyle}>
         <strong style={{ fontSize: '0.875rem' }}>Approver actions</strong>
@@ -86,14 +110,16 @@ export function VersionActionPanel({ version, onVersionUpdate }: Props) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => act(() => approveVersion(version.template_id, version.version_number, true, reason), 'Published')}
-            disabled={busy}
+            disabled={busy || !approveGate.allowed}
+            title={tooltipFor(approveGate)}
             style={{ ...btnStyle, background: '#2563eb', color: '#fff' }}
           >
             Publish
           </button>
           <button
             onClick={() => act(() => approveVersion(version.template_id, version.version_number, false, reason), 'Rejected - back to draft')}
-            disabled={busy}
+            disabled={busy || !approveGate.allowed}
+            title={tooltipFor(approveGate)}
             style={{ ...btnStyle, background: '#fff', color: '#dc2626', border: '1px solid #dc2626' }}
           >
             Reject
