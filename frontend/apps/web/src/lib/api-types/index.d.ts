@@ -4799,6 +4799,24 @@ export interface components {
                 version: components["schemas"]["VersionDTO"];
             };
         };
+        ApproveTemplateVersionResponse: {
+            data: {
+                version: components["schemas"]["VersionDTO"];
+                /**
+                 * @description When the Approve transition terminates as publish (no-reviewer
+                 *     path) or the approver explicitly publishes, a fresh draft
+                 *     v(n+1) is spawned in the same transaction. Returned so the
+                 *     caller can navigate without a list refetch. Null when the
+                 *     transition does not publish (reject path, or reviewer path
+                 *     that only flips to approved).
+                 */
+                next_draft?: {
+                    /** Format: uuid */
+                    id: string;
+                    version_number: number;
+                } | null;
+            };
+        };
         PlaceholderCatalogEntry: {
             key: string;
             label: string;
@@ -6046,7 +6064,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ApproveTemplateVersionResponse"];
+                };
             };
         };
     };

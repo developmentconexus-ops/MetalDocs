@@ -323,12 +323,22 @@ export async function reviewVersion(
   return data.data.version;
 }
 
+export interface NextDraftRef {
+  id: string;
+  versionNumber: number;
+}
+
+export interface ApproveVersionResult {
+  version: VersionDTO;
+  nextDraft: NextDraftRef | null;
+}
+
 export async function approveVersion(
   templateId: string,
   versionNum: number,
   accept: boolean,
   reason?: string,
-): Promise<VersionDTO> {
+): Promise<ApproveVersionResult> {
   const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/approve`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -338,8 +348,18 @@ export async function approveVersion(
     const body = await res.json().catch(() => ({}));
     throw new Error((body as any)?.error?.message || `HTTP ${res.status}`);
   }
-  const data = (await res.json()) as { data: { version: VersionDTO } };
-  return data.data.version;
+  const data = (await res.json()) as {
+    data: {
+      version: VersionDTO;
+      next_draft?: { id: string; version_number: number } | null;
+    };
+  };
+  const raw = data.data.next_draft;
+  const nextDraft: NextDraftRef | null =
+    raw && raw.id && Number.isFinite(raw.version_number)
+      ? { id: raw.id, versionNumber: raw.version_number }
+      : null;
+  return { version: data.data.version, nextDraft };
 }
 
 // Wire-format types (backend snake_case)

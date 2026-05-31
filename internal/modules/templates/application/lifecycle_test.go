@@ -338,7 +338,7 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
-	got, err := svc.Approve(context.Background(), application.ApproveCmd{
+	res, err := svc.Approve(context.Background(), application.ApproveCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
 		ActorRoles:    []string{"approver"},
@@ -349,6 +349,7 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Approve returned error: %v", err)
 	}
+	got := res.Version
 	if got.Status != domain.VersionStatusPublished {
 		t.Fatalf("expected status %q, got %q", domain.VersionStatusPublished, got.Status)
 	}
@@ -370,6 +371,18 @@ func TestApprove_Accept_WithReviewer(t *testing.T) {
 	if len(repo.audit) != 1 || repo.audit[0].Action != domain.AuditPublished {
 		t.Fatalf("expected one %q audit event, got %v", domain.AuditPublished, repo.audit)
 	}
+	if res.NextDraft == nil {
+		t.Fatal("expected NextDraft to be populated on approve-publish")
+	}
+	if res.NextDraft.VersionNumber != version.VersionNumber+1 {
+		t.Fatalf("expected NextDraft.VersionNumber %d, got %d", version.VersionNumber+1, res.NextDraft.VersionNumber)
+	}
+	if res.NextDraft.Status != domain.VersionStatusDraft {
+		t.Fatalf("expected NextDraft.Status %q, got %q", domain.VersionStatusDraft, res.NextDraft.Status)
+	}
+	if template.LatestVersion != res.NextDraft.VersionNumber {
+		t.Fatalf("expected template.LatestVersion %d, got %d", res.NextDraft.VersionNumber, template.LatestVersion)
+	}
 }
 
 func TestApprove_Accept_NoReviewer(t *testing.T) {
@@ -389,7 +402,7 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
-	got, err := svc.Approve(context.Background(), application.ApproveCmd{
+	res, err := svc.Approve(context.Background(), application.ApproveCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
 		ActorRoles:    []string{"approver"},
@@ -400,6 +413,7 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Approve returned error: %v", err)
 	}
+	got := res.Version
 	if got.Status != domain.VersionStatusPublished {
 		t.Fatalf("expected status %q, got %q", domain.VersionStatusPublished, got.Status)
 	}
@@ -408,6 +422,18 @@ func TestApprove_Accept_NoReviewer(t *testing.T) {
 	}
 	if template.PublishedVersionNumber == nil || *template.PublishedVersionNumber != version.VersionNumber {
 		t.Fatalf("expected PublishedVersionNumber %d, got %v", version.VersionNumber, template.PublishedVersionNumber)
+	}
+	if res.NextDraft == nil {
+		t.Fatal("expected NextDraft to be populated on approve-publish (no-reviewer path)")
+	}
+	if res.NextDraft.VersionNumber != version.VersionNumber+1 {
+		t.Fatalf("expected NextDraft.VersionNumber %d, got %d", version.VersionNumber+1, res.NextDraft.VersionNumber)
+	}
+	if res.NextDraft.Status != domain.VersionStatusDraft {
+		t.Fatalf("expected NextDraft.Status %q, got %q", domain.VersionStatusDraft, res.NextDraft.Status)
+	}
+	if template.LatestVersion != res.NextDraft.VersionNumber {
+		t.Fatalf("expected template.LatestVersion %d, got %d", res.NextDraft.VersionNumber, template.LatestVersion)
 	}
 }
 
@@ -436,7 +462,7 @@ func TestApprove_Reject(t *testing.T) {
 
 	svc := application.New(repo, &fakePresigner{}, fakeClock{}, &fakeUUID{})
 
-	got, err := svc.Approve(context.Background(), application.ApproveCmd{
+	res, err := svc.Approve(context.Background(), application.ApproveCmd{
 		TenantID:      "tenant-a",
 		ActorUserID:   "approver-1",
 		ActorRoles:    []string{"approver"},
@@ -447,6 +473,10 @@ func TestApprove_Reject(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Approve returned error: %v", err)
+	}
+	got := res.Version
+	if res.NextDraft != nil {
+		t.Fatalf("expected NextDraft nil on reject, got %v", res.NextDraft)
 	}
 	if got.Status != domain.VersionStatusDraft {
 		t.Fatalf("expected status %q, got %q", domain.VersionStatusDraft, got.Status)

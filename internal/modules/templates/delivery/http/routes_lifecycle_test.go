@@ -282,8 +282,13 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	var out struct {
 		Data struct {
 			Version struct {
-				Status string `json:"status"`
+				Status        string `json:"status"`
+				VersionNumber int    `json:"version_number"`
 			} `json:"version"`
+			NextDraft *struct {
+				ID            string `json:"id"`
+				VersionNumber int    `json:"version_number"`
+			} `json:"next_draft"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
@@ -291,6 +296,66 @@ func TestApprove_Accept_Happy(t *testing.T) {
 	}
 	if out.Data.Version.Status != string(domain.VersionStatusPublished) {
 		t.Fatalf("expected status=published, got %q", out.Data.Version.Status)
+	}
+	if out.Data.NextDraft == nil {
+		t.Fatal("expected data.next_draft to be populated on approve-publish")
+	}
+	if out.Data.NextDraft.VersionNumber != out.Data.Version.VersionNumber+1 {
+		t.Fatalf("expected next_draft.version_number=%d, got %d",
+			out.Data.Version.VersionNumber+1, out.Data.NextDraft.VersionNumber)
+	}
+	if out.Data.NextDraft.ID == "" {
+		t.Fatal("expected next_draft.id to be non-empty")
+	}
+}
+
+func TestApprove_Reject_NextDraftNull(t *testing.T) {
+	repo := newFakeRepo()
+	reviewerRole := "reviewer"
+	repo.templates["11111111-1111-1111-1111-111111111111"] = &domain.Template{ID: "11111111-1111-1111-1111-111111111111", TenantID: "tenant-a"}
+	repo.versions["ver-1"] = &domain.TemplateVersion{
+		ID:                  "ver-1",
+		TemplateID:          "11111111-1111-1111-1111-111111111111",
+		VersionNumber:       1,
+		Status:              domain.VersionStatusApproved,
+		AuthorID:            "author-1",
+		PendingReviewerRole: &reviewerRole,
+		PendingApproverRole: "approver",
+		ReviewerID:          strPtr("reviewer-1"),
+	}
+	mux := newMux(t, func(_ *http.Request, _, _, _ string) error { return nil }, repo)
+
+	raw, _ := json.Marshal(map[string]any{"accept": false, "reason": "needs work"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/templates/11111111-1111-1111-1111-111111111111/versions/1/approve", bytes.NewReader(raw))
+	withHeaders(req)
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "approver-1", []iamdomain.Role{}))
+	withActorRoles(req, "approver")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var out struct {
+		Data struct {
+			Version struct {
+				Status string `json:"status"`
+			} `json:"version"`
+			NextDraft *struct {
+				ID            string `json:"id"`
+				VersionNumber int    `json:"version_number"`
+			} `json:"next_draft"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if out.Data.Version.Status != string(domain.VersionStatusDraft) {
+		t.Fatalf("expected status=draft on reject, got %q", out.Data.Version.Status)
+	}
+	if out.Data.NextDraft != nil {
+		t.Fatalf("expected next_draft=null on reject, got %+v", out.Data.NextDraft)
 	}
 }
 

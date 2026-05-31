@@ -53,7 +53,7 @@ function resolveError(err: unknown, fallback: string): string {
 export function TemplateEditorPage({
   templateId,
   versionNum,
-  onNavigateToVersion: _nav,
+  onNavigateToVersion: onNavigateToVersion,
   onBack,
 }: TemplateEditorPageProps) {
   const draft = useTemplateDraft(templateId, versionNum);
@@ -364,7 +364,12 @@ export function TemplateEditorPage({
       {currentVersion && ['in_review', 'approved', 'published'].includes(currentVersion.status) && (
         <VersionActionPanel
           version={currentVersion}
-          onVersionUpdate={(v) => setLiveVersion(v)}
+          onVersionUpdate={(v, nextDraft) => {
+            setLiveVersion(v);
+            if (nextDraft && onNavigateToVersion) {
+              onNavigateToVersion(templateId, nextDraft.versionNumber);
+            }
+          }}
         />
       )}
     </div>
