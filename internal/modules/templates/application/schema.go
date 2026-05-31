@@ -16,7 +16,7 @@ type UpdateSchemasCmd struct {
 	VersionNumber                     int
 	MetadataSchema                    domain.MetadataSchema
 	PlaceholderSchema                 []domain.Placeholder
-	ExpectedContentHash               string
+	ExpectedLockVersion               int
 }
 
 func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*domain.TemplateVersion, error) {
@@ -29,9 +29,6 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 	}
 	if version.Status != domain.VersionStatusDraft {
 		return nil, domain.ErrInvalidStateTransition
-	}
-	if cmd.ExpectedContentHash != "" && cmd.ExpectedContentHash != version.ContentHash {
-		return nil, domain.ErrStaleBase
 	}
 
 	if err := ValidatePlaceholders(cmd.PlaceholderSchema); err != nil {
@@ -86,7 +83,7 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateEdit), "tenant"); err != nil {
 			return nil, fmt.Errorf("templates update schemas: authz: %w", err)
 		}
-		if err := s.repo.UpdateVersionTx(ctx, tx, cmd.TenantID, version); err != nil {
+		if err := s.repo.UpdateVersionSchemaCASTx(ctx, tx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
 			return nil, wrapAppErr("templates update schemas: update version", err)
 		}
 		if err := s.repo.AppendAuditTx(ctx, tx, audit); err != nil {
@@ -96,7 +93,7 @@ func (s *Service) UpdateSchemas(ctx context.Context, cmd UpdateSchemasCmd) (*dom
 			return nil, err
 		}
 	} else {
-		if err := s.repo.UpdateVersion(ctx, cmd.TenantID, version); err != nil {
+		if err := s.repo.UpdateVersionSchemaCAS(ctx, cmd.TenantID, version, cmd.ExpectedLockVersion); err != nil {
 			return nil, wrapAppErr("templates update schemas: update version", err)
 		}
 		if err := s.repo.AppendAudit(ctx, audit); err != nil {

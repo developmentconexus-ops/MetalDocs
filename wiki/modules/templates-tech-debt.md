@@ -80,13 +80,19 @@
 - **Linked backlog row:** `backlog/templates-refactor.md#R-009`
 - **Linked ADR:** missing-ADR
 
-### T-010 · Optimistic locking field carried but never enforced on autosave — PARTIALLY CLOSED 2026-05-17
-- **Severity:** major → **partially resolved**
-- **Surface (resolved):** `internal/modules/templates/application/autosave.go` (`SaveTemplateDraft`) now calls `UpdateVersionDraftCAS` / `UpdateVersionDraftCASTx`; `internal/modules/templates/repository/postgres.go` enforces `WHERE id = $1 AND lock_version = $2` and returns `ErrStaleLockVersion` when the row exists but the version changed.
-- **Surface (residual):** legacy `/autosave/commit` carries only `expected_content_hash`, not `expected_lock_version`; it is hash-gated and tripwire-protected, but not multi-tab lock-version protected. The 2026-05-17 wizard DOCX import intentionally uses this legacy presign/commit path after template create because it is the existing Eigenpal-compatible import contract.
-- **Observation:** The generated `SaveTemplateDraft` path now enforces the lock field, closing the original unverified-field gap for that route. Eigenpal's current import/autosave wrapper still uses `/autosave/presign` + `/autosave/commit`, so a lock-version follow-up remains if the legacy commit route stays active.
-- **Evidence:** `_artifacts/02-flow-update-schema.md`.
-- **Linked backlog row:** `backlog/templates-refactor.md#R-010`
+### T-010 · Optimistic locking field carried but never enforced on autosave — CLOSED 2026-05-31 (fix/templates-schema-occ-lock)
+- **Severity:** major (closed)
+- **Surface (resolved):**
+  - `internal/modules/templates/application/autosave.go` (`SaveTemplateDraft`) calls `UpdateVersionDraftCAS` / `UpdateVersionDraftCASTx` (closed 2026-05-17).
+  - `internal/modules/templates/application/schema.go` (`UpdateSchemas`) now accepts `ExpectedLockVersion` and calls `UpdateVersionSchemaCAS` / `UpdateVersionSchemaCASTx` (closed 2026-05-31).
+  - `internal/modules/templates/repository/postgres.go` adds `UpdateVersionSchemaCAS`/`Tx` mirroring the draft CAS pattern: `WHERE id = $1 AND lock_version = $2` returning `ErrStaleLockVersion` on miss.
+  - `api/openapi/v1/openapi.yaml` PUT `/api/v1/templates/{id}/versions/{n}/schema` request body now requires `expected_lock_version` (legacy `expected_content_hash` removed from the schema-PUT contract). `VersionDTO.lock_version` exposed.
+  - `internal/modules/templates/delivery/http/routes_schema.go` rejects requests missing `expected_lock_version` with 400 and surfaces 412 `stale_lock_version` on CAS miss.
+  - `frontend/apps/web/src/features/templates/hooks/useTemplateSchemas.ts` holds lockVersion, sends `expected_lock_version`, raises `staleConflict` on 412 instead of silent overwrite; `refetch` clears it.
+- **Surface (residual):** legacy `/autosave/commit` carries only `expected_content_hash`, not `expected_lock_version`; it is hash-gated and tripwire-protected, but not multi-tab lock-version protected. Tracked separately (not under T-010 — the original unverified-field gap is closed for every route that takes a `lock_version` field).
+- **Observation:** Schema PUT was hard-coding `expected_content_hash: ''` from the FE; the server treated empty as "skip CAS", so two tabs editing placeholders concurrently last-write-wins with no audit signal. Switching that path to lock_version CAS closes the silent overwrite class for the schema editor. Eigenpal's DOCX import path still uses `/autosave/commit` and is content-hash gated — separate cleanup outside this branch.
+- **Evidence:** `_artifacts/02-flow-update-schema.md`; `TestUpdateSchemas_StaleLockVersion`; `TestUpdateTemplateSchema_StaleLockVersion_412`; `useTemplateSchemas` vitest stale-conflict spec; preview drive (two-tab editor) — second tab surfaces stale-lock alert, first save survives until explicit refetch.
+- **Linked backlog row:** `backlog/templates-refactor.md#R-010` (close)
 - **Linked ADR:** missing-ADR
 
 ### T-011 · `ListTemplates` is unbounded — no LIMIT / OFFSET / cursor

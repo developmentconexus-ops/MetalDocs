@@ -383,25 +383,66 @@ function placeholderToWire(p: Placeholder): WirePlaceholder {
   };
 }
 
-export async function getTemplateSchemas(templateId: string, versionNum: number): Promise<TemplateSchemas> {
+export class StaleLockVersionError extends Error {
+  readonly code = 'stale_lock_version';
+  constructor(message?: string) {
+    super(message ?? 'stale_lock_version');
+    this.name = 'StaleLockVersionError';
+  }
+}
+
+export async function getTemplateSchemas(
+  templateId: string,
+  versionNum: number,
+): Promise<{ schemas: TemplateSchemas; lockVersion: number }> {
   const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}`);
-  const body = await apiJson<{ data: { version: VersionDTO & { placeholder_schema: WirePlaceholder[] | null } } }>(res);
+  const body = await apiJson<{
+    data: {
+      version: VersionDTO & {
+        placeholder_schema: WirePlaceholder[] | null;
+        lock_version?: number;
+      };
+    };
+  }>(res);
   const v = body.data.version;
   return {
-    placeholders: Array.isArray(v.placeholder_schema) ? v.placeholder_schema.map(placeholderFromWire) : [],
-    composition: null,
+    schemas: {
+      placeholders: Array.isArray(v.placeholder_schema) ? v.placeholder_schema.map(placeholderFromWire) : [],
+      composition: null,
+    },
+    lockVersion: typeof v.lock_version === 'number' ? v.lock_version : 0,
   };
 }
 
-export async function putTemplateSchemas(templateId: string, versionNum: number, schemas: TemplateSchemas): Promise<void> {
+export async function putTemplateSchemas(
+  templateId: string,
+  versionNum: number,
+  schemas: TemplateSchemas,
+  expectedLockVersion: number,
+): Promise<{ lockVersion: number }> {
   const res = await fetch(`/api/v1/templates/${templateId}/versions/${versionNum}/schema`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       metadata_schema: {},
       placeholder_schema: schemas.placeholders.map(placeholderToWire),
-      expected_content_hash: '',
+      expected_lock_version: expectedLockVersion,
     }),
   });
-  await apiJson<unknown>(res);
+  if (!res.ok) {
+    let payload: { code?: string; title?: string; error?: { code?: string; message?: string } } = {};
+    try {
+      payload = await res.json();
+    } catch {
+      // fall through
+    }
+    const code = payload.code ?? payload.error?.code;
+    if (code === 'stale_lock_version') {
+      throw new StaleLockVersionError(payload.title ?? payload.error?.message);
+    }
+    throw new Error(payload.title ?? payload.error?.message ?? `HTTP ${res.status}`);
+  }
+  const body = (await res.json()) as { data?: { version?: { lock_version?: number } } };
+  const next = body?.data?.version?.lock_version;
+  return { lockVersion: typeof next === 'number' ? next : expectedLockVersion + 1 };
 }
