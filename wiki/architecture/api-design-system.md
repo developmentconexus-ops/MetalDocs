@@ -66,6 +66,8 @@ All 4xx/5xx responses MUST use `Content-Type: application/problem+json` with thi
 
 **Frontend helper:** `frontend/apps/web/src/lib/api/problem.ts`     `parseProblem(res)` + `ApiError` class (holds `.code`, `.errors[]`, `.status`). `resolveErrorMessage` dispatches on `code`.
 
+**Error-code coverage (FE):** every backend code must have a PT-BR mapping in `frontend/apps/web/src/lib/api/errorMessages.ts`. Enforced by `src/lib/api/__tests__/errorMessages.coverage.test.ts` against the snapshot `frontend/apps/web/src/lib/api/error-codes.generated.json`. After adding/renaming/removing a backend code, regenerate the snapshot: `go run ./scripts/dump-error-codes.go`. Unmapped codes fall back to an actionable PT-BR template (`Não foi possível concluir a ação. Código: <X>`) and emit a `console.warn` breadcrumb tagged `[api] unmapped error code` for observability.
+
 **Error codes** (full catalog in `internal/platform/problem/codes.go`):
 
 | Code | HTTP | Meaning |
