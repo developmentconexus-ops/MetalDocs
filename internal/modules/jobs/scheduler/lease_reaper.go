@@ -96,7 +96,7 @@ FROM deleted d
 		if len(jobNames) > 0 {
 			if _, err := tx.ExecContext(ctx, `
 INSERT INTO governance_events
-	(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, occurred_at)
+	(tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, created_at)
 SELECT
 	u.tenant_id::uuid,
 	'lease.reaped',
