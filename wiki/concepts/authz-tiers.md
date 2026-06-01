@@ -1,6 +1,6 @@
 # Authz Tiers
 
-> **Last verified:** 2026-05-11
+> **Last verified:** 2026-06-01 (ADR 0016 view-grade caps added: `metrics.view`, `membership.view`, `user.view`, `taxonomy.view`; prior: 2026-05-11)
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
 > **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md`.
 > **Key files:**
@@ -8,7 +8,7 @@
 > - `internal/modules/iam/authz/authz.go:44` — tier-2 `Require`
 > - `internal/modules/iam/authz/context.go:13` — `ErrActorContextMissing` / `ErrTenantContextMissing` typed errors; `MustActorID` at :21, `MustTenantID` at :34
 > - `migrations/0188_tripwire_extend.sql:18` — extended `enforce_capability_asserted()` function covering 12 tables (Plan 5); trigger attachment at lines :186–233
-> - `internal/modules/iam/domain/model.go:15` — `Capability` typed consts (20 total including `CapControlledDocumentObsolete`/`CapControlledDocumentSupersede` added during Plan 5 follow-up cleanup)
+> - `internal/modules/iam/domain/model.go:15` — `Capability` typed consts (27 total; ADR 0016 added `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`; Plan 5 follow-up added `CapControlledDocumentObsolete`/`CapControlledDocumentSupersede`)
 > See ADR `wiki/decisions/0007-two-tier-authz.md` for the decision rationale.
 
 MetalDocs has **two authorization tiers**.
