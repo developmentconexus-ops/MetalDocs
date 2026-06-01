@@ -402,6 +402,7 @@ export function ControlledDocumentDetailPanel({
           documentId={documentId}
           contentHash={contentHash}
           instanceId={instance.id}
+          revisionVersion={revisionVersion}
           onClose={() => setShowSignoffDialog(false)}
           onSuccess={() => void fetchInstance()}
         />

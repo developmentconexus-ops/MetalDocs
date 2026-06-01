@@ -29,6 +29,7 @@ export function InboxPage() {
     documentId: string;
     contentHash: string;
     instanceId: string;
+    revisionVersion: number;
     initialDecision: 'approve' | 'reject';
   } | null>(null);
 
@@ -70,7 +71,12 @@ export function InboxPage() {
     setActionError(null);
     try {
       const active = await getActiveDocumentContext(item.controlled_document_id);
-      if (!active?.documentId || !active?.contentHash || !active?.approvalInstanceId) {
+      if (
+        !active?.documentId ||
+        !active?.contentHash ||
+        !active?.approvalInstanceId ||
+        active?.revisionVersion == null
+      ) {
         setActionError('Fluxo de aprovação indisponível para este documento no momento.');
         return;
       }
@@ -79,6 +85,7 @@ export function InboxPage() {
         documentId: active.documentId,
         contentHash: active.contentHash,
         instanceId: active.approvalInstanceId,
+        revisionVersion: active.revisionVersion,
         initialDecision,
       });
     } catch {
@@ -132,6 +139,7 @@ export function InboxPage() {
           documentId={dialogState.documentId}
           contentHash={dialogState.contentHash}
           instanceId={dialogState.instanceId}
+          revisionVersion={dialogState.revisionVersion}
           initialDecision={dialogState.initialDecision}
           onClose={() => setDialogState(null)}
           onSuccess={() => {
