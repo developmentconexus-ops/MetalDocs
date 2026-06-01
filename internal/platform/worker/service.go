@@ -14,9 +14,10 @@ import (
 var errUnsupportedEventType = errors.New("worker: unsupported event type")
 
 type Service struct {
-	consumer  messaging.Consumer
-	pdfRunner *PDFJobRunner
-	cfg       config.WorkerConfig
+	consumer          messaging.Consumer
+	pdfRunner         *PDFJobRunner
+	materializeRunner *MaterializeJobRunner
+	cfg               config.WorkerConfig
 }
 
 func NewService(consumer messaging.Consumer, cfg config.WorkerConfig) *Service {
@@ -29,6 +30,12 @@ func NewService(consumer messaging.Consumer, cfg config.WorkerConfig) *Service {
 // WithPDFRunner attaches a PDFJobRunner that handles docgen_v2_pdf events.
 func (s *Service) WithPDFRunner(r *PDFJobRunner) *Service {
 	s.pdfRunner = r
+	return s
+}
+
+// WithMaterializeRunner attaches a MaterializeJobRunner that handles docx_materialize events (ADR 0015).
+func (s *Service) WithMaterializeRunner(r *MaterializeJobRunner) *Service {
+	s.materializeRunner = r
 	return s
 }
 
@@ -53,6 +60,10 @@ func (s *Service) RunOnce(ctx context.Context, batchSize int) error {
 		case messaging.EventTypePDFConvert:
 			if s.pdfRunner != nil {
 				handleErr = s.pdfRunner.Handle(ctx, event)
+			}
+		case messaging.EventTypeMaterializeFanout:
+			if s.materializeRunner != nil {
+				handleErr = s.materializeRunner.Handle(ctx, event)
 			}
 		default:
 			handleErr = fmt.Errorf("%w: %s", errUnsupportedEventType, event.EventType)
