@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 
 	approvalapi "metaldocs/internal/modules/documents/approval/api"
@@ -224,6 +225,15 @@ func MapErrorToResponse(err error) *problem.Problem {
 
 func WriteError(w http.ResponseWriter, err error) {
 	prob := MapErrorToResponse(err)
+	// Never swallow server-side failures: the client gets a generic "internal
+	// error" body, so the underlying cause must be logged for diagnosis.
+	if prob.Status >= http.StatusInternalServerError {
+		slog.Error("approval handler error",
+			slog.Int("status", prob.Status),
+			slog.String("code", string(prob.Code)),
+			slog.Any("error", err),
+		)
+	}
 	if writeErr := problem.Write(w, prob); writeErr != nil {
 		WriteJSON(w, http.StatusInternalServerError, problem.New(http.StatusInternalServerError, approvalCodeInternalUnknown, internalErrorMessage))
 	}
