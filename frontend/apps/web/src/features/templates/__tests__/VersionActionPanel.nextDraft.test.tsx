@@ -60,7 +60,7 @@ function makeVersion(overrides: Partial<VersionDTO> = {}): VersionDTO {
 
 beforeEach(() => {
   approveMock.mockReset();
-  seedActor(['approver'], ['template.approve', 'template.publish']);
+  seedActor(['approver'], ['template.approve']);
 });
 
 afterEach(() => {

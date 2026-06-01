@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	iamauthz "metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/templates/domain"
 	"metaldocs/internal/platform/problem"
 )
@@ -48,6 +49,8 @@ func MapErr(err error) (httpStatus int, code problem.Code) {
 		return http.StatusConflict, codeTplUploadMissing
 	case errors.Is(err, domain.ErrISOSegregationViolation):
 		return http.StatusForbidden, codeTplISOSegregation
+	case errors.As(err, new(iamauthz.ErrCapDenied)):
+		return http.StatusForbidden, "capability_denied"
 	case errors.Is(err, domain.ErrForbiddenRole):
 		return http.StatusForbidden, codeTplForbiddenRole
 	case errors.Is(err, domain.ErrForbidden):
