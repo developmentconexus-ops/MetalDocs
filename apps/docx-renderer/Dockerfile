@@ -27,10 +27,9 @@ ENV NODE_ENV=production
 
 # Only the bundle is needed — no node_modules copy required
 COPY --from=build /app/apps/docx-renderer/dist ./dist
-COPY --from=build /app/apps/docx-renderer/package.json ./package.json
 
 USER node
 EXPOSE 3100
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3100/health || exit 1
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/index.cjs"]
