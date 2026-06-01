@@ -322,21 +322,6 @@ func (f *fakePresigner) Exists(_ context.Context, _ string) (bool, error) {
 	return f.exists, nil
 }
 
-type fakeDocgen struct {
-	hashReturn string
-	err        error
-}
-
-func (f fakeDocgen) RenderDocx(_ context.Context, _, _, _ string, _ json.RawMessage) (string, int64, []string, error) {
-	if f.err != nil {
-		return "", 0, nil, f.err
-	}
-	if f.hashReturn != "" {
-		return f.hashReturn, 100, nil, nil
-	}
-	return "h_initial", 100, nil, nil
-}
-
 type fakeTplReader struct {
 	err error
 }
@@ -385,7 +370,6 @@ func TestCreateDocument_OK(t *testing.T) {
 	audit := &noopAudit{}
 	svc := application.NewService(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{hashReturn: "h_initial"},
 		fakeTplReader{},
 		fakeFormVal{valid: true},
@@ -423,7 +407,6 @@ func TestCreateDocument_InvalidFormData_Rejects(t *testing.T) {
 	repo := &fakeRepo{createDocIDs: [3]string{"doc_1", "rev_1", "sess_1"}}
 	svc := application.NewService(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{},
 		fakeTplReader{},
 		fakeFormVal{valid: false, errs: []string{"invalid"}},
@@ -456,7 +439,7 @@ func TestAcquireSession_Readonly_WhenTaken(t *testing.T) {
 		acquireSess: &domain.Session{ID: "sess_taken", DocumentID: "doc_1", UserID: "other"},
 		acquireErr:  domain.ErrSessionTaken,
 	}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 
 	sess, readonly, err := svc.AcquireSession(context.Background(), "tenant_1", "doc_1", "user_1")
 	if err != nil {
@@ -473,7 +456,7 @@ func TestAcquireSession_Readonly_WhenTaken(t *testing.T) {
 func TestAcquireSession_Success_RecordsAudit(t *testing.T) {
 	repo := &fakeRepo{acquireSess: &domain.Session{ID: "sess_1", DocumentID: "doc_1", UserID: "user_1"}}
 	audit := &noopAudit{}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, audit)
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, audit)
 
 	sess, readonly, err := svc.AcquireSession(context.Background(), "tenant_1", "doc_1", "user_1")
 	if err != nil {
@@ -492,7 +475,7 @@ func TestAcquireSession_Success_RecordsAudit(t *testing.T) {
 
 func TestCreateCheckpoint_OK(t *testing.T) {
 	repo := &fakeRepo{checkpointResult: &domain.Checkpoint{ID: "cp_1", DocumentID: "doc_1", VersionNum: 3}}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 
 	cp, err := svc.CreateCheckpoint(context.Background(), "tenant_1", "doc_1", "user_1", "Milestone")
 	if err != nil {
@@ -505,7 +488,7 @@ func TestCreateCheckpoint_OK(t *testing.T) {
 
 func TestFinalize_FromDraft_OK(t *testing.T) {
 	repo := &fakeRepo{docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft}}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 
 	err := svc.Finalize(context.Background(), "tenant_1", "doc_1", "user_1")
 	if err != nil {
@@ -521,7 +504,7 @@ func TestFinalize_FromDraft_OK(t *testing.T) {
 
 func TestFinalize_FromFinalized_Rejects(t *testing.T) {
 	repo := &fakeRepo{updateStatusErr: domain.ErrInvalidStateTransition}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 
 	err := svc.Finalize(context.Background(), "tenant_1", "doc_1", "user_1")
 	if !errors.Is(err, domain.ErrInvalidStateTransition) {
@@ -534,7 +517,7 @@ func TestFinalize_FromFinalized_Rejects(t *testing.T) {
 
 func TestRenameDocument_OK(t *testing.T) {
 	repo := &fakeRepo{docReturn: &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft}}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 
 	err := svc.RenameDocument(context.Background(), "tenant_1", "user_1", "doc_1", "  New Name  ")
 	if err != nil {
@@ -547,7 +530,7 @@ func TestRenameDocument_OK(t *testing.T) {
 
 func TestRenameDocument_InvalidName(t *testing.T) {
 	repo := &fakeRepo{}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 
 	err := svc.RenameDocument(context.Background(), "tenant_1", "user_1", "doc_1", "   ")
 	if !errors.Is(err, domain.ErrInvalidName) {
@@ -565,7 +548,7 @@ func TestCommitAutosave_ForwardsArtifactMetadata(t *testing.T) {
 		commitResult: &application.CommitResult{RevisionID: "rev_2", RevisionNum: 2},
 	}
 	presigner := &fakePresigner{hashReturn: "h1", sizeReturn: 1304}
-	svc := application.New(repo, fakeDocgen{}, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 	pageCount := 3
 
 	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
@@ -593,7 +576,7 @@ func TestCommitAutosave_ForwardsArtifactMetadata(t *testing.T) {
 
 func TestCommitAutosave_InvalidPageCount(t *testing.T) {
 	repo := &fakeRepo{}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 	invalid := 0
 
 	_, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
@@ -621,7 +604,7 @@ func TestSyncArtifactMetadata_ForwardsArtifactMetadata(t *testing.T) {
 		commitResult: &application.CommitResult{RevisionID: "rev_1"},
 	}
 	presigner := &fakePresigner{sizeReturn: 1304}
-	svc := application.New(repo, fakeDocgen{}, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, presigner, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 	pageCount := 3
 
 	_, err := svc.SyncArtifactMetadata(context.Background(), application.SyncArtifactMetadataCmd{
@@ -647,7 +630,7 @@ func TestSyncArtifactMetadata_ForwardsArtifactMetadata(t *testing.T) {
 
 func TestSyncArtifactMetadata_InvalidPageCount(t *testing.T) {
 	repo := &fakeRepo{}
-	svc := application.New(repo, fakeDocgen{}, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
+	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
 	invalid := 0
 
 	_, err := svc.SyncArtifactMetadata(context.Background(), application.SyncArtifactMetadataCmd{

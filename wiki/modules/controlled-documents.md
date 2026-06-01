@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-05-25 (backend medium quality-bar sync) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-25 backend medium quality-bar sync) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:25` - module wiring (`New`, dependencies)
@@ -63,11 +63,13 @@ The **controlled-documents** module owns the catalog of code-numbered Controlled
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped**: it shows controlled-documents' collaborators (taxonomy, documents, approval, idempotency) and the two owned Postgres tables.
 
 ```mermaid
 C4Context
-    title System Context          Controlled Documents
+    title System Context — Controlled Documents (module-scoped)
     Person(author, "Author / QA", "Web client")
     System_Boundary(b1, "MetalDocs") {
         System(controlleddocuments, "Controlled Documents", "Controlled-document catalog: code generation + lifecycle")
@@ -107,13 +109,15 @@ Controlled-documents owns the **identity** of every controlled document under QM
 
 ---
 
-## 5. Building Block View (C4 Level 2 - Container)
+## 5. Building Block View — module-scoped (C4 Level 2 — Container)
 
-### 5.1 Whitebox - Controlled Documents
+> System-level container topology lives in [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md). The diagram below decomposes the internal Go packages of controlled-documents (service/repository/sequence allocator/template-version checker/cross-module ports).
+
+### 5.1 Whitebox — Controlled Documents
 
 ```mermaid
 C4Container
-    title Container View          Controlled Documents
+    title Container View — Controlled Documents (module-internal packages)
     Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "8 routes under /api/v1/controlled-documents")
     Container(svc, "ControlledDocumentsService", "Go", "Create / CreateRevision / Obsolete / Supersede / List / Get / PreviewCode")
     Container(repo, "PostgresControlledDocumentRepository", "Go + database/sql", "CRUD on controlled_documents")
@@ -450,6 +454,22 @@ Top 3 (by severity, then blast-radius):
 | `DocumentInitializer` | Controlled-documents-owned port the documents module implements to materialize the first revision inside the controlled-documents tx |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable mid atomic-create | Tx aborts; no CD row, no first revision — caller sees 500 | `application/service.go:104` `Create` rolls back the whole tx | Per ADR 0011: atomic guarantee — no orphan slots possible by design |
+| Sequence counter collision (concurrent create on same `(tenant, profile, area)`) | One side wins via `NextAndIncrement`; loser retries | `infrastructure/repository.go:239` uses `SELECT … FOR UPDATE` or `UPDATE … RETURNING` | Caller retries with fresh `Idempotency-Key`; race is bounded |
+| Idempotency replay (`Idempotency-Key` header reused) | 201 with stored response; no duplicate CD/document | `platform/idempotency.Require` middleware | Expected; safe network-retry path |
+| Body-hash mismatch on replay | 409 from idempotency middleware | Idempotency store detects payload change | Caller must use a fresh key for a different payload |
+| FK validation: profile / area unknown | 4xx from `TaxonomyProfileReader` / `AreaReader` | `taxRead.GetByCode` returns not-found | Confirm taxonomy data; backfill missing rows |
+| Template-version state invalid for override | Atomic create rejects with conflict | `PostgresTemplateVersionChecker.GetTemplateVersionState` returns non-publishable state | Caller picks a published template version |
+| `DocumentInitializer.CloneTemplate` fails inside tx | Whole atomic create rolls back; no CD; caller sees 500 | Cross-module port returns err; tx rollback | Investigate documents-module clone error; replay with same idempotency key |
+| Obsolete/Supersede emit no audit event | Audit trail missing lifecycle entry | T-002 (registry-legacy critical) — known gap | Wire `auditdomain.Writer.Record` on `changeStatus` |
+| Active-document lookup returns nothing for published-only CD | Frontend cannot render download link | Before E10 fix: missing row; now mitigated by FULL OUTER JOIN in `getActiveDocument` | Regression test on published-only CDs |
+| Sequence counter not initialized for new `(profile, area)` | First create on a pair must call `EnsureCounter` | `service.go:104` ensures counter before `NextAndIncrement` | Self-healing — counter row created lazily |
+| Cross-module governance log lag | Governance event for create lands after CD row | Logger writes post-commit (taxonomy `DBGovernanceLogger`) | Replay outbox if event missing; T-008 tracks dual-sink coupling |
 
 ## Cross-links
 

@@ -1,6 +1,7 @@
 ﻿# System Overview
 
-> **Last verified:** 2026-05-21 (post-freeze terminology sync in module topology section)
+> **Last verified:** 2026-06-01 (added C4 + sequence diagram links; PDF path now Go→Gotenberg direct per Phase A)
+> **Last verified:** 2026-06-01 (docgen-v2 → docx-renderer rename)
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -9,6 +10,76 @@
 > - `frontend/apps/web/vite.config.ts` - frontend dev server
 > - `internal/platform/bootstrap/` - service wiring
 > - `internal/platform/httpclient/internal_client.go:12` - `NewInternalClient` factory; tuned `*http.Client` for service-to-service HTTP (M1 fix)
+
+> **New to the codebase?** Read [`wiki/ONBOARDING.md`](../ONBOARDING.md) first — this page is one of seven docs in the 30-minute mental model there.
+
+---
+
+## At a glance
+
+```mermaid
+C4Context
+    title MetalDocs — System Context (ISO 9001 controlled-document QMS)
+
+    Person(author, "Document author", "Drafts, fills in, edits controlled documents")
+    Person(approver, "Approver", "Reviews and signs off documents per the approval route")
+    Person(admin, "Tenant admin", "Manages users, roles, templates, taxonomy")
+    Person(reader, "Reader", "Consumes approved documents and exports PDFs")
+
+    System(metaldocs, "MetalDocs", "Multi-tenant SaaS for controlled-document lifecycle: templates → drafts → approval → frozen artifact → PDF")
+
+    System_Ext(browser, "User's browser", "Loads the SPA, talks directly to MetalDocs object storage via presigned URLs")
+
+    Rel(author, metaldocs, "Creates and edits documents in the browser editor")
+    Rel(approver, metaldocs, "Signs off via approval inbox")
+    Rel(admin, metaldocs, "Authors templates, manages users + areas")
+    Rel(reader, metaldocs, "Views/exports approved documents")
+    Rel(metaldocs, browser, "Serves SPA + issues short-lived presigned PUT/GET URLs")
+```
+
+> Full version with notes: [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md).
+
+```mermaid
+C4Container
+    title MetalDocs — Backend Container View
+
+    Person(user, "User", "Author / approver / admin / reader")
+
+    System_Boundary(md, "MetalDocs") {
+        Container(web, "metaldocs-web", "React + Vite", "SPA. Eigenpal editor. Uploads/downloads docx directly to MinIO via presigned URLs.")
+        Container(api, "metaldocs-api", "Go (net/http)", "REST API on :8081. All business logic + authz.")
+        Container(worker, "metaldocs-worker", "Go", "Async outbox consumer: PDF, scheduled publish, reminders.")
+        Container(docgen, "docx-renderer", "Node + Fastify + eigenpal (headless)", "Only live route today: /render/fanout (freeze reconstruct).")
+        ContainerDb(pg, "postgres", "Postgres 16", "Authoritative state + transactional outboxes.")
+        ContainerDb(minio, "minio", "S3-compatible store", "All docx + PDF bytes. Browser ↔ MinIO direct.")
+        Container(redis, "redis", "Redis 7", "Authz cache + rate limit.")
+        Container(gotenberg, "gotenberg", "Gotenberg 8", "Pure docx → PDF.")
+    }
+
+    Rel(user, web, "HTTPS + cookie session")
+    Rel(web, api, "REST /api/v1/*")
+    Rel(web, minio, "Presigned PUT/GET")
+    Rel(api, pg, "SQL")
+    Rel(api, redis, "Cache / rate limit")
+    Rel(api, minio, "Presign / head / size")
+    Rel(api, docgen, "POST /render/fanout (in signoff tx)")
+    Rel(worker, pg, "Outbox + artifact metadata")
+    Rel(worker, minio, "Read docx / write PDF")
+    Rel(worker, gotenberg, "docx → PDF")
+```
+
+> Full version with notes and known coupling callouts: [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md).
+
+## End-to-end flows
+
+For each load-bearing user journey, see the canonical sequence diagram. These are the "what really happens" maps; module pages are the depth.
+
+| Flow | Diagram |
+|---|---|
+| **Create document** (template → controlled doc → editor opens) | [sequence-create-document.md](../diagrams/sequence-create-document.md) |
+| **Edit + autosave** (browser ↔ MinIO direct; scalability pattern) | [sequence-edit-autosave.md](../diagrams/sequence-edit-autosave.md) |
+| **Approval signoff + freeze** (compliance moment; ⚠ known sync coupling) | [sequence-signoff-freeze.md](../diagrams/sequence-signoff-freeze.md) |
+| **PDF export** (transactional outbox → worker → Gotenberg) | [sequence-pdf-export.md](../diagrams/sequence-pdf-export.md) |
 
 ---
 
@@ -80,11 +151,11 @@ Shared packages:
 7. Submit -> `POST /documents/{id}/submit` -> `under_review`. Migration `0152`'s `enforce_snapshot_on_submit_trg` trigger requires all six snapshot columns to be non-NULL before draft -> under_review.
 8. Approves -> `POST /documents/{id}/approve` -> triggers `freeze`:
    - Use the creation-time snapshots as the immutable render inputs
-   - Go calls docgen-v2 `POST /render/fanout` with `X-Service-Token`; docgen-v2 validates the token
+   - Go calls docx-renderer `POST /render/fanout` with `X-Service-Token`; docx-renderer validates the token
    - Go sends `tenant_id`, `revision_id`, `body_docx_s3_key`, `placeholder_values`, `composition_config` (always empty     deprecated 2026-04-27     see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27), and `resolved_values`
-   - docgen-v2 computes the final DOCX S3 key internally as `tenants/{tenant_id}/revisions/{revision_id}/frozen.docx`
-   - docgen-v2 runs eigenpal `processTemplateDetailed` for token substitution
-   - docgen-v2 returns `content_hash`, `final_docx_s3_key`, and `unreplaced_vars`
+   - docx-renderer computes the final DOCX S3 key internally as `tenants/{tenant_id}/revisions/{revision_id}/frozen.docx`
+   - docx-renderer runs eigenpal `processTemplateDetailed` for token substitution
+   - docx-renderer returns `content_hash`, `final_docx_s3_key`, and `unreplaced_vars`
    - Persist `final_docx_s3_key`, hashes
 9. **View:** `GET /documents/{id}/view` -> returns signed URL for PDF
 

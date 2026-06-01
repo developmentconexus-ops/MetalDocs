@@ -1,4 +1,4 @@
-﻿package domain
+package domain
 
 import (
 	"crypto/sha256"
@@ -21,8 +21,10 @@ const domainSep = byte(0x1e)
 // determine whether two export calls would produce identical PDFs.
 //
 // Inputs: contentHash (hex string from revision.StorageKey), templateVersionID,
-// grammarVersion (a semver string for the rendering grammar), docgenV2Version
-// (e.g. "docgen-v2@0.4.0"), and canonical-JSON-encoded RenderOptions.
+// grammarVersion (a semver string for the rendering grammar), rendererVersion
+// (e.g. "docgen-v2@0.4.0" — opaque historical tag; do not rename, it is stored
+// verbatim in document_exports.docgen_v2_ver and changes the composite hash),
+// and canonical-JSON-encoded RenderOptions.
 //
 // Any change to any input produces a different hash -> cache miss.
 func ComputeCompositeHash(

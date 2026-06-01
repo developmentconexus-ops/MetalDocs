@@ -64,7 +64,7 @@ func TestCommitAutosave_RejectionBranches(t *testing.T) {
 			if tc.hashReturn != "" {
 				presigner.hashReturn = tc.hashReturn
 			}
-			svc := application.New(repo, nil, presigner, nil, nil, &noopAudit{})
+			svc := application.New(repo, presigner, nil, nil, &noopAudit{})
 
 			result, err := svc.CommitAutosave(context.Background(), application.CommitAutosaveCmd{
 				TenantID:         "tenant_1",

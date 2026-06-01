@@ -268,9 +268,9 @@ func main() {
 	if err := requireApprovalRuntimeSupport(fanoutURL); err != nil {
 		log.Fatal(err)
 	}
-	serviceToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCGEN_V2_SERVICE_TOKEN"))
+	serviceToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCX_RENDERER_SERVICE_TOKEN"))
 	if fanoutURL != "" && serviceToken == "" {
-		log.Fatalf("METALDOCS_DOCGEN_V2_SERVICE_TOKEN is required when METALDOCS_FANOUT_URL is set")
+		log.Fatalf("METALDOCS_DOCX_RENDERER_SERVICE_TOKEN is required when METALDOCS_FANOUT_URL is set")
 	}
 	if fanoutURL != "" && deps.SQLDB != nil {
 		fanoutCfg.client = fanout.NewClient(fanoutURL, serviceToken, httpclient.NewInternalClient())
@@ -303,7 +303,6 @@ func main() {
 	docSnapshotWriter := docrepo.NewSnapshotRepository(deps.SQLDB)
 	docDeps := documents.Dependencies{
 		DB:      deps.SQLDB,
-		Docgen:  nil,
 		Presign: docPresigner,
 		TplRead: docgenv2.NewFanoutTemplateReader(
 			docgenv2.NewTemplateReader(deps.SQLDB, deps.MinioClient, deps.MinioBucket),
@@ -319,8 +318,8 @@ func main() {
 		SnapshotReader:               docSnapshotReader,
 		SnapshotWriter:               docSnapshotWriter,
 	}
-	if deps.DocgenV2Client != nil {
-		docDeps.ExportDocgen = deps.DocgenV2Client
+	if deps.PDFConverter != nil {
+		docDeps.ExportDocgen = deps.PDFConverter
 	}
 	if fanoutCfg.client != nil && deps.SQLDB != nil {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)

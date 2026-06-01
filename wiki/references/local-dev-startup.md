@@ -1,6 +1,6 @@
 # Local Dev Startup
 
-**Last verified:** 2026-05-20
+**Last verified:** 2026-06-01
 
 ## TL;DR
 
@@ -111,31 +111,31 @@ If any checkpoint fails, classify it as a prerequisite first. Do not absorb star
 
 ---
 
-## docgen-v2 (token substitution service)
+## docx-renderer (token substitution service)
 
-Required for document approval flows that fan out to DOCX/PDF generation. If `METALDOCS_FANOUT_URL` is unset, approval can complete locally with freeze skipped. If fanout is configured but docgen-v2 is unavailable, approval can fail during fanout.
+Required for document approval flows that fan out to DOCX/PDF generation. If `METALDOCS_FANOUT_URL` is unset, approval can complete locally with freeze skipped. If fanout is configured but docx-renderer is unavailable, approval can fail during fanout.
 
 **Setup (first time):**
 ```powershell
 # 1. Copy env template
-Copy-Item .env.docgen-v2.example .env.docgen-v2
-# 2. Fill in MinIO creds (dev: minioadmin/minioadmin) and set DOCGEN_V2_SERVICE_TOKEN
+Copy-Item .env.docx-renderer.example .env.docx-renderer
+# 2. Fill in MinIO creds (dev: minioadmin/minioadmin) and set DOCX_RENDERER_SERVICE_TOKEN
 # 3. Install dependencies
-cd apps/docgen-v2 && npm install
+cd apps/docx-renderer && npm install
 ```
 
 **Start:**
 ```powershell
-.\scripts\dev-docgen.ps1   # runs on port 3001
+.\scripts\dev-docgen.ps1   # runs on port 3100
 ```
 
 **Wire to API:** In `.env`, set:
 ```
-METALDOCS_FANOUT_URL=http://localhost:3001
-METALDOCS_DOCGEN_V2_SERVICE_TOKEN=<same value as DOCGEN_V2_SERVICE_TOKEN in .env.docgen-v2>
+METALDOCS_FANOUT_URL=http://localhost:3100
+METALDOCS_DOCX_RENDERER_SERVICE_TOKEN=<same value as DOCX_RENDERER_SERVICE_TOKEN in .env.docx-renderer>
 ```
 
-**Health check:** `GET http://localhost:3001/health` → `{"status":"ok"}`
+**Health check:** `GET http://localhost:3100/health` → `{"status":"ok"}`
 
 ---
 
@@ -174,9 +174,9 @@ Port: `5433` (host) → `5432` (container). DB: `metaldocs`. Schema split:
 
 ## Worker (PDF generation)
 
-Required for PDF generation after document approval. Polls `messaging_outbox` using the configured worker interval, calls docgen-v2 `/convert/pdf`, and writes `final_pdf_s3_key` to DB.
+Required for PDF generation after document approval. Polls `messaging_outbox` using the configured worker interval, calls Gotenberg directly, and writes `final_pdf_s3_key` to DB.
 
-**Start (separate terminal, after API + docgen-v2 are up):**
+**Start (separate terminal, after API + docx-renderer are up):**
 ```powershell
 .\scripts\start-worker.ps1        # uses existing metaldocs-worker.exe
 .\scripts\start-worker.ps1 -Build # rebuild binary first
@@ -185,10 +185,9 @@ Required for PDF generation after document approval. Polls `messaging_outbox` us
 **Verify running:** startup logs `MetalDocs Worker running (poll_interval_s=...)` on boot. The exact value comes from `METALDOCS_WORKER_POLL_INTERVAL_SECONDS` in `.env`, and ongoing `worker_batch result=completed ...` logs follow that configured interval.
 
 **Env vars required (already in `.env`):**
-- `METALDOCS_DOCGEN_V2_URL=http://localhost:3001`
-- `METALDOCS_DOCGEN_V2_SERVICE_TOKEN=dev-local-service-token-32chars!!`
+- `METALDOCS_DOCX_RENDERER_SERVICE_TOKEN=dev-local-service-token-32chars!!`
 
-**If PDF not generated after signoff:** check worker log for `event_type=docgen_v2_pdf result=published`. If missing, first confirm whether `METALDOCS_FANOUT_URL` is configured at all; when it is unset, freeze is skipped. If it is configured, inspect worker/docgen-v2 connectivity because fanout failures can block approval.
+**If PDF not generated after signoff:** check worker log for `event_type=docgen_v2_pdf result=published`. If missing, first confirm whether `METALDOCS_FANOUT_URL` is configured at all; when it is unset, freeze is skipped. If it is configured, inspect worker/docx-renderer connectivity because fanout failures can block approval.
 
 ---
 

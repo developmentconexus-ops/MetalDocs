@@ -33,8 +33,8 @@ frontend/apps/web/playwright-report/
 frontend/apps/web/.cache/
 apps/docgen/node_modules/
 apps/docgen/dist/
-apps/docgen-v2/node_modules/
-apps/docgen-v2/dist/
+apps/docx-renderer/node_modules/
+apps/docx-renderer/dist/
 shared/schemas/node_modules/
 
 .worktrees/
@@ -53,7 +53,7 @@ coverage_phase5.out
 worker.err.log
 worker.out.log
 frontend/apps/web/design-source/.design-canvas.state.json
-.env.docgen-v2
+.env.docx-renderer
 
 # Build artifacts
 *.exe~
@@ -69,9 +69,9 @@ api-*.err
 api-*.out
 api-new.log
 api-restart.log
-docgen-v2.log
-docgen-v2.err
-docgen-v2.*.log
+docx-renderer.log
+docx-renderer.err
+docx-renderer.*.log
 worker.log
 worker-*.log
 worker-*.err.log

@@ -20,6 +20,7 @@
 - [editor-ui-eigenpal.md](editor-ui-eigenpal.md), [editor-ui-eigenpal-tech-debt.md](editor-ui-eigenpal-tech-debt.md)
 - [frontend-primitives.md](frontend-primitives.md), [frontend-primitives-tech-debt.md](frontend-primitives-tech-debt.md)
 - [novo-documento-wizard.md](novo-documento-wizard.md), [novo-documento-wizard-tech-debt.md](novo-documento-wizard-tech-debt.md)
+- [frontend/index.md](frontend/index.md) — per-feature frontend module pages (approval, auth, controlled-documents, documents, iam, templates)
 
 ## Supporting modules
 

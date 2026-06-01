@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-29 (QA `qa/documents-distribution`: `DocumentDistributionPage` wires real document identity via `useDocumentDetailQuery` (Code, RevisionNumber, Name) at honest surfaces (hero breadcrumb, hero badges, props-driven `DocRefCard`, em-breve banner). Mock distribution UI (KPIStrip / DonutCard / DistributionFacts / CoverageByArea / TimelineCard / RecipientsCard / `lib/distributionMeta.ts`) preserved as design scaffolding for unbuilt fanout/read-tracking feature — every illustrative section wrapped in `IllustrativeBlock` with `aria-hidden="true"` + `Dados ilustrativos · Em breve` watermark + `pointer-events:none` + saturate filter + diagonal-stripe overlay. `role="note"` banner above scaffolding names the real document and states numbers are illustrative. 4 hero CTAs `aria-disabled="true" title="Em breve"`. Preview proof on `PO-RH-002` / `REV00` / `DC_Template_Descricao_Cargo`: identity correct on every honest surface, 5 watermarks aria-hidden, only `GET /api/v1/documents/:id` called — zero phantom endpoints. Fanout + read-tracking Go module remains hard-stop / out of scope — see `backlog/distribuicao.md`. Previous: 2026-05-29 QA `qa/documents-detail` follow-up wired `ProcessAreaCodeSnapshot` + `ProfileCodeSnapshot` into `DocumentPublishedPage` via `useAreasQuery` + `useProfilesQuery` (5 hardcoded "—" sites replaced); removed mock `PLACEHOLDER_RELATED` + `PLACEHOLDER_COMMENTS` from §04/§05 → honest em-breve; fixed misleading status badge + wrong Iniciar-revisão title; tsc clean, 19/19 vitest. Previous: 2026-05-29 `qa/documents-editor` ambiguous-content_hash JOIN fix.) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
+**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-29 (QA `qa/documents-distribution`: `DocumentDistributionPage` wires real document identity via `useDocumentDetailQuery` (Code, RevisionNumber, Name) at honest surfaces (hero breadcrumb, hero badges, props-driven `DocRefCard`, em-breve banner). Mock distribution UI (KPIStrip / DonutCard / DistributionFacts / CoverageByArea / TimelineCard / RecipientsCard / `lib/distributionMeta.ts`) preserved as design scaffolding for unbuilt fanout/read-tracking feature — every illustrative section wrapped in `IllustrativeBlock` with `aria-hidden="true"` + `Dados ilustrativos · Em breve` watermark + `pointer-events:none` + saturate filter + diagonal-stripe overlay. `role="note"` banner above scaffolding names the real document and states numbers are illustrative. 4 hero CTAs `aria-disabled="true" title="Em breve"`. Preview proof on `PO-RH-002` / `REV00` / `DC_Template_Descricao_Cargo`: identity correct on every honest surface, 5 watermarks aria-hidden, only `GET /api/v1/documents/:id` called — zero phantom endpoints. Fanout + read-tracking Go module remains hard-stop / out of scope — see `backlog/distribuicao.md`. Previous: 2026-05-29 QA `qa/documents-detail` follow-up wired `ProcessAreaCodeSnapshot` + `ProfileCodeSnapshot` into `DocumentPublishedPage` via `useAreasQuery` + `useProfilesQuery` (5 hardcoded "—" sites replaced); removed mock `PLACEHOLDER_RELATED` + `PLACEHOLDER_COMMENTS` from §04/§05 → honest em-breve; fixed misleading status badge + wrong Iniciar-revisão title; tsc clean, 19/19 vitest. Previous: 2026-05-29 `qa/documents-editor` ambiguous-content_hash JOIN fix.) | **Owner:** unassigned | **Status:** active | **Maturity:** L3
 
 ---
 
@@ -50,11 +50,13 @@
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped**: it shows documents' immediate Go-level collaborators (controlled-documents, templates, iam, render, idempotency platform) and the owned Postgres tables.
 
 ```mermaid
 C4Context
-    title System Context â€” documents
+    title System Context — documents (module-scoped)
     Person(user, "Filler / Approver", "Web client (React)")
     System_Boundary(b1, "MetalDocs API") {
         System(docs, "documents", "Document instance lifecycle: list, create, edit, finalize, approve, publish")
@@ -121,13 +123,15 @@ Quality-managed documents. Each instance traces back to a template + a controlle
 
 ---
 
-## 5. Building Block View (C4 Level 2 â€” Container)
+## 5. Building Block View — module-scoped (C4 Level 2 — Container)
 
-### 5.1 Whitebox â€” documents
+> System-level container topology lives in [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md). The diagram below decomposes the internal Go packages of the documents module (delivery/http + approval/http + application + domain + repository + jobs + generated boundary).
+
+### 5.1 Whitebox — documents
 
 ```mermaid
 C4Container
-    title Container View â€” documents module
+    title Container View — documents module (module-internal packages)
     Container(http, "delivery/http", "Go stdlib mux", "Handler, ExportHandler â€” /api/v1/documents/* + /api/v1/documents/{id}/export/* + comments")
     Container(approvalHttp, "approval/http", "Go", "ApprovalHandler â€” /api/v1/documents/{id}/{submit,signoff,cancel,publish,schedule-publish,supersede,obsolete} + approval admin")
     Container(app, "application", "Go", "Service, SnapshotService, FreezeService, FillinService, ViewService, ExportService, DraftResolverService, ReconstructService, CDDocumentInitializer, SubmitService, DecisionService")
@@ -513,6 +517,23 @@ Top 3 (by severity, then blast radius):
 | `document.submit` | Tier-2 capability string asserted at `submit_service.go:85`; renamed from `doc.submit` in Plan 4 (migration 0186) |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable | 500 on all mutating routes (create, edit/commit, finalize, signoff, export enqueue) | `pgx` errors in `metaldocs-api` logs; `/healthz` | Restore Postgres; outbox-driven exports resume from journal on recovery |
+| Stale `If-Match` on edit/commit (concurrent revision write) | 412 `state.stale_revision`; client must refetch | OCC: `WHERE revision_version = $3` returns 0 rows | Frontend refetches `useDocumentDetailQuery`, surfaces inline conflict |
+| Object-store (MinIO) PUT fails mid-autosave | Commit not invoked; revision stays at prior version | Editor adapter rejects fetch; `AutosaveStatus` flips to error | User retries; if persistent, MinIO healthcheck + bucket CORS |
+| Submit with null `placeholder_schema_snapshot` | 422 / rejected — Postgres trigger `enforce_snapshot_on_submit_trg` (`migrations/0152_*.sql:47`) aborts the `under_review` transition | `SnapshotService` failed to populate snapshot before transition | Investigate `application.SnapshotService`; replay submit |
+| Tier-3 tripwire abort on document mutation | Mutation 500 (mapped to RFC 9457 problem); `metaldocs.asserted_caps` GUC missing the required cap | Postgres `RAISE` from `enforce_capability_asserted` | Code path bypassed `authz.Require` — fix-forward; never disable tripwire |
+| Idempotency replay on signoff | 200 with `was_replay=true`; no duplicate row | `postgres_signoff_idemp_store` field-compare | Expected; safe retry |
+| PDF export outbox stuck | `documents.pdf_status=pending`/`failed` past SLA | `metaldocs.pdf_dispatch_outbox` row state; worker logs | See [`render-fanout.md`](render-fanout.md) failure modes |
+| `finalizeDocument` DB error misclassified | Previously echoed `err.Error()` in 500 response | Closed 2026-05-25 hardening (`finalize C1/C2`); now fails closed with `500 internal_error`, server log only | Regression test prevents reintroduction |
+| Editor session tenant leak | Cross-tenant editor row visible | Migration `0211_editor_sessions_tenant_id.sql` added/backfilled tenant scoping (2026-05-25) | All editor session reads/writes now thread tenant — regression test required |
+| `X-User-Roles` header spoof | Previously could bypass IAM role gate | Closed 2026-05-25 (`IAM role-header hardening sync`) — gate now reads only `iamdomain.RolesFromContext` | Regression test on role-gate path |
+| Orphan pending revision | Editor crashed before commit; ghost row in `documents` / `document_revisions` | `OrphanPendingSweeper` job (`internal/modules/documents/jobs/`) | Cron sweeps; manual sweep available |
+| Comment lock blocks final approval | 409 `approval.unresolved_comments` from approval module | Approval `RecordSignoff` final-stage guard | Resolve comments; retry signoff |
 
 ## Cross-links
 

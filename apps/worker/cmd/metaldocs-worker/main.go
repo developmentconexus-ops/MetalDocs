@@ -33,9 +33,9 @@ func main() {
 	defer deps.Cleanup()
 
 	workerSvc := workerapp.NewService(deps.Consumer, workerCfg)
-	if deps.DocgenV2Client != nil && deps.SQLDB != nil {
+	if deps.PDFConverter != nil && deps.SQLDB != nil {
 		snapRepo := docrepo.NewSnapshotRepository(deps.SQLDB)
-		pdfRunner := workerapp.NewPDFJobRunner(deps.DocgenV2Client, workerapp.NewSnapshotPDFPersister(snapRepo))
+		pdfRunner := workerapp.NewPDFJobRunner(deps.PDFConverter, workerapp.NewSnapshotPDFPersister(snapRepo))
 		workerSvc = workerSvc.WithPDFRunner(pdfRunner)
 	}
 
