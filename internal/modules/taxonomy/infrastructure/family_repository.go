@@ -36,7 +36,7 @@ func (r *FamilyRepository) GetByCode(ctx context.Context, code domain.FamilyCode
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, fmt.Errorf("query family %q: %w", code, err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get family: %w", err)
 	}
 
@@ -68,7 +68,7 @@ func (r *FamilyRepository) List(ctx context.Context, includeInactive bool) ([]do
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List families: %w", err)
 	}
 
@@ -163,7 +163,7 @@ func (r *FamilyRepository) HasActiveProfiles(ctx context.Context, tenantID strin
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return false, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyManage), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
 		return false, fmt.Errorf("taxonomy: authz check HasActiveProfiles: %w", err)
 	}
 
