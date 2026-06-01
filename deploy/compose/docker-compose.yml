@@ -77,17 +77,25 @@ services:
       retries: 10
       start_period: 10s
 
-  docgen-v2:
+  docx-renderer:
     build:
       context: ../..
-      dockerfile: apps/docgen-v2/Dockerfile
+      dockerfile: apps/docx-renderer/Dockerfile
     environment:
-      DOCGEN_V2_PORT: 3100
-      DOCGEN_V2_SERVICE_TOKEN: ${DOCGEN_V2_SERVICE_TOKEN:?DOCGEN_V2_SERVICE_TOKEN required}
+      DOCX_RENDERER_PORT: 3100
+      DOCX_RENDERER_SERVICE_TOKEN: ${DOCX_RENDERER_SERVICE_TOKEN:?DOCX_RENDERER_SERVICE_TOKEN required}
       LOG_LEVEL: info
-      VERSION: ${DOCGEN_V2_VERSION:-dev}
+      VERSION: ${DOCX_RENDERER_VERSION:-dev}
+      # S3/MinIO: MUST share the API's bucket — the API uploads the template body
+      # and reads back the frozen.docx by the key the renderer returns.
+      DOCX_RENDERER_S3_ENDPOINT: http://minio:9000
+      DOCX_RENDERER_S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      DOCX_RENDERER_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      DOCX_RENDERER_S3_BUCKET: ${METALDOCS_MINIO_BUCKET}
+      DOCX_RENDERER_S3_USE_SSL: "false"
+      DOCX_RENDERER_GOTENBERG_URL: http://gotenberg:3000
     ports:
-      - "3100:3100"
+      - "3110:3100"
     depends_on:
       minio:
         condition: service_started
@@ -155,6 +163,8 @@ services:
       METALDOCS_MINIO_USE_SSL: ${METALDOCS_MINIO_USE_SSL}
       METALDOCS_MINIO_AUTO_CREATE_BUCKET: ${METALDOCS_MINIO_AUTO_CREATE_BUCKET}
       METALDOCS_GOTENBERG_URL: ${METALDOCS_GOTENBERG_URL}
+      METALDOCS_FANOUT_URL: http://docx-renderer:3100
+      METALDOCS_DOCX_RENDERER_SERVICE_TOKEN: ${DOCX_RENDERER_SERVICE_TOKEN}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}

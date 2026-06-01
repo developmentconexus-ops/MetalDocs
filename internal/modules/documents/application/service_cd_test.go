@@ -69,7 +69,6 @@ func TestCreate_FromControlledDocument_Happy(t *testing.T) {
 	}
 	svc := application.NewService(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{hashReturn: "h_initial"},
 		fakeTplReader{},
 		fakeFormVal{valid: true},
@@ -113,7 +112,6 @@ func TestCreate_CD_NotActive(t *testing.T) {
 	repo := &captureRepo{fakeRepo: &fakeRepo{}}
 	svc := application.NewService(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{},
 		fakeTplReader{},
 		fakeFormVal{valid: true},
@@ -144,7 +142,6 @@ func TestCreate_NoDefaultTemplate(t *testing.T) {
 	repo := &captureRepo{fakeRepo: &fakeRepo{}}
 	svc := application.NewService(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{},
 		fakeTplReader{},
 		fakeFormVal{valid: true},
@@ -175,7 +172,6 @@ func TestCreate_AuthzFail(t *testing.T) {
 	repo := &captureRepo{fakeRepo: &fakeRepo{}}
 	svc := application.NewService(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{},
 		fakeTplReader{},
 		fakeFormVal{valid: true},
@@ -206,7 +202,6 @@ func TestCreate_NoControlledDocID(t *testing.T) {
 	repo := &captureRepo{fakeRepo: &fakeRepo{}}
 	svc := application.NewService(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{},
 		fakeTplReader{},
 		fakeFormVal{valid: true},

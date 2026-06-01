@@ -25,7 +25,7 @@ type ReconstructionWriter interface {
 	AppendReconstruction(ctx context.Context, tenantID, revisionID string, entry []byte) error
 }
 
-// EngineVersions identifies the docgen stack running the reconstruction. These
+// EngineVersions identifies the docx-renderer stack running the reconstruction. These
 // versions vary across engine upgrades and are the whole point of the forensic
 // record.
 type EngineVersions struct {

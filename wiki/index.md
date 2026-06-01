@@ -1,7 +1,13 @@
 # MetalDocs Wiki
 
-> **Last verified:** 2026-05-27
+> **Last verified:** 2026-06-01
 > **Purpose:** Durable single source of truth for MetalDocs project knowledge.
+
+## Start here
+
+- **New to the codebase?** [ONBOARDING.md](ONBOARDING.md) — day-1 engineer tour, reading order, role-based paths.
+- **Need the visual map?** [diagrams/](diagrams/) — C4 Context + Container + the 4 load-bearing sequence diagrams.
+- **"What should I read for X?"** [architecture/system-map.md](architecture/system-map.md) — task-oriented reading paths (backend route, screen, migration, freeze debug, onboarding).
 
 ## Ownership boundary
 

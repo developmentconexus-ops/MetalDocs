@@ -177,7 +177,7 @@ paths:
         '409': { description: template_draft_stale }
   /api/v1/templates/{id}/versions/{n}/publish:
     post:
-      summary: Publish draft (delegates to docgen-v2 /validate/template)
+      summary: Publish draft (validates template tokens)
       tags: [templates]
       parameters:
         - { in: path, name: id, required: true, schema: { type: string } }

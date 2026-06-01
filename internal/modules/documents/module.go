@@ -32,7 +32,6 @@ type Module struct {
 
 type Dependencies struct {
 	DB                           *sql.DB
-	Docgen                       application.DocgenRenderer
 	Presign                      application.Presigner
 	TplRead                      application.TemplateReader
 	FormVal                      application.FormValidator
@@ -57,9 +56,9 @@ func New(deps Dependencies) *Module {
 	var svc *application.Service
 	if deps.SnapshotReader != nil && deps.SnapshotWriter != nil {
 		snapSvc := application.NewSnapshotService(deps.SnapshotReader, deps.SnapshotWriter)
-		svc = application.NewServiceWithSnapshot(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults, snapSvc)
+		svc = application.NewServiceWithSnapshot(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults, snapSvc)
 	} else {
-		svc = application.NewService(repo, deps.Docgen, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults)
+		svc = application.NewService(repo, deps.Presign, deps.TplRead, deps.FormVal, deps.Audit, deps.ControlledDocumentReader, deps.Caps, deps.ProfileDefaults)
 	}
 	svc.WithDB(deps.DB)
 	svc.WithControlledDocumentDuplicator(deps.ControlledDocumentDuplicator)

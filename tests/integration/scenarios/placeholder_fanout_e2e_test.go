@@ -16,7 +16,7 @@ import (
 )
 
 // TestPlaceholderFanout_E2E exercises the full Draft→Submit→Signoff→Approve→Freeze→Publish
-// flow with a mocked docgen-v2 fanout endpoint.
+// flow with a mocked docx-renderer fanout endpoint.
 //
 // Prerequisites (set via env):
 //   METALDOCS_E2E_URL             - running metaldocs-api base URL
@@ -27,7 +27,7 @@ import (
 //   METALDOCS_E2E_APPROVER_ID     - approver user ID (default: e2e-approver)
 //
 // The test starts a local stub server that captures the fanout POST request so the
-// pipeline can complete without a real docgen-v2 instance.
+// pipeline can complete without a real docx-renderer instance.
 func TestPlaceholderFanout_E2E(t *testing.T) {
 	baseURL := strings.TrimSpace(os.Getenv("METALDOCS_E2E_URL"))
 	if baseURL == "" {
@@ -41,7 +41,7 @@ func TestPlaceholderFanout_E2E(t *testing.T) {
 	routeID := envOrDefault("METALDOCS_E2E_ROUTE_ID", "22222222-2222-2222-2222-222222222222")
 	contentHash := strings.Repeat("b", 64)
 
-	// --- mocked docgen-v2 fanout stub ---
+	// --- mocked docx-renderer fanout stub ---
 	var fanoutCalls int32
 	fanoutStub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&fanoutCalls, 1)

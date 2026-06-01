@@ -32,7 +32,6 @@ func TestCreateDocument_DeniesWhenCapabilityChecker_Denies(t *testing.T) {
 
 	svc := application.NewService(
 		&fakeRepo{},
-		fakeDocgen{},
 		&fakePresigner{},
 		fakeTplReader{},
 		fakeFormVal{valid: true},

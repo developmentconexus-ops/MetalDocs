@@ -1,6 +1,6 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-05-15
+**Last verified:** 2026-06-01
 
 ## API login
 
@@ -34,10 +34,10 @@ PGPASSWORD=Lepa12<>!   ← set via $env:PGPASSWORD in PowerShell, never via bash
 
 See `.env` for full var list. Use `scripts/start-api-ps.ps1` if it exists, otherwise set manually.
 
-**CRITICAL:** `docgen-v2` (port 3001) must be running before starting the API. The approval/signoff transaction calls docgen-v2 synchronously — if it's down, signoffs fail and roll back. Start it with:
+**CRITICAL:** `docx-renderer` (port 3100) must be running before starting the API. The approval/signoff transaction calls docx-renderer synchronously — if it's down, signoffs fail and roll back. Start it with:
 ```powershell
-cd apps/docgen-v2
-$env:METALDOCS_STORAGE_PROVIDER="minio"; $env:MINIO_ENDPOINT="localhost:9000"; ...  # see .env.docgen-v2
+cd apps/docx-renderer
+$env:METALDOCS_STORAGE_PROVIDER="minio"; $env:MINIO_ENDPOINT="localhost:9000"; ...  # see .env.docx-renderer
 npx tsx src/index.ts
 ```
 Or use `scripts/dev-docgen.ps1` if available.

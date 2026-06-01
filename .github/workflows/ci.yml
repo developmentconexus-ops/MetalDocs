@@ -1,9 +1,9 @@
-name: docx-v2 CI
+name: docx-renderer CI
 
 on:
   pull_request:
     paths:
-      - 'apps/docgen-v2/**'
+      - 'apps/docx-renderer/**'
       - 'packages/**'
       - 'migrations/0101_*'
       - 'migrations/0102_*'
@@ -19,7 +19,6 @@ on:
       - 'frontend/apps/web/src/features/documents/v2/**'
       - 'internal/platform/config/feature_flags*.go'
       - 'internal/platform/featureflags/**'
-      - 'internal/platform/servicebus/docgen_v2_client*.go'
       - 'internal/modules/templates/**'
       - 'internal/modules/editor_sessions/**'
       - 'internal/modules/document_revisions/**'
@@ -125,7 +124,7 @@ jobs:
         working-directory: frontend/apps/web
       - run: go run ./apps/api/cmd/metaldocs-api &
         env: { PGCONN: "postgres://metaldocs:metaldocs@127.0.0.1:5432/metaldocs?sslmode=disable" }
-      - run: DOCGEN_V2_SERVICE_TOKEN=test-token-0123456789 DOCGEN_V2_S3_ACCESS_KEY=minioadmin DOCGEN_V2_S3_SECRET_KEY=minioadmin npm run start --workspace @metaldocs/docgen-v2 &
+      - run: DOCX_RENDERER_SERVICE_TOKEN=test-token-0123456789 DOCX_RENDERER_S3_ACCESS_KEY=minioadmin DOCX_RENDERER_S3_SECRET_KEY=minioadmin npm run start --workspace @metaldocs/docx-renderer &
       - run: npx playwright install --with-deps chromium
         working-directory: frontend/apps/web
       - run: npx playwright test author-happy-path.spec.ts
@@ -164,7 +163,7 @@ jobs:
         working-directory: frontend/apps/web
       - run: go run ./apps/api/cmd/metaldocs-api &
         env: { PGCONN: "postgres://metaldocs:metaldocs@127.0.0.1:5432/metaldocs?sslmode=disable" }
-      - run: DOCGEN_V2_SERVICE_TOKEN=test-token-0123456789 DOCGEN_V2_S3_ACCESS_KEY=minioadmin DOCGEN_V2_S3_SECRET_KEY=minioadmin npm run start --workspace @metaldocs/docgen-v2 &
+      - run: DOCX_RENDERER_SERVICE_TOKEN=test-token-0123456789 DOCX_RENDERER_S3_ACCESS_KEY=minioadmin DOCX_RENDERER_S3_SECRET_KEY=minioadmin npm run start --workspace @metaldocs/docx-renderer &
       - run: npx playwright install --with-deps chromium
         working-directory: frontend/apps/web
       - run: npx playwright test filler-happy-path.spec.ts conflict-two-tabs.spec.ts autosave-crash.spec.ts
@@ -207,14 +206,14 @@ jobs:
       - run: go run ./apps/api/cmd/metaldocs-api &
         env:
           PGCONN: "postgres://metaldocs:metaldocs@127.0.0.1:5432/metaldocs?sslmode=disable"
-          DOCGEN_V2_URL: "http://127.0.0.1:4000"
-          DOCGEN_V2_SERVICE_TOKEN: "test-token-0123456789"
+          METALDOCS_FANOUT_URL: "http://127.0.0.1:4000"
+          METALDOCS_DOCX_RENDERER_SERVICE_TOKEN: "test-token-0123456789"
       - run: |
-          DOCGEN_V2_SERVICE_TOKEN=test-token-0123456789 \
-          DOCGEN_V2_S3_ACCESS_KEY=minioadmin \
-          DOCGEN_V2_S3_SECRET_KEY=minioadmin \
-          DOCGEN_V2_GOTENBERG_URL=http://127.0.0.1:3000 \
-          npm run start --workspace @metaldocs/docgen-v2 &
+          DOCX_RENDERER_SERVICE_TOKEN=test-token-0123456789 \
+          DOCX_RENDERER_S3_ACCESS_KEY=minioadmin \
+          DOCX_RENDERER_S3_SECRET_KEY=minioadmin \
+          DOCX_RENDERER_GOTENBERG_URL=http://127.0.0.1:3000 \
+          npm run start --workspace @metaldocs/docx-renderer &
       - run: npx playwright install --with-deps chromium
         working-directory: frontend/apps/web
       - run: npx playwright test export-pdf-happy-path.spec.ts export-pdf-cache-hit.spec.ts export-rate-limit.spec.ts

@@ -3,7 +3,7 @@
 > Living architecture doc. Arc42 (12 sections) + C4 Container/Component diagrams.
 > Supersedes the prior stub (slot-API note, eigenpal-overrides bullet list).
 
-**Last verified:** 2026-05-11 | **Owner:** unassigned (frontend) | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-01 (P2 consolidation: §3 C4 fragment tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-11) | **Owner:** unassigned (frontend) | **Status:** active | **Maturity:** L2
 
 > **Scope:** Shared React primitive that wraps an eigenpal editor canvas, projects a custom toolbar via 3 absolute overlays, and applies MetalDocs visual contract to eigenpal DOM via scoped `:global(.ep-root ...)` CSS overrides. Mounted by `TemplateEditorPage` and `DocumentEditorPage`.
 > **Out of scope:** Eigenpal internals (see [modules/editor-ui-eigenpal.md](editor-ui-eigenpal.md)), template authoring business logic (see [modules/templates.md](templates.md) and [modules/templates.md](templates.md)), document editor business logic (see [modules/documents.md](documents.md)), placeholder rendering (see [concepts/placeholders.md](../concepts/placeholders.md)).
@@ -58,11 +58,13 @@ editor-chrome is the visual shell that two editor pages share. Before its extrac
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped to the frontend**: it shows editor-chrome's consumers inside the SPA (TemplateEditorPage, DocumentEditorPage) and its CSS coupling to vendored eigenpal.
 
 ```mermaid
 C4Context
-    title System Context â€” editor-chrome
+    title System Context — editor-chrome (frontend module-scoped)
     Person(user, "Editor user", "Template author or document editor")
     System_Boundary(fe, "MetalDocs frontend (web)") {
         System(chrome, "editor-chrome", "React shell + eigenpal CSS overrides")
@@ -293,6 +295,17 @@ Top 3 (by severity, then by blast-radius):
 | `:global(...)` | CSS Modules escape hatch â€” selector inside is unscoped and matches eigenpal DOM. |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Eigenpal upgrade breaks `:global(.ep-root)` selector | Toolbar overlays misaligned / styled wrong | Visual QA after vendored bump; chrome RTL test suite (`EditorChrome.test.tsx`) does not cover CSS | Pin eigenpal version (vendored 0.2.0 — see ADR 0001); re-audit overrides on bump |
+| `AutosaveStatus` receives unknown state | Indicator shows nothing or default fallback | Type-check failure at consumer; runtime `else` branch in component | Add explicit case to the 7-state union; do not silently coerce |
+| Overlay swallows eigenpal title-bar clicks | Title bar becomes uninteractive | Manual: clicking title bar does nothing | Confirm overlay container omits `pointer-events`; T-007 tracks the opt-in escape hatch |
+| Token var unresolved (`var(--…)` not defined) | Brand color or spacing falls back to CSS default | Stylelint / visual QA | Add missing token to `styles/tokens.css`; chrome must not hardcode hex |
+| Consumer forgets to pass `right` slot | Action area renders empty | Visual QA | Type does not require slots — guard via lint / consumer review |
+| Chrome leaks domain logic | Reusability lost; chrome no longer domain-agnostic | Code review on PRs touching `EditorChrome.tsx` | Reject PR; domain concerns belong in the consuming page |
 
 ## Cross-links
 
