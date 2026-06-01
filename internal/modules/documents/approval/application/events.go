@@ -43,7 +43,7 @@ func NewSQLEmitter() EventEmitter { return &sqlEmitter{} }
 
 const insertEventSQL = `
 INSERT INTO governance_events
-  (tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, occurred_at)
+  (tenant_id, event_type, actor_user_id, resource_type, resource_id, reason, payload_json, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, now()))`
 
 func (e *sqlEmitter) Emit(ctx context.Context, tx *sql.Tx, ev GovernanceEvent) error {
