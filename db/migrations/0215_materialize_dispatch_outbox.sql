@@ -1,4 +1,4 @@
--- 0210_materialize_dispatch_outbox.sql
+-- 0215_materialize_dispatch_outbox.sql
 -- Transactional outbox for async DOCX materialization (ADR 0015).
 -- Mirrors the pdf_dispatch_outbox schema (ADR 0009).
 BEGIN;
@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS ix_materialize_dispatch_outbox_pending
  WHERE status IN ('pending','processing');
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('0210', 'add metaldocs.materialize_dispatch_outbox transactional outbox table')
+VALUES ('0215', 'add metaldocs.materialize_dispatch_outbox transactional outbox table')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;
