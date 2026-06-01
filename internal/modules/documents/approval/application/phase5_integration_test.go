@@ -136,6 +136,9 @@ func (s *phase5Stmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
 	}
+	if strings.Contains(q, "content_hash_at_submit") && strings.Contains(q, "from documents") {
+		return &submitSingleValueRows{value: validContentHash}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &submitSingleValueRows{value: "QA"}, nil
 	}
@@ -254,7 +257,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		DocumentID:      documentID,
 		RouteID:         routeID,
 		SubmittedBy:     authorID,
-		ContentFormData: map[string]any{"title": "P5 Doc"},
+		ContentFormData: map[string]any{"title": "P5 Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	submitResult, err := submitSvc.SubmitRevisionForReview(ctx, submitDB, submitReq)
@@ -278,10 +281,11 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		TenantID:        tenantID,
 		DocumentID:      documentID,
 		RouteID:         routeID,
-		Status:          domain.InstanceInProgress,
-		SubmittedBy:     authorID,
-		SubmittedAt:     now,
-		RevisionVersion: 1,
+		Status:              domain.InstanceInProgress,
+		SubmittedBy:         authorID,
+		SubmittedAt:         now,
+		RevisionVersion:     1,
+		ContentHashAtSubmit: validContentHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stageID,
@@ -331,7 +335,7 @@ func TestPhase5_FullApprovalAndPublish(t *testing.T) {
 		Comment:          "LGTM",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "P5 Doc"},
+		ContentFormData:  map[string]any{"title": "P5 Doc", "_content_hash": validContentHash},
 	}
 	signoffResult, err := decisionSvc.RecordSignoff(ctx, decisionDB, signoffReq)
 	if err != nil {
@@ -423,10 +427,11 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		TenantID:        tenantID,
 		DocumentID:      documentID,
 		RouteID:         routeID,
-		Status:          domain.InstanceInProgress,
-		SubmittedBy:     authorID,
-		SubmittedAt:     clockAtSubmit1.t,
-		RevisionVersion: 1,
+		Status:              domain.InstanceInProgress,
+		SubmittedBy:         authorID,
+		SubmittedAt:         clockAtSubmit1.t,
+		RevisionVersion:     1,
+		ContentHashAtSubmit: validContentHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stageID,
@@ -503,7 +508,7 @@ func TestPhase5_RejectThenResubmit(t *testing.T) {
 		Comment:          "Not ready",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "rej"},
-		ContentFormData:  map[string]any{"title": "Reject Doc v1"},
+		ContentFormData:  map[string]any{"title": "Reject Doc v1", "_content_hash": validContentHash},
 	}
 	signoffResult, err := decisionSvc.RecordSignoff(ctx, dbDecision, signoffReq)
 	if err != nil {

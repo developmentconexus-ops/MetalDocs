@@ -83,15 +83,16 @@ type signoffRow struct {
 }
 
 type decisionTestConn struct {
-	stageSignoffs      []signoffRow // rows returned by loadStageSignoffs
-	authzGranted       bool
-	authzSet           bool
-	areaCode           string
-	formDataJSON       string
-	actorID            string
-	tenantID           string
-	unresolvedComments int
-	execQueries        []string // SQL passed to Exec calls, for assertion
+	stageSignoffs       []signoffRow // rows returned by loadStageSignoffs
+	authzGranted        bool
+	authzSet            bool
+	areaCode            string
+	formDataJSON        string
+	contentHashAtSubmit string
+	actorID             string
+	tenantID            string
+	unresolvedComments  int
+	execQueries         []string // SQL passed to Exec calls, for assertion
 }
 
 type decisionNoopResult struct{}
@@ -166,6 +167,13 @@ func (s *decisionTestStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: []byte(s.conn.formDataJSON)}, nil
+	}
+	if strings.Contains(q, "content_hash_at_submit") && strings.Contains(q, "from documents") {
+		hash := s.conn.contentHashAtSubmit
+		if hash == "" {
+			hash = validContentHash
+		}
+		return &decisionSingleValueRows{value: hash}, nil
 	}
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: s.conn.areaCode}, nil
@@ -269,10 +277,11 @@ func buildSingleStageInstance(instanceID, stageID, authorUserID string, eligible
 		TenantID:        "tenant-1",
 		DocumentID:      "doc-1",
 		RouteID:         "route-1",
-		Status:          domain.InstanceInProgress,
-		SubmittedBy:     authorUserID,
-		SubmittedAt:     now,
-		RevisionVersion: 1,
+		Status:              domain.InstanceInProgress,
+		SubmittedBy:         authorUserID,
+		SubmittedAt:         now,
+		RevisionVersion:     1,
+		ContentHashAtSubmit: validContentHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stageID,
@@ -358,7 +367,7 @@ func TestRecordSignoff_ApprovePath_QuorumMet(t *testing.T) {
 		Comment:          "LGTM",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
 	result, err := svc.RecordSignoff(context.Background(), db, req)
@@ -433,7 +442,7 @@ func TestRecordSignoff_ApprovePath_QuorumNotYetMet(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
 	result, err := svc.RecordSignoff(context.Background(), db, req)
@@ -448,7 +457,11 @@ func TestRecordSignoff_ApprovePath_QuorumNotYetMet(t *testing.T) {
 	}
 }
 
-func TestRecordSignoff_ContentHashUsesPersistedDocumentFormData(t *testing.T) {
+// TestRecordSignoff_ContentHashEchoesInstanceSubmitHash: the persisted signoff content_hash
+// must equal instance.ContentHashAtSubmit (the value submit stored and that the FE echoes back).
+// Signoff does not recompute over current document form data — that diverges from submit
+// canonicalization and breaks the FE content-pin contract.
+func TestRecordSignoff_ContentHashEchoesInstanceSubmitHash(t *testing.T) {
 	const (
 		instanceID = "inst-db-hash"
 		stageID    = "stage-db-hash"
@@ -461,7 +474,6 @@ func TestRecordSignoff_ContentHashUsesPersistedDocumentFormData(t *testing.T) {
 		authzGranted: true,
 		areaCode:     "QA",
 		actorID:      actorID,
-		formDataJSON: `{"title":"Persisted"}`,
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
@@ -480,7 +492,7 @@ func TestRecordSignoff_ContentHashUsesPersistedDocumentFormData(t *testing.T) {
 		ActorUserID:      actorID,
 		Decision:         "approve",
 		SignaturePayload: map[string]any{},
-		ContentFormData:  map[string]any{"title": "Caller supplied"},
+		ContentFormData:  map[string]any{"_content_hash": inst.ContentHashAtSubmit},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff: unexpected error: %v", err)
@@ -488,17 +500,8 @@ func TestRecordSignoff_ContentHashUsesPersistedDocumentFormData(t *testing.T) {
 	if repo.insertedSignoff == nil {
 		t.Fatal("expected inserted signoff")
 	}
-	wantHash, err := ComputeContentHash(ContentHashInput{
-		TenantID:       "tenant-1",
-		DocumentID:     instanceID,
-		RevisionNumber: 0,
-		FormData:       map[string]any{"title": "Persisted"},
-	})
-	if err != nil {
-		t.Fatalf("ComputeContentHash: %v", err)
-	}
-	if repo.insertedSignoff.ContentHash() != wantHash {
-		t.Errorf("ContentHash() = %q; want persisted DB hash %q", repo.insertedSignoff.ContentHash(), wantHash)
+	if got := repo.insertedSignoff.ContentHash(); got != inst.ContentHashAtSubmit {
+		t.Errorf("ContentHash() = %q; want instance.ContentHashAtSubmit %q", got, inst.ContentHashAtSubmit)
 	}
 }
 
@@ -515,7 +518,6 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 		authzGranted: true,
 		areaCode:     "QA",
 		actorID:      actorID,
-		formDataJSON: `{"title":"Persisted"}`,
 	}
 	repo := &fakeDecisionRepo{instance: inst}
 	svc := &DecisionService{
@@ -527,6 +529,8 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 	}
 	db := newDecisionTestDB(t, conn)
 
+	// Client echoes a hash that does NOT match instance.ContentHashAtSubmit.
+	const drifted = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
 		TenantID:         "tenant-1",
 		InstanceID:       instanceID,
@@ -534,7 +538,7 @@ func TestRecordSignoff_ContentHashMismatchFailsBeforePersisting(t *testing.T) {
 		ActorUserID:      actorID,
 		Decision:         "approve",
 		SignaturePayload: map[string]any{},
-		ContentFormData:  map[string]any{"_content_hash": validContentHash},
+		ContentFormData:  map[string]any{"_content_hash": drifted},
 	})
 	if !errors.Is(err, ErrContentHashMismatch) {
 		t.Fatalf("expected ErrContentHashMismatch, got %v", err)
@@ -599,7 +603,7 @@ func TestRecordSignoff_RejectPath(t *testing.T) {
 		Comment:          "Not acceptable",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "def"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
 	result, err := svc.RecordSignoff(context.Background(), db, req)
@@ -680,7 +684,7 @@ func TestRecordSignoff_SoDViolation(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     authorID, // same as SubmittedBy
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
 	_, err := svc.RecordSignoff(context.Background(), db, req)
@@ -726,7 +730,7 @@ func TestRecordSignoff_RejectsNonEligibleActor(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
 	_, err := svc.RecordSignoff(context.Background(), db, req)
@@ -781,7 +785,7 @@ func TestRecordSignoff_CapabilityDenied(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 
 	_, err := svc.RecordSignoff(context.Background(), db, req)
@@ -855,7 +859,7 @@ func TestRecordSignoff_FinalApprovalBlockedByUnresolvedComments(t *testing.T) {
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err == nil {
 		t.Fatal("expected unresolved comments error")
