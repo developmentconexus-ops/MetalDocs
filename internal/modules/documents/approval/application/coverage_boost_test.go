@@ -532,7 +532,7 @@ func TestSubmitRevisionForReview_RouteNotFound(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "non-existent-route",
 		SubmittedBy:     "user-1",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
@@ -554,7 +554,7 @@ func TestSubmitRevisionForReview_StageInsertError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
@@ -582,7 +582,7 @@ func TestSubmitRevisionForReview_EmitError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
@@ -611,7 +611,7 @@ func TestRecordSignoff_FloatInPayload(t *testing.T) {
 		ActorUserID:      "actor",
 		Decision:         "approve",
 		SignaturePayload: map[string]any{"bad": float64(1.5)},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, ErrFloatInFormData) {
@@ -632,7 +632,7 @@ func TestRecordSignoff_LoadInstanceError(t *testing.T) {
 		StageInstanceID: "stage",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -652,7 +652,7 @@ func TestRecordSignoff_LoadInstanceNotFound(t *testing.T) {
 		StageInstanceID: "stage",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, repository.ErrNoActiveInstance) {
@@ -673,7 +673,7 @@ func TestRecordSignoff_NilInstance(t *testing.T) {
 		StageInstanceID: "stage",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, repository.ErrNoActiveInstance) {
@@ -696,7 +696,7 @@ func TestRecordSignoff_InstanceAlreadyCompleted(t *testing.T) {
 		StageInstanceID: "stage-done",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, repository.ErrInstanceCompleted) {
@@ -717,7 +717,7 @@ func TestRecordSignoff_StageNotActive(t *testing.T) {
 		StageInstanceID: "wrong-stage-id", // doesn't match active stage
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, repository.ErrStageNotActive) {
@@ -733,10 +733,11 @@ func TestRecordSignoff_RequiresStageInstanceID(t *testing.T) {
 	db := newDecisionTestDB(t, conn)
 
 	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
-		TenantID:    "t",
-		InstanceID:  "inst-missing-stage",
-		ActorUserID: "actor",
-		Decision:    "approve",
+		TenantID:        "t",
+		InstanceID:      "inst-missing-stage",
+		ActorUserID:     "actor",
+		Decision:        "approve",
+		ContentFormData: map[string]any{"_content_hash": validContentHash},
 	})
 	if !errors.Is(err, repository.ErrStageNotActive) {
 		t.Errorf("want ErrStageNotActive for missing stage instance id; got %v", err)
@@ -761,7 +762,7 @@ func TestRecordSignoff_InsertSignoffError(t *testing.T) {
 		StageInstanceID: "stage-isig",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -786,7 +787,7 @@ func TestRecordSignoff_ActorAlreadySigned(t *testing.T) {
 		StageInstanceID: "stage-dup",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, repository.ErrActorAlreadySigned) {
@@ -812,7 +813,7 @@ func TestRecordSignoff_IdempotentReplay(t *testing.T) {
 		StageInstanceID: "stage-replay",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	result, err := svc.RecordSignoff(context.Background(), db, req)
 	if err != nil {
@@ -862,7 +863,7 @@ func TestRecordSignoff_UpdateStageStatusError(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, stageErr) {
@@ -907,7 +908,7 @@ func TestRecordSignoff_UpdateInstanceStatusError_Approve(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, instErr) {
@@ -952,7 +953,7 @@ func TestRecordSignoff_UpdateInstanceStatusError_Reject(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "reject",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, instErr) {
@@ -998,7 +999,7 @@ func TestRecordSignoff_EmitError(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -1014,10 +1015,11 @@ func buildTwoStageInstance(instanceID, stage1ID, stage2ID, authorUserID string, 
 		TenantID:        "tenant-1",
 		DocumentID:      "doc-1",
 		RouteID:         "route-1",
-		Status:          domain.InstanceInProgress,
-		SubmittedBy:     authorUserID,
-		SubmittedAt:     now,
-		RevisionVersion: 1,
+		Status:              domain.InstanceInProgress,
+		SubmittedBy:         authorUserID,
+		SubmittedAt:         now,
+		RevisionVersion:     1,
+		ContentHashAtSubmit: validContentHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stage1ID,
@@ -1081,7 +1083,7 @@ func TestRecordSignoff_ActivateNextStage(t *testing.T) {
 		StageInstanceID: stage1ID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	result, err := svc.RecordSignoff(context.Background(), db, req)
 	if err != nil {
@@ -1498,34 +1500,6 @@ func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 }
 
 // ============================================================
-// Extra: RecordSignoff content hash error (nested float in DB form data)
-// ============================================================
-
-func TestRecordSignoff_ContentHashError(t *testing.T) {
-	conn := &decisionTestConn{formDataJSON: `{"nested":{"val":1.5}}`}
-	repo := &fakeDecisionRepo{instance: buildSingleStageInstance("inst", "stage", "author", []string{"actor"})}
-	svc := &DecisionService{repo: repo, emitter: &MemoryEmitter{}, clock: fixedClock{t: time.Now()}, freezeInvoker: &fakeFreezeInvoker{}, pdfDispatcher: &fakePDFDispatchInvoker{}}
-	db := newDecisionTestDB(t, conn)
-
-	req := SignoffRequest{
-		TenantID:         "t",
-		InstanceID:       "inst",
-		StageInstanceID:  "stage",
-		ActorUserID:      "actor",
-		Decision:         "approve",
-		SignaturePayload: map[string]any{},
-		ContentFormData:  map[string]any{"nested": map[string]any{"val": "ignored"}},
-	}
-	_, err := svc.RecordSignoff(context.Background(), db, req)
-	if err == nil {
-		t.Fatal("expected error for float in nested content form data; got nil")
-	}
-	if !errors.Is(err, ErrFloatInFormData) {
-		t.Errorf("want ErrFloatInFormData in chain; got %v", err)
-	}
-}
-
-// ============================================================
 // Shared error-injecting SQL drivers for coverage of error branches
 // ============================================================
 
@@ -1751,7 +1725,7 @@ func TestSubmitRevisionForReview_BeginTxError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
@@ -1833,7 +1807,7 @@ func TestRecordSignoff_BeginTxError(t *testing.T) {
 		StageInstanceID: "stage",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -2289,7 +2263,7 @@ func TestSubmitRevisionForReview_CommitError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
@@ -2640,7 +2614,7 @@ func TestSubmitRevisionForReview_StageQueryError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)
@@ -2688,7 +2662,7 @@ func TestRecordSignoff_NoActiveStage(t *testing.T) {
 		StageInstanceID: "", // empty → won't hit the stageNotActive check
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, domain.ErrNoActiveStage) {
@@ -2714,6 +2688,9 @@ func (s *decisionPriorQueryFailStmt) Query(_ []driver.Value) (driver.Rows, error
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
+	if strings.Contains(q, "content_hash_at_submit") && strings.Contains(q, "from documents") {
+		return &decisionSingleValueRows{value: validContentHash}, nil
 	}
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: "QA"}, nil
@@ -2781,7 +2758,7 @@ func TestRecordSignoff_LoadPriorSignoffsError(t *testing.T) {
 		StageInstanceID: "stage-prior-err",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -2809,7 +2786,7 @@ func TestRecordSignoff_InvalidDecision(t *testing.T) {
 		StageInstanceID: "stage-inv-dec",
 		ActorUserID:     "actor",
 		Decision:        "invalid_decision", // not "approve" or "reject"
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -2883,7 +2860,7 @@ func TestRecordSignoff_LoadStageSignoffsError(t *testing.T) {
 		StageInstanceID: "stage-stage-err",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -2904,14 +2881,15 @@ func TestRecordSignoff_NoEligibleActors_QuorumPending(t *testing.T) {
 		actorID    = "actor-no-elig"
 	)
 	inst := &domain.Instance{
-		ID:              instanceID,
-		TenantID:        "tenant-1",
-		DocumentID:      "doc-1",
-		RouteID:         "route-1",
-		Status:          domain.InstanceInProgress,
-		SubmittedBy:     "author",
-		SubmittedAt:     now,
-		RevisionVersion: 1,
+		ID:                  instanceID,
+		TenantID:            "tenant-1",
+		DocumentID:          "doc-1",
+		RouteID:             "route-1",
+		Status:              domain.InstanceInProgress,
+		SubmittedBy:         "author",
+		SubmittedAt:         now,
+		RevisionVersion:     1,
+		ContentHashAtSubmit: validContentHash,
 		Stages: []domain.StageInstance{
 			{
 				ID:                         stageID,
@@ -2955,7 +2933,7 @@ func TestRecordSignoff_NoEligibleActors_QuorumPending(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	// With AllOf quorum and denominator=1 (fallback) and 1 approval → should complete.
 	result, err := svc.RecordSignoff(context.Background(), db, req)
@@ -2984,6 +2962,9 @@ func (s *decisionReplayCommitFailStmt) Query(_ []driver.Value) (driver.Rows, err
 	q := strings.ToLower(s.query)
 	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
+	}
+	if strings.Contains(q, "content_hash_at_submit") && strings.Contains(q, "from documents") {
+		return &decisionSingleValueRows{value: validContentHash}, nil
 	}
 	if strings.Contains(q, "from documents") {
 		return &decisionSingleValueRows{value: "QA"}, nil
@@ -3050,7 +3031,7 @@ func TestRecordSignoff_ReplayCommitError(t *testing.T) {
 		StageInstanceID: "stage-replay-commit",
 		ActorUserID:     "actor",
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -3107,7 +3088,7 @@ func TestRecordSignoff_ActivateNextStage_UpdateError(t *testing.T) {
 		StageInstanceID: stage1ID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, nextStageErr) {
@@ -3191,7 +3172,7 @@ func TestRecordSignoff_RejectStageUpdateError(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "reject",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err := svc.RecordSignoff(context.Background(), db, req)
 	if !errors.Is(err, rejectStageErr) {
@@ -3252,7 +3233,7 @@ func TestRecordSignoff_FinalCommitError(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	}
 	_, err = svc.RecordSignoff(context.Background(), db, req)
 	if err == nil {
@@ -3431,7 +3412,7 @@ func TestSubmitRevisionForReview_RouteValidateError(t *testing.T) {
 		DocumentID:      "doc-1",
 		RouteID:         "route-uuid-1",
 		SubmittedBy:     "user-1",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 		RevisionVersion: 1,
 	}
 	_, err := svc.SubmitRevisionForReview(context.Background(), db, req)

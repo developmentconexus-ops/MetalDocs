@@ -159,22 +159,27 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, err
 	}
 
-	formData, err := loadCurrentDocumentFormData(ctx, tx, req.TenantID, instance.DocumentID)
+	// Content pin: client echoes back the content hash from the active-document
+	// endpoint to confirm the instance content has not drifted since they loaded it.
+	// Resolve the same value here (documents.content_hash_at_submit, falling back
+	// to the latest document_revisions.content_hash) so client and server agree on
+	// the canonicalization. The approval_instance's content_hash_at_submit is not
+	// the right source — submit canonicalizes over the client-provided hash, which
+	// is irreproducible at signoff time.
+	contentHash, err := loadActiveDocumentContentHash(ctx, tx, req.TenantID, instance.DocumentID)
 	if err != nil {
 		_ = tx.Rollback()
-		return SignoffResult{}, fmt.Errorf("recordSignoff: load document form data: %w", err)
+		return SignoffResult{}, fmt.Errorf("recordSignoff: load active document content hash: %w", err)
 	}
-	contentHash, err := ComputeContentHash(ContentHashInput{
-		TenantID:       req.TenantID,
-		DocumentID:     req.InstanceID, // keyed on instance for signoff hashing
-		RevisionNumber: 0,              // signoff hash does not embed revision
-		FormData:       formData,
-	})
-	if err != nil {
+	// Content pin is mandatory: an unauthenticated or programmatic caller must not
+	// be able to skip the check by omitting `_content_hash`. The HTTP boundary
+	// already enforces a 64-hex hash, so this is a defense-in-depth guard.
+	clientHash, ok := clientContentHash(req.ContentFormData)
+	if !ok {
 		_ = tx.Rollback()
-		return SignoffResult{}, fmt.Errorf("recordSignoff: content hash: %w", err)
+		return SignoffResult{}, ErrContentHashMismatch
 	}
-	if clientContentHash, ok := clientContentHash(req.ContentFormData); ok && clientContentHash != contentHash {
+	if clientHash != contentHash {
 		_ = tx.Rollback()
 		return SignoffResult{}, ErrContentHashMismatch
 	}
@@ -677,6 +682,37 @@ func hasUnresolvedComments(ctx context.Context, tx *sql.Tx, tenantID, documentID
 	return unresolvedCount > 0, nil
 }
 
+// loadActiveDocumentContentHash mirrors the COALESCE used by the
+// /api/v1/controlled-documents/{cd}/active-document endpoint so the value
+// compared on signoff matches what the FE received when it loaded the doc.
+func loadActiveDocumentContentHash(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
+	var hash sql.NullString
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(d.content_hash_at_submit,
+		                (SELECT r.content_hash FROM document_revisions r
+		                  WHERE r.document_id = d.id
+		                  ORDER BY r.created_at DESC LIMIT 1))
+		  FROM documents d
+		 WHERE d.id = $1
+		   AND d.tenant_id = $2`,
+		documentID, tenantID,
+	).Scan(&hash)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Document missing or cross-tenant — treat as content-pin failure so the
+		// signoff path returns a domain error instead of leaking a raw 500.
+		return "", ErrContentHashMismatch
+	}
+	if err != nil {
+		return "", err
+	}
+	if !hash.Valid {
+		// No content_hash_at_submit and no revision rows. A document in this state
+		// cannot be signed off: there is nothing to pin against. Fail closed.
+		return "", ErrContentHashMismatch
+	}
+	return hash.String, nil
+}
+
 func clientContentHash(formData map[string]any) (string, bool) {
 	if len(formData) == 0 {
 		return "", false
@@ -696,28 +732,3 @@ func clientContentHash(formData map[string]any) (string, bool) {
 	return value, true
 }
 
-func loadCurrentDocumentFormData(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (map[string]any, error) {
-	var raw []byte
-	err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(form_data_json, '{}'::jsonb)
-		  FROM documents
-		 WHERE id = $1
-		   AND tenant_id = $2
-		 FOR UPDATE`,
-		documentID, tenantID,
-	).Scan(&raw)
-	if err != nil {
-		return nil, err
-	}
-	if len(raw) == 0 {
-		return map[string]any{}, nil
-	}
-	var formData map[string]any
-	if err := json.Unmarshal(raw, &formData); err != nil {
-		return nil, fmt.Errorf("unmarshal form_data_json: %w", err)
-	}
-	if formData == nil {
-		return map[string]any{}, nil
-	}
-	return formData, nil
-}

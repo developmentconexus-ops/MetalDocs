@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/approval.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/approval-refactor.md`.
 
-**Last verified:** 2026-05-25 (5c + 5d medium sweep sync)
+**Last verified:** 2026-06-01 (T-013 signoff content-pin canonicalization drift closed — hardened to fail-closed on missing client pin or NULL server hash)
 
 ## Severity scale
 
@@ -98,6 +98,15 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Evidence:** surface scan §2; `_artifacts/02-flow-signoff.md` step 9.
 - **Linked backlog row:** `backlog/approval-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
+
+### T-013 · Signoff content-pin canonicalization drift — CLOSED 2026-06-01
+- **Severity:** critical (closed)
+- **Surface (resolved):** `internal/modules/documents/approval/application/decision_service.go:162-176` — signoff now loads the content hash via the same COALESCE used by `/api/v1/controlled-documents/{cd}/active-document` (`internal/modules/controlleddocuments/delivery/http/routes.go:320-343`): `documents.content_hash_at_submit` with fallback to the latest `document_revisions.content_hash`. Compared against the FE-echoed `content_hash` body field; persisted as `approval_signoffs.content_hash`.
+- **Observation (original):** `RecordSignoff` recomputed a content hash with three diverging knobs vs the value the FE received from the active-document endpoint: `DocumentID=req.InstanceID` (was instance id, not document id), `RevisionNumber=0` (vs submit's actual revision), and `FormData=loadCurrentDocumentFormData(...)` (vs the revision-time form snapshot the FE saw). Every `POST /api/v1/documents/{id}/signoff` returned 412 `precondition.content_hash_mismatch` — approvals fully blocked past the submit stage. The two stale comments at `decision_service.go:168-170` ("keyed on instance for signoff hashing" / "signoff hash does not embed revision") were drift, not a documented requirement (no ADR; original commit `911e61f344` adds them without rationale).
+- **Resolution:** Replaced the recompute with a direct lookup of the same value `active-document` exposes; deleted the now-unused `loadCurrentDocumentFormData` helper. Persisted `approval_signoffs.content_hash` now equals the revision hash the FE pinned to, which is the semantically correct value for the regulated audit trail. Hardened per ultrareview: `loadActiveDocumentContentHash` now returns `ErrContentHashMismatch` when the row is missing (`sql.ErrNoRows`) or the COALESCE resolves NULL (no `content_hash_at_submit` and no revisions), and `RecordSignoff` rejects a request that omits `_content_hash` entirely — closing the defense-in-depth bypass for programmatic callers that skip the HTTP boundary's 64-hex validation.
+- **Evidence:** Live chain `create → submit → signoff (approver) → approved` verified `2026-06-01`; instance `8ec1c370-bcfc-4f7f-b5e8-8d697dd2150c` reached `approved` (first iteration), then `a296dd2f-840c-4f7e-9c9e-58409c4cf503` reached `approved` (post-hardening) with `outcome=approved` HTTP 200. Signoff persisted with hash `ba20ff68…` matching `document_revisions.content_hash`. Unit suite `go test ./internal/modules/documents/approval/... -count=1` green after hardening.
+- **Linked backlog row:** n/a (fix landed direct)
+- **Linked ADR:** missing-ADR (signoff content-pin source should be promoted to ADR once finalized)
 
 ### T-012 · iam `AuthorizationService` / `ResourceCtx` / `ErrSoDViolation` unwired (cross-module) — CLOSED Plan 4
 - **Severity:** minor

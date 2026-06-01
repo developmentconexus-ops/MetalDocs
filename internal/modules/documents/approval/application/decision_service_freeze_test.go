@@ -133,6 +133,9 @@ func (s *freezeDecisionStmt) Query(_ []driver.Value) (driver.Rows, error) {
 	if strings.Contains(q, "form_data_json") && strings.Contains(q, "from documents") {
 		return &freezeDecisionSingleValueRows{value: []byte(`{"title":"Doc"}`)}, nil
 	}
+	if strings.Contains(q, "content_hash_at_submit") && strings.Contains(q, "from documents") {
+		return &freezeDecisionSingleValueRows{value: validContentHash}, nil
+	}
 	if strings.Contains(q, "from documents") {
 		return &freezeDecisionSingleValueRows{value: s.conn.areaCode}, nil
 	}
@@ -262,7 +265,7 @@ func TestRecordSignoff_QuorumApproved_CallsFreezeAndApprovesDocument(t *testing.
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
@@ -319,7 +322,7 @@ func TestRecordSignoff_FreezeError_RollsBackTransaction(t *testing.T) {
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err == nil {
 		t.Fatal("expected freeze error")
@@ -381,7 +384,7 @@ func TestRecordSignoff_PDFDispatchError_IsBestEffort(t *testing.T) {
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
@@ -439,7 +442,7 @@ func TestRecordSignoff_OutboxEnqueuedInsideTx(t *testing.T) {
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
@@ -483,7 +486,7 @@ func TestRecordSignoff_WasReplay_DoesNotCallFreeze(t *testing.T) {
 		StageInstanceID: stageID,
 		ActorUserID:     actorID,
 		Decision:        "approve",
-		ContentFormData: map[string]any{"title": "Doc"},
+		ContentFormData: map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
@@ -539,7 +542,7 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if !errors.Is(err, ErrApprovalBlockedByUnresolvedComments) {
 		t.Fatalf("expected ErrApprovalBlockedByUnresolvedComments, got %v", err)
@@ -603,7 +606,7 @@ func TestRecordSignoff_PinInvoker_CallsPinNotFreeze(t *testing.T) {
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
@@ -664,7 +667,7 @@ func TestRecordSignoff_PinInvoker_PDFOutboxNotEnqueued(t *testing.T) {
 		Decision:         "approve",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
@@ -720,7 +723,7 @@ func TestRecordSignoff_RejectPath_AssertsDocumentEditBeforeDocumentWrite(t *test
 		Comment:          "needs changes",
 		SignatureMethod:  "password",
 		SignaturePayload: map[string]any{"hash": "abc"},
-		ContentFormData:  map[string]any{"title": "Doc"},
+		ContentFormData:  map[string]any{"title": "Doc", "_content_hash": validContentHash},
 	})
 	if err != nil {
 		t.Fatalf("RecordSignoff() error = %v", err)
