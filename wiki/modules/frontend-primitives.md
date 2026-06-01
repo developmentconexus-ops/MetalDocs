@@ -1,6 +1,6 @@
 # Module: Frontend UI Primitives (`components/ui/`)
 
-> **Last verified:** 2026-05-13
+> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section; prior: 2026-05-13)
 > **Scope:** Generic, domain-agnostic UI primitives living in `frontend/apps/web/src/components/ui/`. Covers `SelectableCard` and `useRovingRadioGroup`. Other primitives (WorkspaceHeroHeader, TabBar, StatusPill, Stepper) are documented inline in the feature modules that introduced them.
 
 > **Maturity:** L2
@@ -114,6 +114,15 @@ export type RovingRadioGroupResult = {
 `TabBar.tsx` predates this hook and manages its own roving logic inline Ã¢â‚¬â€ migration is deferred until a third consumer appears.
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Consumer forgets `forwardRef` on a custom replacement for `SelectableCard` | `useRovingRadioGroup.getItemProps(i).ref` cannot attach; keyboard focus stays on first card | Manual: arrow keys do not move focus; React `ref` warning in console | Use `SelectableCard` as-is (already `forwardRef`); if a new primitive is needed, wrap with `forwardRef` |
+| `useRovingRadioGroup({ count: 0 })` | Calls to `getItemProps(i)` past `count - 1` would attempt focus on `undefined` ref | Manual: empty radiogroup with arrow-key navigation | Caller must guard render with `if (items.length === 0) return …` |
+| `orientation: 'horizontal'` paired with vertically stacked cards | Up/Down keys do nothing; users see a dead control | UX QA — keyboard sweep | Pass `orientation: 'vertical'` (or default `'both'`) to match visual layout |
+| `selectedIndex === -1` with non-empty group | First item gets `tabIndex=0`; user assumes nothing is selected | Visual: no `.selected` style on any card | Expected — caller sets `selectedIndex` once user picks; consumer story documented in `StepScope.tsx` |
 
 ## Cross-refs
 

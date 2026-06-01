@@ -27,6 +27,7 @@ import (
 	"metaldocs/internal/platform/observability"
 	"metaldocs/internal/platform/render/gotenberg"
 	"metaldocs/internal/platform/servicebus"
+	miniostore "metaldocs/internal/platform/storage/minio"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -43,8 +44,9 @@ type APIDependencies struct {
 	// SQLDB is the raw *sql.DB used by modules that manage their own queries
 	// (e.g. the templates module). Nil in memory/test mode.
 	SQLDB *sql.DB
-	// DocgenV2Client is the docgen-v2 service client. Nil when not configured.
-	DocgenV2Client *servicebus.DocgenV2Client
+	// PDFConverter generates PDFs directly via Gotenberg (docx->PDF). Nil when
+	// Gotenberg is not configured or storage is not MinIO.
+	PDFConverter *servicebus.GotenbergPDFClient
 	// MinioClient is the minio client for presigning. Nil when storage is not minio.
 	MinioClient *miniogo.Client
 	// MinIO wiring.
@@ -82,28 +84,24 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			return APIDependencies{}, fmt.Errorf("open postgres: %w", err)
 		}
 		authRepo := authpg.NewRepository(db)
-		docgenV2Cfg, err := config.LoadDocgenV2Config()
-		if err != nil {
-			_ = closeDB(db)
-			return APIDependencies{}, fmt.Errorf("load docgen-v2 config: %w", err)
-		}
-		var docgenV2Client *servicebus.DocgenV2Client
-		if docgenV2Cfg.Enabled {
-			docgenV2Client = servicebus.NewDocgenV2Client(
-				docgenV2Cfg.APIURL,
-				docgenV2Cfg.ServiceToken,
-				time.Duration(docgenV2Cfg.RequestTimeoutSeconds)*time.Second,
-			)
-		}
 		var minioClient *miniogo.Client
 		var minioPublicClient *miniogo.Client
 		var minioBucket string
+		var pdfConverter *servicebus.GotenbergPDFClient
 		if attachmentsCfg.Provider == config.StorageProviderMinIO {
 			var err error
 			minioClient, minioPublicClient, minioBucket, err = buildMinioClients(attachmentsCfg)
 			if err != nil {
 				_ = closeDB(db)
 				return APIDependencies{}, err
+			}
+			if gotenbergClient != nil {
+				store, err := miniostore.NewStore(attachmentsCfg)
+				if err != nil {
+					_ = closeDB(db)
+					return APIDependencies{}, fmt.Errorf("build minio store: %w", err)
+				}
+				pdfConverter = servicebus.NewGotenbergPDFClient(store, gotenbergClient)
 			}
 		}
 		auditStore := auditpg.NewWriter(db)
@@ -118,7 +116,7 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			GotenbergClient:   gotenbergClient,
 			StatusProvider:    observability.NewPostgresRuntimeStatusProvider(db, repoMode, string(attachmentsCfg.Provider), authn.Enabled(), gotenbergHealthCheck(gotenbergCfg)),
 			SQLDB:             db,
-			DocgenV2Client:    docgenV2Client,
+			PDFConverter:      pdfConverter,
 			MinioClient:       minioClient,
 			MinioPublicClient: minioPublicClient,
 			MinioBucket:       minioBucket,

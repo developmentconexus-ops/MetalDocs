@@ -17,5 +17,5 @@ if (-not (Test-Path $binary) -or $args -contains "-Build") {
     if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
 }
 
-Write-Host "Starting MetalDocs Worker (poll_interval=10s, docgen_v2=$env:METALDOCS_DOCGEN_V2_URL)"
+Write-Host "Starting MetalDocs Worker (poll_interval=10s, fanout=$env:METALDOCS_FANOUT_URL)"
 & $binary

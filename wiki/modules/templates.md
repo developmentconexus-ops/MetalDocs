@@ -4,7 +4,7 @@
 >
 > **Naming note:** module dir is `internal/modules/templates/` and routes still mount under `/api/v1/templates`. Plan 2 (commits ae1229e8..c84215f7) flipped *some* modules to `/api/v1/`; templates is **not yet flipped**. This doc reflects on-disk state. Rename to `templates.md` (and `internal/modules/templates/`, `/api/v1/templates`) lands in a single follow-up commit (see `backlog/templates-refactor.md#R-101`).
 
-**Last verified:** 2026-05-31 (feat/templates-approve-next-draft-response: Approve response now mirrors PublishTemplateVersion — returns `{ version, next_draft }` so the editor navigates straight from vN to the auto-spawned vN+1 draft; `Service.Approve` spawns the draft in-tx in both reviewer+no-reviewer accept paths; `ApproveTemplateVersionResponse` schema added to OpenAPI; FE `approveVersion` returns `{ version, nextDraft }`, `VersionActionPanel` forwards `nextDraft` and shows "Publicado. Nova versão de rascunho criada.", `TemplateEditorPage` calls `onNavigateToVersion` when present) | prior: 2026-05-31 (fix/templates-publish-role-binding — `PublishTemplateVersion` now enforces `pending_approver_role` Tier 2 binding alongside the Tier 1 `template.publish` capability; T-004 fully closed; `Service.Approve` refactored to share new `domain.TemplateVersion.RoleBindingFor` helper; denied-attempt audit emitted) | prior: 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS — `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch — multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 — first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
+**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section) | prior: 2026-05-31 (feat/templates-approve-next-draft-response: Approve response now mirrors PublishTemplateVersion — returns `{ version, next_draft }` so the editor navigates straight from vN to the auto-spawned vN+1 draft; `Service.Approve` spawns the draft in-tx in both reviewer+no-reviewer accept paths; `ApproveTemplateVersionResponse` schema added to OpenAPI; FE `approveVersion` returns `{ version, nextDraft }`, `VersionActionPanel` forwards `nextDraft` and shows "Publicado. Nova versão de rascunho criada.", `TemplateEditorPage` calls `onNavigateToVersion` when present) | prior: 2026-05-31 (fix/templates-publish-role-binding — `PublishTemplateVersion` now enforces `pending_approver_role` Tier 2 binding alongside the Tier 1 `template.publish` capability; T-004 fully closed; `Service.Approve` refactored to share new `domain.TemplateVersion.RoleBindingFor` helper; denied-attempt audit emitted) | prior: 2026-05-31 (fix/templates-schema-occ-lock: PUT /schema lock-version CAS — `expected_lock_version` required on the contract, `UpdateVersionSchemaCAS`/`Tx` enforce CAS, 412 `stale_lock_version` on miss; FE useTemplateSchemas holds lockVersion, surfaces staleConflict + refetch — multi-tab last-write-wins closed) | prior: 2026-05-29 (feat/templates-rev-labels: ADR 0013 — first-class `revision_number` column on `templates_template_version` + `current_revision_number` on TemplateDTO; FE renders REV{nn} via shared `formatRevisionCode`; bug/templates-version-chip: honest chip via `published_version_number`; qa/templates-list: empty-state i18n fix + dead `updated_at` cast removal in `TemplatesListPage.tsx`) | **Owner:** unassigned | **Status:** active (production module; generated OpenAPI surface for 20 template routes; Plan 3 tenant-context sweep applied; Plan 5 wired authz.Require + tripwire on lifecycle/create paths; 2026-05-17 wired the autosave/import commit paths to the same tripwire contract and removed creator-scoped template-use visibility from runtime/API selection behavior; 2026-05-26 added optimistic concurrency on lifecycle version updates and aligned local lifecycle capability checks with the route permission table; 2026-05-29 added `published_version_number` to TemplateDTO so the list-page version chip reflects the *published* version, not the auto-spawned draft `latest_version`; 2026-05-29 promoted `revision_number` to a persisted column per ADR 0013 so REV chip labels are backend-canonical and never computed in the FE) | **Maturity:** L3
 
 ### Version chip source-of-truth (2026-05-29)
 
@@ -69,11 +69,13 @@
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped**: it shows templates' consumers (documents, approval, controlled-documents, docx-renderer) and the iam capability namespace it depends on.
 
 ```mermaid
 C4Context
-    title System Context ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â templates
+    title System Context — templates (module-scoped)
     Person(author, "Author", "QMS author / template editor")
     Person(reviewer, "Reviewer/Approver", "Role-gated workflow actor")
     System_Boundary(b1, "MetalDocs") {
@@ -83,7 +85,7 @@ C4Context
         System(iam, "iam", "Capabilities: template.view/create/edit/submit/approve/publish")
         System(audit, "audit (canonical)", "metaldocs.audit_events")
         System(controlledDocuments, "controlled-documents", "controlled_documents FK to template_version")
-        System(docgenv2, "docgen-v2", "Reads template DOCX bytes for render")
+        System(docxrenderer, "docx-renderer", "Reads template DOCX bytes for render")
     }
     System_Ext(pg, "Postgres", "templates_* tables")
     System_Ext(minio, "MinIO", "DOCX object storage (presigned upload/download)")
@@ -127,13 +129,15 @@ Outbound interfaces:
 
 ---
 
-## 5. Building Block View (C4 Level 2 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Container)
+## 5. Building Block View - module-scoped (C4 Level 2 - Container)
 
-### 5.1 Whitebox ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â templates
+> System-level container topology lives in [](../diagrams/c4-container-backend.md). The diagram below decomposes the internal Go packages of templates (handlers/service/domain/repository/presigner).
+
+### 5.1 Whitebox - templates
 
 ```mermaid
 C4Container
-    title Container View ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â templates
+    title Container View - templates (module-internal packages)
     Container(http, "HTTP Handlers", "Go (net/http + oapi-codegen)", "20 routes under /api/v1/templates")
     Container(svc, "Service Layer", "Go", "CreateTemplate Ãƒâ€šÃ‚Â· CreateNextVersion Ãƒâ€šÃ‚Â· UpdateSchemas Ãƒâ€šÃ‚Â· SaveTemplateDraft Ãƒâ€šÃ‚Â· PresignTemplateUpload Ãƒâ€šÃ‚Â· CommitAutosave Ãƒâ€šÃ‚Â· SubmitForReview Ãƒâ€šÃ‚Â· Review Ãƒâ€šÃ‚Â· Approve Ãƒâ€šÃ‚Â· PublishTemplateVersion Ãƒâ€šÃ‚Â· ArchiveTemplate Ãƒâ€šÃ‚Â· UpsertApprovalConfig Ãƒâ€šÃ‚Â· queries")
     Container(domain, "Domain", "Go", "Template Ãƒâ€šÃ‚Â· TemplateVersion Ãƒâ€šÃ‚Â· ApprovalConfig Ãƒâ€šÃ‚Â· MetadataSchema Ãƒâ€šÃ‚Â· Placeholder Ãƒâ€šÃ‚Â· VisibilityCondition Ãƒâ€šÃ‚Â· CheckSegregation")
@@ -471,6 +475,23 @@ Top 3 (by severity, then blast-radius):
 | Obsolete | Status assigned to the previous published version when a new version is published. |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable | 500 on all template mutating routes; lifecycle / autosave / publish reject | API logs; `/healthz` | Restore Postgres; autosave-uploaded DOCX in MinIO remains until commit |
+| MinIO presigned-PUT fails mid-import | Wizard / autosave commit not invoked; template version stays at prior content_hash | Frontend surfaces fetch error; `apps/api/cmd/metaldocs-api/main.go:327` controls 25 MiB cap | User retries; if persistent, MinIO healthcheck + CORS on dev (per 2026-05-17 hardening) |
+| Stale `lock_version` on PUT schema / lifecycle UPDATE | 412 `stale_lock_version`; client must refetch | OCC CAS in shared `UpdateVersion`/`UpdateVersionTx` (Wave 5, 2026-05-26) | Frontend `useTemplateSchemas` exposes `staleConflict`; user retries with fresh lock |
+| SoD violation on Approve | 409 `template.sod_violation`; cannot approve own work | `domain/approval.go:17 CheckSegregation` enforces author ≠ reviewer ≠ approver | Operator routes to different actor |
+| Publish path bypasses SoD (`Service.PublishTemplateVersion`) | Direct publish allowed without reviewer/approver chain | T-004 — known divergence between `Service.Approve` and `Service.PublishTemplateVersion` | Restrict `template.publish` capability; T-004 tracks unification |
+| Missing `template.publish` / `template.approve` capability | 403 `authz.forbidden` from tier-2 (PR #37 added `pending_approver_role` Tier-2 binding) | Backend authz check | Operator escalates; never bypass tier-1 |
+| Placeholder validation rejects unknown PHType | 422 `template.invalid_placeholder` | `application/schema.go:84 ValidatePlaceholders` enforces fixed 7-token catalog | Author fixes schema; refer to `wiki/concepts/placeholders.md` |
+| `PHComputed` resolver_key unknown (registry wired) | 422 `template.unknown_resolver` | `ResolverRegistryReader` lookup fails | Operator registers the resolver; T-008 — currently nil registry at wiring |
+| Tripwire abort on template_version write | 500 (mapped to RFC 9457); INSERT rejected because `metaldocs.asserted_caps` missing | Postgres `RAISE` from template tripwire | Code path bypassed `authz.Require(CapTemplateEdit/...)`; 2026-05-17 CommitAutosave/SaveTemplateDraft hardening wraps writes in `template.edit` tx |
+| Idempotency replay on submit/review/approve/publish | 200 with prior body; lifecycle state unchanged | PR #36 stabilized idempotency key handling | Expected; safe network retry |
+| Templates writes its own audit sink (parallel to `audit`) | Compliance trail split between `templates_audit_log` and `metaldocs.audit_events` | T-013 — known gap | Migrate to canonical sink; current sink remains append-only |
+| Obsolete-on-publish race (two near-simultaneous publishes) | Both could attempt to obsolete the same prior published version | `UpdateVersionTx` OCC compares lock_version; loser retries | Loser refetches and rebuilds publish |
 
 ## Cross-links
 

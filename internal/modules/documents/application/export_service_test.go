@@ -85,7 +85,7 @@ func (f *fakePDFClient) ConvertPDF(_ context.Context, _ servicebus.ConvertPDFReq
 	if f.err != nil {
 		return servicebus.ConvertPDFResult{}, f.err
 	}
-	return servicebus.ConvertPDFResult{OutputKey: "out.pdf", SizeBytes: 123, DocgenV2Version: "docgen-v2@test"}, nil
+	return servicebus.ConvertPDFResult{OutputKey: "out.pdf", SizeBytes: 123}, nil
 }
 
 type fakeAudit struct {

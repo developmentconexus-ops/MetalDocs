@@ -1,5 +1,6 @@
 # Phase 3 — Cross-deps
 
+> **Last verified:** 2026-06-01
 > Scope: imports IN to `packages/editor-ui/`, imports OUT, runtime callers.
 
 ## OUT-edges (runtime)
@@ -39,9 +40,9 @@ Total external runtime deps: 2 (`@eigenpal/docx-js-editor`, `@metaldocs/shared-t
 
 Template runtime pages consume `@metaldocs/editor-ui`; no production page mounts eigenpal directly.
 
-## docgen-v2 OUT-edge
+## docx-renderer OUT-edge
 
-`apps/docgen-v2/package.json:15` declares `@eigenpal/docx-js-editor` (server-side substitution at freeze). That is OUT of the editor-ui package scope but shares the same vendored tarball — captured as a coupled-dependency risk in tech-debt T-001.
+`apps/docx-renderer/package.json:15` declares `@eigenpal/docx-js-editor` (server-side substitution at freeze). That is OUT of the editor-ui package scope but shares the same vendored tarball — captured as a coupled-dependency risk in tech-debt T-001.
 
 ## Build wiring
 

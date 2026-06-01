@@ -55,7 +55,6 @@ func TestCreateDocument_PopulatesAllSnapshotColumns(t *testing.T) {
 	svc := application.NewServiceWithSnapshot(
 		docrepo.New(db),
 		nil,
-		nil,
 		docgenv2.NewTemplatesTemplateReader(db),
 		fakeFormVal{valid: true},
 		&noopAudit{},

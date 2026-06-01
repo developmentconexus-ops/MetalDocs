@@ -13,7 +13,7 @@ func TestService_ListDocumentsPaginated_AdminBypassesUserFilter(t *testing.T) {
 		listPaginatedReturn: []*domain.Document{{ID: "doc_1"}, {ID: "doc_2"}},
 		countReturn:         2,
 	}
-	svc := application.New(repo, nil, nil, nil, nil, nil)
+	svc := application.New(repo, nil, nil, nil, nil)
 
 	items, total, err := svc.ListDocumentsPaginated(context.Background(), "tenant_1", "", application.ListOptions{CreatedBy: "client_value", Page: 1, PageSize: 10})
 	if err != nil {
@@ -32,7 +32,7 @@ func TestService_ListDocumentsPaginated_FillerForcesUserScope(t *testing.T) {
 		listPaginatedReturn: []*domain.Document{{ID: "doc_1"}},
 		countReturn:         1,
 	}
-	svc := application.New(repo, nil, nil, nil, nil, nil)
+	svc := application.New(repo, nil, nil, nil, nil)
 
 	_, _, err := svc.ListDocumentsPaginated(context.Background(), "tenant_1", "u1", application.ListOptions{CreatedBy: "ignored", Page: 1, PageSize: 10})
 	if err != nil {
@@ -48,7 +48,7 @@ func TestService_Stats_ReturnsMaps(t *testing.T) {
 		statsByStatusReturn: map[string]int64{"draft": 5},
 		statsByAreaReturn:   map[string]int64{"RH": 3},
 	}
-	svc := application.New(repo, nil, nil, nil, nil, nil)
+	svc := application.New(repo, nil, nil, nil, nil)
 
 	stats, err := svc.DocumentStats(context.Background(), "tenant_1", "", application.ListOptions{})
 	if err != nil {

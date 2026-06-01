@@ -77,15 +77,15 @@ services:
       retries: 10
       start_period: 10s
 
-  docgen-v2:
+  docx-renderer:
     build:
       context: ../..
-      dockerfile: apps/docgen-v2/Dockerfile
+      dockerfile: apps/docx-renderer/Dockerfile
     environment:
-      DOCGEN_V2_PORT: 3100
-      DOCGEN_V2_SERVICE_TOKEN: ${DOCGEN_V2_SERVICE_TOKEN:?DOCGEN_V2_SERVICE_TOKEN required}
+      DOCX_RENDERER_PORT: 3100
+      DOCX_RENDERER_SERVICE_TOKEN: ${DOCX_RENDERER_SERVICE_TOKEN:?DOCX_RENDERER_SERVICE_TOKEN required}
       LOG_LEVEL: info
-      VERSION: ${DOCGEN_V2_VERSION:-dev}
+      VERSION: ${DOCX_RENDERER_VERSION:-dev}
     ports:
       - "3100:3100"
     depends_on:
