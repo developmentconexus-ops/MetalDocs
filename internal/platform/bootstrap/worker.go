@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"metaldocs/internal/platform/config"
@@ -19,6 +21,8 @@ type WorkerDependencies struct {
 	Consumer     messaging.Consumer
 	PDFConverter *servicebus.GotenbergPDFClient
 	SQLDB        *sql.DB
+	FanoutURL    string
+	FanoutToken  string
 	Cleanup      func()
 }
 
@@ -40,10 +44,15 @@ func BuildWorkerDependencies(ctx context.Context, workerCfg config.WorkerConfig)
 
 	consumer := outboxpg.NewConsumer(db, workerClaimLease(workerCfg))
 
+	fanoutURL := strings.TrimSpace(os.Getenv("METALDOCS_FANOUT_URL"))
+	fanoutToken := strings.TrimSpace(os.Getenv("METALDOCS_DOCX_RENDERER_SERVICE_TOKEN"))
+
 	return WorkerDependencies{
 		Consumer:     consumer,
 		PDFConverter: pdfConverter,
 		SQLDB:        db,
+		FanoutURL:    fanoutURL,
+		FanoutToken:  fanoutToken,
 		Cleanup:      func() { _ = closeDB(db) },
 	}, nil
 }

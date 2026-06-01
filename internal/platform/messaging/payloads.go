@@ -13,6 +13,12 @@ func DecodePayload(eventType EventType, payloadJSON []byte) (Payload, error) {
 			return nil, fmt.Errorf("decode pdf convert payload: %w", err)
 		}
 		return payload, nil
+	case EventTypeMaterializeFanout:
+		var payload MaterializeFanoutPayload
+		if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+			return nil, fmt.Errorf("decode materialize fanout payload: %w", err)
+		}
+		return payload, nil
 	default:
 		var payload UnknownPayload
 		if err := json.Unmarshal(payloadJSON, &payload); err != nil {
@@ -20,6 +26,14 @@ func DecodePayload(eventType EventType, payloadJSON []byte) (Payload, error) {
 		}
 		return payload, nil
 	}
+}
+
+func MaterializeFanoutPayloadFrom(event Event) (MaterializeFanoutPayload, error) {
+	payload, ok := event.Payload.(MaterializeFanoutPayload)
+	if !ok {
+		return MaterializeFanoutPayload{}, fmt.Errorf("event %s payload has type %T, want messaging.MaterializeFanoutPayload", event.EventID, event.Payload)
+	}
+	return payload, nil
 }
 
 func PDFConvertPayloadFrom(event Event) (PDFConvertPayload, error) {

@@ -11,6 +11,9 @@ type TraceID string
 
 const EventTypePDFConvert EventType = "docgen_v2_pdf"
 
+// EventTypeMaterializeFanout triggers async DOCX materialization (ADR 0015).
+const EventTypeMaterializeFanout EventType = "docx_materialize"
+
 type Payload interface {
 	eventPayload()
 }
@@ -23,6 +26,13 @@ type PDFConvertPayload struct {
 }
 
 func (PDFConvertPayload) eventPayload() {}
+
+type MaterializeFanoutPayload struct {
+	TenantID   string `json:"tenant_id"`
+	RevisionID string `json:"revision_id"`
+}
+
+func (MaterializeFanoutPayload) eventPayload() {}
 
 type UnknownPayload map[string]any
 

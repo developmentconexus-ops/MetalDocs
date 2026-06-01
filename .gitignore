@@ -72,6 +72,11 @@ api-restart.log
 docx-renderer.log
 docx-renderer.err
 docx-renderer.*.log
+# Legacy name (pre-rename from docgen-v2)
+docgen-v2.log
+docgen-v2.err
+docgen-v2.*.log
+.env.docgen-v2
 worker.log
 worker-*.log
 worker-*.err.log

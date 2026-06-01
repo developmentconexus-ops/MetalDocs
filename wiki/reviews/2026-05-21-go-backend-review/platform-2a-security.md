@@ -276,7 +276,7 @@ Any importer can mutate `cfg.Quotas[RouteExportPDF] = 0`. Middleware then comput
 
 ---
 
-### H11 — Idempotency `actor_user_id TEXT` (should be UUID + FK) and unbounded `response_body JSONB` `[db]`
+### H11 — Idempotency `actor_user_id TEXT` (should be UUID + FK) and unbounded `response_body JSONB` `[db]` — **FIXED** in `15edce34`
 
 **File:** [migrations/0147_idempotency_keys.sql:8,13](../../../migrations/0147_idempotency_keys.sql)
 
@@ -285,6 +285,19 @@ Any importer can mutate `cfg.Quotas[RouteExportPDF] = 0`. Middleware then comput
 - `JSONB` also wrong type for `[]byte` from `r.body.Bytes()` — `BYTEA` is correct; valid-JSON coercion fails on non-JSON 2xx responses.
 
 **Recommend:** Migration: `ALTER COLUMN actor_user_id TYPE UUID USING actor_user_id::uuid` (after audit of existing data); add FK to the principal table; change `response_body` to `BYTEA`; add `CHECK (octet_length(response_body) <= 65536)`. Document the 64 KiB cap in middleware so callers know their stored response is truncated/refused above that size.
+
+**Fix verification (`15edce34`):**
+- Schema constraint adjusted from the recommendation: `actor_user_id` remains TEXT and no FK is added. Rationale: `iam_users.user_id` is `text NOT NULL` (not UUID), so a type change + FK is infeasible without a cross-module migration. Service accounts (`"system"`) are valid actors not stored in `iam_users`, making an FK incorrect in any case. Instead: `CHECK (actor_user_id <> '')` added via migration `0204`, rejecting the empty-string silent-write case. Go layer (`BeginReplay`) returns an explicit error before opening a transaction when `actorID == ""`.
+- `response_body` changed from `JSONB` to `BYTEA` in [`migrations/0204_idempotency_body_bytea_actor_nonempty.sql`](../../../migrations/0204_idempotency_body_bytea_actor_nonempty.sql). Existing completed rows are converted via `convert_to(response_body::text, 'UTF8')`; in-flight rows (NULL) pass through. Driver (`pgx/v5`) maps `[]byte` ↔ `BYTEA` natively — no JSON coercion on write or read.
+- 64 KiB `CHECK (response_body IS NULL OR octet_length(response_body) <= 65536)` added. `CompleteReplay` and `RecordReplay` in [`postgres_store.go`](../../../internal/platform/idempotency/postgres_store.go) enforce the same cap before any DB round-trip, returning a descriptive error so the middleware can log the rejection (idempotency is lost for oversized responses; the handler result was already delivered to the client).
+- `maxBodyBytes = 64 * 1024` constant defined in `postgres_store.go` with a Godoc comment documenting the 64 KiB cap and its DB-constraint counterpart.
+- Tests in [`internal/platform/idempotency/h11_schema_test.go`](../../../internal/platform/idempotency/h11_schema_test.go):
+  - `TestBeginReplay_EmptyActorReturnsError` — Go guard fires before DB; nil db is sufficient.
+  - `TestCompleteReplay_OversizedBodyReturnsError` — 64 KiB + 1 rejected; slot rolled back; retry can reclaim.
+  - `TestRecordReplay_OversizedBodyReturnsError` — legacy path also enforces cap.
+  - `TestCompleteReplay_NonJSONBodyRoundTrips` — binary/control-byte body stored and retrieved byte-for-exact byte via BYTEA (no JSON coercion).
+  - `TestCompleteReplay_ExactlyAtCapSucceeds` — boundary: exactly 65536 bytes accepted.
+- Deployment caveat documented in migration header: verify `SELECT COUNT(*) FROM metaldocs.idempotency_keys WHERE actor_user_id = ''` before applying in production. Empty-string rows must be deleted or backfilled first.
 
 ---
 
