@@ -122,16 +122,12 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	activeStage := inst.Active()
-	if activeStage == nil {
-		WriteError(w, repository.ErrInstanceCompleted)
-		return
-	}
-	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
-		WriteError(w, err)
-		return
+	stageIDForHash := ""
+	if activeStage != nil {
+		stageIDForHash = activeStage.ID
 	}
 
-	payloadHash := signoffPayloadHash(docID, inst.ID, activeStage.ID, decision, contractReq.Reason, contractReq.ContentHash)
+	payloadHash := signoffPayloadHash(docID, inst.ID, stageIDForHash, decision, contractReq.Reason, contractReq.ContentHash)
 	var replayHandle interface {
 		Complete(outcome string) error
 		Fail(cause error) error
@@ -147,6 +143,21 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		replayHandle = handle
+	}
+
+	if activeStage == nil {
+		if replayHandle != nil {
+			_ = replayHandle.Fail(repository.ErrInstanceCompleted)
+		}
+		WriteError(w, repository.ErrInstanceCompleted)
+		return
+	}
+	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
+		if replayHandle != nil {
+			_ = replayHandle.Fail(err)
+		}
+		WriteError(w, err)
+		return
 	}
 
 	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
