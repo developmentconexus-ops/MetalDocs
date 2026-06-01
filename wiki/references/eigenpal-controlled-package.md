@@ -1,13 +1,13 @@
 # EigenPal Controlled Package
 
-> **Last verified:** 2026-05-11
+> **Last verified:** 2026-06-01
 > **Scope:** What MetalDocs needs to know about the controlled EigenPal package.
 > **Out of scope:** Internal EigenPal implementation details; keep those in the fork docs.
 > **Key files:**
 > - `vendor/eigenpal/README.md` - artifact source, fork branch, pack command
 > - `vendor/eigenpal/eigenpal-docx-js-editor-0.2.0.tgz` - vendored package artifact
 > - `packages/editor-ui/src/MetalDocsEditor.tsx` - React wrapper used by MetalDocs
-> - `apps/docgen-v2/package.json` - server-side docgen dependency
+> - `apps/docx-renderer/package.json` - server-side docgen dependency
 > - `packages/editor-ui/package.json` - editor-ui dependency
 > - `frontend/apps/web/package.json` - web dependency
 

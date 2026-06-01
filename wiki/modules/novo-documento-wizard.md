@@ -1,6 +1,6 @@
 # Novo-Documento Wizard
 
-> **Last verified:** 2026-05-28 (QA light re-verify — Preview happy/error/edge paths green; submit-flow snippet + anchors corrected)
+> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section; prior: 2026-05-28 QA light re-verify — Preview happy/error/edge paths green; submit-flow snippet + anchors corrected)
 > **Scope:** 4-step document-creation wizard at `/documents/new` Ã¢â‚¬â€ state machine, step components, new primitives (`DocPaperPreview`, `WizardFooter`), sub-controls, and helpers (`resolveQueryError`, `STALE_FIVE_MINUTES`, `QK.templates.byProfile`).
 
 > **Maturity:** L2
@@ -252,6 +252,17 @@ Closed by feat/cd-atomic-create: `sequence-preview` (preview endpoint shipped), 
 Closed by Novo Documento blank-template repair: `blank-template` (system blank endpoint supplies a valid `templateVersionId`; StepTemplate keeps the card selectable even when no profile templates exist).
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Backend 5xx on `POST /api/v1/controlled-documents` (atomic create) | Step 4 surfaces friendly error via `resolveQueryError`; `submitError` action dispatched | `createMutation.onError`; `ApiError.code` carries backend reason | User retries with same `Idempotency-Key` (safe replay); persistent failure → check `controlled-documents` backend |
+| Idempotency replay (network retry of identical key) | 201 with previously-stored response body; no duplicate CD or document | Backend honors `Idempotency-Key` header (per ADR 0011) | Expected — wizard advances to success |
+| URL-seeded `?profile=X` references unknown profile | Step 1 renders alert card with "Limpar seleção" button instead of resetting silently | `profileNotFound` derived flag (`NewDocumentWizardPage.tsx:89–92`) | User clears + reselects |
+| `GET /api/v1/taxonomy/profiles` or `/areas` 5xx | Wizard step shows inline error from `resolveQueryError`; advance gate blocked | TanStack Query error state | Retry; if persistent, taxonomy module backend issue |
+| Blank-template path: `GET /api/v1/templates/system/blank` 404 | Step 3 cannot resolve `templateVersionId`; submit disabled | Query error on blank template fetch | Backend must seed system blank template; tracked in `wiki/concepts/placeholders.md` |
+| Profile change at step >2 leaves stale template selection | `selectProfile` reducer auto-resets `templateID`/`templateVersionID` and clamps to step 2 (`wizard.reducer.ts:66`) | Reducer unit test `wizard.reducer.test.ts` | Self-healing — no operator action |
 
 ## See also
 

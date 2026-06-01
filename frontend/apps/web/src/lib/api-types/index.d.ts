@@ -2600,7 +2600,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Publish draft (delegates to docgen-v2 /validate/template) */
+        /** Publish draft (validates template tokens) */
         post: operations["publishTemplateVersion"];
         delete?: never;
         options?: never;

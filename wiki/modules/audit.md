@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-12 | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-12) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`
@@ -57,11 +57,13 @@
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped**: it shows audit's consumer touch-points (iam, documents, export, auth) and the single owned Postgres table.
 
 ```mermaid
 C4Context
-    title System Context â€” audit
+    title System Context — audit (module-scoped)
     Person(admin, "Admin / Compliance reader", "Web UI")
     System_Boundary(b1, "MetalDocs") {
         System(audit, "audit", "Append-only event sink + read query")
@@ -109,13 +111,15 @@ Outbound interfaces:
 
 ---
 
-## 5. Building Block View (C4 Level 2 â€” Container)
+## 5. Building Block View — module-scoped (C4 Level 2 — Container)
 
-### 5.1 Whitebox â€” audit
+> System-level container topology lives in [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md). The diagram below decomposes the internal Go packages of the audit module (http/application/domain/postgres+memory adapters).
+
+### 5.1 Whitebox — audit
 
 ```mermaid
 C4Container
-    title Container View â€” audit
+    title Container View — audit (module-internal packages)
     Container(http, "HTTP Handler", "Go (http.ServeMux)", "GET /api/v1/audit/events")
     Container(svc, "Application Service", "Go", "ListEvents â€” normalize + clamp limit")
     Container(port, "Domain Port", "Go interfaces", "Writer.Record Â· Reader.ListEvents Â· Event Â· ListEventsQuery")
@@ -342,6 +346,20 @@ Top 3 (by severity, then by blast-radius):
 | `metaldocs_app` | The Postgres role the application connects as. Receives `INSERT` only on `metaldocs.audit_events`. |
 
 ---
+
+## Failure modes
+
+§6.1 already enumerates write-path failures (silent loss by design). This table covers the operational/downstream failures observable across the whole module.
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable for `Record` | Event silently lost (caller ignores returned err — `admin_handler.go:457` pattern) | No client-visible signal; absent rows on later `ListEvents` query | T-005 tracks this gap; mitigation is the row-hash chain (`migrations/0193`) which makes post-hoc gaps detectable, not preventable |
+| `id` collision on `evt_<timestamp>` PK | `unique_violation` on INSERT; event lost | Server logs `pq` 23505 from `postgres.Writer.Record` | T-006; mitigation: ULID-style id generator (deferred) |
+| Auth module never emits audit (T-002 in `auth-tech-debt.md`) | Trail has no login/logout/password-change rows | Compliance review finds gap | Implement `auth` → `Writer.Record` integration; tracked as Critical gap |
+| Tamper attempt via DBA / superuser | Row mutated post-write | `audit_event_row_hash` chain validation job flags `prev_hash`/`row_hash` mismatch | Investigate operator action; restore from PITR backup |
+| `GET /api/v1/audit/events` reached without authz (T-001) | Any caller reads the trail | Manual: route has no tier-1/tier-2 check | T-001 — add authz middleware before exposing to non-internal callers |
+| Limit parse error | 400 with legacy error envelope (T-003 — not RFC 9457) | `Handler.handleEvents` returns `{"error":{...}}` | Migrate to `problem+json`; backlog item |
+| Adapter mismatch (Postgres unavailable, memory adapter selected accidentally in prod) | Trail kept in-process; lost on restart | `bootstrap/api.go:100-101` should always pick `auditpg.NewWriter` in prod | Config audit at startup; bootstrap guard |
 
 ## Cross-links
 

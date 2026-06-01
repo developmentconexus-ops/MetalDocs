@@ -2,7 +2,7 @@
 
 > Living architecture doc. Replaces the prior integration stub. Shape: Arc42 (12 sections) + C4 (Context + Container) Mermaid diagrams + ADR links.
 >
-> **Last verified:** 2026-05-17 | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
+> **Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-17) | **Owner:** unassigned | **Status:** active (FE adapter, two production consumers) | **Maturity:** L2
 
 ---
 
@@ -50,11 +50,13 @@
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped to the frontend ACL**: it shows the adapter's two consumers (DocumentEditorPage, TemplateEditorPage), the EditorChrome sibling, the vendored eigenpal package, and the documents backend autosave surface.
 
 ```mermaid
 C4Context
-    title System Context â€” editor-ui-eigenpal
+    title System Context — editor-ui-eigenpal (frontend ACL, module-scoped)
     Person(author, "Author", "Template / document author")
     System_Boundary(b1, "MetalDocs frontend") {
         System(adapter, "editor-ui-eigenpal", "Adapter package (wraps eigenpal)")
@@ -101,13 +103,15 @@ Outbound:
 
 ---
 
-## 5. Building Block View (C4 Level 2 â€” Container)
+## 5. Building Block View — module-scoped (C4 Level 2 — Container)
+
+> System-level container topology lives in [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md). The diagram below decomposes the internal source files of the adapter package (wrapper, types, plugin bridges, dormant outline plugin, barrel).
 
 ### 5.1 Whitebox
 
 ```mermaid
 C4Container
-    title Container View â€” editor-ui-eigenpal
+    title Container View — editor-ui-eigenpal (adapter-internal modules)
     Container(wrapper, "MetalDocsEditor.tsx", "React forwardRef", "mode gate, autosave debounce, imperative ref")
     Container(types, "types.ts", "TypeScript", "EditorMode, MetalDocsEditorProps, MetalDocsEditorRef")
     Container(sbBridge, "plugins/sidebarModelBridge.ts", "EditorPlugin factory", "Renders SidebarModel as eigenpal sidebar items")
@@ -341,6 +345,19 @@ Top 3 (by severity, then by blast-radius):
 | Dormant plugin | A plugin source file that is still maintained but not registered in the wrapper (e.g. `OutlinePlugin`) |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Vendored eigenpal tarball missing / not installed | Build fails; adapter cannot import `DocxEditor` | `vendor/eigenpal/` empty; `pnpm install` reports missing | Reinstall vendored package per ADR 0001; T-001 closed 2026-05-11 |
+| Consumer bypasses wrapper and mounts eigenpal directly | ACL violated — token / mode / autosave rules not applied | Code review on PRs that import `@eigenpal/docx-js-editor` from outside the adapter | Reject; T-002 (closed; TemplateEditorPage migrated 2026-05-11) — regression rule |
+| Autosave debounce fires while previous PUT in-flight | Wrapper's in-flight guard short-circuits the new emit | Console / network trace; manual rapid-edit test | Expected behavior; consumer owns retry on rejected PUT |
+| `documentBuffer` absent on editable mode | Wrapper seeds with `createEmptyDocument()`; no DB row written until first edit | Adapter `MetalDocsEditor.tsx` blank-seeding path | Expected; readonly empty mounts stay unseeded by design |
+| `applyVariables` called on writer mode | Writer mode silently substitutes — violates "tokens stay literal until server freeze" | No code path today (deferred per ADR 0008); rule guarded by adapter shape | Reject any PR adding client-side substitution to writer mode |
+| Eigenpal upgrade changes `EditorPlugin` interface | Sidebar bridge / template plugin stops registering | Adapter typecheck fails on bump | Update adapter wrapper; do not patch eigenpal — refresh tarball only |
+| `Comment` type drift between eigenpal and `documents` consumers | Type errors in `useDocumentComments` consumers | TypeScript strict mode | Update single re-export in `packages/editor-ui/src/index.ts:3` — chrome's "one type source" guarantee |
+| OutlinePlugin re-introduced into wrapper without ADR | Plugin registered behind feature flag without governance | T-004 — plugin exported but intentionally not registered | Add ADR or keep dormant |
 
 ## Cross-links
 

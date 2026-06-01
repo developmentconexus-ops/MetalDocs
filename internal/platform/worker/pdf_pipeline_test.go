@@ -1,60 +1,77 @@
 package worker
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"metaldocs/internal/platform/config"
 	"metaldocs/internal/platform/messaging"
+	"metaldocs/internal/platform/render/gotenberg"
 	"metaldocs/internal/platform/servicebus"
 )
 
-// TestPDFPipeline_RealClient exercises the real DocgenV2Client.ConvertPDF against
-// a fake HTTP server, then verifies PDFJobRunner writes the result via the persister.
-// Tests the actual HTTP client path — not mocked at the interface level.
+// fakePDFStore is an in-memory object store satisfying the (unexported)
+// object-store surface that GotenbergPDFClient depends on.
+type fakePDFStore struct {
+	objects map[string][]byte
+	saved   map[string][]byte
+}
+
+func (f *fakePDFStore) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	b, ok := f.objects[key]
+	if !ok {
+		return nil, fmt.Errorf("object not found: %s", key)
+	}
+	return io.NopCloser(bytes.NewReader(b)), nil
+}
+
+func (f *fakePDFStore) Save(_ context.Context, key string, content []byte) error {
+	if f.saved == nil {
+		f.saved = map[string][]byte{}
+	}
+	f.saved[key] = append([]byte(nil), content...)
+	return nil
+}
+
+func newGotenbergPDFConverter(t *testing.T, gotenbergURL string, store *fakePDFStore) *servicebus.GotenbergPDFClient {
+	t.Helper()
+	client, err := gotenberg.NewClient(gotenbergURL)
+	if err != nil {
+		t.Fatalf("gotenberg.NewClient: %v", err)
+	}
+	return servicebus.NewGotenbergPDFClient(store, client)
+}
+
+// TestPDFPipeline_RealClient exercises the real Gotenberg client + GotenbergPDFClient
+// against a fake Gotenberg server, then verifies PDFJobRunner writes the result via
+// the persister. Tests the actual HTTP + object-store path — not mocked at the interface level.
 func TestPDFPipeline_RealClient(t *testing.T) {
 	const (
 		tenantID   = "tenant-abc"
 		revisionID = "rev-xyz"
 		docxKey    = "tenants/tenant-abc/revisions/rev-xyz/frozen.docx"
 		outputKey  = "tenants/tenant-abc/revisions/rev-xyz/final.pdf"
-		hexHash    = "deadbeef01234567"
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/convert/pdf" || r.Method != http.MethodPost {
+		if r.URL.Path != "/forms/libreoffice/convert" || r.Method != http.MethodPost {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
-		var req servicebus.ConvertPDFRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "bad body", http.StatusBadRequest)
-			return
-		}
-		if req.DocxKey != docxKey {
-			http.Error(w, "wrong docx_key: "+req.DocxKey, http.StatusBadRequest)
-			return
-		}
-		if req.OutputKey != outputKey {
-			http.Error(w, "wrong output_key: "+req.OutputKey, http.StatusBadRequest)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(servicebus.ConvertPDFResult{
-			OutputKey:   outputKey,
-			ContentHash: hexHash,
-			SizeBytes:   12345,
-		})
+		w.Header().Set("Content-Type", "application/pdf")
+		_, _ = w.Write([]byte("%PDF-1.7 rendered"))
 	}))
 	defer srv.Close()
 
-	client := servicebus.NewDocgenV2Client(srv.URL, "test-token", 10*time.Second)
+	store := &fakePDFStore{objects: map[string][]byte{docxKey: []byte("PK fake docx")}}
+	converter := newGotenbergPDFConverter(t, srv.URL, store)
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(client, persister)
+	runner := NewPDFJobRunner(converter, persister)
 
 	event := makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       tenantID,
@@ -81,50 +98,52 @@ func TestPDFPipeline_RealClient(t *testing.T) {
 	if len(call.pdfHash) == 0 {
 		t.Error("pdfHash empty")
 	}
+	if _, ok := store.saved[outputKey]; !ok {
+		t.Errorf("PDF was not saved to %q", outputKey)
+	}
 }
 
-func TestPDFPipeline_RealClient_DocgenError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, `{"error":"NoSuchKey"}`, http.StatusInternalServerError)
+func TestPDFPipeline_RealClient_GotenbergError(t *testing.T) {
+	const docxKey = "some/key.docx"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
 
-	client := servicebus.NewDocgenV2Client(srv.URL, "", 10*time.Second)
+	store := &fakePDFStore{objects: map[string][]byte{docxKey: []byte("PK fake docx")}}
+	converter := newGotenbergPDFConverter(t, srv.URL, store)
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(client, persister)
+	runner := NewPDFJobRunner(converter, persister)
 
 	err := runner.Handle(context.Background(), makePDFEvent(messaging.PDFConvertPayload{
 		TenantID:       "t1",
 		RevisionID:     "r1",
-		FinalDocxS3Key: "some/key.docx",
+		FinalDocxS3Key: docxKey,
 	}))
 	if err == nil {
-		t.Fatal("expected error from docgen, got nil")
+		t.Fatal("expected error from gotenberg, got nil")
 	}
 	if len(persister.calls) != 0 {
 		t.Error("WritePDF must not be called when convert fails")
 	}
 }
 
-// TestPDFPipeline_WorkerLoop verifies the full Service.RunOnce → PDFJobRunner →
-// DocgenV2Client → WritePDF chain using a fake HTTP server for docgen-v2.
+// TestPDFPipeline_WorkerLoop verifies the full Service.RunOnce -> PDFJobRunner ->
+// GotenbergPDFClient -> WritePDF chain using a fake Gotenberg server.
 func TestPDFPipeline_WorkerLoop(t *testing.T) {
 	const (
 		tenantID   = "t-loop"
 		revisionID = "r-loop"
 		docxKey    = "tenants/t-loop/revisions/r-loop/frozen.docx"
-		outputKey  = "tenants/t-loop/revisions/r-loop/final.pdf"
 	)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(servicebus.ConvertPDFResult{
-			OutputKey:   outputKey,
-			ContentHash: "cafebabe",
-		})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/pdf")
+		_, _ = w.Write([]byte("%PDF-1.7 loop"))
 	}))
 	defer srv.Close()
 
+	store := &fakePDFStore{objects: map[string][]byte{docxKey: []byte("PK fake docx")}}
 	consumer := &fakeConsumer{events: []messaging.Event{
 		makePDFEvent(messaging.PDFConvertPayload{
 			TenantID:       tenantID,
@@ -132,9 +151,9 @@ func TestPDFPipeline_WorkerLoop(t *testing.T) {
 			FinalDocxS3Key: docxKey,
 		}),
 	}}
-	client := servicebus.NewDocgenV2Client(srv.URL, "", 10*time.Second)
+	converter := newGotenbergPDFConverter(t, srv.URL, store)
 	persister := &fakePDFPersister{}
-	runner := NewPDFJobRunner(client, persister)
+	runner := NewPDFJobRunner(converter, persister)
 
 	cfg := config.WorkerConfig{MaxAttempts: 3, RetryBaseSeconds: 10, RetryMaxSeconds: 300}
 	svc := NewService(consumer, cfg).WithPDFRunner(runner)

@@ -1,6 +1,6 @@
 # Module: search
 
-> **Last verified:** 2026-05-26
+> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section; prior: 2026-05-26)
 > **Status:** active (limited surface)
 > **Maturity:** L2
 > **Scope:** Cross-module search across templates, controlled documents, document versions.
@@ -25,6 +25,16 @@ As of 2026-05-26, the `public.documents` reader is intentionally bounded to fiel
 
 - When/whether to introduce a real search index (Elasticsearch, Postgres tsvector) â€” keep deferred until query patterns demand it.
 - PDF body search â€” out of scope until requested.
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable | Search returns 5xx; UI shows generic error | Backend `infrastructure/v2documents/reader.go` SQL error | Check `metaldocs-api` → Postgres connectivity; no fallback (no separate index) |
+| Authorized rows silently dropped before SQL batching landed | Caller saw partial results below requested limit even when more authorized rows existed | Closed 2026-05-26 — service now pages through SQL batches before trimming to caller limit | Regression detection: integration test on `internal/modules/search/` |
+| Live join cost on hot list views | Search latency climbs as `controlled_documents` JOIN row count grows | DB query latency metrics; slow query log | Open Issue if SLA breached; see `Open questions` — index introduction tracked |
+| Area-policy evaluation mismatch | Returned row not visible to caller after authz filter | Reader uses live `businessUnit:department` resource key; mismatch surfaces empty result | Verify `iam.user_process_areas` membership; tier-3 tripwire on read path |
+| Stale data because no separate index | (Not applicable — design choice) | N/A | By design: live JOIN guarantees zero staleness |
 
 ## See also
 

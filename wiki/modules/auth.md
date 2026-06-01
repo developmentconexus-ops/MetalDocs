@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-28 (FE login screen QA — qa/auth-login: post-login returnTo redirect consolidated in `LoginPage`, responsive breakpoint added) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
+**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-28 FE login screen QA — qa/auth-login: post-login returnTo redirect consolidated in `LoginPage`, responsive breakpoint added) | **Owner:** unassigned | **Status:** active (RFC 9457 envelope; auth event audit emission wired) | **Maturity:** L2
 
 > **Key files:**
 > - Current Phase 11 anchors: `internal/modules/auth/delivery/http/handler.go:181` (`recordAudit`), `internal/modules/auth/application/service.go:255` (`ResolveSession`), `service.go:381` (`CreateUserWithInput` shared-tx path), `internal/modules/auth/domain/model.go:145`/`:149` (`AuthenticatedSession` redactors), `internal/modules/auth/infrastructure/postgres/repository.go:98` (`GetUserTenants` ordering), `repository.go:121` (`TouchSession` grace window).
@@ -82,11 +82,13 @@
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped**: it shows auth's consumers (iam, documents/templates/approval), the platform packages that read CurrentUser, and the owned Postgres tables (`auth_identities`, `auth_sessions`) plus the cross-module IAM writes.
 
 ```mermaid
 C4Context
-    title System Context â€” auth
+    title System Context — auth (module-scoped)
     Person(actor, "End user / admin", "Web browser")
     System_Boundary(b1, "MetalDocs API") {
         System(auth, "auth", "Authn, sessions, ManagedUser admin ops")
@@ -143,13 +145,15 @@ Quality-managed app. Every controlled-document mutation must trace to a known ac
 
 ---
 
-## 5. Building Block View (C4 Level 2)
+## 5. Building Block View — module-scoped (C4 Level 2)
 
-### 5.1 Whitebox â€” auth
+> System-level container topology lives in [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md). The diagram below decomposes the internal Go packages of the auth module (handler/middleware/service/repository) — not visible at the system C4 Level 2.
+
+### 5.1 Whitebox — auth
 
 ```mermaid
 C4Container
-    title Container View â€” auth
+    title Container View — auth (module-internal packages)
     Container(handler, "Handler", "Go stdlib mux", "/api/v1/auth/{login,logout,me,change-password}")
     Container(mw, "Middleware", "Go", "Wrap: cookie -> ResolveSession -> WithCurrentUser + WithAuthContext")
     Container(svc, "Service", "Go", "Authenticate, ResolveSession, Logout, ChangePassword*, CreateUser, UpdateUser, AdminResetPassword, UnlockUser, ListUsers, ListOnlineUsers, BootstrapLocalAdmin, cookie helpers, HMAC token signing")
@@ -499,6 +503,22 @@ Refactor backlog: [`wiki/backlog/auth-refactor.md`](../backlog/auth-refactor.md)
 | `ErrTenantClaimRequired` | Login rejected because the user belongs to multiple tenants and no `X-Tenant-ID` was provided. |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable on `Authenticate` | 500 on `/api/v1/auth/login`; no session issued | `metaldocs-api` logs; `/healthz` shows DB unreachable | Restore Postgres; in-memory adapter is dev-only |
+| Bad password (under per-account lockout threshold) | 401 `auth.invalid_credentials`; `failed_login_attempts` increments atomically (`repository.go:163-183`) | `auth_identities.failed_login_attempts` | User retries; counter resets on success |
+| Account locked after threshold | 401 `auth.account_locked`; subsequent attempts also rejected | `auth_identities.locked_until` | Admin invokes `POST /api/v1/admin/users/{id}/unlock` via IAM module |
+| Distributed brute-force across many accounts | No IP-level throttle (T-005); per-account lockout still fires per target | Not detectable inside auth today — gap | T-005 (auth-tech-debt): add IP-based rate limit; in the meantime, edge WAF |
+| Session token expired / revoked | 401 from middleware `ResolveSession`; cookie cleared via `ExpiredSessionCookie` | `authBus` 401 on frontend → `/login?returnTo=...` | User re-authenticates |
+| HMAC session secret rotated | All existing sessions invalidated immediately | Sudden surge of 401s after deploy | T-010 (auth-tech-debt): rolling key window not implemented; communicate rotation window |
+| `MustChangePassword` lock active | All non-change-password routes 403 with `auth.password_change_required` | Middleware short-circuits | User completes `POST /api/v1/auth/change-password` |
+| `X-Tenant-ID` claim names a tenant user has no role in | 403 `ErrTenantNotPermitted` on login | `resolveLoginTenant` returns error | User selects a tenant they belong to |
+| Multi-tenant user omits `X-Tenant-ID` | 400 `ErrTenantClaimRequired` | `resolveLoginTenant` rejects ambiguous login | Frontend prompts for tenant selection |
+| Auth events not emitted to audit (T-002 in auth-tech-debt) | Audit trail missing login/logout/password-change rows | Compliance review | Implement `Writer.Record` calls from `Service` per T-002 |
+| Identity tenant-global (T-008) | No RLS isolation on `auth_identities`/`auth_sessions` | Multi-tenant separation review | T-008: model identity as tenant-scoped or add view-level filtering |
 
 ## Cross-links
 

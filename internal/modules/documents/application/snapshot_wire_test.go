@@ -52,7 +52,6 @@ func TestCreateDocument_SnapshotPopulated(t *testing.T) {
 
 	svc := application.NewServiceWithSnapshot(
 		repo,
-		fakeDocgen{},
 		&fakePresigner{hashReturn: "h_init"},
 		fakeTplReader{},
 		fakeFormVal{valid: true},

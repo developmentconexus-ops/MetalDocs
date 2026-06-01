@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -103,6 +104,27 @@ func (c *Client) ConvertHTMLToPDF(ctx context.Context, htmlBytes []byte, cssByte
 }
 
 func (c *Client) ConvertDocxToPDF(ctx context.Context, docxContent []byte) ([]byte, error) {
+	return c.ConvertDocxToPDFWithOptions(ctx, docxContent, "", false)
+}
+
+// paperDimensionsInches maps a paper-size name to Gotenberg form dimensions.
+// An unknown/empty name yields ok=false, letting LibreOffice use the docx's
+// own page geometry.
+func paperDimensionsInches(paperSize string) (width float64, height float64, ok bool) {
+	switch paperSize {
+	case "A4":
+		return 8.27, 11.69, true
+	case "Letter":
+		return 8.5, 11.0, true
+	default:
+		return 0, 0, false
+	}
+}
+
+// ConvertDocxToPDFWithOptions converts a docx to PDF via the LibreOffice route.
+// When paperSize is "A4"/"Letter" it forces page dimensions (and landscape);
+// otherwise the docx's own page setup is preserved.
+func (c *Client) ConvertDocxToPDFWithOptions(ctx context.Context, docxContent []byte, paperSize string, landscape bool) ([]byte, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	part, err := writer.CreateFormFile("files", "document.docx")
@@ -111,6 +133,13 @@ func (c *Client) ConvertDocxToPDF(ctx context.Context, docxContent []byte) ([]by
 	}
 	if _, err := part.Write(docxContent); err != nil {
 		return nil, fmt.Errorf("gotenberg: write docx content: %w", err)
+	}
+	if w, h, ok := paperDimensionsInches(paperSize); ok {
+		_ = writer.WriteField("paperWidth", strconv.FormatFloat(w, 'f', -1, 64))
+		_ = writer.WriteField("paperHeight", strconv.FormatFloat(h, 'f', -1, 64))
+		if landscape {
+			_ = writer.WriteField("landscape", "true")
+		}
 	}
 	if err := writer.Close(); err != nil {
 		return nil, fmt.Errorf("gotenberg: close multipart: %w", err)

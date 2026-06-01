@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	"metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/documents/repository"
@@ -63,10 +61,6 @@ type Repository interface {
 	DeleteComment(ctx context.Context, tenantID, documentID string, libraryID int) error
 }
 
-type DocgenRenderer interface {
-	RenderDocx(ctx context.Context, templateDocxKey, schemaKey, outputKey string, formData json.RawMessage) (contentHash string, sizeBytes int64, unreplaced []string, err error)
-}
-
 type Presigner interface {
 	PresignRevisionPUT(ctx context.Context, tenantID, docID, contentHash string) (url, storageKey string, err error)
 	PresignObjectGET(ctx context.Context, storageKey string) (url string, err error)
@@ -106,7 +100,6 @@ type ProfileDefaultTemplateReader interface {
 
 type Service struct {
 	repo                         Repository
-	docgen                       DocgenRenderer
 	presigner                    Presigner
 	tpl                          TemplateReader
 	fv                           FormValidator
@@ -124,10 +117,9 @@ func (s *Service) WithDB(db *sql.DB) *Service {
 	return s
 }
 
-func New(r Repository, d DocgenRenderer, p Presigner, t TemplateReader, fv FormValidator, a Audit) *Service {
+func New(r Repository, p Presigner, t TemplateReader, fv FormValidator, a Audit) *Service {
 	return &Service{
 		repo:      r,
-		docgen:    d,
 		presigner: p,
 		tpl:       t,
 		fv:        fv,
@@ -137,7 +129,6 @@ func New(r Repository, d DocgenRenderer, p Presigner, t TemplateReader, fv FormV
 
 func NewService(
 	r Repository,
-	d DocgenRenderer,
 	p Presigner,
 	t TemplateReader,
 	fv FormValidator,
@@ -148,7 +139,6 @@ func NewService(
 ) *Service {
 	return &Service{
 		repo:                     r,
-		docgen:                   d,
 		presigner:                p,
 		tpl:                      t,
 		fv:                       fv,
@@ -163,7 +153,6 @@ func NewService(
 // that will copy template artifacts onto the document at create time.
 func NewServiceWithSnapshot(
 	r Repository,
-	d DocgenRenderer,
 	p Presigner,
 	t TemplateReader,
 	fv FormValidator,
@@ -175,7 +164,6 @@ func NewServiceWithSnapshot(
 ) *Service {
 	return &Service{
 		repo:                     r,
-		docgen:                   d,
 		presigner:                p,
 		tpl:                      t,
 		fv:                       fv,
@@ -229,7 +217,7 @@ func buildDocumentForCreate(cmd CreateDocumentInput, cd *controlleddocumentsdoma
 	}
 }
 
-// CreateDocument is the legacy (non-atomic) create path. It renders via docgen,
+// CreateDocument is the legacy (non-atomic) create path. It renders via docx-renderer,
 // uploads to S3, and audits asynchronously. Only called by DuplicateDocument.
 // The atomic flow (cloneIntoTx) sets storage_key in the same tx — no S3 side-effect.
 // TODO: when duplicate-document migrates to atomic flow, delete this + repo.CreateDocument + SetRevisionStorageKey.
@@ -293,7 +281,7 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 	}
 	resolvedTemplateVersionID := resolution.TemplateVersionID
 
-	docxKey, schemaKey, schemaJSON, err := s.tpl.GetPublishedVersion(ctx, cmd.TenantID, resolvedTemplateVersionID)
+	docxKey, _, schemaJSON, err := s.tpl.GetPublishedVersion(ctx, cmd.TenantID, resolvedTemplateVersionID)
 	if err != nil {
 		return nil, fmt.Errorf("template lookup: %w", err)
 	}
@@ -319,47 +307,13 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		}
 	}
 
-	var contentHash, finalKey string
-	if s.docgen != nil {
-		tmpKey := fmt.Sprintf("tenants/%s/documents/tmp/%s.docx", cmd.TenantID, uuid.New().String())
-		var err error
-		contentHash, _, _, err = s.docgen.RenderDocx(ctx, docxKey, schemaKey, tmpKey, cmd.FormData)
-		if err != nil {
-			return nil, fmt.Errorf("render: %w", err)
-		}
-
-		cleanupKey := tmpKey
-		defer func() {
-			if cleanupKey != "" {
-				_ = s.presigner.DeleteObject(context.Background(), cleanupKey)
-			}
-		}()
-
-		doc := buildDocumentForCreate(cmd, cd, resolvedTemplateVersionID)
-		doc.TemplateSnapshot = snap
-		docID, revID, sessionID, err := s.repo.CreateDocument(ctx, &doc, contentHash, phs)
-		if err != nil {
-			return nil, err
-		}
-
-		finalKey = fmt.Sprintf("tenants/%s/documents/%s/revisions/%s.docx", cmd.TenantID, docID, contentHash)
-		if err := s.presigner.AdoptTempObject(ctx, tmpKey, finalKey); err != nil {
-			return nil, fmt.Errorf("adopt tmp: %w", err)
-		}
-		cleanupKey = ""
-
-		if err := s.repo.SetRevisionStorageKey(ctx, revID, finalKey); err != nil {
-			return nil, fmt.Errorf("set revision key: %w", err)
-		}
-
-		s.audit.Write(ctx, cmd.TenantID, cmd.ActorUserID, "document.created", docID, map[string]any{"template_version_id": resolvedTemplateVersionID})
-		return &CreateDocumentResult{DocumentID: docID, InitialRevisionID: revID, SessionID: sessionID}, nil
-	}
-
-	// docgen not configured: bootstrap document with template docx as initial revision
+	// Document content starts as the template's published docx (template
+	// passthrough): storage_key points directly at the template docx so the
+	// editor opens immediately on first GET. The browser editor is the
+	// fill/edit path; there is no server-side render step.
 	h := sha256.New()
 	h.Write([]byte(docxKey))
-	contentHash = fmt.Sprintf("%x", h.Sum(nil))
+	contentHash := fmt.Sprintf("%x", h.Sum(nil))
 
 	doc := buildDocumentForCreate(cmd, cd, resolvedTemplateVersionID)
 	doc.TemplateSnapshot = snap
@@ -368,7 +322,7 @@ func (s *Service) CreateDocument(ctx context.Context, cmd CreateDocumentInput) (
 		return nil, err
 	}
 
-	finalKey = docxKey // point to template docx directly
+	finalKey := docxKey // point to template docx directly
 	if err := s.repo.SetRevisionStorageKey(ctx, revID, finalKey); err != nil {
 		return nil, fmt.Errorf("set revision key: %w", err)
 	}
@@ -397,7 +351,7 @@ type cloneIntoTxInput struct {
 // insert and the document insert in a single transaction.
 //
 // Differences from CreateDocument:
-//   - No S3 rendering (docgen is not invoked).
+//   - No S3 rendering (docx-renderer is not invoked).
 //   - Template-passthrough: storage_key is set to the template's published
 //     docx key atomically with the insert, so the editor opens immediately
 //     on first GET — no lazy materialization, no AdoptTempObject side-effect.
@@ -428,7 +382,7 @@ func (s *Service) cloneIntoTx(ctx context.Context, tx *sql.Tx, in cloneIntoTxInp
 	}
 
 	// content_hash is required by document_revisions but storage_key is empty
-	// at this point. Mirror the docgen-not-configured fallback in
+	// at this point. Mirror the docx-renderer-not-configured fallback in
 	// CreateDocument: sha256(docxKey). Kept stable across replays.
 	h := sha256.New()
 	h.Write([]byte(docxKey))

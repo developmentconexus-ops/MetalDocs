@@ -1,6 +1,6 @@
 # Reference: Environment Setup
 
-> **Last verified:** 2026-05-15
+> **Last verified:** 2026-06-01
 > **Status:** Stub. See `references/local-dev-startup.md` for the canonical Windows path.
 > **Scope:** Local dev environment bootstrap, secrets, seed data.
 > **Out of scope:** Prod deployment (see `architecture/deployment.md`), credentials (see `references/local-dev-credentials.md`).
@@ -11,7 +11,7 @@ See [references/local-dev-startup.md](local-dev-startup.md) — single source of
 
 ## Prereqs
 
-- Docker Desktop (Postgres, MinIO, Gotenberg, docgen-v2 containers).
+- Docker Desktop (Postgres, MinIO, Gotenberg, docx-renderer containers).
 - Go 1.22+ (verify version against `go.mod`).
 - Node 20+ + pnpm.
 - PowerShell 7+ on Windows; bash/zsh on macOS/Linux (use equivalent commands).

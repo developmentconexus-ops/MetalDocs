@@ -773,7 +773,7 @@ type ServerInterface interface {
 	// Save draft (CAS via expected_lock_version)
 	// (PUT /api/v1/templates/{id}/versions/{n}/draft)
 	SaveTemplateDraft(w http.ResponseWriter, r *http.Request, id string, n int)
-	// Publish draft (delegates to docgen-v2 /validate/template)
+	// Publish draft (validates template tokens)
 	// (POST /api/v1/templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(w http.ResponseWriter, r *http.Request, id string, n int, params PublishTemplateVersionParams)
 
@@ -2308,7 +2308,7 @@ type StrictServerInterface interface {
 	// Save draft (CAS via expected_lock_version)
 	// (PUT /api/v1/templates/{id}/versions/{n}/draft)
 	SaveTemplateDraft(ctx context.Context, request SaveTemplateDraftRequestObject) (SaveTemplateDraftResponseObject, error)
-	// Publish draft (delegates to docgen-v2 /validate/template)
+	// Publish draft (validates template tokens)
 	// (POST /api/v1/templates/{id}/versions/{n}/publish)
 	PublishTemplateVersion(ctx context.Context, request PublishTemplateVersionRequestObject) (PublishTemplateVersionResponseObject, error)
 

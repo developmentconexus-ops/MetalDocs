@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-05-21 (taxonomy spec-mount route-truth sync) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-21 taxonomy spec-mount route-truth sync) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` â€” `DocumentFamily` aggregate
@@ -65,11 +65,13 @@
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped**: it shows taxonomy's consumers (controlled-documents, documents, templates) and the 3 owned Postgres tables.
 
 ```mermaid
 C4Context
-    title System Context â€” taxonomy
+    title System Context — taxonomy (module-scoped)
     Person(admin, "Admin / QMS user", "Web UI")
     System_Boundary(b1, "MetalDocs") {
         System(taxonomy, "taxonomy", "Catalog of families, profiles, areas")
@@ -117,13 +119,15 @@ Outbound interfaces:
 
 ---
 
-## 5. Building Block View (C4 Level 2 â€” Container)
+## 5. Building Block View — module-scoped (C4 Level 2 — Container)
 
-### 5.1 Whitebox â€” taxonomy
+> System-level container topology lives in [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md). The diagram below decomposes the internal Go packages of taxonomy (handler/services/repositories/template-version checker/governance logger).
+
+### 5.1 Whitebox — taxonomy
 
 ```mermaid
 C4Container
-    title Container View â€” taxonomy
+    title Container View — taxonomy (module-internal packages)
     Container(http, "HTTP Handler", "Go (http.ServeMux)", "16 routes: /api/v1/taxonomy/{profiles,areas,families}")
     Container(svc, "Service Layer", "Go", "FamilyService Â· ProfileService Â· AreaService")
     Container(domain, "Domain", "Go", "DocumentFamily Â· DocumentProfile Â· ProcessArea Â· GovernanceEvent Â· sentinel errors")
@@ -420,6 +424,22 @@ Top 3 (by severity, then by blast-radius):
 | `code` | Primary key in all three entities; CHECK `^[a-z][a-z0-9_-]{1,63}$` (profile + area only). Immutable via trigger (profile + area only). |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable | 500 on all taxonomy routes | Handler logs; `/healthz` | Restore Postgres; module uses `*sql.DB` per repo, no tx, so no rollback complexity |
+| Code-immutability trigger fires on PATCH | UPDATE rejected by `trg_document_profiles_code_immutable` / `trg_process_areas_code_immutable` / `trg_reject_families_code_update` (migration 0188) | Postgres `RAISE` from trigger | Caller must not include `code` in PATCH body; handler also overwrites body `code` with path param as guard |
+| Profile/area archive blocked by FK | DELETE returns 409 because dependent rows exist (e.g. active CDs reference profile) | Service-layer pre-check on `HasActiveProfiles` etc. | Operator removes/migrates dependents before archive |
+| Area parent cycle (admin sets area as child of its descendant) | 409 `ErrAreaParentCycle` | `AreaService.SetParent` walks `ListAncestors` | Operator picks a non-descendant parent |
+| Default template version not published | 409 `ErrTemplateNotPublished` on `SetDefaultTemplate` | `TemplateVersionChecker.IsPublished` returns false | Publish template version first; never bind a draft as default |
+| Default template profile mismatch | 409 `ErrTemplateProfileMismatch` | Cross-check vs `templates_template.profile_code` | Pick a template version whose template belongs to this profile |
+| Tier-3 tripwire abort on taxonomy write | Mutation 500; INSERT/UPDATE rejected | Postgres `RAISE` from migration 0188 trigger on taxonomy tables | Code bypassed `authz.Require(CapTaxonomyManage)` — fix-forward |
+| FamilyService omits govLogger (T-004) | Family create/update/deactivate not logged to `governance_events` | Audit review finds gap | T-004: wire `GovernanceLogger` into `FamilyService`; profile + area already wired |
+| Archive/deactivate event coverage incomplete (T-005/T-006) | Some archive paths emit event, some do not | Compliance review | Audit each service path; wire missing emits |
+| Cross-module `DBGovernanceLogger` reuse by controlled-documents | Coupling: controlled-documents writes its events through taxonomy's logger (`registry/module.go:31`) | Architecture review | T-008 (in controlled-documents tech-debt) tracks the dual-sink coupling |
+| Dev tenant fallback used in prod read | `tenant.DevTenantID` returns generic catalog | Bootstrap config check | Production must disable dev tenant fallback |
 
 ## Cross-links
 

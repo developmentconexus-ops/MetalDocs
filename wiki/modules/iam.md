@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes) | **Maturity:** L2
+**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-26 Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes) | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` â€” tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
@@ -69,11 +69,13 @@ IAM owns identity-derived authorization for MetalDocs: it answers "can user X pe
 
 ---
 
-## 3. System Scope & Context (C4 Level 1)
+## 3. System Scope & Context — module-scoped (C4 Level 1)
+
+> System-level context lives in [`wiki/diagrams/c4-context.md`](../diagrams/c4-context.md). The diagram below is **module-scoped**: it shows iam's relationship with tier-2 consumers (documents/approval/templates), auth, audit, and the platform packages that read its capability/tenant context.
 
 ```mermaid
 C4Context
-    title System Context â€” iam
+    title System Context — iam (module-scoped)
     Person(actor, "End user / admin", "HTTP client")
     System_Boundary(b1, "MetalDocs API") {
         System(iam, "iam", "Capabilities, roles, memberships, authz")
@@ -115,13 +117,15 @@ Outbound DB writes (owned): `iam_users`, `iam_user_roles`, `iam_groups`, `iam_gr
 
 ---
 
-## 5. Building Block View (C4 Level 2)
+## 5. Building Block View — module-scoped (C4 Level 2)
 
-### 5.1 Whitebox â€” iam
+> System-level container topology lives in [`wiki/diagrams/c4-container-backend.md`](../diagrams/c4-container-backend.md). The diagram below decomposes the internal Go packages of iam (middleware/handlers/services/role provider cache/authz package).
+
+### 5.1 Whitebox — iam
 
 ```mermaid
 C4Container
-    title Container View â€” iam
+    title Container View — iam (module-internal packages)
     Container(mw, "HTTP middleware", "Go stdlib", "Wrap + tier-1 enforcement")
     Container(adminH, "AdminHandler", "Go stdlib mux", "/api/v1/iam/users/* + /api/v1/iam/admin/overview")
     Container(memH, "MembershipHandler", "Go stdlib mux", "/api/v1/iam/area-memberships")
@@ -437,6 +441,22 @@ Refactor backlog: [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 | SECURITY DEFINER | Postgres function attribute that executes with the function owner's privileges, reading `metaldocs.actor_id` GUC. Used by `metaldocs.grant_area_membership` / `revoke_area_membership` (migration 0137) â€” called only by e2e seed + integration tests; the Go `area_membership/` wrapper was deleted in Plan 4. |
 
 ---
+
+## Failure modes
+
+| Failure | Symptom | Detection | Response |
+|---|---|---|---|
+| Postgres unavailable for `CapabilityService.CanDo` | All non-public routes 500 (tier-1 fails closed) | Middleware logs; `/healthz` | Restore Postgres; cache miss cannot fall through — fail-closed by design |
+| Tier-2 `authz.Require` ctx missing actor / tenant GUC | `ErrActorContextMissing` / `ErrTenantContextMissing` thrown | Caller did not set `metaldocs.actor_id` / `metaldocs.tenant_id` before in-tx capability check | Wrap call site in `SeedTxIdentity`; never call `Require` without GUC seeded |
+| Tier-3 Postgres tripwire abort on iam write | `UpsertUserAndAssignRole` / `ReplaceUserRoles` INSERT rejected | `RAISE` from migration 0188 trigger; caller sees 500 mapped to RFC 9457 | Bypassed `authz.Require(CapUserManage)` — fix-forward; never disable tripwire |
+| `CachedRoleProvider` stale after admin role change | User keeps old roles until TTL expires | Admin handler calls `InvalidateUser(userID)` after every `assignRole`/`replaceRoles` (`application/admin_service.go:42`) | If invalidation forgotten on new write path, add it; TTL bounds blast radius |
+| Spoofed `X-User-Roles` / `X-User-ID` headers | Caller attempts role escalation via headers | Closed 2026-05-25 — `Middleware.Wrap` now strips both before downstream (`Trusted role-header strip sync`) | Regression test on middleware; never restore the legacy fallback |
+| Membership double-grant for `(user, area)` | UNIQUE violation on `user_process_areas` insert | `Insert` / `GrantAtomic` returns pq 23505 | Caller refetches `ListActive`; surfaces as 409 `iam.membership_exists` |
+| Membership revoke race (active row already closed) | `CloseActive` returns 0 rows | `ErrMembershipNotFound` from service | Caller refetches and surfaces NO-OP to UI |
+| Audit emission missing on `handleUserRoleUpsert` (T-005) | Role-upsert action not in audit trail | Compliance review | T-005: wire `audit.Writer.Record` call; presently a known gap |
+| Capability matrix drift from migrations 0165 / 0169 | Operator expects capability that no longer maps to role | Tier-1 returns 403 unexpectedly | Audit matrix vs migration order; never hand-edit `role_capabilities` rows |
+| `system_admin` bypass triggered unintentionally | `authz.BypassSystem` skips tier-2 checks for system_admin | Audit log shows admin acting on tier-2 path | Expected for system_admin; restrict who holds the role |
+| Tenant context default fallback (`tenant.DevTenantID`) leaks into prod | Multi-tenant data crosses boundary | `bootstrap` config check at startup | Production must reject `DevTenantID`; flag deploys that set `AllowDevTenantFallback=true` |
 
 ## Cross-links
 
