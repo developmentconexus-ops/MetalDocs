@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/index.js --log-level=info",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "20.12.12",
+    "esbuild": "^0.21.5",
     "tsx": "^4.11.0",
     "typescript": "5.4.5",
     "vitest": "1.6.0"
