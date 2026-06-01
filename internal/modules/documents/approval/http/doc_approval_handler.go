@@ -11,6 +11,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
+	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
 	"metaldocs/internal/modules/documents/approval/repository"
 )
 
@@ -24,6 +25,19 @@ func (h *Handler) loadActiveInstanceByDocumentForMutation(r *http.Request, tenan
 		return nil, errors.New("mutation lookup service not configured")
 	}
 	return mutationLookup.LoadActiveInstanceByDocumentForMutation(r.Context(), h.db, tenantID, docID)
+}
+
+// failReplaySlot releases an in-flight idempotency slot on an error exit so it
+// is not orphaned until expiry. A non-nil release error is logged (not fatal):
+// the primary error is already being returned to the client, and the platform
+// store reclaims expired orphans on its own.
+func failReplaySlot(handle approvalinfra.SignoffReplayCommitter, cause error) {
+	if handle == nil {
+		return
+	}
+	if err := handle.Fail(cause); err != nil {
+		log.Printf("WARN signoff idempotency slot release failed (non-fatal): %v", err)
+	}
 }
 
 // GetInstanceByDocumentHandler handles GET /api/v1/documents/{id}/approval-instance.
@@ -111,31 +125,16 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 	}
 	decision := domain.Decision(contractReq.Decision)
 
-	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
-	if err != nil {
-		if errors.Is(err, repository.ErrNoActiveInstance) {
-			WriteError(w, repository.ErrNoActiveInstance)
-			return
-		}
-		WriteError(w, err)
-		return
-	}
-
-	activeStage := inst.Active()
-	if activeStage == nil {
-		WriteError(w, repository.ErrInstanceCompleted)
-		return
-	}
-	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
-		WriteError(w, err)
-		return
-	}
-
-	payloadHash := signoffPayloadHash(docID, inst.ID, activeStage.ID, decision, contractReq.Reason, contractReq.ContentHash)
-	var replayHandle interface {
-		Complete(outcome string) error
-		Fail(cause error) error
-	}
+	// The replay fingerprint must depend only on client-stable request inputs
+	// (the path-supplied document ID plus the request body), never on
+	// server-resolved instance/stage state. The active instance and stage rotate
+	// or go terminal between attempts; hashing them would make an identical retry
+	// produce a different fingerprint and trip the misuse guard with a spurious
+	// conflict instead of replaying the recorded outcome. The route template
+	// carries no document ID, so docID is also what isolates distinct documents
+	// under a reused key.
+	payloadHash := signoffPayloadHash(docID, "", "", decision, contractReq.Reason, contractReq.ContentHash)
+	var replayHandle approvalinfra.SignoffReplayCommitter
 	if h.idempStore != nil {
 		handle, replay, err := h.idempStore.BeginDocumentReplay(r.Context(), tenantID, actorID, idempKey, payloadHash)
 		if err != nil {
@@ -147,6 +146,29 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		replayHandle = handle
+	}
+
+	inst, err := h.loadActiveInstanceByDocumentForMutation(r, tenantID, docID)
+	if err != nil {
+		failReplaySlot(replayHandle, err)
+		if errors.Is(err, repository.ErrNoActiveInstance) {
+			WriteError(w, repository.ErrNoActiveInstance)
+			return
+		}
+		WriteError(w, err)
+		return
+	}
+
+	activeStage := inst.Active()
+	if activeStage == nil {
+		failReplaySlot(replayHandle, repository.ErrInstanceCompleted)
+		WriteError(w, repository.ErrInstanceCompleted)
+		return
+	}
+	if err := domain.CheckEligibility(actorID, activeStage.EligibleActorIDs); err != nil {
+		failReplaySlot(replayHandle, err)
+		WriteError(w, err)
+		return
 	}
 
 	result, err := h.decisionSvc.RecordSignoff(r.Context(), h.db, application.SignoffRequest{
@@ -162,9 +184,7 @@ func (h *Handler) SignoffByDocumentHandler(w http.ResponseWriter, r *http.Reques
 		ExpectedRevisionVersion: expectedRevisionVersion,
 	})
 	if err != nil {
-		if replayHandle != nil {
-			_ = replayHandle.Fail(err)
-		}
+		failReplaySlot(replayHandle, err)
 		WriteError(w, err)
 		return
 	}

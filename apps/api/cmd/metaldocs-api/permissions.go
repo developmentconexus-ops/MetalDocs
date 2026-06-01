@@ -60,6 +60,28 @@ func (r routeRule) matches(method, path string) bool {
 // added here; the unmatched default is VisibilitySessionRequired, so a
 // forgotten entry produces a 401 (loud), not a silent public route
 // (catastrophic).
+//
+// F-001 read/write split truth table (audit row -> intended caps):
+//   metrics           GET   /api/v1/metrics              -> CapMetricsView
+//   notifications     GET   /api/v1/notifications        -> CapDocumentView
+//   notifications     POST  /api/v1/notifications/{id}/read -> CapDocumentView (read-side mark)
+//   access-policies   GET   /api/v1/access-policies      -> CapMembershipView
+//   access-policies   PUT   /api/v1/access-policies      -> CapMembershipManage
+//   iam/users         GET   /api/v1/iam/users            -> CapUserView
+//   iam/users         POST/PATCH/PUT (writes)            -> CapUserManage
+//   iam/admin/overview GET  /api/v1/iam/admin/overview   -> CapUserView
+//   taxonomy/profiles GET                                -> CapTaxonomyView
+//   taxonomy/profiles POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
+//   taxonomy/areas    GET                                -> CapTaxonomyView
+//   taxonomy/areas    POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
+//   taxonomy/families GET                                -> CapTaxonomyView
+//   taxonomy/families POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
+//   iam/area-memberships GET                             -> CapMembershipView
+//   iam/area-memberships POST/PUT/PATCH/DELETE           -> CapMembershipManage
+//
+// Authoring rule: every writable prefix MUST have an explicit GET row with a
+// View-grade cap; methodless rows on writable prefixes are forbidden.
+// TestPermissionsTable_NoMethodlessWriteShadowing enforces this in CI.
 var routeRules = []routeRule{
 	// ---- Public (no session required) -----------------------------------
 	{method: http.MethodGet, pathPrefix: "/api/v1/health/", visibility: iamdelivery.VisibilityPublic},
@@ -74,31 +96,31 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathExact: "/api/v1/auth/logout", visibility: iamdelivery.VisibilitySessionRequired},
 
 	// ---- Permission-guarded ---------------------------------------------
-	// Metrics (H5 left intact per scope — separate finding).
-	{pathExact: "/api/v1/metrics", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// Metrics — Prometheus scrape endpoint; read-only.
+	{method: http.MethodGet, pathExact: "/api/v1/metrics", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Search / notifications.
 	{method: http.MethodGet, pathExact: "/api/v1/search/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/notifications", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/notifications/", pathSuffix: "/read", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// Access policies.
-	{method: http.MethodGet, pathExact: "/api/v1/access-policies", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// Access policies. F-001 split: GET view, PUT manage.
+	{method: http.MethodGet, pathExact: "/api/v1/access-policies", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathExact: "/api/v1/access-policies", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Workflow.
 	{method: http.MethodPost, pathPrefix: "/api/v1/workflow/documents/", pathSuffix: "/transitions", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathPrefix: "/api/v1/workflow/documents/", pathSuffix: "/approvals", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// IAM users.
+	// IAM users. F-001 split: GET view, writes manage.
+	{method: http.MethodGet, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodGet, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/iam/users/", notSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/reset-password", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/unlock", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodGet, pathExact: "/api/v1/iam/admin/overview", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/iam/admin/overview", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Legacy taxonomy aliases.
 	{method: http.MethodGet, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -155,20 +177,20 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/cancel", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/reconstruct", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// Taxonomy profiles / areas / families.
-	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// Taxonomy profiles / areas / families. F-001 split: GET view, writes manage.
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodDelete, pathPrefix: "/api/v1/taxonomy/areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/taxonomy/families", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -181,8 +203,13 @@ var routeRules = []routeRule{
 	{method: http.MethodPut, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/obsolete", capability: iamdomain.CapControlledDocumentObsolete, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/supersede", capability: iamdomain.CapControlledDocumentSupersede, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// IAM area memberships — any method.
-	{pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// IAM area memberships. F-001 split: GET view (handler self-scopes via
+	// canManageMembershipTarget at routes_memberships.go:172), writes manage.
+	{method: http.MethodGet, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPatch, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Signed-URL relay.
 	{method: http.MethodGet, pathExact: "/api/v1/signed", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},

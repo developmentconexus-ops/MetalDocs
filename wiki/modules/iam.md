@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-26 Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes) | **Maturity:** L2
+**Last verified:** 2026-06-01 (ADR 0016: added view-grade caps `metrics.view`, `membership.view`, `user.view`, `taxonomy.view`; registry now 24 consts; prior: P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; 2026-05-26 Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes) | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` â€” tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
@@ -18,7 +18,7 @@
 > - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` â€” tenant-scoped `RolesByUserID`
 > - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:34` â€” `UpsertUserAndAssignRole` (BEGIN-authz.Require-DELETE-INSERT); `ReplaceUserRoles` at `:76` â€” both now call `authz.Require(CapUserManage)` (Plan 5 closed T-004 partial)
 > - `internal/modules/iam/infrastructure/postgres/user_area_repository.go:52` â€” `Insert` (tier-2 `authz.Require(CapMembershipManage)`); `CloseActive` at `:84`; `GrantAtomic` at `:109` â€” all three write methods now have tier-2 enforcement (Plan 5 closed T-004 partial)
-> - `internal/modules/iam/domain/model.go:13` â€” single typed `Capability` namespace (20 consts including `CapControlledDocumentObsolete` + `CapControlledDocumentSupersede` added Plan 5; Plan 4 closed T-001)
+> - `internal/modules/iam/domain/model.go:13` â€” single typed `Capability` namespace (27 consts; ADR 0016 added `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`; Plan 5 added `CapControlledDocumentObsolete` + `CapControlledDocumentSupersede`; Plan 4 closed T-001; size locked by `TestCapabilityRegistrySize`)
 > - `apps/api/cmd/metaldocs-api/permissions.go:54,196` â€” `(method,path)â†’Cap*` resolver
 > - `apps/api/internal/wiring/documents.go:24` â€” `NewCapabilityChecker` adapter (J2 fix)
 > - `migrations/0142b_role_capabilities_v2_enforce.sql:67-179` â€” original `enforce_capability_asserted()` function (approval tables only; superseded by 0188)

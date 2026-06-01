@@ -84,6 +84,23 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'document.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'template.view', '') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
+-- View-grade capabilities per ADR 0016 (mirrors db/migrations/0217_view_grade_capabilities.sql).
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'membership.view', 'Read access policies and area memberships') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'taxonomy.view', 'Read taxonomy profiles, areas, families') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'membership.view', 'Read access policies and area memberships') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'taxonomy.view', 'Read taxonomy profiles, areas, families') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'user.view', 'Read user directory') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('author', 'membership.view', 'Read access policies and area memberships') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('author', 'taxonomy.view', 'Read taxonomy profiles, areas, families') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('editor', 'membership.view', 'Read access policies and area memberships') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('editor', 'taxonomy.view', 'Read taxonomy profiles, areas, families') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'membership.view', 'Read access policies and area memberships') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'metrics.view', 'Read /api/v1/metrics Prometheus scrape endpoint') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'taxonomy.view', 'Read taxonomy profiles, areas, families') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'user.view', 'Read user directory and IAM admin overview') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'membership.view', 'Read access policies and area memberships') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'taxonomy.view', 'Read taxonomy profiles, areas, families') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+
 -- System blank template required for controlled document creation defaults.
 -- Invariant: this reference-data row is valid only when bootstrap/storage also seeds
 -- `system/templates/blank.docx` into the configured attachments bucket.

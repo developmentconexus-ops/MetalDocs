@@ -59,10 +59,14 @@ const (
 	CapControlledDocumentCreate    Capability = "controlled_documents.create"
 	CapControlledDocumentObsolete  Capability = "controlled_documents.obsolete"
 	CapControlledDocumentSupersede Capability = "controlled_documents.supersede"
+	CapTaxonomyView                Capability = "taxonomy.view"
 	CapTaxonomyManage              Capability = "taxonomy.manage"
+	CapMembershipView              Capability = "membership.view"
 	CapMembershipManage            Capability = "membership.manage"
 	CapRouteManage                 Capability = "route.manage"
+	CapUserView                    Capability = "user.view"
 	CapUserManage                  Capability = "user.manage"
+	CapMetricsView                 Capability = "metrics.view"
 	CapAuditRead                   Capability = "audit.read"
 )
 
@@ -85,10 +89,14 @@ var validCapabilities = map[Capability]struct{}{
 	CapControlledDocumentCreate:    {},
 	CapControlledDocumentObsolete:  {},
 	CapControlledDocumentSupersede: {},
+	CapTaxonomyView:                {},
 	CapTaxonomyManage:              {},
+	CapMembershipView:              {},
 	CapMembershipManage:            {},
 	CapRouteManage:                 {},
+	CapUserView:                    {},
 	CapUserManage:                  {},
+	CapMetricsView:                 {},
 	CapAuditRead:                   {},
 }
 

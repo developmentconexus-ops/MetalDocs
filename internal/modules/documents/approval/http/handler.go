@@ -59,11 +59,12 @@ var (
 	ErrIfMatchMalformed = errors.New("precondition: If-Match header malformed; expected \"v<N>\" or \"*\"")
 )
 
-// signoffIdempStore backs idempotent replay for SignoffByDocumentHandler.
-// Keyed by (tenantID, actorID, route template, idempotency key, payload hash).
+// signoffIdempStore backs idempotent replay for the signoff handlers. Slots are
+// keyed by (tenantID, actorID, route template, idempotency key); payloadHash is a
+// misuse guard that must be derived only from client-stable request inputs.
 type signoffIdempStore interface {
-	BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*approvalinfra.SignoffReplayHandle, *approvalinfra.SignoffReplay, error)
-	BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*approvalinfra.SignoffReplayHandle, *approvalinfra.SignoffReplay, error)
+	BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error)
+	BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error)
 }
 
 type Handler struct {
