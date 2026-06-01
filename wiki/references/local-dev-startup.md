@@ -141,14 +141,20 @@ METALDOCS_DOCGEN_V2_SERVICE_TOKEN=<same value as DOCGEN_V2_SERVICE_TOKEN in .env
 
 ## Credentials
 
-| field | value |
-|---|---|
-| Login endpoint | `POST /api/v1/auth/login` |
-| Body field | `identifier` (NOT `username`) |
-| identifier | `admin` |
-| password | `AdminMetalDocs123!` |
+| field | admin | approver | author-test | approver-test |
+|---|---|---|---|---|
+| identifier | `admin` | `approver` | `author-test` | `approver-test` |
+| password | `AdminMetalDocs123!` | `ApproverMetalDocs123!` | _(curated seed)_ | `ApproverTest123!` |
+| roles | `system_admin` | `admin` (full caps) | `author` | `approver` (limited caps) |
+| use case | full admin / wizard / list QA | template approve + publish QA (satisfies SoD vs admin author) — preferred for editor lifecycle drive | draft authoring | capability-gate QA: role `approver` holds `template.approve` + `template.review` + `template.view`, lacks `template.submit` / `template.publish` |
 
-The curated local bootstrap creates this user when `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed` runs. First-boot bootstrap admin is separate and opt-in.
+Login endpoint: `POST /api/v1/auth/login`, body field `identifier` (NOT `username`).
+
+The curated local bootstrap creates these users when `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed` runs. First-boot bootstrap admin is separate and opt-in.
+
+**SoD note:** templates lifecycle requires the approver's `userId` to differ from the author's `userId`. `admin` authors → `approver` approves (or `approver-test` for capability-gate-only checks). Two distinct seeded admin-role users (`admin` + `approver`) exist solely to satisfy this segregation locally; see [`migrations/0159_seed_dev_approver_user.sql`](../../migrations/0159_seed_dev_approver_user.sql).
+
+`approver-test` password was reset to `ApproverTest123!` on 2026-05-31 (template-editor QA Preview drive) via `PATCH /api/v1/iam/users/approver-test` `{"newPassword":"ApproverTest123!","mustChangePassword":false}` — required `Origin: http://localhost:8081` to bypass CSRF check.
 
 **To reset local credentials:** rerun `scripts/dev-bootstrap-baseline.ps1 -WithDevSeed`. This rebuilds the curated local database and reapplies the local dev seed.
 
