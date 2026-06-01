@@ -16,6 +16,7 @@ import (
 	approvalsignature "metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
 )
@@ -24,9 +25,11 @@ type fakeDecisionService struct {
 	gotReq application.SignoffRequest
 	result application.SignoffResult
 	err    error
+	calls  int
 }
 
 func (f *fakeDecisionService) RecordSignoff(_ context.Context, _ *sql.DB, req application.SignoffRequest) (application.SignoffResult, error) {
+	f.calls++
 	f.gotReq = req
 	if f.err != nil {
 		return application.SignoffResult{}, f.err
@@ -307,32 +310,84 @@ func (f *fakeReadService) CountPendingForActor(_ context.Context, _ *sql.DB, _, 
 	return 0, nil
 }
 
-type fakeIdempStore struct {
-	entries map[string]string // composite key → outcome
-
-	// Test instrumentation populated by the most recent BeginDocumentReplay call.
-	gotHash   string
+// fakeIdempStore is a faithful in-memory double of the Postgres idempotency
+// store. Slot identity is the composite key (kind, tenant, actor, idempKey) —
+// mirroring the real PK (tenant, actor, route_template, key) — and the payload
+// hash is enforced as a misuse guard: re-claiming a slot with a different hash
+// returns idempotency.ErrConflict, exactly as the production store does at
+// postgres_store.go. Slots progress in_flight → completed (Complete) or are
+// released (Fail), so the record→replay lifecycle is exercised for real.
+type idempSlot struct {
+	hash      string
+	outcome   string
 	completed bool
 }
 
-func (f *fakeIdempStore) BeginDocumentReplay(_ context.Context, tenantID, actorID, key, payloadHash string) (*approvalinfra.SignoffReplayHandle, *approvalinfra.SignoffReplay, error) {
-	f.gotHash = payloadHash
-	k := "document:" + tenantID + ":" + actorID + ":" + key
-	v, ok := f.entries[k]
-	if !ok {
-		return nil, nil, nil
-	}
-	f.completed = true
-	return nil, &approvalinfra.SignoffReplay{Outcome: v}, nil
+type fakeIdempStore struct {
+	// Pre-seeded hash-agnostic outcomes, keyed by composite slot key. Used by
+	// tests that assert replay without exercising the record path.
+	entries map[string]string
+
+	// Faithful slot ledger populated by the record path.
+	slots map[string]*idempSlot
+
+	// Instrumentation from the most recent Begin*Replay call.
+	gotHash   string
+	completed bool
+	failed    bool
 }
 
-func (f *fakeIdempStore) BeginStageReplay(_ context.Context, tenantID, actorID, key, _ string) (*approvalinfra.SignoffReplayHandle, *approvalinfra.SignoffReplay, error) {
-	k := "stage:" + tenantID + ":" + actorID + ":" + key
-	v, ok := f.entries[k]
-	if !ok {
-		return nil, nil, nil
+func (f *fakeIdempStore) begin(kind, tenantID, actorID, key, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error) {
+	f.gotHash = payloadHash
+	k := kind + ":" + tenantID + ":" + actorID + ":" + key
+	if v, ok := f.entries[k]; ok {
+		f.completed = true
+		return nil, &approvalinfra.SignoffReplay{Outcome: v}, nil
 	}
-	return nil, &approvalinfra.SignoffReplay{Outcome: v}, nil
+	if f.slots == nil {
+		f.slots = map[string]*idempSlot{}
+	}
+	if s, ok := f.slots[k]; ok {
+		if s.hash != payloadHash {
+			return nil, nil, idempotency.ErrConflict
+		}
+		if s.completed {
+			f.completed = true
+			return nil, &approvalinfra.SignoffReplay{Outcome: s.outcome}, nil
+		}
+	}
+	s := &idempSlot{hash: payloadHash}
+	f.slots[k] = s
+	return &fakeReplayHandle{store: f, key: k, slot: s}, nil, nil
+}
+
+func (f *fakeIdempStore) BeginDocumentReplay(_ context.Context, tenantID, actorID, key, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error) {
+	return f.begin("document", tenantID, actorID, key, payloadHash)
+}
+
+func (f *fakeIdempStore) BeginStageReplay(_ context.Context, tenantID, actorID, key, payloadHash string) (approvalinfra.SignoffReplayCommitter, *approvalinfra.SignoffReplay, error) {
+	return f.begin("stage", tenantID, actorID, key, payloadHash)
+}
+
+type fakeReplayHandle struct {
+	store *fakeIdempStore
+	key   string
+	slot  *idempSlot
+}
+
+func (h *fakeReplayHandle) Complete(outcome string) error {
+	h.slot.completed = true
+	h.slot.outcome = outcome
+	h.store.completed = true
+	return nil
+}
+
+func (h *fakeReplayHandle) Fail(_ error) error {
+	// Mirror FailReplay rolling back the in_flight row: the slot is released so a
+	// fresh attempt (any hash) can re-claim it. No outcome is recorded.
+	delete(h.store.slots, h.key)
+	h.store.failed = true
+	return nil
 }
 
 func docSignoffTestMux(h *Handler) *http.ServeMux {
@@ -486,31 +541,27 @@ func TestSignoffByDocumentHandler_FirstCallTerminalStateReturnsError(t *testing.
 	}
 }
 
-// TestSignoffByDocumentHandler_StageIDForHashFallbackStable verifies that when
-// activeStage == nil, the payloadHash uses an empty stage ID, producing a
-// replay key stable across the terminal transition. Same (key, payloadHash)
-// tuple recorded before the transition must still replay after.
-func TestSignoffByDocumentHandler_StageIDForHashFallbackStable(t *testing.T) {
+// TestSignoffByDocumentHandler_FingerprintExcludesServerResolvedState verifies
+// that the doc-scoped replay fingerprint is derived only from client-stable
+// inputs (path document ID + body), never from the server-resolved instance or
+// active-stage IDs. This is the root-cause guard for F-002: hashing mutable
+// state made an identical retry produce a different fingerprint after the stage
+// rotated or the instance went terminal.
+func TestSignoffByDocumentHandler_FingerprintExcludesServerResolvedState(t *testing.T) {
 	const (
 		decisionStr = "approve"
-		reason      = ""
+		reason      = "F-002 fingerprint"
 		contentHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	)
-	// Pre-seed the store with the hash computed using empty stage ID (terminal
-	// fallback). The handler must compute the same hash on a terminal instance
-	// and find the cached outcome.
-	preHash := signoffPayloadHash("doc-1", "inst-1", "", domain.Decision(decisionStr), reason, contentHash)
-	store := &fakeIdempStore{
-		entries: map[string]string{"document:tenant-1:actor-1:idem-stable": "approved"},
-	}
+	store := &fakeIdempStore{}
 	h := &Handler{
-		decisionSvc: &fakeDecisionService{},
+		decisionSvc: &fakeDecisionService{result: application.SignoffResult{InstanceApproved: true}},
 		readSvc: &fakeReadService{inst: &domain.Instance{
 			ID:       "inst-1",
 			TenantID: "tenant-1",
 			Stages: []domain.StageInstance{{
 				ID:               "stage-1",
-				Status:           domain.StageCompleted,
+				Status:           domain.StageActive,
 				EligibleActorIDs: []string{"actor-1"},
 			}},
 		}},
@@ -518,29 +569,157 @@ func TestSignoffByDocumentHandler_StageIDForHashFallbackStable(t *testing.T) {
 	}
 	mux := docSignoffTestMux(h)
 
-	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	body := `{"decision":"approve","reason":"F-002 fingerprint","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
-	req.Header.Set("Idempotency-Key", "idem-stable")
+	req.Header.Set("Idempotency-Key", "idem-fp")
 	req.Header.Set("If-Match", "\"v5\"")
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
-
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
 	}
-	var out contracts.SignoffResponse
-	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
+
+	wantClientStable := signoffPayloadHash("doc-1", "", "", domain.Decision(decisionStr), reason, contentHash)
+	if store.gotHash != wantClientStable {
+		t.Fatalf("fingerprint = %q, want client-stable %q", store.gotHash, wantClientStable)
 	}
-	if !out.WasReplay || out.Outcome != "approved" {
-		t.Fatalf("response = %+v, want was_replay=true outcome=approved", out)
+	// The fingerprint MUST NOT match one computed from the resolved instance/stage
+	// IDs — that was the bug.
+	withServerState := signoffPayloadHash("doc-1", "inst-1", "stage-1", domain.Decision(decisionStr), reason, contentHash)
+	if store.gotHash == withServerState {
+		t.Fatalf("fingerprint must not depend on resolved instance/stage IDs")
 	}
-	if store.gotHash == "" || store.gotHash != preHash {
-		t.Fatalf("payload hash = %q, want %q (empty-stage fallback)", store.gotHash, preHash)
+}
+
+// TestSignoffByDocumentHandler_RecordsThenReplaysAcrossTerminalTransition is the
+// authoritative F-002 regression: a first call records the outcome while the
+// stage is active, then the SAME key replays the cached outcome after the
+// instance has gone terminal — driving the real active→terminal recording
+// transition end-to-end (not a pre-seeded slot). This is the exact flow that the
+// live API previously returned 500 on.
+func TestSignoffByDocumentHandler_RecordsThenReplaysAcrossTerminalTransition(t *testing.T) {
+	store := &fakeIdempStore{}
+	decisionSvc := &fakeDecisionService{result: application.SignoffResult{InstanceApproved: true}}
+	read := &fakeReadService{inst: &domain.Instance{
+		ID:       "inst-1",
+		TenantID: "tenant-1",
+		Stages: []domain.StageInstance{{
+			ID:               "stage-1",
+			Status:           domain.StageActive,
+			EligibleActorIDs: []string{"actor-1"},
+		}},
+	}}
+	h := &Handler{decisionSvc: decisionSvc, readSvc: read, idempStore: store}
+	mux := docSignoffTestMux(h)
+
+	body := `{"decision":"approve","reason":"","password":"secret","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`
+	newReq := func() *http.Request {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+		req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+		req.Header.Set("Idempotency-Key", "idem-terminal")
+		req.Header.Set("If-Match", "\"v5\"")
+		return req
+	}
+
+	// First call: stage active, actor eligible → records the outcome.
+	rr1 := httptest.NewRecorder()
+	mux.ServeHTTP(rr1, newReq())
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("first call status = %d, want 200; body: %s", rr1.Code, rr1.Body.String())
+	}
+	var out1 contracts.SignoffResponse
+	if err := json.NewDecoder(rr1.Body).Decode(&out1); err != nil {
+		t.Fatalf("decode first: %v", err)
+	}
+	if out1.WasReplay || out1.Outcome != "approved" {
+		t.Fatalf("first response = %+v, want fresh approved", out1)
+	}
+
+	// Instance now goes terminal out-of-band (no active stage).
+	read.inst = &domain.Instance{
+		ID:       "inst-1",
+		TenantID: "tenant-1",
+		Stages: []domain.StageInstance{{
+			ID:     "stage-1",
+			Status: domain.StageCompleted,
+		}},
+	}
+
+	// Retry with the SAME key: must replay the cached outcome, not 409/500.
+	rr2 := httptest.NewRecorder()
+	mux.ServeHTTP(rr2, newReq())
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("retry status = %d, want 200 (replay after terminal); body: %s", rr2.Code, rr2.Body.String())
+	}
+	var out2 contracts.SignoffResponse
+	if err := json.NewDecoder(rr2.Body).Decode(&out2); err != nil {
+		t.Fatalf("decode retry: %v", err)
+	}
+	if !out2.WasReplay || out2.Outcome != "approved" {
+		t.Fatalf("retry response = %+v, want was_replay=true outcome=approved", out2)
+	}
+	if decisionSvc.calls != 1 {
+		t.Fatalf("decision service calls = %d, want 1 (replay must not re-run the signoff)", decisionSvc.calls)
+	}
+}
+
+// TestSignoffByDocumentHandler_KeyReuseDifferentBodyConflicts verifies the
+// misuse guard surfaces as 409 idempotency.key_conflict (not 500): once a key is
+// recorded, reusing it with a different request body (different content hash)
+// must be rejected as a conflict so the caller rotates the key.
+func TestSignoffByDocumentHandler_KeyReuseDifferentBodyConflicts(t *testing.T) {
+	store := &fakeIdempStore{}
+	read := &fakeReadService{inst: &domain.Instance{
+		ID:       "inst-1",
+		TenantID: "tenant-1",
+		Stages: []domain.StageInstance{{
+			ID:               "stage-1",
+			Status:           domain.StageActive,
+			EligibleActorIDs: []string{"actor-1"},
+		}},
+	}}
+	h := &Handler{
+		decisionSvc: &fakeDecisionService{result: application.SignoffResult{InstanceApproved: true}},
+		readSvc:     read,
+		idempStore:  store,
+	}
+	mux := docSignoffTestMux(h)
+
+	mk := func(contentHash string) *http.Request {
+		body := `{"decision":"approve","reason":"","password":"secret","content_hash":"` + contentHash + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc-1/signoff", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+		req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+		req.Header.Set("Idempotency-Key", "idem-reuse")
+		req.Header.Set("If-Match", "\"v5\"")
+		return req
+	}
+
+	rr1 := httptest.NewRecorder()
+	mux.ServeHTTP(rr1, mk("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+	if rr1.Code != http.StatusOK {
+		t.Fatalf("first call status = %d, want 200; body: %s", rr1.Code, rr1.Body.String())
+	}
+
+	// Same key, different content hash → conflict.
+	rr2 := httptest.NewRecorder()
+	mux.ServeHTTP(rr2, mk("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
+	if rr2.Code != http.StatusConflict {
+		t.Fatalf("reuse status = %d, want %d; body: %s", rr2.Code, http.StatusConflict, rr2.Body.String())
+	}
+	var prob problem.Problem
+	if err := json.NewDecoder(rr2.Body).Decode(&prob); err != nil {
+		t.Fatalf("decode conflict: %v", err)
+	}
+	if prob.Code != "idempotency.key_conflict" {
+		t.Fatalf("error.code = %q, want %q", prob.Code, "idempotency.key_conflict")
 	}
 }
 
