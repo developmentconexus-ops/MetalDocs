@@ -37,6 +37,7 @@ interface SignoffDialogProps {
   documentId: string;
   contentHash: string;
   instanceId: string;
+  revisionVersion: number;
   initialDecision?: Decision;
   onClose: () => void;
   onSuccess: () => void;
@@ -49,6 +50,7 @@ export function SignoffDialog({
   documentId,
   contentHash,
   instanceId,
+  revisionVersion,
   initialDecision,
   onClose,
   onSuccess,
@@ -173,12 +175,16 @@ export function SignoffDialog({
 
     setState('submitting');
     try {
-      await signoff(documentId, {
-        decision,
-        reason: decision === 'reject' ? normalizedReason : undefined,
-        password,
-        content_hash: contentHash,
-      });
+      await signoff(
+        documentId,
+        {
+          decision,
+          reason: decision === 'reject' ? normalizedReason : undefined,
+          password,
+          content_hash: contentHash,
+        },
+        { ifMatch: `"v${revisionVersion}"` },
+      );
 
       setState('success');
       successTimeoutRef.current = window.setTimeout(() => {
