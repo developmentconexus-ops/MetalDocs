@@ -80,14 +80,17 @@ export function canApprove(version: VersionDTO, actor: ActorContext): VersionAct
   });
 }
 
-// canPublish gates the no-reviewer "Publish" path: in_review version with
-// pending_reviewer_role == null transitions straight to published.
-// Backend cap: template.publish. Role binding: pending_approver_role.
+// canPublish gates the no-reviewer "Publish" button on the in_review state.
+// The UI label is "Publish" but the actual call is approveVersion (POST /approve
+// → Service.Approve, which accepts and publishes + spawns next draft in-tx).
+// Backend cap therefore is template.approve, NOT template.publish (template.publish
+// gates the direct POST /publish endpoint, which the editor screen does not call).
+// Role binding: pending_approver_role.
 export function canPublish(version: VersionDTO, actor: ActorContext): VersionActionGate {
   const noReviewerFlow = version.pending_reviewer_role == null;
   return evaluate({
     statusOk: version.status === 'in_review' && noReviewerFlow,
-    capability: 'template.publish',
+    capability: 'template.approve',
     capabilities: actor.capabilities,
     requiredRole: version.pending_approver_role,
     roles: actor.roles,
