@@ -273,6 +273,7 @@ describe('InboxPage', () => {
       documentId: 'doc-1',
       contentHash: 'hash-1',
       approvalInstanceId: 'inst-1',
+      revisionVersion: 0,
     } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },
@@ -316,6 +317,7 @@ describe('InboxPage', () => {
       documentId: 'doc-1',
       contentHash: 'hash-1',
       approvalInstanceId: 'inst-1',
+      revisionVersion: 0,
     } as Awaited<ReturnType<typeof getActiveDocumentContext>>);
     vi.mocked(useInboxQuery).mockReturnValue({
       data: { items: [makeItem({ controlled_document_id: 'cd-123' })], total: 1 },

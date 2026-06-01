@@ -26,6 +26,7 @@ function renderDialog(props: Partial<Parameters<typeof SignoffDialog>[0]> = {}) 
       documentId="doc-1"
       contentHash="hash-1"
       instanceId="inst-1"
+      revisionVersion={0}
       onClose={onClose}
       onSuccess={onSuccess}
       {...props}
@@ -50,12 +51,16 @@ describe('SignoffDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
 
     expect(screen.getByRole('button', { name: 'Enviando...' })).toBeTruthy();
-    expect(vi.mocked(approvalApi.signoff)).toHaveBeenCalledWith('doc-1', {
-      decision: 'approve',
-      reason: undefined,
-      password: 'secret',
-      content_hash: 'hash-1',
-    });
+    expect(vi.mocked(approvalApi.signoff)).toHaveBeenCalledWith(
+      'doc-1',
+      {
+        decision: 'approve',
+        reason: undefined,
+        password: 'secret',
+        content_hash: 'hash-1',
+      },
+      { ifMatch: '"v0"' },
+    );
 
     deferred.resolve({ signoff_id: 'sig-1', was_replay: false });
     await waitFor(() => {
@@ -75,12 +80,16 @@ describe('SignoffDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar assinatura' }));
 
     await waitFor(() => {
-      expect(vi.mocked(approvalApi.signoff)).toHaveBeenCalledWith('doc-1', {
-        decision: 'reject',
-        reason: 'Não atende aos requisitos.',
-        password: 'secret',
-        content_hash: 'hash-1',
-      });
+      expect(vi.mocked(approvalApi.signoff)).toHaveBeenCalledWith(
+        'doc-1',
+        {
+          decision: 'reject',
+          reason: 'Não atende aos requisitos.',
+          password: 'secret',
+          content_hash: 'hash-1',
+        },
+        { ifMatch: '"v0"' },
+      );
     });
   });
 
