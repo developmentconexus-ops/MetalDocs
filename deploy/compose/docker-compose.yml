@@ -87,7 +87,7 @@ services:
       LOG_LEVEL: info
       VERSION: ${DOCX_RENDERER_VERSION:-dev}
     ports:
-      - "3100:3100"
+      - "3110:3100"
     depends_on:
       minio:
         condition: service_started
