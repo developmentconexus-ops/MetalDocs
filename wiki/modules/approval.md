@@ -161,7 +161,7 @@ Source: surface scan Â§2 (~110 exported symbols â€” most undocumented, se
 | `internal/modules/documents/approval/application/services.go:29` | `Services` | type | Composition root for module services |
 | `internal/modules/documents/approval/repository/approval_repository.go:28` | `ApprovalRepository` | iface | Scheduling/publish persistence surface for approval instances, published-head resolution, supersede validation, and OCC status updates |
 | `internal/modules/documents/approval/repository/postgres_approval_repository.go:20` | `NewPostgresApprovalRepository` | func | Postgres impl ctor |
-| `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:14` | `PostgresSignoffIdempStore` | type | Stripe-style HTTP idempotency over `metaldocs.idempotency_keys` |
+| `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go:54` | `PostgresSignoffIdempStore` | type | Stripe-style HTTP idempotency over `metaldocs.idempotency_keys` |
 | `internal/modules/documents/approval/infra/signature/password_reauth.go:53` | `PasswordReauthProvider` | type | Pluggable signature provider (rate-limited) |
 | `internal/modules/documents/approval/http/handler.go:56` | `Handler` + `NewHandler` | type/func | Aggregates 16 HTTP handlers + injected services |
 | `internal/modules/documents/approval/http/router.go:6` | `RegisterRoutes` | method | Mounts 16 routes onto `*http.ServeMux` |
@@ -177,15 +177,15 @@ Source: `_artifacts/01-surface.md` Â§3. Wired via `internal/modules/documents/
 |---|---|---|---|
 | POST | `/api/v1/documents/{id}/submit` | `SubmitHandler` (`submit_handler.go:14`) | `doc.submit` + areaCode |
 | POST | `/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs` | `SignoffHandler` (`signoff_handler.go:18`) | `doc.signoff` + areaCode |
-| POST | `/api/v1/documents/{id}/signoff` | `SignoffByDocumentHandler` (`doc_approval_handler.go:51`) | `doc.signoff` + areaCode |
+| POST | `/api/v1/documents/{id}/signoff` | `SignoffByDocumentHandler` (`doc_approval_handler.go:87`) | `doc.signoff` + areaCode |
 | POST | `/api/v1/documents/{id}/publish` | `PublishHandler` (`publish_handler.go:30`) | `doc.publish` |
 | POST | `/api/v1/documents/{id}/schedule-publish` | `SchedulePublishHandler` (`publish_handler.go:69`) | `doc.publish` |
 | POST | `/api/v1/documents/{id}/supersede` | `SupersedeHandler` (`supersede_handler.go:21`) | `doc.publish` |
 | POST | `/api/v1/documents/{id}/obsolete` | `ObsoleteHandler` (`obsolete_handler.go:21`) | `doc.obsolete` |
 | POST | `/api/v1/approval/instances/{instance_id}/cancel` | `CancelHandler` (`cancel_handler.go:21`) | `doc.cancel` |
-| POST | `/api/v1/documents/{id}/cancel` | `CancelByDocumentHandler` (`doc_approval_handler.go:146`) | `doc.cancel` |
+| POST | `/api/v1/documents/{id}/cancel` | `CancelByDocumentHandler` (`doc_approval_handler.go:207`) | `doc.cancel` |
 | GET | `/api/v1/approval/instances/{instance_id}` | `GetInstanceHandler` (`get_instance_handler.go:14`) | tier-1 only |
-| GET | `/api/v1/documents/{id}/approval-instance` | `GetInstanceByDocumentHandler` (`doc_approval_handler.go:16`) | tier-1 only; modern consumers use this on the editor `under_review` path and on canonical `/documents/:id` to render approval metadata (`approved`/`published` timestamps + signoff chain) |
+| GET | `/api/v1/documents/{id}/approval-instance` | `GetInstanceByDocumentHandler` (`doc_approval_handler.go:45`) | tier-1 only; modern consumers use this on the editor `under_review` path and on canonical `/documents/:id` to render approval metadata (`approved`/`published` timestamps + signoff chain) |
 | GET | `/api/v1/approval/inbox` | `InboxHandler` (`inbox_handler.go:15`) | tier-1 only (JSONB `@>` actor scoping) |
 | POST | `/api/v1/approval/routes` | `CreateRouteHandler` (`route_admin_handler.go:16`) | `route.admin` |
 | PUT | `/api/v1/approval/routes/{id}` | `UpdateRouteHandler` (`route_admin_handler.go:59`) | `route.admin` |
