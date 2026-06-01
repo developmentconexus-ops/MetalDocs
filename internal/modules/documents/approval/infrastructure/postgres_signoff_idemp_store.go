@@ -19,6 +19,15 @@ type SignoffReplay struct {
 	Outcome string `json:"outcome"`
 }
 
+// SignoffReplayCommitter is the slot handle a winning caller must resolve with
+// exactly one of Complete or Fail. It is returned as an interface so HTTP
+// handlers depend on the behaviour, not the Postgres-bound concrete type, which
+// keeps the replay seam unit-testable with an in-memory double.
+type SignoffReplayCommitter interface {
+	Complete(outcome string) error
+	Fail(cause error) error
+}
+
 type SignoffReplayHandle struct {
 	store  *idempotency.Store
 	handle *idempotency.ReplayHandle
@@ -57,15 +66,15 @@ func NewPostgresSignoffIdempStore(db *sql.DB) *PostgresSignoffIdempStore {
 	}
 }
 
-func (s *PostgresSignoffIdempStore) BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*SignoffReplayHandle, *SignoffReplay, error) {
+func (s *PostgresSignoffIdempStore) BeginDocumentReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (SignoffReplayCommitter, *SignoffReplay, error) {
 	return s.beginReplay(ctx, s.document, tenantID, actorID, idempKey, payloadHash)
 }
 
-func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (*SignoffReplayHandle, *SignoffReplay, error) {
+func (s *PostgresSignoffIdempStore) BeginStageReplay(ctx context.Context, tenantID, actorID, idempKey, payloadHash string) (SignoffReplayCommitter, *SignoffReplay, error) {
 	return s.beginReplay(ctx, s.stage, tenantID, actorID, idempKey, payloadHash)
 }
 
-func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (*SignoffReplayHandle, *SignoffReplay, error) {
+func (s *PostgresSignoffIdempStore) beginReplay(ctx context.Context, store *idempotency.Store, tenantID, actorID, idempKey, payloadHash string) (SignoffReplayCommitter, *SignoffReplay, error) {
 	if store == nil {
 		return nil, nil, errors.New("idempotency store database not configured")
 	}

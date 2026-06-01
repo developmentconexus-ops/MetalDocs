@@ -16,6 +16,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 	v2dom "metaldocs/internal/modules/documents/domain"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/problem"
 )
 
@@ -39,6 +40,7 @@ const (
 	approvalCodePreconditionIfMatch      problem.Code = "precondition.if_match_required"
 	approvalCodeValidationIfMatchBad     problem.Code = "validation.if_match_malformed"
 	approvalCodeIdempotencyRequired      problem.Code = "idempotency.key_required"
+	approvalCodeIdempotencyKeyConflict   problem.Code = "idempotency.key_conflict"
 	approvalCodePreconditionHashMismatch problem.Code = "precondition.content_hash_mismatch"
 	approvalCodeAuthnSignatureInvalid    problem.Code = "authn.signature_invalid"
 	approvalCodeInternalDBPrivilege      problem.Code = "internal.db_privilege_missing"
@@ -124,6 +126,11 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, ErrIdempotencyRequired):
 		statusCode = http.StatusBadRequest
 		code = approvalCodeIdempotencyRequired
+	case errors.Is(err, idempotency.ErrConflict):
+		// Same Idempotency-Key reused with a different request fingerprint: the
+		// caller must rotate the key for a genuinely new attempt.
+		statusCode = http.StatusConflict
+		code = approvalCodeIdempotencyKeyConflict
 	case errors.Is(err, ErrContentHashMismatch):
 		statusCode = http.StatusPreconditionFailed
 		code = approvalCodePreconditionHashMismatch

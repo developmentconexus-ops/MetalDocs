@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
@@ -76,22 +77,23 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "templates approval config", method: http.MethodPut, path: "/api/v1/templates/t1/approval-config", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates archive", method: http.MethodPost, path: "/api/v1/templates/t1/archive", wantCap: iamdomain.Capability("template.archive"), wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
-		// --- Permission-guarded: IAM users ---
-		{name: "iam users list", method: http.MethodGet, path: "/api/v1/iam/users", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// --- Permission-guarded: IAM users (F-001 split: GET=view, writes=manage) ---
+		{name: "iam users list", method: http.MethodGet, path: "/api/v1/iam/users", wantCap: iamdomain.CapUserView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam users create", method: http.MethodPost, path: "/api/v1/iam/users", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam users patch profile", method: http.MethodPatch, path: "/api/v1/iam/users/u-1", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam users post roles", method: http.MethodPost, path: "/api/v1/iam/users/u-1/roles", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam users put roles", method: http.MethodPut, path: "/api/v1/iam/users/u-1/roles", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam users reset password", method: http.MethodPost, path: "/api/v1/iam/users/u-1/reset-password", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam users unlock", method: http.MethodPost, path: "/api/v1/iam/users/u-1/unlock", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "iam admin overview", method: http.MethodGet, path: "/api/v1/iam/admin/overview", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "iam admin overview", method: http.MethodGet, path: "/api/v1/iam/admin/overview", wantCap: iamdomain.CapUserView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
-		// --- Permission-guarded: taxonomy + legacy aliases ---
-		{name: "taxonomy families list", method: http.MethodGet, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// --- Permission-guarded: taxonomy (F-001 split: GET=view, writes=manage) + legacy aliases ---
+		{name: "taxonomy families list", method: http.MethodGet, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy families create", method: http.MethodPost, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy families patch", method: http.MethodPatch, path: "/api/v1/taxonomy/families/PROC", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "taxonomy areas list", method: http.MethodGet, path: "/api/v1/taxonomy/areas", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy areas patch", method: http.MethodPatch, path: "/api/v1/taxonomy/areas/QA", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "taxonomy profiles list", method: http.MethodGet, path: "/api/v1/taxonomy/profiles", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "taxonomy profiles list", method: http.MethodGet, path: "/api/v1/taxonomy/profiles", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "legacy document-profiles list", method: http.MethodGet, path: "/api/v1/document-profiles", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "legacy process-areas create", method: http.MethodPost, path: "/api/v1/process-areas", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "legacy document-subjects delete", method: http.MethodDelete, path: "/api/v1/document-subjects/s-1", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -110,16 +112,18 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "search documents", method: http.MethodGet, path: "/api/v1/search/documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "notifications list", method: http.MethodGet, path: "/api/v1/notifications", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "notification mark read", method: http.MethodPost, path: "/api/v1/notifications/n-1/read", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "access policies get", method: http.MethodGet, path: "/api/v1/access-policies", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "access policies get", method: http.MethodGet, path: "/api/v1/access-policies", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "access policies put", method: http.MethodPut, path: "/api/v1/access-policies", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
-		// --- Permission-guarded: misc ---
-		{name: "iam area memberships any method", method: http.MethodPost, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// --- Permission-guarded: misc (F-001 split: area-memberships GET=view, writes=manage) ---
+		{name: "iam area memberships list", method: http.MethodGet, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "iam area memberships create", method: http.MethodPost, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "iam area memberships delete", method: http.MethodDelete, path: "/api/v1/iam/area-memberships/m-1", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval get", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval post", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/decisions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "audit events", method: http.MethodGet, path: "/api/v1/audit/events", wantCap: iamdomain.CapAuditRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "metrics", method: http.MethodGet, path: "/api/v1/metrics", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "metrics", method: http.MethodGet, path: "/api/v1/metrics", wantCap: iamdomain.CapMetricsView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 	}
 
 	for _, tc := range testCases {
@@ -336,4 +340,66 @@ func matchedByRule(method, path string) bool {
 		}
 	}
 	return false
+}
+
+// TestPermissionsTable_NoMethodlessWriteShadowing locks the F-001 authoring
+// invariants. Fails if any rule:
+//   (a) has empty method AND a Manage/Submit/write-grade cap, OR
+//   (b) has empty method on a prefix where some OTHER rule declares a write
+//       verb (so the methodless row would shadow per-verb intent).
+//
+// See wiki/concepts/authz-tiers.md §Tier-1 rule authoring rules.
+func TestPermissionsTable_NoMethodlessWriteShadowing(t *testing.T) {
+	t.Parallel()
+
+	writeMethods := map[string]bool{
+		http.MethodPost:   true,
+		http.MethodPut:    true,
+		http.MethodPatch:  true,
+		http.MethodDelete: true,
+	}
+	isWriteCap := func(c iamdomain.Capability) bool {
+		s := string(c)
+		return strings.Contains(s, ".manage") ||
+			strings.Contains(s, ".submit") ||
+			strings.Contains(s, ".create") ||
+			strings.Contains(s, ".edit") ||
+			strings.Contains(s, ".approve") ||
+			strings.Contains(s, ".publish") ||
+			strings.Contains(s, ".signoff") ||
+			strings.Contains(s, ".obsolete") ||
+			strings.Contains(s, ".supersede") ||
+			strings.Contains(s, ".review")
+	}
+
+	// (a) methodless row carrying a write-grade cap.
+	for i, r := range routeRules {
+		if r.method == "" && r.capability != "" && isWriteCap(r.capability) {
+			t.Errorf("routeRules[%d]: methodless rule cannot carry write-grade cap %q (prefix=%q, exact=%q). Split into per-verb rows.",
+				i, r.capability, r.pathPrefix, r.pathExact)
+		}
+	}
+
+	// (b) methodless prefix overlapping a path declared with a write verb elsewhere.
+	for i, mr := range routeRules {
+		if mr.method != "" || mr.pathPrefix == "" {
+			continue
+		}
+		for j, other := range routeRules {
+			if i == j || !writeMethods[other.method] {
+				continue
+			}
+			overlap := false
+			if other.pathPrefix != "" && strings.HasPrefix(other.pathPrefix, mr.pathPrefix) {
+				overlap = true
+			}
+			if other.pathExact != "" && strings.HasPrefix(other.pathExact, mr.pathPrefix) {
+				overlap = true
+			}
+			if overlap {
+				t.Errorf("routeRules[%d]: methodless prefix %q shadows write-verb rule routeRules[%d] (%s %s%s). Replace methodless row with per-verb rows.",
+					i, mr.pathPrefix, j, other.method, other.pathPrefix, other.pathExact)
+			}
+		}
+	}
 }

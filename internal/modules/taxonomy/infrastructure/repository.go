@@ -50,7 +50,7 @@ func (r *ProfileRepository) GetByCode(ctx context.Context, tenantID string, code
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, fmt.Errorf("query profile %q: %w", code, err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyView), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get profile: %w", err)
 	}
 
@@ -98,7 +98,7 @@ func (r *ProfileRepository) List(ctx context.Context, tenantID string, includeAr
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyView), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List profiles: %w", err)
 	}
 
@@ -341,7 +341,7 @@ func (r *AreaRepository) GetByCode(ctx context.Context, tenantID string, code do
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, fmt.Errorf("query area %q: %w", code, err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyView), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check Get area: %w", err)
 	}
 
@@ -387,7 +387,7 @@ func (r *AreaRepository) List(ctx context.Context, tenantID string, includeArchi
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyView), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List areas: %w", err)
 	}
 
@@ -637,7 +637,7 @@ func (r *AreaRepository) ListAncestors(ctx context.Context, tenantID string, cod
 	if err := setAuthzGUC(ctx, tx); err != nil {
 		return nil, fmt.Errorf("query area ancestors %q: %w", code, err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapTaxonomyView), "tenant"); err != nil {
 		return nil, fmt.Errorf("taxonomy: authz check List area ancestors: %w", err)
 	}
 

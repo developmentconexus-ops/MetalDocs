@@ -30,3 +30,38 @@ func TestCapabilityInvariants(t *testing.T) {
 	}()
 	_ = MustCapability("invalid.capability")
 }
+
+// Locks the registry size so silent deletions or duplicate inserts surface
+// as a test failure. Bump intentionally when caps are added/removed via ADR.
+func TestCapabilityRegistrySize(t *testing.T) {
+	const want = 27
+	if got := len(validCapabilities); got != want {
+		t.Fatalf("validCapabilities size = %d, want %d (bump only via ADR; current = 23 base + 4 ADR 0016 view caps)", got, want)
+	}
+	if got := len(AllCapabilities()); got != want {
+		t.Fatalf("AllCapabilities() size = %d, want %d", got, want)
+	}
+}
+
+func TestViewGradeCapabilitiesRegistered(t *testing.T) {
+	viewCaps := []Capability{
+		CapMetricsView,
+		CapMembershipView,
+		CapUserView,
+		CapTaxonomyView,
+	}
+	wantValues := map[Capability]string{
+		CapMetricsView:    "metrics.view",
+		CapMembershipView: "membership.view",
+		CapUserView:       "user.view",
+		CapTaxonomyView:   "taxonomy.view",
+	}
+	for _, c := range viewCaps {
+		if !IsValidCapability(c) {
+			t.Errorf("view cap %q must be in validCapabilities", c)
+		}
+		if string(c) != wantValues[c] {
+			t.Errorf("cap string drift: got %q, want %q", string(c), wantValues[c])
+		}
+	}
+}
