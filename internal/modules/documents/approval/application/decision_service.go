@@ -25,6 +25,14 @@ type FreezeInvoker interface {
 	Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
 }
 
+// PinInvoker is the async-freeze replacement for FreezeInvoker (ADR 0015).
+// Pin performs validation, resolves computed placeholders, writes values_hash +
+// frozen_at, and enqueues a materialize_dispatch_outbox row — all inside tx.
+// No network calls to docx-renderer.
+type PinInvoker interface {
+	Pin(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
+}
+
 type PDFDispatchInvoker interface {
 	Dispatch(ctx context.Context, tenantID, revisionID string) error
 }
@@ -40,6 +48,7 @@ type DecisionService struct {
 	emitter       EventEmitter
 	clock         Clock
 	freezeInvoker FreezeInvoker
+	pinInvoker    PinInvoker
 	// deprecated: post-commit best-effort dispatcher; replaced by pdfOutbox.
 	pdfDispatcher PDFDispatchInvoker
 	pdfOutbox     PDFOutboxEnqueuer
@@ -64,6 +73,13 @@ func NewDecisionService(
 // WithPDFOutbox sets the transactional outbox enqueuer, replacing the post-commit dispatcher.
 func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionService {
 	s.pdfOutbox = enqueuer
+	return s
+}
+
+// WithPinInvoker enables the async-freeze path (ADR 0015). When set, Pin is
+// called instead of Freeze during signoff, eliminating the in-tx network call.
+func (s *DecisionService) WithPinInvoker(invoker PinInvoker) *DecisionService {
+	s.pinInvoker = invoker
 	return s
 }
 
@@ -342,16 +358,26 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 				_ = tx.Rollback()
 				return SignoffResult{}, err
 			}
-			if s.freezeInvoker == nil {
-				_ = tx.Rollback()
-				return SignoffResult{}, fmt.Errorf("recordSignoff: freezeInvoker not configured")
-			}
-			if err := s.freezeInvoker.Freeze(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
-				UserID:       req.ActorUserID,
-				Capabilities: req.Capabilities,
-			}); err != nil {
-				_ = tx.Rollback()
-				return SignoffResult{}, fmt.Errorf("recordSignoff: freeze: %w", err)
+			if s.pinInvoker != nil {
+				if err := s.pinInvoker.Pin(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
+					UserID:       req.ActorUserID,
+					Capabilities: req.Capabilities,
+				}); err != nil {
+					_ = tx.Rollback()
+					return SignoffResult{}, fmt.Errorf("recordSignoff: pin: %w", err)
+				}
+			} else {
+				if s.freezeInvoker == nil {
+					_ = tx.Rollback()
+					return SignoffResult{}, fmt.Errorf("recordSignoff: neither pinInvoker nor freezeInvoker configured")
+				}
+				if err := s.freezeInvoker.Freeze(ctx, tx, req.TenantID, instance.DocumentID, docapp.ApproverContext{
+					UserID:       req.ActorUserID,
+					Capabilities: req.Capabilities,
+				}); err != nil {
+					_ = tx.Rollback()
+					return SignoffResult{}, fmt.Errorf("recordSignoff: freeze: %w", err)
+				}
 			}
 			// Transition document under_review → approved.
 			res, err := tx.ExecContext(ctx, `
@@ -472,7 +498,9 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 
 	// Step 13: enqueue PDF dispatch inside tx (transactional outbox).
-	if shouldDispatchPDF && s.pdfOutbox != nil {
+	// Skipped when pinInvoker is active: PDF dispatch is enqueued by MaterializeJobRunner
+	// after the fanout call succeeds (ADR 0015).
+	if shouldDispatchPDF && s.pdfOutbox != nil && s.pinInvoker == nil {
 		if err := s.pdfOutbox.Enqueue(ctx, tx, pdfTenantID, pdfRevisionID, []byte(contentHash)); err != nil {
 			_ = tx.Rollback()
 			return SignoffResult{}, fmt.Errorf("recordSignoff: enqueue pdf outbox: %w", err)
@@ -485,7 +513,7 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 	// deprecated: post-commit best-effort dispatch (replaced by pdfOutbox transactional enqueue above).
 	// Left in place for callers that have not yet wired pdfOutbox.
-	if shouldDispatchPDF && s.pdfOutbox == nil && s.pdfDispatcher != nil {
+	if shouldDispatchPDF && s.pdfOutbox == nil && s.pdfDispatcher != nil && s.pinInvoker == nil {
 		// Client fails fast; retry owned by PDFOutboxWorker (wiki/decisions/0009-pdf-dispatch-outbox.md).
 		dispatchCtx, dispatchCancel := context.WithTimeout(ctx, 45*time.Second)
 		defer dispatchCancel()

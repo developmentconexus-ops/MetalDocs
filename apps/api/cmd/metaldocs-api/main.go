@@ -358,38 +358,47 @@ func main() {
 		log.Fatal("approval runtime requires configured freeze service")
 	}
 	pdfOutboxRepo := fanout.NewPDFOutboxRepository(deps.SQLDB)
-	pdfOutboxWorker := fanout.NewPDFOutboxWorker(pdfOutboxRepo, deps.Publisher, slog.Default())
+	materializeOutboxRepo := fanout.NewMaterializeOutboxRepository(deps.SQLDB)
+
+	// Wire materialize outbox into the freeze service so Pin can enqueue async jobs.
+	fanoutCfg.freezeService.WithMaterializeOutbox(materializeOutboxRepo)
+
 	var workerWG sync.WaitGroup
-	workerWG.Add(1)
-	go func() {
-		defer workerWG.Done()
-		// Restart loop with capped exponential backoff. The worker normally only
-		// exits when ctx is cancelled; any non-nil return is treated as a crash
-		// and the loop re-runs after a backoff so document approval doesn't
-		// keep succeeding while PDF delivery silently stops.
-		backoff := time.Second
-		for ctx.Err() == nil {
-			err := pdfOutboxWorker.Run(ctx)
-			if err == nil {
-				return
-			}
-			slog.Error("pdf outbox worker exited; restarting", "err", err, "backoff", backoff)
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(backoff):
-			}
-			if backoff < time.Minute {
-				backoff *= 2
-				if backoff > time.Minute {
-					backoff = time.Minute
+	startOutboxWorker := func(name string, run func(context.Context) error) {
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			backoff := time.Second
+			for ctx.Err() == nil {
+				err := run(ctx)
+				if err == nil {
+					return
+				}
+				slog.Error(name+" exited; restarting", "err", err, "backoff", backoff)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(backoff):
+				}
+				if backoff < time.Minute {
+					backoff *= 2
+					if backoff > time.Minute {
+						backoff = time.Minute
+					}
 				}
 			}
-		}
-	}()
+		}()
+	}
+
+	pdfOutboxWorker := fanout.NewPDFOutboxWorker(pdfOutboxRepo, deps.Publisher, slog.Default())
+	startOutboxWorker("pdf outbox worker", pdfOutboxWorker.Run)
+
+	materializeOutboxWorker := fanout.NewMaterializeOutboxWorker(materializeOutboxRepo, deps.Publisher, slog.Default())
+	startOutboxWorker("materialize outbox worker", materializeOutboxWorker.Run)
+
 	approvalServices.Decision = approvalapp.NewDecisionService(
 		approvalRepo, approvalEmitter, approvalapp.RealClock{}, fanoutCfg.freezeService, fanoutCfg.pdfDispatchAdapter,
-	).WithPDFOutbox(pdfOutboxRepo)
+	).WithPDFOutbox(pdfOutboxRepo).WithPinInvoker(fanoutCfg.freezeService)
 	docDeps.SubmitSvc = approvalServices.Submit
 
 	docMod := documents.New(docDeps)
