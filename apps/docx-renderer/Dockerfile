@@ -6,8 +6,8 @@ COPY package.json package-lock.json ./
 COPY packages/shared-tokens/package.json ./packages/shared-tokens/
 COPY apps/docx-renderer/package.json ./apps/docx-renderer/
 
-# Vendor tarball required for the file: reference in package.json
-COPY vendor ./vendor
+# Vendor tarball lives alongside the app (not in Go's /vendor root)
+COPY apps/docx-renderer/vendor ./apps/docx-renderer/vendor
 
 # Install workspace deps (includes esbuild devDep)
 RUN npm ci --workspace @metaldocs/docx-renderer --include-workspace-root
