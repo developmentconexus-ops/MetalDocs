@@ -1,6 +1,6 @@
 # Approval Full-Flow QA Run — 2026-06-01
 
-**Verdict:** PASS-WITH-WARNINGS — happy-path signoff + content-pin + OCC + governance events confirmed; **one CRITICAL regression** found on the taxonomy authz cap downgrade (commit `8e1518c85`); one MEDIUM idempotency-replay semantics gap on doc-scoped signoff.
+**Verdict:** PASS (post-fix, see §9) — F-001 + F-002 both confirmed fixed after commits `f52917495`, `1f9fed6fe` (ADR 0016), `aefb23ea8`, `f529c3f47` (ADR 0017). Original verdict was PASS-WITH-WARNINGS; retained in §1-§8 as historical record.
 
 ## 1. Environment
 
@@ -239,3 +239,44 @@ Browser pass does not invalidate the prior §1-§7 conclusions:
 - All other commit-level checks remain as in §7.
 
 Final verdict unchanged: **PASS-WITH-WARNINGS**, with F-001 still the only CRITICAL.
+
+## 9. Post-fix verification — 2026-06-01 (PM)
+
+After F-001 and F-002 fixes landed (`f52917495`, `1f9fed6fe`, `aefb23ea8`, `f529c3f47`), rebuild + browser revalidation:
+
+### 9.1 API restart
+- Built `metaldocs-api.exe` direct via `go build -o metaldocs-api.exe ./apps/api/cmd/metaldocs-api/...` (avoids `-Build` flag fanout to worker+jobs).
+- Launched via `.\scripts\start-api.ps1` (no rebuild flag, binary fresh).
+- `/healthz=200` on :8081.
+
+### 9.2 F-001 re-verification (approver session)
+
+Capability set on approver now includes `taxonomy.view` and `membership.view` (ADR 0016 view-grade caps). Taxonomy GETs:
+
+| Endpoint | Pre-fix | Post-fix |
+|---|---|---|
+| `GET /api/v1/taxonomy/profiles` | 403 AUTH_FORBIDDEN | **200** |
+| `GET /api/v1/taxonomy/areas` | 403 AUTH_FORBIDDEN | **200** |
+| `GET /api/v1/taxonomy/families` | 403 AUTH_FORBIDDEN | **200** |
+
+**F-001 PASS.** Read-path no longer requires `taxonomy.manage`.
+
+### 9.3 F-002 happy path
+
+New doc `PO-RH-008` (CD `16656e6b-be7f-4f80-850b-9ddfd268b782`, doc `16facaf3-1f3f-4b87-9e9d-0dc656867ebe`):
+1. `POST /controlled-documents` → 201
+2. `POST /documents/{doc}/finalize` (admin) → 201 instance `cf959e06-2293-4f59-ae4f-a3197bcbfc6e`
+3. Logout admin, login approver, `GET /controlled-documents/{cd}/active-document` → 200 (content-pin source)
+4. `POST /documents/{doc}/signoff` idem=`7782a0e4-…`, `content_hash=ba20ff…` → **200** `{outcome:"approved", was_replay:false}`
+
+### 9.4 F-002 replay-after-terminal (flagship)
+
+Instance now terminal (`active.approvalState=approved`). Retry same `Idempotency-Key` + same payload:
+
+`POST /documents/{doc}/signoff` (same idem `7782a0e4-…`, same body) → **200** `{outcome:"approved", was_replay:true}`
+
+**F-002 PASS.** Replay now wins over post-load terminal-state validation (ADR 0017 fingerprint reorder).
+
+### 9.5 Verdict update
+
+Both regressions clear. **Verdict: PASS.**
