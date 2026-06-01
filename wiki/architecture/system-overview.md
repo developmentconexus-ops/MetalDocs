@@ -1,7 +1,6 @@
 ﻿# System Overview
 
-> **Last verified:** 2026-06-01 (added C4 + sequence diagram links; PDF path now Go→Gotenberg direct per Phase A)
-> **Last verified:** 2026-06-01 (docgen-v2 → docx-renderer rename)
+> **Last verified:** 2026-06-01 (async freeze refactor — ADR 0015)
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -48,8 +47,8 @@ C4Container
     System_Boundary(md, "MetalDocs") {
         Container(web, "metaldocs-web", "React + Vite", "SPA. Eigenpal editor. Uploads/downloads docx directly to MinIO via presigned URLs.")
         Container(api, "metaldocs-api", "Go (net/http)", "REST API on :8081. All business logic + authz.")
-        Container(worker, "metaldocs-worker", "Go", "Async outbox consumer: PDF, scheduled publish, reminders.")
-        Container(docgen, "docx-renderer", "Node + Fastify + eigenpal (headless)", "Only live route today: /render/fanout (freeze reconstruct).")
+        Container(worker, "metaldocs-worker", "Go", "Async outbox consumer: PDF, docx materialization (ADR 0015), scheduled publish, reminders.")
+        Container(docgen, "docx-renderer", "Node + Fastify + eigenpal (headless)", "Routes: /render/fanout (reconstructs frozen docx), /health.")
         ContainerDb(pg, "postgres", "Postgres 16", "Authoritative state + transactional outboxes.")
         ContainerDb(minio, "minio", "S3-compatible store", "All docx + PDF bytes. Browser ↔ MinIO direct.")
         Container(redis, "redis", "Redis 7", "Authz cache + rate limit.")
@@ -62,7 +61,7 @@ C4Container
     Rel(api, pg, "SQL")
     Rel(api, redis, "Cache / rate limit")
     Rel(api, minio, "Presign / head / size")
-    Rel(api, docgen, "POST /render/fanout (in signoff tx)")
+    Rel(worker, docgen, "POST /render/fanout (async, via materialize outbox — ADR 0015)")
     Rel(worker, pg, "Outbox + artifact metadata")
     Rel(worker, minio, "Read docx / write PDF")
     Rel(worker, gotenberg, "docx → PDF")
@@ -78,7 +77,7 @@ For each load-bearing user journey, see the canonical sequence diagram. These ar
 |---|---|
 | **Create document** (template → controlled doc → editor opens) | [sequence-create-document.md](../diagrams/sequence-create-document.md) |
 | **Edit + autosave** (browser ↔ MinIO direct; scalability pattern) | [sequence-edit-autosave.md](../diagrams/sequence-edit-autosave.md) |
-| **Approval signoff + freeze** (compliance moment; ⚠ known sync coupling) | [sequence-signoff-freeze.md](../diagrams/sequence-signoff-freeze.md) |
+| **Approval signoff + freeze** (compliance moment; async since ADR 0015) | [sequence-signoff-freeze.md](../diagrams/sequence-signoff-freeze.md) |
 | **PDF export** (transactional outbox → worker → Gotenberg) | [sequence-pdf-export.md](../diagrams/sequence-pdf-export.md) |
 
 ---
@@ -149,7 +148,7 @@ Shared packages:
 5. **Document creation:** end user picks a controlled doc -> wizard creates the `documents` row. `application.SnapshotService`, wired via `documents.Dependencies.SnapshotReader`/`SnapshotWriter`, populates `placeholder_schema_snapshot`, `placeholder_schema_hash`, `composition_config_snapshot`, `composition_config_hash`, `body_docx_snapshot_s3_key`, and `body_docx_hash`.
 6. For catalog-only templates, `composition_config_snapshot` stores `{}`. (composition deprecated 2026-04-27     see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27     column still written as `{}` for back-compat)
 7. Submit -> `POST /documents/{id}/submit` -> `under_review`. Migration `0152`'s `enforce_snapshot_on_submit_trg` trigger requires all six snapshot columns to be non-NULL before draft -> under_review.
-8. Approves -> `POST /documents/{id}/approve` -> triggers `freeze`:
+8. Approves -> `POST /documents/{id}/approve` -> triggers `Pin` (in-tx, no network) + async `Materialize` (via materialize_dispatch_outbox — ADR 0015):
    - Use the creation-time snapshots as the immutable render inputs
    - Go calls docx-renderer `POST /render/fanout` with `X-Service-Token`; docx-renderer validates the token
    - Go sends `tenant_id`, `revision_id`, `body_docx_s3_key`, `placeholder_values`, `composition_config` (always empty     deprecated 2026-04-27     see wiki/concepts/placeholders.md#composition-system-deprecated-2026-04-27), and `resolved_values`

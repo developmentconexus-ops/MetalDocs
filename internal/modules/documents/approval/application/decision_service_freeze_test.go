@@ -26,6 +26,16 @@ func (f *fakeFreezeInvoker) Freeze(_ context.Context, _ *sql.Tx, _, _ string, _ 
 	return f.err
 }
 
+type fakePinInvoker struct {
+	calls int
+	err   error
+}
+
+func (f *fakePinInvoker) Pin(_ context.Context, _ *sql.Tx, _, _ string, _ docapp.ApproverContext) error {
+	f.calls++
+	return f.err
+}
+
 type fakePDFDispatchInvoker struct {
 	calls int
 	err   error
@@ -545,6 +555,122 @@ func TestRecordSignoff_UnresolvedComments_RollsBackBeforeApprove(t *testing.T) {
 	}
 	if freeze.calls != 0 {
 		t.Fatalf("freeze must not run when unresolved comments block approval, got %d calls", freeze.calls)
+	}
+}
+
+func TestRecordSignoff_PinInvoker_CallsPinNotFreeze(t *testing.T) {
+	const (
+		instanceID = "inst-pin-1"
+		stageID    = "stage-pin-1"
+		actorID    = "approver-1"
+		authorID   = "author-1"
+	)
+	signedAt := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	repo := &fakeDecisionRepo{
+		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
+		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-pin-1", WasReplay: false},
+	}
+	pin := &fakePinInvoker{}
+	freeze := &fakeFreezeInvoker{}
+	conn := &freezeDecisionConn{
+		actorID: actorID,
+		stageSignoffs: []signoffRow{{
+			id:                 "sig-pin-1",
+			approvalInstanceID: instanceID,
+			stageInstanceID:    stageID,
+			actorUserID:        actorID,
+			actorTenantID:      "tenant-1",
+			decision:           "approve",
+			signedAt:           signedAt,
+			signatureMethod:    "password",
+			signaturePayload:   []byte(`{}`),
+			contentHash:        validContentHash,
+		}},
+	}
+	db := newFreezeDecisionTestDB(t, conn)
+	svc := (&DecisionService{
+		repo:          repo,
+		emitter:       &MemoryEmitter{},
+		clock:         fixedClock{t: signedAt},
+		freezeInvoker: freeze,
+	}).WithPinInvoker(pin)
+
+	result, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "abc"},
+		ContentFormData:  map[string]any{"title": "Doc"},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff() error = %v", err)
+	}
+	if !result.InstanceApproved || conn.documentStatus != "approved" {
+		t.Fatalf("expected approved document, status=%q result=%+v", conn.documentStatus, result)
+	}
+	if pin.calls != 1 {
+		t.Fatalf("Pin should be called once, got %d", pin.calls)
+	}
+	if freeze.calls != 0 {
+		t.Fatalf("Freeze must not be called when pinInvoker is set, got %d", freeze.calls)
+	}
+}
+
+func TestRecordSignoff_PinInvoker_PDFOutboxNotEnqueued(t *testing.T) {
+	// When pinInvoker is used, the PDF outbox enqueue is skipped in decision_service
+	// because MaterializeJobRunner handles it after the fanout call succeeds.
+	const (
+		instanceID = "inst-pin-2"
+		stageID    = "stage-pin-2"
+		actorID    = "approver-1"
+		authorID   = "author-1"
+	)
+	signedAt := time.Date(2026, 6, 1, 11, 0, 0, 0, time.UTC)
+	repo := &fakeDecisionRepo{
+		instance:         buildSingleStageInstance(instanceID, stageID, authorID, []string{actorID}),
+		insertSignoffRes: repository.SignoffInsertResult{ID: "sig-pin-2", WasReplay: false},
+	}
+	pdfOutbox := &fakePDFOutboxEnqueuer{}
+	conn := &freezeDecisionConn{
+		actorID: actorID,
+		stageSignoffs: []signoffRow{{
+			id:                 "sig-pin-2",
+			approvalInstanceID: instanceID,
+			stageInstanceID:    stageID,
+			actorUserID:        actorID,
+			actorTenantID:      "tenant-1",
+			decision:           "approve",
+			signedAt:           signedAt,
+			signatureMethod:    "password",
+			signaturePayload:   []byte(`{}`),
+			contentHash:        validContentHash,
+		}},
+	}
+	db := newFreezeDecisionTestDB(t, conn)
+	svc := (&DecisionService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: signedAt},
+	}).WithPinInvoker(&fakePinInvoker{}).WithPDFOutbox(pdfOutbox)
+
+	_, err := svc.RecordSignoff(context.Background(), db, SignoffRequest{
+		TenantID:         "tenant-1",
+		InstanceID:       instanceID,
+		StageInstanceID:  stageID,
+		ActorUserID:      actorID,
+		Decision:         "approve",
+		SignatureMethod:  "password",
+		SignaturePayload: map[string]any{"hash": "abc"},
+		ContentFormData:  map[string]any{"title": "Doc"},
+	})
+	if err != nil {
+		t.Fatalf("RecordSignoff() error = %v", err)
+	}
+	if pdfOutbox.calls != 0 {
+		t.Fatalf("PDF outbox must not be enqueued when pinInvoker is active, got %d calls", pdfOutbox.calls)
 	}
 }
 

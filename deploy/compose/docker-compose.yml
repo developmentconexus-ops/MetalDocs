@@ -194,6 +194,8 @@ services:
         condition: service_started
       api:
         condition: service_healthy
+      docx-renderer:
+        condition: service_healthy
     environment:
       METALDOCS_REPOSITORY: postgres
       METALDOCS_WORKER_POLL_INTERVAL_SECONDS: ${METALDOCS_WORKER_POLL_INTERVAL_SECONDS}
@@ -203,6 +205,8 @@ services:
       METALDOCS_WORKER_MAX_ATTEMPTS: ${METALDOCS_WORKER_MAX_ATTEMPTS}
       METALDOCS_WORKER_RETRY_BASE_SECONDS: ${METALDOCS_WORKER_RETRY_BASE_SECONDS}
       METALDOCS_WORKER_RETRY_MAX_SECONDS: ${METALDOCS_WORKER_RETRY_MAX_SECONDS}
+      METALDOCS_FANOUT_URL: http://docx-renderer:3100
+      METALDOCS_DOCX_RENDERER_SERVICE_TOKEN: ${DOCX_RENDERER_SERVICE_TOKEN}
       PGHOST: postgres
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB}
