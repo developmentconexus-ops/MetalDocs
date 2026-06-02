@@ -11,6 +11,10 @@ import { RouteAdminPage } from './RouteAdminPage';
 vi.mock('../../api/routeAdminApi');
 vi.mock('../../../taxonomy/api/taxonomy', () => ({
   fetchAreas: vi.fn().mockResolvedValue([{ code: 'AREA-01', name: 'Área 01' }]),
+  fetchProfiles: vi.fn().mockResolvedValue([
+    { code: 'JUR', name: 'Jurídico' },
+    { code: 'OPS', name: 'Operações' },
+  ]),
 }));
 
 function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
@@ -23,20 +27,22 @@ function makeRoute(overrides: Partial<RouteSummary> = {}): RouteSummary {
     version: 3,
     stages: [
       {
-        label: 'Revisão',
+        order: 1,
+        name: 'Revisão',
         required_role: 'approver',
         required_capability: 'doc.signoff',
         area_code: 'AREA-01',
-        quorum_kind: 'any_1_of',
+        quorum: 'any_1_of',
         quorum_m: null,
         drift_policy: 'reduce_quorum',
       },
       {
-        label: 'Aprovação',
+        order: 2,
+        name: 'Aprovação',
         required_role: 'approver',
         required_capability: 'doc.signoff',
         area_code: 'AREA-01',
-        quorum_kind: 'all_of',
+        quorum: 'all_of',
         quorum_m: null,
         drift_policy: 'reduce_quorum',
       },
@@ -122,6 +128,7 @@ describe('RouteAdminPage', () => {
     fireEvent.change(within(dialog).getByLabelText('Nome da rota'), {
       target: { value: 'Nova Rota' },
     });
+    await within(dialog).findByRole('option', { name: 'Jurídico (JUR)' });
     fireEvent.change(within(dialog).getByLabelText('Código do perfil'), {
       target: { value: 'JUR' },
     });
@@ -154,6 +161,7 @@ describe('RouteAdminPage', () => {
     fireEvent.change(within(dialog).getByLabelText('Nome da rota'), {
       target: { value: 'Rota M' },
     });
+    await within(dialog).findByRole('option', { name: 'Operações (OPS)' });
     fireEvent.change(within(dialog).getByLabelText('Código do perfil'), {
       target: { value: 'OPS' },
     });
@@ -201,6 +209,7 @@ describe('RouteAdminPage', () => {
     fireEvent.change(within(dialog).getByLabelText('Nome da rota'), {
       target: { value: 'Conflito' },
     });
+    await within(dialog).findByRole('option', { name: 'Jurídico (JUR)' });
     fireEvent.change(within(dialog).getByLabelText('Código do perfil'), {
       target: { value: 'JUR' },
     });

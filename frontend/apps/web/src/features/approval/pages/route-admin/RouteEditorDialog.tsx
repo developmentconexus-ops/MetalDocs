@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Dialog } from '../../../../components/ui';
 import { resolveErrorMessage } from '../../../../lib/api/problem';
 import { useAreasQuery } from '../../../documents/queries/useAreasQuery';
+import { useProfilesQuery } from '../../../taxonomy/queries/useProfilesQuery';
 import { useIamRolesQuery } from '../../queries/useIamRolesQuery';
 import type {
   CreateRouteRequest,
@@ -83,11 +84,11 @@ function toDraft(route: RouteSummary | null): RouteDraft {
     profileCode: route.profile_code,
     stages: route.stages.map((stage) => ({
       uid: uuidv4() as string,
-      label: stage.label,
+      label: stage.name,
       requiredRole: stage.required_role ?? '',
       requiredCapability: stage.required_capability || 'doc.signoff',
       areaCode: stage.area_code ?? '',
-      quorumKind: stage.quorum_kind,
+      quorumKind: stage.quorum,
       m: String(stage.quorum_m ?? 1),
       driftPolicy: stage.drift_policy,
     })),
@@ -178,9 +179,12 @@ export function RouteEditorDialog({
 
   const rolesQuery = useIamRolesQuery();
   const areasQuery = useAreasQuery();
+  const profilesQuery = useProfilesQuery();
 
   const roleOptions = rolesQuery.data ?? [];
   const areaOptions = areasQuery.data ?? [];
+  const profileOptions = profilesQuery.data ?? [];
+  const hasNoProfiles = !profilesQuery.isLoading && !profilesQuery.isError && profileOptions.length === 0;
 
   const updateStage = (uid: string, patch: Partial<StageDraft>) => {
     setDraft((prev) => ({
@@ -290,6 +294,12 @@ export function RouteEditorDialog({
         </div>
       ) : null}
 
+      {!isEdit && profilesQuery.isError ? (
+        <div className={styles.warningBox} role="alert">
+          Não foi possível carregar os perfis. Recarregue a página para tentar novamente.
+        </div>
+      ) : null}
+
       <form id="route-editor-form" className={styles.form} onSubmit={handleSubmit} noValidate>
         <label className={styles.fieldLabel} htmlFor="route-name">
           Nome da rota
@@ -306,19 +316,38 @@ export function RouteEditorDialog({
         <label className={styles.fieldLabel} htmlFor="route-profile-code">
           Código do perfil
         </label>
-        <input
+        <select
           id="route-profile-code"
           className={styles.input}
           value={draft.profileCode}
-          onChange={(event) =>
-            setDraft((prev) => ({ ...prev, profileCode: event.target.value.toUpperCase() }))
-          }
-          disabled={isSubmitting || isEdit}
-          aria-describedby={isEdit ? 'route-profile-code-help' : undefined}
-        />
+          onChange={(event) => setDraft((prev) => ({ ...prev, profileCode: event.target.value }))}
+          // Edit is immutable; an empty registry or in-flight/failed load leaves
+          // nothing valid to pick. The registered options guarantee the value
+          // satisfies the backend FK to `metaldocs.document_profiles`.
+          disabled={isSubmitting || isEdit || profilesQuery.isLoading || hasNoProfiles}
+          aria-describedby={isEdit || hasNoProfiles ? 'route-profile-code-help' : undefined}
+        >
+          <option value="" disabled>
+            {profilesQuery.isLoading ? 'Carregando perfis…' : 'Selecione o perfil'}
+          </option>
+          {/* Keep the immutable current code selectable on edit even if it was
+              archived out of the active profile list. */}
+          {isEdit && draft.profileCode && !profileOptions.some((p) => p.code === draft.profileCode) ? (
+            <option value={draft.profileCode}>{draft.profileCode}</option>
+          ) : null}
+          {profileOptions.map((profile) => (
+            <option key={profile.code} value={profile.code}>
+              {profile.name} ({profile.code})
+            </option>
+          ))}
+        </select>
         {isEdit ? (
           <small id="route-profile-code-help" className={styles.helpText}>
             Código do perfil é imutável após criação.
+          </small>
+        ) : hasNoProfiles ? (
+          <small id="route-profile-code-help" className={styles.helpText}>
+            Nenhum perfil registrado. Cadastre um perfil antes de criar a rota.
           </small>
         ) : null}
 
