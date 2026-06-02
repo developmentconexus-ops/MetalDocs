@@ -2,11 +2,13 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as approvalApi from '../api/approvalApi';
+import * as routeAdminApi from '../api/routeAdminApi';
 import { etagCache } from '../api/etagCache';
 import type { ApprovalInstance } from '../api/approvalTypes';
 import { ControlledDocumentDetailPanel } from './ControlledDocumentDetailPanel';
 
 vi.mock('../api/approvalApi');
+vi.mock('../api/routeAdminApi');
 vi.mock('./SignoffDialog', () => ({
   SignoffDialog: () => <div>SignoffDialogMock</div>,
 }));
@@ -41,7 +43,7 @@ describe('ControlledDocumentDetailPanel', () => {
     vi.resetAllMocks();
     etagCache.clear();
     vi.mocked(approvalApi.getInstance).mockResolvedValue(makeInstance());
-    vi.mocked(approvalApi.listRoutes).mockResolvedValue({ routes: [], total: 0 });
+    vi.mocked(routeAdminApi.listRoutes).mockResolvedValue({ routes: [], total: 0 });
   });
 
   afterEach(() => {

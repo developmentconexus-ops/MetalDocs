@@ -6,12 +6,8 @@ import type {
   ApprovalInstance,
   CancelRequest,
   CancelResponse,
-  CreateRouteRequest,
-  CreateRouteResponse,
-  DeactivateRouteResponse,
   ListInboxParams,
   ListInboxResponse,
-  ListRoutesResponse,
   ObsoleteRequest,
   ObsoleteResponse,
   PublishRequest,
@@ -24,8 +20,6 @@ import type {
   SubmitResponse,
   SupersedeRequest,
   SupersedeResponse,
-  UpdateRouteRequest,
-  UpdateRouteResponse,
 } from './approvalTypes';
 
 const BASE = '/api/v1';
@@ -63,11 +57,6 @@ export async function listInbox(params: ListInboxParams = {}): Promise<ListInbox
   }
   const url = `${BASE}/approval/inbox${qs.toString() ? `?${qs}` : ''}`;
   const { data } = await getJSON<ListInboxResponse>(url);
-  return data;
-}
-
-export async function listRoutes(): Promise<ListRoutesResponse> {
-  const { data } = await getJSON<ListRoutesResponse>(`${BASE}/approval/routes`);
   return data;
 }
 
@@ -144,34 +133,6 @@ export function cancel(
 ): Promise<CancelResponse> {
   return mutate('POST', `${BASE}/documents/${documentId}/cancel`, body, {
     resourceId: documentId,
-    ...opts,
-  });
-}
-
-export function createRoute(
-  body: CreateRouteRequest,
-  opts?: MutateOptions,
-): Promise<CreateRouteResponse> {
-  return mutate('POST', `${BASE}/approval/routes`, body, opts);
-}
-
-export function updateRoute(
-  routeId: string,
-  body: UpdateRouteRequest,
-  opts?: MutateOptions,
-): Promise<UpdateRouteResponse> {
-  return mutate('PUT', `${BASE}/approval/routes/${routeId}`, body, {
-    resourceId: routeId,
-    ...opts,
-  });
-}
-
-export function deactivateRoute(
-  routeId: string,
-  opts?: MutateOptions,
-): Promise<DeactivateRouteResponse> {
-  return mutate('DELETE', `${BASE}/approval/routes/${routeId}`, undefined, {
-    resourceId: routeId,
     ...opts,
   });
 }
