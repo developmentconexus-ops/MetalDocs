@@ -151,8 +151,7 @@ func TestIAMAdminHandlerUnlockUser(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed auth user: %v", err)
 	}
-	lock := time.Now().UTC().Add(time.Minute)
-	if err := authRepo.RecordFailedLogin(context.Background(), "test-user", 5, &lock); err != nil {
+	if _, _, err := authRepo.RecordFailedLogin(context.Background(), "test-user", 1, 60, ""); err != nil {
 		t.Fatalf("seed lock state: %v", err)
 	}
 	handler := iamdelivery.NewAdminHandler(service, authService)

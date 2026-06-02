@@ -138,7 +138,7 @@ func (r *Repository) RecordSuccessfulLogin(_ context.Context, userID string, log
 	return nil
 }
 
-func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAttempts int, lockDurationSeconds int) (int, *time.Time, error) {
+func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAttempts int, lockDurationSeconds int, _ string) (int, *time.Time, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
