@@ -45,6 +45,13 @@ user_id text NOT NULL,
 );
 ```
 
+## Indexes (post-baseline)
+
+| Index | Definition | Migration | Why |
+|---|---|---|---|
+| `idx_auth_identities_locked_until` | partial on `(locked_until) WHERE locked_until IS NOT NULL` | 0210 | Drives `/security/lockouts` ordered by lockout end. |
+| `idx_auth_identities_last_failed_login_at` | partial on `(last_failed_login_at) WHERE last_failed_login_at IS NOT NULL` | 0211 (PR-7b) | Backs `CountRecentFailedLoginsByUser` rolling-window scan used by `/security/signals`. |
+
 ## Runtime Usage
 
 Use `rg -n "auth_identities" internal apps` and the owning module wiki to verify readers/writers before changing this table.

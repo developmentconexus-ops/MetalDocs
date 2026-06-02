@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"metaldocs/internal/modules/audit/domain"
+	"metaldocs/internal/platform/sqlescape"
 )
 
 type Writer struct {
@@ -234,7 +235,8 @@ func buildWhere(q domain.ListEventsQuery) ([]string, []any) {
 	}
 	if v := strings.TrimSpace(q.Action); v != "" {
 		if strings.HasSuffix(v, "*") {
-			add("action LIKE $%d", strings.TrimSuffix(v, "*")+"%")
+			escaped := sqlescape.LikeEscape(strings.TrimSuffix(v, "*"))
+			add(`action LIKE $%d ESCAPE '\'`, escaped+"%")
 		} else {
 			add("action = $%d", v)
 		}
@@ -246,11 +248,11 @@ func buildWhere(q domain.ListEventsQuery) ([]string, []any) {
 		add("occurred_at < $%d", q.OccurredBefore)
 	}
 	if needle := strings.TrimSpace(q.Query); needle != "" {
-		pattern := "%" + needle + "%"
+		pattern := "%" + sqlescape.LikeEscape(needle) + "%"
 		args = append(args, pattern)
 		idx := len(args)
 		where = append(where, fmt.Sprintf(
-			"(action ILIKE $%d OR actor_id ILIKE $%d OR resource_id ILIKE $%d OR payload::text ILIKE $%d)",
+			`(action ILIKE $%d ESCAPE '\' OR actor_id ILIKE $%d ESCAPE '\' OR resource_id ILIKE $%d ESCAPE '\' OR payload::text ILIKE $%d ESCAPE '\')`,
 			idx, idx, idx, idx,
 		))
 	}

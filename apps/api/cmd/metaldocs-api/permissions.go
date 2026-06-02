@@ -115,6 +115,13 @@ var routeRules = []routeRule{
 	// IAM users. F-001 split: GET view, writes manage.
 	{method: http.MethodGet, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// PR-4 PeopleHandler routes — exact path match first so the PATCH /users/
+	// prefix rule below cannot shadow them. Without these explicit entries the
+	// fallback returns VisibilitySessionRequired and any authenticated user
+	// (Viewer included) can invite / bulk-mutate / list memberships.
+	{method: http.MethodPost, pathExact: "/api/v1/iam/users/invite", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathExact: "/api/v1/iam/users/bulk", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/iam/users/", notSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/roles", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},

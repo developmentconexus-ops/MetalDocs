@@ -188,6 +188,10 @@ func (s *Service) ExportEvents(ctx context.Context, actorID string, format domai
 }
 
 // GetExportStatus returns an export job, enforcing tenant + actor scoping.
+// Fail-closed on empty actorID — the prior "if non-empty, then check" pattern
+// silently bypassed ownership when an internal caller forgot to thread the
+// actor through. Edge layer rejects empty userIDs today; this is defense in
+// depth.
 func (s *Service) GetExportStatus(ctx context.Context, tenantID, actorID, exportID string) (domain.ExportJob, error) {
 	if s == nil || s.exportRepo == nil {
 		return domain.ExportJob{}, ErrExportRepoMissing
@@ -196,11 +200,15 @@ func (s *Service) GetExportStatus(ctx context.Context, tenantID, actorID, export
 	if tenantID == "" {
 		return domain.ExportJob{}, ErrTenantRequired
 	}
+	actorID = strings.TrimSpace(actorID)
+	if actorID == "" {
+		return domain.ExportJob{}, ErrActorRequired
+	}
 	job, err := s.exportRepo.Get(ctx, tenantID, strings.TrimSpace(exportID))
 	if err != nil {
 		return domain.ExportJob{}, err
 	}
-	if a := strings.TrimSpace(actorID); a != "" && job.ActorID != a {
+	if job.ActorID != actorID {
 		return domain.ExportJob{}, domain.ErrExportJobNotFound
 	}
 	return job, nil

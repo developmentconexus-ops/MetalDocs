@@ -82,3 +82,25 @@ func TestListEventsPreservesTenantIDDuringNormalization(t *testing.T) {
 		t.Fatalf("Limit = %d, want 50", reader.query.Limit)
 	}
 }
+
+// fakeExportRepo just satisfies the ExportJobRepository surface; only Get is
+// invoked by GetExportStatus.
+type fakeExportRepo struct{}
+
+func (fakeExportRepo) Save(context.Context, domain.ExportJob) error { return nil }
+func (fakeExportRepo) Get(context.Context, string, string) (domain.ExportJob, error) {
+	return domain.ExportJob{}, domain.ErrExportJobNotFound
+}
+func (fakeExportRepo) GetByDownloadToken(context.Context, string, string) (domain.ExportJob, error) {
+	return domain.ExportJob{}, domain.ErrExportJobNotFound
+}
+
+func TestGetExportStatus_RequiresActorID(t *testing.T) {
+	t.Parallel()
+
+	svc := application.NewService(&captureReader{}).WithExports(nil, fakeExportRepo{}, nil, nil)
+	_, err := svc.GetExportStatus(context.Background(), "tenant-a", "   ", "export-1")
+	if !errors.Is(err, application.ErrActorRequired) {
+		t.Fatalf("expected ErrActorRequired for empty actorID, got %v", err)
+	}
+}
