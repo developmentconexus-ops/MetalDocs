@@ -214,10 +214,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lista usuarios internos com estado de autenticacao */
-        get: operations["listManagedUsers"];
+        /** List tenant users (cursor-paginated, filterable) */
+        get: operations["listUsers"];
         put?: never;
-        /** Cria usuario interno com credencial local inicial */
+        /** Cria usuario interno com credencial local inicial (legacy; prefer POST /iam/users/invite) */
         post: operations["createManagedUser"];
         delete?: never;
         options?: never;
@@ -238,8 +238,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Atualiza estado e credencial de um usuario interno */
-        patch: operations["updateManagedUser"];
+        /** Atomic metadata + tenant role update (single tx) */
+        patch: operations["patchUser"];
         trace?: never;
     };
     "/iam/users/{userId}/reset-password": {
@@ -251,8 +251,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reseta administrativamente a senha de um usuario e exige troca no proximo login */
-        post: operations["resetManagedUserPassword"];
+        /** Admin password reset (forces must-change-on-first-login) */
+        post: operations["resetPassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -268,8 +268,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Limpa lock operacional e contador de falhas de login de um usuario */
-        post: operations["unlockManagedUser"];
+        /** Clear operational lock + failed-login counter for a user */
+        post: operations["unlockUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -283,8 +283,263 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Resumo administrativo de usuarios, presenca e atividades recentes */
+        /** Composed Admin Center overview (KPI strip + presence + recent activity) */
         get: operations["getIamAdminOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/users/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Invite a new user (server-generated temp password, must change on first login) */
+        post: operations["inviteUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/users/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk action over a set of users (activate, deactivate, unlock, force-logout) */
+        post: operations["bulkUsers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/users/{userId}/memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List area memberships for a user */
+        get: operations["listMemberships"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List canonical tenant roles (read-only) */
+        get: operations["listRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List capability registry (read-only) */
+        get: operations["listCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/role-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List role-capability matrix rows (read-only) */
+        get: operations["listRoleCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/kpi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant KPI snapshot for the Overview strip */
+        get: operations["getKpi"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant consumption snapshot (seats, storage, API, active users) */
+        get: operations["getUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/iam/presence/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Online presence snapshot (HTTP fallback when WebSocket unavailable) */
+        get: operations["getPresenceSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/events/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export filtered audit events as CSV or JSONL (signed URL, async if large) */
+        post: operations["exportAuditEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active sessions in the current tenant */
+        get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke (force-logout) a specific session. Gate CapSessionManage. */
+        delete: operations["revokeSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/security/mfa-coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** MFA enrollment coverage by tenant + by role */
+        get: operations["getMfaCoverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/security/lockouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current account lockouts (locked-until window) */
+        get: operations["listLockouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/security/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Anomaly cards (repeated-failed-login, new-device-login, lockout-spike, off-hours-admin-action) */
+        get: operations["listSecuritySignals"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1796,7 +2051,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lista eventos de auditoria append-only */
+        /** Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated) */
         get: operations["listAuditEvents"];
         put?: never;
         post?: never;
@@ -3747,6 +4002,45 @@ export interface components {
             changed: boolean;
             user: components["schemas"]["CurrentUser"];
         };
+        /**
+         * @description Canonical tenant role. 8 values; no `admin` or `reviewer` phantoms.
+         * @enum {string}
+         */
+        UserRole: "system_admin" | "approver" | "author" | "editor" | "viewer" | "signer" | "area_admin" | "qms_admin";
+        AreaMembership: {
+            userId: string;
+            areaCode: string;
+            role: components["schemas"]["UserRole"];
+            /** Format: date-time */
+            grantedAt?: string;
+            grantedBy?: string;
+        };
+        AreaMembershipInput: {
+            areaCode: string;
+            role: components["schemas"]["UserRole"];
+        };
+        /** @description Canonical user shape — single tenantRole + multi area memberships. */
+        ManagedUserCore: {
+            userId: string;
+            username: string;
+            email?: string;
+            displayName: string;
+            isActive: boolean;
+            mustChangePassword: boolean;
+            failedLoginAttempts: number;
+            /** Format: date-time */
+            lockedUntil?: string;
+            /** Format: date-time */
+            lastLoginAt?: string;
+            tenantRole: components["schemas"]["UserRole"];
+            areaMemberships: components["schemas"]["AreaMembership"][];
+            mfaEnabled?: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        /** @description Legacy shape kept for backward compat with hand-wired /iam/users handlers. Prefer ManagedUserCore. */
         ManagedUserItem: {
             userId: string;
             username: string;
@@ -3765,18 +4059,98 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        AdminOnlineUserItem: {
+        CursorPage: {
+            next_cursor: string | null;
+            has_more: boolean;
+        };
+        ListUsersResponse: {
+            items: components["schemas"]["ManagedUserCore"][];
+            page: components["schemas"]["CursorPage"];
+            total?: number;
+        };
+        UserInviteRequest: {
+            username: string;
+            /** Format: email */
+            email: string;
+            displayName: string;
+            tenantRole: components["schemas"]["UserRole"];
+            areaMemberships?: components["schemas"]["AreaMembershipInput"][];
+        };
+        /** @description tempPassword is returned one-time only and never persisted plaintext. */
+        UserInviteResponse: {
+            userId: string;
+            tempPassword: string;
+        };
+        /** @enum {string} */
+        UserBulkActionKind: "activate" | "deactivate" | "unlock" | "force-logout";
+        UserBulkActionRequest: {
+            userIds: string[];
+            action: components["schemas"]["UserBulkActionKind"];
+            reason?: string;
+        };
+        UserBulkActionFailure: {
+            userId: string;
+            code: string;
+            message: string;
+        };
+        UserBulkActionResult: {
+            succeeded: string[];
+            failed: components["schemas"]["UserBulkActionFailure"][];
+        };
+        ListMembershipsResponse: {
+            items: components["schemas"]["AreaMembership"][];
+        };
+        RoleDescriptor: {
+            code: components["schemas"]["UserRole"];
+            label: string;
+            description: string;
+        };
+        ListRolesResponse: {
+            items: components["schemas"]["RoleDescriptor"][];
+        };
+        CapabilityDescriptor: {
+            code: string;
+            description: string;
+            category: string;
+        };
+        ListCapabilitiesResponse: {
+            items: components["schemas"]["CapabilityDescriptor"][];
+        };
+        RoleCapabilityLink: {
+            role: components["schemas"]["UserRole"];
+            capability: string;
+        };
+        ListRoleCapabilitiesResponse: {
+            items: components["schemas"]["RoleCapabilityLink"][];
+        };
+        IamKpiRoleCount: {
+            role: components["schemas"]["UserRole"];
+            count: number;
+        };
+        IamKpiSnapshot: {
+            lockedAccounts: number;
+            mfaCoveragePct: number;
+            failedLogins24h: number;
+            dormantUsers30d: number;
+            roleDistribution: components["schemas"]["IamKpiRoleCount"][];
+            auditEventsPerMinute: number;
+        };
+        OnlinePresenceItem: {
             userId: string;
             username: string;
             displayName: string;
             /** Format: date-time */
             lastSeenAt: string;
         };
+        PresenceSnapshotResponse: {
+            items: components["schemas"]["OnlinePresenceItem"][];
+        };
         AdminOverviewResponse: {
-            users: components["schemas"]["ManagedUserItem"][];
-            onlineUsers: components["schemas"]["AdminOnlineUserItem"][];
+            kpi: components["schemas"]["IamKpiSnapshot"];
+            presence: components["schemas"]["OnlinePresenceItem"][];
             recentActivities: components["schemas"]["AuditEventItem"][];
         };
+        /** @description Legacy list shape. Prefer ListUsersResponse. */
         ListManagedUsersResponse: {
             items: components["schemas"]["ManagedUserItem"][];
         };
@@ -3791,13 +4165,19 @@ export interface components {
         CreateManagedUserResponse: {
             userId: string;
         };
+        /**
+         * @description Atomic metadata + tenant role update. All fields optional;
+         *     server applies only the supplied subset in a single transaction.
+         */
         UpdateManagedUserRequest: {
             displayName?: string;
             email?: string;
             isActive?: boolean;
             newPassword?: string;
             mustChangePassword?: boolean;
+            tenantRole?: components["schemas"]["UserRole"];
         };
+        /** @description Legacy response shape; new patchUser returns ManagedUserCore. */
         UpdateManagedUserResponse: {
             userId: string;
             updated: boolean;
@@ -4411,6 +4791,112 @@ export interface components {
         };
         ListAuditEventsResponse: {
             items: components["schemas"]["AuditEventItem"][];
+            page: components["schemas"]["CursorPage"];
+            total?: number;
+        };
+        /** @description Multi-axis audit filter (mirrors GET /audit/events query params). */
+        AuditFilter: {
+            actorId?: string;
+            action?: string;
+            resourceType?: string;
+            resourceId?: string;
+            /** Format: date-time */
+            occurredAfter?: string;
+            /** Format: date-time */
+            occurredBefore?: string;
+            q?: string;
+        };
+        /** @enum {string} */
+        AuditExportFormat: "csv" | "jsonl";
+        AuditExportRequest: {
+            format: components["schemas"]["AuditExportFormat"];
+            filter: components["schemas"]["AuditFilter"];
+        };
+        AuditExportResponse: {
+            exportId: string;
+            /** Format: uri */
+            signedUrl: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        SessionItem: {
+            sessionId: string;
+            userId: string;
+            displayName: string;
+            ipAddress?: string;
+            userAgent?: string;
+            deviceLabel?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            lastSeenAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        ListSessionsResponse: {
+            items: components["schemas"]["SessionItem"][];
+            page: components["schemas"]["CursorPage"];
+            total?: number;
+        };
+        MfaCoverageRoleSlice: {
+            role: components["schemas"]["UserRole"];
+            total: number;
+            mfaEnabled: number;
+            pct: number;
+        };
+        MfaCoverage: {
+            totalUsers: number;
+            mfaEnabled: number;
+            mfaEnabledPct: number;
+            byRole: components["schemas"]["MfaCoverageRoleSlice"][];
+        };
+        LockoutItem: {
+            userId: string;
+            displayName: string;
+            /** Format: date-time */
+            lockedUntil?: string;
+            failedAttempts: number;
+            /** Format: date-time */
+            lastFailedAt?: string;
+            lastFailedIp?: string;
+        };
+        ListLockoutsResponse: {
+            items: components["schemas"]["LockoutItem"][];
+        };
+        /** @enum {string} */
+        SecuritySignalKind: "repeated-failed-login" | "new-device-login" | "lockout-spike" | "off-hours-admin-action";
+        /** @enum {string} */
+        SecuritySignalSeverity: "info" | "warn" | "critical";
+        SecuritySignal: {
+            signalId: string;
+            kind: components["schemas"]["SecuritySignalKind"];
+            severity: components["schemas"]["SecuritySignalSeverity"];
+            summary: string;
+            evidence?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            detectedAt: string;
+        };
+        ListSecuritySignalsResponse: {
+            items: components["schemas"]["SecuritySignal"][];
+        };
+        UsageWindowCounts: {
+            last24h: number;
+            last7d: number;
+            last30d: number;
+        };
+        UsageSnapshot: {
+            seats: {
+                used: number;
+                allocated: number;
+            };
+            storage: {
+                usedBytes: number;
+                allocatedBytes: number;
+            };
+            apiCalls: components["schemas"]["UsageWindowCounts"];
+            activeUsers: components["schemas"]["UsageWindowCounts"];
         };
         NotificationItem: {
             id: string;
@@ -5224,22 +5710,48 @@ export interface operations {
             };
         };
     };
-    listManagedUsers: {
+    listUsers: {
         parameters: {
-            query?: never;
+            query?: {
+                isActive?: boolean;
+                role?: components["schemas"]["UserRole"];
+                areaCode?: string;
+                /** @description Free-text search across displayName, username, email */
+                q?: string;
+                cursor?: string;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Lista de usuarios */
+            /** @description Lista paginada de usuarios */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListManagedUsersResponse"];
+                    "application/json": components["schemas"]["ListUsersResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5268,7 +5780,7 @@ export interface operations {
             };
         };
     };
-    updateManagedUser: {
+    patchUser: {
         parameters: {
             query?: never;
             header?: never;
@@ -5289,12 +5801,48 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UpdateManagedUserResponse"];
+                    "application/json": components["schemas"]["ManagedUserCore"];
+                };
+            };
+            /** @description Requisicao invalida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Usuario nao encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
     };
-    resetManagedUserPassword: {
+    resetPassword: {
         parameters: {
             query?: never;
             header?: never;
@@ -5318,9 +5866,36 @@ export interface operations {
                     "application/json": components["schemas"]["ResetManagedUserPasswordResponse"];
                 };
             };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Usuario nao encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
-    unlockManagedUser: {
+    unlockUser: {
         parameters: {
             query?: never;
             header?: never;
@@ -5338,6 +5913,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnlockManagedUserResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Usuario nao encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5366,7 +5968,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Sem permissao */
@@ -5375,7 +5977,650 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    inviteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserInviteRequest"];
+            };
+        };
+        responses: {
+            /** @description Usuario convidado */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserInviteResponse"];
+                };
+            };
+            /** @description Requisicao invalida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflito (username/email ja em uso) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bulkUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserBulkActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Resultado da acao em lote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserBulkActionResult"];
+                };
+            };
+            /** @description Requisicao invalida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listMemberships: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de memberships */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListMembershipsResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Usuario nao encontrado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de roles canonicos */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRolesResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listCapabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de capabilities */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCapabilitiesResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listRoleCapabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matriz role x capability */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRoleCapabilitiesResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getKpi: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Snapshot de KPIs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IamKpiSnapshot"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Snapshot de consumo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSnapshot"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getPresenceSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Snapshot de presenca */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresenceSnapshotResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    exportAuditEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuditExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Exportacao agendada (assinada) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditExportResponse"];
+                };
+            };
+            /** @description Requisicao invalida */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listSessions: {
+        parameters: {
+            query?: {
+                userId?: string;
+                isActive?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de sessoes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSessionsResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    revokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessao revogada */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sessao nao encontrada */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getMfaCoverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cobertura de MFA */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaCoverage"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listLockouts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lista de lockouts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLockoutsResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listSecuritySignals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sinais de seguranca */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSecuritySignalsResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -5383,8 +6628,15 @@ export interface operations {
     listAuditEvents: {
         parameters: {
             query?: {
+                actorId?: string;
+                action?: string;
                 resourceType?: string;
                 resourceId?: string;
+                occurredAfter?: string;
+                occurredBefore?: string;
+                /** @description Free-text search on action / payload summary */
+                q?: string;
+                cursor?: string;
                 limit?: number;
             };
             header?: never;
@@ -5408,7 +6660,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Nao autenticado */
@@ -5417,7 +6669,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Sem permissao */
@@ -5426,7 +6678,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
         };

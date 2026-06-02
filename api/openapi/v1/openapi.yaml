@@ -137,18 +137,55 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
   /iam/users:
     get:
-      summary: Lista usuarios internos com estado de autenticacao
+      summary: List tenant users (cursor-paginated, filterable)
       tags: [iam]
-      operationId: listManagedUsers
+      operationId: listUsers
+      parameters:
+        - name: isActive
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: role
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - name: areaCode
+          in: query
+          required: false
+          schema: { type: string }
+        - name: q
+          in: query
+          required: false
+          description: Free-text search across displayName, username, email
+          schema: { type: string }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200 }
       responses:
         '200':
-          description: Lista de usuarios
+          description: Lista paginada de usuarios
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ListManagedUsersResponse'
+                $ref: '#/components/schemas/ListUsersResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
     post:
-      summary: Cria usuario interno com credencial local inicial
+      summary: Cria usuario interno com credencial local inicial (legacy; prefer POST /iam/users/invite)
       tags: [iam]
       operationId: createManagedUser
       requestBody:
@@ -166,9 +203,9 @@ paths:
                 $ref: '#/components/schemas/CreateManagedUserResponse'
   /iam/users/{userId}:
     patch:
-      summary: Atualiza estado e credencial de um usuario interno
+      summary: Atomic metadata + tenant role update (single tx)
       tags: [iam]
-      operationId: updateManagedUser
+      operationId: patchUser
       parameters:
         - name: userId
           in: path
@@ -187,12 +224,32 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateManagedUserResponse'
+                $ref: '#/components/schemas/ManagedUserCore'
+        '400':
+          description: Requisicao invalida
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Usuario nao encontrado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /iam/users/{userId}/reset-password:
     post:
-      summary: Reseta administrativamente a senha de um usuario e exige troca no proximo login
+      summary: Admin password reset (forces must-change-on-first-login)
       tags: [iam]
-      operationId: resetManagedUserPassword
+      operationId: resetPassword
       parameters:
         - name: userId
           in: path
@@ -212,11 +269,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResetManagedUserPasswordResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Usuario nao encontrado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /iam/users/{userId}/unlock:
     post:
-      summary: Limpa lock operacional e contador de falhas de login de um usuario
+      summary: Clear operational lock + failed-login counter for a user
       tags: [iam]
-      operationId: unlockManagedUser
+      operationId: unlockUser
       parameters:
         - name: userId
           in: path
@@ -230,9 +302,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UnlockManagedUserResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Usuario nao encontrado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /iam/admin/overview:
     get:
-      summary: Resumo administrativo de usuarios, presenca e atividades recentes
+      summary: Composed Admin Center overview (KPI strip + presence + recent activity)
       tags: [iam]
       operationId: getIamAdminOverview
       responses:
@@ -245,15 +332,416 @@ paths:
         '401':
           description: Nao autenticado
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+                $ref: '#/components/schemas/Problem'
         '403':
           description: Sem permissao
           content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /iam/users/invite:
+    post:
+      summary: Invite a new user (server-generated temp password, must change on first login)
+      tags: [iam]
+      operationId: inviteUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInviteRequest'
+      responses:
+        '201':
+          description: Usuario convidado
+          content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+                $ref: '#/components/schemas/UserInviteResponse'
+        '400':
+          description: Requisicao invalida
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: Conflito (username/email ja em uso)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/users/bulk:
+    post:
+      summary: Bulk action over a set of users (activate, deactivate, unlock, force-logout)
+      tags: [iam]
+      operationId: bulkUsers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserBulkActionRequest'
+      responses:
+        '200':
+          description: Resultado da acao em lote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBulkActionResult'
+        '400':
+          description: Requisicao invalida
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/users/{userId}/memberships:
+    get:
+      summary: List area memberships for a user
+      tags: [iam]
+      operationId: listMemberships
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Lista de memberships
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListMembershipsResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Usuario nao encontrado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/roles:
+    get:
+      summary: List canonical tenant roles (read-only)
+      tags: [iam]
+      operationId: listRoles
+      responses:
+        '200':
+          description: Lista de roles canonicos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListRolesResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/capabilities:
+    get:
+      summary: List capability registry (read-only)
+      tags: [iam]
+      operationId: listCapabilities
+      responses:
+        '200':
+          description: Lista de capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListCapabilitiesResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/role-capabilities:
+    get:
+      summary: List role-capability matrix rows (read-only)
+      tags: [iam]
+      operationId: listRoleCapabilities
+      responses:
+        '200':
+          description: Matriz role x capability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListRoleCapabilitiesResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/kpi:
+    get:
+      summary: Tenant KPI snapshot for the Overview strip
+      tags: [iam]
+      operationId: getKpi
+      responses:
+        '200':
+          description: Snapshot de KPIs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IamKpiSnapshot'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/usage:
+    get:
+      summary: Tenant consumption snapshot (seats, storage, API, active users)
+      tags: [iam]
+      operationId: getUsage
+      responses:
+        '200':
+          description: Snapshot de consumo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageSnapshot'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /iam/presence/snapshot:
+    get:
+      summary: Online presence snapshot (HTTP fallback when WebSocket unavailable)
+      tags: [iam]
+      operationId: getPresenceSnapshot
+      responses:
+        '200':
+          description: Snapshot de presenca
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresenceSnapshotResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /audit/events/export:
+    post:
+      summary: Export filtered audit events as CSV or JSONL (signed URL, async if large)
+      tags: [audit]
+      operationId: exportAuditEvents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditExportRequest'
+      responses:
+        '202':
+          description: Exportacao agendada (assinada)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditExportResponse'
+        '400':
+          description: Requisicao invalida
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /auth/sessions:
+    get:
+      summary: List active sessions in the current tenant
+      tags: [iam]
+      operationId: listSessions
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: isActive
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        '200':
+          description: Lista de sessoes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSessionsResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /auth/sessions/{sessionId}:
+    delete:
+      summary: Revoke (force-logout) a specific session. Gate CapSessionManage.
+      tags: [iam]
+      operationId: revokeSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Sessao revogada
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Sessao nao encontrada
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /security/mfa-coverage:
+    get:
+      summary: MFA enrollment coverage by tenant + by role
+      tags: [security]
+      operationId: getMfaCoverage
+      responses:
+        '200':
+          description: Cobertura de MFA
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaCoverage'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /security/lockouts:
+    get:
+      summary: Current account lockouts (locked-until window)
+      tags: [security]
+      operationId: listLockouts
+      responses:
+        '200':
+          description: Lista de lockouts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListLockoutsResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /security/signals:
+    get:
+      summary: Anomaly cards (repeated-failed-login, new-device-login, lockout-spike, off-hours-admin-action)
+      tags: [security]
+      operationId: listSecuritySignals
+      responses:
+        '200':
+          description: Sinais de seguranca
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSecuritySignalsResponse'
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /document-types:
     get:
       summary: Lista os tipos documentais suportados
@@ -1077,20 +1565,43 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
   /audit/events:
     get:
-      summary: Lista eventos de auditoria append-only
+      summary: Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
       tags: [audit]
       operationId: listAuditEvents
       parameters:
+        - name: actorId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: action
+          in: query
+          required: false
+          schema: { type: string }
         - name: resourceType
           in: query
           required: false
-          schema:
-            type: string
+          schema: { type: string }
         - name: resourceId
           in: query
           required: false
-          schema:
-            type: string
+          schema: { type: string }
+        - name: occurredAfter
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: occurredBefore
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: q
+          in: query
+          required: false
+          description: Free-text search on action / payload summary
+          schema: { type: string }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
         - name: limit
           in: query
           required: false
@@ -1108,21 +1619,18 @@ paths:
         '400':
           description: Parametro invalido
           content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '401':
           description: Nao autenticado
           content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '403':
           description: Sem permissao
           content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiErrorEnvelope'
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /notifications:
     get:
       summary: Lista notificacoes operacionais do usuario autenticado
@@ -3313,8 +3821,73 @@ components:
           type: boolean
         user:
           $ref: '#/components/schemas/CurrentUser'
+    UserRole:
+      type: string
+      description: Canonical tenant role. 8 values; no `admin` or `reviewer` phantoms.
+      enum: [system_admin, approver, author, editor, viewer, signer, area_admin, qms_admin]
+    AreaMembership:
+      type: object
+      required: [userId, areaCode, role]
+      properties:
+        userId: { type: string }
+        areaCode: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+        grantedAt:
+          type: string
+          format: date-time
+        grantedBy:
+          type: string
+    AreaMembershipInput:
+      type: object
+      required: [areaCode, role]
+      properties:
+        areaCode: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+    ManagedUserCore:
+      type: object
+      description: Canonical user shape — single tenantRole + multi area memberships.
+      required:
+        - userId
+        - username
+        - displayName
+        - isActive
+        - mustChangePassword
+        - failedLoginAttempts
+        - tenantRole
+        - areaMemberships
+        - createdAt
+        - updatedAt
+      properties:
+        userId: { type: string }
+        username: { type: string }
+        email: { type: string }
+        displayName: { type: string }
+        isActive: { type: boolean }
+        mustChangePassword: { type: boolean }
+        failedLoginAttempts: { type: integer }
+        lockedUntil:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+        tenantRole:
+          $ref: '#/components/schemas/UserRole'
+        areaMemberships:
+          type: array
+          items:
+            $ref: '#/components/schemas/AreaMembership'
+        mfaEnabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     ManagedUserItem:
       type: object
+      description: Legacy shape kept for backward compat with hand-wired /iam/users handlers. Prefer ManagedUserCore.
       required: [userId, username, displayName, isActive, mustChangePassword, failedLoginAttempts, roles, createdAt, updatedAt]
       properties:
         userId:
@@ -3348,37 +3921,193 @@ components:
         updatedAt:
           type: string
           format: date-time
-    AdminOnlineUserItem:
+    CursorPage:
+      type: object
+      required: [next_cursor, has_more]
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    ListUsersResponse:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ManagedUserCore'
+        page:
+          $ref: '#/components/schemas/CursorPage'
+        total:
+          type: integer
+          minimum: 0
+    UserInviteRequest:
+      type: object
+      required: [username, email, displayName, tenantRole]
+      properties:
+        username: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        displayName: { type: string, minLength: 1 }
+        tenantRole: { $ref: '#/components/schemas/UserRole' }
+        areaMemberships:
+          type: array
+          items:
+            $ref: '#/components/schemas/AreaMembershipInput'
+    UserInviteResponse:
+      type: object
+      required: [userId, tempPassword]
+      description: tempPassword is returned one-time only and never persisted plaintext.
+      properties:
+        userId: { type: string }
+        tempPassword: { type: string }
+    UserBulkActionKind:
+      type: string
+      enum: [activate, deactivate, unlock, force-logout]
+    UserBulkActionRequest:
+      type: object
+      required: [userIds, action]
+      properties:
+        userIds:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { type: string }
+        action:
+          $ref: '#/components/schemas/UserBulkActionKind'
+        reason:
+          type: string
+    UserBulkActionFailure:
+      type: object
+      required: [userId, code, message]
+      properties:
+        userId: { type: string }
+        code: { type: string }
+        message: { type: string }
+    UserBulkActionResult:
+      type: object
+      required: [succeeded, failed]
+      properties:
+        succeeded:
+          type: array
+          items: { type: string }
+        failed:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserBulkActionFailure'
+    ListMembershipsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AreaMembership'
+    RoleDescriptor:
+      type: object
+      required: [code, label, description]
+      properties:
+        code: { $ref: '#/components/schemas/UserRole' }
+        label: { type: string }
+        description: { type: string }
+    ListRolesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleDescriptor'
+    CapabilityDescriptor:
+      type: object
+      required: [code, description, category]
+      properties:
+        code: { type: string }
+        description: { type: string }
+        category: { type: string }
+    ListCapabilitiesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityDescriptor'
+    RoleCapabilityLink:
+      type: object
+      required: [role, capability]
+      properties:
+        role: { $ref: '#/components/schemas/UserRole' }
+        capability: { type: string }
+    ListRoleCapabilitiesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoleCapabilityLink'
+    IamKpiRoleCount:
+      type: object
+      required: [role, count]
+      properties:
+        role: { $ref: '#/components/schemas/UserRole' }
+        count: { type: integer, minimum: 0 }
+    IamKpiSnapshot:
+      type: object
+      required:
+        - lockedAccounts
+        - mfaCoveragePct
+        - failedLogins24h
+        - dormantUsers30d
+        - roleDistribution
+        - auditEventsPerMinute
+      properties:
+        lockedAccounts: { type: integer, minimum: 0 }
+        mfaCoveragePct: { type: number, minimum: 0, maximum: 100 }
+        failedLogins24h: { type: integer, minimum: 0 }
+        dormantUsers30d: { type: integer, minimum: 0 }
+        roleDistribution:
+          type: array
+          items:
+            $ref: '#/components/schemas/IamKpiRoleCount'
+        auditEventsPerMinute: { type: number, minimum: 0 }
+    OnlinePresenceItem:
       type: object
       required: [userId, username, displayName, lastSeenAt]
       properties:
-        userId:
-          type: string
-        username:
-          type: string
-        displayName:
-          type: string
+        userId: { type: string }
+        username: { type: string }
+        displayName: { type: string }
         lastSeenAt:
           type: string
           format: date-time
+    PresenceSnapshotResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnlinePresenceItem'
     AdminOverviewResponse:
       type: object
-      required: [users, onlineUsers, recentActivities]
+      required: [kpi, presence, recentActivities]
       properties:
-        users:
+        kpi:
+          $ref: '#/components/schemas/IamKpiSnapshot'
+        presence:
           type: array
           items:
-            $ref: '#/components/schemas/ManagedUserItem'
-        onlineUsers:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminOnlineUserItem'
+            $ref: '#/components/schemas/OnlinePresenceItem'
         recentActivities:
           type: array
           items:
             $ref: '#/components/schemas/AuditEventItem'
     ListManagedUsersResponse:
       type: object
+      description: Legacy list shape. Prefer ListUsersResponse.
       required: [items]
       properties:
         items:
@@ -3414,6 +4143,9 @@ components:
           type: string
     UpdateManagedUserRequest:
       type: object
+      description: |
+        Atomic metadata + tenant role update. All fields optional;
+        server applies only the supplied subset in a single transaction.
       properties:
         displayName:
           type: string
@@ -3425,8 +4157,11 @@ components:
           type: string
         mustChangePassword:
           type: boolean
+        tenantRole:
+          $ref: '#/components/schemas/UserRole'
     UpdateManagedUserResponse:
       type: object
+      description: Legacy response shape; new patchUser returns ManagedUserCore.
       required: [userId, updated]
       properties:
         userId:
@@ -4642,12 +5377,182 @@ components:
           type: string
     ListAuditEventsResponse:
       type: object
-      required: [items]
+      required: [items, page]
       properties:
         items:
           type: array
           items:
             $ref: '#/components/schemas/AuditEventItem'
+        page:
+          $ref: '#/components/schemas/CursorPage'
+        total:
+          type: integer
+          minimum: 0
+    AuditFilter:
+      type: object
+      description: Multi-axis audit filter (mirrors GET /audit/events query params).
+      properties:
+        actorId: { type: string }
+        action: { type: string }
+        resourceType: { type: string }
+        resourceId: { type: string }
+        occurredAfter:
+          type: string
+          format: date-time
+        occurredBefore:
+          type: string
+          format: date-time
+        q: { type: string }
+    AuditExportFormat:
+      type: string
+      enum: [csv, jsonl]
+    AuditExportRequest:
+      type: object
+      required: [format, filter]
+      properties:
+        format: { $ref: '#/components/schemas/AuditExportFormat' }
+        filter: { $ref: '#/components/schemas/AuditFilter' }
+    AuditExportResponse:
+      type: object
+      required: [exportId, signedUrl, expiresAt]
+      properties:
+        exportId: { type: string }
+        signedUrl: { type: string, format: uri }
+        expiresAt:
+          type: string
+          format: date-time
+    SessionItem:
+      type: object
+      required: [sessionId, userId, displayName, createdAt, lastSeenAt, expiresAt]
+      properties:
+        sessionId: { type: string }
+        userId: { type: string }
+        displayName: { type: string }
+        ipAddress: { type: string }
+        userAgent: { type: string }
+        deviceLabel: { type: string }
+        createdAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    ListSessionsResponse:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionItem'
+        page:
+          $ref: '#/components/schemas/CursorPage'
+        total:
+          type: integer
+          minimum: 0
+    MfaCoverageRoleSlice:
+      type: object
+      required: [role, total, mfaEnabled, pct]
+      properties:
+        role: { $ref: '#/components/schemas/UserRole' }
+        total: { type: integer, minimum: 0 }
+        mfaEnabled: { type: integer, minimum: 0 }
+        pct: { type: number, minimum: 0, maximum: 100 }
+    MfaCoverage:
+      type: object
+      required: [totalUsers, mfaEnabled, mfaEnabledPct, byRole]
+      properties:
+        totalUsers: { type: integer, minimum: 0 }
+        mfaEnabled: { type: integer, minimum: 0 }
+        mfaEnabledPct: { type: number, minimum: 0, maximum: 100 }
+        byRole:
+          type: array
+          items:
+            $ref: '#/components/schemas/MfaCoverageRoleSlice'
+    LockoutItem:
+      type: object
+      required: [userId, displayName, failedAttempts]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        lockedUntil:
+          type: string
+          format: date-time
+        failedAttempts: { type: integer, minimum: 0 }
+        lastFailedAt:
+          type: string
+          format: date-time
+        lastFailedIp: { type: string }
+    ListLockoutsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LockoutItem'
+    SecuritySignalKind:
+      type: string
+      enum:
+        - repeated-failed-login
+        - new-device-login
+        - lockout-spike
+        - off-hours-admin-action
+    SecuritySignalSeverity:
+      type: string
+      enum: [info, warn, critical]
+    SecuritySignal:
+      type: object
+      required: [signalId, kind, severity, summary, detectedAt]
+      properties:
+        signalId: { type: string }
+        kind: { $ref: '#/components/schemas/SecuritySignalKind' }
+        severity: { $ref: '#/components/schemas/SecuritySignalSeverity' }
+        summary: { type: string }
+        evidence:
+          type: object
+          additionalProperties: true
+        detectedAt:
+          type: string
+          format: date-time
+    ListSecuritySignalsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SecuritySignal'
+    UsageWindowCounts:
+      type: object
+      required: [last24h, last7d, last30d]
+      properties:
+        last24h: { type: integer, minimum: 0 }
+        last7d: { type: integer, minimum: 0 }
+        last30d: { type: integer, minimum: 0 }
+    UsageSnapshot:
+      type: object
+      required: [seats, storage, apiCalls, activeUsers]
+      properties:
+        seats:
+          type: object
+          required: [used, allocated]
+          properties:
+            used: { type: integer, minimum: 0 }
+            allocated: { type: integer, minimum: 0 }
+        storage:
+          type: object
+          required: [usedBytes, allocatedBytes]
+          properties:
+            usedBytes: { type: integer, minimum: 0 }
+            allocatedBytes: { type: integer, minimum: 0 }
+        apiCalls:
+          $ref: '#/components/schemas/UsageWindowCounts'
+        activeUsers:
+          $ref: '#/components/schemas/UsageWindowCounts'
     NotificationItem:
       type: object
       required: [id, recipientUserId, eventType, resourceType, resourceId, title, message, status, createdAt]
