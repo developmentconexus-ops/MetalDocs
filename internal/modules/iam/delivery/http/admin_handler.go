@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
@@ -30,11 +31,26 @@ type UserAdminService interface {
 	UnlockUser(ctx context.Context, userID string) error
 }
 
+// AuditEventLister is the narrow port the Admin Center overview uses to
+// surface recent activity. Mirrors audit.Service.ListEvents — kept scoped
+// to the small surface the handler actually needs so tests can pass fakes
+// without depending on the full audit reader/counter/export plumbing.
+type AuditEventLister interface {
+	ListEvents(ctx context.Context, query auditdomain.ListEventsQuery) ([]auditdomain.Event, error)
+}
+
+// KpiReader is the narrow port the overview uses to fold the KPI snapshot
+// into its composed response. Implemented by *iamapp.ObservabilityService.
+type KpiReader interface {
+	GetKpi(ctx context.Context, tenantID string) (iamdomain.KpiSnapshot, error)
+}
+
 type AdminHandler struct {
 	service     *iamapp.AdminService
 	authService UserAdminService
 	audit       auditdomain.Writer
-	auditReader auditdomain.Reader
+	auditEvents AuditEventLister
+	kpi         KpiReader
 }
 
 type UpsertUserRoleRequest struct {
@@ -57,8 +73,20 @@ func NewAdminHandler(service *iamapp.AdminService, authService UserAdminService,
 	return &AdminHandler{service: service, authService: authService, audit: writer}
 }
 
-func (h *AdminHandler) WithAuditReader(reader auditdomain.Reader) *AdminHandler {
-	h.auditReader = reader
+// WithAuditEventLister wires the audit-events reader used by the composed
+// admin overview to fetch the recent-activities stream. Replaces the
+// legacy direct auditReader field (dropped in PR-8): the handler now
+// depends on an application-layer interface, not a raw repository port.
+func (h *AdminHandler) WithAuditEventLister(events AuditEventLister) *AdminHandler {
+	h.auditEvents = events
+	return h
+}
+
+// WithObservabilityService wires the KPI source used by the composed
+// admin overview. Added in PR-8 — the overview response shape was
+// retyped in PR-3 to carry { kpi, presence, recentActivities }.
+func (h *AdminHandler) WithObservabilityService(svc KpiReader) *AdminHandler {
+	h.kpi = svc
 	return h
 }
 
@@ -75,9 +103,6 @@ func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/iam/admin/overview", h.handleAdminOverview)
 }
 
-// handleUserRoleUpsertTyped is the Go 1.22 typed-pattern entrypoint to the
-// legacy role upsert. The path parameter is extracted with r.PathValue so we
-// no longer split the URL by hand.
 func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.Request) {
 	userID := strings.TrimSpace(r.PathValue("userId"))
 	if userID == "" {
@@ -96,6 +121,13 @@ func (h *AdminHandler) handleReplaceUserRolesTyped(w http.ResponseWriter, r *htt
 	h.handleReplaceUserRoles(w, r, userID)
 }
 
+// handleAdminOverview composes the three independent snapshots that back
+// the Admin Center Overview tab: KPI, presence, and recent activities.
+// PR-8 refactor:
+//   - drops the legacy users[] field (People tab owns it now);
+//   - retypes the response to {kpi, presence, recentActivities};
+//   - runs the three reads concurrently via errgroup so the wall-clock
+//     budget is max(kpi, presence, audit) rather than the legacy sum.
 func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -112,53 +144,57 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	}
 	now := time.Now().UTC()
 	activeSince := now.Add(-10 * time.Minute)
-	users, err := h.authService.ListUsers(r.Context(), tenantID)
-	if err != nil {
-		log.Printf("iam admin: list users failed: %v", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
-		return
-	}
-	onlineUsers, err := h.authService.ListOnlineUsers(r.Context(), tenantID, activeSince)
-	if err != nil {
-		log.Printf("iam admin: list online users failed: %v", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list online users"))
-		return
-	}
-	recentEvents := []auditdomain.Event{}
-	if h.auditReader != nil {
-		// TODO: keep this tenant filter in place until the backing governance_events resource index includes tenant_id.
-		events, err := h.auditReader.ListEvents(r.Context(), auditdomain.ListEventsQuery{Limit: 25, TenantID: tenantID})
+
+	var (
+		kpiSnapshot  iamdomain.KpiSnapshot
+		onlineUsers  []authdomain.OnlineUser
+		recentEvents []auditdomain.Event
+	)
+
+	g, gctx := errgroup.WithContext(r.Context())
+
+	g.Go(func() error {
+		if h.kpi == nil {
+			return nil
+		}
+		snap, err := h.kpi.GetKpi(gctx, tenantID)
 		if err != nil {
-			log.Printf("iam admin: list audit events failed: %v", err)
-			h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list audit events"))
-			return
+			return err
+		}
+		kpiSnapshot = snap
+		return nil
+	})
+
+	g.Go(func() error {
+		items, err := h.authService.ListOnlineUsers(gctx, tenantID, activeSince)
+		if err != nil {
+			return err
+		}
+		onlineUsers = items
+		return nil
+	})
+
+	g.Go(func() error {
+		if h.auditEvents == nil {
+			return nil
+		}
+		events, err := h.auditEvents.ListEvents(gctx, auditdomain.ListEventsQuery{Limit: 25, TenantID: tenantID})
+		if err != nil {
+			return err
 		}
 		recentEvents = events
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		log.Printf("iam admin: overview composition failed: %v", err)
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to load admin overview"))
+		return
 	}
-	userOut := make([]map[string]any, 0, len(users))
-	for _, item := range users {
-		roles := make([]string, 0, len(item.Roles))
-		for _, role := range item.Roles {
-			roles = append(roles, string(role))
-		}
-		userOut = append(userOut, map[string]any{
-			"userId":              item.UserID,
-			"username":            item.Username,
-			"email":               item.Email,
-			"displayName":         item.DisplayName,
-			"isActive":            item.IsActive,
-			"mustChangePassword":  item.MustChangePassword,
-			"failedLoginAttempts": item.FailedLoginAttempts,
-			"roles":               roles,
-			"lastLoginAt":         formatOptionalTime(item.LastLoginAt),
-			"lockedUntil":         formatOptionalTime(item.LockedUntil),
-			"createdAt":           item.CreatedAt.UTC().Format(time.RFC3339),
-			"updatedAt":           item.UpdatedAt.UTC().Format(time.RFC3339),
-		})
-	}
-	onlineOut := make([]map[string]any, 0, len(onlineUsers))
+
+	presenceOut := make([]map[string]any, 0, len(onlineUsers))
 	for _, item := range onlineUsers {
-		onlineOut = append(onlineOut, map[string]any{
+		presenceOut = append(presenceOut, map[string]any{
 			"userId":      item.UserID,
 			"username":    item.Username,
 			"displayName": item.DisplayName,
@@ -183,11 +219,33 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"users":            userOut,
-		"onlineUsers":      onlineOut,
+		"kpi":              kpiToOverviewJSON(kpiSnapshot),
+		"presence":         presenceOut,
 		"recentActivities": eventOut,
 	})
 }
+
+// kpiToOverviewJSON mirrors the shape produced by ObservabilityHandler so
+// the composed overview and the standalone /iam/kpi endpoint return
+// identical kpi payloads.
+func kpiToOverviewJSON(k iamdomain.KpiSnapshot) map[string]any {
+	dist := make([]map[string]any, 0, len(k.RoleDistribution))
+	for _, rc := range k.RoleDistribution {
+		dist = append(dist, map[string]any{
+			"role":  string(rc.Role),
+			"count": rc.Count,
+		})
+	}
+	return map[string]any{
+		"lockedAccounts":       k.LockedAccounts,
+		"mfaCoveragePct":       k.MfaCoveragePct,
+		"failedLogins24h":      k.FailedLogins24h,
+		"dormantUsers30d":      k.DormantUsers30d,
+		"roleDistribution":     dist,
+		"auditEventsPerMinute": k.AuditEventsPerMinute,
+	}
+}
+
 // Legacy suffix-dispatcher / list / create / patch / reset / unlock methods
 // were removed by PR-4. Those endpoints now live on PeopleHandler in
 // people_handler.go, registered via Go 1.22 typed mux patterns under
@@ -358,10 +416,6 @@ func parseExactlyOneRole(items []string) (iamdomain.Role, error) {
 }
 
 func authenticatedActor(r *http.Request) string {
-	// Policy: tolerated fallback. Used as a label-only field on a path where
-	// no authenticated actor existing legitimately maps to "system" (e.g.
-	// bootstrap admin routes). Audit-bearing IAM mutations fail-closed in
-	// routes_memberships.go.
 	if userID, ok := authn.UserIDFromContext(r.Context()); ok {
 		return userID
 	}

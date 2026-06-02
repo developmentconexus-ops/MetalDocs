@@ -129,6 +129,12 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/iam/users/", pathSuffix: "/unlock", capability: iamdomain.CapUserManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/iam/admin/overview", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
+	// IAM Admin Center Usage + KPI cards (PR-8). Tenant-scoped read-only
+	// observability — guarded by CapMetricsView (separate from the Overview
+	// composition which retains CapUserView so a viewer can see the tab).
+	{method: http.MethodGet, pathExact: "/api/v1/iam/usage", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/iam/kpi", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
+
 	// Legacy taxonomy aliases.
 	{method: http.MethodGet, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -245,6 +251,11 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/security/mfa-coverage", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/security/lockouts", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/security/signals", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Presence (PR-9). Snapshot fallback + WebSocket stream are both
+	// tenant-scoped observability; both fold under CapUserView.
+	{method: http.MethodGet, pathExact: "/api/v1/iam/presence/snapshot", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/iam/presence/stream", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 }
 
 func newPermissionResolver() iamdelivery.PermissionResolver {
