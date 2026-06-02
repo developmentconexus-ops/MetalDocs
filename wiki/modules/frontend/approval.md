@@ -1,6 +1,6 @@
 # Frontend module: approval
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section)
+> **Last verified:** 2026-06-02 (PR-5 structural sweep: RouteAdminPage anchor repaired for post-PR-4 layout)
 > **Scope:** Inbox (caixa-de-aprovação), signoff dialog, approval-route admin. Frontend slice of the backend [`approval`](../approval.md) module.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/approval.md`](../approval.md)
 
@@ -12,7 +12,7 @@ Renders the approver inbox, drives the signoff flow with `If-Match` revision pre
 
 - [`frontend/apps/web/src/features/approval/routes.tsx:1`](../../../frontend/apps/web/src/features/approval/routes.tsx) — route table.
 - [`frontend/apps/web/src/features/approval/pages/InboxPage.tsx:23`](../../../frontend/apps/web/src/features/approval/pages/InboxPage.tsx) — `InboxPage` route entry.
-- [`frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:363`](../../../frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx) — `RouteAdminPage` (admin only).
+- [`frontend/apps/web/src/features/approval/pages/route-admin/RouteAdminPage.tsx:17`](../../../frontend/apps/web/src/features/approval/pages/route-admin/RouteAdminPage.tsx) — `RouteAdminPage` (admin only; PR-4 canonical rewrite split from monolithic file).
 - [`frontend/apps/web/src/features/approval/queries/useInboxQuery.ts:6`](../../../frontend/apps/web/src/features/approval/queries/useInboxQuery.ts) — `useInboxQuery`.
 - [`frontend/apps/web/src/features/approval/api/approvalApi.ts:43`](../../../frontend/apps/web/src/features/approval/api/approvalApi.ts) — `getInstance`, `listInbox` (line 53), `submit` (74), `signoff` (85), `publish` (96), `schedulePublish` (107), `supersede` (118), `obsolete` (129), `cancel` (140), route CRUD (151–169).
 - [`frontend/apps/web/src/features/approval/api/mutationClient.ts:31`](../../../frontend/apps/web/src/features/approval/api/mutationClient.ts) — `If-Match` + ETag wrapper.

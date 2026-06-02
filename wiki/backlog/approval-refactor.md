@@ -2,7 +2,7 @@
 
 > Actionable rows. One row = one PR. Pulled from `wiki/modules/approval-tech-debt.md`.
 
-**Last verified:** 2026-05-25 (5c + 5d medium sweep sync)
+**Last verified:** 2026-06-02 (R-RouteAdmin-Rewrite added + marked merged; closes composite T-015 in `approval-tech-debt.md`)
 
 ## Rows
 
@@ -20,9 +20,11 @@
 | R-010 | Add Go doc comments to exported approval symbols | T-010 | M | minor | — | — | open | — |
 | R-011 | Remove `WithMembershipContext` in favor of `setAuthzGUC` | T-011 | XS | minor | — | — | open | — |
 | R-012 | Close approval-tech-debt T-012 — iam `AuthorizationService` deleted Plan 4; update cross-module debt row; no adoption path needed | T-012 | XS | minor | — | — | open | — |
+| R-RouteAdmin-Rewrite | Canonical conversion of Approval Route Admin (OpenAPI describe → BE hardening → ADR/concept docs → FE rewrite on TanStack Query + codegen schemas + native `<dialog>`) | T-015 | L (composite) | high | — | — | merged | merged 2026-06-02 with PR-1..PR-4 (commits `f57d5525e`, `0d61b7165`, `ab7c29539`, `e4e0be399`, `5794e4d4e`; PRs #47, #48, #49, #50, #51); closes FE-1..FE-20 + C-2 + BE-1 + BE-3..BE-12; BE-9 (Tier-1 `route.view` split) carried over to F-001 follow-up |
 
 ## Notes
 
 - R-001 + R-002 are both `M` and depend on a shared envelope/spec decision — sequence them: R-002 first (lock the schema), then R-001 (server emits matching shape).
 - R-006 is gated by extending `tally_check.sh` audit to non-test service files — keep diff small, no new lint dependencies.
 - R-008 completed in migration 0194; repository column surface is now `document_id`.
+- R-RouteAdmin-Rewrite is the composite row for the Route Admin canonical conversion sprint (PR-1..PR-4 in `main`, PR-5 doc-only sync 2026-06-02). Future regressions on individual FE-x / BE-x sub-items must re-open the specific row rather than reusing this composite.
