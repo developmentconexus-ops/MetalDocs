@@ -215,11 +215,12 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 	stages := make([]contracts.ListStageItem, 0, len(route.Stages))
 	for _, stage := range route.Stages {
 		stages = append(stages, contracts.ListStageItem{
-			Label:              stage.Name,
+			Order:              stage.Order,
+			Name:               stage.Name,
 			RequiredRole:       stage.RequiredRole,
 			RequiredCapability: stage.RequiredCapability,
 			AreaCode:           stage.AreaCode,
-			QuorumKind:         contracts.QuorumKind(stage.Quorum),
+			Quorum:             contracts.QuorumKind(stage.Quorum),
 			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
 		})
@@ -241,10 +242,11 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 	out := make([]domain.Stage, 0, len(stages))
 	for _, s := range stages {
+		// required_capability is validated as non-empty + pattern-checked by
+		// CreateRouteRequest/UpdateRouteRequest.Validate before we reach here,
+		// so no silent default is needed (and a defaulted code may not even be
+		// a registered capability).
 		cap := strings.TrimSpace(s.RequiredCapability)
-		if cap == "" {
-			cap = "workflow.sign"
-		}
 		out = append(out, domain.Stage{
 			Order:              s.Order,
 			Name:               s.Name,

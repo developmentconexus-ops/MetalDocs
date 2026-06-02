@@ -58,6 +58,7 @@
     "archived",
     "authn.signature_invalid",
     "authz.capability_denied",
+    "capability_denied",
     "checkpoint_not_found",
     "comment_invalid",
     "comment_not_found",
@@ -76,6 +77,7 @@
     "form_data_invalid",
     "freeze.effective_date_missing",
     "gotenberg_failed",
+    "idempotency.key_conflict",
     "idempotency.key_required",
     "internal",
     "internal.db_privilege_missing",
@@ -129,6 +131,7 @@
     "validation.param_required",
     "validation.param_too_many_values",
     "validation.param_unmarshal",
+    "validation.profile_unknown",
     "validation.reason_required",
     "validation.request_invalid"
   ]

@@ -1,6 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { QK } from '../../../lib/queryKeys';
+import { resolveErrorMessage } from '../../../lib/api/problem';
+import { ApprovalError } from '../api/mutationClient';
 import {
   createRoute,
   deactivateRoute,
@@ -22,17 +25,91 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Surfaces a non-412 mutation failure as a toast. 412 (stale ETag) is already
+ * toasted inside `mutationClient`, so we skip it here to avoid a duplicate.
+ */
+function toastMutationError(err: unknown): void {
+  if (err instanceof ApprovalError && err.status === 412) return;
+  toast.error(resolveErrorMessage(err));
+}
+
 function stageRequestToSummary(
   stage: CreateRouteRequest['stages'][number],
 ): RouteSummary['stages'][number] {
   return {
-    label: stage.name,
+    order: stage.order,
+    name: stage.name,
     required_role: stage.required_role,
     required_capability: stage.required_capability,
     area_code: stage.area_code,
-    quorum_kind: stage.quorum,
+    quorum: stage.quorum,
     quorum_m: stage.quorum_m ?? null,
     drift_policy: stage.drift_policy,
+  };
+}
+
+/**
+ * Options for the shared optimistic-mutation factory used by update and
+ * deactivate. Create has a distinct non-optimistic shape and is not folded in.
+ */
+interface OptimisticRouteMutationOptions<TVariables extends { routeId: string }> {
+  mutationFn: (variables: TVariables) => Promise<RouteResponse>;
+  applyOptimistic: (route: RouteSummary, variables: TVariables) => RouteSummary;
+  successMessage: string;
+}
+
+/**
+ * Factory that produces the shared onMutate/onError/onSuccess/onSettled
+ * scaffold used by `useUpdateRoute` and `useDeactivateRoute`.
+ *
+ * Both mutations snapshot the list cache, apply an optimistic row patch, roll
+ * back on any error (412 stale, 409 active-instance, 422), re-seed the ETag
+ * on success, and invalidate the list on settled. Only the row-patch function
+ * and success-toast text differ between the two callers.
+ */
+function makeOptimisticRouteMutation<TVariables extends { routeId: string }>(
+  queryClient: ReturnType<typeof useQueryClient>,
+  queryKey: readonly unknown[],
+  options: OptimisticRouteMutationOptions<TVariables>,
+) {
+  const { mutationFn, applyOptimistic, successMessage } = options;
+
+  return {
+    mutationFn,
+    onMutate: async (variables: TVariables): Promise<ListSnapshot> => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<ListRoutesResponse>(queryKey);
+      if (!previous) {
+        return { previous };
+      }
+
+      const nextRoutes = previous.routes.map((route): RouteSummary =>
+        route.id === variables.routeId ? applyOptimistic(route, variables) : route,
+      );
+
+      queryClient.setQueryData<ListRoutesResponse>(queryKey, {
+        ...previous,
+        routes: nextRoutes,
+      });
+
+      return { previous };
+    },
+    onSuccess: (response: RouteResponse, variables: TVariables): void => {
+      if (response.new_version != null) {
+        seedRouteEtag(variables.routeId, response.new_version);
+      }
+      toast.success(successMessage);
+    },
+    onError: (err: unknown, _vars: TVariables, context: ListSnapshot | undefined): void => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toastMutationError(err);
+    },
+    onSettled: (): void => {
+      void queryClient.invalidateQueries({ queryKey });
+    },
   };
 }
 
@@ -60,6 +137,10 @@ export function useCreateRoute() {
     mutationFn: (body) => createRoute(body),
     onSuccess: (response) => {
       seedRouteEtag(response.route_id, 1);
+      toast.success('Rota criada.');
+    },
+    onError: (err) => {
+      toastMutationError(err);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey });
@@ -81,49 +162,19 @@ export function useUpdateRoute() {
     Error,
     { routeId: string; body: UpdateRouteRequest },
     ListSnapshot
-  >({
-    mutationFn: ({ routeId, body }) => updateRoute(routeId, body),
-    onMutate: async ({ routeId, body }) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<ListRoutesResponse>(queryKey);
-      if (!previous) {
-        return { previous };
-      }
-
-      const nextRoutes = previous.routes.map((route): RouteSummary => {
-        if (route.id !== routeId) {
-          return route;
-        }
-        return {
-          ...route,
-          name: body.name,
-          stages: body.stages.map(stageRequestToSummary),
-          version: route.version + 1,
-          updated_at: nowIso(),
-        };
-      });
-
-      queryClient.setQueryData<ListRoutesResponse>(queryKey, {
-        ...previous,
-        routes: nextRoutes,
-      });
-
-      return { previous };
-    },
-    onSuccess: (response, variables) => {
-      if (response.new_version != null) {
-        seedRouteEtag(variables.routeId, response.new_version);
-      }
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey });
-    },
-  });
+  >(
+    makeOptimisticRouteMutation(queryClient, queryKey, {
+      mutationFn: ({ routeId, body }) => updateRoute(routeId, body),
+      applyOptimistic: (route, { body }) => ({
+        ...route,
+        name: body.name,
+        stages: body.stages.map(stageRequestToSummary),
+        version: (route.version ?? 0) + 1,
+        updated_at: nowIso(),
+      }),
+      successMessage: 'Rota atualizada.',
+    }),
+  );
 }
 
 /**
@@ -139,40 +190,16 @@ export function useDeactivateRoute() {
     Error,
     { routeId: string; body: DeactivateRouteRequest },
     ListSnapshot
-  >({
-    mutationFn: ({ routeId, body }) => deactivateRoute(routeId, body),
-    onMutate: async ({ routeId }) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<ListRoutesResponse>(queryKey);
-      if (!previous) {
-        return { previous };
-      }
-
-      const nextRoutes = previous.routes.map((route): RouteSummary =>
-        route.id === routeId
-          ? { ...route, active: false, version: route.version + 1, updated_at: nowIso() }
-          : route,
-      );
-
-      queryClient.setQueryData<ListRoutesResponse>(queryKey, {
-        ...previous,
-        routes: nextRoutes,
-      });
-
-      return { previous };
-    },
-    onSuccess: (response, variables) => {
-      if (response.new_version != null) {
-        seedRouteEtag(variables.routeId, response.new_version);
-      }
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey });
-    },
-  });
+  >(
+    makeOptimisticRouteMutation(queryClient, queryKey, {
+      mutationFn: ({ routeId, body }) => deactivateRoute(routeId, body),
+      applyOptimistic: (route) => ({
+        ...route,
+        active: false,
+        version: (route.version ?? 0) + 1,
+        updated_at: nowIso(),
+      }),
+      successMessage: 'Rota desativada.',
+    }),
+  );
 }

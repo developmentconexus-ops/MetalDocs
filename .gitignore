@@ -126,3 +126,6 @@ frontend-dev.err.log
 
 # Claude project-root memory (local session state — not for repo)
 memory/
+
+# API stdout/stderr capture (start-api.ps1 tee)
+logs/

@@ -5029,11 +5029,12 @@ export interface components {
             [key: string]: unknown;
         };
         StageSummary: {
-            label: string;
+            order: number;
+            name: string;
             required_role: string;
             required_capability: string;
             area_code: string;
-            quorum_kind: components["schemas"]["QuorumKind"];
+            quorum: components["schemas"]["QuorumKind"];
             quorum_m?: number | null;
             drift_policy: components["schemas"]["DriftPolicy"];
         } & {
