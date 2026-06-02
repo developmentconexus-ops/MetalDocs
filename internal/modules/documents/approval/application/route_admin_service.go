@@ -13,7 +13,15 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// routeProfileFKConstraint is the FK on approval_routes (tenant_id, profile_code)
+// → metaldocs.document_profiles. A violation of this specific constraint means
+// the profile is not registered for the tenant: report it as a validation error.
+// Any other FK violation must fall through to a 500 with diagnostic context.
+const routeProfileFKConstraint = "approval_routes_document_profile_fk"
 
 // RouteAdminService manages approval route configuration changes.
 type RouteAdminService struct {
@@ -44,6 +52,11 @@ var ErrRouteAlreadyInactive = errors.New("route_admin: route already inactive")
 // ErrRouteDeactivateReasonRequired is returned when DeactivateRouteInput.Reason
 // is empty or whitespace-only.
 var ErrRouteDeactivateReasonRequired = errors.New("route_admin: deactivate reason must not be empty")
+
+// ErrRouteProfileUnknown is returned when the route's profile_code has no
+// matching document profile for the tenant (FK violation on create). Surfaced
+// as an actionable 4xx instead of an opaque 500.
+var ErrRouteProfileUnknown = errors.New("route_admin: profile_code not registered for tenant")
 
 // CreateRouteInput carries all inputs for Create.
 type CreateRouteInput struct {
@@ -176,7 +189,17 @@ func (s *RouteAdminService) createTx(ctx context.Context, db *sql.DB, in CreateR
 	).Scan(&routeID)
 	if err != nil {
 		_ = tx.Rollback()
-		return CreateRouteResult{}, fmt.Errorf("insert route: %w", repository.MapPgError(err, repository.MapHints{}))
+		mapped := repository.MapPgError(err, repository.MapHints{})
+		// Only a 23503 violation of the profile FK means the profile is not
+		// registered for the tenant — map that to a validation error. Any other
+		// FK violation falls through to a wrapped error so WriteError logs it at 500.
+		if errors.Is(mapped, repository.ErrFKViolation) {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.ConstraintName == routeProfileFKConstraint {
+				return CreateRouteResult{}, ErrRouteProfileUnknown
+			}
+		}
+		return CreateRouteResult{}, fmt.Errorf("insert route: %w", mapped)
 	}
 
 	if err := insertRouteStages(ctx, tx, routeID, in.Stages); err != nil {
@@ -558,6 +581,7 @@ func isPassThroughRouteAdminErr(err error) bool {
 	case errors.Is(err, ErrRouteNotFound),
 		errors.Is(err, ErrRouteAlreadyInactive),
 		errors.Is(err, ErrRouteDeactivateReasonRequired),
+		errors.Is(err, ErrRouteProfileUnknown),
 		errors.Is(err, repository.ErrStaleRevision),
 		errors.Is(err, repository.ErrRouteInUse),
 		errors.Is(err, repository.ErrDuplicateRouteProfile):
