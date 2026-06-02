@@ -229,7 +229,6 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 	for _, stage := range route.Stages {
 		stages = append(stages, contracts.ListStageItem{
 			Label:              stage.Name,
-			Members:            []string{stage.RequiredRole},
 			RequiredRole:       stage.RequiredRole,
 			RequiredCapability: stage.RequiredCapability,
 			AreaCode:           stage.AreaCode,

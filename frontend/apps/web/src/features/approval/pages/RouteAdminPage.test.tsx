@@ -26,13 +26,11 @@ describe('RouteAdminPage', () => {
           stages: [
             {
               label: 'Revisão',
-              members: ['ana'],
               quorum_kind: 'any_1_of',
               drift_policy: 'auto_cancel',
             },
             {
               label: 'Aprovação',
-              members: ['carlos'],
               quorum_kind: 'all_of',
               drift_policy: 'none',
             },
@@ -75,7 +73,6 @@ describe('RouteAdminPage', () => {
           stages: [
             {
               label: 'Financeiro',
-              members: ['joao'],
               quorum_kind: 'any_1_of',
               drift_policy: 'alert_only',
             },
@@ -108,7 +105,6 @@ describe('RouteAdminPage', () => {
           stages: [
             {
               label: 'Operação',
-              members: ['luis'],
               quorum_kind: 'any_1_of',
               drift_policy: 'auto_cancel',
             },

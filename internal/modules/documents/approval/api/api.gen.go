@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -300,6 +301,48 @@ func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
 	}
 }
 
+// Defines values for DriftPolicy.
+const (
+	FailStage    DriftPolicy = "fail_stage"
+	KeepSnapshot DriftPolicy = "keep_snapshot"
+	ReduceQuorum DriftPolicy = "reduce_quorum"
+)
+
+// Valid indicates whether the value is a known member of the DriftPolicy enum.
+func (e DriftPolicy) Valid() bool {
+	switch e {
+	case FailStage:
+		return true
+	case KeepSnapshot:
+		return true
+	case ReduceQuorum:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for QuorumKind.
+const (
+	AllOf  QuorumKind = "all_of"
+	Any1Of QuorumKind = "any_1_of"
+	MOfN   QuorumKind = "m_of_n"
+)
+
+// Valid indicates whether the value is a known member of the QuorumKind enum.
+func (e QuorumKind) Valid() bool {
+	switch e {
+	case AllOf:
+		return true
+	case Any1Of:
+		return true
+	case MOfN:
+		return true
+	default:
+		return false
+	}
+}
+
 // ApprovalInstanceByDocumentResponse defines model for ApprovalInstanceByDocumentResponse.
 type ApprovalInstanceByDocumentResponse struct {
 	CompletedAt *time.Time                               `json:"completed_at,omitempty"`
@@ -356,6 +399,21 @@ type ApprovalStageInstanceResponse struct {
 
 // ApprovalStageInstanceResponseStatus defines model for ApprovalStageInstanceResponse.Status.
 type ApprovalStageInstanceResponseStatus string
+
+// CreateRouteRequest defines model for CreateRouteRequest.
+type CreateRouteRequest struct {
+	Name                 string                 `json:"name"`
+	ProfileCode          string                 `json:"profile_code"`
+	Stages               []StageRequest         `json:"stages"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// DeactivateRouteRequest defines model for DeactivateRouteRequest.
+type DeactivateRouteRequest struct {
+	// Reason Governance reason recorded with deactivation event.
+	Reason               string                 `json:"reason"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
 
 // DocumentTemplateFieldSlotNodeResponse defines model for DocumentTemplateFieldSlotNodeResponse.
 type DocumentTemplateFieldSlotNodeResponse struct {
@@ -449,6 +507,9 @@ type DocumentTemplateTableSlotNodeResponseFieldKind string
 // DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
 type DocumentTemplateTableSlotNodeResponseType string
 
+// DriftPolicy Behaviour applied when an actor loses eligibility mid-stage.
+type DriftPolicy string
+
 // FieldError defines model for FieldError.
 type FieldError struct {
 	Code string `json:"code"`
@@ -456,6 +517,13 @@ type FieldError struct {
 	// Field JSON pointer or dot path
 	Field   string `json:"field"`
 	Message string `json:"message"`
+}
+
+// ListRoutesResponse defines model for ListRoutesResponse.
+type ListRoutesResponse struct {
+	Routes               []RouteSummary         `json:"routes"`
+	Total                int                    `json:"total"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
 // Problem defines model for Problem.
@@ -470,11 +538,103 @@ type Problem struct {
 	Type     string        `json:"type"`
 }
 
+// QuorumKind Quorum policy applied to a stage. `m_of_n` requires `quorum_m`.
+type QuorumKind string
+
+// RouteResponse defines model for RouteResponse.
+type RouteResponse struct {
+	// NewVersion New route version after a successful update. Omitted for create/deactivate.
+	NewVersion           *int                   `json:"new_version,omitempty"`
+	RouteId              openapi_types.UUID     `json:"route_id"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// RouteSummary defines model for RouteSummary.
+type RouteSummary struct {
+	Active      bool               `json:"active"`
+	CreatedAt   time.Time          `json:"created_at"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	ProfileCode string             `json:"profile_code"`
+	Stages      []StageSummary     `json:"stages"`
+	TenantId    openapi_types.UUID `json:"tenant_id"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+
+	// Version Monotonic version bumped on each update or deactivation.
+	Version              int                    `json:"version"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// StageRequest defines model for StageRequest.
+type StageRequest struct {
+	AreaCode string `json:"area_code"`
+
+	// DriftPolicy Behaviour applied when an actor loses eligibility mid-stage.
+	DriftPolicy DriftPolicy `json:"drift_policy"`
+	Name        string      `json:"name"`
+
+	// Order 1-based stage ordinal. Must equal index+1.
+	Order int `json:"order"`
+
+	// Quorum Quorum policy applied to a stage. `m_of_n` requires `quorum_m`.
+	Quorum QuorumKind `json:"quorum"`
+
+	// QuorumM Required when `quorum` is `m_of_n`; must be omitted otherwise.
+	QuorumM              *int                   `json:"quorum_m,omitempty"`
+	RequiredCapability   string                 `json:"required_capability"`
+	RequiredRole         string                 `json:"required_role"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// StageSummary defines model for StageSummary.
+type StageSummary struct {
+	AreaCode string `json:"area_code"`
+
+	// DriftPolicy Behaviour applied when an actor loses eligibility mid-stage.
+	DriftPolicy DriftPolicy `json:"drift_policy"`
+	Label       string      `json:"label"`
+
+	// QuorumKind Quorum policy applied to a stage. `m_of_n` requires `quorum_m`.
+	QuorumKind           QuorumKind             `json:"quorum_kind"`
+	QuorumM              *int                   `json:"quorum_m,omitempty"`
+	RequiredCapability   string                 `json:"required_capability"`
+	RequiredRole         string                 `json:"required_role"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
+// UpdateRouteRequest defines model for UpdateRouteRequest.
+type UpdateRouteRequest struct {
+	Name                 string                 `json:"name"`
+	Stages               []StageRequest         `json:"stages"`
+	AdditionalProperties map[string]interface{} `json:"-"`
+}
+
 // RecordApprovalStageSignoffParams defines parameters for RecordApprovalStageSignoff.
 type RecordApprovalStageSignoffParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 
 	// IfMatch Expected revision version ETag in the form "v<N>"
+	IfMatch string `json:"If-Match"`
+}
+
+// CreateApprovalRouteParams defines parameters for CreateApprovalRoute.
+type CreateApprovalRouteParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// DeactivateApprovalRouteParams defines parameters for DeactivateApprovalRoute.
+type DeactivateApprovalRouteParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected route version ETag in the form "v<N>"
+	IfMatch string `json:"If-Match"`
+}
+
+// UpdateApprovalRouteParams defines parameters for UpdateApprovalRoute.
+type UpdateApprovalRouteParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+
+	// IfMatch Expected route version ETag in the form "v<N>"
 	IfMatch string `json:"If-Match"`
 }
 
@@ -490,6 +650,895 @@ type RecordDocumentSignoffParams struct {
 type SubmitDocumentForApprovalParams struct {
 	// IfMatch Expected revision version ETag in the form "v<N>"
 	IfMatch string `json:"If-Match"`
+}
+
+// CreateApprovalRouteJSONRequestBody defines body for CreateApprovalRoute for application/json ContentType.
+type CreateApprovalRouteJSONRequestBody = CreateRouteRequest
+
+// DeactivateApprovalRouteJSONRequestBody defines body for DeactivateApprovalRoute for application/json ContentType.
+type DeactivateApprovalRouteJSONRequestBody = DeactivateRouteRequest
+
+// UpdateApprovalRouteJSONRequestBody defines body for UpdateApprovalRoute for application/json ContentType.
+type UpdateApprovalRouteJSONRequestBody = UpdateRouteRequest
+
+// Getter for additional properties for CreateRouteRequest. Returns the specified
+// element and whether it was found
+func (a CreateRouteRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for CreateRouteRequest
+func (a *CreateRouteRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for CreateRouteRequest to handle AdditionalProperties
+func (a *CreateRouteRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["profile_code"]; found {
+		err = json.Unmarshal(raw, &a.ProfileCode)
+		if err != nil {
+			return fmt.Errorf("error reading 'profile_code': %w", err)
+		}
+		delete(object, "profile_code")
+	}
+
+	if raw, found := object["stages"]; found {
+		err = json.Unmarshal(raw, &a.Stages)
+		if err != nil {
+			return fmt.Errorf("error reading 'stages': %w", err)
+		}
+		delete(object, "stages")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for CreateRouteRequest to handle AdditionalProperties
+func (a CreateRouteRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["name"], err = json.Marshal(a.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	object["profile_code"], err = json.Marshal(a.ProfileCode)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'profile_code': %w", err)
+	}
+
+	if a.Stages != nil {
+		object["stages"], err = json.Marshal(a.Stages)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stages': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for DeactivateRouteRequest. Returns the specified
+// element and whether it was found
+func (a DeactivateRouteRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for DeactivateRouteRequest
+func (a *DeactivateRouteRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for DeactivateRouteRequest to handle AdditionalProperties
+func (a *DeactivateRouteRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["reason"]; found {
+		err = json.Unmarshal(raw, &a.Reason)
+		if err != nil {
+			return fmt.Errorf("error reading 'reason': %w", err)
+		}
+		delete(object, "reason")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for DeactivateRouteRequest to handle AdditionalProperties
+func (a DeactivateRouteRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["reason"], err = json.Marshal(a.Reason)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'reason': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for ListRoutesResponse. Returns the specified
+// element and whether it was found
+func (a ListRoutesResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for ListRoutesResponse
+func (a *ListRoutesResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for ListRoutesResponse to handle AdditionalProperties
+func (a *ListRoutesResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["routes"]; found {
+		err = json.Unmarshal(raw, &a.Routes)
+		if err != nil {
+			return fmt.Errorf("error reading 'routes': %w", err)
+		}
+		delete(object, "routes")
+	}
+
+	if raw, found := object["total"]; found {
+		err = json.Unmarshal(raw, &a.Total)
+		if err != nil {
+			return fmt.Errorf("error reading 'total': %w", err)
+		}
+		delete(object, "total")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for ListRoutesResponse to handle AdditionalProperties
+func (a ListRoutesResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.Routes != nil {
+		object["routes"], err = json.Marshal(a.Routes)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'routes': %w", err)
+		}
+	}
+
+	object["total"], err = json.Marshal(a.Total)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'total': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for RouteResponse. Returns the specified
+// element and whether it was found
+func (a RouteResponse) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for RouteResponse
+func (a *RouteResponse) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for RouteResponse to handle AdditionalProperties
+func (a *RouteResponse) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["new_version"]; found {
+		err = json.Unmarshal(raw, &a.NewVersion)
+		if err != nil {
+			return fmt.Errorf("error reading 'new_version': %w", err)
+		}
+		delete(object, "new_version")
+	}
+
+	if raw, found := object["route_id"]; found {
+		err = json.Unmarshal(raw, &a.RouteId)
+		if err != nil {
+			return fmt.Errorf("error reading 'route_id': %w", err)
+		}
+		delete(object, "route_id")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for RouteResponse to handle AdditionalProperties
+func (a RouteResponse) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.NewVersion != nil {
+		object["new_version"], err = json.Marshal(a.NewVersion)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'new_version': %w", err)
+		}
+	}
+
+	object["route_id"], err = json.Marshal(a.RouteId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'route_id': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for RouteSummary. Returns the specified
+// element and whether it was found
+func (a RouteSummary) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for RouteSummary
+func (a *RouteSummary) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for RouteSummary to handle AdditionalProperties
+func (a *RouteSummary) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["active"]; found {
+		err = json.Unmarshal(raw, &a.Active)
+		if err != nil {
+			return fmt.Errorf("error reading 'active': %w", err)
+		}
+		delete(object, "active")
+	}
+
+	if raw, found := object["created_at"]; found {
+		err = json.Unmarshal(raw, &a.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'created_at': %w", err)
+		}
+		delete(object, "created_at")
+	}
+
+	if raw, found := object["id"]; found {
+		err = json.Unmarshal(raw, &a.Id)
+		if err != nil {
+			return fmt.Errorf("error reading 'id': %w", err)
+		}
+		delete(object, "id")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["profile_code"]; found {
+		err = json.Unmarshal(raw, &a.ProfileCode)
+		if err != nil {
+			return fmt.Errorf("error reading 'profile_code': %w", err)
+		}
+		delete(object, "profile_code")
+	}
+
+	if raw, found := object["stages"]; found {
+		err = json.Unmarshal(raw, &a.Stages)
+		if err != nil {
+			return fmt.Errorf("error reading 'stages': %w", err)
+		}
+		delete(object, "stages")
+	}
+
+	if raw, found := object["tenant_id"]; found {
+		err = json.Unmarshal(raw, &a.TenantId)
+		if err != nil {
+			return fmt.Errorf("error reading 'tenant_id': %w", err)
+		}
+		delete(object, "tenant_id")
+	}
+
+	if raw, found := object["updated_at"]; found {
+		err = json.Unmarshal(raw, &a.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("error reading 'updated_at': %w", err)
+		}
+		delete(object, "updated_at")
+	}
+
+	if raw, found := object["version"]; found {
+		err = json.Unmarshal(raw, &a.Version)
+		if err != nil {
+			return fmt.Errorf("error reading 'version': %w", err)
+		}
+		delete(object, "version")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for RouteSummary to handle AdditionalProperties
+func (a RouteSummary) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["active"], err = json.Marshal(a.Active)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'active': %w", err)
+	}
+
+	object["created_at"], err = json.Marshal(a.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'created_at': %w", err)
+	}
+
+	object["id"], err = json.Marshal(a.Id)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'id': %w", err)
+	}
+
+	object["name"], err = json.Marshal(a.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	object["profile_code"], err = json.Marshal(a.ProfileCode)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'profile_code': %w", err)
+	}
+
+	if a.Stages != nil {
+		object["stages"], err = json.Marshal(a.Stages)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stages': %w", err)
+		}
+	}
+
+	object["tenant_id"], err = json.Marshal(a.TenantId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'tenant_id': %w", err)
+	}
+
+	object["updated_at"], err = json.Marshal(a.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'updated_at': %w", err)
+	}
+
+	object["version"], err = json.Marshal(a.Version)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'version': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for StageRequest. Returns the specified
+// element and whether it was found
+func (a StageRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for StageRequest
+func (a *StageRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for StageRequest to handle AdditionalProperties
+func (a *StageRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["area_code"]; found {
+		err = json.Unmarshal(raw, &a.AreaCode)
+		if err != nil {
+			return fmt.Errorf("error reading 'area_code': %w", err)
+		}
+		delete(object, "area_code")
+	}
+
+	if raw, found := object["drift_policy"]; found {
+		err = json.Unmarshal(raw, &a.DriftPolicy)
+		if err != nil {
+			return fmt.Errorf("error reading 'drift_policy': %w", err)
+		}
+		delete(object, "drift_policy")
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["order"]; found {
+		err = json.Unmarshal(raw, &a.Order)
+		if err != nil {
+			return fmt.Errorf("error reading 'order': %w", err)
+		}
+		delete(object, "order")
+	}
+
+	if raw, found := object["quorum"]; found {
+		err = json.Unmarshal(raw, &a.Quorum)
+		if err != nil {
+			return fmt.Errorf("error reading 'quorum': %w", err)
+		}
+		delete(object, "quorum")
+	}
+
+	if raw, found := object["quorum_m"]; found {
+		err = json.Unmarshal(raw, &a.QuorumM)
+		if err != nil {
+			return fmt.Errorf("error reading 'quorum_m': %w", err)
+		}
+		delete(object, "quorum_m")
+	}
+
+	if raw, found := object["required_capability"]; found {
+		err = json.Unmarshal(raw, &a.RequiredCapability)
+		if err != nil {
+			return fmt.Errorf("error reading 'required_capability': %w", err)
+		}
+		delete(object, "required_capability")
+	}
+
+	if raw, found := object["required_role"]; found {
+		err = json.Unmarshal(raw, &a.RequiredRole)
+		if err != nil {
+			return fmt.Errorf("error reading 'required_role': %w", err)
+		}
+		delete(object, "required_role")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for StageRequest to handle AdditionalProperties
+func (a StageRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["area_code"], err = json.Marshal(a.AreaCode)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'area_code': %w", err)
+	}
+
+	object["drift_policy"], err = json.Marshal(a.DriftPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'drift_policy': %w", err)
+	}
+
+	object["name"], err = json.Marshal(a.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	object["order"], err = json.Marshal(a.Order)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'order': %w", err)
+	}
+
+	object["quorum"], err = json.Marshal(a.Quorum)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'quorum': %w", err)
+	}
+
+	if a.QuorumM != nil {
+		object["quorum_m"], err = json.Marshal(a.QuorumM)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'quorum_m': %w", err)
+		}
+	}
+
+	object["required_capability"], err = json.Marshal(a.RequiredCapability)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'required_capability': %w", err)
+	}
+
+	object["required_role"], err = json.Marshal(a.RequiredRole)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'required_role': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for StageSummary. Returns the specified
+// element and whether it was found
+func (a StageSummary) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for StageSummary
+func (a *StageSummary) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for StageSummary to handle AdditionalProperties
+func (a *StageSummary) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["area_code"]; found {
+		err = json.Unmarshal(raw, &a.AreaCode)
+		if err != nil {
+			return fmt.Errorf("error reading 'area_code': %w", err)
+		}
+		delete(object, "area_code")
+	}
+
+	if raw, found := object["drift_policy"]; found {
+		err = json.Unmarshal(raw, &a.DriftPolicy)
+		if err != nil {
+			return fmt.Errorf("error reading 'drift_policy': %w", err)
+		}
+		delete(object, "drift_policy")
+	}
+
+	if raw, found := object["label"]; found {
+		err = json.Unmarshal(raw, &a.Label)
+		if err != nil {
+			return fmt.Errorf("error reading 'label': %w", err)
+		}
+		delete(object, "label")
+	}
+
+	if raw, found := object["quorum_kind"]; found {
+		err = json.Unmarshal(raw, &a.QuorumKind)
+		if err != nil {
+			return fmt.Errorf("error reading 'quorum_kind': %w", err)
+		}
+		delete(object, "quorum_kind")
+	}
+
+	if raw, found := object["quorum_m"]; found {
+		err = json.Unmarshal(raw, &a.QuorumM)
+		if err != nil {
+			return fmt.Errorf("error reading 'quorum_m': %w", err)
+		}
+		delete(object, "quorum_m")
+	}
+
+	if raw, found := object["required_capability"]; found {
+		err = json.Unmarshal(raw, &a.RequiredCapability)
+		if err != nil {
+			return fmt.Errorf("error reading 'required_capability': %w", err)
+		}
+		delete(object, "required_capability")
+	}
+
+	if raw, found := object["required_role"]; found {
+		err = json.Unmarshal(raw, &a.RequiredRole)
+		if err != nil {
+			return fmt.Errorf("error reading 'required_role': %w", err)
+		}
+		delete(object, "required_role")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for StageSummary to handle AdditionalProperties
+func (a StageSummary) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["area_code"], err = json.Marshal(a.AreaCode)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'area_code': %w", err)
+	}
+
+	object["drift_policy"], err = json.Marshal(a.DriftPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'drift_policy': %w", err)
+	}
+
+	object["label"], err = json.Marshal(a.Label)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'label': %w", err)
+	}
+
+	object["quorum_kind"], err = json.Marshal(a.QuorumKind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'quorum_kind': %w", err)
+	}
+
+	if a.QuorumM != nil {
+		object["quorum_m"], err = json.Marshal(a.QuorumM)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'quorum_m': %w", err)
+		}
+	}
+
+	object["required_capability"], err = json.Marshal(a.RequiredCapability)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'required_capability': %w", err)
+	}
+
+	object["required_role"], err = json.Marshal(a.RequiredRole)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'required_role': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for UpdateRouteRequest. Returns the specified
+// element and whether it was found
+func (a UpdateRouteRequest) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for UpdateRouteRequest
+func (a *UpdateRouteRequest) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for UpdateRouteRequest to handle AdditionalProperties
+func (a *UpdateRouteRequest) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["name"]; found {
+		err = json.Unmarshal(raw, &a.Name)
+		if err != nil {
+			return fmt.Errorf("error reading 'name': %w", err)
+		}
+		delete(object, "name")
+	}
+
+	if raw, found := object["stages"]; found {
+		err = json.Unmarshal(raw, &a.Stages)
+		if err != nil {
+			return fmt.Errorf("error reading 'stages': %w", err)
+		}
+		delete(object, "stages")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for UpdateRouteRequest to handle AdditionalProperties
+func (a UpdateRouteRequest) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["name"], err = json.Marshal(a.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'name': %w", err)
+	}
+
+	if a.Stages != nil {
+		object["stages"], err = json.Marshal(a.Stages)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'stages': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
 }
 
 // AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
@@ -745,18 +1794,18 @@ type ServerInterface interface {
 
 	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params RecordApprovalStageSignoffParams)
-
+	// List approval routes for the active tenant
 	// (GET /api/v1/approval/routes)
 	ListApprovalRoutes(w http.ResponseWriter, r *http.Request)
-
+	// Create an approval route for the active tenant
 	// (POST /api/v1/approval/routes)
-	CreateApprovalRoute(w http.ResponseWriter, r *http.Request)
-
+	CreateApprovalRoute(w http.ResponseWriter, r *http.Request, params CreateApprovalRouteParams)
+	// Deactivate an approval route
 	// (DELETE /api/v1/approval/routes/{id})
-	DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
+	DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeactivateApprovalRouteParams)
+	// Update an approval route (new version)
 	// (PUT /api/v1/approval/routes/{id})
-	UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UpdateApprovalRouteParams)
 
 	// (GET /api/v1/documents/{id}/approval-instance)
 	GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -961,8 +2010,39 @@ func (siw *ServerInterfaceWrapper) ListApprovalRoutes(w http.ResponseWriter, r *
 // CreateApprovalRoute operation middleware
 func (siw *ServerInterfaceWrapper) CreateApprovalRoute(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateApprovalRouteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CreateApprovalRoute(w, r)
+		siw.Handler.CreateApprovalRoute(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -987,8 +2067,59 @@ func (siw *ServerInterfaceWrapper) DeactivateApprovalRoute(w http.ResponseWriter
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeactivateApprovalRouteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeactivateApprovalRoute(w, r, id)
+		siw.Handler.DeactivateApprovalRoute(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1013,8 +2144,59 @@ func (siw *ServerInterfaceWrapper) UpdateApprovalRoute(w http.ResponseWriter, r 
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateApprovalRouteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateApprovalRoute(w, r, id)
+		siw.Handler.UpdateApprovalRoute(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1543,59 +2725,313 @@ type ListApprovalRoutesResponseObject interface {
 	VisitListApprovalRoutesResponse(w http.ResponseWriter) error
 }
 
-type ListApprovalRoutes200Response struct {
+type ListApprovalRoutes200JSONResponse ListRoutesResponse
+
+func (response ListApprovalRoutes200JSONResponse) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-func (response ListApprovalRoutes200Response) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+type ListApprovalRoutes401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListApprovalRoutes401ApplicationProblemPlusJSONResponse) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListApprovalRoutes403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListApprovalRoutes403ApplicationProblemPlusJSONResponse) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type CreateApprovalRouteRequestObject struct {
+	Params CreateApprovalRouteParams
+	Body   *CreateApprovalRouteJSONRequestBody
 }
 
 type CreateApprovalRouteResponseObject interface {
 	VisitCreateApprovalRouteResponse(w http.ResponseWriter) error
 }
 
-type CreateApprovalRoute200Response struct {
+type CreateApprovalRoute201JSONResponse RouteResponse
+
+func (response CreateApprovalRoute201JSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-func (response CreateApprovalRoute200Response) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+type CreateApprovalRoute400ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApprovalRoute401ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApprovalRoute403ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApprovalRoute409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type DeactivateApprovalRouteRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params DeactivateApprovalRouteParams
+	Body   *DeactivateApprovalRouteJSONRequestBody
 }
 
 type DeactivateApprovalRouteResponseObject interface {
 	VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error
 }
 
-type DeactivateApprovalRoute200Response struct {
+type DeactivateApprovalRoute200JSONResponse RouteResponse
+
+func (response DeactivateApprovalRoute200JSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-func (response DeactivateApprovalRoute200Response) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+type DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse Problem
+
+func (response DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse Problem
+
+func (response DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse Problem
+
+func (response DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse Problem
+
+func (response DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse Problem
+
+func (response DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type UpdateApprovalRouteRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params UpdateApprovalRouteParams
+	Body   *UpdateApprovalRouteJSONRequestBody
 }
 
 type UpdateApprovalRouteResponseObject interface {
 	VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error
 }
 
-type UpdateApprovalRoute200Response struct {
+type UpdateApprovalRoute200JSONResponse RouteResponse
+
+func (response UpdateApprovalRoute200JSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
-func (response UpdateApprovalRoute200Response) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
+type UpdateApprovalRoute400ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateApprovalRoute401ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateApprovalRoute403ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateApprovalRoute404ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateApprovalRoute404ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateApprovalRoute409ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetApprovalInstanceByDocumentRequestObject struct {
@@ -1762,16 +3198,16 @@ type StrictServerInterface interface {
 
 	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoff(ctx context.Context, request RecordApprovalStageSignoffRequestObject) (RecordApprovalStageSignoffResponseObject, error)
-
+	// List approval routes for the active tenant
 	// (GET /api/v1/approval/routes)
 	ListApprovalRoutes(ctx context.Context, request ListApprovalRoutesRequestObject) (ListApprovalRoutesResponseObject, error)
-
+	// Create an approval route for the active tenant
 	// (POST /api/v1/approval/routes)
 	CreateApprovalRoute(ctx context.Context, request CreateApprovalRouteRequestObject) (CreateApprovalRouteResponseObject, error)
-
+	// Deactivate an approval route
 	// (DELETE /api/v1/approval/routes/{id})
 	DeactivateApprovalRoute(ctx context.Context, request DeactivateApprovalRouteRequestObject) (DeactivateApprovalRouteResponseObject, error)
-
+	// Update an approval route (new version)
 	// (PUT /api/v1/approval/routes/{id})
 	UpdateApprovalRoute(ctx context.Context, request UpdateApprovalRouteRequestObject) (UpdateApprovalRouteResponseObject, error)
 
@@ -1958,8 +3394,17 @@ func (sh *strictHandler) ListApprovalRoutes(w http.ResponseWriter, r *http.Reque
 }
 
 // CreateApprovalRoute operation middleware
-func (sh *strictHandler) CreateApprovalRoute(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) CreateApprovalRoute(w http.ResponseWriter, r *http.Request, params CreateApprovalRouteParams) {
 	var request CreateApprovalRouteRequestObject
+
+	request.Params = params
+
+	var body CreateApprovalRouteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateApprovalRoute(ctx, request.(CreateApprovalRouteRequestObject))
@@ -1982,10 +3427,21 @@ func (sh *strictHandler) CreateApprovalRoute(w http.ResponseWriter, r *http.Requ
 }
 
 // DeactivateApprovalRoute operation middleware
-func (sh *strictHandler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeactivateApprovalRouteParams) {
 	var request DeactivateApprovalRouteRequestObject
 
 	request.Id = id
+	request.Params = params
+
+	var body DeactivateApprovalRouteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.DeactivateApprovalRoute(ctx, request.(DeactivateApprovalRouteRequestObject))
@@ -2008,10 +3464,18 @@ func (sh *strictHandler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.
 }
 
 // UpdateApprovalRoute operation middleware
-func (sh *strictHandler) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UpdateApprovalRouteParams) {
 	var request UpdateApprovalRouteRequestObject
 
 	request.Id = id
+	request.Params = params
+
+	var body UpdateApprovalRouteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.UpdateApprovalRoute(ctx, request.(UpdateApprovalRouteRequestObject))
@@ -2248,47 +3712,64 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"/SxSIK/KHNKiYgmJ0f5y//8BAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

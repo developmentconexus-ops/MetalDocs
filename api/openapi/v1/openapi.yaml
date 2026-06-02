@@ -3058,24 +3058,158 @@ paths:
       responses: { '200': { description: ok } }
   /api/v1/approval/routes:
     post:
+      summary: Create an approval route for the active tenant
       tags: [approval]
       operationId: createApprovalRoute
-      responses: { '200': { description: ok } }
+      parameters:
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRouteRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteResponse'
+        '400':
+          description: validation_error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: unauthenticated
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: forbidden
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: idempotency_replay_or_conflict
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
     get:
+      summary: List approval routes for the active tenant
       tags: [approval]
       operationId: listApprovalRoutes
-      responses: { '200': { description: ok } }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListRoutesResponse'
+        '401':
+          description: unauthenticated
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: forbidden
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /api/v1/approval/routes/{id}:
     put:
+      summary: Update an approval route (new version)
       tags: [approval]
       operationId: updateApprovalRoute
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok } }
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected route version ETag in the form "v<N>"' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRouteRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteResponse'
+        '400':
+          description: validation_error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: unauthenticated
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: forbidden
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: route_not_found
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: version_conflict_or_replay
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
     delete:
+      summary: Deactivate an approval route
       tags: [approval]
       operationId: deactivateApprovalRoute
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
-      responses: { '200': { description: ok } }
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected route version ETag in the form "v<N>"' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivateRouteRequest'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteResponse'
+        '400':
+          description: validation_error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: unauthenticated
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: forbidden
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: route_not_found
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: version_conflict_or_replay
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
 components:
   parameters:
@@ -5451,3 +5585,114 @@ components:
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }
+    QuorumKind:
+      type: string
+      description: Quorum policy applied to a stage. `m_of_n` requires `quorum_m`.
+      enum: [any_1_of, all_of, m_of_n]
+    DriftPolicy:
+      type: string
+      description: Behaviour applied when an actor loses eligibility mid-stage.
+      enum: [reduce_quorum, fail_stage, keep_snapshot]
+    StageRequest:
+      type: object
+      additionalProperties: true
+      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy]
+      properties:
+        order:
+          type: integer
+          minimum: 1
+          description: 1-based stage ordinal. Must equal index+1.
+        name: { type: string, minLength: 1, maxLength: 64 }
+        required_role: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+        required_capability: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9_]*\.[a-z0-9._]*[a-z0-9]$' }
+        area_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+        quorum: { $ref: '#/components/schemas/QuorumKind' }
+        quorum_m:
+          type: integer
+          minimum: 1
+          description: Required when `quorum` is `m_of_n`; must be omitted otherwise.
+        drift_policy: { $ref: '#/components/schemas/DriftPolicy' }
+    StageSummary:
+      type: object
+      additionalProperties: true
+      required: [label, required_role, required_capability, area_code, quorum_kind, drift_policy]
+      properties:
+        label: { type: string }
+        required_role: { type: string }
+        required_capability: { type: string }
+        area_code: { type: string }
+        quorum_kind: { $ref: '#/components/schemas/QuorumKind' }
+        quorum_m:
+          type: integer
+          minimum: 1
+          nullable: true
+        drift_policy: { $ref: '#/components/schemas/DriftPolicy' }
+    CreateRouteRequest:
+      type: object
+      additionalProperties: true
+      required: [profile_code, name, stages]
+      properties:
+        profile_code: { type: string, minLength: 1, maxLength: 64, pattern: '^[a-z0-9_-]+$' }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        stages:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/StageRequest' }
+    UpdateRouteRequest:
+      type: object
+      additionalProperties: true
+      required: [name, stages]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        stages:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/StageRequest' }
+    DeactivateRouteRequest:
+      type: object
+      additionalProperties: true
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Governance reason recorded with deactivation event.
+    RouteResponse:
+      type: object
+      additionalProperties: true
+      required: [route_id]
+      properties:
+        route_id: { type: string, format: uuid }
+        new_version:
+          type: integer
+          minimum: 1
+          description: New route version after a successful update. Omitted for create/deactivate.
+    RouteSummary:
+      type: object
+      additionalProperties: true
+      required: [id, name, tenant_id, profile_code, active, version, stages, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        tenant_id: { type: string, format: uuid }
+        profile_code: { type: string }
+        active: { type: boolean }
+        version:
+          type: integer
+          minimum: 1
+          description: Monotonic version bumped on each update or deactivation.
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/StageSummary' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    ListRoutesResponse:
+      type: object
+      additionalProperties: true
+      required: [routes, total]
+      properties:
+        routes:
+          type: array
+          items: { $ref: '#/components/schemas/RouteSummary' }
+        total: { type: integer, minimum: 0 }
