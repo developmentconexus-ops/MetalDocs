@@ -8,7 +8,7 @@ export const approvalRoutes: RouteObject[] = [
   },
   {
     path: "approval-routes",
-    handle: { workspaceView: "approval-routes", requiresAdmin: true },
+    handle: { workspaceView: "approval-routes", requiresCapability: "route.manage" },
     lazy: () =>
       import("./pages/route-admin/RouteAdminPage").then((module) => ({
         Component: module.RouteAdminPage,
