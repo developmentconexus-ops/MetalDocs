@@ -2,7 +2,9 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-06-01 (ADR 0016: added view-grade caps `metrics.view`, `membership.view`, `user.view`, `taxonomy.view`; registry now 24 consts; prior: P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; 2026-05-26 Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes) | **Maturity:** L2
+**Last verified:** 2026-06-01 (Approval route admin PR-3 spike: confirmed `GET /api/v1/iam/roles` does **not** exist today — role catalogue is hard-coded in `internal/modules/iam/domain/model.go:10-16` (`approver`, `author`, `editor`, `system_admin`, `viewer`). Proposed endpoint shape `{roles:[{code,label}]}` gated by `CapMembershipView` is documented in [ADR 0018 §"IAM roles source"](../decisions/0018-approval-route-lifecycle.md); implementation deferred to PR-4 of approval route admin work or its own micro-PR. Frontend hard-codes the same list at `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:10` as `STAGE_ROLES`. Prior verification line preserved below.) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
+
+**Prior verification — 2026-06-01:** ADR 0016: added view-grade caps `metrics.view`, `membership.view`, `user.view`, `taxonomy.view`; registry now 24 consts; prior: P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; 2026-05-26 Wave 2 authz tx seeding sync) | **Owner:** unassigned | **Status:** active (partial contract-first; defense-in-depth now two-layer on IAM writes) | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/iam/application/capability_service.go:31` â€” tier-1 `CanDo` (DB-backed EXISTS over 4 branches)
@@ -202,6 +204,7 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 | POST | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleUserRoleUpsert` | `/iam/users/{userId}/roles` | â€” | â€” | Aligned | Routed through path suffix dispatcher; operationId not defined. |
 | PUT | `/api/v1/iam/users/{userId}/roles` | `internal/modules/iam/delivery/http/admin_handler.go:85` | `handleUserRoute` -> `handleReplaceUserRoles` | `/iam/users/{userId}/roles` | â€” | â€” | Aligned | Routed through path suffix dispatcher; operationId not defined. |
 | GET | `/api/v1/iam/admin/overview` | `internal/modules/iam/delivery/http/admin_handler.go:86` | `handleAdminOverview` | `/iam/admin/overview` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
+| GET | `/api/v1/iam/roles` | â€” | â€” | â€” | â€” | â€” | **Proposed (not implemented)** | Spike result from approval route admin PR-3. Catalogue lives in `internal/modules/iam/domain/model.go:10-16`. Proposal shape `{roles:[{code,label}]}` gated by `CapMembershipView` — see [ADR 0018](../decisions/0018-approval-route-lifecycle.md) §"IAM roles source". Implementation deferred to PR-4 or micro-PR. |
 
 - Module contract status: Contracted
 - Owner: leandro
@@ -394,6 +397,7 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 | Collapse dual capability namespaces â€” typed `iamdomain.Capability` wins; `capabilities.go` deleted; DB reseeded to `document.*` | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
 | Delete `AuthorizationService` (third authz surface); Plan 5 wired tier-2 per module (IAM repos, controlled-documents, taxonomy, templates, documents) | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
 | Delete `area_membership/` Go wrapper; canonical write surface is `UserAreaRepository.GrantAtomic`; SECURITY DEFINER SQL funcs stay for e2e seed | Plan 4 (2026-05-11). No standalone ADR â€” **ADR-TODO** per Plan 13. |
+| Role list endpoint (`GET /api/v1/iam/roles`) shape + cap gate proposal (deferred) | [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) §"IAM roles source" |
 
 ---
 
