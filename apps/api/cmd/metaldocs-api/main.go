@@ -196,8 +196,16 @@ func main() {
 	}
 
 	auditService := auditapp.NewService(deps.AuditReader)
+	if deps.AuditCounter != nil && deps.AuditExports != nil {
+		auditService.WithExports(deps.AuditCounter, deps.AuditExports, deps.AuditWriter, func(job auditdomain.ExportJob) string {
+			if job.ID == "" || job.DownloadToken == "" {
+				return ""
+			}
+			return fmt.Sprintf("/api/v1/audit/events/export/%s/download?token=%s", job.ID, job.DownloadToken)
+		})
+	}
 
-	auditHandler := auditdelivery.NewHandler(auditService)
+	auditHandler := auditdelivery.NewHandler(auditService).WithExporter(auditService)
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB))
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
