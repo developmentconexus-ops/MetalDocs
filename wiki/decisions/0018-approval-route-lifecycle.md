@@ -1,7 +1,7 @@
 # ADR 0018 — Approval Route Lifecycle
 
 > **Status:** accepted 2026-06-01 (drafted as the architectural baseline for the PR-4 frontend rewrite of the route admin page; codifies the lifecycle, OCC, in-use guard, capability pinning, and audit semantics already shipped by Approval Route Admin PR-2)
-> **Last verified:** 2026-06-01
+> **Last verified:** 2026-06-02 (PR-5 structural sweep: stale STAGE_ROLES path references updated to reflect PR-4 deletion)
 > **Scope:** Per-tenant approval route catalogue at `public.approval_routes` + `public.approval_route_stages`. State machine, version OCC, in-use deactivate guard, required-capability pin per stage, reason audit, deferred Tier-1 cap split.
 > **Out of scope:** Per-instance runtime (stage instances, signoff state machine — see `wiki/modules/approval.md` §6). Eligibility drift policies — listed in stage config but enforced at instance runtime, owned by `domain/drift.go`. New `GET /api/v1/iam/roles` endpoint — proposed below, deferred to PR-4 or its own micro-PR.
 > **Key files:**
@@ -26,7 +26,7 @@ PR-4 needs an unambiguous, single-source written model of:
 3. What blocks deactivation today, and what error code the frontend must map.
 4. Where stage-level required capability is frozen, and when.
 5. Where the deactivate reason lives in the audit trail.
-6. Where role labels come from for the stage editor — replacing the hard-coded `STAGE_ROLES` literal at `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:10`.
+6. Where role labels come from for the stage editor — replacing the hard-coded `STAGE_ROLES` literal (formerly at `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:10`; file deleted by PR-4 canonical rewrite — `STAGE_ROLES` removed, `useIamRolesQuery` now used at `pages/route-admin/RouteEditorDialog.tsx:180`).
 
 Today this knowledge is split across `wiki/modules/approval.md` §12 (terms only), the route admin service implementation, and the schema. Codifying it here lets PR-4 reference one durable doc instead of re-reading scattered code.
 
@@ -123,7 +123,7 @@ PR-4 should not block on this. It consumes the existing endpoint with the existi
 | `RoleSystemAdmin` | `system_admin` |
 | `RoleViewer` | `viewer` |
 
-The frontend page hard-codes the same list at `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:10` as `STAGE_ROLES`. This drifts the moment a role is added.
+The frontend page formerly hard-coded the same list at `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:10` as `STAGE_ROLES` (file deleted by PR-4; `STAGE_ROLES` removed). PR-4 implemented Option A below — `useIamRolesQuery` at `pages/route-admin/RouteEditorDialog.tsx:180` now fetches the list dynamically.
 
 **Proposal — `GET /api/v1/iam/roles`** (deferred to PR-4, or its own micro-PR if non-trivial):
 
