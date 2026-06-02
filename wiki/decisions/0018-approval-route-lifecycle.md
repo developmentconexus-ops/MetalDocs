@@ -78,6 +78,12 @@ Today this knowledge is split across `wiki/modules/approval.md` §12 (terms only
 - The reason is therefore part of the durable, append-only governance trail. There is no separate "reason" column on `approval_routes` — the payload is the source of truth.
 - Why this matters for PR-4: a deactivated route in the list view should be displayable with its reason. PR-4 may need a future "history" affordance; that is out of scope for the rewrite but is unblocked because the data is already captured.
 
+### 5b. Update does not require an operator reason
+
+`UpdateRouteInput` carries no `Reason` field and `route.config.updated` governance events carry no `reason` in payload.
+
+Rationale: Update is an in-place edit on an `active=true` route — version bumps, OCC enforces ordering, governance event still captures actor + timestamp + before/after-derivable state. Deactivate is terminal and irreversible — the audit trail needs explicit operator justification for the transition out of `active=true`. Symmetric reason capture across all route mutations is rejected today as audit-noise; revisit if compliance review demands it.
+
 ### 6. Tier-1 cap split for route admin reads is deferred to F-001 follow-up
 
 The Tier-1 declarative table at `apps/api/cmd/metaldocs-api/permissions.go` currently gates `GET /api/v1/approval/routes` and the `POST`/`PUT`/`DELETE` route admin verbs with the same `route.admin` (manage-grade) cap. This conflates read and write per the F-001 audit pattern (see [ADR 0016](0016-view-grade-capabilities.md) for the four view-grade caps that unblocked the F-001 split elsewhere).
