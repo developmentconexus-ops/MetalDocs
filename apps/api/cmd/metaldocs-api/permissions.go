@@ -228,6 +228,8 @@ var routeRules = []routeRule{
 
 	// Audit.
 	{method: http.MethodGet, pathExact: "/api/v1/audit/events", capability: iamdomain.CapAuditRead, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathExact: "/api/v1/audit/events/export", capability: iamdomain.CapAuditRead, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathPrefix: "/api/v1/audit/events/export/", capability: iamdomain.CapAuditRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 }
 
 func newPermissionResolver() iamdelivery.PermissionResolver {
