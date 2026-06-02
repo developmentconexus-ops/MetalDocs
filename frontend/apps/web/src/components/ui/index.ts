@@ -11,3 +11,4 @@ export type { SelectableCardProps } from './SelectableCard';
 export { TabBar } from './TabBar';
 export type { TabBarItem } from './TabBar';
 export { WorkspaceHeroHeader } from './WorkspaceHeroHeader';
+export { Dialog } from './Dialog';

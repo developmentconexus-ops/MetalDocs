@@ -1,2 +1,2 @@
 export * from './InboxPage';
-export * from './RouteAdminPage';
+export { RouteAdminPage } from './route-admin/RouteAdminPage';
