@@ -60,6 +60,13 @@ export const QK = {
   approval: {
     instance: (documentId: string) =>
       ['approval', 'instance', documentId] as const,
+    routes: {
+      list: () => ['approval', 'routes', 'list'] as const,
+      detail: (id: string) => ['approval', 'routes', 'detail', id] as const,
+    },
+  },
+  iam: {
+    roles: () => ['iam', 'roles'] as const,
   },
   notifications: {
     unreadCount: () => ['notifications', 'unread-count'] as const,

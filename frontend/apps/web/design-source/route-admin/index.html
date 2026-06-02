@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Route Admin — Reference Design</title>
+  <style>
+    :root {
+      --color-surface: #ffffff;
+      --color-surface-subtle: #f8fafc;
+      --color-border: rgba(15, 23, 42, 0.16);
+      --color-border-subtle: rgba(15, 23, 42, 0.08);
+      --color-text: #1e293b;
+      --color-text-muted: #475569;
+      --color-accent: #2563eb;
+    }
+    body { font: 14px/1.5 system-ui, sans-serif; background: #f1f5f9; color: var(--color-text); margin: 0; padding: 24px; }
+    .page { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+    .subtitle { margin: 0; color: var(--color-text-muted); max-width: 720px; }
+    .primary { background: var(--color-accent); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+    .secondary { background: white; color: var(--color-text); border: 1px solid var(--color-border); padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+    .warn { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+    .wrap { border: 1px solid var(--color-border-subtle); border-radius: 12px; overflow: hidden; background: white; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--color-border-subtle); }
+    th { background: var(--color-surface-subtle); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+    .badge-active, .badge-inactive { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+    .badge-active { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
+    .badge-inactive { background: #f1f5f9; color: #475569; border: 1px solid #cbd5f5; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+    .row-actions { display: flex; gap: 8px; }
+    code { background: rgba(15,23,42,0.04); padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+    .dialog { border: none; border-radius: 12px; padding: 0; max-width: 640px; width: 100%; box-shadow: 0 10px 38px rgba(0,0,0,0.18); }
+    .dialog::backdrop { background: rgba(15,23,42,0.45); }
+    .dialog-header { padding: 20px 24px 12px; border-bottom: 1px solid var(--color-border-subtle); display: flex; justify-content: space-between; align-items: center; }
+    .dialog-body { padding: 16px 24px; }
+    .dialog-footer { padding: 16px 24px; background: var(--color-surface-subtle); border-top: 1px solid var(--color-border-subtle); display: flex; justify-content: flex-end; gap: 8px; }
+    label { font-size: 0.85rem; font-weight: 500; }
+    input, select, textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--color-border); font: inherit; box-sizing: border-box; }
+    .stage-card { background: var(--color-surface-subtle); border: 1px solid var(--color-border-subtle); border-radius: 10px; padding: 12px 14px; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div>
+        <h1>Administração de Rotas</h1>
+        <p class="subtitle">Configure rotas de aprovação por perfil. Edições criam uma nova versão; desativações exigem motivo de governança.</p>
+      </div>
+      <button class="primary" type="button">Nova rota</button>
+    </header>
+
+    <div class="wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th><th>Perfil</th><th>Etapas</th><th>Status</th><th>Atualizado em</th><th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Rota Jurídica</td>
+            <td><code>JUR</code></td>
+            <td>2 etapa(s)</td>
+            <td><span class="badge-active"><span class="dot"></span>Ativa</span></td>
+            <td>20/04/2026</td>
+            <td class="row-actions">
+              <button class="secondary" type="button">Editar</button>
+              <button class="warn" type="button">Desativar</button>
+            </td>
+          </tr>
+          <tr>
+            <td>Rota Financeira</td>
+            <td><code>FIN</code></td>
+            <td>1 etapa(s)</td>
+            <td><span class="badge-inactive"><span class="dot"></span>Inativa</span></td>
+            <td>10/03/2026</td>
+            <td class="row-actions">
+              <button class="secondary" type="button" disabled title="Rota inativa — desativada e somente leitura.">Editar</button>
+              <button class="warn" type="button" disabled title="Rota já desativada.">Desativar</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <dialog class="dialog" open>
+      <header class="dialog-header">
+        <h2>Criar rota</h2>
+        <button aria-label="Fechar" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">×</button>
+      </header>
+      <div class="dialog-body">
+        <form style="display:flex;flex-direction:column;gap:8px;">
+          <label>Nome da rota</label>
+          <input value="Nova rota" />
+
+          <label>Código do perfil</label>
+          <input value="JUR" />
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+            <h3 style="margin:0;font-size:1rem;">Etapas</h3>
+            <button class="secondary" type="button" style="padding:6px 10px;">Adicionar etapa</button>
+          </div>
+
+          <article class="stage-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <strong>Etapa 1</strong>
+              <button class="secondary" type="button" style="padding:4px 8px;font-size:0.8rem;">Remover</button>
+            </div>
+            <label>Nome da etapa 1</label>
+            <input value="Jurídico" />
+            <label>Role requerida da etapa 1</label>
+            <select><option>Aprovador</option><option>Editor</option></select>
+            <label>Área da etapa 1</label>
+            <select><option>Área Jurídica (AREA-JUR)</option></select>
+            <label>Quórum da etapa 1</label>
+            <select><option>Qualquer um (1 de N)</option><option>Todos (N de N)</option><option>M de N</option></select>
+            <small style="color:var(--color-text-muted);">Aprovado quando qualquer aprovador da etapa assina.</small>
+            <label>Política de drift da etapa 1</label>
+            <select><option>Reduzir quórum</option></select>
+          </article>
+        </form>
+      </div>
+      <footer class="dialog-footer">
+        <button class="secondary" type="button">Cancelar</button>
+        <button class="primary" type="submit">Salvar rota</button>
+      </footer>
+    </dialog>
+  </main>
+</body>
+</html>

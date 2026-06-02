@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { cancel, getInstance, listRoutes, submit } from '../api/approvalApi';
+import { cancel, getInstance, submit } from '../api/approvalApi';
 import { etagCache } from '../api/etagCache';
-import type { ApprovalInstance, ApprovalState, Route } from '../api/approvalTypes';
+import { listRoutes, type RouteSummary } from '../api/routeAdminApi';
+import type { ApprovalInstance, ApprovalState } from '../api/approvalTypes';
 import { ApprovalTimelinePanel } from './ApprovalTimelinePanel';
 import { LockBadge } from './LockBadge';
 import { SignoffDialog } from './SignoffDialog';
@@ -123,7 +124,7 @@ export function ControlledDocumentDetailPanel({
   const [now, setNow] = useState(() => Date.now());
 
   const [showSubmitSection, setShowSubmitSection] = useState(false);
-  const [routes, setRoutes] = useState<Route[]>([]);
+  const [routes, setRoutes] = useState<RouteSummary[]>([]);
   const [routesLoading, setRoutesLoading] = useState(false);
   const [routesError, setRoutesError] = useState<string | null>(null);
   const [selectedRouteId, setSelectedRouteId] = useState('');

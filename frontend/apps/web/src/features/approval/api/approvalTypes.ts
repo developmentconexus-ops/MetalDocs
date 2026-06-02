@@ -10,29 +10,11 @@ export type ApprovalState =
   | 'cancelled';
 
 export type SignatureMethod = 'password_reauth' | 'icp_brasil';
-export type QuorumKind = 'any_1_of' | 'all_of' | 'm_of_n';
-export type DriftPolicy = 'reduce_quorum' | 'fail_stage' | 'keep_snapshot' | 'auto_cancel' | 'alert_only' | 'none';
 
-export interface RouteStage {
-  label: string;
-  required_role?: string;
-  required_capability?: string;
-  area_code?: string;
-  quorum_kind: QuorumKind;
-  m?: number;
-  drift_policy: DriftPolicy;
-}
-
-export interface Route {
-  id: string;
-  name: string;
-  tenant_id: string;
-  profile_code: string;
-  stages: RouteStage[];
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+// Route-admin DTOs (Route, RouteStage, *RouteRequest/*RouteResponse, ListRoutesResponse)
+// previously lived here as hand-rolled types. They were deleted in the
+// canonical FE rewrite — consumers now import the codegen types from
+// `lib/api-types` via `features/approval/api/routeAdminApi.ts`.
 
 export interface Signoff {
   id: string;
@@ -140,40 +122,6 @@ export interface CancelResponse {
   document_id: string;
 }
 
-export interface StageWriteRequest {
-  order: number;
-  name: string;
-  required_role: string;
-  required_capability: string;
-  area_code: string;
-  quorum: QuorumKind;
-  quorum_m?: number;
-  drift_policy: DriftPolicy;
-}
-
-export interface CreateRouteRequest {
-  name: string;
-  profile_code: string;
-  stages: StageWriteRequest[];
-}
-
-export interface CreateRouteResponse {
-  route_id: string;
-}
-
-export interface UpdateRouteRequest {
-  name?: string;
-  stages?: StageWriteRequest[];
-}
-
-export interface UpdateRouteResponse {
-  route_id: string;
-}
-
-export interface DeactivateRouteResponse {
-  route_id: string;
-}
-
 export interface ListInboxParams {
   area_code?: string;
   limit?: number;
@@ -182,10 +130,5 @@ export interface ListInboxParams {
 
 export interface ListInboxResponse {
   items: InboxItem[];
-  total: number;
-}
-
-export interface ListRoutesResponse {
-  routes: Route[];
   total: number;
 }
