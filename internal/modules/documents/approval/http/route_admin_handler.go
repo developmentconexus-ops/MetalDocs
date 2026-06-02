@@ -195,9 +195,13 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		routes = append(routes, mapListRoute(route))
 	}
 
+	total := len(out.Routes)
+	if len(out.Routes) > 0 {
+		total = out.Routes[0].Total
+	}
 	WriteJSON(w, http.StatusOK, contracts.ListRoutesResponse{
 		Routes: routes,
-		Total:  len(routes),
+		Total:  total,
 	})
 }
 

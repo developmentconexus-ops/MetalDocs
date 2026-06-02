@@ -533,3 +533,31 @@ func TestUpdateRoute_RejectsIfMatchV0(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
 	}
 }
+
+func TestListRoutes_TotalReflectsRepoCount(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		listResult: application.ListRoutesResult{Routes: []repository.Route{
+			{ID: "r1", Total: 42},
+		}},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/routes", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-7"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-7", []iamdomain.Role{}))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	var out contracts.ListRoutesResponse
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Total != 42 {
+		t.Fatalf("total = %d; want 42", out.Total)
+	}
+}

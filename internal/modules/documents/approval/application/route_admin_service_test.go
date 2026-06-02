@@ -983,3 +983,32 @@ func TestRouteAdminCreate_LogsCommitterFailError(t *testing.T) {
 		t.Fatalf("expected op=create in log; got: %s", out)
 	}
 }
+
+func TestRouteAdminList_PassesThroughTotalFromRepo(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	repo := &stubRouteListRepo{
+		routes: []repository.Route{
+			{ID: "r1", TenantID: "tenant-list", Total: 3},
+			{ID: "r2", TenantID: "tenant-list", Total: 3},
+			{ID: "r3", TenantID: "tenant-list", Total: 3},
+		},
+	}
+	svc := &RouteAdminService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+
+	out, err := svc.List(context.Background(), db, "tenant-list", "actor-list")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(out.Routes) != 3 {
+		t.Fatalf("routes len = %d; want 3", len(out.Routes))
+	}
+	if out.Routes[0].Total != 3 {
+		t.Fatalf("Total = %d; want 3", out.Routes[0].Total)
+	}
+}

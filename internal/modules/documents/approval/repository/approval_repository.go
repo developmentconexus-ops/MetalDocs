@@ -40,6 +40,7 @@ type Route struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Stages      []RouteStage
+	Total       int
 }
 
 // RouteStage is the repository projection for an approval route stage.
