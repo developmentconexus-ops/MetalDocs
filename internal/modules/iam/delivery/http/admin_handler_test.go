@@ -3,11 +3,13 @@ package httpdelivery
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	auditdomain "metaldocs/internal/modules/audit/domain"
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -100,3 +102,144 @@ func TestHandleAdminOverview_PassesTenantIDToOnlineUsers(t *testing.T) {
 		t.Fatalf("ListOnlineUsers tenant = %q", authSvc.listOnlineUsersTenantID)
 	}
 }
+
+// --- PR-8 overview composition tests ----------------------------------------
+
+type stubKpiReader struct {
+	tenantID string
+	delay    time.Duration
+	snap     iamdomain.KpiSnapshot
+}
+
+func (s *stubKpiReader) GetKpi(_ context.Context, tenantID string) (iamdomain.KpiSnapshot, error) {
+	s.tenantID = tenantID
+	if s.delay > 0 {
+		time.Sleep(s.delay)
+	}
+	return s.snap, nil
+}
+
+type stubAuditLister struct {
+	tenantID string
+	delay    time.Duration
+	events   []auditdomain.Event
+}
+
+func (s *stubAuditLister) ListEvents(_ context.Context, q auditdomain.ListEventsQuery) ([]auditdomain.Event, error) {
+	s.tenantID = q.TenantID
+	if s.delay > 0 {
+		time.Sleep(s.delay)
+	}
+	return s.events, nil
+}
+
+type delayedOnlineService struct {
+	stubUserAdminService
+	delay time.Duration
+}
+
+func (s *delayedOnlineService) ListOnlineUsers(ctx context.Context, tenantID string, _ time.Time) ([]authdomain.OnlineUser, error) {
+	s.listOnlineUsersTenantID = tenantID
+	if s.delay > 0 {
+		time.Sleep(s.delay)
+	}
+	return nil, nil
+}
+
+func TestHandleAdminOverview_DropsUsersField_ReturnsTypedShape(t *testing.T) {
+	authSvc := &stubUserAdminService{}
+	handler := NewAdminHandler(nil, authSvc).
+		WithObservabilityService(&stubKpiReader{snap: iamdomain.KpiSnapshot{LockedAccounts: 3}}).
+		WithAuditEventLister(&stubAuditLister{events: []auditdomain.Event{{ID: "evt_1", TenantID: tenantA, Action: "x", ResourceType: "user", ResourceID: "u1"}}})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/iam/admin/overview", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantA))
+	rec := httptest.NewRecorder()
+	handler.handleAdminOverview(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if _, ok := body["users"]; ok {
+		t.Fatalf("response still carries legacy users[] field: %v", body)
+	}
+	if _, ok := body["kpi"]; !ok {
+		t.Fatalf("response missing kpi: %v", body)
+	}
+	if _, ok := body["presence"]; !ok {
+		t.Fatalf("response missing presence: %v", body)
+	}
+	if _, ok := body["recentActivities"]; !ok {
+		t.Fatalf("response missing recentActivities: %v", body)
+	}
+	kpi := body["kpi"].(map[string]any)
+	if kpi["lockedAccounts"] != float64(3) {
+		t.Fatalf("kpi.lockedAccounts = %v, want 3", kpi["lockedAccounts"])
+	}
+}
+
+func TestHandleAdminOverview_TenantIsolation(t *testing.T) {
+	authSvc := &stubUserAdminService{}
+	kpi := &stubKpiReader{}
+	audit := &stubAuditLister{}
+	handler := NewAdminHandler(nil, authSvc).
+		WithObservabilityService(kpi).
+		WithAuditEventLister(audit)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/iam/admin/overview", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantB))
+	rec := httptest.NewRecorder()
+	handler.handleAdminOverview(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if kpi.tenantID != tenantB {
+		t.Fatalf("kpi tenant = %q, want %q", kpi.tenantID, tenantB)
+	}
+	if audit.tenantID != tenantB {
+		t.Fatalf("audit tenant = %q, want %q", audit.tenantID, tenantB)
+	}
+	if authSvc.listOnlineUsersTenantID != tenantB {
+		t.Fatalf("online users tenant = %q, want %q", authSvc.listOnlineUsersTenantID, tenantB)
+	}
+}
+
+// TestHandleAdminOverview_RunsInParallel asserts the three composition reads
+// run concurrently. Each downstream sleeps 80ms; sequential = 240ms,
+// parallel = ~80ms. A 200ms ceiling leaves slack for slow CI without
+// allowing a regression to a sequential composition.
+func TestHandleAdminOverview_RunsInParallel(t *testing.T) {
+	const delay = 80 * time.Millisecond
+	authSvc := &delayedOnlineService{delay: delay}
+	kpi := &stubKpiReader{delay: delay}
+	audit := &stubAuditLister{delay: delay}
+	handler := NewAdminHandler(nil, authSvc).
+		WithObservabilityService(kpi).
+		WithAuditEventLister(audit)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/iam/admin/overview", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), tenantA))
+	rec := httptest.NewRecorder()
+
+	start := time.Now()
+	handler.handleAdminOverview(rec, req)
+	elapsed := time.Since(start)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	// Sequential composition would take 3×80ms ≈ 240ms. Parallel runs
+	// max(80ms) plus a small overhead. 200ms ceiling catches regressions
+	// without flaking on slow CI.
+	if elapsed > 200*time.Millisecond {
+		t.Fatalf("overview composition took %v, expected parallel (<200ms with 3×80ms downstreams)", elapsed)
+	}
+}
+
+const tenantA = "11111111-1111-1111-1111-111111111111"
+const tenantB = "22222222-2222-2222-2222-222222222222"
