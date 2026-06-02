@@ -550,11 +550,19 @@ func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID strin
 }
 
 func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages []domain.Stage) error {
-	for _, st := range stages {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO approval_route_stages
-				(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+	if len(stages) == 0 {
+		return nil
+	}
+	const colsPerRow = 9
+	placeholders := make([]string, 0, len(stages))
+	args := make([]any, 0, len(stages)*colsPerRow)
+	for i, st := range stages {
+		base := i*colsPerRow + 1
+		placeholders = append(placeholders, fmt.Sprintf(
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base, base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
+		))
+		args = append(args,
 			routeID,
 			st.Order,
 			st.Name,
@@ -564,9 +572,14 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 			st.Quorum,
 			st.QuorumM,
 			st.OnEligibilityDrift,
-		); err != nil {
-			return fmt.Errorf("route_admin: insert stage %d: %w", st.Order, repository.MapPgError(err, repository.MapHints{}))
-		}
+		)
+	}
+	query := `
+		INSERT INTO approval_route_stages
+			(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift)
+		VALUES ` + strings.Join(placeholders, ",")
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("route_admin: insert stages: %w", repository.MapPgError(err, repository.MapHints{}))
 	}
 	return nil
 }

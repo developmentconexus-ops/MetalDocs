@@ -81,6 +81,11 @@ func (s *routeAdminStmt) Exec(args []driver.Value) (driver.Result, error) {
 		}
 		return routeAdminResult{rowsAffected: 1}, nil
 	}
+	if strings.Contains(lower, "insert into approval_route_stages") {
+		s.conn.stageInsertExecCount++
+		s.conn.stageInsertArgCount = len(args)
+		return routeAdminResult{rowsAffected: int64(len(args) / 9)}, nil
+	}
 	return routeAdminResult{rowsAffected: 1}, nil
 }
 
@@ -166,6 +171,8 @@ type routeAdminConn struct {
 	deactivateNoRows    bool
 	capturedTenantGUC   string
 	capturedActorGUC    string
+	stageInsertExecCount int
+	stageInsertArgCount  int
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -736,6 +743,37 @@ func TestRouteAdminList_RunsUnderTenantGUC(t *testing.T) {
 	}
 	if len(out.Routes) != 1 || out.Routes[0].ID != "r1" {
 		t.Fatalf("unexpected routes: %+v", out.Routes)
+	}
+}
+
+func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+
+	stages := []domain.Stage{
+		{Order: 1, Name: "s1", RequiredRole: "r1", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAny1Of, OnEligibilityDrift: domain.DriftReduceQuorum},
+		{Order: 2, Name: "s2", RequiredRole: "r2", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
+		{Order: 3, Name: "s3", RequiredRole: "r3", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
+	}
+	if _, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO",
+		ActorUserID: "user-1",
+		Stages:      stages,
+	}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if conn.stageInsertExecCount != 1 {
+		t.Fatalf("stage insert exec count = %d; want 1 (batched)", conn.stageInsertExecCount)
+	}
+	if conn.stageInsertArgCount != 27 {
+		t.Fatalf("stage insert arg count = %d; want 27 (3 stages * 9 cols)", conn.stageInsertArgCount)
 	}
 }
 
