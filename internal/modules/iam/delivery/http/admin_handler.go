@@ -49,27 +49,6 @@ type ReplaceUserRolesRequest struct {
 	AssignedBy  string   `json:"assignedBy,omitempty"`
 }
 
-type CreateUserRequest struct {
-	UserID      string   `json:"userId,omitempty"`
-	Username    string   `json:"username"`
-	Email       string   `json:"email,omitempty"`
-	DisplayName string   `json:"displayName"`
-	Password    string   `json:"password"`
-	Roles       []string `json:"roles"`
-}
-
-type UpdateUserRequest struct {
-	DisplayName        *string `json:"displayName,omitempty"`
-	Email              *string `json:"email,omitempty"`
-	IsActive           *bool   `json:"isActive,omitempty"`
-	NewPassword        string  `json:"newPassword,omitempty"`
-	MustChangePassword *bool   `json:"mustChangePassword,omitempty"`
-}
-
-type ResetPasswordRequest struct {
-	NewPassword string `json:"newPassword"`
-}
-
 func NewAdminHandler(service *iamapp.AdminService, authService UserAdminService, auditWriter ...auditdomain.Writer) *AdminHandler {
 	var writer auditdomain.Writer
 	if len(auditWriter) > 0 {
@@ -83,21 +62,38 @@ func (h *AdminHandler) WithAuditReader(reader auditdomain.Reader) *AdminHandler 
 	return h
 }
 
+// RegisterRoutes wires the legacy AdminHandler surface: roles + overview only.
+//
+// PR-4 moved the People-tab user CRUD (list/invite/patch/bulk/reset/unlock/
+// memberships) to PeopleHandler, which registers its own typed Go 1.22 mux
+// patterns under /api/v1/iam/users/*. The role-edit endpoints stay here
+// because PR-5 (Roles & Caps matrix) owns them and will restructure them
+// next.
 func (h *AdminHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/v1/iam/users", h.handleUsers)
-	mux.HandleFunc("/api/v1/iam/users/", h.handleUserRoute)
+	mux.HandleFunc(http.MethodPost+" /api/v1/iam/users/{userId}/roles", h.handleUserRoleUpsertTyped)
+	mux.HandleFunc(http.MethodPut+" /api/v1/iam/users/{userId}/roles", h.handleReplaceUserRolesTyped)
 	mux.HandleFunc("/api/v1/iam/admin/overview", h.handleAdminOverview)
 }
 
-func (h *AdminHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		h.handleListUsers(w, r)
-	case http.MethodPost:
-		h.handleCreateUser(w, r)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
+// handleUserRoleUpsertTyped is the Go 1.22 typed-pattern entrypoint to the
+// legacy role upsert. The path parameter is extracted with r.PathValue so we
+// no longer split the URL by hand.
+func (h *AdminHandler) handleUserRoleUpsertTyped(w http.ResponseWriter, r *http.Request) {
+	userID := strings.TrimSpace(r.PathValue("userId"))
+	if userID == "" {
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		return
 	}
+	h.handleUserRoleUpsert(w, r, userID)
+}
+
+func (h *AdminHandler) handleReplaceUserRolesTyped(w http.ResponseWriter, r *http.Request) {
+	userID := strings.TrimSpace(r.PathValue("userId"))
+	if userID == "" {
+		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		return
+	}
+	h.handleReplaceUserRoles(w, r, userID)
 }
 
 func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Request) {
@@ -192,137 +188,11 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		"recentActivities": eventOut,
 	})
 }
-func (h *AdminHandler) handleUserRoute(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/iam/users/")
-	parts := strings.Split(path, "/")
-	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "roles" {
-		switch r.Method {
-		case http.MethodPost:
-			h.handleUserRoleUpsert(w, r, strings.TrimSpace(parts[0]))
-		case http.MethodPut:
-			h.handleReplaceUserRoles(w, r, strings.TrimSpace(parts[0]))
-		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
-		}
-		return
-	}
-	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "reset-password" && r.Method == http.MethodPost {
-		h.handleResetPassword(w, r, strings.TrimSpace(parts[0]))
-		return
-	}
-	if len(parts) == 2 && strings.TrimSpace(parts[0]) != "" && parts[1] == "unlock" && r.Method == http.MethodPost {
-		h.handleUnlockUser(w, r, strings.TrimSpace(parts[0]))
-		return
-	}
-	if len(parts) == 1 && strings.TrimSpace(parts[0]) != "" && r.Method == http.MethodPatch {
-		h.handlePatchUser(w, r, strings.TrimSpace(parts[0]))
-		return
-	}
-	h.writeProblem(w, problem.New(http.StatusNotFound, "INTERNAL_ERROR", "Route not found"))
-}
-
-func (h *AdminHandler) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	if h.authService == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
-		return
-	}
-	tenantID, err := tenant.FromContext(r.Context())
-	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
-		return
-	}
-	items, err := h.authService.ListUsers(r.Context(), tenantID)
-	if err != nil {
-		log.Printf("iam admin: list users failed: %v", err)
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
-		return
-	}
-	out := make([]map[string]any, 0, len(items))
-	for _, item := range items {
-		roles := make([]string, 0, len(item.Roles))
-		for _, role := range item.Roles {
-			roles = append(roles, string(role))
-		}
-		out = append(out, map[string]any{
-			"userId":              item.UserID,
-			"username":            item.Username,
-			"email":               item.Email,
-			"displayName":         item.DisplayName,
-			"isActive":            item.IsActive,
-			"mustChangePassword":  item.MustChangePassword,
-			"failedLoginAttempts": item.FailedLoginAttempts,
-			"roles":               roles,
-			"lastLoginAt":         formatOptionalTime(item.LastLoginAt),
-			"lockedUntil":         formatOptionalTime(item.LockedUntil),
-			"createdAt":           item.CreatedAt.UTC().Format(time.RFC3339),
-			"updatedAt":           item.UpdatedAt.UTC().Format(time.RFC3339),
-		})
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": out})
-}
-
-func (h *AdminHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
-	if h.authService == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
-		return
-	}
-	var req CreateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
-		return
-	}
-	role, err := parseExactlyOneRole(req.Roles)
-	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
-		return
-	}
-	tenantID, err := tenant.FromContext(r.Context())
-	if err != nil {
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
-		return
-	}
-	assignedBy := authenticatedActor(r)
-	if err := h.authService.CreateUser(r.Context(), req.UserID, req.Username, req.Email, req.DisplayName, req.Password, tenantID, []iamdomain.Role{role}, assignedBy); err != nil {
-		h.writeAuthError(w, err)
-		return
-	}
-	createdUserID := strings.TrimSpace(defaultString(req.UserID, req.Username))
-	writeJSON(w, http.StatusCreated, map[string]any{"userId": createdUserID})
-	h.recordAudit(r, createdUserID, "auth.user.created", map[string]any{
-		"username": req.Username,
-		"roles":    req.Roles,
-		"email":    req.Email,
-	})
-}
-
-func (h *AdminHandler) handlePatchUser(w http.ResponseWriter, r *http.Request, userID string) {
-	if h.authService == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
-		return
-	}
-	var req UpdateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
-		return
-	}
-	if err := h.authService.UpdateUser(r.Context(), authdomain.UpdateUserParams{
-		UserID:             userID,
-		DisplayName:        req.DisplayName,
-		Email:              req.Email,
-		IsActive:           req.IsActive,
-		MustChangePassword: req.MustChangePassword,
-	}, req.NewPassword); err != nil {
-		h.writeAuthError(w, err)
-		return
-	}
-	h.recordAudit(r, userID, "iam.user.updated", map[string]any{
-		"displayName":        req.DisplayName,
-		"email":              req.Email,
-		"isActive":           req.IsActive,
-		"mustChangePassword": req.MustChangePassword,
-	})
-	writeJSON(w, http.StatusOK, map[string]any{"userId": userID, "updated": true})
-}
+// Legacy suffix-dispatcher / list / create / patch / reset / unlock methods
+// were removed by PR-4. Those endpoints now live on PeopleHandler in
+// people_handler.go, registered via Go 1.22 typed mux patterns under
+// /api/v1/iam/users/* in the form "METHOD /path". The roles endpoints below
+// stay here (PR-5 will own them next).
 
 func (h *AdminHandler) handleUserRoleUpsert(w http.ResponseWriter, r *http.Request, userID string) {
 	if r.Method != http.MethodPost {
@@ -408,39 +278,6 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	h.recordAudit(r, userID, "iam.user.roles.replaced", map[string]any{
 		"roles": []string{string(role)},
 	})
-}
-
-func (h *AdminHandler) handleResetPassword(w http.ResponseWriter, r *http.Request, userID string) {
-	if h.authService == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
-		return
-	}
-	var req ResetPasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
-		return
-	}
-	if err := h.authService.AdminResetPassword(r.Context(), userID, req.NewPassword); err != nil {
-		h.writeAuthError(w, err)
-		return
-	}
-	h.recordAudit(r, userID, "auth.user.password_reset", map[string]any{
-		"mustChangePassword": true,
-	})
-	writeJSON(w, http.StatusOK, map[string]any{"userId": userID, "reset": true, "mustChangePassword": true})
-}
-
-func (h *AdminHandler) handleUnlockUser(w http.ResponseWriter, r *http.Request, userID string) {
-	if h.authService == nil {
-		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "User management service is not configured"))
-		return
-	}
-	if err := h.authService.UnlockUser(r.Context(), userID); err != nil {
-		h.writeAuthError(w, err)
-		return
-	}
-	h.recordAudit(r, userID, "auth.user.unlocked", map[string]any{})
-	writeJSON(w, http.StatusOK, map[string]any{"userId": userID, "unlocked": true})
 }
 
 func (h *AdminHandler) writeAuthError(w http.ResponseWriter, err error) {

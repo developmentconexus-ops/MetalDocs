@@ -3,7 +3,6 @@ package httpdelivery
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -77,32 +76,12 @@ func TestHandleReplaceUserRoles_RejectsMultipleRoles(t *testing.T) {
 	}
 }
 
-func TestHandleCreateUser_RejectsMultipleRoles(t *testing.T) {
-	authSvc := &stubUserAdminService{}
-	handler := NewAdminHandler(iamapp.NewAdminService(stubRoleAdminRepository{}, nil), authSvc)
-
-	payload, err := json.Marshal(CreateUserRequest{
-		Username:    "alice",
-		DisplayName: "Alice",
-		Password:    "Password123!",
-		Roles:       []string{"editor", "viewer"},
-	})
-	if err != nil {
-		t.Fatalf("Marshal: %v", err)
-	}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/users", bytes.NewReader(payload))
-	req = req.WithContext(tenant.WithTenantID(req.Context(), "11111111-1111-1111-1111-111111111111"))
-	rec := httptest.NewRecorder()
-
-	handler.handleCreateUser(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-	}
-	if got := rec.Body.String(); !bytes.Contains([]byte(got), []byte("Exactly one role is required")) {
-		t.Fatalf("response body %q does not mention single-role requirement", got)
-	}
-}
+// TestHandleCreateUser_RejectsMultipleRoles was removed by PR-4: the legacy
+// POST /iam/users endpoint and its CreateUserRequest type were replaced by
+// POST /iam/users/invite (UserInviteRequest), which carries a single
+// tenantRole field instead of a multi-role array — so a "rejects multiple
+// roles" assertion is no longer expressible at this layer. Equivalent
+// canonical-role-only coverage lives in tests/unit/iam_people/.
 
 func TestHandleAdminOverview_PassesTenantIDToOnlineUsers(t *testing.T) {
 	authSvc := &stubUserAdminService{}
