@@ -3,9 +3,9 @@ import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Dialog } from '../../../../components/ui';
+import { resolveErrorMessage } from '../../../../lib/api/problem';
 import { useAreasQuery } from '../../../documents/queries/useAreasQuery';
 import { useIamRolesQuery } from '../../queries/useIamRolesQuery';
-import { ApprovalError } from '../../api/mutationClient';
 import type {
   CreateRouteRequest,
   RouteSummary,
@@ -19,7 +19,6 @@ import {
   describeQuorumKind,
   labelForDriftPolicy,
   labelForQuorumKind,
-  messageForRouteError,
   type DriftPolicy,
   type QuorumKind,
 } from './routeAdminLabels';
@@ -228,13 +227,7 @@ export function RouteEditorDialog({
     try {
       await onSubmit(payload);
     } catch (err) {
-      if (err instanceof ApprovalError) {
-        setError(messageForRouteError(err.code, err.status, err.message));
-      } else if (err instanceof Error) {
-        setError(messageForRouteError(undefined, undefined, err.message));
-      } else {
-        setError(messageForRouteError(undefined, undefined));
-      }
+      setError(resolveErrorMessage(err));
     }
   };
 
@@ -274,7 +267,10 @@ export function RouteEditorDialog({
       description={description}
       onClose={isSubmitting ? () => {} : onClose}
       footer={footer}
-      disableBackdropClose={isSubmitting}
+      // Always block backdrop dismissal: editor drafts (route name + stages)
+      // are easy to lose to a stray click on the dialog padding. The explicit
+      // Cancel / × buttons remain the only exit affordances.
+      disableBackdropClose
     >
       {error ? (
         <div className={styles.errorBox} role="alert">
