@@ -15,7 +15,6 @@ export type DriftPolicy = 'reduce_quorum' | 'fail_stage' | 'keep_snapshot' | 'au
 
 export interface RouteStage {
   label: string;
-  members: string[];
   required_role?: string;
   required_capability?: string;
   area_code?: string;

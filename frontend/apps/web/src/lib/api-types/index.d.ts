@@ -3666,8 +3666,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List approval routes for the active tenant */
         get: operations["listApprovalRoutes"];
         put?: never;
+        /** Create an approval route for the active tenant */
         post: operations["createApprovalRoute"];
         delete?: never;
         options?: never;
@@ -3683,8 +3685,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Update an approval route (new version) */
         put: operations["updateApprovalRoute"];
         post?: never;
+        /** Deactivate an approval route */
         delete: operations["deactivateApprovalRoute"];
         options?: never;
         head?: never;
@@ -3709,6 +3713,13 @@ export interface components {
             displayName: string;
             mustChangePassword: boolean;
             roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
+            /**
+             * @description Capability codes the actor holds in the active tenant. UX hint only —
+             *     backend remains the sole authorization boundary (see
+             *     wiki/concepts/authz-tiers.md). May be empty when no capability
+             *     provider is wired (in-memory dev modes).
+             */
+            capabilities: string[];
         };
         AuthLoginResponse: {
             user: components["schemas"]["CurrentUser"];
@@ -4992,6 +5003,92 @@ export interface components {
             /** @description Machine-readable code from canonical taxonomy */
             code: string;
             errors?: components["schemas"]["FieldError"][];
+        };
+        /**
+         * @description Quorum policy applied to a stage. `m_of_n` requires `quorum_m`.
+         * @enum {string}
+         */
+        QuorumKind: "any_1_of" | "all_of" | "m_of_n";
+        /**
+         * @description Behaviour applied when an actor loses eligibility mid-stage.
+         * @enum {string}
+         */
+        DriftPolicy: "reduce_quorum" | "fail_stage" | "keep_snapshot";
+        StageRequest: {
+            /** @description 1-based stage ordinal. Must equal index+1. */
+            order: number;
+            name: string;
+            required_role: string;
+            required_capability: string;
+            area_code: string;
+            quorum: components["schemas"]["QuorumKind"];
+            /** @description Required when `quorum` is `m_of_n`; must be omitted otherwise. */
+            quorum_m?: number;
+            drift_policy: components["schemas"]["DriftPolicy"];
+        } & {
+            [key: string]: unknown;
+        };
+        StageSummary: {
+            label: string;
+            required_role: string;
+            required_capability: string;
+            area_code: string;
+            quorum_kind: components["schemas"]["QuorumKind"];
+            quorum_m?: number | null;
+            drift_policy: components["schemas"]["DriftPolicy"];
+        } & {
+            [key: string]: unknown;
+        };
+        CreateRouteRequest: {
+            profile_code: string;
+            name: string;
+            stages: components["schemas"]["StageRequest"][];
+        } & {
+            [key: string]: unknown;
+        };
+        UpdateRouteRequest: {
+            name: string;
+            stages: components["schemas"]["StageRequest"][];
+        } & {
+            [key: string]: unknown;
+        };
+        DeactivateRouteRequest: {
+            /** @description Governance reason recorded with deactivation event. */
+            reason: string;
+        } & {
+            [key: string]: unknown;
+        };
+        RouteResponse: {
+            /** Format: uuid */
+            route_id: string;
+            /** @description New route version after a successful update. Omitted for create/deactivate. */
+            new_version?: number;
+        } & {
+            [key: string]: unknown;
+        };
+        RouteSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            tenant_id: string;
+            profile_code: string;
+            active: boolean;
+            /** @description Monotonic version bumped on each update or deactivation. */
+            version: number;
+            stages: components["schemas"]["StageSummary"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        } & {
+            [key: string]: unknown;
+        };
+        ListRoutesResponse: {
+            routes: components["schemas"]["RouteSummary"][];
+            total: number;
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: never;
@@ -8096,65 +8193,239 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ListRoutesResponse"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
     createApprovalRoute: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRouteRequest"];
+            };
+        };
         responses: {
-            /** @description ok */
-            200: {
+            /** @description created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RouteResponse"];
+                };
+            };
+            /** @description validation_error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description idempotency_replay_or_conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
     updateApprovalRoute: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Expected route version ETag in the form "v<N>" */
+                "If-Match": string;
+            };
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRouteRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RouteResponse"];
+                };
+            };
+            /** @description validation_error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description route_not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description version_conflict_or_replay */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
     deactivateApprovalRoute: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": string;
+                /** @description Expected route version ETag in the form "v<N>" */
+                "If-Match": string;
+            };
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DeactivateRouteRequest"];
+            };
+        };
         responses: {
             /** @description ok */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["RouteResponse"];
+                };
+            };
+            /** @description validation_error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description unauthenticated */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description route_not_found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description version_conflict_or_replay */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
