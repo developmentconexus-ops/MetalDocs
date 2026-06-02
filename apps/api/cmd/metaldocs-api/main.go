@@ -416,6 +416,8 @@ func main() {
 	}
 	templatesModule.Register(mux)
 	signoffIdempStore := approvalinfra.NewPostgresSignoffIdempStore(deps.SQLDB)
+	routeAdminIdempStore := approvalinfra.NewPostgresRouteAdminIdempStore(deps.SQLDB)
+	approvalServices = approvalServices.WithRouteAdminIdempStore(routeAdminIdempStore)
 	approvalHandler := approvalhttp.NewHandler(approvalServices, deps.SQLDB, signoffIdempStore)
 	approvalHandler.RegisterRoutes(mux)
 	mountE2EHandlersIfEnabled(mux, func(m *http.ServeMux) {

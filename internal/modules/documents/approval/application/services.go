@@ -72,6 +72,16 @@ func (s *Services) WithScheduledPublishEnqueuer(enqueuer ScheduledPublishEnqueue
 	return s
 }
 
+// WithRouteAdminIdempStore returns the Services with route-admin idempotency
+// wired. The store is optional — unset leaves the no-store path in place
+// (acceptable in tests; production composition root MUST set it).
+func (s *Services) WithRouteAdminIdempStore(store RouteAdminIdempStore) *Services {
+	if s != nil && s.RouteAdmin != nil {
+		s.RouteAdmin = s.RouteAdmin.WithIdempStore(store)
+	}
+	return s
+}
+
 // ValidateEventPayload returns ErrFloatInFormData if any value in payload is a
 // float64. JSON unmarshal defaults numeric values to float64, which breaks
 // canonical hashing; callers must use strings or ints instead.

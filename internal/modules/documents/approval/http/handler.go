@@ -11,7 +11,6 @@ import (
 	"metaldocs/internal/modules/documents/approval/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	approvalinfra "metaldocs/internal/modules/documents/approval/infrastructure"
-	"metaldocs/internal/modules/documents/approval/repository"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -48,10 +47,7 @@ type routeAdminService interface {
 	Create(ctx context.Context, db *sql.DB, in application.CreateRouteInput) (application.CreateRouteResult, error)
 	Update(ctx context.Context, db *sql.DB, in application.UpdateRouteInput) (application.UpdateRouteResult, error)
 	Deactivate(ctx context.Context, db *sql.DB, in application.DeactivateRouteInput) (application.DeactivateRouteResult, error)
-}
-
-type routeListRepository interface {
-	ListRoutes(ctx context.Context, tenantID string) ([]repository.Route, error)
+	List(ctx context.Context, db *sql.DB, tenantID, actorID string) (application.ListRoutesResult, error)
 }
 
 var (
@@ -77,7 +73,6 @@ type Handler struct {
 	obsoleteSvc  obsoleteService
 	supersedeSvc supersedeService
 	routeAdmin   routeAdminService
-	routeRepo    routeListRepository
 	idempStore   signoffIdempStore
 }
 
@@ -95,9 +90,6 @@ func NewHandler(services *application.Services, db *sql.DB, idempStore signoffId
 		h.obsoleteSvc = services.Obsolete
 		h.supersedeSvc = services.Supersede
 		h.routeAdmin = services.RouteAdmin
-	}
-	if db != nil {
-		h.routeRepo = repository.NewPostgresApprovalRepository(db)
 	}
 	return h
 }

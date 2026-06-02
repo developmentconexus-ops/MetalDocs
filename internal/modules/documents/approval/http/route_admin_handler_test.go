@@ -30,6 +30,11 @@ type fakeRouteAdminService struct {
 	deactivateResult application.DeactivateRouteResult
 	deactivateErr    error
 	deactivateReq    application.DeactivateRouteInput
+
+	listResult application.ListRoutesResult
+	listErr    error
+	listTenant string
+	listActor  string
 }
 
 func (f *fakeRouteAdminService) Create(_ context.Context, _ *sql.DB, in application.CreateRouteInput) (application.CreateRouteResult, error) {
@@ -54,6 +59,15 @@ func (f *fakeRouteAdminService) Deactivate(_ context.Context, _ *sql.DB, in appl
 		return application.DeactivateRouteResult{}, f.deactivateErr
 	}
 	return f.deactivateResult, nil
+}
+
+func (f *fakeRouteAdminService) List(_ context.Context, _ *sql.DB, tenantID, actorID string) (application.ListRoutesResult, error) {
+	f.listTenant = tenantID
+	f.listActor = actorID
+	if f.listErr != nil {
+		return application.ListRoutesResult{}, f.listErr
+	}
+	return f.listResult, nil
 }
 
 func routeAdminTestMux(h *Handler) *http.ServeMux {
@@ -301,9 +315,10 @@ func TestDeactivateRoute_HappyPath(t *testing.T) {
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
-			req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", nil)
+			req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", strings.NewReader(`{"reason":"end of lifecycle"}`))
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 			req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Idempotency-Key", "idem-1")
 			req.Header.Set("If-Match", "\"v3\"")
 
@@ -327,7 +342,62 @@ func TestDeactivateRoute_HappyPath(t *testing.T) {
 			if svc.deactivateReq.ExpectedVersion != 3 {
 				t.Fatalf("expected version = %d, want 3", svc.deactivateReq.ExpectedVersion)
 			}
+			if svc.deactivateReq.Reason != "end of lifecycle" {
+				t.Fatalf("reason = %q, want %q", svc.deactivateReq.Reason, "end of lifecycle")
+			}
+			if svc.deactivateReq.IdempotencyKey != "idem-1" {
+				t.Fatalf("idempotency_key = %q, want %q", svc.deactivateReq.IdempotencyKey, "idem-1")
+			}
 		})
+	}
+}
+
+func TestDeactivateRoute_RejectsEmptyReason(t *testing.T) {
+	svc := &fakeRouteAdminService{}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", strings.NewReader(`{"reason":"   "}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("If-Match", "\"v3\"")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+func TestListRoutes_PassesTenantAndActor(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		listResult: application.ListRoutesResult{},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/routes", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-7"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-7", []iamdomain.Role{}))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if svc.listTenant != "tenant-7" || svc.listActor != "actor-7" {
+		t.Fatalf("List args tenant=%q actor=%q; want tenant-7 / actor-7", svc.listTenant, svc.listActor)
+	}
+	var out contracts.ListRoutesResponse
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Total != 0 || len(out.Routes) != 0 {
+		t.Fatalf("got %+v; want empty envelope", out)
 	}
 }
 

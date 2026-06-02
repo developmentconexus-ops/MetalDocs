@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/approval.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/approval-refactor.md`.
 
-**Last verified:** 2026-06-01 (T-013 signoff content-pin canonicalization drift closed — hardened to fail-closed on missing client pin or NULL server hash)
+**Last verified:** 2026-06-01 (Approval route admin PR-2 backend hardening — closes route-admin scan items BE-3 (missing idempotency persistence), BE-4 (untyped list envelope), BE-5 (two-tx authz + read TOCTOU), BE-6 (missing governance reason on deactivate), BE-8 (asymmetric stage normalization), BE-10 (inconsistent error wrap), BE-11 (dead `Members` field on `ListStageItem`), BE-12 (route admin service unaware of `Idempotency-Key`). Implementation: `internal/modules/documents/approval/application/route_admin_service.go` + `internal/modules/documents/approval/infrastructure/postgres_route_admin_idemp_store.go` + `internal/modules/documents/approval/http/route_admin_handler.go`; tests under `application/route_admin_service_test.go` (`TestRouteAdminCreate_ReplayReturnsPriorResponse`, `TestRouteAdminCreate_IdempotencyKeyConflict`, `TestRouteAdminDeactivate_RejectsEmptyReason`, `TestRouteAdminDeactivate_ReasonInGovernancePayload`, `TestRouteAdminList_RunsUnderTenantGUC`) and `http/route_admin_handler_test.go` (`TestDeactivateRoute_RejectsEmptyReason`, `TestListRoutes_PassesTenantAndActor`). Prior verification — T-013 signoff content-pin canonicalization drift closed.)
 
 ## Severity scale
 
