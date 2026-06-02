@@ -1,10 +1,10 @@
 # Workflow: Approval
 
-> **Last verified:** 2026-05-15
+> **Last verified:** 2026-06-02 (PR-5 structural sweep: handler.go line anchors repaired)
 > **Scope:** Submit → route assignment → signoffs → approval condition met → freeze trigger.
 > **Out of scope:** Freeze pipeline (see `workflows/freeze-and-fanout.md`), route admin (see `modules/approval.md`).
 > **Key files:**
-> - `internal/modules/documents/delivery/http/handler.go:316` — `finalizeDocument` — atomic finalize+submit handler
+> - `internal/modules/documents/delivery/http/handler.go:423` — `finalizeDocument` — atomic finalize+submit handler
 > - `internal/modules/documents/approval/application/submit_service.go:140` — `resolveEligibleActors` call inside stage-instance loop
 > - `internal/modules/documents/approval/application/submit_service.go:299` — `resolveEligibleActors` implementation (queries `metaldocs.user_process_areas`)
 > - `internal/modules/documents/approval/http/doc_approval_handler.go:51` — `SignoffByDocumentHandler` with idempotency replay
@@ -32,7 +32,7 @@ Now `finalizeDocument` at `handler.go:316`:
 4. Calls `SubmitRevisionForReview` — this single transaction creates the approval instance, stage instances, and transitions the document to `under_review`.
 5. Returns HTTP 201 with `{"instanceId": "<uuid>"}`.
 
-`NewHandlerWithSubmit` at `handler.go:73` is required to wire `db` + `submitSvc`; if only `NewHandler` is used the legacy status-only path runs as fallback.
+`NewHandlerWithSubmit` at `handler.go:90` is required to wire `db` + `submitSvc`; if only `NewHandler` is used the legacy status-only path runs as fallback.
 
 ## eligible_actor_ids populated at submit time (fixed 2026-05-02)
 

@@ -67,3 +67,5 @@ Source: F-001 audit (`wiki/references/qa-runs/plans-f001-f002.md`). The Tier-1 d
 - [`wiki/modules/auth.md`](../modules/auth.md) — canonical auth module doc; §8.1 covers the session-enforcement layer that is upstream of both authz tiers; middleware at `internal/modules/auth/delivery/http/middleware.go:47` injects `iamdomain.WithAuthContext` so tier-1 and tier-2 checks have an actor in context
 - [`wiki/modules/iam.md`](../modules/iam.md) — full Arc42 + C4 doc for `internal/modules/iam`; two live authz tiers documented in §8.1 (AuthorizationService deleted in Plan 4 — T-003 closed; Plan 5 expanded tier-2 to all IAM-owned write surfaces)
 - [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) — ADR rationale for the two-tier design
+- [`wiki/concepts/approval-routes.md`](approval-routes.md) — plain-language overview of the approval route catalogue (Tier-1 read split / `CapRouteView` deferral cross-referenced from §"Tier-1 rule authoring rules" rule 4)
+- [`wiki/decisions/0018-approval-route-lifecycle.md`](../decisions/0018-approval-route-lifecycle.md) — route lifecycle ADR; §6 specifies the deferred Tier-1 `route.view` capability
