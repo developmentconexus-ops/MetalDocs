@@ -1,10 +1,9 @@
 package approvalhttp
 
 import (
-	"context"
-	"database/sql"
+	"encoding/json"
 	"errors"
-	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/http/contracts"
 	"metaldocs/internal/modules/documents/approval/repository"
-	"metaldocs/internal/modules/iam/authz"
 )
 
 const CapManageRoutes = "route.admin"
@@ -48,11 +46,12 @@ func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := routeAdminSvc.Create(r.Context(), h.db, application.CreateRouteInput{
-		TenantID:    tenantID,
-		ProfileCode: req.ProfileCode,
-		Name:        req.Name,
-		ActorUserID: actorID,
-		Stages:      mapStageRequests(req.Stages),
+		TenantID:       tenantID,
+		ProfileCode:    req.ProfileCode,
+		Name:           req.Name,
+		ActorUserID:    actorID,
+		IdempotencyKey: idempotencyKey,
+		Stages:         mapStageRequests(req.Stages),
 	})
 	if err != nil {
 		WriteError(w, err)
@@ -104,6 +103,7 @@ func (h *Handler) UpdateRouteHandler(w http.ResponseWriter, r *http.Request) {
 		RouteID:         routeID,
 		Name:            req.Name,
 		ActorUserID:     actorID,
+		IdempotencyKey:  idempotencyKey,
 		ExpectedVersion: expectedVersion,
 		Stages:          mapStageRequests(req.Stages),
 	})
@@ -137,6 +137,12 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	reason, err := decodeDeactivateReason(r)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
 		WriteError(w, errors.New("route admin service not configured"))
@@ -147,6 +153,8 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		TenantID:        tenantID,
 		RouteID:         routeID,
 		ActorUserID:     actorID,
+		IdempotencyKey:  idempotencyKey,
+		Reason:          reason,
 		ExpectedVersion: expectedVersion,
 	})
 	if err != nil {
@@ -159,6 +167,32 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+func decodeDeactivateReason(r *http.Request) (string, error) {
+	defer func() {
+		if r.Body != nil {
+			_, _ = io.Copy(io.Discard, r.Body)
+			_ = r.Body.Close()
+		}
+	}()
+	if r.ContentLength == 0 && r.Body == nil {
+		return "", application.ErrRouteDeactivateReasonRequired
+	}
+	var body contracts.DeactivateRouteRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		if errors.Is(err, io.EOF) {
+			return "", application.ErrRouteDeactivateReasonRequired
+		}
+		return "", err
+	}
+	reason := strings.TrimSpace(body.Reason)
+	if reason == "" {
+		return "", application.ErrRouteDeactivateReasonRequired
+	}
+	return reason, nil
+}
+
 func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
@@ -167,55 +201,27 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	actorID := actorIDFromRequest(r)
 
-	if h.db == nil {
-		WriteError(w, fmt.Errorf("database not configured"))
+	routeAdminSvc := h.routeAdmin
+	if routeAdminSvc == nil {
+		WriteError(w, errors.New("route admin service not configured"))
 		return
 	}
 
-	if err := h.requireRouteManagement(r.Context(), tenantID, actorID); err != nil {
-		WriteError(w, err)
-		return
-	}
-
-	routeRepo := h.routeRepo
-	if routeRepo == nil {
-		routeRepo = repository.NewPostgresApprovalRepository(h.db)
-	}
-	routeRows, err := routeRepo.ListRoutes(r.Context(), tenantID)
+	out, err := routeAdminSvc.List(r.Context(), h.db, tenantID, actorID)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
 
-	routes := make([]contracts.ListRouteItem, 0, len(routeRows))
-	for _, route := range routeRows {
+	routes := make([]contracts.ListRouteItem, 0, len(out.Routes))
+	for _, route := range out.Routes {
 		routes = append(routes, mapListRoute(route))
 	}
 
-	WriteJSON(w, http.StatusOK, map[string]any{
-		"routes": routes,
-		"total":  len(routes),
+	WriteJSON(w, http.StatusOK, contracts.ListRoutesResponse{
+		Routes: routes,
+		Total:  len(routes),
 	})
-}
-
-func (h *Handler) requireRouteManagement(ctx context.Context, tenantID, actorID string) error {
-	return withAuthzCheck(ctx, h.db, tenantID, actorID, CapManageRoutes, "tenant")
-}
-
-func withAuthzCheck(ctx context.Context, db *sql.DB, tenantID, actorID, capability, areaCode string) error {
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("authz check: begin tx: %w", err)
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.tenant_id', $1, true)", tenantID); err != nil {
-		return fmt.Errorf("authz check: set tenant GUC: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.actor_id', $1, true)", actorID); err != nil {
-		return fmt.Errorf("authz check: set actor GUC: %w", err)
-	}
-	return authz.Require(authz.WithCapCache(ctx), tx, capability, areaCode)
 }
 
 func mapListRoute(route repository.Route) contracts.ListRouteItem {
@@ -233,6 +239,7 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 			RequiredCapability: stage.RequiredCapability,
 			AreaCode:           stage.AreaCode,
 			QuorumKind:         contracts.QuorumKind(stage.Quorum),
+			QuorumM:            stage.QuorumM,
 			DriftPolicy:        contracts.DriftPolicyKind(stage.DriftPolicy),
 		})
 	}
@@ -243,6 +250,7 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 		TenantID:    route.TenantID,
 		ProfileCode: route.ProfileCode,
 		Active:      route.Active,
+		Version:     route.Version,
 		Stages:      stages,
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
@@ -252,11 +260,15 @@ func mapListRoute(route repository.Route) contracts.ListRouteItem {
 func mapStageRequests(stages []contracts.StageRequest) []domain.Stage {
 	out := make([]domain.Stage, 0, len(stages))
 	for _, s := range stages {
+		cap := strings.TrimSpace(s.RequiredCapability)
+		if cap == "" {
+			cap = "workflow.sign"
+		}
 		out = append(out, domain.Stage{
 			Order:              s.Order,
 			Name:               s.Name,
-			RequiredRole:       s.RequiredRole,
-			RequiredCapability: s.RequiredCapability,
+			RequiredRole:       strings.ToLower(strings.TrimSpace(s.RequiredRole)),
+			RequiredCapability: cap,
 			AreaCode:           strings.ToLower(strings.TrimSpace(s.AreaCode)),
 			Quorum:             domain.QuorumPolicy(s.Quorum),
 			QuorumM:            s.QuorumM,

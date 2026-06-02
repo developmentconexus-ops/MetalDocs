@@ -420,20 +420,36 @@ func (r *postgresApprovalRepository) GetDocumentRevisionVersion(ctx context.Cont
 
 // ListRoutes loads tenant-scoped route configuration and stages in one joined query.
 func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID string) ([]Route, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.active, r.created_at, r.created_at AS updated_at,
-		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.on_eligibility_drift
-		  FROM approval_routes r
-		  JOIN approval_route_stages s
-		    ON s.route_id = r.id
-		 WHERE r.tenant_id = $1::uuid
-		 ORDER BY r.created_at DESC, s.stage_order ASC`,
-		tenantID,
-	)
+	rows, err := r.db.QueryContext(ctx, listRoutesQuery, tenantID)
 	if err != nil {
 		return nil, MapPgError(err, MapHints{})
 	}
 	defer rows.Close()
+	return scanRouteListRows(rows)
+}
+
+// ListRoutesTx is the transaction-scoped variant used by the route admin
+// service so the tenant GUC set on the transaction governs row visibility
+// (single-tx authz + read; no TOCTOU).
+func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]Route, error) {
+	rows, err := tx.QueryContext(ctx, listRoutesQuery, tenantID)
+	if err != nil {
+		return nil, MapPgError(err, MapHints{})
+	}
+	defer rows.Close()
+	return scanRouteListRows(rows)
+}
+
+const listRoutesQuery = `
+		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.active, r.version, r.created_at, r.created_at AS updated_at,
+		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift
+		  FROM approval_routes r
+		  JOIN approval_route_stages s
+		    ON s.route_id = r.id
+		 WHERE r.tenant_id = $1::uuid
+		 ORDER BY r.created_at DESC, s.stage_order ASC`
+
+func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 
 	routeMap := make(map[string]*Route)
 	var routeOrder []string
@@ -441,14 +457,16 @@ func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID st
 		var (
 			routeID, routeName, routeTenantID, profileCode string
 			active                                         bool
+			version                                        int
 			createdAt, updatedAt                           time.Time
 			stage                                          RouteStage
 			stageName, stageRole, stageCapability          sql.NullString
 			stageArea, stageQuorum, stageDrift             sql.NullString
+			stageQuorumM                                   sql.NullInt64
 		)
 		if err := rows.Scan(
-			&routeID, &routeName, &routeTenantID, &profileCode, &active, &createdAt, &updatedAt,
-			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageDrift,
+			&routeID, &routeName, &routeTenantID, &profileCode, &active, &version, &createdAt, &updatedAt,
+			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageQuorumM, &stageDrift,
 		); err != nil {
 			return nil, fmt.Errorf("scan approval route list row: %w", err)
 		}
@@ -461,6 +479,7 @@ func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID st
 				TenantID:    routeTenantID,
 				ProfileCode: profileCode,
 				Active:      active,
+				Version:     version,
 				CreatedAt:   createdAt,
 				UpdatedAt:   updatedAt,
 				Stages:      []RouteStage{},
@@ -483,6 +502,10 @@ func (r *postgresApprovalRepository) ListRoutes(ctx context.Context, tenantID st
 		}
 		if stageQuorum.Valid {
 			stage.Quorum = stageQuorum.String
+		}
+		if stageQuorumM.Valid {
+			m := int(stageQuorumM.Int64)
+			stage.QuorumM = &m
 		}
 		if stageDrift.Valid {
 			stage.DriftPolicy = stageDrift.String

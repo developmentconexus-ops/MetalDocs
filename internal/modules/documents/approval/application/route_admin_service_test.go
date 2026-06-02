@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	"metaldocs/internal/platform/idempotency"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -57,8 +59,19 @@ type routeAdminStmt struct {
 func (s *routeAdminStmt) Close() error  { return nil }
 func (s *routeAdminStmt) NumInput() int { return -1 }
 
-func (s *routeAdminStmt) Exec(_ []driver.Value) (driver.Result, error) {
+func (s *routeAdminStmt) Exec(args []driver.Value) (driver.Result, error) {
 	lower := strings.ToLower(s.query)
+
+	if strings.Contains(lower, "set_config('metaldocs.tenant_id'") && len(args) > 0 {
+		if v, ok := args[0].(string); ok {
+			s.conn.capturedTenantGUC = v
+		}
+	}
+	if strings.Contains(lower, "set_config('metaldocs.actor_id'") && len(args) > 0 {
+		if v, ok := args[0].(string); ok {
+			s.conn.capturedActorGUC = v
+		}
+	}
 	if strings.Contains(lower, "update approval_routes") && strings.Contains(lower, "set active = false") {
 		if s.conn.deactivateErr != nil {
 			return nil, s.conn.deactivateErr
@@ -71,8 +84,19 @@ func (s *routeAdminStmt) Exec(_ []driver.Value) (driver.Result, error) {
 	return routeAdminResult{rowsAffected: 1}, nil
 }
 
-func (s *routeAdminStmt) Query(_ []driver.Value) (driver.Rows, error) {
+func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 	lower := strings.ToLower(s.query)
+
+	if strings.Contains(lower, "set_config('metaldocs.tenant_id'") && len(args) > 0 {
+		if v, ok := args[0].(string); ok {
+			s.conn.capturedTenantGUC = v
+		}
+	}
+	if strings.Contains(lower, "set_config('metaldocs.actor_id'") && len(args) > 0 {
+		if v, ok := args[0].(string); ok {
+			s.conn.capturedActorGUC = v
+		}
+	}
 
 	if strings.Contains(lower, "select exists") && strings.Contains(lower, "iam_user_roles") {
 		return &routeAdminRows{cols: []string{"exists"}, values: []driver.Value{false}}, nil
@@ -140,6 +164,8 @@ type routeAdminConn struct {
 	deactivateErr       error
 	updateNoRows        bool
 	deactivateNoRows    bool
+	capturedTenantGUC   string
+	capturedActorGUC    string
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -367,6 +393,7 @@ func TestRouteAdminDeactivate_HappyPath(t *testing.T) {
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
+		Reason:          "obsolete policy",
 		ExpectedVersion: 2,
 	})
 	if err != nil {
@@ -423,6 +450,7 @@ func TestRouteAdminDeactivate_StaleVersion(t *testing.T) {
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
+		Reason:          "stale check",
 		ExpectedVersion: 5,
 	})
 	if !errors.Is(err, repository.ErrStaleRevision) {
@@ -449,9 +477,265 @@ func TestRouteAdminDeactivate_AlreadyInactive(t *testing.T) {
 		TenantID:        "tenant-1",
 		RouteID:         "route-1",
 		ActorUserID:     "user-1",
+		Reason:          "already inactive check",
 		ExpectedVersion: 5,
 	})
 	if !errors.Is(err, ErrRouteAlreadyInactive) {
 		t.Fatalf("expected ErrRouteAlreadyInactive; got %v", err)
 	}
 }
+
+// --- PR-2 hardening: idempotency, reason, single-tx list ---
+
+type memoryRouteAdminIdempStore struct {
+	create     map[string]*memoryRouteAdminSlot
+	update     map[string]*memoryRouteAdminSlot
+	deactivate map[string]*memoryRouteAdminSlot
+}
+
+type memoryRouteAdminSlot struct {
+	hash    string
+	replay  *RouteAdminReplay
+	pending bool
+}
+
+type memoryRouteAdminCommitter struct {
+	slot *memoryRouteAdminSlot
+}
+
+func (c *memoryRouteAdminCommitter) Complete(routeID string, newVersion *int) error {
+	c.slot.pending = false
+	c.slot.replay = &RouteAdminReplay{RouteID: routeID, NewVersion: newVersion}
+	return nil
+}
+
+func (c *memoryRouteAdminCommitter) Fail(_ error) error {
+	c.slot.pending = false
+	c.slot.replay = nil
+	return nil
+}
+
+func newMemoryRouteAdminIdempStore() *memoryRouteAdminIdempStore {
+	return &memoryRouteAdminIdempStore{
+		create:     map[string]*memoryRouteAdminSlot{},
+		update:     map[string]*memoryRouteAdminSlot{},
+		deactivate: map[string]*memoryRouteAdminSlot{},
+	}
+}
+
+func memoryIdempKey(tenantID, actorID, key string) string {
+	return tenantID + "|" + actorID + "|" + key
+}
+
+func (m *memoryRouteAdminIdempStore) begin(bucket map[string]*memoryRouteAdminSlot, tenantID, actorID, key, hash string) (RouteAdminReplayCommitter, *RouteAdminReplay, error) {
+	k := memoryIdempKey(tenantID, actorID, key)
+	if slot, ok := bucket[k]; ok {
+		if slot.hash != hash {
+			return nil, nil, idempotency.ErrConflict
+		}
+		if slot.pending {
+			return nil, nil, fmt.Errorf("idempotency: in_flight orphan (key in use)")
+		}
+		if slot.replay != nil {
+			cp := *slot.replay
+			return nil, &cp, nil
+		}
+		return &memoryRouteAdminCommitter{slot: slot}, nil, nil
+	}
+	slot := &memoryRouteAdminSlot{hash: hash, pending: true}
+	bucket[k] = slot
+	return &memoryRouteAdminCommitter{slot: slot}, nil, nil
+}
+
+func (m *memoryRouteAdminIdempStore) BeginCreateReplay(_ context.Context, tenantID, actorID, key, hash string) (RouteAdminReplayCommitter, *RouteAdminReplay, error) {
+	return m.begin(m.create, tenantID, actorID, key, hash)
+}
+
+func (m *memoryRouteAdminIdempStore) BeginUpdateReplay(_ context.Context, tenantID, actorID, key, hash string) (RouteAdminReplayCommitter, *RouteAdminReplay, error) {
+	return m.begin(m.update, tenantID, actorID, key, hash)
+}
+
+func (m *memoryRouteAdminIdempStore) BeginDeactivateReplay(_ context.Context, tenantID, actorID, key, hash string) (RouteAdminReplayCommitter, *RouteAdminReplay, error) {
+	return m.begin(m.deactivate, tenantID, actorID, key, hash)
+}
+
+func TestRouteAdminCreate_ReplayReturnsPriorResponse(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-replay-1"}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	emitter := &MemoryEmitter{}
+	svc := (&RouteAdminService{
+		emitter: emitter,
+		clock:   fixedClock{t: time.Now()},
+	}).WithIdempStore(store)
+
+	in := CreateRouteInput{
+		TenantID:       "tenant-1",
+		ProfileCode:    "po",
+		Name:           "PO Route",
+		ActorUserID:    "user-1",
+		IdempotencyKey: "idem-create-1",
+		Stages:         validRouteStages(),
+	}
+
+	first, err := svc.Create(context.Background(), db, in)
+	if err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+	if first.RouteID != "route-replay-1" {
+		t.Fatalf("first RouteID = %q", first.RouteID)
+	}
+	if len(emitter.Events) != 1 {
+		t.Fatalf("first Create: events=%d want 1", len(emitter.Events))
+	}
+
+	second, err := svc.Create(context.Background(), db, in)
+	if err != nil {
+		t.Fatalf("replay Create: %v", err)
+	}
+	if second.RouteID != first.RouteID {
+		t.Fatalf("replay RouteID = %q; want %q", second.RouteID, first.RouteID)
+	}
+	if len(emitter.Events) != 1 {
+		t.Fatalf("replay must not re-run handler: events=%d want 1", len(emitter.Events))
+	}
+}
+
+func TestRouteAdminCreate_IdempotencyKeyConflict(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, createdRouteID: "route-replay-2"}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}).WithIdempStore(store)
+
+	if _, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:       "tenant-1",
+		ProfileCode:    "po",
+		Name:           "PO Route",
+		ActorUserID:    "user-1",
+		IdempotencyKey: "idem-conflict",
+		Stages:         validRouteStages(),
+	}); err != nil {
+		t.Fatalf("first Create: %v", err)
+	}
+
+	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:       "tenant-1",
+		ProfileCode:    "po",
+		Name:           "PO Route — different body",
+		ActorUserID:    "user-1",
+		IdempotencyKey: "idem-conflict",
+		Stages:         validRouteStages(),
+	})
+	if !errors.Is(err, idempotency.ErrConflict) {
+		t.Fatalf("expected idempotency.ErrConflict; got %v", err)
+	}
+}
+
+func TestRouteAdminDeactivate_RejectsEmptyReason(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, routeExists: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		Reason:          "   ",
+		ExpectedVersion: 2,
+	})
+	if !errors.Is(err, ErrRouteDeactivateReasonRequired) {
+		t.Fatalf("expected ErrRouteDeactivateReasonRequired; got %v", err)
+	}
+}
+
+func TestRouteAdminDeactivate_ReasonInGovernancePayload(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, routeExists: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	emitter := &MemoryEmitter{}
+	svc := &RouteAdminService{
+		emitter: emitter,
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+
+	if _, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		Reason:          "policy retired by quality manager",
+		ExpectedVersion: 2,
+	}); err != nil {
+		t.Fatalf("Deactivate: %v", err)
+	}
+	if len(emitter.Events) != 1 {
+		t.Fatalf("events=%d want 1", len(emitter.Events))
+	}
+	ev := emitter.Events[0]
+	if ev.EventType != "route.config.deactivated" {
+		t.Fatalf("event_type = %q", ev.EventType)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(ev.PayloadJSON, &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if payload["reason"] != "policy retired by quality manager" {
+		t.Fatalf("payload.reason = %v; want %q", payload["reason"], "policy retired by quality manager")
+	}
+}
+
+type stubRouteListRepo struct {
+	repository.ApprovalRepository
+	called   bool
+	tenant   string
+	routes   []repository.Route
+	returnTx *sql.Tx
+}
+
+func (s *stubRouteListRepo) ListRoutesTx(_ context.Context, tx *sql.Tx, tenantID string) ([]repository.Route, error) {
+	s.called = true
+	s.tenant = tenantID
+	s.returnTx = tx
+	return s.routes, nil
+}
+
+func TestRouteAdminList_RunsUnderTenantGUC(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	repo := &stubRouteListRepo{routes: []repository.Route{{ID: "r1", TenantID: "tenant-list"}}}
+	svc := &RouteAdminService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	out, err := svc.List(context.Background(), db, "tenant-list", "actor-list")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if !repo.called {
+		t.Fatalf("ListRoutesTx not called")
+	}
+	if repo.tenant != "tenant-list" {
+		t.Fatalf("ListRoutesTx tenant = %q; want tenant-list", repo.tenant)
+	}
+	if conn.capturedTenantGUC != "tenant-list" {
+		t.Fatalf("tenant GUC = %q; want tenant-list (single-tx authz+read)", conn.capturedTenantGUC)
+	}
+	if conn.capturedActorGUC != "actor-list" {
+		t.Fatalf("actor GUC = %q; want actor-list", conn.capturedActorGUC)
+	}
+	if len(out.Routes) != 1 || out.Routes[0].ID != "r1" {
+		t.Fatalf("unexpected routes: %+v", out.Routes)
+	}
+}
+

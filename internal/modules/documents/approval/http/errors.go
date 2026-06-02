@@ -182,7 +182,8 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, application.ErrApprovalBlockedByUnresolvedComments):
 			statusCode = http.StatusConflict
 			code = approvalCodeApprovalUnresolved
-		case errors.Is(err, application.ErrReasonRequired):
+		case errors.Is(err, application.ErrReasonRequired),
+			errors.Is(err, application.ErrRouteDeactivateReasonRequired):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationReasonRequired
 		case errors.Is(err, application.ErrInvalidObsoleteSource):
