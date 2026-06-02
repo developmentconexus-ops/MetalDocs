@@ -63,6 +63,7 @@ const (
 	approvalCodeValidationContentType    problem.Code = "validation.content_type"
 	approvalCodeValidationBodyTooLarge   problem.Code = "validation.body_too_large"
 	approvalCodeValidationRequestInvalid problem.Code = "validation.request_invalid"
+	approvalCodeValidationProfileUnknown problem.Code = "validation.profile_unknown"
 )
 
 type ValidationError struct {
@@ -193,6 +194,11 @@ func MapErrorToResponse(err error) *problem.Problem {
 		case errors.Is(err, application.ErrEffectiveDateInPast):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationRequestInvalid
+		case errors.Is(err, application.ErrRouteProfileUnknown):
+			// FK violation on (tenant_id, profile_code) → the document profile
+			// does not exist for this tenant. Actionable 4xx, never a 500.
+			statusCode = http.StatusUnprocessableEntity
+			code = approvalCodeValidationProfileUnknown
 		case errors.Is(err, application.ErrRouteNotFound):
 			statusCode = http.StatusNotFound
 			code = approvalCodeNotFoundRoute
