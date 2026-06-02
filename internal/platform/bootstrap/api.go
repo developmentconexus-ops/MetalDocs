@@ -37,6 +37,8 @@ type APIDependencies struct {
 	AuthRepo        authdomain.Repository
 	AuditWriter     auditdomain.Writer
 	AuditReader     auditdomain.Reader
+	AuditCounter    auditdomain.Counter
+	AuditExports    auditdomain.ExportJobRepository
 	AuditValidator  auditdomain.IntegrityValidator
 	Publisher       messaging.Publisher
 	GotenbergClient *gotenberg.Client
@@ -105,12 +107,15 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			}
 		}
 		auditStore := auditpg.NewWriter(db)
+		auditExports := auditpg.NewExportJobRepository(db)
 		return APIDependencies{
 			RoleProvider:      iampg.NewRoleProvider(db),
 			RoleAdminRepo:     iampg.NewRoleAdminRepository(db),
 			AuthRepo:          authRepo,
 			AuditWriter:       auditStore,
 			AuditReader:       auditStore,
+			AuditCounter:      auditStore,
+			AuditExports:      auditExports,
 			AuditValidator:    auditStore,
 			Publisher:         outboxpg.NewPublisher(db),
 			GotenbergClient:   gotenbergClient,
@@ -136,12 +141,15 @@ func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg c
 			}
 		}
 		auditStore := auditmemory.NewWriter()
+		auditExports := auditmemory.NewExportJobRepository()
 		return APIDependencies{
 			RoleProvider:    authRepo,
 			RoleAdminRepo:   authRepo,
 			AuthRepo:        authRepo,
 			AuditWriter:     auditStore,
 			AuditReader:     auditStore,
+			AuditCounter:    auditStore,
+			AuditExports:    auditExports,
 			AuditValidator:  auditStore,
 			Publisher:       nooppub.NewPublisher(),
 			GotenbergClient: gotenbergClient,
