@@ -256,6 +256,14 @@ func main() {
 	}
 	iamdelivery.NewMembershipHandler(membershipService).RegisterRoutes(mux)
 
+	// PR-4: People-tab orchestrator. AreaCatalogReader is wired to the
+	// permissive impl pending a dedicated process_areas reader (TODO PR-5):
+	// the Postgres area membership grant path already verifies areaCode via
+	// foreign-key checks, so invalid codes still fail-closed downstream — the
+	// permissive validator just defers the error one layer.
+	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, iamapp.PermissiveAreaCatalog{}, cachedProvider)
+	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
+
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
