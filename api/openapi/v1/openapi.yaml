@@ -4006,11 +4006,15 @@ components:
             $ref: '#/components/schemas/AreaMembership'
     RoleDescriptor:
       type: object
-      required: [code, label, description]
+      required: [code, label, description, category]
       properties:
         code: { $ref: '#/components/schemas/UserRole' }
         label: { type: string }
         description: { type: string }
+        category:
+          type: string
+          enum: [tenant, area]
+          description: tenant — global tenant role; area — granted per process-area membership.
     ListRolesResponse:
       type: object
       required: [items]
