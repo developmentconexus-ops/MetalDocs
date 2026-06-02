@@ -203,6 +203,12 @@ var routeRules = []routeRule{
 	{method: http.MethodPut, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/obsolete", capability: iamdomain.CapControlledDocumentObsolete, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/controlled-documents", pathSuffix: "/supersede", capability: iamdomain.CapControlledDocumentSupersede, visibility: iamdelivery.VisibilityPermissionGuarded},
 
+	// IAM Admin Center "Roles & Capabilities" tab (PR-5). Read-only matrix
+	// endpoints; all gated on CapMembershipView.
+	{method: http.MethodGet, pathExact: "/api/v1/iam/roles", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/iam/capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/iam/role-capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
+
 	// IAM area memberships. F-001 split: GET view (handler self-scopes via
 	// canManageMembershipTarget at routes_memberships.go:172), writes manage.
 	{method: http.MethodGet, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
