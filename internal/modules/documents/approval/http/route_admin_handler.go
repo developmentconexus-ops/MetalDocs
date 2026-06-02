@@ -1,9 +1,7 @@
 package approvalhttp
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -137,11 +135,16 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	reason, err := decodeDeactivateReason(r)
-	if err != nil {
+	var body contracts.DeactivateRouteRequest
+	if err := contracts.Decode(r, &body); err != nil {
 		WriteError(w, err)
 		return
 	}
+	if err := body.Validate(); err != nil {
+		WriteError(w, NewValidationError(err.Error()))
+		return
+	}
+	reason := strings.TrimSpace(body.Reason)
 
 	routeAdminSvc := h.routeAdmin
 	if routeAdminSvc == nil {
@@ -165,32 +168,6 @@ func (h *Handler) DeactivateRouteHandler(w http.ResponseWriter, r *http.Request)
 	WriteJSON(w, http.StatusOK, contracts.RouteResponse{
 		RouteID: result.RouteID,
 	})
-}
-
-func decodeDeactivateReason(r *http.Request) (string, error) {
-	defer func() {
-		if r.Body != nil {
-			_, _ = io.Copy(io.Discard, r.Body)
-			_ = r.Body.Close()
-		}
-	}()
-	if r.ContentLength == 0 && r.Body == nil {
-		return "", application.ErrRouteDeactivateReasonRequired
-	}
-	var body contracts.DeactivateRouteRequest
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&body); err != nil {
-		if errors.Is(err, io.EOF) {
-			return "", application.ErrRouteDeactivateReasonRequired
-		}
-		return "", err
-	}
-	reason := strings.TrimSpace(body.Reason)
-	if reason == "" {
-		return "", application.ErrRouteDeactivateReasonRequired
-	}
-	return reason, nil
 }
 
 func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
@@ -218,9 +195,13 @@ func (h *Handler) ListRoutesHandler(w http.ResponseWriter, r *http.Request) {
 		routes = append(routes, mapListRoute(route))
 	}
 
+	total := len(out.Routes)
+	if len(out.Routes) > 0 {
+		total = out.Routes[0].Total
+	}
 	WriteJSON(w, http.StatusOK, contracts.ListRoutesResponse{
 		Routes: routes,
-		Total:  len(routes),
+		Total:  total,
 	})
 }
 

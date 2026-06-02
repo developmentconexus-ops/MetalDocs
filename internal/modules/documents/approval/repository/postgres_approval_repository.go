@@ -442,7 +442,8 @@ func (r *postgresApprovalRepository) ListRoutesTx(ctx context.Context, tx *sql.T
 
 const listRoutesQuery = `
 		SELECT r.id, r.name, r.tenant_id::text, r.profile_code, r.active, r.version, r.created_at, r.created_at AS updated_at,
-		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift
+		       s.stage_order, s.name, s.required_role, s.required_capability, s.area_code, s.quorum, s.quorum_m, s.on_eligibility_drift,
+		       (SELECT COUNT(*) FROM approval_routes WHERE tenant_id = $1::uuid) AS total_count
 		  FROM approval_routes r
 		  JOIN approval_route_stages s
 		    ON s.route_id = r.id
@@ -463,10 +464,12 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 			stageName, stageRole, stageCapability          sql.NullString
 			stageArea, stageQuorum, stageDrift             sql.NullString
 			stageQuorumM                                   sql.NullInt64
+			totalCount                                     int64
 		)
 		if err := rows.Scan(
 			&routeID, &routeName, &routeTenantID, &profileCode, &active, &version, &createdAt, &updatedAt,
 			&stage.Order, &stageName, &stageRole, &stageCapability, &stageArea, &stageQuorum, &stageQuorumM, &stageDrift,
+			&totalCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan approval route list row: %w", err)
 		}
@@ -483,6 +486,7 @@ func scanRouteListRows(rows *sql.Rows) ([]Route, error) {
 				CreatedAt:   createdAt,
 				UpdatedAt:   updatedAt,
 				Stages:      []RouteStage{},
+				Total:       int(totalCount),
 			}
 			routeMap[routeID] = route
 			routeOrder = append(routeOrder, routeID)

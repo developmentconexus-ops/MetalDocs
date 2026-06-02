@@ -99,6 +99,14 @@ Source: `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md`. U
 - **Linked backlog row:** `backlog/approval-refactor.md#R-011`
 - **Linked ADR:** missing-ADR
 
+### T-014 · Idempotency store wrapper duplication
+- **Severity:** minor
+- **Surface:** `internal/modules/documents/approval/infrastructure/postgres_route_admin_idemp_store.go` and `internal/modules/documents/approval/infrastructure/postgres_signoff_idemp_store.go`
+- **Observation:** ~95% wrapper code is duplicated across the two stores around `internal/platform/idempotency.Store` — `ReplayHandle` adapter, `beginReplay` helper, JSON envelope marshalling. ~80 LOC duplicated. Promote `TypedStore[T any]` generic helper into `internal/platform/idempotency/` when the 3rd module-local store appears (taxonomy admin / cd admin / templates). YAGNI today.
+- **Resolution:** Defer. Revisit at 3rd-store boundary.
+- **Linked backlog row:** n/a
+- **Linked ADR:** [`0017-signoff-idempotency-fingerprint.md`](../decisions/0017-signoff-idempotency-fingerprint.md)
+
 ### T-013 · Signoff content-pin canonicalization drift — CLOSED 2026-06-01
 - **Severity:** critical (closed)
 - **Surface (resolved):** `internal/modules/documents/approval/application/decision_service.go:162-176` — signoff now loads the content hash via the same COALESCE used by `/api/v1/controlled-documents/{cd}/active-document` (`internal/modules/controlleddocuments/delivery/http/routes.go:320-343`): `documents.content_hash_at_submit` with fallback to the latest `document_revisions.content_hash`. Compared against the FE-echoed `content_hash` body field; persisted as `approval_signoffs.content_hash`.
