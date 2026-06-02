@@ -29,7 +29,7 @@ afterAll(() => {
   globalThis.Request = RealRequest;
 });
 
-function makeUser(roles: UserRole[]): CurrentUser {
+function makeUser(capabilities: string[], roles: UserRole[] = ['viewer']): CurrentUser {
   return {
     userId: '1',
     tenantId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
@@ -39,7 +39,7 @@ function makeUser(roles: UserRole[]): CurrentUser {
     displayName: 'U',
     mustChangePassword: false,
     roles,
-    capabilities: [],
+    capabilities,
   };
 }
 
@@ -54,7 +54,17 @@ function renderAt(path: string) {
           {
             path: 'admin',
             element: <div>Admin Page</div>,
-            handle: { requiresAdmin: true },
+            handle: { requiresCapability: 'user.view' },
+          },
+          {
+            path: 'admin/memberships',
+            element: <div>Memberships Page</div>,
+            handle: { requiresCapability: 'membership.view' },
+          },
+          {
+            path: 'multi',
+            element: <div>Multi Page</div>,
+            handle: { requiresAnyCapability: ['taxonomy.view', 'taxonomy.manage'] },
           },
         ],
       },
@@ -64,26 +74,52 @@ function renderAt(path: string) {
   return render(<RouterProvider router={router} />);
 }
 
-describe('AppShell admin route guard', () => {
+describe('AppShell capability route guard', () => {
   beforeEach(() => {
     useAuthStore.setState({ authState: 'ready' });
   });
 
-  it('renders an admin route for a system_admin user', () => {
-    useAuthStore.setState({ user: makeUser(['system_admin']) });
+  it('renders /admin when user holds user.view', () => {
+    useAuthStore.setState({ user: makeUser(['user.view']) });
     renderAt('/admin');
     expect(screen.getByText('Admin Page')).toBeTruthy();
   });
 
-  it('redirects a non-admin away from an admin route', async () => {
-    useAuthStore.setState({ user: makeUser(['viewer']) });
+  it('redirects /admin to root when capability missing', async () => {
+    useAuthStore.setState({ user: makeUser([]) });
     renderAt('/admin');
     await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy());
     expect(screen.queryByText('Admin Page')).toBeNull();
   });
 
-  it('renders a non-admin route for a non-admin user', () => {
-    useAuthStore.setState({ user: makeUser(['viewer']) });
+  it('redirects /admin/memberships when only user.view granted', async () => {
+    useAuthStore.setState({ user: makeUser(['user.view']) });
+    renderAt('/admin/memberships');
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy());
+    expect(screen.queryByText('Memberships Page')).toBeNull();
+  });
+
+  it('renders /admin/memberships when membership.view granted', () => {
+    useAuthStore.setState({ user: makeUser(['membership.view']) });
+    renderAt('/admin/memberships');
+    expect(screen.getByText('Memberships Page')).toBeTruthy();
+  });
+
+  it('renders multi-cap route when any required cap is held', () => {
+    useAuthStore.setState({ user: makeUser(['taxonomy.manage']) });
+    renderAt('/multi');
+    expect(screen.getByText('Multi Page')).toBeTruthy();
+  });
+
+  it('redirects multi-cap route when none of the required caps held', async () => {
+    useAuthStore.setState({ user: makeUser(['user.view']) });
+    renderAt('/multi');
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy());
+    expect(screen.queryByText('Multi Page')).toBeNull();
+  });
+
+  it('renders ungated routes regardless of capabilities', () => {
+    useAuthStore.setState({ user: makeUser([]) });
     renderAt('/');
     expect(screen.getByText('Dashboard')).toBeTruthy();
   });
