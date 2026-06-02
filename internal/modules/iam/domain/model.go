@@ -13,6 +13,9 @@ const (
 	RoleEditor      Role = "editor"
 	RoleSystemAdmin Role = "system_admin"
 	RoleViewer      Role = "viewer"
+	RoleSigner      Role = "signer"
+	RoleAreaAdmin   Role = "area_admin"
+	RoleQmsAdmin    Role = "qms_admin"
 )
 
 var validRoles = map[Role]struct{}{
@@ -21,6 +24,9 @@ var validRoles = map[Role]struct{}{
 	RoleEditor:      {},
 	RoleSystemAdmin: {},
 	RoleViewer:      {},
+	RoleSigner:      {},
+	RoleAreaAdmin:   {},
+	RoleQmsAdmin:    {},
 }
 
 func IsValidRole(role Role) bool {
