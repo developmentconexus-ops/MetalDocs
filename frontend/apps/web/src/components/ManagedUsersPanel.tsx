@@ -69,15 +69,29 @@ function toInitials(value: string) {
   return [first?.[0], second?.[0]].filter(Boolean).join("").toUpperCase();
 }
 
+const ROLE_LABELS: Record<UserRole, string> = {
+  system_admin: "System Admin",
+  approver: "Approver",
+  author: "Author",
+  editor: "Editor",
+  viewer: "Viewer",
+  signer: "Signer",
+  area_admin: "Area Admin",
+  qms_admin: "QMS Admin",
+  admin: "Admin",
+  reviewer: "Reviewer",
+};
+
 function roleLabel(role?: UserRole) {
-  const match = PROFILE_OPTIONS.find((option) => option.value === role);
-  return match?.label ?? "Viewer";
+  if (!role) return "Viewer";
+  return ROLE_LABELS[role] ?? role;
 }
 
 function roleChipClass(role?: UserRole) {
   if (role === "system_admin") return `${styles.roleChip} ${styles.roleChipAdmin}`;
   if (role === "editor") return `${styles.roleChip} ${styles.roleChipEditor}`;
   if (role === "approver") return `${styles.roleChip} ${styles.roleChipReviewer}`;
+  if (role === "author") return `${styles.roleChip} ${styles.roleChipReviewer}`;
   return `${styles.roleChip} ${styles.roleChipViewer}`;
 }
 

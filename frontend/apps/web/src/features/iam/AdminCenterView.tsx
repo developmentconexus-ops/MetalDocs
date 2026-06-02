@@ -52,7 +52,10 @@ export function AdminCenterView() {
 
   const activityLabel = (action: string) => {
     const lower = action.toLowerCase();
+    if (lower.includes("logout")) return "LOGOUT";
     if (lower.includes("login")) return "LOGIN";
+    if (lower.includes("session")) return "SESSAO";
+    if (lower.includes("publish") || lower.includes("public")) return "PUBLICAR";
     if (lower.includes("create") || lower.includes("criad")) return "CRIAR";
     if (lower.includes("approve") || lower.includes("aprov")) return "APROVAR";
     if (lower.includes("edit") || lower.includes("update") || lower.includes("atual")) return "EDICAO";
@@ -61,7 +64,10 @@ export function AdminCenterView() {
 
   const activityVariant = (action: string) => {
     const lower = action.toLowerCase();
+    if (lower.includes("logout")) return "login";
     if (lower.includes("login")) return "login";
+    if (lower.includes("session")) return "default";
+    if (lower.includes("publish") || lower.includes("public")) return "approve";
     if (lower.includes("create") || lower.includes("criad")) return "create";
     if (lower.includes("approve") || lower.includes("aprov")) return "approve";
     if (lower.includes("edit") || lower.includes("update") || lower.includes("atual")) return "edit";
