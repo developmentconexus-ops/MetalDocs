@@ -51,6 +51,7 @@ import (
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	iampresence "metaldocs/internal/modules/iam/presence"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
@@ -285,6 +286,23 @@ func main() {
 	}
 	if observabilityHandler != nil {
 		observabilityHandler.RegisterRoutes(mux)
+	}
+
+	// PR-9: presence hub + WebSocket stream + HTTP snapshot fallback.
+	// Backed by metaldocs.iam_users.last_seen_at (migration 0220). The
+	// hub.Run + hub.RunHeartbeat goroutines tick every 15s / 30s; they
+	// exit when ctx is cancelled. The bump middleware is wrapped into
+	// the outer chain below so authenticated requests refresh the
+	// caller's last_seen_at (debounced 60s per user).
+	var presenceBump *iampresence.BumpMiddleware
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		presenceRepo := iampresence.NewPostgresRepository(sqlDB)
+		presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
+		go presenceHub.Run(ctx)
+		go presenceHub.RunHeartbeat(ctx)
+		iampresence.NewHandler(presenceHub, presenceRepo, slog.Default()).RegisterRoutes(mux)
+		presenceBump = iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
+		iamAdminHandler.WithPresenceReader(presenceRepo)
 	}
 
 	taxonomyModule := buildTaxonomyModule(deps)
@@ -555,7 +573,14 @@ func main() {
 		}()
 	}
 
-	handler := cors.Wrap(originProtection.Wrap(authMiddleware.Wrap(iamMiddleware.Wrap(httpObs.Wrap(rateLimiter.Wrap(mux))))))
+	// PR-9: presenceBump sits AFTER iamMiddleware (so iamdomain.UserID
+	// is in ctx) and wraps the inner stack so authenticated requests
+	// bump iam_users.last_seen_at (debounced 60s per user).
+	var presenceWrapped http.Handler = httpObs.Wrap(rateLimiter.Wrap(mux))
+	if presenceBump != nil {
+		presenceWrapped = presenceBump.Wrap(presenceWrapped)
+	}
+	handler := cors.Wrap(originProtection.Wrap(authMiddleware.Wrap(iamMiddleware.Wrap(presenceWrapped))))
 
 	addr := ":8080"
 	if appPort := os.Getenv("APP_PORT"); appPort != "" {
