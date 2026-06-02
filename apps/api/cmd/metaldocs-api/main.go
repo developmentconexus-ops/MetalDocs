@@ -42,6 +42,7 @@ import (
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
 	authapp "metaldocs/internal/modules/auth/application"
 	authdelivery "metaldocs/internal/modules/auth/delivery/http"
+	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
 	controlleddocumentsapp "metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
@@ -54,6 +55,9 @@ import (
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
 	searchdelivery "metaldocs/internal/modules/search/delivery/http"
+	securityapp "metaldocs/internal/modules/security/application"
+	securitydelivery "metaldocs/internal/modules/security/delivery/http"
+	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	searchdocs "metaldocs/internal/modules/search/infrastructure/v2documents"
 	"metaldocs/internal/modules/taxonomy"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
@@ -230,6 +234,21 @@ func main() {
 	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider)
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
 		WithAuditReader(deps.AuditReader)
+
+	// PR-7 Sessions & Security tab. The session handler depends on the
+	// concrete *authpg.Repository for the iam_users JOIN it needs to derive
+	// SessionItem.displayName; memory/dev mode falls through to 501 so the
+	// in-memory auth path doesn't have to approximate the JOIN.
+	var sessionsHandler *iamdelivery.SessionsHandler
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		sessionsHandler = iamdelivery.NewSessionsHandler(authpg.NewRepository(sqlDB), deps.AuditWriter)
+	}
+	var securityHandler *securitydelivery.Handler
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		securityHandler = securitydelivery.NewHandler(securityapp.NewService(securitypg.NewRepository(sqlDB)))
+	} else {
+		securityHandler = securitydelivery.NewHandler(nil)
+	}
 	featureFlagsHandler := featureflags.NewHandler(featureFlagsCfg)
 	httpObs := observability.NewHTTPObservability(deps.StatusProvider)
 	rateLimiter := security.NewRateLimiter(rateCfg)
@@ -242,6 +261,12 @@ func main() {
 	auditHandler.RegisterRoutes(mux)
 	searchHandler.RegisterRoutes(mux)
 	iamAdminHandler.RegisterRoutes(mux)
+	if sessionsHandler != nil {
+		sessionsHandler.RegisterRoutes(mux)
+	}
+	if securityHandler != nil {
+		securityHandler.RegisterRoutes(mux)
+	}
 
 	taxonomyModule := buildTaxonomyModule(deps)
 	taxonomyModule.RegisterRoutes(mux)
