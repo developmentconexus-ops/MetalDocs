@@ -55,15 +55,15 @@ func (h *Handler) CancelDocumentApproval(w http.ResponseWriter, r *http.Request,
 	h.CancelByDocumentHandler(w, r)
 }
 
-func (h *Handler) CreateApprovalRoute(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateApprovalRoute(w http.ResponseWriter, r *http.Request, params approvalapi.CreateApprovalRouteParams) {
 	h.CreateRouteHandler(w, r)
 }
 
-func (h *Handler) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.UpdateApprovalRouteParams) {
 	h.UpdateRouteHandler(w, r)
 }
 
-func (h *Handler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (h *Handler) DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params approvalapi.DeactivateApprovalRouteParams) {
 	h.DeactivateRouteHandler(w, r)
 }
 
