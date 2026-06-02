@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"reflect"
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/domain"
@@ -118,7 +120,14 @@ func (s *RouteAdminService) Create(ctx context.Context, db *sql.DB, in CreateRou
 	result, err := s.createTx(ctx, db, in)
 	if err != nil {
 		if committer != nil {
-			_ = committer.Fail(err)
+			if ferr := committer.Fail(err); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", err,
+					"fail_err", ferr,
+				)
+			}
 		}
 		return CreateRouteResult{}, wrapRouteAdminErr(op, err)
 	}
@@ -231,7 +240,14 @@ func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRou
 	result, err := s.updateTx(ctx, db, in)
 	if err != nil {
 		if committer != nil {
-			_ = committer.Fail(err)
+			if ferr := committer.Fail(err); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", err,
+					"fail_err", ferr,
+				)
+			}
 		}
 		return UpdateRouteResult{}, wrapRouteAdminErr(op, err)
 	}
@@ -264,6 +280,13 @@ func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateR
 		_ = tx.Rollback()
 		return UpdateRouteResult{}, err
 	}
+
+	currentStages, err := loadRouteStagesTx(ctx, tx, in.RouteID)
+	if err != nil {
+		_ = tx.Rollback()
+		return UpdateRouteResult{}, err
+	}
+	stagesChanged := !stagesEqual(currentStages, in.Stages)
 
 	route := domain.Route{
 		ID:       in.RouteID,
@@ -298,18 +321,20 @@ func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateR
 		return UpdateRouteResult{}, fmt.Errorf("update route: %w", mapped)
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM approval_route_stages
-		WHERE route_id = $1`,
-		in.RouteID,
-	); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, fmt.Errorf("delete stages: %w", err)
-	}
+	if stagesChanged {
+		if _, err := tx.ExecContext(ctx, `
+			DELETE FROM approval_route_stages
+			WHERE route_id = $1`,
+			in.RouteID,
+		); err != nil {
+			_ = tx.Rollback()
+			return UpdateRouteResult{}, fmt.Errorf("delete stages: %w", err)
+		}
 
-	if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, err
+		if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
+			_ = tx.Rollback()
+			return UpdateRouteResult{}, err
+		}
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -345,9 +370,6 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 	const op = "deactivate"
 
 	reason := strings.TrimSpace(in.Reason)
-	if reason == "" {
-		return DeactivateRouteResult{}, ErrRouteDeactivateReasonRequired
-	}
 	in.Reason = reason
 
 	var (
@@ -366,10 +388,31 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 		}
 	}
 
+	if reason == "" {
+		if committer != nil {
+			if ferr := committer.Fail(ErrRouteDeactivateReasonRequired); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", ErrRouteDeactivateReasonRequired,
+					"fail_err", ferr,
+				)
+			}
+		}
+		return DeactivateRouteResult{}, ErrRouteDeactivateReasonRequired
+	}
+
 	result, err := s.deactivateTx(ctx, db, in)
 	if err != nil {
 		if committer != nil {
-			_ = committer.Fail(err)
+			if ferr := committer.Fail(err); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", err,
+					"fail_err", ferr,
+				)
+			}
 		}
 		return DeactivateRouteResult{}, wrapRouteAdminErr(op, err)
 	}
@@ -550,11 +593,19 @@ func lockRouteForUpdate(ctx context.Context, tx *sql.Tx, tenantID, routeID strin
 }
 
 func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages []domain.Stage) error {
-	for _, st := range stages {
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO approval_route_stages
-				(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+	if len(stages) == 0 {
+		return nil
+	}
+	const colsPerRow = 9
+	placeholders := make([]string, 0, len(stages))
+	args := make([]any, 0, len(stages)*colsPerRow)
+	for i, st := range stages {
+		base := i*colsPerRow + 1
+		placeholders = append(placeholders, fmt.Sprintf(
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base, base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8,
+		))
+		args = append(args,
 			routeID,
 			st.Order,
 			st.Name,
@@ -564,9 +615,52 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 			st.Quorum,
 			st.QuorumM,
 			st.OnEligibilityDrift,
-		); err != nil {
-			return fmt.Errorf("route_admin: insert stage %d: %w", st.Order, repository.MapPgError(err, repository.MapHints{}))
-		}
+		)
+	}
+	query := `
+		INSERT INTO approval_route_stages
+			(route_id, stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift)
+		VALUES ` + strings.Join(placeholders, ",")
+	if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("route_admin: insert stages: %w", repository.MapPgError(err, repository.MapHints{}))
 	}
 	return nil
+}
+
+func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domain.Stage, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift
+		  FROM approval_route_stages
+		 WHERE route_id = $1
+		 ORDER BY stage_order ASC`,
+		routeID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("route_admin: load stages: %w", repository.MapPgError(err, repository.MapHints{}))
+	}
+	defer rows.Close()
+
+	var out []domain.Stage
+	for rows.Next() {
+		var (
+			st      domain.Stage
+			quorumM sql.NullInt64
+		)
+		if err := rows.Scan(&st.Order, &st.Name, &st.RequiredRole, &st.RequiredCapability, &st.AreaCode, &st.Quorum, &quorumM, &st.OnEligibilityDrift); err != nil {
+			return nil, fmt.Errorf("route_admin: scan stage: %w", err)
+		}
+		if quorumM.Valid {
+			m := int(quorumM.Int64)
+			st.QuorumM = &m
+		}
+		out = append(out, st)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("route_admin: iterate stages: %w", err)
+	}
+	return out, nil
+}
+
+func stagesEqual(a, b []domain.Stage) bool {
+	return reflect.DeepEqual(a, b)
 }

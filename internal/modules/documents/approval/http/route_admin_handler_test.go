@@ -372,6 +372,88 @@ func TestDeactivateRoute_RejectsEmptyReason(t *testing.T) {
 	}
 }
 
+func TestDeactivateRoute_BodyTooLargeReturns413(t *testing.T) {
+	svc := &fakeRouteAdminService{}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	huge := strings.Repeat("a", 70*1024)
+	body := `{"reason":"` + huge + `"}`
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("If-Match", "\"v3\"")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestDeactivateRoute_WrongContentTypeReturns415(t *testing.T) {
+	svc := &fakeRouteAdminService{}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", strings.NewReader(`reason=foo`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("If-Match", "\"v3\"")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnsupportedMediaType)
+	}
+}
+
+func TestDeactivateRoute_EmptyBodyReturns400(t *testing.T) {
+	svc := &fakeRouteAdminService{}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", strings.NewReader(""))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("If-Match", "\"v3\"")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+func TestDeactivateRoute_UnknownFieldReturns400(t *testing.T) {
+	svc := &fakeRouteAdminService{}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/approval/routes/route-1", strings.NewReader(`{"reason":"x","bogus":1}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req.Header.Set("If-Match", "\"v3\"")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
 func TestListRoutes_PassesTenantAndActor(t *testing.T) {
 	svc := &fakeRouteAdminService{
 		listResult: application.ListRoutesResult{},
@@ -449,5 +531,33 @@ func TestUpdateRoute_RejectsIfMatchV0(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+func TestListRoutes_TotalReflectsRepoCount(t *testing.T) {
+	svc := &fakeRouteAdminService{
+		listResult: application.ListRoutesResult{Routes: []repository.Route{
+			{ID: "r1", Total: 42},
+		}},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/routes", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-7"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-7", []iamdomain.Role{}))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	var out contracts.ListRoutesResponse
+	if err := json.NewDecoder(rr.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Total != 42 {
+		t.Fatalf("total = %d; want 42", out.Total)
 	}
 }

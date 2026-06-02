@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	approvalapi "metaldocs/internal/modules/documents/approval/api"
 	"metaldocs/internal/modules/documents/approval/application"
@@ -205,6 +206,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationJSONDecode
 		case errors.Is(err, io.ErrUnexpectedEOF):
+			statusCode = http.StatusBadRequest
+			code = approvalCodeValidationJSONDecode
+		case err != nil && strings.HasPrefix(err.Error(), "json: unknown field"):
 			statusCode = http.StatusBadRequest
 			code = approvalCodeValidationJSONDecode
 		case errors.As(err, &typeErr):

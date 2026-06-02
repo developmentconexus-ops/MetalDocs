@@ -1,6 +1,7 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -46,6 +48,25 @@ func (r routeAdminEmptyRows) Columns() []string         { return r.cols }
 func (r routeAdminEmptyRows) Close() error              { return nil }
 func (r routeAdminEmptyRows) Next([]driver.Value) error { return io.EOF }
 
+type routeAdminMultiRows struct {
+	cols   []string
+	values [][]driver.Value
+	idx    int
+}
+
+func (r *routeAdminMultiRows) Columns() []string { return r.cols }
+func (r *routeAdminMultiRows) Close() error      { return nil }
+func (r *routeAdminMultiRows) Next(dest []driver.Value) error {
+	if r.idx >= len(r.values) {
+		return io.EOF
+	}
+	for i, v := range r.values[r.idx] {
+		dest[i] = v
+	}
+	r.idx++
+	return nil
+}
+
 type routeAdminResult struct{ rowsAffected int64 }
 
 func (r routeAdminResult) LastInsertId() (int64, error) { return 0, nil }
@@ -79,6 +100,15 @@ func (s *routeAdminStmt) Exec(args []driver.Value) (driver.Result, error) {
 		if s.conn.deactivateNoRows {
 			return routeAdminResult{rowsAffected: 0}, nil
 		}
+		return routeAdminResult{rowsAffected: 1}, nil
+	}
+	if strings.Contains(lower, "insert into approval_route_stages") {
+		s.conn.stageInsertExecCount++
+		s.conn.stageInsertArgCount = len(args)
+		return routeAdminResult{rowsAffected: int64(len(args) / 9)}, nil
+	}
+	if strings.Contains(lower, "delete from approval_route_stages") {
+		s.conn.stageDeleteExecCount++
 		return routeAdminResult{rowsAffected: 1}, nil
 	}
 	return routeAdminResult{rowsAffected: 1}, nil
@@ -146,6 +176,23 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 			values: []driver.Value{int64(s.conn.newVersion)},
 		}, nil
 	}
+	if strings.Contains(lower, "from approval_route_stages") && strings.Contains(lower, "select") {
+		stages := s.conn.stageLoadStages
+		rows := &routeAdminMultiRows{
+			cols:   []string{"stage_order", "name", "required_role", "required_capability", "area_code", "quorum", "quorum_m", "on_eligibility_drift"},
+			values: make([][]driver.Value, 0, len(stages)),
+		}
+		for _, st := range stages {
+			var qm driver.Value
+			if st.QuorumM != nil {
+				qm = int64(*st.QuorumM)
+			} else {
+				qm = nil
+			}
+			rows.values = append(rows.values, []driver.Value{int64(st.Order), st.Name, st.RequiredRole, st.RequiredCapability, st.AreaCode, string(st.Quorum), qm, string(st.OnEligibilityDrift)})
+		}
+		return rows, nil
+	}
 	return routeAdminEmptyRows{cols: []string{"v"}}, nil
 }
 
@@ -166,6 +213,10 @@ type routeAdminConn struct {
 	deactivateNoRows    bool
 	capturedTenantGUC   string
 	capturedActorGUC    string
+	stageInsertExecCount int
+	stageInsertArgCount  int
+	stageLoadStages      []domain.Stage
+	stageDeleteExecCount int
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -497,6 +548,7 @@ type memoryRouteAdminSlot struct {
 	hash    string
 	replay  *RouteAdminReplay
 	pending bool
+	failErr error
 }
 
 type memoryRouteAdminCommitter struct {
@@ -512,6 +564,9 @@ func (c *memoryRouteAdminCommitter) Complete(routeID string, newVersion *int) er
 func (c *memoryRouteAdminCommitter) Fail(_ error) error {
 	c.slot.pending = false
 	c.slot.replay = nil
+	if c.slot.failErr != nil {
+		return c.slot.failErr
+	}
 	return nil
 }
 
@@ -739,3 +794,221 @@ func TestRouteAdminList_RunsUnderTenantGUC(t *testing.T) {
 	}
 }
 
+func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+
+	stages := []domain.Stage{
+		{Order: 1, Name: "s1", RequiredRole: "r1", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAny1Of, OnEligibilityDrift: domain.DriftReduceQuorum},
+		{Order: 2, Name: "s2", RequiredRole: "r2", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
+		{Order: 3, Name: "s3", RequiredRole: "r3", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
+	}
+	if _, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO",
+		ActorUserID: "user-1",
+		Stages:      stages,
+	}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if conn.stageInsertExecCount != 1 {
+		t.Fatalf("stage insert exec count = %d; want 1 (batched)", conn.stageInsertExecCount)
+	}
+	if conn.stageInsertArgCount != 27 {
+		t.Fatalf("stage insert arg count = %d; want 27 (3 stages * 9 cols)", conn.stageInsertArgCount)
+	}
+}
+
+func TestRouteAdminUpdate_NoOpStages_SkipsDelete(t *testing.T) {
+	stages := validRouteStages()
+	conn := &routeAdminConn{
+		authzGranted:    true,
+		routeExists:     true,
+		newVersion:      3,
+		stageLoadStages: stages,
+	}
+	db := newRouteAdminTestDB(t, conn)
+
+	emitter := &MemoryEmitter{}
+	svc := &RouteAdminService{
+		emitter: emitter,
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+
+	out, err := svc.Update(context.Background(), db, UpdateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		Name:            "Same Name Different Update",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 2,
+		Stages:          stages,
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if out.NewVersion != 3 {
+		t.Fatalf("NewVersion = %d; want 3 (version still bumps on no-op stage)", out.NewVersion)
+	}
+	if conn.stageDeleteExecCount != 0 {
+		t.Fatalf("stage DELETE exec count = %d; want 0 (no-op skip)", conn.stageDeleteExecCount)
+	}
+	if conn.stageInsertExecCount != 0 {
+		t.Fatalf("stage INSERT exec count = %d; want 0 (no-op skip)", conn.stageInsertExecCount)
+	}
+	if len(emitter.Events) != 1 || emitter.Events[0].EventType != "route.config.updated" {
+		t.Fatalf("expected route.config.updated event; got %v", emitter.Events)
+	}
+}
+
+func TestRouteAdminDeactivate_ReplayBeforeReasonValidation(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, routeExists: true}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}).WithIdempStore(store)
+
+	// Pre-seed a completed replay slot under the empty-reason hash.
+	emptyReasonHash := computeDeactivateRoutePayloadHash("route-1", 2, "")
+	k := memoryIdempKey("tenant-1", "user-1", "idem-replay-empty")
+	store.deactivate[k] = &memoryRouteAdminSlot{
+		hash:   emptyReasonHash,
+		replay: &RouteAdminReplay{RouteID: "route-1"},
+	}
+
+	out, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		IdempotencyKey:  "idem-replay-empty",
+		Reason:          "", // empty: would fail validation if checked before replay
+		ExpectedVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("expected replay to succeed despite empty reason; got %v", err)
+	}
+	if out.RouteID != "route-1" {
+		t.Fatalf("RouteID = %q; want route-1 (from cached replay)", out.RouteID)
+	}
+}
+
+func TestRouteAdminDeactivate_FirstCallEmptyReason_Returns400(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, routeExists: true}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}).WithIdempStore(store)
+
+	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		IdempotencyKey:  "idem-empty-first",
+		Reason:          "   ",
+		ExpectedVersion: 2,
+	})
+	if !errors.Is(err, ErrRouteDeactivateReasonRequired) {
+		t.Fatalf("expected ErrRouteDeactivateReasonRequired; got %v", err)
+	}
+	// Slot must be released (Fail called → replay nil, pending false).
+	k := memoryIdempKey("tenant-1", "user-1", "idem-empty-first")
+	slot, ok := store.deactivate[k]
+	if !ok {
+		t.Fatalf("slot missing")
+	}
+	if slot.pending {
+		t.Fatalf("slot still pending; expected Fail() to clear it")
+	}
+	if slot.replay != nil {
+		t.Fatalf("slot replay should be nil after Fail; got %+v", slot.replay)
+	}
+}
+
+func TestRouteAdminCreate_LogsCommitterFailError(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: false}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	// Pre-create the slot so we can wire failErr.
+	failErr := errors.New("simulated fail-replay failure")
+	k := memoryIdempKey("tenant-1", "user-1", "idem-fail-log")
+	store.create[k] = &memoryRouteAdminSlot{
+		hash:    computeCreateRoutePayloadHash("po", "PO Route", validRouteStages()),
+		pending: false,
+		failErr: failErr,
+	}
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}).WithIdempStore(store)
+
+	// Swap slog default to capture.
+	var buf bytes.Buffer
+	oldDefault := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(oldDefault) })
+
+	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:       "tenant-1",
+		ProfileCode:    "po",
+		Name:           "PO Route",
+		ActorUserID:    "user-1",
+		IdempotencyKey: "idem-fail-log",
+		Stages:         validRouteStages(),
+	})
+	if err == nil {
+		t.Fatalf("Create expected to fail on cap denial")
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "committer.Fail failed") {
+		t.Fatalf("expected log entry; got: %s", out)
+	}
+	if !strings.Contains(out, "fail_err=") {
+		t.Fatalf("expected fail_err attribute in log; got: %s", out)
+	}
+	if !strings.Contains(out, "op=create") {
+		t.Fatalf("expected op=create in log; got: %s", out)
+	}
+}
+
+func TestRouteAdminList_PassesThroughTotalFromRepo(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true}
+	db := newRouteAdminTestDB(t, conn)
+
+	repo := &stubRouteListRepo{
+		routes: []repository.Route{
+			{ID: "r1", TenantID: "tenant-list", Total: 3},
+			{ID: "r2", TenantID: "tenant-list", Total: 3},
+			{ID: "r3", TenantID: "tenant-list", Total: 3},
+		},
+	}
+	svc := &RouteAdminService{
+		repo:    repo,
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+
+	out, err := svc.List(context.Background(), db, "tenant-list", "actor-list")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(out.Routes) != 3 {
+		t.Fatalf("routes len = %d; want 3", len(out.Routes))
+	}
+	if out.Routes[0].Total != 3 {
+		t.Fatalf("Total = %d; want 3", out.Routes[0].Total)
+	}
+}

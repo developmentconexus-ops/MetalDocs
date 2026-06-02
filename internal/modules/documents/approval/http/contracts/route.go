@@ -3,6 +3,7 @@ package contracts
 import (
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 type QuorumKind string
@@ -204,4 +205,11 @@ type ListRoutesResponse struct {
 
 type DeactivateRouteRequest struct {
 	Reason string `json:"reason"`
+}
+
+func (r DeactivateRouteRequest) Validate() error {
+	if err := validateRequired("reason", strings.TrimSpace(r.Reason)); err != nil {
+		return wrapValidation(err)
+	}
+	return nil
 }
