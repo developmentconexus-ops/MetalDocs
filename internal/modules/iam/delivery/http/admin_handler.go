@@ -17,6 +17,7 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
+	iampresence "metaldocs/internal/modules/iam/presence"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/problem"
 	"metaldocs/internal/platform/tenant"
@@ -45,12 +46,22 @@ type KpiReader interface {
 	GetKpi(ctx context.Context, tenantID string) (iamdomain.KpiSnapshot, error)
 }
 
+// PresenceReader is the narrow port the overview uses to fold real-time
+// presence into its composed response. Implemented by
+// *iampresence.PostgresRepository (PR-9). When wired, replaces the legacy
+// 10-minute auth_sessions polling fallback derived from
+// authService.ListOnlineUsers.
+type PresenceReader interface {
+	Snapshot(ctx context.Context, tenantID string, now time.Time) ([]iampresence.Item, error)
+}
+
 type AdminHandler struct {
 	service     *iamapp.AdminService
 	authService UserAdminService
 	audit       auditdomain.Writer
 	auditEvents AuditEventLister
 	kpi         KpiReader
+	presence    PresenceReader
 }
 
 type UpsertUserRoleRequest struct {
@@ -87,6 +98,15 @@ func (h *AdminHandler) WithAuditEventLister(events AuditEventLister) *AdminHandl
 // retyped in PR-3 to carry { kpi, presence, recentActivities }.
 func (h *AdminHandler) WithObservabilityService(svc KpiReader) *AdminHandler {
 	h.kpi = svc
+	return h
+}
+
+// WithPresenceReader wires the real-time presence reader (PR-9). When
+// set, the overview composes presence from iam_users.last_seen_at via
+// this reader instead of the 10-minute auth_sessions window derived
+// from authService.ListOnlineUsers.
+func (h *AdminHandler) WithPresenceReader(r PresenceReader) *AdminHandler {
+	h.presence = r
 	return h
 }
 
@@ -146,9 +166,10 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	activeSince := now.Add(-10 * time.Minute)
 
 	var (
-		kpiSnapshot  iamdomain.KpiSnapshot
-		onlineUsers  []authdomain.OnlineUser
-		recentEvents []auditdomain.Event
+		kpiSnapshot   iamdomain.KpiSnapshot
+		onlineUsers   []authdomain.OnlineUser
+		presenceItems []iampresence.Item
+		recentEvents  []auditdomain.Event
 	)
 
 	g, gctx := errgroup.WithContext(r.Context())
@@ -166,6 +187,17 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 	})
 
 	g.Go(func() error {
+		// PR-9: prefer iam_users.last_seen_at via PresenceReader when
+		// wired; falls back to the legacy 10-minute auth_sessions
+		// window in dev / in-memory mode.
+		if h.presence != nil {
+			items, err := h.presence.Snapshot(gctx, tenantID, now)
+			if err != nil {
+				return err
+			}
+			presenceItems = items
+			return nil
+		}
 		items, err := h.authService.ListOnlineUsers(gctx, tenantID, activeSince)
 		if err != nil {
 			return err
@@ -192,14 +224,25 @@ func (h *AdminHandler) handleAdminOverview(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	presenceOut := make([]map[string]any, 0, len(onlineUsers))
-	for _, item := range onlineUsers {
-		presenceOut = append(presenceOut, map[string]any{
-			"userId":      item.UserID,
-			"username":    item.Username,
-			"displayName": item.DisplayName,
-			"lastSeenAt":  item.LastSeenAt.UTC().Format(time.RFC3339),
-		})
+	presenceOut := make([]map[string]any, 0, len(onlineUsers)+len(presenceItems))
+	if h.presence != nil {
+		for _, item := range presenceItems {
+			presenceOut = append(presenceOut, map[string]any{
+				"userId":      item.UserID,
+				"displayName": item.DisplayName,
+				"lastSeenAt":  item.LastSeenAt.UTC().Format(time.RFC3339),
+				"status":      string(item.Status),
+			})
+		}
+	} else {
+		for _, item := range onlineUsers {
+			presenceOut = append(presenceOut, map[string]any{
+				"userId":      item.UserID,
+				"username":    item.Username,
+				"displayName": item.DisplayName,
+				"lastSeenAt":  item.LastSeenAt.UTC().Format(time.RFC3339),
+			})
+		}
 	}
 	eventOut := make([]map[string]any, 0, len(recentEvents))
 	for _, item := range recentEvents {
