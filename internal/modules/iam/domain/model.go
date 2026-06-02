@@ -68,6 +68,7 @@ const (
 	CapUserManage                  Capability = "user.manage"
 	CapMetricsView                 Capability = "metrics.view"
 	CapAuditRead                   Capability = "audit.read"
+	CapSessionManage               Capability = "session.manage"
 )
 
 var validCapabilities = map[Capability]struct{}{
@@ -98,6 +99,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapUserManage:                  {},
 	CapMetricsView:                 {},
 	CapAuditRead:                   {},
+	CapSessionManage:               {},
 }
 
 func IsValidCapability(cap Capability) bool {
