@@ -1,7 +1,20 @@
 import type { AdminOverviewResponse, AuditEventItem, ManagedUserItem, OnlineUserItem, UserRole } from "../../../lib/types";
 import { request } from "../../../lib/api/client";
 
-const allowedRoles = new Set<UserRole>(["admin", "editor", "reviewer", "viewer"]);
+// Canonical role catalogue mirrors `internal/modules/iam/domain/model.go` (5 tenant roles + 3 area-only).
+// MUST stay in sync with the backend role enum — see wiki/modules/iam.md §5.2 "domain/model.go" and
+// wiki/decisions/0018-approval-route-lifecycle.md §"IAM roles source" (proposed GET /api/v1/iam/roles
+// endpoint that would obviate this hardcoded list).
+const allowedRoles = new Set<UserRole>([
+  "system_admin",
+  "approver",
+  "author",
+  "editor",
+  "viewer",
+  "signer",
+  "area_admin",
+  "qms_admin",
+]);
 
 function normalizeRoles(value: unknown): UserRole[] {
   if (!Array.isArray(value)) {
