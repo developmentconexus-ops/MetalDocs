@@ -46,6 +46,25 @@ func (r routeAdminEmptyRows) Columns() []string         { return r.cols }
 func (r routeAdminEmptyRows) Close() error              { return nil }
 func (r routeAdminEmptyRows) Next([]driver.Value) error { return io.EOF }
 
+type routeAdminMultiRows struct {
+	cols   []string
+	values [][]driver.Value
+	idx    int
+}
+
+func (r *routeAdminMultiRows) Columns() []string { return r.cols }
+func (r *routeAdminMultiRows) Close() error      { return nil }
+func (r *routeAdminMultiRows) Next(dest []driver.Value) error {
+	if r.idx >= len(r.values) {
+		return io.EOF
+	}
+	for i, v := range r.values[r.idx] {
+		dest[i] = v
+	}
+	r.idx++
+	return nil
+}
+
 type routeAdminResult struct{ rowsAffected int64 }
 
 func (r routeAdminResult) LastInsertId() (int64, error) { return 0, nil }
@@ -85,6 +104,10 @@ func (s *routeAdminStmt) Exec(args []driver.Value) (driver.Result, error) {
 		s.conn.stageInsertExecCount++
 		s.conn.stageInsertArgCount = len(args)
 		return routeAdminResult{rowsAffected: int64(len(args) / 9)}, nil
+	}
+	if strings.Contains(lower, "delete from approval_route_stages") {
+		s.conn.stageDeleteExecCount++
+		return routeAdminResult{rowsAffected: 1}, nil
 	}
 	return routeAdminResult{rowsAffected: 1}, nil
 }
@@ -151,6 +174,23 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 			values: []driver.Value{int64(s.conn.newVersion)},
 		}, nil
 	}
+	if strings.Contains(lower, "from approval_route_stages") && strings.Contains(lower, "select") {
+		stages := s.conn.stageLoadStages
+		rows := &routeAdminMultiRows{
+			cols:   []string{"stage_order", "name", "required_role", "required_capability", "area_code", "quorum", "quorum_m", "on_eligibility_drift"},
+			values: make([][]driver.Value, 0, len(stages)),
+		}
+		for _, st := range stages {
+			var qm driver.Value
+			if st.QuorumM != nil {
+				qm = int64(*st.QuorumM)
+			} else {
+				qm = nil
+			}
+			rows.values = append(rows.values, []driver.Value{int64(st.Order), st.Name, st.RequiredRole, st.RequiredCapability, st.AreaCode, string(st.Quorum), qm, string(st.OnEligibilityDrift)})
+		}
+		return rows, nil
+	}
 	return routeAdminEmptyRows{cols: []string{"v"}}, nil
 }
 
@@ -173,6 +213,8 @@ type routeAdminConn struct {
 	capturedActorGUC    string
 	stageInsertExecCount int
 	stageInsertArgCount  int
+	stageLoadStages      []domain.Stage
+	stageDeleteExecCount int
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -774,6 +816,47 @@ func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
 	}
 	if conn.stageInsertArgCount != 27 {
 		t.Fatalf("stage insert arg count = %d; want 27 (3 stages * 9 cols)", conn.stageInsertArgCount)
+	}
+}
+
+func TestRouteAdminUpdate_NoOpStages_SkipsDelete(t *testing.T) {
+	stages := validRouteStages()
+	conn := &routeAdminConn{
+		authzGranted:    true,
+		routeExists:     true,
+		newVersion:      3,
+		stageLoadStages: stages,
+	}
+	db := newRouteAdminTestDB(t, conn)
+
+	emitter := &MemoryEmitter{}
+	svc := &RouteAdminService{
+		emitter: emitter,
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}
+
+	out, err := svc.Update(context.Background(), db, UpdateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		Name:            "Same Name Different Update",
+		ActorUserID:     "user-1",
+		ExpectedVersion: 2,
+		Stages:          stages,
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if out.NewVersion != 3 {
+		t.Fatalf("NewVersion = %d; want 3 (version still bumps on no-op stage)", out.NewVersion)
+	}
+	if conn.stageDeleteExecCount != 0 {
+		t.Fatalf("stage DELETE exec count = %d; want 0 (no-op skip)", conn.stageDeleteExecCount)
+	}
+	if conn.stageInsertExecCount != 0 {
+		t.Fatalf("stage INSERT exec count = %d; want 0 (no-op skip)", conn.stageInsertExecCount)
+	}
+	if len(emitter.Events) != 1 || emitter.Events[0].EventType != "route.config.updated" {
+		t.Fatalf("expected route.config.updated event; got %v", emitter.Events)
 	}
 }
 

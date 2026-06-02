@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"metaldocs/internal/modules/documents/approval/domain"
@@ -265,6 +266,13 @@ func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateR
 		return UpdateRouteResult{}, err
 	}
 
+	currentStages, err := loadRouteStagesTx(ctx, tx, in.RouteID)
+	if err != nil {
+		_ = tx.Rollback()
+		return UpdateRouteResult{}, err
+	}
+	stagesChanged := !stagesEqual(currentStages, in.Stages)
+
 	route := domain.Route{
 		ID:       in.RouteID,
 		TenantID: in.TenantID,
@@ -298,18 +306,20 @@ func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateR
 		return UpdateRouteResult{}, fmt.Errorf("update route: %w", mapped)
 	}
 
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM approval_route_stages
-		WHERE route_id = $1`,
-		in.RouteID,
-	); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, fmt.Errorf("delete stages: %w", err)
-	}
+	if stagesChanged {
+		if _, err := tx.ExecContext(ctx, `
+			DELETE FROM approval_route_stages
+			WHERE route_id = $1`,
+			in.RouteID,
+		); err != nil {
+			_ = tx.Rollback()
+			return UpdateRouteResult{}, fmt.Errorf("delete stages: %w", err)
+		}
 
-	if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
-		_ = tx.Rollback()
-		return UpdateRouteResult{}, err
+		if err := insertRouteStages(ctx, tx, in.RouteID, in.Stages); err != nil {
+			_ = tx.Rollback()
+			return UpdateRouteResult{}, err
+		}
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -582,4 +592,42 @@ func insertRouteStages(ctx context.Context, tx *sql.Tx, routeID string, stages [
 		return fmt.Errorf("route_admin: insert stages: %w", repository.MapPgError(err, repository.MapHints{}))
 	}
 	return nil
+}
+
+func loadRouteStagesTx(ctx context.Context, tx *sql.Tx, routeID string) ([]domain.Stage, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT stage_order, name, required_role, required_capability, area_code, quorum, quorum_m, on_eligibility_drift
+		  FROM approval_route_stages
+		 WHERE route_id = $1
+		 ORDER BY stage_order ASC`,
+		routeID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("route_admin: load stages: %w", repository.MapPgError(err, repository.MapHints{}))
+	}
+	defer rows.Close()
+
+	var out []domain.Stage
+	for rows.Next() {
+		var (
+			st      domain.Stage
+			quorumM sql.NullInt64
+		)
+		if err := rows.Scan(&st.Order, &st.Name, &st.RequiredRole, &st.RequiredCapability, &st.AreaCode, &st.Quorum, &quorumM, &st.OnEligibilityDrift); err != nil {
+			return nil, fmt.Errorf("route_admin: scan stage: %w", err)
+		}
+		if quorumM.Valid {
+			m := int(quorumM.Int64)
+			st.QuorumM = &m
+		}
+		out = append(out, st)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("route_admin: iterate stages: %w", err)
+	}
+	return out, nil
+}
+
+func stagesEqual(a, b []domain.Stage) bool {
+	return reflect.DeepEqual(a, b)
 }
