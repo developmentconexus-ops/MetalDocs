@@ -2,7 +2,51 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync)
+**Last verified:** 2026-06-02 (PR-7b hardening closed 8 findings — see T-PR7B-1..8)
+
+### T-PR7B-1 · CRITICAL — cross-tenant ATO via `handleResetPassword` — CLOSED 2026-06-02
+- **Severity:** critical (closed)
+- **Observation:** `PeopleHandler.handleResetPassword` delegated to `authSvc.AdminResetPassword` without verifying the target userID belonged to the caller's tenant; `auth_identities` has no tenant_id column so SQL writes were tenant-blind. Allowed cross-tenant account takeover.
+- **Resolution:** Added `PeopleService.VerifyUserInTenant` (membership probe via `auth.ListUsers(tenantID)`) + `guardUserInTenant` helper on `PeopleHandler`. Returns 404 NOT 403 to avoid leaking existence in other tenants.
+
+### T-PR7B-2 · CRITICAL — cross-tenant unlock — CLOSED 2026-06-02
+- **Severity:** critical (closed)
+- **Observation:** Same shape as T-PR7B-1 on `handleUnlock`.
+- **Resolution:** Same guard.
+
+### T-PR7B-3 · CRITICAL — PeopleHandler routes fell through to SessionRequired — CLOSED 2026-06-02
+- **Severity:** critical (closed)
+- **Observation:** `POST /iam/users/invite`, `POST /iam/users/bulk`, `GET /iam/users/{userId}/memberships` were not enumerated in `apps/api/cmd/metaldocs-api/permissions.go` routeRules. Fallback returned `VisibilitySessionRequired`, so any authenticated session (Viewer included) bypassed the capability gate.
+- **Resolution:** Added explicit rules with `CapUserManage` (invite, bulk) and `CapMembershipView` (memberships). Regression test `TestPermissionResolver_PeopleHandlerRoutes` locks the contract.
+
+### T-PR7B-4 · HIGH — `tests/unit` package failed to build — CLOSED 2026-06-02
+- **Severity:** high (closed)
+- **Observation:** Three compile errors after PR-2/PR-5 interface drift (NewService now returns 2 values, NewDevRoleProvider gained allowedTenantID, RoleCacheInvalidator gained InvalidateUserTenant). Reset/unlock tests also still pointed at the retired AdminHandler routes.
+- **Resolution:** Stub method on `fakeInvalidator`, updated call sites, rerouted tests via PeopleHandler.
+
+### T-PR7B-5 · HIGH — LIKE metacharacter injection on `action` filter — CLOSED 2026-06-02
+- **Severity:** high (closed)
+- **Observation:** `audit/infrastructure/postgres/writer.go` built `LIKE` patterns directly from user input with no `%` / `_` escaping. Intra-tenant over-matching.
+- **Resolution:** New `internal/platform/sqlescape` package; applied `LikeEscape` + `ESCAPE '\'` clause to action prefix and free-text q paths.
+
+### T-PR7B-6 · HIGH — missing index on `auth_identities.last_failed_login_at` — CLOSED 2026-06-02
+- **Severity:** high (closed)
+- **Observation:** Migration 0210 added the column but only indexed `locked_until`. `CountRecentFailedLoginsByUser` seq-scanned per `/security/signals` call.
+- **Resolution:** Migration 0211 partial index `WHERE last_failed_login_at IS NOT NULL`.
+
+### T-PR7B-7 · MEDIUM — `GetExportStatus` silent bypass on empty actor — CLOSED 2026-06-02
+- **Severity:** medium (closed)
+- **Observation:** Service skipped per-actor ownership check when actorID was empty; handler discarded the `ok` bool from `authn.UserIDFromContext`. Edge layer covers HTTP today but the path was a latent defense-in-depth gap.
+- **Resolution:** Service fails-closed with `ErrActorRequired`; handler returns 401 when context has no userID.
+
+### T-PR7B-8 · MEDIUM — silent page-1 reset on stale cursor — CLOSED 2026-06-02
+- **Severity:** medium (closed)
+- **Observation:** `decodeCursorIndex` returned 0 when the anchor user was no longer in the filtered set; caller silently restarted pagination with `hasMore=true`. Client appending without dedup got duplicate rows / could loop.
+- **Resolution:** `decodeCursorIndex` now returns `(idx, found)`; service emits `ErrCursorExpired`; handler maps to 410 `CURSOR_EXPIRED`.
+
+---
+
+**Prior verified:** 2026-05-26 (Wave 2 authz tx seeding sync)
 
 ## Severity scale
 

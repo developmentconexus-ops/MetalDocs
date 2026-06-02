@@ -39,6 +39,17 @@ var ErrPeopleValidation = errors.New("people_validation_error")
 // for the tenant. Maps to a 400 with detail listing the missing codes.
 var ErrAreaUnknown = errors.New("area_unknown")
 
+// ErrUserNotInTenant signals the target userID is not a member of the caller's
+// tenant. Handlers MUST map this to 404 to avoid leaking the existence of
+// users in other tenants.
+var ErrUserNotInTenant = errors.New("user_not_in_tenant")
+
+// ErrCursorExpired signals the cursor anchor's user is no longer present in
+// the filtered set (deleted / changed role / etc). Handlers map to 410 Gone
+// with code CURSOR_EXPIRED so clients restart pagination explicitly instead
+// of silently resetting to page 1 and emitting duplicate rows.
+var ErrCursorExpired = errors.New("cursor_expired")
+
 // AreaCatalogReader lets PeopleService verify that an areaCode supplied in an
 // invite exists before we burn an auth identity on it. PR-4 supplies a no-op
 // implementation for in-memory tests; the postgres impl reads process_areas.
@@ -443,6 +454,10 @@ func (s *PeopleService) BulkAction(ctx context.Context, tenantID, actorID, actio
 			out.Failed = append(out.Failed, BulkFailure{UserID: raw, Code: "VALIDATION_ERROR", Message: "userId required"})
 			continue
 		}
+		if err := s.VerifyUserInTenant(ctx, tenantID, userID); err != nil {
+			out.Failed = append(out.Failed, BulkFailure{UserID: userID, Code: "NOT_FOUND", Message: "User not found"})
+			continue
+		}
 		if err := s.applyBulkAction(ctx, action, userID); err != nil {
 			out.Failed = append(out.Failed, BulkFailure{UserID: userID, Code: bulkErrorCode(err), Message: err.Error()})
 			continue
@@ -533,7 +548,11 @@ func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filte
 	filtered := applyPeopleFilters(listed, filters)
 	cursorIdx := 0
 	if filters.Cursor != nil && strings.TrimSpace(*filters.Cursor) != "" {
-		cursorIdx = decodeCursorIndex(*filters.Cursor, filtered)
+		idx, found := decodeCursorIndex(*filters.Cursor, filtered)
+		if !found {
+			return ListResult{}, ErrCursorExpired
+		}
+		cursorIdx = idx
 	}
 	if cursorIdx < 0 {
 		cursorIdx = 0
@@ -557,6 +576,28 @@ func (s *PeopleService) ListFiltered(ctx context.Context, tenantID string, filte
 		HasMore:    hasMore,
 		Total:      &total,
 	}, nil
+}
+
+// VerifyUserInTenant returns nil if userID is a member of tenantID per the
+// auth ListUsers projection (which joins iam_users tenant_id). Returns
+// ErrUserNotInTenant on miss. Used as a tenant-membership guard before
+// delegating to tenant-agnostic auth mutations (reset password, unlock).
+func (s *PeopleService) VerifyUserInTenant(ctx context.Context, tenantID, userID string) error {
+	tenantID = strings.TrimSpace(tenantID)
+	userID = strings.TrimSpace(userID)
+	if tenantID == "" || userID == "" {
+		return ErrUserNotInTenant
+	}
+	users, err := s.auth.ListUsers(ctx, tenantID)
+	if err != nil {
+		return err
+	}
+	for _, u := range users {
+		if u.UserID == userID {
+			return nil
+		}
+	}
+	return ErrUserNotInTenant
 }
 
 // ListMemberships returns the active area memberships for a single user. Mirrors
@@ -619,16 +660,18 @@ func encodeCursor(u ListedUser) string {
 	return u.UserID
 }
 
-// decodeCursorIndex returns the index AFTER the cursor's anchor row. Cursor is
-// the previous page's last userId. If not found we return 0 (start over) — the
-// caller treats negative as 0.
-func decodeCursorIndex(cursor string, in []ListedUser) int {
+// decodeCursorIndex returns (index after the cursor's anchor row, true) when
+// the anchor is still in the filtered slice. Returns (0, false) when the
+// anchor is missing — caller surfaces ErrCursorExpired so the client restarts
+// pagination explicitly instead of silently returning page 1 (which causes
+// duplicate rows on append).
+func decodeCursorIndex(cursor string, in []ListedUser) (int, bool) {
 	for i, item := range in {
 		if item.UserID == cursor {
-			return i + 1
+			return i + 1, true
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // generateTempPassword returns a 16-character password with at least one
