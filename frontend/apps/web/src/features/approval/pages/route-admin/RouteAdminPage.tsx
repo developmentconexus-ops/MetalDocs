@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 
-import { ApprovalError } from '../../api/mutationClient';
+import { resolveErrorMessage } from '../../../../lib/api/problem';
 import type { RouteSummary } from '../../api/routeAdminApi';
 import {
   useCreateRoute,
@@ -11,7 +11,6 @@ import { useRoutesQuery } from '../../queries/useRoutesQuery';
 import { DeactivateRouteDialog } from './DeactivateRouteDialog';
 import { RouteEditorDialog, type RouteEditorSubmission } from './RouteEditorDialog';
 import { RouteListTable } from './RouteListTable';
-import { messageForRouteError } from './routeAdminLabels';
 import styles from './RouteAdmin.module.css';
 
 export function RouteAdminPage() {
@@ -72,17 +71,11 @@ export function RouteAdminPage() {
   };
 
   const queryError = routesQuery.error;
-  let loadErrorMessage: string | null = null;
-  if (queryError) {
-    if (queryError instanceof ApprovalError) {
-      loadErrorMessage = messageForRouteError(queryError.code, queryError.status, queryError.message);
-    } else {
-      loadErrorMessage = 'Erro ao carregar rotas. Tente novamente.';
-    }
-  }
+  const loadErrorMessage = queryError ? resolveErrorMessage(queryError) : null;
 
-  const isMutating =
-    createMutation.isPending || updateMutation.isPending || deactivateMutation.isPending;
+  // Editor lock reflects only editor-owned mutations; a background deactivate
+  // must not disable the editor's submit/cancel buttons.
+  const isEditorSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
     <section className={styles.page} aria-labelledby="route-admin-heading">
@@ -137,7 +130,7 @@ export function RouteAdminPage() {
       <RouteEditorDialog
         open={editorOpen}
         route={editingRoute}
-        isSubmitting={isMutating}
+        isSubmitting={isEditorSubmitting}
         onSubmit={handleEditorSubmit}
         onClose={closeEditor}
       />

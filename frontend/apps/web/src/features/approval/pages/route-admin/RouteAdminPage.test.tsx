@@ -184,10 +184,14 @@ describe('RouteAdminPage', () => {
     expect(vi.mocked(routeAdminApi.createRoute)).not.toHaveBeenCalled();
   });
 
-  it('optimistic create rolls back when server returns 409', async () => {
+  it('create surfaces backend conflict via shared problem-code → PT-BR mapping', async () => {
     vi.mocked(routeAdminApi.listRoutes).mockResolvedValue(listResponse([]));
+    // `route.duplicate_profile` is the real backend code (errors.go:36); the
+    // canonical PT-BR copy lives in `lib/api/errorMessages.ts`. The dialog
+    // stays open with the mapped message inline; no synthetic optimistic row
+    // is ever inserted, so there is nothing in the table to roll back.
     vi.mocked(routeAdminApi.createRoute).mockRejectedValueOnce(
-      new ApprovalError('approval.route.name_conflict', 409, 'name conflict'),
+      new ApprovalError('route.duplicate_profile', 409, 'duplicate profile'),
     );
 
     renderWithProviders(<RouteAdminPage />);
@@ -216,10 +220,10 @@ describe('RouteAdminPage', () => {
 
     await waitFor(() =>
       expect(
-        within(dialog).getByText(/Já existe uma rota ativa com este nome no perfil\./),
+        within(dialog).getByText(/Já existe uma rota para este perfil\./),
       ).toBeTruthy(),
     );
-    // Rollback: list still shows the empty state, no row labelled "Conflito".
+    // No synthetic row was inserted into the list — assert the table stays empty.
     expect(
       screen.queryByRole('cell', { name: 'Conflito' }),
     ).toBeNull();

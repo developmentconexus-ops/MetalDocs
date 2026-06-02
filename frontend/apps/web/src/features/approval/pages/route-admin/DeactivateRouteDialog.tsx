@@ -1,9 +1,8 @@
 import { type FormEvent, useEffect, useState } from 'react';
 
 import { Dialog } from '../../../../components/ui';
-import { ApprovalError } from '../../api/mutationClient';
+import { resolveErrorMessage } from '../../../../lib/api/problem';
 import type { RouteSummary } from '../../api/routeAdminApi';
-import { messageForRouteError } from './routeAdminLabels';
 import styles from './RouteAdmin.module.css';
 
 interface DeactivateRouteDialogProps {
@@ -50,13 +49,7 @@ export function DeactivateRouteDialog({
     try {
       await onConfirm(route.id, trimmed);
     } catch (err) {
-      if (err instanceof ApprovalError) {
-        setError(messageForRouteError(err.code, err.status, err.message));
-      } else if (err instanceof Error) {
-        setError(messageForRouteError(undefined, undefined, err.message));
-      } else {
-        setError(messageForRouteError(undefined, undefined));
-      }
+      setError(resolveErrorMessage(err));
     }
   };
 
