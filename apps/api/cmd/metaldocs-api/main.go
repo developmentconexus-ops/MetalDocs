@@ -256,6 +256,13 @@ func main() {
 	}
 	iamdelivery.NewMembershipHandler(membershipService).RegisterRoutes(mux)
 
+	// IAM Admin Center "Roles & Capabilities" tab (PR-5): read-only matrix.
+	var roleCapsReader iamdelivery.RoleCapabilitiesReader
+	if deps.SQLDB != nil {
+		roleCapsReader = iampg.NewRoleCapabilitiesRepository(deps.SQLDB)
+	}
+	iamdelivery.NewRolesCapsHandler(roleCapsReader).RegisterRoutes(mux)
+
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
 	docPresigner := objectstore.NewDocumentPresigner(deps.MinioClient, deps.MinioPublicClient, deps.MinioBucket, 15*time.Minute, 25*1024*1024)
