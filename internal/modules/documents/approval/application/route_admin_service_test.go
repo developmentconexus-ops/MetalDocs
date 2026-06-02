@@ -1,6 +1,7 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"database/sql/driver"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -546,6 +548,7 @@ type memoryRouteAdminSlot struct {
 	hash    string
 	replay  *RouteAdminReplay
 	pending bool
+	failErr error
 }
 
 type memoryRouteAdminCommitter struct {
@@ -561,6 +564,9 @@ func (c *memoryRouteAdminCommitter) Complete(routeID string, newVersion *int) er
 func (c *memoryRouteAdminCommitter) Fail(_ error) error {
 	c.slot.pending = false
 	c.slot.replay = nil
+	if c.slot.failErr != nil {
+		return c.slot.failErr
+	}
 	return nil
 }
 
@@ -926,5 +932,54 @@ func TestRouteAdminDeactivate_FirstCallEmptyReason_Returns400(t *testing.T) {
 	}
 	if slot.replay != nil {
 		t.Fatalf("slot replay should be nil after Fail; got %+v", slot.replay)
+	}
+}
+
+func TestRouteAdminCreate_LogsCommitterFailError(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: false}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	// Pre-create the slot so we can wire failErr.
+	failErr := errors.New("simulated fail-replay failure")
+	k := memoryIdempKey("tenant-1", "user-1", "idem-fail-log")
+	store.create[k] = &memoryRouteAdminSlot{
+		hash:    computeCreateRoutePayloadHash("po", "PO Route", validRouteStages()),
+		pending: false,
+		failErr: failErr,
+	}
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}).WithIdempStore(store)
+
+	// Swap slog default to capture.
+	var buf bytes.Buffer
+	oldDefault := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(oldDefault) })
+
+	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:       "tenant-1",
+		ProfileCode:    "po",
+		Name:           "PO Route",
+		ActorUserID:    "user-1",
+		IdempotencyKey: "idem-fail-log",
+		Stages:         validRouteStages(),
+	})
+	if err == nil {
+		t.Fatalf("Create expected to fail on cap denial")
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "committer.Fail failed") {
+		t.Fatalf("expected log entry; got: %s", out)
+	}
+	if !strings.Contains(out, "fail_err=") {
+		t.Fatalf("expected fail_err attribute in log; got: %s", out)
+	}
+	if !strings.Contains(out, "op=create") {
+		t.Fatalf("expected op=create in log; got: %s", out)
 	}
 }

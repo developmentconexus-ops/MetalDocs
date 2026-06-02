@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"strings"
 
@@ -119,7 +120,14 @@ func (s *RouteAdminService) Create(ctx context.Context, db *sql.DB, in CreateRou
 	result, err := s.createTx(ctx, db, in)
 	if err != nil {
 		if committer != nil {
-			_ = committer.Fail(err)
+			if ferr := committer.Fail(err); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", err,
+					"fail_err", ferr,
+				)
+			}
 		}
 		return CreateRouteResult{}, wrapRouteAdminErr(op, err)
 	}
@@ -232,7 +240,14 @@ func (s *RouteAdminService) Update(ctx context.Context, db *sql.DB, in UpdateRou
 	result, err := s.updateTx(ctx, db, in)
 	if err != nil {
 		if committer != nil {
-			_ = committer.Fail(err)
+			if ferr := committer.Fail(err); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", err,
+					"fail_err", ferr,
+				)
+			}
 		}
 		return UpdateRouteResult{}, wrapRouteAdminErr(op, err)
 	}
@@ -375,7 +390,14 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 
 	if reason == "" {
 		if committer != nil {
-			_ = committer.Fail(ErrRouteDeactivateReasonRequired)
+			if ferr := committer.Fail(ErrRouteDeactivateReasonRequired); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", ErrRouteDeactivateReasonRequired,
+					"fail_err", ferr,
+				)
+			}
 		}
 		return DeactivateRouteResult{}, ErrRouteDeactivateReasonRequired
 	}
@@ -383,7 +405,14 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 	result, err := s.deactivateTx(ctx, db, in)
 	if err != nil {
 		if committer != nil {
-			_ = committer.Fail(err)
+			if ferr := committer.Fail(err); ferr != nil {
+				slog.ErrorContext(ctx, "route_admin: committer.Fail failed; idempotency slot may be orphaned",
+					"op", op,
+					"key", in.IdempotencyKey,
+					"primary_err", err,
+					"fail_err", ferr,
+				)
+			}
 		}
 		return DeactivateRouteResult{}, wrapRouteAdminErr(op, err)
 	}
