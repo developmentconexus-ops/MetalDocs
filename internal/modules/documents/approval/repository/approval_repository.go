@@ -36,6 +36,7 @@ type Route struct {
 	TenantID    string
 	ProfileCode string
 	Active      bool
+	Version     int
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Stages      []RouteStage
@@ -49,6 +50,7 @@ type RouteStage struct {
 	RequiredCapability string
 	AreaCode           string
 	Quorum             string
+	QuorumM            *int
 	DriftPolicy        string
 }
 
@@ -66,6 +68,7 @@ type ApprovalRepository interface {
 	LoadCurrentPublishedHead(ctx context.Context, tx *sql.Tx, tenantID, controlledDocumentID string) (string, error)
 	GetDocumentRevisionVersion(ctx context.Context, tx *sql.Tx, documentID, tenantID string) (int, error)
 	ListRoutes(ctx context.Context, tenantID string) ([]Route, error)
+	ListRoutesTx(ctx context.Context, tx *sql.Tx, tenantID string) ([]Route, error)
 	MarkSuperseded(ctx context.Context, tx *sql.Tx, tenantID, documentID string) error
 	UpdateStageStatus(ctx context.Context, tx *sql.Tx, tenantID, stageID string, newStatus, expectedOldStatus domain.StageStatus) error
 	UpdateInstanceStatus(ctx context.Context, tx *sql.Tx, tenantID, instID string, newStatus domain.InstanceStatus, expectedStatus domain.InstanceStatus, completedAt *time.Time) error

@@ -178,6 +178,7 @@ type ListStageItem struct {
 	RequiredCapability string          `json:"required_capability"`
 	AreaCode           string          `json:"area_code"`
 	QuorumKind         QuorumKind      `json:"quorum_kind"`
+	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }
 
@@ -187,7 +188,20 @@ type ListRouteItem struct {
 	TenantID    string          `json:"tenant_id"`
 	ProfileCode string          `json:"profile_code"`
 	Active      bool            `json:"active"`
+	Version     int             `json:"version"`
 	Stages      []ListStageItem `json:"stages"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
+}
+
+// ListRoutesResponse mirrors the OpenAPI `ListRoutesResponse` schema introduced
+// in PR-1 (`api/openapi/v1/openapi.yaml` 5690-5698). The handler emits this
+// typed envelope instead of an ad-hoc `map[string]any`.
+type ListRoutesResponse struct {
+	Routes []ListRouteItem `json:"routes"`
+	Total  int             `json:"total"`
+}
+
+type DeactivateRouteRequest struct {
+	Reason string `json:"reason"`
 }
