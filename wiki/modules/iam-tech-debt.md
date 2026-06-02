@@ -44,6 +44,24 @@
 - **Observation:** `decodeCursorIndex` returned 0 when the anchor user was no longer in the filtered set; caller silently restarted pagination with `hasMore=true`. Client appending without dedup got duplicate rows / could loop.
 - **Resolution:** `decodeCursorIndex` now returns `(idx, found)`; service emits `ErrCursorExpired`; handler maps to 410 `CURSOR_EXPIRED`.
 
+### T-PR8-1 · MEDIUM — `tenant_plans` mutation surface is Tier-A only (open) — 2026-06-02
+- **Severity:** medium (open, by design)
+- **Surface:** `internal/modules/iam/infrastructure/postgres/observability_repository.go::GetTenantPlan` (read-only); `db/migrations/0221_tenant_plans.sql` (table + backfill).
+- **Observation:** PR-8 reads `metaldocs.tenant_plans` to render the Admin Center Usage card. Upgrade/downgrade, billing, overage flows belong to the **Tier-A platform-owner surface** and are intentionally NOT implemented at Tier-B (tenant admin). Tenant admins see their quota envelope; they cannot change it from the SaaS app.
+- **Resolution path:** stand up a separate Tier-A admin surface (`/platform/...`) with `CapPlatformAdmin` cap; wire UPDATE / billing webhook ingestion there.
+
+### T-PR8-2 · MEDIUM — `storage.usedBytes` returns -1 (open) — 2026-06-02
+- **Severity:** medium (open)
+- **Surface:** `internal/modules/iam/infrastructure/postgres/observability_repository.go::StorageUsedBytes`.
+- **Observation:** Blob-layer byte aggregation is not yet tenant-scoped end-to-end (`document_attachments` has no `tenant_id`, requires JOIN via `documents`; revision artifacts spread across multiple tables). PR-8 returns `-1` so the FE renders "—" rather than fabricating a zero.
+- **Resolution path:** add `tenant_id` columns or a per-tenant materialized rollup that sums `document_attachments.size_bytes`, `document_versions.file_size_bytes`, `document_images.byte_size`, `document_exports.size_bytes`.
+
+### T-PR8-3 · LOW — `usage.apiCalls` counts zero (open) — 2026-06-02
+- **Severity:** low (open)
+- **Surface:** `internal/modules/iam/infrastructure/postgres/observability_repository.go::CountAuditEventsByActionPrefix` with `actionPrefix = "http.request."`.
+- **Observation:** No audit action under the `http.request.*` namespace exists today, so the query always returns 0. Acceptable for v1 — the FE shows 0 across the 24h/7d/30d panes.
+- **Resolution path:** either start emitting a coarse `http.request.<route>` audit row at the API edge, or back the count with a dedicated request-log table.
+
 ---
 
 **Prior verified:** 2026-05-26 (Wave 2 authz tx seeding sync)

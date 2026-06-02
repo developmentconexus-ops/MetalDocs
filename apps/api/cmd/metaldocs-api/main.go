@@ -241,21 +241,29 @@ func main() {
 
 	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider)
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
-		WithAuditReader(deps.AuditReader)
+		WithAuditEventLister(auditService)
 
-	// PR-7 Sessions & Security tab. The session handler depends on the
-	// concrete *authpg.Repository for the iam_users JOIN it needs to derive
-	// SessionItem.displayName; memory/dev mode falls through to 501 so the
-	// in-memory auth path doesn't have to approximate the JOIN.
+	// PR-7 Sessions & Security tab.
 	var sessionsHandler *iamdelivery.SessionsHandler
 	if sqlDB := deps.SQLDB; sqlDB != nil {
 		sessionsHandler = iamdelivery.NewSessionsHandler(authpg.NewRepository(sqlDB), deps.AuditWriter)
 	}
+	var securityService *securityapp.Service
 	var securityHandler *securitydelivery.Handler
 	if sqlDB := deps.SQLDB; sqlDB != nil {
-		securityHandler = securitydelivery.NewHandler(securityapp.NewService(securitypg.NewRepository(sqlDB)))
+		securityService = securityapp.NewService(securitypg.NewRepository(sqlDB))
+		securityHandler = securitydelivery.NewHandler(securityService)
 	} else {
 		securityHandler = securitydelivery.NewHandler(nil)
+	}
+
+	// PR-8 Observability service.
+	var observabilityHandler *iamdelivery.ObservabilityHandler
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		observabilityRepo := iampg.NewObservabilityRepository(sqlDB)
+		observabilityService := iamapp.NewObservabilityService(observabilityRepo, mfaCoveragePctAdapter{svc: securityService})
+		observabilityHandler = iamdelivery.NewObservabilityHandler(observabilityService)
+		iamAdminHandler = iamAdminHandler.WithObservabilityService(observabilityService)
 	}
 	featureFlagsHandler := featureflags.NewHandler(featureFlagsCfg)
 	httpObs := observability.NewHTTPObservability(deps.StatusProvider)
@@ -274,6 +282,9 @@ func main() {
 	}
 	if securityHandler != nil {
 		securityHandler.RegisterRoutes(mux)
+	}
+	if observabilityHandler != nil {
+		observabilityHandler.RegisterRoutes(mux)
 	}
 
 	taxonomyModule := buildTaxonomyModule(deps)
@@ -822,4 +833,22 @@ func (a *profileDefaultsAdapter) GetDefaultTemplateVersionID(ctx context.Context
 	}
 	status := "published"
 	return profile.DefaultTemplateVersionID, &status, nil
+}
+
+// mfaCoveragePctAdapter narrows securityapp.Service to the
+// MfaCoveragePctReader port consumed by iamapp.ObservabilityService.
+// Returns 0 when the security service is nil (in-memory / dev mode).
+type mfaCoveragePctAdapter struct {
+	svc *securityapp.Service
+}
+
+func (a mfaCoveragePctAdapter) MfaCoveragePct(ctx context.Context, tenantID string) (float32, error) {
+	if a.svc == nil {
+		return 0, nil
+	}
+	cov, err := a.svc.MfaCoverage(ctx, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	return cov.MfaEnabledPct, nil
 }
