@@ -860,3 +860,71 @@ func TestRouteAdminUpdate_NoOpStages_SkipsDelete(t *testing.T) {
 	}
 }
 
+func TestRouteAdminDeactivate_ReplayBeforeReasonValidation(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, routeExists: true}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}).WithIdempStore(store)
+
+	// Pre-seed a completed replay slot under the empty-reason hash.
+	emptyReasonHash := computeDeactivateRoutePayloadHash("route-1", 2, "")
+	k := memoryIdempKey("tenant-1", "user-1", "idem-replay-empty")
+	store.deactivate[k] = &memoryRouteAdminSlot{
+		hash:   emptyReasonHash,
+		replay: &RouteAdminReplay{RouteID: "route-1"},
+	}
+
+	out, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		IdempotencyKey:  "idem-replay-empty",
+		Reason:          "", // empty: would fail validation if checked before replay
+		ExpectedVersion: 2,
+	})
+	if err != nil {
+		t.Fatalf("expected replay to succeed despite empty reason; got %v", err)
+	}
+	if out.RouteID != "route-1" {
+		t.Fatalf("RouteID = %q; want route-1 (from cached replay)", out.RouteID)
+	}
+}
+
+func TestRouteAdminDeactivate_FirstCallEmptyReason_Returns400(t *testing.T) {
+	conn := &routeAdminConn{authzGranted: true, routeExists: true}
+	db := newRouteAdminTestDB(t, conn)
+	store := newMemoryRouteAdminIdempStore()
+
+	svc := (&RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)},
+	}).WithIdempStore(store)
+
+	_, err := svc.Deactivate(context.Background(), db, DeactivateRouteInput{
+		TenantID:        "tenant-1",
+		RouteID:         "route-1",
+		ActorUserID:     "user-1",
+		IdempotencyKey:  "idem-empty-first",
+		Reason:          "   ",
+		ExpectedVersion: 2,
+	})
+	if !errors.Is(err, ErrRouteDeactivateReasonRequired) {
+		t.Fatalf("expected ErrRouteDeactivateReasonRequired; got %v", err)
+	}
+	// Slot must be released (Fail called → replay nil, pending false).
+	k := memoryIdempKey("tenant-1", "user-1", "idem-empty-first")
+	slot, ok := store.deactivate[k]
+	if !ok {
+		t.Fatalf("slot missing")
+	}
+	if slot.pending {
+		t.Fatalf("slot still pending; expected Fail() to clear it")
+	}
+	if slot.replay != nil {
+		t.Fatalf("slot replay should be nil after Fail; got %+v", slot.replay)
+	}
+}

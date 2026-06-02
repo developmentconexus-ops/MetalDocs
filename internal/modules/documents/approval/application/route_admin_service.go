@@ -355,9 +355,6 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 	const op = "deactivate"
 
 	reason := strings.TrimSpace(in.Reason)
-	if reason == "" {
-		return DeactivateRouteResult{}, ErrRouteDeactivateReasonRequired
-	}
 	in.Reason = reason
 
 	var (
@@ -374,6 +371,13 @@ func (s *RouteAdminService) Deactivate(ctx context.Context, db *sql.DB, in Deact
 		if replay != nil {
 			return DeactivateRouteResult{RouteID: replay.RouteID}, nil
 		}
+	}
+
+	if reason == "" {
+		if committer != nil {
+			_ = committer.Fail(ErrRouteDeactivateReasonRequired)
+		}
+		return DeactivateRouteResult{}, ErrRouteDeactivateReasonRequired
 	}
 
 	result, err := s.deactivateTx(ctx, db, in)
