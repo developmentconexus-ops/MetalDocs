@@ -230,6 +230,14 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/audit/events", capability: iamdomain.CapAuditRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/audit/events/export", capability: iamdomain.CapAuditRead, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathPrefix: "/api/v1/audit/events/export/", capability: iamdomain.CapAuditRead, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Sessions & Security (PR-7). Read endpoints fold under CapUserView; the
+	// destructive force-logout requires CapSessionManage (PR-2 cap).
+	{method: http.MethodGet, pathExact: "/api/v1/auth/sessions", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/auth/sessions/", capability: iamdomain.CapSessionManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/security/mfa-coverage", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/security/lockouts", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodGet, pathExact: "/api/v1/security/signals", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
 }
 
 func newPermissionResolver() iamdelivery.PermissionResolver {

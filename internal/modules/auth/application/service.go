@@ -192,7 +192,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	}
 	// TODO: use SELECT ... FOR UPDATE or advisory lock to make lockout atomic.
 	if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(password)) != nil {
-		if _, _, err := s.repo.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds())); err != nil {
+		if _, _, err := s.repo.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds()), s.remoteIP(r)); err != nil {
 			return authdomain.AuthenticatedSession{}, fmt.Errorf("record failed login: %w", err)
 		}
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials

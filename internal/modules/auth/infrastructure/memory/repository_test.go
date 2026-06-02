@@ -211,7 +211,7 @@ func TestRecordFailedLogin_ConcurrentIncrementsAndLockout(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					<-start
-					attempts, _, err := repo.RecordFailedLogin(ctx, userID, tc.maxAttempts, 600)
+					attempts, _, err := repo.RecordFailedLogin(ctx, userID, tc.maxAttempts, 600, "")
 					if err != nil {
 						errs <- err
 						return
