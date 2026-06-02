@@ -12,6 +12,8 @@ import (
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	auditmemory "metaldocs/internal/modules/audit/infrastructure/memory"
+	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
 )
 
 func TestListAuditEventsByDocument(t *testing.T) {
@@ -31,6 +33,7 @@ func TestListAuditEventsByDocument(t *testing.T) {
 		ResourceID:   "doc-1",
 		PayloadJSON:  `{"to_status":"IN_REVIEW"}`,
 		TraceID:      "trace-1",
+		TenantID:     "test-tenant",
 	})
 	_ = store.Record(context.Background(), auditdomain.Event{
 		ID:           "evt-2",
@@ -41,9 +44,13 @@ func TestListAuditEventsByDocument(t *testing.T) {
 		ResourceID:   "doc-2",
 		PayloadJSON:  `{"to_status":"APPROVED"}`,
 		TraceID:      "trace-2",
+		TenantID:     "test-tenant",
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/audit/events?resourceType=document&resourceId=doc-1&limit=10", nil)
+	ctx := iamdomain.WithAuthContext(req.Context(), "viewer-1", []iamdomain.Role{iamdomain.RoleViewer})
+	ctx = tenant.WithTenantID(ctx, "test-tenant")
+	req = req.WithContext(ctx)
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 

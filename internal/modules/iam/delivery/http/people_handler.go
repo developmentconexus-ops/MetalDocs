@@ -89,6 +89,10 @@ func (h *PeopleHandler) handleListUsers(w http.ResponseWriter, r *http.Request) 
 
 	result, err := h.service.ListFiltered(r.Context(), tenantID, filters)
 	if err != nil {
+		if errors.Is(err, iamapp.ErrCursorExpired) {
+			h.writeProblem(w, problem.New(http.StatusGone, "CURSOR_EXPIRED", "The pagination cursor refers to an item that is no longer available. Restart from the first page."))
+			return
+		}
 		log.Printf("iam people: list users failed: %v", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list users"))
 		return
@@ -190,6 +194,9 @@ func (h *PeopleHandler) handlePatch(w http.ResponseWriter, r *http.Request) {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return
 	}
+	if !h.guardUserInTenant(w, r, userID) {
+		return
+	}
 	var body iamapi.UpdateManagedUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
@@ -242,6 +249,9 @@ func (h *PeopleHandler) handleResetPassword(w http.ResponseWriter, r *http.Reque
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "Invalid JSON payload"))
 		return
 	}
+	if !h.guardUserInTenant(w, r, userID) {
+		return
+	}
 	if err := h.authSvc.AdminResetPassword(r.Context(), userID, body.NewPassword); err != nil {
 		h.writeAuthError(w, err)
 		return
@@ -264,6 +274,9 @@ func (h *PeopleHandler) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	userID := strings.TrimSpace(r.PathValue("userId"))
 	if userID == "" {
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
+		return
+	}
+	if !h.guardUserInTenant(w, r, userID) {
 		return
 	}
 	if err := h.authSvc.UnlockUser(r.Context(), userID); err != nil {
@@ -380,6 +393,32 @@ func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Req
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
+// guardUserInTenant verifies the target userID is a member of the caller's
+// tenant before delegating to tenant-agnostic auth mutations. Returns true on
+// match. On miss writes 404 NOT_FOUND (NOT 403) so cross-tenant probes cannot
+// distinguish "exists elsewhere" from "does not exist".
+func (h *PeopleHandler) guardUserInTenant(w http.ResponseWriter, r *http.Request, userID string) bool {
+	if h.service == nil {
+		h.writeProblem(w, problem.New(http.StatusNotImplemented, "INTERNAL_ERROR", "People service is not configured"))
+		return false
+	}
+	tenantID, err := tenant.FromContext(r.Context())
+	if err != nil {
+		h.writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		return false
+	}
+	if err := h.service.VerifyUserInTenant(r.Context(), tenantID, userID); err != nil {
+		if errors.Is(err, iamapp.ErrUserNotInTenant) {
+			h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
+			return false
+		}
+		log.Printf("iam people: verify user-in-tenant failed: %v", err)
+		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to verify user"))
+		return false
+	}
+	return true
+}
+
 func (h *PeopleHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	if werr := problem.Write(w, p); werr != nil {
 		log.Printf("iam people: write response failed: %v", werr)
@@ -395,6 +434,8 @@ func (h *PeopleHandler) writePeopleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, authdomain.ErrUserAlreadyExists):
 		h.writeProblem(w, problem.New(http.StatusConflict, "CONFLICT_ERROR", "User already exists"))
 	case errors.Is(err, authdomain.ErrIdentityNotFound):
+		h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
+	case errors.Is(err, iamapp.ErrUserNotInTenant):
 		h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
 	case errors.Is(err, authdomain.ErrPasswordPolicy):
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))

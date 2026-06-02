@@ -242,7 +242,11 @@ func (h *Handler) handleExportSubresource(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	actorID, _ := authn.UserIDFromContext(r.Context())
+	actorID, ok := authn.UserIDFromContext(r.Context())
+	if !ok || strings.TrimSpace(actorID) == "" {
+		writeProblem(w, problem.New(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required"))
+		return
+	}
 	job, err := h.exporter.GetExportStatus(r.Context(), tenantID, actorID, exportID)
 	if err != nil {
 		if errors.Is(err, domain.ErrExportJobNotFound) {

@@ -18,12 +18,50 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
+const testTenantID = "test-tenant"
+
+func newAuthServiceForTest(t *testing.T, authRepo *authmemory.Repository, roleAdminRepo iamdomain.RoleAdminRepository, userRoles map[string][]iamdomain.Role) *authapp.Service {
+	t.Helper()
+	provider := iamapp.NewDevRoleProvider(userRoles, testTenantID)
+	svc, err := authapp.NewService(authRepo, provider, roleAdminRepo, authapp.Config{
+		SessionSecret:          "0123456789abcdef0123456789abcdef",
+		SessionTTL:             time.Hour,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 5,
+		LoginLockDuration:      time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("new auth service: %v", err)
+	}
+	return svc
+}
+
+func registerPeopleHandlerForTest(t *testing.T, mux *http.ServeMux, authSvc *authapp.Service, roleAdmin iamdomain.RoleAdminRepository, inv iamapp.RoleCacheInvalidator) {
+	t.Helper()
+	peopleSvc := iamapp.NewPeopleService(authSvc, peopleRoleProviderShim{}, roleAdmin, nil, nil, inv)
+	iamdelivery.NewPeopleHandler(peopleSvc, authSvc, nil).RegisterRoutes(mux)
+}
+
+// peopleRoleProviderShim satisfies the peopleRoleProvider interface that
+// PeopleService accepts. We do not exercise role-driven branches in these
+// tests so a stub returning the viewer role for any user is sufficient.
+type peopleRoleProviderShim struct{}
+
+func (peopleRoleProviderShim) RolesByUserID(_ context.Context, _, _ string) ([]iamdomain.Role, error) {
+	return []iamdomain.Role{iamdomain.RoleViewer}, nil
+}
+
 type fakeInvalidator struct {
 	called bool
 	userID string
 }
 
 func (f *fakeInvalidator) InvalidateUser(userID string) {
+	f.called = true
+	f.userID = userID
+}
+
+func (f *fakeInvalidator) InvalidateUserTenant(userID, _ string) {
 	f.called = true
 	f.userID = userID
 }
@@ -61,7 +99,7 @@ func TestIAMAdminHandlerReplaceRoles(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/iam/users/test-user/roles", strings.NewReader(`{"displayName":"Test User","roles":["editor","approver"]}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/iam/users/test-user/roles", strings.NewReader(`{"displayName":"Test User","roles":["editor"]}`))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-Id", "admin-local")
@@ -77,17 +115,12 @@ func TestIAMAdminHandlerReplaceRoles(t *testing.T) {
 }
 
 func TestIAMAdminHandlerResetPassword(t *testing.T) {
-	repo := iammemory.NewRoleAdminRepository()
+	_ = iamapp.NewAdminService // legacy reference retained
 	inv := &fakeInvalidator{}
-	service := iamapp.NewAdminService(repo, inv)
 	authRepo := authmemory.NewRepository()
 	roleAdminRepo := iammemory.NewRoleAdminRepository()
-	authService := authapp.NewService(authRepo, iamapp.NewDevRoleProvider(map[string][]iamdomain.Role{
+	authService := newAuthServiceForTest(t, authRepo, roleAdminRepo, map[string][]iamdomain.Role{
 		"test-user": {iamdomain.RoleViewer},
-	}), roleAdminRepo, authapp.Config{
-		PasswordMinLength:      8,
-		LoginMaxFailedAttempts: 5,
-		LoginLockDuration:      time.Minute,
 	})
 	if err := authRepo.CreateUser(context.Background(), authdomain.CreateUserParams{
 		UserID:             "test-user",
@@ -102,12 +135,12 @@ func TestIAMAdminHandlerResetPassword(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed auth user: %v", err)
 	}
-	handler := iamdelivery.NewAdminHandler(service, authService)
 
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	registerPeopleHandlerForTest(t, mux, authService, roleAdminRepo, inv)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/test-user/reset-password", strings.NewReader(`{"newPassword":"Reset1234"}`))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), testTenantID))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-User-Id", "admin-local")
 	rr := httptest.NewRecorder()
@@ -126,17 +159,11 @@ func TestIAMAdminHandlerResetPassword(t *testing.T) {
 }
 
 func TestIAMAdminHandlerUnlockUser(t *testing.T) {
-	repo := iammemory.NewRoleAdminRepository()
 	inv := &fakeInvalidator{}
-	service := iamapp.NewAdminService(repo, inv)
 	authRepo := authmemory.NewRepository()
 	roleAdminRepo := iammemory.NewRoleAdminRepository()
-	authService := authapp.NewService(authRepo, iamapp.NewDevRoleProvider(map[string][]iamdomain.Role{
+	authService := newAuthServiceForTest(t, authRepo, roleAdminRepo, map[string][]iamdomain.Role{
 		"test-user": {iamdomain.RoleViewer},
-	}), roleAdminRepo, authapp.Config{
-		PasswordMinLength:      8,
-		LoginMaxFailedAttempts: 5,
-		LoginLockDuration:      time.Minute,
 	})
 	if err := authRepo.CreateUser(context.Background(), authdomain.CreateUserParams{
 		UserID:             "test-user",
@@ -154,12 +181,12 @@ func TestIAMAdminHandlerUnlockUser(t *testing.T) {
 	if _, _, err := authRepo.RecordFailedLogin(context.Background(), "test-user", 1, 60, ""); err != nil {
 		t.Fatalf("seed lock state: %v", err)
 	}
-	handler := iamdelivery.NewAdminHandler(service, authService)
 
 	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	registerPeopleHandlerForTest(t, mux, authService, roleAdminRepo, inv)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/iam/users/test-user/unlock", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), testTenantID))
 	req.Header.Set("X-User-Id", "admin-local")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
