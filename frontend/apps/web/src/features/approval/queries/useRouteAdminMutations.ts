@@ -22,54 +22,44 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function stageRequestToSummary(
+  stage: CreateRouteRequest['stages'][number],
+): RouteSummary['stages'][number] {
+  return {
+    label: stage.name,
+    required_role: stage.required_role,
+    required_capability: stage.required_capability,
+    area_code: stage.area_code,
+    quorum_kind: stage.quorum,
+    quorum_m: stage.quorum_m ?? null,
+    drift_policy: stage.drift_policy,
+  };
+}
+
 /**
- * Optimistic create: inserts a placeholder row keyed by a temporary id, then
- * replaces it with the server's `route_id` on success. Rolls the full list
- * back to its snapshot on error (409, 422, network).
+ * Create mutation — non-optimistic.
+ *
+ * The previous implementation inserted a placeholder row keyed by a synthetic
+ * `optimistic-…` id. That id leaked into `RouteListTable` for the window
+ * between `onMutate` and the `onSettled` refetch, letting the user click
+ * Edit/Deactivate on a row whose backing UUID did not exist yet — every
+ * follow-up `PUT`/`DELETE` then fired against a non-UUID path and 404'd.
+ * Server creates are sub-second; the cost of a true optimistic insert is
+ * higher than the latency it saves, so we skip it and rely on
+ * `invalidateQueries` plus the trigger's `isPending` state for feedback.
+ *
+ * On success we seed the new route's ETag at `v1` (per ADR 0018 routes are
+ * created at version 1) so an immediate Edit does not race the list refetch
+ * for the `If-Match` token.
  */
 export function useCreateRoute() {
   const queryClient = useQueryClient();
   const queryKey = QK.approval.routes.list();
 
-  return useMutation<RouteResponse, Error, CreateRouteRequest, ListSnapshot>({
+  return useMutation<RouteResponse, Error, CreateRouteRequest>({
     mutationFn: (body) => createRoute(body),
-    onMutate: async (body) => {
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<ListRoutesResponse>(queryKey);
-
-      const optimistic: RouteSummary = {
-        id: `optimistic-${body.name}-${nowIso()}`,
-        name: body.name,
-        tenant_id: '',
-        profile_code: body.profile_code,
-        active: true,
-        version: 1,
-        stages: body.stages.map((stage) => ({
-          label: stage.name,
-          required_role: stage.required_role,
-          required_capability: stage.required_capability,
-          area_code: stage.area_code,
-          quorum_kind: stage.quorum,
-          quorum_m: stage.quorum_m ?? null,
-          drift_policy: stage.drift_policy,
-        })),
-        created_at: nowIso(),
-        updated_at: nowIso(),
-      };
-
-      const base: ListRoutesResponse = previous ?? { routes: [], total: 0 };
-      queryClient.setQueryData<ListRoutesResponse>(queryKey, {
-        ...base,
-        routes: [...base.routes, optimistic],
-        total: base.total + 1,
-      });
-
-      return { previous };
-    },
-    onError: (_err, _body, context) => {
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
+    onSuccess: (response) => {
+      seedRouteEtag(response.route_id, 1);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey });
@@ -107,15 +97,7 @@ export function useUpdateRoute() {
         return {
           ...route,
           name: body.name,
-          stages: body.stages.map((stage) => ({
-            label: stage.name,
-            required_role: stage.required_role,
-            required_capability: stage.required_capability,
-            area_code: stage.area_code,
-            quorum_kind: stage.quorum,
-            quorum_m: stage.quorum_m ?? null,
-            drift_policy: stage.drift_policy,
-          })),
+          stages: body.stages.map(stageRequestToSummary),
           version: route.version + 1,
           updated_at: nowIso(),
         };

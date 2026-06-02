@@ -1,17 +1,13 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react';
 
 import styles from './Dialog.module.css';
 
 interface DialogProps {
-  /** Controls visibility. The dialog mounts only while `open` is true. */
+  /**
+   * Controls visibility. The `<dialog>` node stays mounted regardless of
+   * `open`; `showModal()` / `close()` toggle the modal state so the browser
+   * can restore focus to the previously focused element on close.
+   */
   open: boolean;
   /** Accessible label rendered as the dialog heading. */
   title: string;
@@ -28,10 +24,12 @@ interface DialogProps {
 }
 
 /**
- * Accessible modal dialog built on the native <dialog> element.
+ * Accessible modal dialog built on the native `<dialog>` element.
  *
  * - `showModal()` traps focus to dialog descendants while open.
- * - Browser returns focus to the previously focused element on close.
+ * - Browser returns focus to the previously focused element when `close()`
+ *   fires — this relies on the dialog node staying mounted across
+ *   open/close cycles, so we do NOT unmount on `open=false`.
  * - Escape closes via the native `cancel` event.
  * - Backdrop click closes unless `disableBackdropClose` is set.
  *
@@ -52,22 +50,24 @@ export function Dialog({
 
   useEffect(() => {
     const node = dialogRef.current;
-    if (!node) {
-      return;
-    }
+    if (!node) return;
+
     if (open && !node.open) {
       if (typeof node.showModal === 'function') {
         try {
           node.showModal();
         } catch {
-          // jsdom and a handful of older browsers throw on showModal — fall
-          // back to the boolean `open` attribute so the dialog still mounts.
+          // jsdom and older browsers can throw on showModal — fall back to
+          // the boolean `open` attribute so the dialog still mounts.
           node.setAttribute('open', '');
         }
       } else {
         node.setAttribute('open', '');
       }
-    } else if (!open && node.open) {
+      return;
+    }
+
+    if (!open && node.open) {
       if (typeof node.close === 'function') {
         node.close();
       } else {
@@ -76,44 +76,25 @@ export function Dialog({
     }
   }, [open]);
 
-  const handleCancel = useCallback(
-    (event: Event) => {
-      event.preventDefault();
-      onClose();
-    },
-    [onClose],
-  );
-
   useEffect(() => {
     const node = dialogRef.current;
-    if (!node) {
-      return;
-    }
+    if (!node) return;
+
+    const handleCancel = (event: Event) => {
+      event.preventDefault();
+      onClose();
+    };
+
     node.addEventListener('cancel', handleCancel);
     return () => node.removeEventListener('cancel', handleCancel);
-  }, [handleCancel]);
+  }, [onClose]);
 
   const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
-    if (disableBackdropClose) {
-      return;
-    }
+    if (disableBackdropClose) return;
     if (event.target === dialogRef.current) {
       onClose();
     }
   };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
-    // Defensive: native <dialog> already handles Esc through 'cancel', but a
-    // dialog-in-dialog stack can swallow it on some engines. Keep this no-op
-    // unless we detect a regression.
-    if (event.key === 'Escape' && !event.defaultPrevented) {
-      // Let native handler fire.
-    }
-  };
-
-  if (!open) {
-    return null;
-  }
 
   return (
     <dialog
@@ -122,33 +103,34 @@ export function Dialog({
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
     >
-      <div className={styles.content}>
-        <header className={styles.header}>
-          <h2 id={titleId} className={styles.title}>
-            {title}
-          </h2>
-          <button
-            type="button"
-            className={styles.closeButton}
-            aria-label="Fechar"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </header>
+      {open ? (
+        <div className={styles.content}>
+          <header className={styles.header}>
+            <h2 id={titleId} className={styles.title}>
+              {title}
+            </h2>
+            <button
+              type="button"
+              className={styles.closeButton}
+              aria-label="Fechar"
+              onClick={onClose}
+            >
+              ×
+            </button>
+          </header>
 
-        {description ? (
-          <p id={descriptionId} className={styles.description}>
-            {description}
-          </p>
-        ) : null}
+          {description ? (
+            <p id={descriptionId} className={styles.description}>
+              {description}
+            </p>
+          ) : null}
 
-        <div className={styles.body}>{children}</div>
+          <div className={styles.body}>{children}</div>
 
-        {footer ? <footer className={styles.footer}>{footer}</footer> : null}
-      </div>
+          {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+        </div>
+      ) : null}
     </dialog>
   );
 }
