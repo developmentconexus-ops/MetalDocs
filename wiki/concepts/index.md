@@ -9,6 +9,7 @@
 - [token-syntax.md](token-syntax.md) - token syntax and migration rationale
 - [controlled-documents.md](controlled-documents.md) - controlled-document concept and numbering model
 - [authz-tiers.md](authz-tiers.md) - tier-1 versus tier-2 authorization model
+- [approval-routes.md](approval-routes.md) - approval route catalogue: stages, quorum, drift policies, lifecycle
 - [error-ux.md](error-ux.md) - shared error handling and UX mapping rules
 - [freeze-and-hashing.md](freeze-and-hashing.md) - freeze, immutability, and hash semantics
 - [iso-segregation.md](iso-segregation.md) - submitter/approver segregation rationale
