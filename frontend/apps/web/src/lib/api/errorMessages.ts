@@ -30,6 +30,8 @@ export const errorMessages: Record<string, string> = {
   'validation.param_required': 'Um parâmetro obrigatório não foi enviado.',
   'validation.param_too_many_values': 'Um parâmetro foi enviado com valores demais.',
   'validation.param_unmarshal': 'Um parâmetro não pôde ser interpretado.',
+  'validation.profile_unknown':
+    'O perfil informado não está cadastrado para este tenant. Verifique o código do perfil.',
   'validation.reason_required': 'Informe o motivo para continuar.',
   'validation.request_invalid': 'A requisição enviada é inválida.',
   invalid_request: 'A requisição enviada é inválida.',
@@ -54,6 +56,7 @@ export const errorMessages: Record<string, string> = {
 
   // ─── Platform: authz / capability ─────────────────────────────────────────
   'authz.capability_denied': 'Você não tem permissão para executar esta ação.',
+  capability_denied: 'Você não tem permissão para executar esta ação.',
   FORBIDDEN_CAPABILITY: 'Você não tem permissão para executar esta ação.',
   FORBIDDEN_AREA: 'Você não tem permissão para atuar nesta área.',
   FORBIDDEN_ORIGIN: 'Origem da requisição não autorizada.',
@@ -66,6 +69,7 @@ export const errorMessages: Record<string, string> = {
   IDEMPOTENCY_KEY_REQUIRED: 'Identificador de operação ausente. Recarregue e tente novamente.',
   IDEMPOTENCY_KEY_REUSED: 'A chave de idempotência já foi usada com outro conteúdo.',
   IDEMPOTENCY_REPLAY: 'A requisição já havia sido processada; a resposta anterior foi reaproveitada.',
+  'idempotency.key_conflict': 'A chave de idempotência já foi usada com outro conteúdo.',
   'idempotency.key_required': 'Identificador de operação ausente. Recarregue e tente novamente.',
   RATE_LIMITED: 'Muitas requisições em sequência. Tente novamente em instantes.',
   timeout: 'A operação demorou mais que o esperado. Tente novamente.',

@@ -28,7 +28,14 @@ export type StageRequest = components['schemas']['StageRequest'];
 export async function listRoutes(): Promise<ListRoutesResponse> {
   const res = await fetch(BASE);
   if (res.ok) {
-    return (await res.json()) as ListRoutesResponse;
+    const data = (await res.json()) as ListRoutesResponse;
+    // Seed the ETag cache from the list so a cold-load Edit/Deactivate sends a
+    // valid `If-Match` without first issuing a write. `seedRouteEtag` is
+    // monotonic and skips version <= 0, so legacy rows are a safe no-op.
+    for (const route of data.routes ?? []) {
+      seedRouteEtag(route.id, route.version);
+    }
+    return data;
   }
 
   const prob = await parseProblem(res.clone());

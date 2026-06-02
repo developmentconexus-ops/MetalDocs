@@ -168,6 +168,14 @@ Until that endpoint lands, PR-4 should:
 - This ADR is doc-only. Rollback = revert this file + the concept doc + the module wiki cross-links. No code or schema change is gated on this ADR landing.
 - The behavior described here was shipped by PR-1 + PR-2; this ADR codifies it. If a future change reverses any of these rules (e.g. introduces reactivate), open a new ADR superseding §X of this one and update the state-machine diagram.
 
+## Postscript — QA-fix remediation (2026-06-02)
+
+Preview QA against `/approval-routes` exposed gaps in the shipped lifecycle; this PR closed them without changing the decisions above:
+
+- **List response carries `version` for ETag seeding.** The `If-Match` OCC contract requires the client to hold a current ETag before Edit/Deactivate. On a cold page load the only read is `GET /api/v1/approval/routes`, so the frontend now seeds its ETag cache from each row's `version` (`"v<N>"` format, monotonic, skips `version <= 0`). Without this, the first Edit/Deactivate after a fresh load fired with no `If-Match` and returned `428`. The ETag format remains `"v<N>"` — unchanged.
+- **`StageSummary` field names unified with `StageRequest`.** The read projection used legacy `label`/`quorum_kind`; it now uses canonical `name`/`quorum` and emits `order`, matching the write contract — same shape on read and write.
+- **Profile FK is a `422`, not a `500`.** Creating a route whose `profile_code` has no matching `metaldocs.document_profiles` row trips `approval_routes_document_profile_fk`; the service now maps `repository.ErrFKViolation` → `application.ErrRouteProfileUnknown` → `422 validation.profile_unknown` instead of falling through to `500 internal.unknown`.
+
 ## References
 
 - `wiki/modules/approval.md` §12 — Glossary terms (Route, Stage, Quorum, J1, SoD)

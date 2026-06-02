@@ -5615,13 +5615,14 @@ components:
     StageSummary:
       type: object
       additionalProperties: true
-      required: [label, required_role, required_capability, area_code, quorum_kind, drift_policy]
+      required: [order, name, required_role, required_capability, area_code, quorum, drift_policy]
       properties:
-        label: { type: string }
+        order: { type: integer, minimum: 1 }
+        name: { type: string }
         required_role: { type: string }
         required_capability: { type: string }
         area_code: { type: string }
-        quorum_kind: { $ref: '#/components/schemas/QuorumKind' }
+        quorum: { $ref: '#/components/schemas/QuorumKind' }
         quorum_m:
           type: integer
           minimum: 1

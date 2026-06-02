@@ -206,6 +206,78 @@ func TestCreateRoute_DuplicateProfile(t *testing.T) {
 	}
 }
 
+func TestCreateRoute_ProfileUnknown(t *testing.T) {
+	// A profile_code with no matching document profile trips the FK; the
+	// service translates it to ErrRouteProfileUnknown, which must surface as a
+	// 422 validation error — never an opaque 500.
+	svc := &fakeRouteAdminService{createErr: application.ErrRouteProfileUnknown}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	body := `{"profile_code":"qa-preview","name":"QA Preview","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "idem-1")
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnprocessableEntity)
+	}
+	var prob struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&prob); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if prob.Code != "validation.profile_unknown" {
+		t.Fatalf("code = %q, want %q", prob.Code, "validation.profile_unknown")
+	}
+}
+
+func TestListRoutes_CanonicalStageNames(t *testing.T) {
+	// The list response must serialise stages with canonical field names
+	// (`name`, `quorum`) — not the legacy `label`/`quorum_kind`.
+	svc := &fakeRouteAdminService{
+		listResult: application.ListRoutesResult{Routes: []repository.Route{
+			{
+				ID: "r1", Name: "Ops", TenantID: "tenant-1", ProfileCode: "ops",
+				Active: true, Version: 3, Total: 1,
+				Stages: []repository.RouteStage{
+					{Order: 1, Name: "Review", RequiredRole: "reviewer", RequiredCapability: "doc.signoff", AreaCode: "ops", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
+				},
+			},
+		}},
+	}
+	h := &Handler{routeAdmin: svc}
+	mux := routeAdminTestMux(h)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/approval/routes", nil)
+	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	raw := rr.Body.String()
+	for _, want := range []string{`"name":"Review"`, `"quorum":"any_1_of"`, `"order":1`, `"version":3`} {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("response missing %q; body = %s", want, raw)
+		}
+	}
+	for _, banned := range []string{`"label"`, `"quorum_kind"`} {
+		if strings.Contains(raw, banned) {
+			t.Fatalf("response contains legacy field %q; body = %s", banned, raw)
+		}
+	}
+}
+
 func TestUpdateRoute_HappyPath(t *testing.T) {
 	tests := []struct {
 		name string
