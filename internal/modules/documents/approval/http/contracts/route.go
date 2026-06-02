@@ -174,11 +174,12 @@ type StageResponse struct {
 }
 
 type ListStageItem struct {
-	Label              string          `json:"label"`
+	Order              int             `json:"order"`
+	Name               string          `json:"name"`
 	RequiredRole       string          `json:"required_role"`
 	RequiredCapability string          `json:"required_capability"`
 	AreaCode           string          `json:"area_code"`
-	QuorumKind         QuorumKind      `json:"quorum_kind"`
+	Quorum             QuorumKind      `json:"quorum"`
 	QuorumM            *int            `json:"quorum_m,omitempty"`
 	DriftPolicy        DriftPolicyKind `json:"drift_policy"`
 }

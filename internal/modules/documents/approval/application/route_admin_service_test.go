@@ -150,6 +150,9 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 		return &routeAdminRows{cols: []string{"v"}, values: []driver.Value{"ok"}}, nil
 	}
 	if strings.Contains(lower, "insert into approval_routes") && strings.Contains(lower, "returning id") {
+		if s.conn.insertRouteErr != nil {
+			return nil, s.conn.insertRouteErr
+		}
 		return &routeAdminRows{
 			cols:   []string{"id"},
 			values: []driver.Value{s.conn.createdRouteID},
@@ -217,6 +220,7 @@ type routeAdminConn struct {
 	stageInsertArgCount  int
 	stageLoadStages      []domain.Stage
 	stageDeleteExecCount int
+	insertRouteErr       error
 }
 
 func (c *routeAdminConn) Prepare(query string) (driver.Stmt, error) {
@@ -359,6 +363,68 @@ func TestRouteAdminCreate_InvalidRoute(t *testing.T) {
 	}
 	if len(emitter.Events) != 0 {
 		t.Fatalf("expected no events on validation failure; got %d", len(emitter.Events))
+	}
+}
+
+// TestRouteAdminCreate_ProfileFKViolation verifies that a 23503 violation of the
+// profile FK constraint maps to ErrRouteProfileUnknown (→ 422).
+func TestRouteAdminCreate_ProfileFKViolation(t *testing.T) {
+	profileFKErr := &pgconn.PgError{
+		Code:           "23503",
+		ConstraintName: routeProfileFKConstraint,
+	}
+	conn := &routeAdminConn{authzGranted: true, insertRouteErr: profileFKErr}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "unknown-profile",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		Stages:      validRouteStages(),
+	})
+	if !errors.Is(err, ErrRouteProfileUnknown) {
+		t.Errorf("expected ErrRouteProfileUnknown; got %v", err)
+	}
+}
+
+// TestRouteAdminCreate_OtherFKViolation verifies that a 23503 violation of a
+// different FK constraint does NOT map to ErrRouteProfileUnknown and instead
+// falls through to a wrapped error (preserving diagnostic context for a 500).
+func TestRouteAdminCreate_OtherFKViolation(t *testing.T) {
+	otherFKErr := &pgconn.PgError{
+		Code:           "23503",
+		ConstraintName: "some_other_fk_constraint",
+	}
+	conn := &routeAdminConn{authzGranted: true, insertRouteErr: otherFKErr}
+	db := newRouteAdminTestDB(t, conn)
+
+	svc := &RouteAdminService{
+		emitter: &MemoryEmitter{},
+		clock:   fixedClock{t: time.Now()},
+	}
+
+	_, err := svc.Create(context.Background(), db, CreateRouteInput{
+		TenantID:    "tenant-1",
+		ProfileCode: "po",
+		Name:        "PO Route",
+		ActorUserID: "user-1",
+		Stages:      validRouteStages(),
+	})
+	if errors.Is(err, ErrRouteProfileUnknown) {
+		t.Errorf("unexpected ErrRouteProfileUnknown for unrelated FK violation")
+	}
+	if err == nil {
+		t.Errorf("expected an error for FK violation; got nil")
+	}
+	// The wrapped error must still carry FK violation context.
+	if !errors.Is(err, repository.ErrFKViolation) {
+		t.Errorf("expected wrapped ErrFKViolation; got %v", err)
 	}
 }
 

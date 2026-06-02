@@ -321,9 +321,23 @@ if (-not $NoJobs) {
     Write-Host ("Jobs host launched and remained alive for the initial check window (PID: " + $jobsProc.Id + ")")
 }
 
+# Capture stdout+stderr (slog writes here) to logs/api.log so handler errors —
+# including the >=500 `slog.Error("approval handler error", ...)` lines — are
+# inspectable from the same session. `& $binary` is foreground/blocking, so
+# Tee-Object blocking is fine; output still streams to the console live.
+$logDir = Join-Path $root "logs"
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+$apiLogFile = Join-Path $logDir "api.log"
+
 Write-Host "Starting MetalDocs API on :8081 after timestamp-based binary checks (scheduled publish ownership lives in metaldocs-jobs)"
+Write-Host "API stdout/stderr is tee'd to $apiLogFile"
+# slog writes to stderr; merging it into the pipeline (`*>&1`) turns each native
+# stderr line into an ErrorRecord. With the script-wide `Stop` preference that
+# would terminate on the first log line, so relax it for the foreground run —
+# this is the last step, the binary owns its own exit handling from here.
+$ErrorActionPreference = "Continue"
 try {
-    & $binary
+    & $binary *>&1 | Tee-Object -FilePath $apiLogFile -Append
 } catch {
     $message = $_.Exception.Message
     if ($message -notmatch 'Acesso negado' -and $message -notmatch 'Access is denied') {
@@ -332,7 +346,7 @@ try {
 
     Write-Host "Launching metaldocs-api.exe was denied by the local Windows environment; falling back to go run for the API process"
     $env:GOFLAGS = "-mod=mod"
-    go run ./apps/api/cmd/metaldocs-api/...
+    go run ./apps/api/cmd/metaldocs-api/... *>&1 | Tee-Object -FilePath $apiLogFile -Append
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
