@@ -256,20 +256,26 @@ WHERE user_id = $1
 	return nil
 }
 
-func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int) (int, *time.Time, error) {
+// RecordFailedLogin atomically increments failed_login_attempts and, when the
+// threshold is reached, sets locked_until. It also stamps last_failed_login_at
+// + last_failed_login_ip (PR-7) so /security/lockouts and /security/signals
+// can surface the most recent failure context per user.
+func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
 	const q = `
 UPDATE metaldocs.auth_identities
 SET failed_login_attempts = failed_login_attempts + 1,
     locked_until = CASE WHEN failed_login_attempts + 1 >= $2
                         THEN NOW() + ($3 * INTERVAL '1 second')
                         ELSE locked_until END,
+    last_failed_login_at = NOW(),
+    last_failed_login_ip = NULLIF($4, ''),
     updated_at = NOW()
 WHERE user_id = $1
 RETURNING failed_login_attempts, locked_until
 `
 	var attempts int
 	var lockedUntil sql.NullTime
-	if err := r.db.QueryRowContext(ctx, q, userID, maxAttempts, lockDurationSeconds).Scan(&attempts, &lockedUntil); err != nil {
+	if err := r.db.QueryRowContext(ctx, q, userID, maxAttempts, lockDurationSeconds, ip).Scan(&attempts, &lockedUntil); err != nil {
 		return 0, nil, fmt.Errorf("update failed login: %w", err)
 	}
 	if !lockedUntil.Valid {

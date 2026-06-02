@@ -28,9 +28,13 @@ type Repository interface {
 	// derived device label that produced the most recent successful login. Stored
 	// on metaldocs.iam_users (governance metadata, tenant-scoped) — separate from
 	// auth_identities.last_login_at which lives on the credential row. PR-4 leaves
-	// deviceLabel empty; PR-7 will populate it via UA parsing.
+	// deviceLabel empty; PR-7 populates it via UA parsing.
 	RecordLastLoginContext(ctx context.Context, userID, tenantID, ip, userAgent, deviceLabel string) error
-	RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int) (attempts int, lockedUntil *time.Time, err error)
+	// RecordFailedLogin increments failed_login_attempts and, on threshold,
+	// sets locked_until. ip is the request remote address — implementations
+	// may stamp it onto last_failed_login_ip alongside last_failed_login_at
+	// so the Sessions & Security tab can surface the most recent failure.
+	RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (attempts int, lockedUntil *time.Time, err error)
 	CreateUser(ctx context.Context, params CreateUserParams) error
 	ListUsers(ctx context.Context) ([]ManagedUser, error)
 	UpdateUser(ctx context.Context, params UpdateUserParams) error
