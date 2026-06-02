@@ -24,6 +24,12 @@ type Repository interface {
 	RevokeSession(ctx context.Context, sessionID string, revokedAt time.Time) error
 	RevokeSessionsByUserID(ctx context.Context, userID string, revokedAt time.Time) error
 	RecordSuccessfulLogin(ctx context.Context, userID string, loginAt time.Time) error
+	// RecordLastLoginContext records the client IP, User-Agent, and (optionally)
+	// derived device label that produced the most recent successful login. Stored
+	// on metaldocs.iam_users (governance metadata, tenant-scoped) — separate from
+	// auth_identities.last_login_at which lives on the credential row. PR-4 leaves
+	// deviceLabel empty; PR-7 will populate it via UA parsing.
+	RecordLastLoginContext(ctx context.Context, userID, tenantID, ip, userAgent, deviceLabel string) error
 	RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int) (attempts int, lockedUntil *time.Time, err error)
 	CreateUser(ctx context.Context, params CreateUserParams) error
 	ListUsers(ctx context.Context) ([]ManagedUser, error)

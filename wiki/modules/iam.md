@@ -2,7 +2,8 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-06-02 (PR-2: added `CapSessionManage`; broadened `CapAuditRead` grants to qms_admin/area_admin/approver via migration 0210; registry size 27 → 28; ADR 0019 documents the read-only-by-design naming exception. Prior verification line preserved below.)
+**Last verified:** 2026-06-02 (PR-4: People-tab backend slice — `PeopleHandler` registered via Go 1.22 typed mux patterns owns `GET /iam/users`, `POST /iam/users/invite`, `PATCH /iam/users/{userId}`, `POST /iam/users/bulk`, `POST /iam/users/{userId}/reset-password`, `POST /iam/users/{userId}/unlock`, `GET /iam/users/{userId}/memberships`; legacy `handleUserRoute` suffix dispatcher + `POST /iam/users` create retired; migration 0219 adds last-login context columns to `iam_users`; canonical-roles catalog grew to 8 (added `signer`, `area_admin`, `qms_admin` in `internal/modules/iam/domain/model.go`). T-004 noted closed — `authz.Require(CapUserManage)` already lives inside both `UpsertUserAndAssignRole` and `ReplaceUserRolesTx` in `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:47,99`. Prior verification line preserved below.)
+**Prior verification — 2026-06-02 (PR-2):** added `CapSessionManage`; broadened `CapAuditRead` grants to qms_admin/area_admin/approver via migration 0210; registry size 27 → 28; ADR 0019 documents the read-only-by-design naming exception.
 
 **Prior verification — 2026-06-02 (PR-1):** T-005 (audit emission) + T-006 (RFC 9457 envelope) closed; §5.3 + §6.2 + §6.3 + §6.4 cap columns refreshed against `apps/api/cmd/metaldocs-api/permissions.go:108-123` (ADR 0016 view-grade split). | **Owner:** unassigned | **Status:** active | **Maturity:** L2
 
@@ -186,13 +187,17 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 | POST | `/api/v1/iam/area-memberships` | `MembershipHandler.grantMembership` (`:31`) | `membership.manage` |
 | DELETE | `/api/v1/iam/area-memberships` | `MembershipHandler.revokeMembership` (`:32`) | `membership.manage` |
 | GET | `/api/v1/iam/admin/overview` | `AdminHandler.handleAdminOverview` (`admin_handler.go:85`) | `user.view` |
-| GET | `/api/v1/iam/users` | `AdminHandler.handleListUsers` (`:88`) | `user.view` |
-| POST | `/api/v1/iam/users` | `AdminHandler.handleCreateUser` (`:90`) | `user.manage` |
-| POST | `/api/v1/iam/users/{userId}/roles` | `AdminHandler.handleUserRoleUpsert` (`:196`) | `user.manage` |
-| PUT | `/api/v1/iam/users/{userId}/roles` | `AdminHandler.handleReplaceUserRoles` (`:198`) | `user.manage` |
-| POST | `/api/v1/iam/users/{userId}/reset-password` | `AdminHandler.handleResetPassword` (`:206`) | `user.manage` |
-| POST | `/api/v1/iam/users/{userId}/unlock` | `AdminHandler.handleUnlockUser` (`:210`) | `user.manage` |
-| PATCH | `/api/v1/iam/users/{userId}` | `AdminHandler.handlePatchUser` (`:214`) | `user.manage` |
+| GET | `/api/v1/iam/users` | `PeopleHandler.handleListUsers` (`people_handler.go`) | `user.view` |
+| POST | `/api/v1/iam/users/invite` | `PeopleHandler.handleInvite` (`people_handler.go`) | `user.manage` |
+| PATCH | `/api/v1/iam/users/{userId}` | `PeopleHandler.handlePatch` (`people_handler.go`) | `user.manage` |
+| POST | `/api/v1/iam/users/bulk` | `PeopleHandler.handleBulk` (`people_handler.go`) | `user.manage` |
+| POST | `/api/v1/iam/users/{userId}/reset-password` | `PeopleHandler.handleResetPassword` (`people_handler.go`) | `user.manage` |
+| POST | `/api/v1/iam/users/{userId}/unlock` | `PeopleHandler.handleUnlock` (`people_handler.go`) | `user.manage` |
+| GET | `/api/v1/iam/users/{userId}/memberships` | `PeopleHandler.handleListMemberships` (`people_handler.go`) | `membership.view` |
+| POST | `/api/v1/iam/users/{userId}/roles` | `AdminHandler.handleUserRoleUpsert` (`admin_handler.go`) | `user.manage` |
+| PUT | `/api/v1/iam/users/{userId}/roles` | `AdminHandler.handleReplaceUserRoles` (`admin_handler.go`) | `user.manage` |
+
+PR-4 refactor: the legacy `handleUserRoute` suffix dispatcher and the `POST /api/v1/iam/users` create endpoint were retired. The new People-tab handler (`people_handler.go`) owns user list/invite/patch/bulk/reset/unlock/memberships, wired via Go 1.22 typed mux patterns (`mux.HandleFunc("METHOD /path", …)`). `POST /iam/users/invite` server-generates a 16-char temp password (returned one-time only, never logged or audited) and the role-replace endpoints stay on `AdminHandler` pending PR-5's Roles & Caps matrix.
 
 Post-ADR-0016 split (GET = view-grade, writes = manage-grade) verified against `apps/api/cmd/metaldocs-api/permissions.go:108-123`.
 
