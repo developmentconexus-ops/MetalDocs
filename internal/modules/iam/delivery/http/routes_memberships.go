@@ -96,30 +96,43 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	userID := strings.TrimSpace(r.URL.Query().Get("userId"))
-	if userID == "" {
-		userID = strings.TrimSpace(authenticatedActor(r))
-	}
-	if userID == "" {
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId is required"))
-		return
-	}
-	if !canManageMembershipTarget(r.Context(), userID) {
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
-		return
-	}
-
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "internal server error"))
 		return
 	}
 
-	if !h.guardMembershipUserInTenant(w, r, tenantID, userID) {
-		return
+	userID := strings.TrimSpace(r.URL.Query().Get("userId"))
+	areaCode := strings.TrimSpace(r.URL.Query().Get("areaCode"))
+	role := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("role")))
+
+	// Directory scope (ADR 0016 view/manage split): membership.view is held by
+	// every role, so a tenant-wide directory must be gated tighter than the
+	// route-level view gate. System admins (membership.manage) get the full
+	// tenant directory with optional filters; everyone else is restricted to
+	// their own memberships regardless of the userId filter they pass.
+	if !isMembershipDirectoryAdmin(r.Context()) {
+		actor := strings.TrimSpace(authenticatedActor(r))
+		if actor == "" {
+			h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			return
+		}
+		if userID != "" && !strings.EqualFold(userID, actor) {
+			h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
+			return
+		}
+		userID = actor
 	}
 
-	items, err := h.svc.ListActive(r.Context(), userID, tenantID)
+	// When a specific target user is in scope, preserve the cross-tenant 404
+	// guard (an attacker must not distinguish "exists elsewhere" from "absent").
+	if userID != "" {
+		if !h.guardMembershipUserInTenant(w, r, tenantID, userID) {
+			return
+		}
+	}
+
+	items, err := h.svc.ListByTenant(r.Context(), tenantID, userID, areaCode, role)
 	if err != nil {
 		log.Printf("iam memberships: list failed: %v", err)
 		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships"))
@@ -343,6 +356,19 @@ func isSelf(ctx context.Context, targetUserID string) bool {
 		return false
 	}
 	return strings.EqualFold(actor, strings.TrimSpace(targetUserID))
+}
+
+// isMembershipDirectoryAdmin reports whether the actor may read the full
+// tenant membership directory. Gated on RoleSystemAdmin (the membership.manage
+// holder surfaced in request context); area-scoped directories for area_admin
+// are deferred — see PR-2 close-out notes.
+func isMembershipDirectoryAdmin(ctx context.Context) bool {
+	for _, role := range iamdomain.RolesFromContext(ctx) {
+		if role == iamdomain.RoleSystemAdmin {
+			return true
+		}
+	}
+	return false
 }
 
 func canManageMembershipTarget(ctx context.Context, targetUserID string) bool {
