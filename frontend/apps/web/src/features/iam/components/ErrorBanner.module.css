@@ -1,0 +1,25 @@
+.banner {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-3);
+  font-size: var(--font-size-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.retryButton {
+  font: inherit;
+  background: var(--surface);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: var(--r-2);
+  padding: 6px var(--sp-3);
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.retryButton:hover { background: var(--danger); color: var(--text-on-brand); }
+.retryButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -4,6 +4,7 @@ import { Avatar } from "../../../components/ui/Avatar";
 import { getRelativeTime } from "../presenters/relative-time-presenter";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
 import { QK } from "../../../lib/queryKeys";
+import ErrorBanner from "./ErrorBanner";
 import styles from "./PresencePanel.module.css";
 
 const SKELETON_ROWS = 5;
@@ -36,18 +37,12 @@ export default function PresencePanel() {
       </header>
 
       {error ? (
-        <div role="alert" className={styles.errorBanner}>
-          <span>{resolveQueryError(error, "Não foi possível carregar a presença.")}</span>
-          <button
-            type="button"
-            className={styles.retryButton}
-            onClick={() =>
-              queryClient.invalidateQueries({ queryKey: QK.iam.presenceSnapshot() })
-            }
-          >
-            Tentar novamente
-          </button>
-        </div>
+        <ErrorBanner
+          message={resolveQueryError(error, "Não foi possível carregar a presença.")}
+          onRetry={() =>
+            queryClient.invalidateQueries({ queryKey: QK.iam.presenceSnapshot() })
+          }
+        />
       ) : null}
 
       {isLoading ? (

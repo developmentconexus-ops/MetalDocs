@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useUsageQuery } from "../queries/useUsageQuery";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
 import { QK } from "../../../lib/queryKeys";
+import ErrorBanner from "./ErrorBanner";
 import styles from "./UsageGauges.module.css";
 
 const integerFormatter = new Intl.NumberFormat("pt-BR");
@@ -96,7 +97,7 @@ function GaugeCard({ id, title, subtitle, used, allocated, isBytes, hint }: Gaug
         <div
           className={styles.track}
           role="progressbar"
-          aria-label={ariaText}
+          aria-label={title}
           aria-valuenow={Math.round(r * 100)}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -136,8 +137,6 @@ function StatsCard({ id, title, subtitle, data, hint }: StatsCardProps) {
         <span className={styles.subtitle}>{subtitle}</span>
       </header>
 
-      {hint ? <p className={styles.hint}>{hint}</p> : null}
-
       <dl className={styles.statsRow}>
         <div className={styles.statCell}>
           <dt className={styles.statLabel}>24 horas</dt>
@@ -152,6 +151,8 @@ function StatsCard({ id, title, subtitle, data, hint }: StatsCardProps) {
           <dd className={styles.statValue}>{integerFormatter.format(data.last30d)}</dd>
         </div>
       </dl>
+
+      {hint ? <p className={styles.hint}>{hint}</p> : null}
     </article>
   );
 }
@@ -172,9 +173,7 @@ function UnavailableCard({ id, title, subtitle, body }: UnavailableCardProps) {
           Não disponível
         </span>
       </header>
-      <p className={styles.subtitle} style={{ textTransform: "none", letterSpacing: 0 }}>
-        {subtitle}
-      </p>
+      <p className={styles.description}>{subtitle}</p>
       <div className={styles.unavailableBlock}>
         <span className={styles.unavailableTitle}>Dados ainda não expostos pela API</span>
         <span>{body}</span>
@@ -187,8 +186,8 @@ function SkeletonCard({ id }: { id: string }) {
   return (
     <article className={styles.card} data-testid={`usage-skeleton-${id}`} aria-hidden="true">
       <header className={styles.cardHeader}>
-        <span className={styles.skeletonValue} style={{ width: "8rem", height: "1.1rem" }} />
-        <span className={styles.skeletonValue} style={{ width: "4rem", height: "0.9rem" }} />
+        <span className={`${styles.skeletonValue} ${styles.skeletonTitle}`} />
+        <span className={`${styles.skeletonValue} ${styles.skeletonSubtitle}`} />
       </header>
       <div className={styles.gaugeBlock}>
         <span className={styles.skeletonValue} />
@@ -204,15 +203,11 @@ export default function UsageGauges() {
 
   if (error) {
     return (
-      <div className={styles.errorBanner} role="alert" data-testid="usage-error">
-        <span>{resolveQueryError(error, "Não foi possível carregar o consumo.")}</span>
-        <button
-          type="button"
-          className={styles.retryButton}
-          onClick={() => queryClient.invalidateQueries({ queryKey: QK.iam.usage() })}
-        >
-          Tentar novamente
-        </button>
+      <div data-testid="usage-error">
+        <ErrorBanner
+          message={resolveQueryError(error, "Não foi possível carregar o consumo.")}
+          onRetry={() => queryClient.invalidateQueries({ queryKey: QK.iam.usage() })}
+        />
       </div>
     );
   }
@@ -254,7 +249,11 @@ export default function UsageGauges() {
         title="Usuários ativos"
         subtitle="Janelas"
         data={data.activeUsers}
-        hint={`Ativos vs. licenciados em 30 dias: ${integerFormatter.format(data.activeUsers.last30d)} de ${integerFormatter.format(data.seats.allocated)}.`}
+        hint={
+          data.seats.allocated <= 0
+            ? `Ativos vs. licenciados em 30 dias: ${integerFormatter.format(data.activeUsers.last30d)} (sem assentos provisionados).`
+            : `Ativos vs. licenciados em 30 dias: ${integerFormatter.format(data.activeUsers.last30d)} de ${integerFormatter.format(data.seats.allocated)}.`
+        }
       />
 
       <StatsCard
