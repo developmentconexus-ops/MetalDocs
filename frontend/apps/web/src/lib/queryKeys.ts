@@ -77,6 +77,7 @@ export const QK = {
     userMemberships: (userId: string) => ['iam', 'admin', 'users', userId, 'memberships'] as const,
     audit: (params?: Record<string, unknown>) => ['iam', 'admin', 'audit', params ?? {}] as const,
     sessions: (params?: Record<string, unknown>) => ['iam', 'admin', 'sessions', params ?? {}] as const,
+    sessionsAll: () => ['iam', 'admin', 'sessions'] as const,
     mfaCoverage: () => ['iam', 'admin', 'security', 'mfa-coverage'] as const,
     lockouts: () => ['iam', 'admin', 'security', 'lockouts'] as const,
     securitySignals: (window?: string) => ['iam', 'admin', 'security', 'signals', window ?? '7d'] as const,
