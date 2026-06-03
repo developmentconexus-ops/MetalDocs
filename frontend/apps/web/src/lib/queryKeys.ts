@@ -75,6 +75,15 @@ export const QK = {
     presenceSnapshot: () => ['iam', 'admin', 'presence', 'snapshot'] as const,
     users: (params?: Record<string, unknown>) => ['iam', 'admin', 'users', params ?? {}] as const,
     userMemberships: (userId: string) => ['iam', 'admin', 'users', userId, 'memberships'] as const,
+    memberships: {
+      all: ['iam', 'admin', 'memberships'] as const,
+      list: (params: Record<string, unknown> = {}) =>
+        ['iam', 'admin', 'memberships', 'list', params] as const,
+      byArea: (areaCode: string) =>
+        ['iam', 'admin', 'memberships', 'by-area', areaCode] as const,
+      byUser: (userId: string) =>
+        ['iam', 'admin', 'memberships', 'by-user', userId] as const,
+    },
     audit: (params?: Record<string, unknown>) => ['iam', 'admin', 'audit', params ?? {}] as const,
     sessions: (params?: Record<string, unknown>) => ['iam', 'admin', 'sessions', params ?? {}] as const,
     sessionsAll: () => ['iam', 'admin', 'sessions'] as const,

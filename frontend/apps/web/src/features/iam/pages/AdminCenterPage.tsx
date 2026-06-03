@@ -32,6 +32,11 @@ function AdminCenterPage() {
       isVisible: canViewMembership,
     },
     {
+      path: "memberships",
+      label: "Memberships",
+      isVisible: canViewMembership,
+    },
+    {
       path: "audit",
       label: "Auditoria",
       isVisible: canReadAudit,
