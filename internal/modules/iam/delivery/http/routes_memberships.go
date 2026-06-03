@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	iamapp "metaldocs/internal/modules/iam/application"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -22,6 +23,32 @@ type grantMembershipRequest struct {
 	UserID   string `json:"userId"`
 	AreaCode string `json:"areaCode"`
 	Role     string `json:"role"`
+}
+
+type membershipDTO struct {
+	UserID        string  `json:"userId"`
+	TenantID      string  `json:"tenantId"`
+	AreaCode      string  `json:"areaCode"`
+	Role          string  `json:"role"`
+	EffectiveFrom string  `json:"effectiveFrom"`
+	EffectiveTo   *string `json:"effectiveTo"`
+	GrantedBy     *string `json:"grantedBy"`
+}
+
+func toMembershipDTO(m iamdomain.UserProcessArea) membershipDTO {
+	dto := membershipDTO{
+		UserID:        m.UserID,
+		TenantID:      m.TenantID,
+		AreaCode:      m.AreaCode,
+		Role:          string(m.Role),
+		EffectiveFrom: m.EffectiveFrom.Format(time.RFC3339),
+		GrantedBy:     m.GrantedBy,
+	}
+	if m.EffectiveTo != nil {
+		s := m.EffectiveTo.Format(time.RFC3339)
+		dto.EffectiveTo = &s
+	}
+	return dto
 }
 
 func NewMembershipHandler(svc *iamapp.AreaMembershipService) *MembershipHandler {
@@ -64,7 +91,11 @@ func (h *MembershipHandler) listMemberships(w http.ResponseWriter, r *http.Reque
 		_ = problem.Write(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to list memberships"))
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	dtos := make([]membershipDTO, 0, len(items))
+	for _, m := range items {
+		dtos = append(dtos, toMembershipDTO(m))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": dtos})
 }
 
 func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Request) {
