@@ -47,15 +47,13 @@ export default function MfaCoverageCard() {
         <div className={styles.empty} aria-busy="true">
           Carregando…
         </div>
-      ) : null}
-
-      {error ? (
+      ) : error ? (
         <div role="alert" className={styles.error}>
           {resolveQueryError(error, "Não foi possível carregar a cobertura de MFA.")}
         </div>
-      ) : null}
-
-      {data ? (
+      ) : !data ? (
+        <div className={styles.empty}>Sem dados.</div>
+      ) : (
         <>
           <div className={styles.heroRow}>
             <span className={styles.heroPct}>{formatPct(data.mfaEnabledPct)}</span>
@@ -97,7 +95,7 @@ export default function MfaCoverageCard() {
             })}
           </div>
         </>
-      ) : null}
+      )}
     </section>
   );
 }

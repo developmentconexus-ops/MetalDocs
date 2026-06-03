@@ -13,7 +13,7 @@ export function useRevokeSessionMutation() {
       return data;
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: QK.iam.sessions() });
+      void qc.invalidateQueries({ queryKey: QK.iam.sessionsAll() });
     },
   });
 }

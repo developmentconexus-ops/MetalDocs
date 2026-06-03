@@ -99,13 +99,13 @@ export default function SecuritySignalsList() {
                 role="listitem"
               >
                 <span className={`${styles.badge} ${sev.badge}`}>
-                  {SEVERITY_LABEL[s.severity]}
+                  {SEVERITY_LABEL[s.severity] ?? s.severity}
                 </span>
                 <div className={styles.body}>
                   <span className={styles.summary}>
-                    {KIND_LABEL[s.kind]} — {s.summary}
+                    {KIND_LABEL[s.kind] ?? s.kind} — {s.summary}
                   </span>
-                  <span className={styles.mitigation}>{MITIGATION[s.kind]}</span>
+                  <span className={styles.mitigation}>{MITIGATION[s.kind] ?? "—"}</span>
                 </div>
                 <div className={styles.meta}>
                   {count !== undefined ? (

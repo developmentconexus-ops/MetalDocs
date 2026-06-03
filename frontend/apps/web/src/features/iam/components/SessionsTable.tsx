@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Avatar } from "../../../components/ui/Avatar";
@@ -12,8 +12,7 @@ import { getRelativeTime } from "../presenters/relative-time-presenter";
 import { SP_DATE_TIME_FORMATTER } from "../constants";
 import styles from "./SessionsTable.module.css";
 
-type MfaFilter = "all" | "yes" | "no";
-
+// TODO PR-12 Fase 7+: server-side paging + filter pushdown when SessionItem grows beyond bounded tenants.
 const LIMIT = 200;
 
 export default function SessionsTable() {
@@ -23,28 +22,32 @@ export default function SessionsTable() {
 
   const [userFilter, setUserFilter] = useState("");
   const [ipFilter, setIpFilter] = useState("");
-  const [countryFilter, setCountryFilter] = useState("");
-  const [mfaFilter, setMfaFilter] = useState<MfaFilter>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [bulkPending, setBulkPending] = useState(false);
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
 
   const items = data?.items ?? [];
 
   const filtered = useMemo(() => {
     const u = userFilter.trim().toLowerCase();
     const ip = ipFilter.trim().toLowerCase();
-    const c = countryFilter.trim().toLowerCase();
     return items.filter((s) => {
       if (u && !s.displayName.toLowerCase().includes(u)) return false;
       if (ip && !(s.ipAddress ?? "").toLowerCase().includes(ip)) return false;
-      // SessionItem schema has no country/mfa fields yet — filters apply
-      // when backend extends the contract; until then "all" matches.
-      if (c) return false;
-      if (mfaFilter !== "all") return false;
       return true;
     });
-  }, [items, userFilter, ipFilter, countryFilter, mfaFilter]);
+  }, [items, userFilter, ipFilter]);
+
+  const allSelected =
+    filtered.length > 0 && filtered.every((s) => selected.has(s.sessionId));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
 
   if (isLoading) {
     return (
@@ -63,9 +66,6 @@ export default function SessionsTable() {
       </section>
     );
   }
-
-  const allSelected =
-    filtered.length > 0 && filtered.every((s) => selected.has(s.sessionId));
 
   const toggleAll = () => {
     if (allSelected) {
@@ -92,7 +92,20 @@ export default function SessionsTable() {
       ...prev,
       items: prev.items.filter((s) => !ids.has(s.sessionId)),
     });
-    return () => qc.setQueryData(key, prev);
+    return (succeededIds?: ReadonlySet<string>) => {
+      const current = qc.getQueryData<typeof data>(key);
+      if (!current) {
+        qc.setQueryData(key, prev);
+        return;
+      }
+      if (!succeededIds || succeededIds.size === 0) {
+        qc.setQueryData(key, prev);
+        return;
+      }
+      // Re-insert only the ids that failed; keep succeeded ones dropped.
+      const restored = prev.items.filter((s) => !succeededIds.has(s.sessionId));
+      qc.setQueryData(key, { ...prev, items: restored });
+    };
   };
 
   const handleRevoke = (sessionId: string) => {
@@ -100,7 +113,7 @@ export default function SessionsTable() {
     revoke.mutate(sessionId, {
       onSuccess: () => {
         toast.success("Sessão revogada.");
-        void qc.invalidateQueries({ queryKey: QK.iam.sessions() });
+        void qc.invalidateQueries({ queryKey: QK.iam.sessions({ limit: LIMIT }) });
       },
       onError: (err) => {
         rollback();
@@ -115,27 +128,27 @@ export default function SessionsTable() {
     setBulkPending(true);
     const rollback = optimisticDrop(selected);
     const results = await Promise.allSettled(
-      ids.map(
-        (id) =>
-          new Promise<void>((resolve, reject) => {
-            revoke.mutate(id, {
-              onSuccess: () => resolve(),
-              onError: (e) => reject(e),
-            });
-          }),
-      ),
+      ids.map((id) => revoke.mutateAsync(id)),
     );
     setBulkPending(false);
     setConfirmOpen(false);
-    const failures = results.filter((r) => r.status === "rejected");
-    if (failures.length > 0) {
-      rollback();
-      toast.error(`Falha ao revogar ${failures.length} sessão(ões).`);
+    const succeededIds = new Set<string>();
+    let failureCount = 0;
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") succeededIds.add(ids[i]);
+      else failureCount += 1;
+    });
+    if (failureCount > 0) {
+      rollback(succeededIds);
+      toast.error(`Falha ao revogar ${failureCount} sessão(ões).`);
+      setSelected(
+        (prev) => new Set(Array.from(prev).filter((id) => !succeededIds.has(id))),
+      );
     } else {
       toast.success(`${ids.length} sessão(ões) revogada(s).`);
       setSelected(new Set());
     }
-    void qc.invalidateQueries({ queryKey: QK.iam.sessions() });
+    void qc.invalidateQueries({ queryKey: QK.iam.sessions({ limit: LIMIT }) });
   };
 
   return (
@@ -176,18 +189,22 @@ export default function SessionsTable() {
         <input
           type="search"
           placeholder="País"
-          value={countryFilter}
-          onChange={(e) => setCountryFilter(e.target.value)}
+          value=""
+          onChange={() => {}}
           aria-label="Filtrar por país"
+          aria-disabled="true"
+          disabled
+          title="Indisponível nesta versão"
         />
         <select
-          value={mfaFilter}
-          onChange={(e) => setMfaFilter(e.target.value as MfaFilter)}
+          value="all"
+          onChange={() => {}}
           aria-label="Filtrar por MFA no login"
+          aria-disabled="true"
+          disabled
+          title="Indisponível nesta versão"
         >
           <option value="all">MFA: todos</option>
-          <option value="yes">MFA: com</option>
-          <option value="no">MFA: sem</option>
         </select>
         <button
           type="button"
@@ -208,6 +225,7 @@ export default function SessionsTable() {
               <tr>
                 <th>
                   <input
+                    ref={headerCheckboxRef}
                     type="checkbox"
                     className={styles.checkbox}
                     checked={allSelected}
@@ -289,7 +307,10 @@ export default function SessionsTable() {
 
       <Dialog
         open={confirmOpen}
-        onClose={() => (bulkPending ? undefined : setConfirmOpen(false))}
+        onClose={() => {
+          if (!bulkPending) setConfirmOpen(false);
+        }}
+        disableBackdropClose={bulkPending}
         title="Revogar sessões selecionadas"
         description={`Você vai encerrar ${selected.size} sessão(ões). Os usuários afetados precisarão fazer login novamente.`}
         footer={
