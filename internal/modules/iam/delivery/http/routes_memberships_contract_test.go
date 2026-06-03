@@ -20,6 +20,10 @@ func (f fakeUserAreaWriteRepository) ListActive(ctx context.Context, userID, ten
 	return nil, nil
 }
 
+func (f fakeUserAreaWriteRepository) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]iamdomain.UserProcessArea, error) {
+	return nil, nil
+}
+
 func (f fakeUserAreaWriteRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
 	return nil
 }

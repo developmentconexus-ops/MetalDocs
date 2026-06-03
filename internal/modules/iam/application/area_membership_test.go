@@ -24,9 +24,15 @@ type userAreaWriteRepoStub struct {
 	closeActiveErr   error
 	insertErr        error
 	grantAtomicErr   error
+	tenantFilter     [4]string
 }
 
 func (s *userAreaWriteRepoStub) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error) {
+	return append([]domain.UserProcessArea(nil), s.activeList...), nil
+}
+
+func (s *userAreaWriteRepoStub) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]domain.UserProcessArea, error) {
+	s.tenantFilter = [4]string{tenantID, userID, areaCode, role}
 	return append([]domain.UserProcessArea(nil), s.activeList...), nil
 }
 
@@ -136,6 +142,28 @@ func TestGrant_Overlap_Merge(t *testing.T) {
 	}
 	if repo.atomicNew.Role != domain.RoleApprover {
 		t.Fatalf("expected atomic new role approver, got %q", repo.atomicNew.Role)
+	}
+}
+
+func TestListByTenant_PassesFilters(t *testing.T) {
+	now := time.Date(2026, 4, 21, 12, 0, 0, 0, time.UTC)
+	repo := &userAreaWriteRepoStub{
+		activeList: []domain.UserProcessArea{
+			{UserID: "u1", TenantID: "t1", AreaCode: "A1", Role: domain.RoleEditor, EffectiveFrom: now},
+		},
+	}
+	service := NewAreaMembershipService(repo, &membershipLoggerStub{})
+	service.nowFn = func() time.Time { return now }
+
+	items, err := service.ListByTenant(context.Background(), "t1", "u1", "A1", "editor")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if got, want := repo.tenantFilter, ([4]string{"t1", "u1", "A1", "editor"}); got != want {
+		t.Fatalf("filters not threaded: got %v want %v", got, want)
 	}
 }
 
