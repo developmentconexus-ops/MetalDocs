@@ -5031,7 +5031,10 @@ export interface components {
             /** @enum {string} */
             resourceScope: "document" | "document_type" | "area";
             resourceId: string;
-            /** @enum {string} */
+            /**
+             * @description Document-level ACL action code for the per-document access-policy feature (backend-unimplemented; backed by the document_access_policies CHECK constraint). This is a SEPARATE vocabulary from the IAM tier-1/tier-2 capability registry (internal/modules/iam/domain validCapabilities) and is deliberately disjoint from it — these are NOT IAM capabilities. See ADR 0022 Finding 3.
+             * @enum {string}
+             */
             capability: "document.create" | "document.view" | "document.edit" | "document.upload_attachment" | "document.change_workflow" | "document.manage_permissions";
             /** @enum {string} */
             effect: "allow" | "deny";
@@ -5040,7 +5043,10 @@ export interface components {
             /** @enum {string} */
             subjectType: "user" | "role" | "group";
             subjectId: string;
-            /** @enum {string} */
+            /**
+             * @description Document-level ACL action code for the per-document access-policy feature (backend-unimplemented; backed by the document_access_policies CHECK constraint). This is a SEPARATE vocabulary from the IAM tier-1/tier-2 capability registry (internal/modules/iam/domain validCapabilities) and is deliberately disjoint from it — these are NOT IAM capabilities. See ADR 0022 Finding 3.
+             * @enum {string}
+             */
             capability: "document.create" | "document.view" | "document.edit" | "document.upload_attachment" | "document.change_workflow" | "document.manage_permissions";
             /** @enum {string} */
             effect: "allow" | "deny";
@@ -6823,9 +6829,11 @@ export interface operations {
     listAreaMemberships: {
         parameters: {
             query?: {
-                /** @description Filter by target userId. Defaults to the authenticated actor when omitted. */
+                /** @description Filter by target userId. System admins omitting userId receive the full tenant directory; non-admins are always scoped to their own memberships regardless of this value. */
                 userId?: string;
+                /** @description Optional exact-match filter on the process area code. */
                 areaCode?: string;
+                /** @description Optional exact-match filter on the membership role. */
                 role?: components["schemas"]["UserRole"];
             };
             header?: never;

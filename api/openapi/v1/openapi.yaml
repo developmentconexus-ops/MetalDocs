@@ -5911,6 +5911,13 @@ components:
           type: string
         capability:
           type: string
+          description: >-
+            Document-level ACL action code for the per-document access-policy
+            feature (backend-unimplemented; backed by the document_access_policies
+            CHECK constraint). This is a SEPARATE vocabulary from the IAM
+            tier-1/tier-2 capability registry (internal/modules/iam/domain
+            validCapabilities) and is deliberately disjoint from it — these are
+            NOT IAM capabilities. See ADR 0022 Finding 3.
           enum: [document.create, document.view, document.edit, document.upload_attachment, document.change_workflow, document.manage_permissions]
         effect:
           type: string
@@ -5926,6 +5933,13 @@ components:
           type: string
         capability:
           type: string
+          description: >-
+            Document-level ACL action code for the per-document access-policy
+            feature (backend-unimplemented; backed by the document_access_policies
+            CHECK constraint). This is a SEPARATE vocabulary from the IAM
+            tier-1/tier-2 capability registry (internal/modules/iam/domain
+            validCapabilities) and is deliberately disjoint from it — these are
+            NOT IAM capabilities. See ADR 0022 Finding 3.
           enum: [document.create, document.view, document.edit, document.upload_attachment, document.change_workflow, document.manage_permissions]
         effect:
           type: string

@@ -1,6 +1,6 @@
 # Authz Tiers
 
-> **Last verified:** 2026-06-01 (F-001 closed: Tier-1 read/write split applied to 13 rows in `permissions.go`; new Tier-1 rule authoring rules subsection + `TestPermissionsTable_NoMethodlessWriteShadowing` CI guard; taxonomy Tier-2 reads migrated to `CapTaxonomyView`; ADR 0016 view-grade caps `metrics.view`/`membership.view`/`user.view`/`taxonomy.view` accepted; prior: 2026-05-11)
+> **Last verified:** 2026-06-03 (ADR 0022 Phase 5: added the `cap:<name>` marker convention + `wiki-capability-parity` CI binding; prior: 2026-06-01 — F-001 closed: Tier-1 read/write split applied to 13 rows in `permissions.go`; new Tier-1 rule authoring rules subsection + `TestPermissionsTable_NoMethodlessWriteShadowing` CI guard; taxonomy Tier-2 reads migrated to `CapTaxonomyView`; ADR 0016 view-grade caps `metrics.view`/`membership.view`/`user.view`/`taxonomy.view` accepted; prior: 2026-05-11)
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
 > **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md`.
 > **Key files:**
@@ -45,7 +45,15 @@ MetalDocs has **two authorization tiers**.
 | controlled-documents | `Create`, `CreateTx` (`controlled_documents.create`); `changeStatus` (`controlled_documents.obsolete`\|`controlled_documents.supersede`) | `controlled_documents`, `cd_sequence_counters` |
 | taxonomy | `FamilyRepository.Create/Update`, `ProfileRepository.Create/Update`, `AreaRepository.Create/Update` | `document_profiles`, `document_process_areas`, `document_families` |
 | templates | `CreateTemplate`, `SubmitForReview`, `Review`, `Approve`, `PublishTemplateVersion`, `ArchiveTemplate` | `templates_template`, `templates_template_version` |
-| iam | `UpsertUserAndAssignRole`, `ReplaceUserRoles` (user.manage); `Insert`, `CloseActive`, `GrantAtomic` (membership.manage) | `iam_user_roles`, `user_process_areas` |
+| iam | `UpsertUserAndAssignRole`, `ReplaceUserRoles` (`cap:user.manage`); `Insert`, `CloseActive`, `GrantAtomic` (`cap:membership.manage`) | `iam_user_roles`, `user_process_areas` |
+
+> **Capability reference convention (ADR 0022 Phase 5):** an enforcement claim —
+> a statement that a capability is actually checked — is written `` `cap:<name>` ``
+> (e.g. `` `cap:membership.manage` ``). `scripts/api-lint`'s `wiki-capability-parity`
+> rule binds every `cap:` marker in this doc to the Go registry (`validCapabilities`),
+> so a name that does not exist (a future `membership.grant`-style drift) is a red
+> build. Illustrative or deferred mentions (e.g. `doc.create` above, `route.view`
+> below) are unmarked prose and intentionally not checked.
 
 ## Tier-1 rule authoring rules
 
