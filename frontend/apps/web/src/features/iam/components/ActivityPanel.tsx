@@ -9,7 +9,7 @@ const LIMIT = 20;
 
 export default function ActivityPanel() {
   const { data, isLoading, error, refetch } = useAuditEventsQuery({ limit: LIMIT });
-  const events = data?.items ?? [];
+  const events = data?.pages[0]?.items ?? [];
 
   return (
     <section

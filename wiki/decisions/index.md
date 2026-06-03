@@ -15,5 +15,6 @@
 - [0013-template-revision-labels.md](0013-template-revision-labels.md) — **Proposed** (awaiting ratification)
 - [0017-signoff-idempotency-fingerprint.md](0017-signoff-idempotency-fingerprint.md) — signoff idempotency fingerprint = client-stable inputs only (F-002 correction)
 - [0018-approval-route-lifecycle.md](0018-approval-route-lifecycle.md) — approval route lifecycle: terminal-on-deactivate state machine, version OCC, in-use guard, capability pin, reason audit
+- [2026-06-03-audit-events-cursor-shape.md](2026-06-03-audit-events-cursor-shape.md) — **Open** — `/audit/events` runtime emits flat `{nextCursor,hasMore}` while spec declares `page.{next_cursor,has_more}`; FE adapter bridges until backend reconciles
 
 Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.

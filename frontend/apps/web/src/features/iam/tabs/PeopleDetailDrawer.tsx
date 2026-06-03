@@ -253,7 +253,7 @@ function ActivityPanel({ userId }: { userId: string }) {
     actorId: userId,
     limit: 50,
   });
-  const items = data?.items ?? [];
+  const items = data?.pages[0]?.items ?? [];
 
   if (isLoading) return <div className={styles.loading}>Carregando atividade…</div>;
   if (error) {
