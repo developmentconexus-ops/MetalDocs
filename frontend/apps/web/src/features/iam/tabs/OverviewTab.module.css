@@ -1,0 +1,39 @@
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+.heading {
+  margin: 0 0 var(--sp-1) 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.lede {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.headerBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bento {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--sp-5);
+  align-items: stretch;
+}
+
+@media (max-width: 980px) {
+  .bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

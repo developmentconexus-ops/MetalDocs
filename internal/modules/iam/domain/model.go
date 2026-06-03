@@ -7,18 +7,29 @@ import (
 
 type Role string
 
+// Canonical tenant roles (8). PR-5 will move this catalog to a dedicated file
+// (`canonical_roles.go`) when the Roles & Capabilities matrix lands; the three
+// area-only roles (signer / area_admin / qms_admin) are added here in PR-4 so
+// People-tab invite validation can accept area-membership.role values that
+// match the OpenAPI UserRole enum. Source: wiki/modules/iam.md §canonical-roles.
 const (
 	RoleApprover    Role = "approver"
+	RoleAreaAdmin   Role = "area_admin"
 	RoleAuthor      Role = "author"
 	RoleEditor      Role = "editor"
+	RoleQmsAdmin    Role = "qms_admin"
+	RoleSigner      Role = "signer"
 	RoleSystemAdmin Role = "system_admin"
 	RoleViewer      Role = "viewer"
 )
 
 var validRoles = map[Role]struct{}{
 	RoleApprover:    {},
+	RoleAreaAdmin:   {},
 	RoleAuthor:      {},
 	RoleEditor:      {},
+	RoleQmsAdmin:    {},
+	RoleSigner:      {},
 	RoleSystemAdmin: {},
 	RoleViewer:      {},
 }
@@ -68,6 +79,7 @@ const (
 	CapUserManage                  Capability = "user.manage"
 	CapMetricsView                 Capability = "metrics.view"
 	CapAuditRead                   Capability = "audit.read"
+	CapSessionManage               Capability = "session.manage"
 )
 
 var validCapabilities = map[Capability]struct{}{
@@ -98,6 +110,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapUserManage:                  {},
 	CapMetricsView:                 {},
 	CapAuditRead:                   {},
+	CapSessionManage:               {},
 }
 
 func IsValidCapability(cap Capability) bool {

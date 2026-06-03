@@ -42,6 +42,7 @@ import (
 	auditdelivery "metaldocs/internal/modules/audit/delivery/http"
 	authapp "metaldocs/internal/modules/auth/application"
 	authdelivery "metaldocs/internal/modules/auth/delivery/http"
+	authpg "metaldocs/internal/modules/auth/infrastructure/postgres"
 	controlleddocuments "metaldocs/internal/modules/controlleddocuments"
 	controlleddocumentsapp "metaldocs/internal/modules/controlleddocuments/application"
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
@@ -50,10 +51,14 @@ import (
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
+	iampresence "metaldocs/internal/modules/iam/presence"
 	"metaldocs/internal/modules/render/fanout"
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
 	searchdelivery "metaldocs/internal/modules/search/delivery/http"
+	securityapp "metaldocs/internal/modules/security/application"
+	securitydelivery "metaldocs/internal/modules/security/delivery/http"
+	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
 	searchdocs "metaldocs/internal/modules/search/infrastructure/v2documents"
 	"metaldocs/internal/modules/taxonomy"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
@@ -196,8 +201,16 @@ func main() {
 	}
 
 	auditService := auditapp.NewService(deps.AuditReader)
+	if deps.AuditCounter != nil && deps.AuditExports != nil {
+		auditService.WithExports(deps.AuditCounter, deps.AuditExports, deps.AuditWriter, func(job auditdomain.ExportJob) string {
+			if job.ID == "" || job.DownloadToken == "" {
+				return ""
+			}
+			return fmt.Sprintf("/api/v1/audit/events/export/%s/download?token=%s", job.ID, job.DownloadToken)
+		})
+	}
 
-	auditHandler := auditdelivery.NewHandler(auditService)
+	auditHandler := auditdelivery.NewHandler(auditService).WithExporter(auditService)
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB))
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
@@ -229,7 +242,30 @@ func main() {
 
 	iamAdminService := iamapp.NewAdminService(deps.RoleAdminRepo, cachedProvider)
 	iamAdminHandler := iamdelivery.NewAdminHandler(iamAdminService, authService, deps.AuditWriter).
-		WithAuditReader(deps.AuditReader)
+		WithAuditEventLister(auditService)
+
+	// PR-7 Sessions & Security tab.
+	var sessionsHandler *iamdelivery.SessionsHandler
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		sessionsHandler = iamdelivery.NewSessionsHandler(authpg.NewRepository(sqlDB), deps.AuditWriter)
+	}
+	var securityService *securityapp.Service
+	var securityHandler *securitydelivery.Handler
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		securityService = securityapp.NewService(securitypg.NewRepository(sqlDB))
+		securityHandler = securitydelivery.NewHandler(securityService)
+	} else {
+		securityHandler = securitydelivery.NewHandler(nil)
+	}
+
+	// PR-8 Observability service.
+	var observabilityHandler *iamdelivery.ObservabilityHandler
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		observabilityRepo := iampg.NewObservabilityRepository(sqlDB)
+		observabilityService := iamapp.NewObservabilityService(observabilityRepo, mfaCoveragePctAdapter{svc: securityService})
+		observabilityHandler = iamdelivery.NewObservabilityHandler(observabilityService)
+		iamAdminHandler = iamAdminHandler.WithObservabilityService(observabilityService)
+	}
 	featureFlagsHandler := featureflags.NewHandler(featureFlagsCfg)
 	httpObs := observability.NewHTTPObservability(deps.StatusProvider)
 	rateLimiter := security.NewRateLimiter(rateCfg)
@@ -242,6 +278,32 @@ func main() {
 	auditHandler.RegisterRoutes(mux)
 	searchHandler.RegisterRoutes(mux)
 	iamAdminHandler.RegisterRoutes(mux)
+	if sessionsHandler != nil {
+		sessionsHandler.RegisterRoutes(mux)
+	}
+	if securityHandler != nil {
+		securityHandler.RegisterRoutes(mux)
+	}
+	if observabilityHandler != nil {
+		observabilityHandler.RegisterRoutes(mux)
+	}
+
+	// PR-9: presence hub + WebSocket stream + HTTP snapshot fallback.
+	// Backed by metaldocs.iam_users.last_seen_at (migration 0220). The
+	// hub.Run + hub.RunHeartbeat goroutines tick every 15s / 30s; they
+	// exit when ctx is cancelled. The bump middleware is wrapped into
+	// the outer chain below so authenticated requests refresh the
+	// caller's last_seen_at (debounced 60s per user).
+	var presenceBump *iampresence.BumpMiddleware
+	if sqlDB := deps.SQLDB; sqlDB != nil {
+		presenceRepo := iampresence.NewPostgresRepository(sqlDB)
+		presenceHub := iampresence.NewHub(presenceRepo, slog.Default())
+		go presenceHub.Run(ctx)
+		go presenceHub.RunHeartbeat(ctx)
+		iampresence.NewHandler(presenceHub, presenceRepo, slog.Default()).RegisterRoutes(mux)
+		presenceBump = iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
+		iamAdminHandler.WithPresenceReader(presenceRepo)
+	}
 
 	taxonomyModule := buildTaxonomyModule(deps)
 	taxonomyModule.RegisterRoutes(mux)
@@ -255,6 +317,21 @@ func main() {
 		membershipService = iamapp.NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)
 	}
 	iamdelivery.NewMembershipHandler(membershipService).RegisterRoutes(mux)
+
+	// PR-4: People-tab orchestrator. AreaCatalogReader is wired to the
+	// permissive impl pending a dedicated process_areas reader (TODO PR-5):
+	// the Postgres area membership grant path already verifies areaCode via
+	// foreign-key checks, so invalid codes still fail-closed downstream — the
+	// permissive validator just defers the error one layer.
+	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, iamapp.PermissiveAreaCatalog{}, cachedProvider)
+	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
+
+	// PR-5: IAM Admin Center "Roles & Capabilities" tab: read-only matrix.
+	var roleCapsReader iamdelivery.RoleCapabilitiesReader
+	if deps.SQLDB != nil {
+		roleCapsReader = iampg.NewRoleCapabilitiesRepository(deps.SQLDB)
+	}
+	iamdelivery.NewRolesCapsHandler(roleCapsReader).RegisterRoutes(mux)
 
 	// Legacy templates module routes removed — templates owns /api/v1/templates/*
 
@@ -496,7 +573,14 @@ func main() {
 		}()
 	}
 
-	handler := cors.Wrap(originProtection.Wrap(authMiddleware.Wrap(iamMiddleware.Wrap(httpObs.Wrap(rateLimiter.Wrap(mux))))))
+	// PR-9: presenceBump sits AFTER iamMiddleware (so iamdomain.UserID
+	// is in ctx) and wraps the inner stack so authenticated requests
+	// bump iam_users.last_seen_at (debounced 60s per user).
+	var presenceWrapped http.Handler = httpObs.Wrap(rateLimiter.Wrap(mux))
+	if presenceBump != nil {
+		presenceWrapped = presenceBump.Wrap(presenceWrapped)
+	}
+	handler := cors.Wrap(originProtection.Wrap(authMiddleware.Wrap(iamMiddleware.Wrap(presenceWrapped))))
 
 	addr := ":8080"
 	if appPort := os.Getenv("APP_PORT"); appPort != "" {
@@ -774,4 +858,22 @@ func (a *profileDefaultsAdapter) GetDefaultTemplateVersionID(ctx context.Context
 	}
 	status := "published"
 	return profile.DefaultTemplateVersionID, &status, nil
+}
+
+// mfaCoveragePctAdapter narrows securityapp.Service to the
+// MfaCoveragePctReader port consumed by iamapp.ObservabilityService.
+// Returns 0 when the security service is nil (in-memory / dev mode).
+type mfaCoveragePctAdapter struct {
+	svc *securityapp.Service
+}
+
+func (a mfaCoveragePctAdapter) MfaCoveragePct(ctx context.Context, tenantID string) (float32, error) {
+	if a.svc == nil {
+		return 0, nil
+	}
+	cov, err := a.svc.MfaCoverage(ctx, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	return cov.MfaEnabledPct, nil
 }

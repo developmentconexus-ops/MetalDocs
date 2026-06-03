@@ -192,7 +192,7 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	}
 	// TODO: use SELECT ... FOR UPDATE or advisory lock to make lockout atomic.
 	if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(password)) != nil {
-		if _, _, err := s.repo.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds())); err != nil {
+		if _, _, err := s.repo.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds()), s.remoteIP(r)); err != nil {
 			return authdomain.AuthenticatedSession{}, fmt.Errorf("record failed login: %w", err)
 		}
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
@@ -206,6 +206,13 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	}
 	if err := s.repo.RecordSuccessfulLogin(ctx, identity.UserID, now); err != nil {
 		return authdomain.AuthenticatedSession{}, err
+	}
+	// Governance hint for the People-tab "Last login" drawer (PR-4). Best-effort:
+	// failure to update iam_users must not block login — the credential row above
+	// is the source of truth. PR-7 will populate deviceLabel via UA parsing.
+	if err := s.repo.RecordLastLoginContext(ctx, identity.UserID, tenantID, s.remoteIP(r), truncate(strings.TrimSpace(r.UserAgent()), 512), ""); err != nil {
+		// Swallow — already journalled by RecordSuccessfulLogin above.
+		_ = err
 	}
 
 	rawToken, sessionID, err := s.newSessionToken()
