@@ -1,6 +1,6 @@
 # Local Dev Credentials
 
-**Last verified:** 2026-06-01
+**Last verified:** 2026-06-03 (ADR 0022 Phase 5: marked `cap:membership.manage` for the `wiki-capability-parity` CI binding; prior: 2026-06-01)
 
 ## API login
 
@@ -76,6 +76,11 @@ Dev seed: `admin` user has **qms_admin** role in `general` area (applied by migr
 > **Note:** illustrative legacy naming. The authoritative role→capability matrix
 > is `db/reference-data/0001_product_reference_data.sql` (registry consts in
 > `internal/modules/iam/domain/model.go`). `area_admin` is **not** seeded
-> `doc.publish`; its real seeded cap is `membership.manage` (ADR 0022 Phase 1).
+> `doc.publish`; its real seeded cap is `cap:membership.manage` (ADR 0022 Phase 1).
+>
+> Capability references written `` `cap:<name>` `` are enforcement claims bound to
+> the Go registry by `scripts/api-lint` (`wiki-capability-parity`, ADR 0022
+> Phase 5) — a name not in `validCapabilities` fails CI. Unmarked dotted tokens
+> (the illustrative legacy names in the table above) are prose and not checked.
 
 **Historical note:** `user_process_areas_role_check` originally only allowed `viewer/editor/reviewer/approver` (0125) while `role_capabilities` used a different set. Migration 0158 widens the constraint to align them. See `decisions/` for the ADR.
