@@ -25,6 +25,14 @@ func (f fakeUserAreaWriteRepository) ListByTenant(ctx context.Context, tenantID,
 	return nil, nil
 }
 
+func (f fakeUserAreaWriteRepository) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (bool, bool, error) {
+	return false, false, nil
+}
+
+func (f fakeUserAreaWriteRepository) ListByTenantInManagedAreas(ctx context.Context, tenantID, userID, areaCode, role, actorID, capability string, now time.Time) ([]iamdomain.UserProcessArea, error) {
+	return nil, nil
+}
+
 func (f fakeUserAreaWriteRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
 	return nil
 }
