@@ -118,7 +118,7 @@ func TestPermissionResolver(t *testing.T) {
 		// --- Permission-guarded: misc (F-001 split: area-memberships GET=view, writes=manage) ---
 		{name: "iam area memberships list", method: http.MethodGet, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam area memberships create", method: http.MethodPost, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "iam area memberships delete", method: http.MethodDelete, path: "/api/v1/iam/area-memberships/m-1", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "iam area memberships delete", method: http.MethodDelete, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval get", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval post", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/decisions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -256,7 +256,7 @@ func TestRouteCoverage(t *testing.T) {
 		// iamdelivery.NewMembershipHandler(...).RegisterRoutes (main.go:238)
 		{"area-memberships", http.MethodGet, "/api/v1/iam/area-memberships"},
 		{"area-memberships", http.MethodPost, "/api/v1/iam/area-memberships"},
-		{"area-memberships", http.MethodDelete, "/api/v1/iam/area-memberships/m-1"},
+		{"area-memberships", http.MethodDelete, "/api/v1/iam/area-memberships"},
 
 		// docMod.RegisterRoutes (main.go:379)
 		{"documents", http.MethodGet, "/api/v1/documents"},
@@ -432,6 +432,49 @@ func TestPermissionResolver_PeopleHandlerRoutes(t *testing.T) {
 		}
 		if gotCap != tc.cap {
 			t.Errorf("%s %s: cap=%q want %q", tc.method, tc.path, gotCap, tc.cap)
+		}
+	}
+}
+
+// TestPermissionResolver_AreaMembershipRoutes pins the PR-1 contract: GET
+// resolves to membership.view, POST + DELETE to membership.manage, and PUT +
+// PATCH are NOT on the surface (the API offers grant + revoke only — role
+// changes go via revoke-then-grant). Without this lock test the rules at
+// permissions.go:225-233 could regress to a path-prefix entry that silently
+// admits PUT/PATCH.
+func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
+	t.Parallel()
+
+	resolver := newPermissionResolver()
+	cases := []struct {
+		method string
+		path   string
+		cap    iamdomain.Capability
+	}{
+		{http.MethodGet, "/api/v1/iam/area-memberships", iamdomain.CapMembershipView},
+		{http.MethodPost, "/api/v1/iam/area-memberships", iamdomain.CapMembershipManage},
+		{http.MethodDelete, "/api/v1/iam/area-memberships", iamdomain.CapMembershipManage},
+	}
+	for _, tc := range cases {
+		gotCap, gotVis := resolver(tc.method, tc.path)
+		if gotVis != iamdelivery.VisibilityPermissionGuarded {
+			t.Errorf("%s %s: visibility=%v want PermissionGuarded", tc.method, tc.path, gotVis)
+		}
+		if gotCap != tc.cap {
+			t.Errorf("%s %s: cap=%q want %q", tc.method, tc.path, gotCap, tc.cap)
+		}
+	}
+
+	// PUT + PATCH must NOT be permission-guarded on this path — they're not
+	// part of the surface (the API offers grant + revoke only). A future
+	// regression that resolves them to *any* permission-guarded cap (manage,
+	// view, or anything else) silently expands the attack surface; the only
+	// safe verdict is fall-through to VisibilitySessionRequired so the
+	// ServeMux 405 handles them.
+	for _, method := range []string{http.MethodPut, http.MethodPatch} {
+		gotCap, gotVis := resolver(method, "/api/v1/iam/area-memberships")
+		if gotVis == iamdelivery.VisibilityPermissionGuarded {
+			t.Errorf("%s /api/v1/iam/area-memberships: visibility=PermissionGuarded cap=%q — PUT/PATCH must fall through to VisibilitySessionRequired", method, gotCap)
 		}
 	}
 }

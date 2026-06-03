@@ -2661,7 +2661,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/iam/area-memberships": {
+    "/iam/area-memberships": {
         parameters: {
             query?: never;
             header?: never;
@@ -2671,7 +2671,7 @@ export interface paths {
         /** List active area memberships for the current tenant */
         get: operations["listAreaMemberships"];
         put?: never;
-        /** Grant or replace an active area membership */
+        /** Grant an active area membership */
         post: operations["grantAreaMembership"];
         /** Revoke an active area membership */
         delete: operations["revokeAreaMembership"];
@@ -4019,6 +4019,32 @@ export interface components {
             areaCode: string;
             role: components["schemas"]["UserRole"];
         };
+        /** @description Active area membership row returned by the tenant-scoped /iam/area-memberships listing. */
+        AreaMembershipRow: {
+            userId: string;
+            tenantId: string;
+            areaCode: string;
+            role: components["schemas"]["UserRole"];
+            /** Format: date-time */
+            effectiveFrom: string;
+            /** Format: date-time */
+            effectiveTo?: string | null;
+            grantedBy?: string | null;
+        };
+        AreaMembershipListResponse: {
+            items: components["schemas"]["AreaMembershipRow"][];
+        };
+        GrantAreaMembershipRequest: {
+            userId: string;
+            areaCode: string;
+            role: components["schemas"]["UserRole"];
+        };
+        GrantAreaMembershipResponse: {
+            userId: string;
+            tenantId: string;
+            areaCode: string;
+            role: components["schemas"]["UserRole"];
+        };
         /** @description Canonical user shape — single tenantRole + multi area memberships. */
         ManagedUserCore: {
             userId: string;
@@ -4104,6 +4130,11 @@ export interface components {
             code: components["schemas"]["UserRole"];
             label: string;
             description: string;
+            /**
+             * @description tenant — global tenant role; area — granted per process-area membership.
+             * @enum {string}
+             */
+            category: "tenant" | "area";
         };
         ListRolesResponse: {
             items: components["schemas"]["RoleDescriptor"][];
@@ -6791,19 +6822,62 @@ export interface operations {
     };
     listAreaMemberships: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Filter by target userId. Defaults to the authenticated actor when omitted. */
+                userId?: string;
+                areaCode?: string;
+                role?: components["schemas"]["UserRole"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description ok */
+            /** @description Active memberships for the current tenant */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AreaMembershipListResponse"];
+                };
+            };
+            /** @description Validation failure */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Target user not in tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -6816,46 +6890,120 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    userId: string;
-                    areaCode: string;
-                    role: string;
-                    grantedBy?: string;
-                };
+                "application/json": components["schemas"]["GrantAreaMembershipRequest"];
             };
         };
         responses: {
-            /** @description created */
+            /** @description Membership granted */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["GrantAreaMembershipResponse"];
+                };
+            };
+            /** @description Validation failure (missing fields, unknown role) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Target user not in tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Active membership for (user, area) already exists with the same role */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
     revokeAreaMembership: {
         parameters: {
-            query?: never;
+            query: {
+                userId: string;
+                areaCode: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    userId: string;
-                    areaCode: string;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description revoked */
+            /** @description Membership revoked */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation failure */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Target user not in tenant, or no active membership for (user, area) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
