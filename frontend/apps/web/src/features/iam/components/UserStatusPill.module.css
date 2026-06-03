@@ -1,0 +1,22 @@
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.statusActive { background: var(--success-bg); color: var(--success); }
+.statusPending { background: var(--warning-bg, var(--surface-2)); color: var(--warning); }
+.statusSuspended { background: var(--surface-2); color: var(--text-muted); }
+.statusLocked { background: var(--danger-bg); color: var(--danger); }
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
