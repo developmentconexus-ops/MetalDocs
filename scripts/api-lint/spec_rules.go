@@ -19,7 +19,7 @@ type Violation struct {
 
 // Paths in the OpenAPI doc exclude the server prefix (`/api/v1`), so match on
 // the bare resource path.
-var stateTransitionPathRE = regexp.MustCompile(`^/[^/]+/\{[^}]+\}/(publish|submit|approve|reject|archive|unarchive)$`)
+var stateTransitionPathRE = regexp.MustCompile(`^/[^/]+/\{[^}]+\}/(publish|submit|approve|reject|archive|unarchive|signoff|supersede|obsolete|schedule-publish)$`)
 
 func RunSpecRules(specPath string) ([]Violation, error) {
 	data, err := os.ReadFile(specPath)
