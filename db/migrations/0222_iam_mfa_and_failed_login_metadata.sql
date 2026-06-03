@@ -1,6 +1,13 @@
--- SUPERSEDED BY db/migrations/0222_iam_mfa_and_failed_login_metadata.sql. DO NOT COPY OR REPLAY. The runtime only applies db/migrations/*.sql; this archive copy is kept for history only.
--- migrations/0210_iam_mfa_and_failed_login_metadata.sql
--- PR-7 Sessions & Security tab backend.
+-- db/migrations/0222_iam_mfa_and_failed_login_metadata.sql
+-- Retro-land of PR-7 (commit e408d7578). The original file was authored as
+-- migrations/0210_iam_mfa_and_failed_login_metadata.sql under the LEGACY
+-- migrations/ archive directory, which the API runtime does NOT replay
+-- (runtime applies db/migrations/*.sql only — see
+-- apps/api/cmd/metaldocs-api/main.go:188 and wiki/database/migration-policy.md).
+-- Result: live iam_users was missing mfa_enabled + mfa_enrolled_at and live
+-- auth_identities was missing last_failed_login_at + last_failed_login_ip,
+-- which caused /iam/kpi to 500 and made RecordFailedLogin a latent 500.
+--
 -- iam_users  : MFA enrollment columns. Stub-only until a real MFA flow ships
 --              (see wiki/modules/security-tech-debt.md). Both default-false so
 --              coverage reports report 0% honestly.
@@ -26,7 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_auth_identities_locked_until
   WHERE locked_until IS NOT NULL;
 
 INSERT INTO public.schema_migrations (version, description)
-VALUES ('0210', 'iam_users mfa metadata + auth_identities last_failed_login_* (PR-7)')
+VALUES ('0222', 'PR-7 retro-land: iam_users mfa metadata + auth_identities last_failed_login_* (originally orphan migrations/0210)')
 ON CONFLICT (version) DO NOTHING;
 
 COMMIT;

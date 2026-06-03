@@ -1,3 +1,4 @@
+-- SUPERSEDED BY db/migrations/0223_iam_last_failed_login_index.sql. DO NOT COPY OR REPLAY. The runtime only applies db/migrations/*.sql; this archive copy is kept for history only.
 -- migrations/0211_iam_last_failed_login_index.sql
 -- PR-7b hardening. Sessions & Security tab calls
 -- CountRecentFailedLoginsByUser, which WHERE-filters on
