@@ -11,6 +11,11 @@ export type DocumentStatus =
   | "obsolete";
 export type Classification = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
 export type ResourceScope = "document" | "document_type" | "area";
+// NOTE PR-12: "admin" and "reviewer" retained as compat aliases — still referenced by
+// features/templates (pending_reviewer_role workflow role), features/documents
+// (DocumentPublishedPage role check), features/taxonomy (ProfileEditDialog default),
+// features/iam/membershipApi. Backend canonical role enum is the 8 below. Cleanup of
+// these two literals across the FE deferred to a dedicated follow-up PR.
 export type UserRole =
   | "admin"
   | "system_admin"
@@ -38,6 +43,14 @@ export interface CurrentUser {
   capabilities: string[];
 }
 
+export interface AreaMembership {
+  areaId: string;
+  areaCode: string;
+  areaName: string;
+  roleInArea: UserRole;
+  grantedAt: string;
+}
+
 export interface ManagedUserItem {
   userId: string;
   username: string;
@@ -48,9 +61,14 @@ export interface ManagedUserItem {
   failedLoginAttempts: number;
   lockedUntil?: string;
   lastLoginAt?: string;
+  lastLoginIp?: string;
+  lastLoginCountry?: string;
   createdAt: string;
   updatedAt: string;
-  roles: UserRole[];
+  tenantRole: UserRole;
+  areaMemberships: AreaMembership[];
+  status: "active" | "pending" | "suspended" | "locked" | "left";
+  mfaEnrolled: boolean;
 }
 
 export interface OnlineUserItem {
