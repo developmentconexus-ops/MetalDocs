@@ -1,6 +1,6 @@
 # Decisions
 
-> **Last verified:** 2026-06-01
+> **Last verified:** 2026-06-03
 > **Scope:** Durable ADRs and consequential technical decisions.
 
 - [0001-eigenpal-adoption.md](0001-eigenpal-adoption.md)
@@ -15,6 +15,9 @@
 - [0013-template-revision-labels.md](0013-template-revision-labels.md) — **Proposed** (awaiting ratification)
 - [0017-signoff-idempotency-fingerprint.md](0017-signoff-idempotency-fingerprint.md) — signoff idempotency fingerprint = client-stable inputs only (F-002 correction)
 - [0018-approval-route-lifecycle.md](0018-approval-route-lifecycle.md) — approval route lifecycle: terminal-on-deactivate state machine, version OCC, in-use guard, capability pin, reason audit
+- [0019-cap-audit-read-and-session-manage.md](0019-cap-audit-read-and-session-manage.md) — tier-1 caps for audit read + session manage (PR-2)
+- [0020-admin-center-six-tab-ia.md](0020-admin-center-six-tab-ia.md) — **Accepted** — Admin Center 6-tab IA, shipped at PR-12
+- [0021-tenant-vs-platform-admin-separation.md](0021-tenant-vs-platform-admin-separation.md) — **Accepted** — tenant admin vs. platform admin scope split, shipped at PR-12
 - [2026-06-03-audit-events-cursor-shape.md](2026-06-03-audit-events-cursor-shape.md) — **Open** — `/audit/events` runtime emits flat `{nextCursor,hasMore}` while spec declares `page.{next_cursor,has_more}`; FE adapter bridges until backend reconciles
 
 Legacy ADR material in `docs/adr/` remains historical/reference content until reconciled deliberately.
