@@ -16,7 +16,18 @@ interface RoleDescriptor {
   code: IamRole | string;
   label?: string;
   description?: string;
-  category?: string;
+}
+
+const TENANT_ROLES = new Set<string>([
+  "system_admin",
+  "approver",
+  "author",
+  "editor",
+  "viewer",
+]);
+
+function getRoleScope(code: string): "tenant" | "area" {
+  return TENANT_ROLES.has(code) ? "tenant" : "area";
 }
 
 interface CapabilityDescriptor {
@@ -139,7 +150,7 @@ export default function RoleCapabilityMatrix({
           <tbody>
             {roles.map((role) => {
               const matrix: RoleMatrix = perRoleMatrix.get(role.code) ?? new Map();
-              const scope = role.category ? SCOPE_LABEL[role.category] : undefined;
+              const scope = SCOPE_LABEL[getRoleScope(role.code)];
               return (
                 <tr key={role.code} className={styles.row}>
                   <th scope="row" className={styles.roleHeader}>

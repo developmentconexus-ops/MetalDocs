@@ -5,7 +5,6 @@ import RoleCapabilityMatrix, {
 import {
   CAPABILITY_DOMAINS,
   GRADE_LABEL,
-  GRADE_ORDER,
   getCapabilityDomain,
   getCapabilityGrade,
   type CapabilityDomain,
@@ -258,6 +257,10 @@ function RoleDetailPanel({
     ? codes.filter((c) => getCapabilityDomain(c) === filterDomain)
     : codes;
   const grouped = groupByDomain(filteredCodes, capByCode);
+  const renderedCount = Array.from(grouped.values()).reduce(
+    (a, b) => a + b.length,
+    0,
+  );
 
   const domainLabel = filterDomain
     ? CAPABILITY_DOMAINS.find((d) => d.key === filterDomain)?.label
@@ -282,7 +285,7 @@ function RoleDetailPanel({
       <div className={styles.statsRow}>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Capacidades</span>
-          <span className={styles.statValue}>{filteredCodes.length}</span>
+          <span className={styles.statValue}>{renderedCount}</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Usuários</span>
@@ -311,7 +314,7 @@ function RoleDetailPanel({
                       <CapBullet grade={getCapabilityGrade(c.code)} />
                       <button
                         type="button"
-                        className={styles.clearBtn}
+                        className={styles.capLink}
                         onClick={() => onCapability(c.code)}
                         title={c.description}
                       >
@@ -391,10 +394,6 @@ function CapabilityDetailPanel({
 
       <p className={styles.deferNote}>
         <strong>Em breve:</strong> rotas REST gatadas por esta capacidade.
-      </p>
-
-      <p className={styles.detailEmpty}>
-        Grades: {GRADE_ORDER.map((g) => GRADE_LABEL[g]).join(" · ")}
       </p>
     </>
   );
