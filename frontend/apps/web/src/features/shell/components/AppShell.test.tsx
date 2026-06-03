@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { RouterProvider, createMemoryRouter } from 'react-router-dom';
+import { Outlet, RouterProvider, createMemoryRouter } from 'react-router-dom';
 import { AppShell } from './AppShell';
 import { useAuthStore } from '../../../store/auth.store';
 import type { CurrentUser, UserRole } from '../../../lib/types';
@@ -51,15 +51,29 @@ function renderAt(path: string) {
         element: <AppShell />,
         children: [
           { index: true, element: <div>Dashboard</div> },
+          // Mirrors features/iam/routes.tsx: the Admin Center parent carries a
+          // wide requiresAnyCapability and the memberships child tightens it to
+          // requiresCapability "membership.view". The orphan top-level
+          // admin/memberships route was removed in PR-2 — memberships is now a
+          // child of the admin parent, but the deep-link still resolves.
           {
             path: 'admin',
-            element: <div>Admin Page</div>,
-            handle: { requiresCapability: 'user.view' },
-          },
-          {
-            path: 'admin/memberships',
-            element: <div>Memberships Page</div>,
-            handle: { requiresCapability: 'membership.view' },
+            element: (
+              <>
+                <div>Admin Page</div>
+                <Outlet />
+              </>
+            ),
+            handle: {
+              requiresAnyCapability: ['user.view', 'membership.view', 'metrics.view'],
+            },
+            children: [
+              {
+                path: 'memberships',
+                element: <div>Memberships Page</div>,
+                handle: { requiresCapability: 'membership.view' },
+              },
+            ],
           },
           {
             path: 'multi',
