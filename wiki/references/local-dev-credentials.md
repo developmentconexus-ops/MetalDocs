@@ -70,7 +70,12 @@ Dev seed: `admin` user has **qms_admin** role in `general` area (applied by migr
 | `author` | doc.submit, doc.edit_draft |
 | `reviewer` | doc.signoff, doc.submit |
 | `signer` | doc.signoff |
-| `area_admin` | doc.submit, doc.signoff, doc.publish, membership.grant |
+| `area_admin` | doc.submit, doc.signoff, membership.manage |
 | `qms_admin` | all of the above + doc.obsolete, doc.reconstruct, route.admin |
+
+> **Note:** illustrative legacy naming. The authoritative role→capability matrix
+> is `db/reference-data/0001_product_reference_data.sql` (registry consts in
+> `internal/modules/iam/domain/model.go`). `area_admin` is **not** seeded
+> `doc.publish`; its real seeded cap is `membership.manage` (ADR 0022 Phase 1).
 
 **Historical note:** `user_process_areas_role_check` originally only allowed `viewer/editor/reviewer/approver` (0125) while `role_capabilities` used a different set. Migration 0158 widens the constraint to align them. See `decisions/` for the ADR.
