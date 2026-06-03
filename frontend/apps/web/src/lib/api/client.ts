@@ -16,6 +16,19 @@ function apiUrl(path: string) {
   return `${API_BASE_URL}${path}`;
 }
 
+function rewriteRequest(req: Request): Request {
+  let url: URL;
+  try {
+    url = new URL(req.url);
+  } catch {
+    return req;
+  }
+  if (url.origin !== window.location.origin) return req;
+  if (url.pathname.startsWith("/api/")) return req;
+  url.pathname = `${API_BASE_URL}${url.pathname}`;
+  return new Request(url.toString(), req);
+}
+
 function withDefaultHeaders(init?: ApiFetchOptions): RequestInit | undefined {
   if (!init) return undefined;
   const { idempotencyKey, ...rest } = init;
@@ -69,7 +82,12 @@ export async function apiFetch<T>(input: RequestInfo | URL, init?: ApiFetchOptio
   const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
   const path = input instanceof Request ? input.url : String(input);
   const traceItemId = traceRequestStart(method, path);
-  const requestInput = typeof input === "string" ? apiUrl(input) : input;
+  const requestInput =
+    typeof input === "string"
+      ? apiUrl(input)
+      : input instanceof Request
+        ? rewriteRequest(input)
+        : input;
   const res = await fetch(requestInput, withDefaultHeaders(init));
   traceRequestEnd(traceItemId);
 
