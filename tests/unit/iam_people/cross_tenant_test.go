@@ -115,6 +115,21 @@ func TestUnlock_RejectsCrossTenantUserWith404(t *testing.T) {
 	}
 }
 
+func TestListMemberships_RejectsCrossTenantUserWith404(t *testing.T) {
+	auth := &tenantAwareAuth{}
+	auth.seed(crossTenantB, authdomain.ManagedUser{UserID: "victim", Username: "victim"})
+
+	mux := newCrossTenantMux(auth)
+
+	req := withTenant(httptest.NewRequest(http.MethodGet, "/api/v1/iam/users/victim/memberships", nil), crossTenantA)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d body=%s; want 404 NOT_FOUND", rec.Code, rec.Body.String())
+	}
+}
+
 func TestPatch_RejectsCrossTenantUserWith404(t *testing.T) {
 	auth := &tenantAwareAuth{}
 	auth.seed(crossTenantB, authdomain.ManagedUser{UserID: "victim", Username: "victim"})

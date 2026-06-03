@@ -11,18 +11,16 @@ export type DocumentStatus =
   | "obsolete";
 export type Classification = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
 export type ResourceScope = "document" | "document_type" | "area";
-// NOTE PR-12: "admin" and "reviewer" retained as compat aliases — still referenced by
-// features/templates (pending_reviewer_role workflow role), features/documents
-// (DocumentPublishedPage role check), features/taxonomy (ProfileEditDialog default),
-// features/iam/membershipApi. Backend canonical role enum is the 8 below. Cleanup of
-// these two literals across the FE deferred to a dedicated follow-up PR.
+// Canonical 8-role backend enum. The legacy FE-only phantoms "admin" and
+// "reviewer" were removed in PR-12b — their last consumers were migrated to
+// system_admin (DocumentPublishedPage) and to plain workflow-role strings
+// (templates). features/iam uses the narrower IamRole alias declared next to
+// the IAM admin code.
 export type UserRole =
-  | "admin"
   | "system_admin"
   | "approver"
   | "author"
   | "editor"
-  | "reviewer"
   | "viewer"
   | "signer"
   | "area_admin"
@@ -76,12 +74,6 @@ export interface OnlineUserItem {
   username: string;
   displayName: string;
   lastSeenAt: string;
-}
-
-export interface AdminOverviewResponse {
-  users: ManagedUserItem[];
-  onlineUsers: OnlineUserItem[];
-  recentActivities: AuditEventItem[];
 }
 
 export interface DocumentTypeItem {

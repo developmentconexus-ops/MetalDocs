@@ -238,6 +238,35 @@ func TestBumpMiddleware_NoUserNoBump(t *testing.T) {
 	}
 }
 
+func TestBumpMiddleware_EvictStaleEntries(t *testing.T) {
+	repo := newFakeRepo()
+	mw := NewBumpMiddleware(repo, nil)
+
+	clock := time.Now().UTC()
+	mw.WithClock(func() time.Time { return clock })
+	mw.WithDebounce(60 * time.Second)
+
+	mw.mu.Lock()
+	mw.lastBump["fresh"] = clock.Add(-time.Minute)
+	mw.lastBump["stale"] = clock.Add(-20 * time.Minute)
+	mw.lastBump["older"] = clock.Add(-time.Hour)
+	mw.mu.Unlock()
+
+	mw.evictStale(10 * time.Minute)
+
+	mw.mu.Lock()
+	defer mw.mu.Unlock()
+	if _, ok := mw.lastBump["fresh"]; !ok {
+		t.Fatalf("fresh entry should remain")
+	}
+	if _, ok := mw.lastBump["stale"]; ok {
+		t.Fatalf("stale entry should be evicted")
+	}
+	if _, ok := mw.lastBump["older"]; ok {
+		t.Fatalf("older entry should be evicted")
+	}
+}
+
 // --- WS stream (integration via httptest.Server) ----------------------------
 
 func TestStream_TenantIsolation(t *testing.T) {

@@ -1,7 +1,7 @@
 // Canonical 8-role backend enum (matches internal/modules/iam/domain/model.go).
-// Distinct from `UserRole` in lib/types which retains FE compat aliases "admin" and
-// "reviewer" still used by templates/documents/taxonomy features. New IAM admin code
-// (PR-12) routes through this narrower type to stay aligned with the codegen schema.
+// Identical to `UserRole` in lib/types after PR-12b removed the phantoms.
+// Kept as a feature-local alias so IAM code remains decoupled from the shared
+// types module and lines up 1:1 with the codegen schema.
 export type IamRole =
   | "system_admin"
   | "approver"

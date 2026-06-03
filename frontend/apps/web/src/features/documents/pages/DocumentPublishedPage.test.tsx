@@ -16,7 +16,7 @@ vi.mock('../../../store/auth.store', () => ({
       user: {
         userId: 'admin-user',
         displayName: 'Administrator',
-        roles: ['admin'],
+        roles: ['system_admin'],
       },
     }),
 }));
