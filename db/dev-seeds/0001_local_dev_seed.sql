@@ -61,6 +61,28 @@ VALUES
     'admin',
     NULL,
     NULL
+  ),
+  (
+    'qualidade',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'Qualidade',
+    'Area seeded para QA do diretório de memberships.',
+    TRUE,
+    NULL,
+    'admin',
+    NULL,
+    NULL
+  ),
+  (
+    'producao',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'Producao',
+    'Area seeded sem membership de author-test para exercitar o grant new-pair.',
+    TRUE,
+    NULL,
+    'admin',
+    NULL,
+    NULL
   )
 ON CONFLICT (tenant_id, code) DO NOTHING;
 
@@ -133,7 +155,42 @@ VALUES
     NULL,
     'admin-local',
     NULL
+  ),
+  -- Qualidade: varied roles so the tenant directory shows multiple users/areas.
+  (
+    'admin',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'qualidade',
+    'qms_admin',
+    now(),
+    NULL,
+    'admin-local',
+    NULL
+  ),
+  (
+    'approver-test',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'qualidade',
+    'reviewer',
+    now(),
+    NULL,
+    'admin-local',
+    NULL
+  ),
+  (
+    'reviewer-1',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'qualidade',
+    'viewer',
+    now(),
+    NULL,
+    'admin-local',
+    NULL
   )
+  -- NOTE: 'producao' is intentionally left with no memberships, and 'author-test'
+  -- stays only in 'rh', so QA can exercise both grant paths: role-change
+  -- (author-test rh/author -> rh/viewer, GrantAtomic) and new-pair
+  -- (author-test -> producao/author, Insert).
 ON CONFLICT (tenant_id, user_id, area_code, role) WHERE effective_to IS NULL DO NOTHING;
 
 COMMIT;

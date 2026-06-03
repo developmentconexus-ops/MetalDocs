@@ -22,6 +22,7 @@ var (
 
 type UserAreaWriteRepository interface {
 	ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)
+	ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]domain.UserProcessArea, error)
 	Insert(ctx context.Context, membership domain.UserProcessArea) error
 	CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
 	GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error
@@ -50,6 +51,14 @@ func NewAreaMembershipService(repo UserAreaWriteRepository, logger MembershipGov
 
 func (s *AreaMembershipService) ListActive(ctx context.Context, userID, tenantID string) ([]domain.UserProcessArea, error) {
 	return s.repo.ListActive(ctx, userID, tenantID, s.nowFn())
+}
+
+// ListByTenant returns active memberships across the tenant with optional
+// exact-match filters (empty string = no filter). Tenant-wide directory mode
+// for the admin surface; authz scoping (who may see the whole tenant vs only
+// their own rows) is enforced by the HTTP handler.
+func (s *AreaMembershipService) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string) ([]domain.UserProcessArea, error) {
+	return s.repo.ListByTenant(ctx, tenantID, userID, areaCode, role, s.nowFn())
 }
 
 func (s *AreaMembershipService) Grant(

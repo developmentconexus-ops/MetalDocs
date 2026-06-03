@@ -50,6 +50,42 @@ ORDER BY area_code ASC, effective_from DESC
 	return result, nil
 }
 
+// ListByTenant returns active memberships across the whole tenant, with
+// optional exact-match filters. An empty filter string means "no filter" for
+// that column; the ($n = '' OR col = $n) form keeps the statement static and
+// injection-safe regardless of which filters are supplied.
+func (r *UserAreaRepository) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]iamdomain.UserProcessArea, error) {
+	const q = `
+SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
+FROM public.user_process_areas
+WHERE tenant_id = $1::uuid
+  AND effective_from <= $2
+  AND (effective_to IS NULL OR effective_to > $2)
+  AND ($3 = '' OR user_id   = $3)
+  AND ($4 = '' OR area_code = $4)
+  AND ($5 = '' OR role      = $5)
+ORDER BY user_id ASC, area_code ASC, effective_from DESC
+`
+	rows, err := r.db.QueryContext(ctx, q, tenantID, now, userID, areaCode, role)
+	if err != nil {
+		return nil, fmt.Errorf("query tenant process areas: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]iamdomain.UserProcessArea, 0, 16)
+	for rows.Next() {
+		item, err := scanUserProcessArea(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate tenant process areas: %w", err)
+	}
+	return result, nil
+}
+
 func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -119,13 +155,14 @@ func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, 
 
 	const q = `
 UPDATE public.user_process_areas
-SET effective_to = $4
+SET effective_to = $4,
+    revoked_by   = $5
 WHERE user_id = $1
   AND tenant_id = $2::uuid
   AND area_code = $3
   AND effective_to IS NULL
 `
-	result, err := tx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo)
+	result, err := tx.ExecContext(ctx, q, userID, tenantID, areaCode, effectiveTo, actorID)
 	if err != nil {
 		return fmt.Errorf("close active user process area: %w", err)
 	}
@@ -162,7 +199,8 @@ func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, new
 
 	const closeQ = `
 UPDATE public.user_process_areas
-SET effective_to = $5
+SET effective_to = $5,
+    revoked_by   = $6
 WHERE user_id = $1
   AND tenant_id = $2::uuid
   AND area_code = $3
@@ -177,6 +215,7 @@ WHERE user_id = $1
 		oldMembership.AreaCode,
 		oldMembership.EffectiveFrom,
 		newMembership.EffectiveFrom,
+		grantedByActor(newMembership.GrantedBy),
 	)
 	if err != nil {
 		return fmt.Errorf("close active membership in grant transaction: %w", err)
