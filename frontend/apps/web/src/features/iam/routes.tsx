@@ -34,6 +34,11 @@ export const iamRoutes: RouteObject[] = [
         lazy: () => import("./tabs/RolesCapsTab.route"),
       },
       {
+        path: "memberships",
+        handle: { requiresCapability: "membership.view" },
+        lazy: () => import("./tabs/MembershipsTab.route"),
+      },
+      {
         path: "audit",
         handle: { requiresCapability: "audit.read" },
         lazy: () => import("./tabs/AuditTab.route"),
@@ -49,10 +54,5 @@ export const iamRoutes: RouteObject[] = [
         lazy: () => import("./tabs/UsageTab.route"),
       },
     ],
-  },
-  {
-    path: "admin/memberships",
-    handle: { workspaceView: "iam-memberships", requiresCapability: "membership.view" },
-    lazy: () => import("./pages/AreaMembershipAdminRoutePage"),
   },
 ];
