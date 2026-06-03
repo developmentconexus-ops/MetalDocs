@@ -30,26 +30,33 @@ export function AppShell() {
   const hideToolbar = matches.some(
     (m) => (m.handle as RouteHandle | undefined)?.workspaceView === 'document-editor',
   );
-  const required = useMemo<RequiredCapability | null>(() => {
+  // Collect every capability constraint along the match chain — parent + child.
+  // Defense in depth: a child route can both inherit a parent gate and tighten
+  // it (e.g. parent requiresAnyCapability ["user.view","membership.view"],
+  // child requiresCapability "audit.read"). All collected constraints must
+  // pass; otherwise a viewer who satisfies the parent could reach the child.
+  const required = useMemo<RequiredCapability[]>(() => {
+    const out: RequiredCapability[] = [];
     for (const m of matches) {
       const handle = m.handle as RouteHandle | undefined;
       if (handle?.requiresCapability) {
-        return { kind: 'single', cap: handle.requiresCapability };
+        out.push({ kind: 'single', cap: handle.requiresCapability });
       }
       if (handle?.requiresAnyCapability && handle.requiresAnyCapability.length > 0) {
-        return { kind: 'any', caps: handle.requiresAnyCapability };
+        out.push({ kind: 'any', caps: handle.requiresAnyCapability });
       }
     }
-    return null;
+    return out;
   }, [matches]);
 
-  if (required) {
+  if (required.length > 0) {
     const granted = capabilities ?? [];
-    const allowed =
-      required.kind === 'single'
-        ? granted.includes(required.cap)
-        : required.caps.some((cap) => granted.includes(cap));
-    if (!allowed) {
+    const allAllowed = required.every((req) =>
+      req.kind === 'single'
+        ? granted.includes(req.cap)
+        : req.caps.some((cap) => granted.includes(cap)),
+    );
+    if (!allAllowed) {
       return <Navigate to="/" replace />;
     }
   }
