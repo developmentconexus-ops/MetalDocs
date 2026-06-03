@@ -2,6 +2,11 @@ package main
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -46,10 +51,10 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "documents create", method: http.MethodPost, path: "/api/v1/documents", wantCap: iamdomain.CapDocumentCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents submit", method: http.MethodPost, path: "/api/v1/documents/d1/submit", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents signoff", method: http.MethodPost, path: "/api/v1/documents/d1/signoff", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents publish", method: http.MethodPost, path: "/api/v1/documents/d1/publish", wantCap: iamdomain.Capability("doc.publish"), wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents schedule publish", method: http.MethodPost, path: "/api/v1/documents/d1/schedule-publish", wantCap: iamdomain.Capability("doc.publish"), wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents supersede", method: http.MethodPost, path: "/api/v1/documents/d1/supersede", wantCap: iamdomain.Capability("doc.supersede"), wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents obsolete", method: http.MethodPost, path: "/api/v1/documents/d1/obsolete", wantCap: iamdomain.Capability("doc.obsolete"), wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "documents publish", method: http.MethodPost, path: "/api/v1/documents/d1/publish", wantCap: iamdomain.CapDocumentPublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "documents schedule publish", method: http.MethodPost, path: "/api/v1/documents/d1/schedule-publish", wantCap: iamdomain.CapDocumentPublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "documents supersede", method: http.MethodPost, path: "/api/v1/documents/d1/supersede", wantCap: iamdomain.CapDocumentSupersede, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "documents obsolete", method: http.MethodPost, path: "/api/v1/documents/d1/obsolete", wantCap: iamdomain.CapDocumentObsolete, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents artifact metadata", method: http.MethodPost, path: "/api/v1/documents/d1/artifact-metadata", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents finalize", method: http.MethodPost, path: "/api/v1/documents/d1/finalize", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents session force release", method: http.MethodPost, path: "/api/v1/documents/d1/session/force-release", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -75,7 +80,7 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "templates review", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/review", wantCap: iamdomain.CapTemplateReview, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates approve", method: http.MethodPost, path: "/api/v1/templates/t1/versions/1/approve", wantCap: iamdomain.CapTemplateApprove, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "templates approval config", method: http.MethodPut, path: "/api/v1/templates/t1/approval-config", wantCap: iamdomain.CapTemplateEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "templates archive", method: http.MethodPost, path: "/api/v1/templates/t1/archive", wantCap: iamdomain.Capability("template.archive"), wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "templates archive", method: http.MethodPost, path: "/api/v1/templates/t1/archive", wantCap: iamdomain.CapTemplateArchive, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
 		// --- Permission-guarded: IAM users (F-001 split: GET=view, writes=manage) ---
 		{name: "iam users list", method: http.MethodGet, path: "/api/v1/iam/users", wantCap: iamdomain.CapUserView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -475,6 +480,88 @@ func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
 		gotCap, gotVis := resolver(method, "/api/v1/iam/area-memberships")
 		if gotVis == iamdelivery.VisibilityPermissionGuarded {
 			t.Errorf("%s /api/v1/iam/area-memberships: visibility=PermissionGuarded cap=%q — PUT/PATCH must fall through to VisibilitySessionRequired", method, gotCap)
+		}
+	}
+}
+
+// TestEveryRouteCapInRegistry binds the Tier-1 route table to the Go capability
+// registry (single source of truth, ADR 0022 Phase 1). Every non-empty
+// routeRules[i].capability MUST be a typed const present in validCapabilities.
+// A raw iamdomain.Capability("typo") row — which compiles clean — fails here.
+func TestEveryRouteCapInRegistry(t *testing.T) {
+	t.Parallel()
+
+	for i, r := range routeRules {
+		if r.capability == "" {
+			continue // public / session-required rows carry no cap
+		}
+		if !iamdomain.IsValidCapability(r.capability) {
+			t.Errorf("routeRules[%d]: capability %q is not in the registry (validCapabilities). Promote it to a typed const in internal/modules/iam/domain/model.go (path prefix=%q exact=%q suffix=%q).",
+				i, r.capability, r.pathPrefix, r.pathExact, r.pathSuffix)
+		}
+	}
+}
+
+// seededCaps reads the canonical role_capabilities seed and returns the set of
+// distinct capability values granted to ≥1 role. The seed is the DB source of
+// truth bound here so a registry cap that is never seeded (and never bypass-only
+// by design) becomes a red build instead of a silent always-403 capability.
+func seededCaps(t *testing.T) map[iamdomain.Capability]struct{} {
+	t.Helper()
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed; cannot locate seed file")
+	}
+	// apps/api/cmd/metaldocs-api/ → repo root is four levels up.
+	seedPath := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..",
+		"db", "reference-data", "0001_product_reference_data.sql")
+	raw, err := os.ReadFile(seedPath)
+	if err != nil {
+		t.Fatalf("read seed %s: %v", seedPath, err)
+	}
+
+	// Match: INSERT INTO metaldocs.role_capabilities (...) VALUES ('role', 'cap', ...
+	re := regexp.MustCompile(`(?i)INSERT INTO\s+metaldocs\.role_capabilities[^V]*VALUES\s*\(\s*'[^']*'\s*,\s*'([^']+)'`)
+	matches := re.FindAllStringSubmatch(string(raw), -1)
+	if len(matches) == 0 {
+		t.Fatalf("no role_capabilities INSERT rows parsed from %s", seedPath)
+	}
+	set := make(map[iamdomain.Capability]struct{}, len(matches))
+	for _, m := range matches {
+		set[iamdomain.Capability(m[1])] = struct{}{}
+	}
+	return set
+}
+
+// TestEveryCapSeededOrDeferred asserts every registry capability is either
+// seeded to ≥1 role OR is an explicitly-deferred write cap enforced today only
+// via the system_admin tier-2 bypass (routed in permissions.go, granted to no
+// tenant role yet). ADR 0022 Phase 1. A new registry cap that is neither seeded
+// nor allow-listed fails — preventing a capability that nobody (except
+// system_admin) can ever satisfy from slipping in unnoticed.
+func TestEveryCapSeededOrDeferred(t *testing.T) {
+	t.Parallel()
+
+	// Routed-but-unseeded write caps. Enforced only by the system_admin bypass
+	// until ADR 0022 later phases decide a per-role grant. NOT seeded by design.
+	deferred := map[iamdomain.Capability]struct{}{
+		iamdomain.CapDocumentPublish:   {},
+		iamdomain.CapDocumentObsolete:  {},
+		iamdomain.CapDocumentSupersede: {},
+		iamdomain.CapTemplateArchive:   {},
+	}
+
+	seeded := seededCaps(t)
+
+	caps := iamdomain.AllCapabilities()
+	sort.Slice(caps, func(i, j int) bool { return caps[i] < caps[j] }) // map order is random
+
+	for _, c := range caps {
+		_, isSeeded := seeded[c]
+		_, isDeferred := deferred[c]
+		if !isSeeded && !isDeferred {
+			t.Errorf("capability %q is in the registry but seeded to no role and not in the deferred allow-list. Seed it in db/reference-data/0001_product_reference_data.sql or document the deferral.", c)
 		}
 	}
 }
