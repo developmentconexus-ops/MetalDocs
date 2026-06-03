@@ -55,9 +55,9 @@ const (
 	CapDocumentEdit      Capability = "document.edit"
 	CapDocumentSubmit    Capability = "document.submit"
 	CapDocumentSignoff   Capability = "document.signoff"
+	CapDocumentPublish   Capability = "doc.publish"
+	CapDocumentObsolete  Capability = "doc.obsolete"
 	CapDocumentSupersede Capability = "doc.supersede"
-	CapWorkflowReview    Capability = "workflow.review"
-	CapWorkflowApprove   Capability = "workflow.approve"
 
 	CapTemplateView    Capability = "template.view"
 	CapTemplateCreate  Capability = "template.create"
@@ -66,6 +66,7 @@ const (
 	CapTemplateReview  Capability = "template.review"
 	CapTemplateApprove Capability = "template.approve"
 	CapTemplatePublish Capability = "template.publish"
+	CapTemplateArchive Capability = "template.archive"
 
 	CapControlledDocumentCreate    Capability = "controlled_documents.create"
 	CapControlledDocumentObsolete  Capability = "controlled_documents.obsolete"
@@ -88,9 +89,9 @@ var validCapabilities = map[Capability]struct{}{
 	CapDocumentEdit:                {},
 	CapDocumentSubmit:              {},
 	CapDocumentSignoff:             {},
+	CapDocumentPublish:             {},
+	CapDocumentObsolete:            {},
 	CapDocumentSupersede:           {},
-	CapWorkflowReview:              {},
-	CapWorkflowApprove:             {},
 	CapTemplateView:                {},
 	CapTemplateCreate:              {},
 	CapTemplateEdit:                {},
@@ -98,6 +99,7 @@ var validCapabilities = map[Capability]struct{}{
 	CapTemplateReview:              {},
 	CapTemplateApprove:             {},
 	CapTemplatePublish:             {},
+	CapTemplateArchive:             {},
 	CapControlledDocumentCreate:    {},
 	CapControlledDocumentObsolete:  {},
 	CapControlledDocumentSupersede: {},
