@@ -107,6 +107,16 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'audit.read', 'Read governance / audit events') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'session.manage', 'Force-logout / revoke auth sessions') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
+-- ADR 0022 Phase 2: document-lifecycle write caps (mirrors db/migrations/0225_authz_p2_document_lifecycle_grants.sql).
+-- system_admin holds these via the tier-2 bypass (not seeded explicitly).
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.obsolete', 'Make a document obsolete') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.obsolete', 'Make a document obsolete') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.archive', 'Archive a template') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+
 -- System blank template required for controlled document creation defaults.
 -- Invariant: this reference-data row is valid only when bootstrap/storage also seeds
 -- `system/templates/blank.docx` into the configured attachments bucket.
