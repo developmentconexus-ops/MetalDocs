@@ -14,6 +14,8 @@
 -- 24-byte hex string and the row carries an expires_at column so the URL is
 -- effectively short-lived even before any object-storage signing exists.
 
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS metaldocs.audit_export_jobs (
     id              TEXT PRIMARY KEY,
     tenant_id       UUID NOT NULL,
@@ -39,3 +41,5 @@ CREATE INDEX IF NOT EXISTS ix_audit_export_jobs_tenant_actor
 CREATE INDEX IF NOT EXISTS ix_audit_export_jobs_download_token
     ON metaldocs.audit_export_jobs (download_token)
     WHERE download_token IS NOT NULL;
+
+COMMIT;
