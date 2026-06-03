@@ -64,6 +64,14 @@ func RunCodeRules(specPath, modulesRoot string) ([]Violation, error) {
 	}
 	out = append(out, tripwire...)
 
+	// ADR 0022 Phase 5 — registry-binding lints (inline-cap ban, seed parity,
+	// wiki parity). Reuses the same fset/modulesRoot.
+	registry, err := RunRegistryRules(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, registry...)
+
 	return out, nil
 }
 
