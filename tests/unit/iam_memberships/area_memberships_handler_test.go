@@ -192,7 +192,8 @@ func newHarness(t *testing.T) *harness {
 }
 
 // adminReq seeds tenant + system_admin actor context on the request so the
-// handler's canManageMembershipTarget check passes for any target user.
+// handler permits tenant-wide directory access and non-self grant/revoke for
+// any target user (system_admin bypasses tier-2 area scoping at the repo layer).
 func adminReq(method, url string, body string, tenantID, actorID string) *http.Request {
 	var r io.Reader
 	if body != "" {
@@ -509,6 +510,67 @@ func TestListAreaMemberships_AreaScopedUnderTenantIsolation(t *testing.T) {
 	got := resp.Items[0]
 	if got.TenantID != tenantAlpha || got.AreaCode != "QMS" {
 		t.Errorf("tenantAlpha listing leaked tenantBeta row: %+v", got)
+	}
+}
+
+// TestGrantMembership_AreaAdminReachesServiceAfterGateRemoval locks ADR 0022
+// Phase 3: the canManageMembershipTarget RoleSystemAdmin handler gate is gone, so
+// a non-system actor (area_admin) granting another target is no longer blocked at
+// the handler. The in-memory repo has no tier-2 authz, so the request reaches the
+// service and succeeds (201); the actual area-scope enforcement (area_admin denied
+// outside a managed area) is asserted in tests/integration/iam against a real DB.
+func TestGrantMembership_AreaAdminReachesServiceAfterGateRemoval(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, targetID)
+
+	body := `{"userId":"` + targetID + `","areaCode":"QMS","role":"author"}`
+	req := userReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("area_admin grant status=%d body=%s want 201 (handler role gate must be removed)", rec.Code, rec.Body.String())
+	}
+	if events := h.audit.snapshot(); len(events) != 1 {
+		t.Errorf("area_admin grant audit events=%d want 1", len(events))
+	}
+}
+
+// TestRevokeMembership_AreaAdminReachesServiceAfterGateRemoval mirrors the grant
+// case for the revoke path (DELETE), which also dropped the role gate.
+func TestRevokeMembership_AreaAdminReachesServiceAfterGateRemoval(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, targetID)
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: targetID, TenantID: tenantAlpha, AreaCode: "QMS", Role: iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	req := userReq(http.MethodDelete, "/api/v1/iam/area-memberships?userId="+targetID+"&areaCode=QMS", "", tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("area_admin revoke status=%d body=%s want 204 (handler role gate must be removed)", rec.Code, rec.Body.String())
+	}
+}
+
+// TestGrantMembership_AreaAdminSelfGrantStill403 confirms the self-grant business
+// invariant survives the gate removal for a non-system actor.
+func TestGrantMembership_AreaAdminSelfGrantStill403(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, "area-admin-1")
+
+	body := `{"userId":"area-admin-1","areaCode":"QMS","role":"approver"}`
+	req := userReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("area_admin self-grant status=%d body=%s want 403", rec.Code, rec.Body.String())
+	}
+	if rows, _ := h.repo.ListActive(context.Background(), "area-admin-1", tenantAlpha, time.Now().UTC()); len(rows) != 0 {
+		t.Errorf("self-grant created %d rows; must be 0", len(rows))
 	}
 }
 

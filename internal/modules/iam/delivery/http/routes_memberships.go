@@ -27,6 +27,7 @@ import (
 
 	auditdomain "metaldocs/internal/modules/audit/domain"
 	iamapp "metaldocs/internal/modules/iam/application"
+	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/authn"
 	"metaldocs/internal/platform/problem"
@@ -164,14 +165,16 @@ func (h *MembershipHandler) grantMembership(w http.ResponseWriter, r *http.Reque
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId, areaCode and role are required"))
 		return
 	}
-	if !canManageMembershipTarget(r.Context(), userID) {
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
-		return
-	}
-	// Self-grant lockdown: a CapMembershipManage holder must not be able to
-	// hand themselves additional area roles. System admins bypass via the
-	// non-self path (target != actor); area admins lose self-escalation here
-	// but retain cross-target grants in their managed area.
+	// ADR 0022 Phase 3: authorization is tier-1 (route cap) + tier-2 (area,
+	// enforced in the repository's authz.Require with the target areaCode). The
+	// former canManageMembershipTarget RoleSystemAdmin handler gate is removed —
+	// area_admin is now authorized within their managed area, and tier-2 returns
+	// ErrCapDenied (→ 403) when the actor lacks membership.manage in that area.
+	//
+	// Self-grant lockdown remains a business invariant (not an authz question): a
+	// CapMembershipManage holder must not hand themselves additional area roles.
+	// System admins bypass via the non-self path (target != actor); area admins
+	// lose self-escalation here but retain cross-target grants in their area.
 	if isSelf(r.Context(), userID) {
 		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Self-grant is not permitted"))
 		return
@@ -232,10 +235,9 @@ func (h *MembershipHandler) revokeMembership(w http.ResponseWriter, r *http.Requ
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId and areaCode are required"))
 		return
 	}
-	if !canManageMembershipTarget(r.Context(), userID) {
-		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
-		return
-	}
+	// ADR 0022 Phase 3: tier-2 area enforcement (repository authz.Require with the
+	// target areaCode) replaces the removed RoleSystemAdmin handler gate; an actor
+	// without membership.manage in this area gets 403 via ErrCapDenied.
 
 	tenantID, err := tenantIDFromRequest(r)
 	if err != nil {
@@ -277,7 +279,12 @@ func (h *MembershipHandler) writeProblem(w http.ResponseWriter, p *problem.Probl
 }
 
 func (h *MembershipHandler) writeMembershipError(w http.ResponseWriter, err error, defaultMessage string) {
+	var capDenied authz.ErrCapDenied
 	switch {
+	case errors.As(err, &capDenied):
+		// ADR 0022 Phase 3: tier-2 area denial (area_admin acting outside a
+		// managed area, or actor lacking membership.manage there) → 403, not 500.
+		h.writeProblem(w, problem.New(http.StatusForbidden, "AUTH_FORBIDDEN", "Insufficient permissions"))
 	case errors.Is(err, iamapp.ErrMembershipExists):
 		h.writeProblem(w, problem.New(http.StatusConflict, "MEMBERSHIP_EXISTS", "Membership already exists for this user and area with the same role"))
 	case errors.Is(err, iamapp.ErrMembershipNotFound):
@@ -363,22 +370,6 @@ func isSelf(ctx context.Context, targetUserID string) bool {
 // holder surfaced in request context); area-scoped directories for area_admin
 // are deferred — see PR-2 close-out notes.
 func isMembershipDirectoryAdmin(ctx context.Context) bool {
-	for _, role := range iamdomain.RolesFromContext(ctx) {
-		if role == iamdomain.RoleSystemAdmin {
-			return true
-		}
-	}
-	return false
-}
-
-func canManageMembershipTarget(ctx context.Context, targetUserID string) bool {
-	actor := strings.TrimSpace(authenticatedActorFromContext(ctx))
-	if actor == "" {
-		return false
-	}
-	if strings.EqualFold(actor, strings.TrimSpace(targetUserID)) {
-		return true
-	}
 	for _, role := range iamdomain.RolesFromContext(ctx) {
 		if role == iamdomain.RoleSystemAdmin {
 			return true
