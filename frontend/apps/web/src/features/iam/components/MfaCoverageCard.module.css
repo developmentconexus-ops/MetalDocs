@@ -1,0 +1,128 @@
+.card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--accent);
+  opacity: 0.8;
+}
+
+.header { display: flex; flex-direction: column; gap: 2px; }
+
+.title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.heroRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+}
+
+.heroPct {
+  font-family: var(--font-sans);
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.heroSuffix {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.roles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.roleRow {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 56px 1fr;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.roleLabel {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.criticalDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-bg);
+}
+
+.critical { color: var(--danger); font-weight: 600; }
+
+.pct {
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  text-align: right;
+  font-weight: 600;
+}
+
+.bar {
+  position: relative;
+  height: 8px;
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+}
+
+.barFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--success);
+  border-radius: var(--r-pill);
+  transition: width 250ms ease;
+}
+
+.barFillWarn { background: var(--warning); }
+.barFillDanger { background: var(--danger); }
+
+.empty,
+.error {
+  padding: var(--sp-4);
+  text-align: center;
+  color: var(--text-muted);
+  border-radius: var(--r-3);
+  background: var(--surface-2);
+}
+
+.error { background: var(--danger-bg); color: var(--danger); }
