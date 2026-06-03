@@ -97,7 +97,10 @@ func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.Us
 	if err := authz.SeedTxIdentity(ctx, tx, membership.TenantID, grantedByActor(membership.GrantedBy)); err != nil {
 		return fmt.Errorf("iam: seed authz Insert area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
+	// ADR 0022 Phase 3: area-scoped tier-2 — pass the membership's real area so
+	// area_admin is authorized only within areas where they hold membership.manage.
+	// system_admin still bypasses (authz.Require short-circuits before the area filter).
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), membership.AreaCode); err != nil {
 		return fmt.Errorf("iam: authz check Insert area: %w", err)
 	}
 
@@ -149,7 +152,8 @@ func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, 
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return fmt.Errorf("iam: seed authz CloseActive area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
+	// ADR 0022 Phase 3: area-scoped tier-2 — see Insert.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), areaCode); err != nil {
 		return fmt.Errorf("iam: authz check CloseActive area: %w", err)
 	}
 
@@ -189,11 +193,22 @@ func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, new
 	}
 	defer rollbackTx("grant_atomic_user_process_area", tx)
 
+	// ADR 0022 Phase 3: the single area-scoped tier-2 check below governs both the
+	// close (old) and insert (new) legs, so they MUST target the same area. The
+	// service only ever rebuilds in place; enforce that as a hard repository
+	// invariant so a future caller can't close a row in an area it isn't
+	// authorized for by pairing it with an authorized new area.
+	if oldMembership.AreaCode != newMembership.AreaCode {
+		return fmt.Errorf("iam: GrantAtomic area mismatch: old=%q new=%q", oldMembership.AreaCode, newMembership.AreaCode)
+	}
+
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.SeedTxIdentity(ctx, tx, newMembership.TenantID, grantedByActor(newMembership.GrantedBy)); err != nil {
 		return fmt.Errorf("iam: seed authz GrantAtomic: %w", err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), "tenant"); err != nil {
+	// Area-scoped tier-2 — old/new share one area (asserted above), so the new
+	// area governs the check.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), newMembership.AreaCode); err != nil {
 		return fmt.Errorf("iam: authz check GrantAtomic: %w", err)
 	}
 
