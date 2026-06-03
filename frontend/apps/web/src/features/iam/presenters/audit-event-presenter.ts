@@ -1,7 +1,19 @@
 // Canonical map keyed off backend audit action enums. Update whenever a new
-// `recordAudit(...)` call site or `audit.Record(..., Action: ...)` is added in
-// internal/modules/{iam,audit,auth,...}. Never sniff substrings — match exact
-// keys so an unknown action surfaces as the explicit `unknown` fallback.
+// `recordAudit(...)` call site or `audit.Record(..., Action: ...)` is added.
+//
+// Authoritative backend sources for emitted actions:
+//   - internal/modules/iam/delivery/http/*.go
+//   - internal/modules/audit/...
+//   - internal/modules/auth/...
+//   - internal/modules/documents/application/service.go
+//
+// To enumerate live action strings before extending REGISTRY:
+//   rg -n -e 'recordAudit\(' -e 'Action:\s*"' internal/modules
+//
+// Same drift discipline applies to RESOURCE_TYPES in AuditFilterBar.tsx.
+//
+// Never sniff substrings — match exact keys so an unknown action surfaces as
+// the explicit `unknown` fallback.
 
 export type AuditEventSeverity = "info" | "warn" | "error" | "success";
 

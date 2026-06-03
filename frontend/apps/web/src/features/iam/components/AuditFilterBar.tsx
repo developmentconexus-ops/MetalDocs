@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, type KeyboardEvent } from "react";
 import {
   AUDIT_CATEGORY_LABELS,
   KNOWN_AUDIT_ACTIONS,
@@ -35,7 +35,14 @@ const PRESET_OPTIONS: ReadonlyArray<readonly [AuditDatePreset, string]> = [
 ];
 
 // Stable resource type options. Mirrors values the backend currently emits
-// across modules — extend if a new resource type starts appearing.
+// across the canonical modules:
+//   - internal/modules/iam/delivery/http/*.go
+//   - internal/modules/audit/...
+//   - internal/modules/auth/...
+//   - internal/modules/documents/application/service.go
+// To enumerate live resource strings before extending:
+//   rg -n 'ResourceType:\s*"' internal/modules
+// Extend if a new resource type starts appearing.
 const RESOURCE_TYPES: ReadonlyArray<readonly [string, string]> = [
   ["user", "Usuário"],
   ["role", "Função"],
@@ -62,6 +69,11 @@ function groupActionsByCategory(): ReadonlyArray<
 }
 
 const ACTION_GROUPS = groupActionsByCategory();
+
+// Brazil abolished DST in 2019 (Decreto 9.772/2019), so São Paulo is fixed at
+// UTC-3 year-round. Used by datetime-local conversion below — avoid pulling
+// in a date library for this single offset.
+const SP_UTC_OFFSET_HOURS = 3;
 
 export default function AuditFilterBar({ value, onChange }: AuditFilterBarProps) {
   const hasAny = useMemo(
@@ -93,19 +105,63 @@ export default function AuditFilterBar({ value, onChange }: AuditFilterBarProps)
     });
   };
 
+  // ARIA APG radiogroup: only the active (or first) chip is tab-focusable;
+  // Arrow/Home/End move focus and select. Wrap-around.
+  const presetRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const activeIdx = PRESET_OPTIONS.findIndex(([v]) => v === value.datePreset);
+  const focusedPresetIdx = activeIdx >= 0 ? activeIdx : 0;
+
+  const handlePresetKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const last = PRESET_OPTIONS.length - 1;
+    let nextIdx: number | null = null;
+    switch (e.key) {
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIdx = focusedPresetIdx <= 0 ? last : focusedPresetIdx - 1;
+        break;
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIdx = focusedPresetIdx >= last ? 0 : focusedPresetIdx + 1;
+        break;
+      case "Home":
+        nextIdx = 0;
+        break;
+      case "End":
+        nextIdx = last;
+        break;
+      default:
+        return;
+    }
+    if (nextIdx === null) return;
+    e.preventDefault();
+    const [nextPreset] = PRESET_OPTIONS[nextIdx];
+    handlePreset(nextPreset);
+    presetRefs.current[nextIdx]?.focus();
+  };
+
   return (
     <div className={styles.bar} role="group" aria-label="Filtros de auditoria">
       <div className={styles.row}>
         <span className={styles.label}>Período</span>
-        <div className={styles.presetGroup} role="radiogroup" aria-label="Janela de tempo">
-          {PRESET_OPTIONS.map(([v, label]) => {
+        <div
+          className={styles.presetGroup}
+          role="radiogroup"
+          aria-label="Janela de tempo"
+          onKeyDown={handlePresetKeyDown}
+        >
+          {PRESET_OPTIONS.map(([v, label], idx) => {
             const active = value.datePreset === v;
+            const focusable = focusedPresetIdx === idx;
             return (
               <button
                 key={v}
                 type="button"
                 role="radio"
                 aria-checked={active}
+                tabIndex={focusable ? 0 : -1}
+                ref={(el) => {
+                  presetRefs.current[idx] = el;
+                }}
                 className={`${styles.presetBtn} ${active ? styles.presetActive : ""}`}
                 onClick={() => handlePreset(v)}
               >
@@ -260,7 +316,6 @@ function fromLocalInput(local: string): string | undefined {
   const [y, mo, d] = datePart.split("-").map(Number);
   const [h, mi] = timePart.split(":").map(Number);
   if ([y, mo, d, h, mi].some((n) => Number.isNaN(n))) return undefined;
-  // SP is UTC-3 year-round (no DST since 2019). Avoid extra deps.
-  const utcMs = Date.UTC(y, mo - 1, d, h + 3, mi);
+  const utcMs = Date.UTC(y, mo - 1, d, h + SP_UTC_OFFSET_HOURS, mi);
   return new Date(utcMs).toISOString();
 }

@@ -1,11 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { api } from "../../../lib/api/client";
 import { QK } from "../../../lib/queryKeys";
 
 const STALE_30S = 30_000;
 
 export type AuditEventsQueryParams = {
-  cursor?: string;
   limit?: number;
   action?: string;
   actorId?: string;
@@ -33,10 +32,9 @@ export type AuditEventsPage = {
   hasMore: boolean;
 };
 
-// Backend currently returns `{items, nextCursor, hasMore}` (flat) while the
-// generated OpenAPI shape declares `page: { next_cursor, has_more }`. Adapt
-// here so callers see a single, stable structure regardless of which shape
-// the server emits on a given deploy.
+// TODO(contract-drift): backend returns flat {items,nextCursor,hasMore};
+// OpenAPI says page.{next_cursor,has_more}. Tracked in
+// wiki/decisions/2026-06-03-audit-events-cursor-shape.md
 function adaptPage(raw: unknown): AuditEventsPage {
   if (!raw || typeof raw !== "object") {
     return { items: [], nextCursor: null, hasMore: false };
@@ -60,15 +58,17 @@ function adaptPage(raw: unknown): AuditEventsPage {
 }
 
 export function useAuditEventsQuery(params: AuditEventsQueryParams = {}) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: QK.iam.audit(params as Record<string, unknown>),
-    queryFn: async (): Promise<AuditEventsPage> => {
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }): Promise<AuditEventsPage> => {
       const { data, error } = await api.GET("/audit/events", {
-        params: { query: params },
+        params: { query: { ...params, cursor: pageParam } },
       });
       if (error) throw error;
       return adaptPage(data);
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: STALE_30S,
   });
 }

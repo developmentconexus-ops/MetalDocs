@@ -27,6 +27,22 @@ interface ReadyJob {
   expiresAt: string;
 }
 
+// Accept only safe download URLs: relative paths starting with "/" or
+// same-origin https URLs. Reject javascript:, data:, blob:, and cross-origin
+// http to neutralise any signed-URL injection in the backend response.
+function safeDownloadUrl(url: string): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/") && !url.startsWith("//")) return url;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.protocol !== "https:") return undefined;
+    if (parsed.origin !== window.location.origin) return undefined;
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export default function AuditExportButton({ filter }: AuditExportButtonProps) {
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [job, setJob] = useState<ReadyJob | null>(null);
@@ -42,9 +58,14 @@ export default function AuditExportButton({ filter }: AuditExportButtonProps) {
             toast.error("Resposta inesperada do servidor.");
             return;
           }
+          const safeUrl = safeDownloadUrl(data.signedUrl);
+          if (!safeUrl) {
+            toast.error("URL de download inválida recebida do servidor.");
+            return;
+          }
           setJob({
             exportId: data.exportId,
-            signedUrl: data.signedUrl,
+            signedUrl: safeUrl,
             format,
             expiresAt: data.expiresAt,
           });

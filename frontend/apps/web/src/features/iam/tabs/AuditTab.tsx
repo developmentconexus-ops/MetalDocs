@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import AuditEventsTable, {
-  type AuditEventItem,
-} from "../components/AuditEventsTable";
+import AuditEventsTable from "../components/AuditEventsTable";
 import AuditExportButton from "../components/AuditExportButton";
 import AuditFilterBar, {
   type AuditDatePreset,
@@ -31,6 +29,12 @@ const PRESET_MS: Readonly<Record<Exclude<AuditDatePreset, "custom">, number>> = 
   "90d": 90 * 24 * 60 * 60 * 1000,
 };
 
+// Rolling presets recompute their `occurredAfter` against the live `now` —
+// refreshed every minute via `windowKey` so a long-idle tab does not freeze
+// the filter window. 1-minute granularity is adequate for an audit timeline;
+// finer ticks would just thrash the query cache.
+const ROLLING_WINDOW_TICK_MS = 60_000;
+
 function readPreset(raw: string | null): AuditDatePreset | undefined {
   if (!raw) return undefined;
   return PRESET_VALUES.includes(raw as AuditDatePreset)
@@ -38,17 +42,18 @@ function readPreset(raw: string | null): AuditDatePreset | undefined {
     : undefined;
 }
 
-function resolveDateWindow(
+export function resolveDateWindow(
   preset: AuditDatePreset | undefined,
   occurredAfter: string | undefined,
   occurredBefore: string | undefined,
+  now: number = Date.now(),
 ): { occurredAfter?: string; occurredBefore?: string } {
   if (preset === "custom") {
     return { occurredAfter, occurredBefore };
   }
   if (preset) {
     const ms = PRESET_MS[preset];
-    return { occurredAfter: new Date(Date.now() - ms).toISOString() };
+    return { occurredAfter: new Date(now - ms).toISOString() };
   }
   return {};
 }
@@ -70,10 +75,18 @@ export default function AuditTab() {
     [searchParams],
   );
 
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [accumulated, setAccumulated] = useState<ReadonlyArray<AuditEventItem>>(
-    [],
-  );
+  const isRollingPreset =
+    !!filterValue.datePreset && filterValue.datePreset !== "custom";
+
+  const [windowKey, setWindowKey] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!isRollingPreset) return;
+    const id = setInterval(
+      () => setWindowKey(Date.now()),
+      ROLLING_WINDOW_TICK_MS,
+    );
+    return () => clearInterval(id);
+  }, [isRollingPreset]);
 
   const dateWindow = useMemo(
     () =>
@@ -81,14 +94,19 @@ export default function AuditTab() {
         filterValue.datePreset,
         filterValue.occurredAfter,
         filterValue.occurredBefore,
+        windowKey,
       ),
-    [filterValue.datePreset, filterValue.occurredAfter, filterValue.occurredBefore],
+    [
+      filterValue.datePreset,
+      filterValue.occurredAfter,
+      filterValue.occurredBefore,
+      windowKey,
+    ],
   );
 
   const queryParams: AuditEventsQueryParams = useMemo(
     () => ({
       limit: PAGE_SIZE,
-      cursor,
       actorId: filterValue.actorId,
       action: filterValue.action,
       resourceType: filterValue.resourceType,
@@ -98,7 +116,6 @@ export default function AuditTab() {
       q: filterValue.q,
     }),
     [
-      cursor,
       filterValue.actorId,
       filterValue.action,
       filterValue.resourceType,
@@ -111,30 +128,13 @@ export default function AuditTab() {
 
   const eventsQuery = useAuditEventsQuery(queryParams);
 
-  // Reset cursor + accumulator when the filter changes.
-  const filterFingerprint = useMemo(
-    () =>
-      JSON.stringify({
-        ...filterValue,
-        windowAfter: dateWindow.occurredAfter,
-        windowBefore: dateWindow.occurredBefore,
-      }),
-    [filterValue, dateWindow.occurredAfter, dateWindow.occurredBefore],
+  const events = useMemo(
+    () => eventsQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [eventsQuery.data],
   );
-  const lastAppendedRef = useRef<unknown>(null);
-  useEffect(() => {
-    lastAppendedRef.current = null;
-    setCursor(undefined);
-    setAccumulated([]);
-  }, [filterFingerprint]);
 
-  useEffect(() => {
-    if (!eventsQuery.data) return;
-    if (lastAppendedRef.current === eventsQuery.data) return;
-    lastAppendedRef.current = eventsQuery.data;
-    const incoming = eventsQuery.data.items;
-    setAccumulated((prev) => (cursor ? [...prev, ...incoming] : [...incoming]));
-  }, [eventsQuery.data, cursor]);
+  const lastPage = eventsQuery.data?.pages.at(-1);
+  const hasMore = lastPage?.hasMore ?? false;
 
   const handleFilterChange = useCallback(
     (next: AuditFilterValue) => {
@@ -157,9 +157,10 @@ export default function AuditTab() {
   );
 
   const handleLoadMore = useCallback(() => {
-    const next = eventsQuery.data?.nextCursor;
-    if (next) setCursor(next);
-  }, [eventsQuery.data?.nextCursor]);
+    if (eventsQuery.hasNextPage && !eventsQuery.isFetchingNextPage) {
+      eventsQuery.fetchNextPage();
+    }
+  }, [eventsQuery]);
 
   const exportFilter = useMemo(
     () => ({
@@ -174,9 +175,7 @@ export default function AuditTab() {
     [filterValue, dateWindow.occurredAfter, dateWindow.occurredBefore],
   );
 
-  const isInitialLoading = eventsQuery.isLoading && accumulated.length === 0;
-  const isFetchingMore =
-    !!cursor && eventsQuery.isFetching && !eventsQuery.isLoading;
+  const isInitialLoading = eventsQuery.isLoading;
 
   return (
     <section
@@ -200,12 +199,12 @@ export default function AuditTab() {
       </div>
 
       <AuditEventsTable
-        events={accumulated}
+        events={events}
         isLoading={isInitialLoading}
         error={eventsQuery.error}
         onRetry={() => eventsQuery.refetch()}
-        hasMore={eventsQuery.data?.hasMore ?? false}
-        isFetchingMore={isFetchingMore}
+        hasMore={hasMore}
+        isFetchingMore={eventsQuery.isFetchingNextPage}
         onLoadMore={handleLoadMore}
       />
     </section>

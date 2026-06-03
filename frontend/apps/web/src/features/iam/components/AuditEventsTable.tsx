@@ -7,18 +7,10 @@ import {
   type AuditEventSeverity,
 } from "../presenters/audit-event-presenter";
 import { getRelativeTime } from "../presenters/relative-time-presenter";
+import type { AuditEventItem } from "../queries/useAuditEventsQuery";
 import styles from "./AuditEventsTable.module.css";
 
-export type AuditEventItem = {
-  id: string;
-  occurredAt: string;
-  actorId: string;
-  action: string;
-  resourceType: string;
-  resourceId: string;
-  payload: Record<string, unknown>;
-  traceId?: string;
-};
+export type { AuditEventItem };
 
 interface AuditEventsTableProps {
   events: ReadonlyArray<AuditEventItem>;
@@ -143,21 +135,6 @@ export default function AuditEventsTable({
                   className={`${styles.row} ${grouped ? styles.grouped : ""} ${
                     expanded ? styles.expanded : ""
                   }`}
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={expanded}
-                  aria-controls={`audit-payload-${ev.id}`}
-                  onClick={() =>
-                    setExpandedId((cur) => (cur === ev.id ? null : ev.id))
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setExpandedId((cur) =>
-                        cur === ev.id ? null : ev.id,
-                      );
-                    }
-                  }}
                   data-testid="audit-event-row"
                 >
                   <span
@@ -200,13 +177,14 @@ export default function AuditEventsTable({
                     aria-label={
                       expanded ? "Recolher payload" : "Expandir payload"
                     }
+                    aria-expanded={expanded}
+                    aria-controls={`audit-payload-${ev.id}`}
                     className={`${styles.expandBtn} ${expanded ? styles.open : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() =>
                       setExpandedId((cur) =>
                         cur === ev.id ? null : ev.id,
-                      );
-                    }}
+                      )
+                    }
                   >
                     <svg
                       width="14"
