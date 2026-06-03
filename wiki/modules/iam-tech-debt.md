@@ -2,7 +2,7 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-06-02 (PR-7b hardening closed 8 findings — see T-PR7B-1..8)
+**Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: T-004 resolved-surface line numbers updated to reflect new file layout after `ListByTenant` insertion)
 
 ### T-PR7B-1 · CRITICAL — cross-tenant ATO via `handleResetPassword` — CLOSED 2026-06-02
 - **Severity:** critical (closed)
@@ -89,7 +89,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ### T-002 · Two area-membership write surfaces — CLOSED 2026-05-11 (Plan 4)
 - **Severity:** major (closed)
-- **Surface:** `internal/modules/iam/area_membership/area_membership.go:53,65,77` (free `Grant`/`Revoke`/`List` taking `*sql.Tx`, calling `metaldocs.grant_area_membership` / `revoke_area_membership` SECURITY DEFINER funcs) vs `internal/modules/iam/application/area_membership_service.go:49,108` (`AreaMembershipService.Grant`/`Revoke`) calling `UserAreaRepository.GrantAtomic` (`infrastructure/postgres/user_area_repository.go:90`) with direct DML
+- **Surface:** `internal/modules/iam/area_membership/area_membership.go:53,65,77` (free `Grant`/`Revoke`/`List` taking `*sql.Tx`, calling `metaldocs.grant_area_membership` / `revoke_area_membership` SECURITY DEFINER funcs) vs `internal/modules/iam/application/area_membership_service.go:64,120` (`AreaMembershipService.Grant`/`Revoke`) calling `UserAreaRepository.GrantAtomic` (`infrastructure/postgres/user_area_repository.go:185`) with direct DML
 - **Observation:** Two implementations of the same use case exist with different semantics. The v2 HTTP route at `/api/v1/iam/area-memberships` (POST) uses the application-service + repo path (artifact 02-flow-grant-membership). The `area_membership/` package is wired into none of the routes registered in `main.go` (per artifact 03 §3 DI touchpoints) — its callers are not in the IAM module. SECURITY DEFINER funcs `metaldocs.grant_area_membership` reads `metaldocs.actor_id` GUC; the direct-DML path does not.
 - **Evidence:** `_artifacts/01-surface.md` (both surfaces); `_artifacts/04-persistence.md` §5 (tripwire pairing rows for both); `_artifacts/03-deps.md` §3.
 - **Linked backlog row:** `backlog/iam-refactor.md#R-002`
@@ -105,7 +105,7 @@ When triggers overlap: pick the highest matching tier and justify in the row's `
 
 ### T-004 · IAM mutations have neither tier-2 nor tripwire enforcement — PARTIALLY CLOSED 2026-05-11 (Plan 5)
 - **Severity:** major → **partially resolved** (residual: `iam_users` INSERT still tier-1 only)
-- **Surface (resolved):** `infrastructure/postgres/role_admin_repository.go:34,76` (`UpsertUserAndAssignRole` at `:40`, `ReplaceUserRoles` at `:82` now call `authz.Require(CapUserManage)`); `infrastructure/postgres/user_area_repository.go:52,84,109` (`Insert` at `:59`, `CloseActive` at `:91`, `GrantAtomic` at `:118` now call `authz.Require(CapMembershipManage)`). `migrations/0188_tripwire_extend.sql` attaches `trg_require_cap_asserted` to `metaldocs.iam_user_roles` (line 187) and `metaldocs.user_process_areas` (line 192).
+- **Surface (resolved):** `infrastructure/postgres/role_admin_repository.go:34,76` (`UpsertUserAndAssignRole` at `:40`, `ReplaceUserRoles` at `:82` now call `authz.Require(CapUserManage)`); `infrastructure/postgres/user_area_repository.go:89,141,185` (`Insert` at `:100`, `CloseActive` at `:152`, `GrantAtomic` at `:196` now call `authz.Require(CapMembershipManage)`). `migrations/0188_tripwire_extend.sql` attaches `trg_require_cap_asserted` to `metaldocs.iam_user_roles` (line 187) and `metaldocs.user_process_areas` (line 192).
 - **Surface (residual):** `iam_users` INSERT inside `UpsertUserAndAssignRole` (`role_admin_repository.go:50`) and `ReplaceUserRoles` (`:92`) is still not explicitly guarded at tier-2 on the `iam_users` table itself (no separate tripwire trigger on `metaldocs.iam_users`). The capability check on the enclosing tx covers it functionally, but DB-layer enforcement is absent.
 - **Observation (original):** All IAM-owned mutating tables (`iam_user_roles`, `user_process_areas`, `iam_users`) were guarded by tier-1 middleware only. `authz.Require(...)` was called by none of these repository methods. The Postgres tripwire `enforce_capability_asserted` was attached to `public.approval_instances` and `public.approval_signoffs` only (`migrations/0142b_role_capabilities_v2_enforce.sql:200-209`), not to any IAM-owned table. The defense-in-depth pattern (IP-004 in `references/industry-patterns-index.md`) was therefore single-layer for IAM admin writes.
 - **Evidence:** `_artifacts/04-persistence.md` §3, §5; `_artifacts/05-industry.md` §IP-004.

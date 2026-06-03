@@ -58,13 +58,15 @@
 | `internal/modules/iam/application/admin_service.go:47` | func | `ReplaceUserRoles` | `func (s *AdminService) ReplaceUserRoles(ctx context.Context, userID, displayName, tenantID string, roles []domain.Role, assignedBy string) error` | `(undocumented)` |
 | `internal/modules/iam/application/area_membership_service.go:13` | var | `ErrMembershipNotFound` | `var ErrMembershipNotFound error` | `(undocumented)` |
 | `internal/modules/iam/application/area_membership_service.go:14` | var | `ErrUnknownRole` | `var ErrUnknownRole error` | `(undocumented)` |
-| `internal/modules/iam/application/area_membership_service.go:17` | iface | `UserAreaWriteRepository` | `type UserAreaWriteRepository interface` | `(undocumented)` |
-| `internal/modules/iam/application/area_membership_service.go:25` | iface | `MembershipGovernanceLogger` | `type MembershipGovernanceLogger interface` | `(undocumented)` |
-| `internal/modules/iam/application/area_membership_service.go:29` | type | `AreaMembershipService` | `type AreaMembershipService struct` | `(undocumented)` |
-| `internal/modules/iam/application/area_membership_service.go:35` | func | `NewAreaMembershipService` | `func NewAreaMembershipService(repo UserAreaWriteRepository, logger MembershipGovernanceLogger) *AreaMembershipService` | `(undocumented)` |
-| `internal/modules/iam/application/area_membership_service.go:45` | func | `ListActive` | `func (s *AreaMembershipService) ListActive(ctx context.Context, userID, tenantID string) ([]domain.UserProcessArea, error)` | `(undocumented)` |
-| `internal/modules/iam/application/area_membership_service.go:49` | func | `Grant` | `func (s *AreaMembershipService) Grant(ctx context.Context, userID, tenantID, areaCode string, role domain.Role, grantedBy string) error` | `(undocumented)` |
-| `internal/modules/iam/application/area_membership_service.go:108` | func | `Revoke` | `func (s *AreaMembershipService) Revoke(ctx context.Context, userID, tenantID, areaCode string, revokedBy string) error` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:20` | var | `ErrMembershipExists` | `var ErrMembershipExists error` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:23` | iface | `UserAreaWriteRepository` | `type UserAreaWriteRepository interface` (includes `ListByTenant`) | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:32` | iface | `MembershipGovernanceLogger` | `type MembershipGovernanceLogger interface` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:36` | type | `AreaMembershipService` | `type AreaMembershipService struct` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:42` | func | `NewAreaMembershipService` | `func NewAreaMembershipService(repo UserAreaWriteRepository, logger MembershipGovernanceLogger) *AreaMembershipService` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:52` | func | `ListActive` | `func (s *AreaMembershipService) ListActive(ctx context.Context, userID, tenantID string) ([]domain.UserProcessArea, error)` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:60` | func | `ListByTenant` | `func (s *AreaMembershipService) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string) ([]domain.UserProcessArea, error)` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:64` | func | `Grant` | `func (s *AreaMembershipService) Grant(ctx context.Context, userID, tenantID, areaCode string, role domain.Role, grantedBy string) error` | `(undocumented)` |
+| `internal/modules/iam/application/area_membership_service.go:120` | func | `Revoke` | `func (s *AreaMembershipService) Revoke(ctx context.Context, userID, tenantID, areaCode string, revokedBy string) error` | `(undocumented)` |
 | `internal/modules/iam/application/authorization.go:15` | var | `ErrAccessDenied` | `var ErrAccessDenied error` | `(undocumented)` |
 | `internal/modules/iam/application/authorization.go:16` | var | `ErrSoDViolation` | `var ErrSoDViolation error` | `(undocumented)` |
 | `internal/modules/iam/application/authorization.go:17` | var | `ErrAreaRequired` | `var ErrAreaRequired error` | `(undocumented)` |
@@ -171,19 +173,20 @@
 | `internal/modules/iam/infrastructure/postgres/role_provider.go:19` | func | `RolesByUserID` | `func (p *RoleProvider) RolesByUserID(ctx context.Context, userID, tenantID string) ([]domain.Role, error)` | `(undocumented)` |
 | `internal/modules/iam/infrastructure/postgres/user_area_repository.go:13` | type | `UserAreaRepository` | `type UserAreaRepository struct` | `(undocumented)` |
 | `internal/modules/iam/infrastructure/postgres/user_area_repository.go:17` | func | `NewUserAreaRepository` | `func NewUserAreaRepository(db *sql.DB) *UserAreaRepository` | `(undocumented)` |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:21` | func | `ListActive` | `func (r *UserAreaRepository) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)` | `(undocumented)` |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:51` | func | `Insert` | `func (r *UserAreaRepository) Insert(ctx context.Context, membership domain.UserProcessArea) error` | `(undocumented)` |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:75` | func | `CloseActive` | `func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time) error` | `(undocumented)` |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:90` | func | `GrantAtomic` | `func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error` | `(undocumented)` |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:154` | func | `GetActiveByUserAndArea` | `func (r *UserAreaRepository) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error)` | `(undocumented)` |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:23` | func | `ListActive` | `func (r *UserAreaRepository) ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)` | `(undocumented)` |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:57` | func | `ListByTenant` | `func (r *UserAreaRepository) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]domain.UserProcessArea, error)` | `(undocumented)` |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:89` | func | `Insert` | `func (r *UserAreaRepository) Insert(ctx context.Context, membership domain.UserProcessArea) error` | `(undocumented)` |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:141` | func | `CloseActive` | `func (r *UserAreaRepository) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error` | `(undocumented)` |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:185` | func | `GrantAtomic` | `func (r *UserAreaRepository) GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error` | `(undocumented)` |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:264` | func | `GetActiveByUserAndArea` | `func (r *UserAreaRepository) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*domain.UserProcessArea, error)` | `(undocumented)` |
 
 ## 3. HTTP operations
 
 | Method | Path | Handler symbol | Source file:line |
 |---|---|---|---|
-| `GET` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).listMemberships` | `internal/modules/iam/delivery/http/routes_memberships.go:30` |
-| `POST` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).grantMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:31` |
-| `DELETE` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).revokeMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:32` |
+| `GET` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).listMemberships` | `internal/modules/iam/delivery/http/routes_memberships.go:93` |
+| `POST` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).grantMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:149` |
+| `DELETE` | `/api/v1/iam/area-memberships` | `(*MembershipHandler).revokeMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:223` |
 | `GET` | `/api/v1/iam/users` | `(*AdminHandler).handleListUsers` | `internal/modules/iam/delivery/http/admin_handler.go:88` |
 | `POST` | `/api/v1/iam/users` | `(*AdminHandler).handleCreateUser` | `internal/modules/iam/delivery/http/admin_handler.go:90` |
 | `GET` | `/api/v1/iam/admin/overview` | `(*AdminHandler).handleAdminOverview` | `internal/modules/iam/delivery/http/admin_handler.go:85` |
@@ -195,4 +198,4 @@
 
 ## 4. Migration list
 
-migrations: external — see persistence artifact
+migrations: external ï¿½ see persistence artifact
