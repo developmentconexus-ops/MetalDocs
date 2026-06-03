@@ -10,6 +10,7 @@ import (
 
 	apiv2 "metaldocs/internal/api/v2"
 	iamapp "metaldocs/internal/modules/iam/application"
+	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/tenant"
 )
@@ -49,14 +50,42 @@ func (passThroughVerifier) VerifyUserInTenant(ctx context.Context, tenantID, use
 	return nil
 }
 
+// capDeniedAreaRepo simulates the real tier-2 outcome of ADR 0022 Phase 3: an
+// active membership exists, but the area-scoped authz.Require denies the revoke
+// (actor lacks membership.manage in the target area). GetActiveByUserAndArea
+// must return a live row first so Revoke reaches CloseActive (else it short-
+// circuits to ErrMembershipNotFound/404 before authz runs).
+type capDeniedAreaRepo struct{ fakeUserAreaWriteRepository }
+
+func (capDeniedAreaRepo) GetActiveByUserAndArea(ctx context.Context, userID, tenantID, areaCode string, now time.Time) (*iamdomain.UserProcessArea, error) {
+	return &iamdomain.UserProcessArea{
+		UserID:        userID,
+		TenantID:      tenantID,
+		AreaCode:      areaCode,
+		Role:          iamdomain.RoleAuthor,
+		EffectiveFrom: now.Add(-time.Hour),
+	}, nil
+}
+
+func (capDeniedAreaRepo) CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error {
+	// Returns the bare ErrCapDenied value. The real repository wraps it once in
+	// fmt.Errorf("...: %w", err); writeMembershipError uses errors.As, which
+	// resolves both forms, so the unwrapped value is sufficient for this contract.
+	return authz.ErrCapDenied{Capability: string(iamdomain.CapMembershipManage), AreaCode: areaCode, ActorID: actorID}
+}
+
+// TestMembershipsHandler_ErrorEnvelopeContract verifies the problem+json error
+// envelope for a tier-2 area denial (ADR 0022 Phase 3). The former trigger was
+// the removed RoleSystemAdmin handler gate; the equivalent forbidden outcome is
+// now ErrCapDenied bubbling from the repository, mapped to 403 AUTH_FORBIDDEN.
 func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
-	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, nil)
+	svc := iamapp.NewAreaMembershipService(capDeniedAreaRepo{}, nil)
 	handler := NewMembershipHandler(svc, passThroughVerifier{}, nil)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/iam/area-memberships?userId=user-1&areaCode=ops&revokedBy=attacker", nil)
-	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "session-user", nil))
+	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "session-user", []iamdomain.Role{iamdomain.RoleAreaAdmin}))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)

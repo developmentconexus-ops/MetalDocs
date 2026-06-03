@@ -2155,6 +2155,11 @@ paths:
       summary: Grant an active area membership
       tags: [iam]
       operationId: grantAreaMembership
+      x-authz-area:
+        source: body
+        field: areaCode
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 3): membership.manage is enforced at the tx-layer repository via authz.Require with the request areaCode. The IAM membership handler is hand-rolled (pre-codegen, ADR 0012 partial rollout), so authz-call-present — a single-function-body scan keyed to the PascalCase operationId handler calling req.Body/req.Params — cannot match it. Covered by tests/unit/iam_memberships + tests/integration/iam/membership_area_scope_test.go; lint activation deferred to ADR 0022 Phase 5.'
       requestBody:
         required: true
         content:
@@ -2197,6 +2202,11 @@ paths:
       summary: Revoke an active area membership
       tags: [iam]
       operationId: revokeAreaMembership
+      x-authz-area:
+        source: query
+        field: areaCode
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 3): membership.manage is enforced at the tx-layer repository via authz.Require with the query areaCode. The IAM membership handler is hand-rolled (pre-codegen, ADR 0012 partial rollout), so authz-call-present — a single-function-body scan keyed to the PascalCase operationId handler calling req.Body/req.Params — cannot match it. Covered by tests/unit/iam_memberships + tests/integration/iam/membership_area_scope_test.go; lint activation deferred to ADR 0022 Phase 5.'
       parameters:
         - name: userId
           in: query
