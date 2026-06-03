@@ -222,13 +222,13 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/iam/capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/iam/role-capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// IAM area memberships. F-001 split: GET view (handler self-scopes via
-	// canManageMembershipTarget at routes_memberships.go:172), writes manage.
-	{method: http.MethodGet, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPut, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPatch, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodDelete, pathPrefix: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	// IAM area memberships (PR-1). ADR 0016 view/manage split: GET view (handler
+	// also self-scopes via canManageMembershipTarget in routes_memberships.go),
+	// POST + DELETE manage. PUT/PATCH are intentionally omitted — the API surface
+	// is grant + revoke only; role changes go via revoke-then-grant.
+	{method: http.MethodGet, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Signed-URL relay.
 	{method: http.MethodGet, pathExact: "/api/v1/signed", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},

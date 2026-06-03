@@ -12,6 +12,12 @@ import (
 var (
 	ErrMembershipNotFound = errors.New("membership_not_found")
 	ErrUnknownRole        = errors.New("unknown_role")
+	// ErrMembershipExists is returned by Grant when an active membership for
+	// (user, tenant, area) with the same role already exists. The admin
+	// surface treats grant as non-idempotent: callers must explicitly revoke
+	// before re-granting the same role; a role change still succeeds via
+	// GrantAtomic (close-old + insert-new).
+	ErrMembershipExists = errors.New("membership_exists")
 )
 
 type UserAreaWriteRepository interface {
@@ -63,6 +69,9 @@ func (s *AreaMembershipService) Grant(
 	}
 	membership := buildMembership(userID, tenantID, areaCode, role, now, grantedBy)
 	if existing != nil && existing.IsActive(now) {
+		if existing.Role == role {
+			return ErrMembershipExists
+		}
 		if err := s.repo.GrantAtomic(ctx, *existing, membership); err != nil {
 			return fmt.Errorf("grant membership atomically: %w", err)
 		}

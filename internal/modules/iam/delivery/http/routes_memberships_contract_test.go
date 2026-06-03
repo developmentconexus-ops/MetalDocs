@@ -36,9 +36,18 @@ func (f fakeUserAreaWriteRepository) GetActiveByUserAndArea(ctx context.Context,
 	return nil, nil
 }
 
+// passThroughVerifier accepts every (tenant, user) combination so the handler
+// reaches the service layer in unit tests. Cross-tenant 404 enforcement lives
+// in tests/integration/iam where the real PeopleService is exercised.
+type passThroughVerifier struct{}
+
+func (passThroughVerifier) VerifyUserInTenant(ctx context.Context, tenantID, userID string) error {
+	return nil
+}
+
 func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, nil)
-	handler := NewMembershipHandler(svc)
+	handler := NewMembershipHandler(svc, passThroughVerifier{}, nil)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 
@@ -67,7 +76,7 @@ func TestMembershipsHandler_ErrorEnvelopeContract(t *testing.T) {
 
 func TestMembershipsHandler_SystemAdminCanTargetOtherUser(t *testing.T) {
 	svc := iamapp.NewAreaMembershipService(fakeUserAreaWriteRepository{}, nil)
-	handler := NewMembershipHandler(svc)
+	handler := NewMembershipHandler(svc, passThroughVerifier{}, nil)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 

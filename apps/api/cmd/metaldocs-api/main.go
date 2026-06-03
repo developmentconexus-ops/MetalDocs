@@ -317,7 +317,6 @@ func main() {
 	if deps.SQLDB != nil {
 		membershipService = iamapp.NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)
 	}
-	iamdelivery.NewMembershipHandler(membershipService).RegisterRoutes(mux)
 
 	// PR-4: People-tab orchestrator. AreaCatalogReader is wired to the
 	// permissive impl pending a dedicated process_areas reader (TODO PR-5):
@@ -326,6 +325,12 @@ func main() {
 	// permissive validator just defers the error one layer.
 	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, iamapp.PermissiveAreaCatalog{}, cachedProvider)
 	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
+
+	// PR-1 (area-memberships rebuild): MembershipHandler now takes a
+	// cross-tenant verifier (PeopleService.VerifyUserInTenant) and the audit
+	// writer so grant/revoke emit iam.area_membership.granted / .revoked rows
+	// and cross-tenant probes return 404.
+	iamdelivery.NewMembershipHandler(membershipService, peopleService, deps.AuditWriter).RegisterRoutes(mux)
 
 	// PR-5: IAM Admin Center "Roles & Capabilities" tab: read-only matrix.
 	var roleCapsReader iamdelivery.RoleCapabilitiesReader
