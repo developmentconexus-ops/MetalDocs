@@ -3549,6 +3549,8 @@ paths:
     post:
       tags: [approval]
       operationId: submitDocumentForApproval
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.submit is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
@@ -3557,6 +3559,8 @@ paths:
     post:
       tags: [approval]
       operationId: recordApprovalStageSignoff
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.signoff is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters:
         - { name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: stage_id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3567,24 +3571,32 @@ paths:
     post:
       tags: [approval]
       operationId: publishDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/schedule-publish:
     post:
       tags: [approval]
       operationId: scheduleDocumentPublish
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/supersede:
     post:
       tags: [approval]
       operationId: supersedeDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.supersede is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/obsolete:
     post:
       tags: [approval]
       operationId: obsoleteDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.obsolete is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/approval/instances/{instance_id}/cancel:
@@ -3638,6 +3650,8 @@ paths:
     post:
       tags: [approval]
       operationId: recordDocumentSignoff
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.signoff is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }

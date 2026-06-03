@@ -543,14 +543,12 @@ func seededCaps(t *testing.T) map[iamdomain.Capability]struct{} {
 func TestEveryCapSeededOrDeferred(t *testing.T) {
 	t.Parallel()
 
-	// Routed-but-unseeded write caps. Enforced only by the system_admin bypass
-	// until ADR 0022 later phases decide a per-role grant. NOT seeded by design.
-	deferred := map[iamdomain.Capability]struct{}{
-		iamdomain.CapDocumentPublish:   {},
-		iamdomain.CapDocumentObsolete:  {},
-		iamdomain.CapDocumentSupersede: {},
-		iamdomain.CapTemplateArchive:   {},
-	}
+	// Routed-but-unseeded write caps enforced only by the system_admin bypass.
+	// ADR 0022 Phase 1 deferred doc.publish/doc.obsolete/doc.supersede/template.archive
+	// here; Phase 2 (migration 0225 + reference-data mirror) seeds all four to
+	// real tenant roles, so the allow-list is now empty. A future routed-but-
+	// unseeded cap goes here with a documented deferral.
+	deferred := map[iamdomain.Capability]struct{}{}
 
 	seeded := seededCaps(t)
 
