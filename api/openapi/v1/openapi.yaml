@@ -2100,16 +2100,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
-  /api/v1/iam/area-memberships:
+  /iam/area-memberships:
     get:
       summary: List active area memberships for the current tenant
       tags: [iam]
       operationId: listAreaMemberships
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter by target userId. Defaults to the authenticated actor when omitted.
+        - name: areaCode
+          in: query
+          required: false
+          schema: { type: string }
+        - name: role
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/UserRole' }
       responses:
         '200':
-          description: ok
+          description: Active memberships for the current tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AreaMembershipListResponse'
+        '400':
+          description: Validation failure
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Target user not in tenant
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
     post:
-      summary: Grant or replace an active area membership
+      summary: Grant an active area membership
       tags: [iam]
       operationId: grantAreaMembership
       requestBody:
@@ -2117,33 +2155,75 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [userId, areaCode, role]
-              properties:
-                userId: { type: string }
-                areaCode: { type: string }
-                role: { type: string }
-                grantedBy: { type: string }
+              $ref: '#/components/schemas/GrantAreaMembershipRequest'
       responses:
         '201':
-          description: created
+          description: Membership granted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrantAreaMembershipResponse'
+        '400':
+          description: Validation failure (missing fields, unknown role)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Target user not in tenant
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: Active membership for (user, area) already exists with the same role
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
     delete:
       summary: Revoke an active area membership
       tags: [iam]
       operationId: revokeAreaMembership
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [userId, areaCode]
-              properties:
-                userId: { type: string }
-                areaCode: { type: string }
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: areaCode
+          in: query
+          required: true
+          schema: { type: string }
       responses:
         '204':
-          description: revoked
+          description: Membership revoked
+        '400':
+          description: Validation failure
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Nao autenticado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403':
+          description: Sem permissao
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '404':
+          description: Target user not in tenant, or no active membership for (user, area)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
   /telemetry/mddm-shadow-diff:
     post:
       summary: Submit a Phase 1 shadow-diff telemetry event
@@ -3841,6 +3921,48 @@ components:
       type: object
       required: [areaCode, role]
       properties:
+        areaCode: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+    AreaMembershipRow:
+      type: object
+      description: Active area membership row returned by the tenant-scoped /iam/area-memberships listing.
+      required: [userId, tenantId, areaCode, role, effectiveFrom]
+      properties:
+        userId: { type: string }
+        tenantId: { type: string }
+        areaCode: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+        effectiveFrom:
+          type: string
+          format: date-time
+        effectiveTo:
+          type: string
+          format: date-time
+          nullable: true
+        grantedBy:
+          type: string
+          nullable: true
+    AreaMembershipListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AreaMembershipRow'
+    GrantAreaMembershipRequest:
+      type: object
+      required: [userId, areaCode, role]
+      properties:
+        userId: { type: string }
+        areaCode: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+    GrantAreaMembershipResponse:
+      type: object
+      required: [userId, tenantId, areaCode, role]
+      properties:
+        userId: { type: string }
+        tenantId: { type: string }
         areaCode: { type: string }
         role: { $ref: '#/components/schemas/UserRole' }
     ManagedUserCore:

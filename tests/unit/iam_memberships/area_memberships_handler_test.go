@@ -1,0 +1,400 @@
+// area_memberships_handler_test.go — PR-1 (IAM area-memberships rebuild)
+// handler coverage.
+//
+// Lives in its own sub-package (tests/unit/iam_memberships) mirroring the PR-7b
+// tests/unit/iam_people layout — exercises the actual MembershipHandler via
+// httptest against in-memory dependencies (no DB, no codegen server stubs).
+//
+//   go test ./tests/unit/iam_memberships/...
+//
+// Surface covered (matches OpenAPI spec at api/openapi/v1/openapi.yaml):
+//   - listAreaMemberships  — response shape contract
+//   - grantAreaMembership  — audit emission, 404 cross-tenant guard, 409 duplicate
+//   - revokeAreaMembership — 404 cross-tenant guard, audit emission
+package iammembershipstest
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"io"
+
+	auditdomain "metaldocs/internal/modules/audit/domain"
+	iamapp "metaldocs/internal/modules/iam/application"
+	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
+	iamdomain "metaldocs/internal/modules/iam/domain"
+	"metaldocs/internal/platform/tenant"
+)
+
+
+const (
+	tenantAlpha = "11111111-1111-1111-1111-111111111111"
+	tenantBeta  = "22222222-2222-2222-2222-222222222222"
+	adminID     = "admin-1"
+	targetID    = "alice"
+)
+
+// ─── fakes ───────────────────────────────────────────────────────────────
+
+// memAreaRepo is an in-memory UserAreaWriteRepository. Tracks active rows
+// keyed by (userID, tenantID, areaCode); revoked rows are dropped (the
+// service only ever lists active anyway).
+type memAreaRepo struct {
+	mu     sync.Mutex
+	active map[string]iamdomain.UserProcessArea
+}
+
+func newMemAreaRepo() *memAreaRepo {
+	return &memAreaRepo{active: map[string]iamdomain.UserProcessArea{}}
+}
+
+func memKey(userID, tenantID, areaCode string) string {
+	return userID + "|" + tenantID + "|" + areaCode
+}
+
+func (r *memAreaRepo) ListActive(_ context.Context, userID, tenantID string, _ time.Time) ([]iamdomain.UserProcessArea, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]iamdomain.UserProcessArea, 0)
+	for _, m := range r.active {
+		if m.UserID == userID && m.TenantID == tenantID {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+func (r *memAreaRepo) Insert(_ context.Context, m iamdomain.UserProcessArea) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.active[memKey(m.UserID, m.TenantID, m.AreaCode)] = m
+	return nil
+}
+
+func (r *memAreaRepo) CloseActive(_ context.Context, userID, tenantID, areaCode string, _ time.Time, _ string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.active, memKey(userID, tenantID, areaCode))
+	return nil
+}
+
+func (r *memAreaRepo) GrantAtomic(_ context.Context, oldM, newM iamdomain.UserProcessArea) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.active, memKey(oldM.UserID, oldM.TenantID, oldM.AreaCode))
+	r.active[memKey(newM.UserID, newM.TenantID, newM.AreaCode)] = newM
+	return nil
+}
+
+func (r *memAreaRepo) GetActiveByUserAndArea(_ context.Context, userID, tenantID, areaCode string, _ time.Time) (*iamdomain.UserProcessArea, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if m, ok := r.active[memKey(userID, tenantID, areaCode)]; ok {
+		return &m, nil
+	}
+	return nil, nil
+}
+
+// tenantScopedVerifier returns ErrUserNotInTenant when the (tenantID, userID)
+// pair is not in the seeded set — mirrors PeopleService.VerifyUserInTenant.
+type tenantScopedVerifier struct {
+	in map[string]struct{} // key: tenantID|userID
+}
+
+func newTenantScopedVerifier() *tenantScopedVerifier {
+	return &tenantScopedVerifier{in: map[string]struct{}{}}
+}
+
+func (v *tenantScopedVerifier) seed(tenantID, userID string) {
+	v.in[tenantID+"|"+userID] = struct{}{}
+}
+
+func (v *tenantScopedVerifier) VerifyUserInTenant(_ context.Context, tenantID, userID string) error {
+	if _, ok := v.in[tenantID+"|"+userID]; ok {
+		return nil
+	}
+	return iamapp.ErrUserNotInTenant
+}
+
+// recordingAudit captures every audit Event for assertion.
+type recordingAudit struct {
+	mu     sync.Mutex
+	events []auditdomain.Event
+}
+
+func (a *recordingAudit) Record(_ context.Context, ev auditdomain.Event) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.events = append(a.events, ev)
+	return nil
+}
+
+func (a *recordingAudit) RecordTx(_ context.Context, _ *sql.Tx, ev auditdomain.Event) error {
+	return a.Record(context.Background(), ev)
+}
+
+func (a *recordingAudit) snapshot() []auditdomain.Event {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := make([]auditdomain.Event, len(a.events))
+	copy(out, a.events)
+	return out
+}
+
+// ─── harness ─────────────────────────────────────────────────────────────
+
+type harness struct {
+	mux      *http.ServeMux
+	repo     *memAreaRepo
+	verifier *tenantScopedVerifier
+	audit    *recordingAudit
+}
+
+func newHarness(t *testing.T) *harness {
+	t.Helper()
+	repo := newMemAreaRepo()
+	verifier := newTenantScopedVerifier()
+	audit := &recordingAudit{}
+	svc := iamapp.NewAreaMembershipService(repo, nil)
+	h := iamdelivery.NewMembershipHandler(svc, verifier, audit)
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
+	return &harness{mux: mux, repo: repo, verifier: verifier, audit: audit}
+}
+
+// adminReq seeds tenant + system_admin actor context on the request so the
+// handler's canManageMembershipTarget check passes for any target user.
+func adminReq(method, url string, body string, tenantID, actorID string) *http.Request {
+	var r io.Reader
+	if body != "" {
+		r = strings.NewReader(body)
+	}
+	req := httptest.NewRequest(method, url, r)
+	ctx := tenant.WithTenantID(req.Context(), tenantID)
+	ctx = iamdomain.WithAuthContext(ctx, actorID, []iamdomain.Role{iamdomain.RoleSystemAdmin})
+	return req.WithContext(ctx)
+}
+
+// ─── tests ───────────────────────────────────────────────────────────────
+
+func TestListAreaMemberships_ContractShape(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, targetID)
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID:        targetID,
+		TenantID:      tenantAlpha,
+		AreaCode:      "QMS",
+		Role:          iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?userId="+targetID, "", tenantAlpha, adminID)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s want 200", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Items []map[string]any `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v body=%s", err, rec.Body.String())
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("items=%d want 1; body=%s", len(resp.Items), rec.Body.String())
+	}
+	row := resp.Items[0]
+	for _, key := range []string{"userId", "tenantId", "areaCode", "role", "effectiveFrom"} {
+		if _, ok := row[key]; !ok {
+			t.Errorf("row missing %q (lowerCamel contract violation); row=%v", key, row)
+		}
+	}
+	if row["userId"] != targetID || row["tenantId"] != tenantAlpha || row["areaCode"] != "QMS" {
+		t.Errorf("row content mismatch: %v", row)
+	}
+}
+
+func TestGrantMembership_EmitsAudit(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, targetID)
+
+	body := `{"userId":"` + targetID + `","areaCode":"QMS","role":"author"}`
+	req := adminReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, adminID)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s want 201", rec.Code, rec.Body.String())
+	}
+	events := h.audit.snapshot()
+	if len(events) != 1 {
+		t.Fatalf("audit events=%d want 1", len(events))
+	}
+	ev := events[0]
+	if ev.Action != "iam.area_membership.granted" {
+		t.Errorf("action=%q want iam.area_membership.granted", ev.Action)
+	}
+	if ev.ResourceType != "area_membership" {
+		t.Errorf("resourceType=%q want area_membership", ev.ResourceType)
+	}
+	if ev.ResourceID != targetID {
+		t.Errorf("resourceID=%q want %q", ev.ResourceID, targetID)
+	}
+	if ev.TenantID != tenantAlpha {
+		t.Errorf("tenantID=%q want %q", ev.TenantID, tenantAlpha)
+	}
+	if !strings.Contains(ev.PayloadJSON, `"areaCode":"QMS"`) || !strings.Contains(ev.PayloadJSON, `"role":"author"`) {
+		t.Errorf("payload missing areaCode/role: %s", ev.PayloadJSON)
+	}
+}
+
+func TestRevokeMembership_RejectsCrossTenantUserWith404(t *testing.T) {
+	h := newHarness(t)
+	// Target lives in tenantBeta; admin is acting under tenantAlpha.
+	h.verifier.seed(tenantBeta, targetID)
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID:        targetID,
+		TenantID:      tenantBeta,
+		AreaCode:      "QMS",
+		Role:          iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	req := adminReq(http.MethodDelete, "/api/v1/iam/area-memberships?userId="+targetID+"&areaCode=QMS", "", tenantAlpha, adminID)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status=%d body=%s want 404 (cross-tenant probe must not leak existence)", rec.Code, rec.Body.String())
+	}
+	// Confirm membership in tenantBeta was NOT revoked.
+	rows, err := h.repo.ListActive(context.Background(), targetID, tenantBeta, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("ListActive: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("cross-tenant revoke leaked: tenantBeta active=%d want 1", len(rows))
+	}
+	// And no audit event was emitted (the guard ran before service).
+	if events := h.audit.snapshot(); len(events) != 0 {
+		t.Errorf("cross-tenant 404 must not emit audit; got %d events", len(events))
+	}
+}
+
+func TestGrantMembership_DuplicateReturns409(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, targetID)
+
+	body := `{"userId":"` + targetID + `","areaCode":"QMS","role":"author"}`
+
+	// First grant — 201.
+	req1 := adminReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, adminID)
+	rec1 := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec1, req1)
+	if rec1.Code != http.StatusCreated {
+		t.Fatalf("first grant status=%d body=%s want 201", rec1.Code, rec1.Body.String())
+	}
+
+	// Same role re-grant — 409 MEMBERSHIP_EXISTS.
+	req2 := adminReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, adminID)
+	rec2 := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusConflict {
+		t.Fatalf("duplicate grant status=%d body=%s want 409", rec2.Code, rec2.Body.String())
+	}
+	if ct := rec2.Header().Get("Content-Type"); ct != "application/problem+json" {
+		t.Errorf("duplicate Content-Type=%q want application/problem+json", ct)
+	}
+	var p struct {
+		Code   string `json:"code"`
+		Status int    `json:"status"`
+	}
+	if err := json.Unmarshal(rec2.Body.Bytes(), &p); err != nil {
+		t.Fatalf("decode problem: %v body=%s", err, rec2.Body.String())
+	}
+	if p.Code != "MEMBERSHIP_EXISTS" || p.Status != http.StatusConflict {
+		t.Errorf("problem code=%q status=%d want MEMBERSHIP_EXISTS/409", p.Code, p.Status)
+	}
+	// Only one audit event (the first successful grant).
+	if events := h.audit.snapshot(); len(events) != 1 {
+		t.Errorf("audit events=%d want 1 (only first grant); got %+v", len(events), events)
+	}
+}
+
+func TestListAreaMemberships_AreaScopedUnderTenantIsolation(t *testing.T) {
+	h := newHarness(t)
+	// Target is in BOTH tenants (e.g. cross-org user) with different area sets.
+	h.verifier.seed(tenantAlpha, targetID)
+	h.verifier.seed(tenantBeta, targetID)
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID:        targetID,
+		TenantID:      tenantAlpha,
+		AreaCode:      "QMS",
+		Role:          iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID:        targetID,
+		TenantID:      tenantBeta,
+		AreaCode:      "RH",
+		Role:          iamdomain.RoleApprover,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	// List from tenantAlpha context — must only see QMS row.
+	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?userId="+targetID, "", tenantAlpha, adminID)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tenantAlpha list status=%d body=%s want 200", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Items []struct {
+			TenantID string `json:"tenantId"`
+			AreaCode string `json:"areaCode"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v body=%s", err, rec.Body.String())
+	}
+	if len(resp.Items) != 1 {
+		t.Fatalf("items=%d want 1 (tenant isolation breach)", len(resp.Items))
+	}
+	got := resp.Items[0]
+	if got.TenantID != tenantAlpha || got.AreaCode != "QMS" {
+		t.Errorf("tenantAlpha listing leaked tenantBeta row: %+v", got)
+	}
+}
+
+// TestGrantMembership_RejectsSelfGrant locks the PR-1 security hardening: a
+// CapMembershipManage holder must not be able to grant themselves additional
+// roles even though canManageMembershipTarget treats actor==target as
+// permitted (legitimate for self-list and self-revoke).
+func TestGrantMembership_RejectsSelfGrant(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, adminID)
+
+	body := `{"userId":"` + adminID + `","areaCode":"QMS","role":"approver"}`
+	req := adminReq(http.MethodPost, "/api/v1/iam/area-memberships", body, tenantAlpha, adminID)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("self-grant status=%d body=%s want 403", rec.Code, rec.Body.String())
+	}
+	// And no audit / no row created.
+	if rows, _ := h.repo.ListActive(context.Background(), adminID, tenantAlpha, time.Now().UTC()); len(rows) != 0 {
+		t.Errorf("self-grant created %d rows; must be 0", len(rows))
+	}
+	if events := h.audit.snapshot(); len(events) != 0 {
+		t.Errorf("self-grant emitted %d audit events; must be 0", len(events))
+	}
+}
