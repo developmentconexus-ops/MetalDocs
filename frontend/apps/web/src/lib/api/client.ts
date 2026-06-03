@@ -5,6 +5,11 @@ import { dispatchAuthExpired } from "./authBus";
 import { ApiError } from "./errors";
 import { parseProblem } from "./problem";
 
+// INVARIANT: API_BASE_URL must start with "/api/" (or be a full URL on another
+// origin). createClient receives it as `baseUrl` so openapi-fetch emits
+// /api/v1-prefixed paths; rewriteRequest then early-returns the Request
+// unchanged. If this ever became a non-"/api/" path, rewriteRequest would
+// rebuild the Request and re-break body POSTs (the "Failed to fetch" bug).
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
 export type ApiFetchOptions = RequestInit & { idempotencyKey?: string };
@@ -124,5 +129,5 @@ export async function requestBlob(path: string, init?: RequestInit): Promise<Blo
   return response.blob();
 }
 
-export const api = createClient<paths>({ fetch: apiFetch });
+export const api = createClient<paths>({ baseUrl: API_BASE_URL, fetch: apiFetch });
 

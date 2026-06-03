@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { SearchBar } from "../../../components/ui/SearchBar";
 import { resolveQueryError } from "../../../lib/api/resolveQueryError";
 import { useHasCapability } from "../hooks/useHasCapability";
+import { useAuthStore } from "../../../store/auth.store";
 import { useMembershipsQuery } from "../queries/useMembershipsQuery";
 import { useUsersQuery } from "../queries/useUsersQuery";
 import { useGrantMembershipMutation } from "../mutations/useGrantMembershipMutation";
@@ -56,6 +57,7 @@ const USERS_LIMIT = 200;
 export default function MembershipsTab() {
   const [searchParams, setSearchParams] = useSearchParams();
   const canManage = useHasCapability("membership.manage");
+  const currentUserId = useAuthStore((s) => s.user?.userId);
 
   const filterValue: MembershipsFilterValue = useMemo(
     () => ({
@@ -113,16 +115,19 @@ export default function MembershipsTab() {
     const set = new Set<string>();
     for (const r of rows) set.add(r.areaCode);
     for (const u of usersQuery.data?.items ?? []) {
-      for (const m of u.areaMemberships) set.add(m.areaCode);
+      for (const m of u.areaMemberships ?? []) set.add(m.areaCode);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
   }, [rows, usersQuery.data]);
 
   const userOptions: ReadonlyArray<GrantUserOption> = useMemo(() => {
+    // Self-grant is blocked server-side (403); drop the current user from the
+    // grant dropdown so the action never offers a guaranteed-failing target.
     return (usersQuery.data?.items ?? [])
+      .filter((u) => u.userId !== currentUserId)
       .map((u) => ({ userId: u.userId, label: u.displayName || u.username }))
       .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
-  }, [usersQuery.data]);
+  }, [usersQuery.data, currentUserId]);
 
   const kpis = useMemo(() => {
     const areas = new Set(rows.map((r) => r.areaCode));
