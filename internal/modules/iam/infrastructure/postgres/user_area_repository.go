@@ -86,6 +86,100 @@ ORDER BY user_id ASC, area_code ASC, effective_from DESC
 	return result, nil
 }
 
+// MembershipDirectoryScope resolves the actor's membership-directory visibility
+// (ADR 0022 Phase 4) in a single round trip:
+//   - tenantWide: actor is system_admin (role or group-derived) — the tier-2
+//     inheritance bypass (R1) that authz.Require already honors. Detected at the
+//     data layer so the handler never pivots on a role-name string (ADR 0021).
+//   - hasManagedAreas: actor holds `capability` in ≥1 area (role_capabilities ↔
+//     user_process_areas join). Mirrors the area-grant predicate in authz.Require
+//     but spans all areas (no per-area filter), so area_admin is distinguished
+//     from self-only roles.
+func (r *UserAreaRepository) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (bool, bool, error) {
+	const q = `
+SELECT
+  EXISTS (
+    SELECT 1
+      FROM metaldocs.iam_user_roles ur
+     WHERE ur.user_id   = $1
+       AND ur.tenant_id = $2::uuid
+       AND ur.role_code = 'system_admin'
+    UNION ALL
+    SELECT 1
+      FROM metaldocs.iam_group_members gm
+      JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+      JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+     WHERE gm.user_id  = $1
+       AND gm.tenant_id = $2::uuid
+       AND g.tenant_id  = $2::uuid
+       AND gr.role = 'system_admin'
+  ) AS tenant_wide,
+  EXISTS (
+    SELECT 1
+      FROM metaldocs.role_capabilities rc
+      JOIN public.user_process_areas upa
+        ON upa.role = rc.role
+       AND upa.tenant_id = $2::uuid
+       AND upa.user_id   = $1
+       AND upa.effective_from <= now()
+       AND upa.effective_to IS NULL
+     WHERE rc.capability = $3
+  ) AS has_managed_areas
+`
+	var tenantWide, hasManagedAreas bool
+	if err := r.db.QueryRowContext(ctx, q, actorID, tenantID, capability).Scan(&tenantWide, &hasManagedAreas); err != nil {
+		return false, false, fmt.Errorf("resolve membership directory scope: %w", err)
+	}
+	return tenantWide, hasManagedAreas, nil
+}
+
+// ListByTenantInManagedAreas lists active memberships across the tenant
+// restricted to the areas where the actor holds `capability`. The managed-area
+// restriction is a SQL subquery JOIN (ADR 0022 R3 — filter at the data access
+// layer, never post-fetch). Optional exact-match filters follow ListByTenant.
+func (r *UserAreaRepository) ListByTenantInManagedAreas(ctx context.Context, tenantID, userID, areaCode, role, actorID, capability string, now time.Time) ([]iamdomain.UserProcessArea, error) {
+	const q = `
+SELECT user_id, tenant_id::text, area_code, role, effective_from, effective_to, granted_by
+FROM public.user_process_areas
+WHERE tenant_id = $1::uuid
+  AND effective_from <= $2
+  AND (effective_to IS NULL OR effective_to > $2)
+  AND ($3 = '' OR user_id   = $3)
+  AND ($4 = '' OR area_code = $4)
+  AND ($5 = '' OR role      = $5)
+  AND area_code IN (
+    SELECT upa.area_code
+    FROM metaldocs.role_capabilities rc
+    JOIN public.user_process_areas upa
+      ON upa.role = rc.role
+     AND upa.tenant_id = $1::uuid
+     AND upa.user_id   = $6
+     AND upa.effective_from <= $2
+     AND upa.effective_to IS NULL
+    WHERE rc.capability = $7
+  )
+ORDER BY user_id ASC, area_code ASC, effective_from DESC
+`
+	rows, err := r.db.QueryContext(ctx, q, tenantID, now, userID, areaCode, role, actorID, capability)
+	if err != nil {
+		return nil, fmt.Errorf("query managed-area process areas: %w", err)
+	}
+	defer rows.Close()
+
+	result := make([]iamdomain.UserProcessArea, 0, 16)
+	for rows.Next() {
+		item, err := scanUserProcessArea(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate managed-area process areas: %w", err)
+	}
+	return result, nil
+}
+
 func (r *UserAreaRepository) Insert(ctx context.Context, membership iamdomain.UserProcessArea) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

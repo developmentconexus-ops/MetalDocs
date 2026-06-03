@@ -36,6 +36,14 @@ func (s *userAreaWriteRepoStub) ListByTenant(ctx context.Context, tenantID, user
 	return append([]domain.UserProcessArea(nil), s.activeList...), nil
 }
 
+func (s *userAreaWriteRepoStub) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (bool, bool, error) {
+	return false, false, nil
+}
+
+func (s *userAreaWriteRepoStub) ListByTenantInManagedAreas(ctx context.Context, tenantID, userID, areaCode, role, actorID, capability string, now time.Time) ([]domain.UserProcessArea, error) {
+	return append([]domain.UserProcessArea(nil), s.activeList...), nil
+}
+
 func (s *userAreaWriteRepoStub) Insert(ctx context.Context, membership domain.UserProcessArea) error {
 	if s.insertErr != nil {
 		return s.insertErr

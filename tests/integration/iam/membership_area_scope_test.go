@@ -21,6 +21,7 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	iamapp "metaldocs/internal/modules/iam/application"
@@ -250,6 +251,79 @@ func TestMembershipAreaScope_SystemAdmin_BypassNotBlockedByMissingArea(t *testin
 	}
 	if err := svc.Revoke(ctx, target, devTenant, areaUnmanaged, sysAdmin); err != nil {
 		t.Fatalf("system_admin revoke w/o area row = %v, want nil (R1 inheritance)", err)
+	}
+}
+
+// TestMembershipDirectory_AreaAdminScopedInSQL is the ADR 0022 Phase 4 + R3
+// acceptance criterion: the area_admin membership directory is filtered IN SQL
+// to the actor's managed areas. An area_admin holding membership.manage in
+// areaManaged sees the target's row in that area but NOT the target's row in
+// areaUnmanaged. Scope resolution reports (tenantWide=false, hasManaged=true).
+func TestMembershipDirectory_AreaAdminScopedInSQL(t *testing.T) {
+	db := openDB(t)
+	repo := pgrepo.NewUserAreaRepository(db)
+	ctx := context.Background()
+
+	areaAdmin := testdb.DeterministicID(t, "area-admin")
+	target := testdb.DeterministicID(t, "target")
+	seedIdentity(t, db, areaAdmin)
+	seedIdentity(t, db, target)
+	seedAreaAdminMembership(t, db, areaAdmin, areaManaged) // membership.manage in areaManaged only
+	t.Cleanup(func() { closeAllActive(db, target) })
+
+	// Target has an active row in BOTH the managed and the unmanaged area.
+	withBypass(t, db, func(tx *sql.Tx) {
+		for _, area := range []string{areaManaged, areaUnmanaged} {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO public.user_process_areas
+				   (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by, revoked_by)
+				 VALUES ($1, $2::uuid, $3, 'author', now() - interval '1 hour', NULL, $4, NULL)`,
+				target, devTenant, area, areaAdmin,
+			); err != nil {
+				t.Fatalf("seed target row in %s: %v", area, err)
+			}
+		}
+	})
+
+	tenantWide, hasManaged, err := repo.MembershipDirectoryScope(ctx, devTenant, areaAdmin, string(iamdomain.CapMembershipManage))
+	if err != nil {
+		t.Fatalf("MembershipDirectoryScope(area_admin) = %v", err)
+	}
+	if tenantWide || !hasManaged {
+		t.Fatalf("area_admin scope = (tenantWide=%v, hasManaged=%v), want (false, true)", tenantWide, hasManaged)
+	}
+
+	// Filter by target to stay deterministic on the shared dev tenant: the
+	// managed-area SQL filter must keep the areaManaged row and drop areaUnmanaged.
+	rows, err := repo.ListByTenantInManagedAreas(ctx, devTenant, target, "", "", areaAdmin, string(iamdomain.CapMembershipManage), time.Now().UTC())
+	if err != nil {
+		t.Fatalf("ListByTenantInManagedAreas = %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("managed-area directory rows for target = %d, want 1 (areaManaged only); rows=%+v", len(rows), rows)
+	}
+	if rows[0].AreaCode != areaManaged {
+		t.Fatalf("managed-area directory leaked unmanaged area: %+v", rows[0])
+	}
+}
+
+// TestMembershipDirectory_SystemAdminTenantWide: a system_admin resolves to a
+// tenant-wide directory scope (R1 inheritance) regardless of any per-area row.
+func TestMembershipDirectory_SystemAdminTenantWide(t *testing.T) {
+	db := openDB(t)
+	repo := pgrepo.NewUserAreaRepository(db)
+	ctx := context.Background()
+
+	sysAdmin := testdb.DeterministicID(t, "sys-admin")
+	seedIdentity(t, db, sysAdmin)
+	seedSystemAdminRole(t, db, sysAdmin)
+
+	tenantWide, _, err := repo.MembershipDirectoryScope(ctx, devTenant, sysAdmin, string(iamdomain.CapMembershipManage))
+	if err != nil {
+		t.Fatalf("MembershipDirectoryScope(system_admin) = %v", err)
+	}
+	if !tenantWide {
+		t.Fatalf("system_admin scope tenantWide = false, want true (R1 inheritance)")
 	}
 }
 

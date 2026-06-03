@@ -23,6 +23,15 @@ var (
 type UserAreaWriteRepository interface {
 	ListActive(ctx context.Context, userID, tenantID string, now time.Time) ([]domain.UserProcessArea, error)
 	ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]domain.UserProcessArea, error)
+	// MembershipDirectoryScope reports the actor's directory visibility (ADR 0022
+	// Phase 4). tenantWide=true → full tenant directory (system_admin inheritance
+	// bypass, R1). Otherwise hasManagedAreas=true → the actor holds the given
+	// capability in at least one area (area_admin); both false → self-only.
+	MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (tenantWide bool, hasManagedAreas bool, err error)
+	// ListByTenantInManagedAreas lists active memberships restricted to the areas
+	// where the actor holds the given capability. The managed-area restriction is
+	// applied IN SQL (ADR 0022 R3 — data-layer enforcement, not post-fetch).
+	ListByTenantInManagedAreas(ctx context.Context, tenantID, userID, areaCode, role, actorID, capability string, now time.Time) ([]domain.UserProcessArea, error)
 	Insert(ctx context.Context, membership domain.UserProcessArea) error
 	CloseActive(ctx context.Context, userID, tenantID, areaCode string, effectiveTo time.Time, actorID string) error
 	GrantAtomic(ctx context.Context, oldMembership, newMembership domain.UserProcessArea) error
@@ -59,6 +68,18 @@ func (s *AreaMembershipService) ListActive(ctx context.Context, userID, tenantID
 // their own rows) is enforced by the HTTP handler.
 func (s *AreaMembershipService) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string) ([]domain.UserProcessArea, error) {
 	return s.repo.ListByTenant(ctx, tenantID, userID, areaCode, role, s.nowFn())
+}
+
+// DirectoryScope resolves the actor's membership-directory visibility (ADR 0022
+// Phase 4). See UserAreaWriteRepository.MembershipDirectoryScope.
+func (s *AreaMembershipService) DirectoryScope(ctx context.Context, tenantID, actorID, capability string) (tenantWide bool, hasManagedAreas bool, err error) {
+	return s.repo.MembershipDirectoryScope(ctx, tenantID, actorID, capability)
+}
+
+// ListByTenantInManagedAreas lists active memberships scoped to the actor's
+// managed areas (areas where the actor holds capability), filtered in SQL.
+func (s *AreaMembershipService) ListByTenantInManagedAreas(ctx context.Context, tenantID, userID, areaCode, role, actorID, capability string) ([]domain.UserProcessArea, error) {
+	return s.repo.ListByTenantInManagedAreas(ctx, tenantID, userID, areaCode, role, actorID, capability, s.nowFn())
 }
 
 func (s *AreaMembershipService) Grant(
