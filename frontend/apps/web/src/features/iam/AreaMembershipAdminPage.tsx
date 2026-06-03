@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fetchMemberships, revokeMembership } from "./membershipApi";
 import type { AreaMembership } from "./membershipApi";
 import { MembershipGrantDialog } from "./MembershipGrantDialog";
+import { useAuthStore } from "../../store/auth.store";
 
 export function AreaMembershipAdminPage() {
   const [userIdInput, setUserIdInput] = useState("");
@@ -10,6 +11,8 @@ export function AreaMembershipAdminPage() {
   const [error, setError] = useState("");
   const [showGrant, setShowGrant] = useState(false);
   const [lastQuery, setLastQuery] = useState("");
+  const capabilities = useAuthStore((s) => s.user?.capabilities ?? []);
+  const canManage = capabilities.includes("membership.manage");
 
   async function handleFilter(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,9 +48,11 @@ export function AreaMembershipAdminPage() {
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <h2 style={{ margin: 0, fontSize: 16 }}>Memberships de Area</h2>
-        <button type="button" onClick={() => setShowGrant(true)} style={{ marginLeft: "auto", padding: "6px 14px" }}>
-          + Conceder acesso
-        </button>
+        {canManage && (
+          <button type="button" onClick={() => setShowGrant(true)} style={{ marginLeft: "auto", padding: "6px 14px" }}>
+            + Conceder acesso
+          </button>
+        )}
       </div>
 
       <form onSubmit={(e) => void handleFilter(e)} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -72,7 +77,7 @@ export function AreaMembershipAdminPage() {
               <th style={{ padding: "6px 8px" }}>Papel</th>
               <th style={{ padding: "6px 8px" }}>Desde</th>
               <th style={{ padding: "6px 8px" }}>Ate</th>
-              <th style={{ padding: "6px 8px" }}>Acoes</th>
+              {canManage && <th style={{ padding: "6px 8px" }}>Acoes</th>}
             </tr>
           </thead>
           <tbody>
@@ -83,15 +88,17 @@ export function AreaMembershipAdminPage() {
                 <td style={{ padding: "6px 8px" }}>{m.role}</td>
                 <td style={{ padding: "6px 8px", fontSize: 11 }}>{m.effectiveFrom}</td>
                 <td style={{ padding: "6px 8px", fontSize: 11 }}>{m.effectiveTo ?? "-"}</td>
-                <td style={{ padding: "6px 8px" }}>
-                  <button
-                    type="button"
-                    onClick={() => void handleRevoke(m.userId, m.areaCode)}
-                    style={{ padding: "3px 8px", fontSize: 12, color: "#c00" }}
-                  >
-                    Revogar
-                  </button>
-                </td>
+                {canManage && (
+                  <td style={{ padding: "6px 8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => void handleRevoke(m.userId, m.areaCode)}
+                      style={{ padding: "3px 8px", fontSize: 12, color: "#c00" }}
+                    >
+                      Revogar
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

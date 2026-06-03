@@ -13,13 +13,18 @@ export interface AreaMembership {
 export interface GrantMembershipRequest {
   userId: string;
   areaCode: string;
-  role: 'viewer' | 'editor' | 'reviewer' | 'author' | 'approver' | 'signer' | 'area_admin' | 'qms_admin';
+  role: 'viewer' | 'editor' | 'author' | 'approver' | 'signer' | 'area_admin' | 'qms_admin';
+}
+
+interface MembershipListResponse {
+  items: AreaMembership[] | null;
 }
 
 const BASE = "/api/v1/iam/area-memberships";
 
 export async function fetchMemberships(userId: string): Promise<AreaMembership[]> {
-  return apiFetch<AreaMembership[]>(`${BASE}?userId=${encodeURIComponent(userId)}`);
+  const res = await apiFetch<MembershipListResponse>(`${BASE}?userId=${encodeURIComponent(userId)}`);
+  return res.items ?? [];
 }
 
 export async function grantMembership(req: GrantMembershipRequest): Promise<void> {
