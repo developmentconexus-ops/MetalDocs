@@ -1,79 +1,119 @@
 # Frontend module: iam
 
-> **Last verified:** 2026-06-01 (P2 consolidation: added Failure modes section)
-> **Scope:** Admin Center (users, roles, locks, password resets) and area-membership administration. Frontend slice of the backend [`iam`](../iam.md) module.
+> **Last verified:** 2026-06-03 (PR-12 full rebuild — 6-tab Admin Center IA)
+> **Scope:** Admin Center (Overview, People, Roles & Capabilities, Audit, Sessions & Security, Usage) and tenant area-membership administration. Frontend slice of the backend [`iam`](../iam.md) and [`audit`](../audit.md) modules.
 > **Owner:** unassigned | **Backend counterpart:** [`wiki/modules/iam.md`](../iam.md)
 
 ## 1. Purpose
 
-`system_admin` operator UI for user management and tenant area membership. Gated by `handle.requiresAdmin` client-side (defense-in-depth); backend tier-1 capability middleware is authoritative.
+Tenant operator UI for IAM. Surfaces user lifecycle, role/capability matrix, audit trail, active sessions + MFA coverage + lockouts + risk signals, and usage/seat metrics. Each tab is gated by a tier-1 capability declared on the route handle (defense-in-depth; backend remains the sole authz enforcer — see [`wiki/concepts/authz-tiers.md`](../../concepts/authz-tiers.md)).
 
 ## 2. Key files
 
-- [`frontend/apps/web/src/features/iam/routes.tsx:1`](../../../frontend/apps/web/src/features/iam/routes.tsx)
-- [`frontend/apps/web/src/features/iam/pages/AdminCenterPage.tsx:3`](../../../frontend/apps/web/src/features/iam/pages/AdminCenterPage.tsx) → [`AdminCenterView.tsx`](../../../frontend/apps/web/src/features/iam/AdminCenterView.tsx).
-- [`frontend/apps/web/src/features/iam/pages/AreaMembershipAdminRoutePage.tsx:3`](../../../frontend/apps/web/src/features/iam/pages/AreaMembershipAdminRoutePage.tsx) → [`AreaMembershipAdminPage.tsx`](../../../frontend/apps/web/src/features/iam/AreaMembershipAdminPage.tsx).
-- [`frontend/apps/web/src/features/iam/MembershipGrantDialog.tsx`](../../../frontend/apps/web/src/features/iam/MembershipGrantDialog.tsx)
-- [`frontend/apps/web/src/features/iam/api/iam.ts:52`](../../../frontend/apps/web/src/features/iam/api/iam.ts) — `listUsers` (52), `getAdminOverview` (57), `createUser` (66), `updateUser` (70), `assignRole` (77), `replaceUserRoles` (84), `adminResetPassword` (91), `unlockUser` (98).
-- [`frontend/apps/web/src/features/iam/membershipApi.ts:21`](../../../frontend/apps/web/src/features/iam/membershipApi.ts) — `fetchMemberships` (21), `grantMembership` (25), `revokeMembership` (33).
-- [`frontend/apps/web/src/features/iam/useAdminCenter.ts:7`](../../../frontend/apps/web/src/features/iam/useAdminCenter.ts), [`useManagedUsers.ts`](../../../frontend/apps/web/src/features/iam/useManagedUsers.ts).
+- [`frontend/apps/web/src/features/iam/routes.tsx:4`](../../../frontend/apps/web/src/features/iam/routes.tsx) — 6-tab IA with per-tab `requiresCapability` / `requiresAnyCapability`.
+- [`frontend/apps/web/src/features/iam/pages/AdminCenterPage.tsx`](../../../frontend/apps/web/src/features/iam/pages/AdminCenterPage.tsx) — shell with header + tablist + `<Outlet />`.
+- [`frontend/apps/web/src/features/iam/pages/AreaMembershipAdminRoutePage.tsx`](../../../frontend/apps/web/src/features/iam/pages/AreaMembershipAdminRoutePage.tsx) — legacy membership admin (`/admin/memberships`).
+- Tab containers — one `.route.tsx` + one `.tsx` per tab:
+  - [`tabs/OverviewTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/OverviewTab.route.tsx) → [`OverviewTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/OverviewTab.tsx)
+  - [`tabs/PeopleTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/PeopleTab.route.tsx) → [`PeopleTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/PeopleTab.tsx)
+  - [`tabs/PeopleDetailDrawer.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/PeopleDetailDrawer.route.tsx) → [`PeopleDetailDrawer.tsx`](../../../frontend/apps/web/src/features/iam/tabs/PeopleDetailDrawer.tsx)
+  - [`tabs/RolesCapsTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/RolesCapsTab.route.tsx) → [`RolesCapsTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/RolesCapsTab.tsx)
+  - [`tabs/AuditTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/AuditTab.route.tsx) → [`AuditTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/AuditTab.tsx)
+  - [`tabs/SessionsTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/SessionsTab.route.tsx) → [`SessionsTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/SessionsTab.tsx)
+  - [`tabs/UsageTab.route.tsx`](../../../frontend/apps/web/src/features/iam/tabs/UsageTab.route.tsx) → [`UsageTab.tsx`](../../../frontend/apps/web/src/features/iam/tabs/UsageTab.tsx)
+- Components: [`components/KpiStrip.tsx`](../../../frontend/apps/web/src/features/iam/components/KpiStrip.tsx), [`ActivityPanel.tsx`](../../../frontend/apps/web/src/features/iam/components/ActivityPanel.tsx), [`SessionsTable.tsx`](../../../frontend/apps/web/src/features/iam/components/SessionsTable.tsx), [`UserSessionsTable.tsx`](../../../frontend/apps/web/src/features/iam/components/UserSessionsTable.tsx), [`LockoutsTable.tsx`](../../../frontend/apps/web/src/features/iam/components/LockoutsTable.tsx), [`MfaCoverageCard.tsx`](../../../frontend/apps/web/src/features/iam/components/MfaCoverageCard.tsx), [`SecuritySignalsList.tsx`](../../../frontend/apps/web/src/features/iam/components/SecuritySignalsList.tsx), [`PresenceBadge.tsx`](../../../frontend/apps/web/src/features/iam/components/PresenceBadge.tsx).
+- Queries (openapi-fetch + TanStack Query): everything under [`features/iam/queries/`](../../../frontend/apps/web/src/features/iam/queries/) (`useOverviewQuery`, `useKpiQuery`, `useUsersQuery`, `useUserDetailQuery`, `useRolesQuery`, `useCapabilitiesQuery`, `useRoleCapabilitiesQuery`, `useAuditEventsQuery`, `useSessionsQuery`, `useMfaCoverageQuery`, `useLockoutsQuery`, `useSecuritySignalsQuery`, `useUsageQuery`, `useUserMembershipsQuery`, `usePresenceStream`).
+- Mutations: [`features/iam/mutations/`](../../../frontend/apps/web/src/features/iam/mutations/) (`useInviteUserMutation`, `usePatchUserMutation`, `useBulkUsersMutation`, `useResetPasswordMutation`, `useRevokeSessionMutation`, `useUnlockUserMutation`, `useExportAuditMutation`).
+- Legacy compat (membership area admin only): [`membershipApi.ts`](../../../frontend/apps/web/src/features/iam/membershipApi.ts) — still uses `apiFetch` for `/api/v1/admin/users/{userId}/memberships`.
 
 ## 3. Routes
 
-| Path | Component | Handle |
+| Path | Component | Required capability |
 |---|---|---|
-| `/admin` | `AdminCenterPage` | `workspaceView: 'admin', requiresAdmin: true` |
-| `/admin/memberships` | `AreaMembershipAdminRoutePage` | `workspaceView: 'iam-memberships', requiresAdmin: true` |
+| `/admin` | `AdminCenterPage` | any of `user.view`, `membership.view`, `metrics.view` |
+| `/admin/overview` | `OverviewTab` | any of `user.view`, `membership.view`, `metrics.view` |
+| `/admin/people` | `PeopleTab` | `user.view` |
+| `/admin/people/:userId` | `PeopleDetailDrawer` | `user.view` |
+| `/admin/roles` | `RolesCapsTab` | `membership.view` |
+| `/admin/audit` | `AuditTab` | `audit.read` |
+| `/admin/sessions` | `SessionsTab` | `user.view` |
+| `/admin/usage` | `UsageTab` | `metrics.view` |
+| `/admin/memberships` | `AreaMembershipAdminRoutePage` | `membership.view` |
+
+> Note: the `AppShell` gate collects every `requiresCapability` / `requiresAnyCapability` along the match chain and requires all of them to pass. Parent + child constraints both enforced (fixed at PR-12 closeout — see [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../../docs/audits/QA-evidence-admin-center-rebuild.md)).
 
 ## 4. TanStack Query
 
-The IAM slice currently uses ad-hoc keys inside `useAdminCenter` / `useManagedUsers` hooks (no central `QK.iam.*` entry yet). Server-state moves through these hooks — server data never lives in `auth.store`.
+All keys flow through hooks in `features/iam/queries/`. Each hook returns a typed `useQuery` (`paths` from `lib/api-types/`) and a stable key under namespaces like `["iam","users", …]`, `["iam","sessions", …]`, `["iam","audit", …]`, `["iam","usage", …]`. Invalidation on mutation:
 
-**Invalidation rules:** role / lock / password mutations should refetch the admin overview and managed-users list. Membership grant/revoke should refetch `fetchMemberships(userId)` for the affected user.
+- `useInviteUserMutation` / `usePatchUserMutation` / `useBulkUsersMutation` → `["iam","users"]`, `["iam","kpi"]`.
+- `useResetPasswordMutation` → `["iam","users", userId]`.
+- `useRevokeSessionMutation` → `["iam","sessions"]`, `["iam","kpi"]`.
+- `useUnlockUserMutation` → `["iam","lockouts"]`, `["iam","kpi"]`.
+- `useExportAuditMutation` → `["iam","audit"]` (re-fetches timeline so the export event appears).
+
+Presence is a WebSocket subscription (`usePresenceStream`) that writes into a dedicated key family so it can be observed by Overview without polling.
 
 ## 5. API endpoints consumed
 
 | FE call | Backend route |
 |---|---|
-| `getAdminOverview` | `GET /api/v1/admin/overview` |
-| `listUsers` | `GET /api/v1/admin/users` |
-| `createUser` | `POST /api/v1/admin/users` |
-| `updateUser` | `PUT /api/v1/admin/users/{id}` |
-| `assignRole` / `replaceUserRoles` | `POST/PUT /api/v1/admin/users/{id}/roles` |
-| `adminResetPassword` | `POST /api/v1/admin/users/{id}/reset-password` |
-| `unlockUser` | `POST /api/v1/admin/users/{id}/unlock` |
-| `fetchMemberships` / `grantMembership` / `revokeMembership` | `/api/v1/admin/users/{userId}/memberships[/{areaCode}]` |
+| `useOverviewQuery` | `GET /api/v1/admin/iam/overview` |
+| `useKpiQuery` | `GET /api/v1/admin/iam/kpi` |
+| `useUsersQuery` / `useUserDetailQuery` | `GET /api/v1/admin/iam/users[?cursor=…]`, `GET /api/v1/admin/iam/users/{userId}` |
+| `useInviteUserMutation` | `POST /api/v1/admin/iam/users` |
+| `usePatchUserMutation` | `PATCH /api/v1/admin/iam/users/{userId}` |
+| `useBulkUsersMutation` | `POST /api/v1/admin/iam/users/bulk` |
+| `useResetPasswordMutation` | `POST /api/v1/admin/iam/users/{userId}/reset-password` |
+| `useRolesQuery` / `useCapabilitiesQuery` / `useRoleCapabilitiesQuery` | `GET /api/v1/admin/iam/roles`, `/capabilities`, `/role-capabilities` |
+| `useAuditEventsQuery` | `GET /api/v1/admin/audit/events` |
+| `useExportAuditMutation` | `POST /api/v1/admin/audit/exports` |
+| `useSessionsQuery` | `GET /api/v1/admin/iam/sessions` |
+| `useRevokeSessionMutation` | `DELETE /api/v1/admin/iam/sessions/{sessionId}` (bulk via body) |
+| `useMfaCoverageQuery` | `GET /api/v1/admin/iam/mfa-coverage` |
+| `useLockoutsQuery` / `useUnlockUserMutation` | `GET /api/v1/admin/iam/lockouts`, `POST /api/v1/admin/iam/users/{userId}/unlock` |
+| `useSecuritySignalsQuery` | `GET /api/v1/admin/iam/signals` |
+| `useUsageQuery` | `GET /api/v1/admin/iam/usage` |
+| `usePresenceStream` | `WS /api/v1/admin/iam/presence` (PR-9) |
+| `fetchMemberships` / `grantMembership` / `revokeMembership` | `/api/v1/admin/users/{userId}/memberships[/{areaCode}]` (legacy `apiFetch`) |
 
 ## 6. Dependencies
 
-**Imports from:** `lib/api/`, `store/auth.store` (read-only — current user), `components/ui/` (Avatar with hashed color, StatusPill).
+**Imports from:** `lib/api` (typed openapi-fetch client `api.GET/POST/PATCH/DELETE`), `lib/api-types/` (generated paths), `store/auth.store` (current user capabilities), `components/ui/` primitives, `lib/queryKeys.ts` (audit + sessions + usage namespaces).
 
-**Imported by:** `features/shell/components/AppShell.tsx` — reads `auth.store.user.roles` to honor `handle.requiresAdmin` redirect; no IAM API imports from outside this feature.
+**Imported by:** `features/shell/components/AppShell.tsx` (capability gate read), router root (`routes.tsx` registration).
 
 ## 7. Invariants
 
-- `handle.requiresAdmin` redirects non-admins from `/admin*` to `/` (UX gate only; backend authoritative).
-- All mutations go through `lib/api/apiFetch`; no direct `fetch`.
-- A future migration should add `QK.iam.*` to `lib/queryKeys.ts` — current ad-hoc keys are tracked as drift.
+- Every IAM admin API call uses the typed `api.*` client; only the legacy `membershipApi.ts` still uses `apiFetch`. Direct `fetch()` is banned in this slice.
+- Sessions filters live in the URL (`?usuario=…&ip=…&mfa=…`) so the tab is shareable; cache key includes the filter signature.
+- Bulk-row-action mutations use a single bulk endpoint, not N parallel single-id calls.
+- All KPI cards have a `refetch` action; failed cards render an inline retry, not a full-page error.
+- The 6-tab IA is the only public surface — no legacy `AdminCenterView` / `useAdminCenter` / `useManagedUsers` / `state/admin.store.ts` remains (verified at PR-12 closeout).
 
 ## 8. Known issues / tech-debt
 
-- See backend [`iam-tech-debt.md`](../iam-tech-debt.md).
-- Centralized `QK.iam.*` keys missing — invalidation depends on hook-local strings.
+- **`UserRole` carries `admin` + `reviewer` literals beyond canonical 8** in `lib/types/index.ts:19-29`. Phase 1 left these to avoid touching unrelated call sites (templates/documents/taxonomy/iam-membership). Cleanup tracked for follow-up PR.
+- Membership area admin (`/admin/memberships`) still uses `apiFetch` — migration to `api.*` deferred.
+- Backend IAM tech-debt remains tracked at [`iam-tech-debt.md`](../iam-tech-debt.md).
 
 ## 9. Failure modes
 
 | Failure | Symptom | Detection | Response |
 |---|---|---|---|
-| Non-admin user reaches `/admin*` directly | `handle.requiresAdmin` redirects to `/` (UX gate); backend tier-1 still enforced | `AppShell.tsx` reads `auth.store.user.roles`; backend returns 403 if FE bypassed | Expected behavior; if backend 403 still leaks data, check `iam` capability middleware |
-| 403 on `assignRole` / `replaceUserRoles` (operator missing `system_admin`) | Toast with backend `ApiError.message`; mutation fails | `ApiError.code === 'authz.forbidden'` | Operator escalates; no client retry |
-| Duplicate `grantMembership` for `(userId, areaCode)` | Backend 409 `iam.membership_exists` | `ApiError.code` | Refetch `fetchMemberships(userId)` to reconcile UI state |
-| Backend 5xx on admin overview load | Admin Center shows error state; managed users list empty | `useAdminCenter.error` | Retry; check `metaldocs-api` IAM logs |
-| Stale managed-users list after mutation | New user not visible until manual refresh | Ad-hoc query keys not invalidated (tracked in §8) | Manual refetch; migrate to `QK.iam.*` invalidation |
-| 401 on any admin call | `authBus` redirect → `/login`; admin context lost | Standard `apiFetch` 401 path | Re-login; returnTo restores `/admin` |
+| User without IAM caps reaches `/admin/*` | First tab cap denied → `<Navigate to="/" />`; tabs without caps hidden from tablist | `AppShell.tsx` reads `auth.store.user.capabilities`; backend returns 403 on data calls | Expected; tighten gate (see §8) |
+| 403 on `usePatchUserMutation` / `useBulkUsersMutation` | Inline error banner; row stays selected, no optimistic flicker | `ApiError.code === 'authz.capability_denied'` | Operator lacks `user.manage` |
+| 409 on `useInviteUserMutation` (`iam.user_exists`) | Toast with backend message; drawer stays open with field highlighted | `ApiError.code` | Operator chooses different identifier or re-uses existing |
+| Bulk revoke partial failure | Per-session error rendered in row; successes invalidate the list | `useRevokeSessionMutation` returns `{succeeded, failed[]}` | Operator retries failed rows |
+| Audit export returns 202 | Toast "Exportação solicitada"; new `audit_export.requested` event appears at top of timeline | `useExportAuditMutation` resolves with `exportId` | Operator picks up downloaded file from audit row when status flips to `done` |
+| WebSocket presence drops | `Quem está online` shows last known snapshot with reconnect banner | `usePresenceStream` reconnect logic | Auto-retry; manual refresh as fallback |
+| `useInfiniteQuery` (Audit timeline) cursor desync | "Carregar mais" returns duplicate or empty page | Cursor pagination contract drift | See ADR [`2026-06-03-audit-events-cursor-shape.md`](../../decisions/2026-06-03-audit-events-cursor-shape.md) |
+| 401 anywhere | `authBus` redirect → `/login`; admin context lost | Standard `apiFetch` / openapi-fetch error path | Re-login; returnTo restores last `/admin/*` tab |
 
 ## 10. Cross-links
 
-- Backend module: [`wiki/modules/iam.md`](../iam.md)
+- Backend module: [`wiki/modules/iam.md`](../iam.md), [`wiki/modules/audit.md`](../audit.md)
 - Concept: [`wiki/concepts/authz-tiers.md`](../../concepts/authz-tiers.md)
+- ADRs: [`0019-cap-audit-read-and-session-manage.md`](../../decisions/0019-cap-audit-read-and-session-manage.md), [`0020-admin-center-six-tab-ia.md`](../../decisions/0020-admin-center-six-tab-ia.md), [`0021-tenant-vs-platform-admin-separation.md`](../../decisions/0021-tenant-vs-platform-admin-separation.md), [`2026-06-03-audit-events-cursor-shape.md`](../../decisions/2026-06-03-audit-events-cursor-shape.md)
 - Skill: [`metaldocs-frontend`](../../../.agents/skills/metaldocs-frontend/SKILL.md)
+- QA evidence: [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../../docs/audits/QA-evidence-admin-center-rebuild.md)

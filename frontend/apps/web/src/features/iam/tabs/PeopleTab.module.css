@@ -1,0 +1,115 @@
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.titleBlock h2 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  margin-top: 4px;
+}
+
+.primaryAction {
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  background: var(--brand);
+  color: var(--text-on-brand);
+  border: 1px solid var(--brand);
+  border-radius: var(--r-2);
+  padding: 8px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+}
+
+.primaryAction:hover { filter: brightness(1.05); }
+.primaryAction:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.searchBox {
+  flex: 1 1 280px;
+  min-width: 220px;
+  max-width: 360px;
+}
+
+.bulkBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--brand-pale);
+  border: 1px solid var(--brand);
+  border-radius: var(--r-3);
+  font-size: var(--font-size-sm);
+  color: var(--text);
+}
+
+.bulkActions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.bulkBtn {
+  font: inherit;
+  font-size: var(--font-size-sm);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-2);
+  padding: 6px var(--sp-3);
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.bulkBtn:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.bulkBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.bulkBtnDanger { border-color: var(--danger); color: var(--danger); }
+.bulkBtnDanger:hover { background: var(--danger); color: var(--text-on-brand); }
+
+.clearBulk {
+  font: inherit;
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  font-size: var(--font-size-sm);
+}
+.clearBulk:hover { color: var(--text); }
+
+.confirmText {
+  font-size: var(--font-size-sm);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.confirmStrong { font-weight: 600; }

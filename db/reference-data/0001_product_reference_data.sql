@@ -101,6 +101,12 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'membership.view', 'Read access policies and area memberships') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'taxonomy.view', 'Read taxonomy profiles, areas, families') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
+-- PR-2 (ADR 0019): broaden audit.read; add session.manage (mirrors db/migrations/0218_iam_caps_audit_session_pr2.sql).
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'audit.read', 'Read governance / audit events') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'audit.read', 'Read governance / audit events') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'audit.read', 'Read governance / audit events') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'session.manage', 'Force-logout / revoke auth sessions') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+
 -- System blank template required for controlled document creation defaults.
 -- Invariant: this reference-data row is valid only when bootstrap/storage also seeds
 -- `system/templates/blank.docx` into the configured attachments bucket.

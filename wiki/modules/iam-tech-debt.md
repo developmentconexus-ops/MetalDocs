@@ -2,7 +2,69 @@
 
 > Companion to [`wiki/modules/iam.md`](iam.md). Debt only — no fix prescriptions. Fixes live in [`wiki/backlog/iam-refactor.md`](../backlog/iam-refactor.md).
 
-**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync)
+**Last verified:** 2026-06-02 (PR-7b hardening closed 8 findings — see T-PR7B-1..8)
+
+### T-PR7B-1 · CRITICAL — cross-tenant ATO via `handleResetPassword` — CLOSED 2026-06-02
+- **Severity:** critical (closed)
+- **Observation:** `PeopleHandler.handleResetPassword` delegated to `authSvc.AdminResetPassword` without verifying the target userID belonged to the caller's tenant; `auth_identities` has no tenant_id column so SQL writes were tenant-blind. Allowed cross-tenant account takeover.
+- **Resolution:** Added `PeopleService.VerifyUserInTenant` (membership probe via `auth.ListUsers(tenantID)`) + `guardUserInTenant` helper on `PeopleHandler`. Returns 404 NOT 403 to avoid leaking existence in other tenants.
+
+### T-PR7B-2 · CRITICAL — cross-tenant unlock — CLOSED 2026-06-02
+- **Severity:** critical (closed)
+- **Observation:** Same shape as T-PR7B-1 on `handleUnlock`.
+- **Resolution:** Same guard.
+
+### T-PR7B-3 · CRITICAL — PeopleHandler routes fell through to SessionRequired — CLOSED 2026-06-02
+- **Severity:** critical (closed)
+- **Observation:** `POST /iam/users/invite`, `POST /iam/users/bulk`, `GET /iam/users/{userId}/memberships` were not enumerated in `apps/api/cmd/metaldocs-api/permissions.go` routeRules. Fallback returned `VisibilitySessionRequired`, so any authenticated session (Viewer included) bypassed the capability gate.
+- **Resolution:** Added explicit rules with `CapUserManage` (invite, bulk) and `CapMembershipView` (memberships). Regression test `TestPermissionResolver_PeopleHandlerRoutes` locks the contract.
+
+### T-PR7B-4 · HIGH — `tests/unit` package failed to build — CLOSED 2026-06-02
+- **Severity:** high (closed)
+- **Observation:** Three compile errors after PR-2/PR-5 interface drift (NewService now returns 2 values, NewDevRoleProvider gained allowedTenantID, RoleCacheInvalidator gained InvalidateUserTenant). Reset/unlock tests also still pointed at the retired AdminHandler routes.
+- **Resolution:** Stub method on `fakeInvalidator`, updated call sites, rerouted tests via PeopleHandler.
+
+### T-PR7B-5 · HIGH — LIKE metacharacter injection on `action` filter — CLOSED 2026-06-02
+- **Severity:** high (closed)
+- **Observation:** `audit/infrastructure/postgres/writer.go` built `LIKE` patterns directly from user input with no `%` / `_` escaping. Intra-tenant over-matching.
+- **Resolution:** New `internal/platform/sqlescape` package; applied `LikeEscape` + `ESCAPE '\'` clause to action prefix and free-text q paths.
+
+### T-PR7B-6 · HIGH — missing index on `auth_identities.last_failed_login_at` — CLOSED 2026-06-02
+- **Severity:** high (closed)
+- **Observation:** Migration 0210 added the column but only indexed `locked_until`. `CountRecentFailedLoginsByUser` seq-scanned per `/security/signals` call.
+- **Resolution:** Migration 0211 partial index `WHERE last_failed_login_at IS NOT NULL`.
+
+### T-PR7B-7 · MEDIUM — `GetExportStatus` silent bypass on empty actor — CLOSED 2026-06-02
+- **Severity:** medium (closed)
+- **Observation:** Service skipped per-actor ownership check when actorID was empty; handler discarded the `ok` bool from `authn.UserIDFromContext`. Edge layer covers HTTP today but the path was a latent defense-in-depth gap.
+- **Resolution:** Service fails-closed with `ErrActorRequired`; handler returns 401 when context has no userID.
+
+### T-PR7B-8 · MEDIUM — silent page-1 reset on stale cursor — CLOSED 2026-06-02
+- **Severity:** medium (closed)
+- **Observation:** `decodeCursorIndex` returned 0 when the anchor user was no longer in the filtered set; caller silently restarted pagination with `hasMore=true`. Client appending without dedup got duplicate rows / could loop.
+- **Resolution:** `decodeCursorIndex` now returns `(idx, found)`; service emits `ErrCursorExpired`; handler maps to 410 `CURSOR_EXPIRED`.
+
+### T-PR8-1 · MEDIUM — `tenant_plans` mutation surface is Tier-A only (open) — 2026-06-02
+- **Severity:** medium (open, by design)
+- **Surface:** `internal/modules/iam/infrastructure/postgres/observability_repository.go::GetTenantPlan` (read-only); `db/migrations/0221_tenant_plans.sql` (table + backfill).
+- **Observation:** PR-8 reads `metaldocs.tenant_plans` to render the Admin Center Usage card. Upgrade/downgrade, billing, overage flows belong to the **Tier-A platform-owner surface** and are intentionally NOT implemented at Tier-B (tenant admin). Tenant admins see their quota envelope; they cannot change it from the SaaS app.
+- **Resolution path:** stand up a separate Tier-A admin surface (`/platform/...`) with `CapPlatformAdmin` cap; wire UPDATE / billing webhook ingestion there.
+
+### T-PR8-2 · MEDIUM — `storage.usedBytes` returns -1 (open) — 2026-06-02
+- **Severity:** medium (open)
+- **Surface:** `internal/modules/iam/infrastructure/postgres/observability_repository.go::StorageUsedBytes`.
+- **Observation:** Blob-layer byte aggregation is not yet tenant-scoped end-to-end (`document_attachments` has no `tenant_id`, requires JOIN via `documents`; revision artifacts spread across multiple tables). PR-8 returns `-1` so the FE renders "—" rather than fabricating a zero.
+- **Resolution path:** add `tenant_id` columns or a per-tenant materialized rollup that sums `document_attachments.size_bytes`, `document_versions.file_size_bytes`, `document_images.byte_size`, `document_exports.size_bytes`.
+
+### T-PR8-3 · LOW — `usage.apiCalls` counts zero (open) — 2026-06-02
+- **Severity:** low (open)
+- **Surface:** `internal/modules/iam/infrastructure/postgres/observability_repository.go::CountAuditEventsByActionPrefix` with `actionPrefix = "http.request."`.
+- **Observation:** No audit action under the `http.request.*` namespace exists today, so the query always returns 0. Acceptable for v1 — the FE shows 0 across the 24h/7d/30d panes.
+- **Resolution path:** either start emitting a coarse `http.request.<route>` audit row at the API edge, or back the count with a dedicated request-log table.
+
+---
+
+**Prior verified:** 2026-05-26 (Wave 2 authz tx seeding sync)
 
 ## Severity scale
 

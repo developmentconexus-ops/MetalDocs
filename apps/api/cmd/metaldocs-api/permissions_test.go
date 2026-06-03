@@ -403,3 +403,35 @@ func TestPermissionsTable_NoMethodlessWriteShadowing(t *testing.T) {
 		}
 	}
 }
+
+// TestPermissionResolver_PeopleHandlerRoutes asserts the PR-4 People-tab
+// routes resolve to VisibilityPermissionGuarded with the documented cap.
+// Without explicit rules they would fall through to VisibilitySessionRequired
+// — the long-term guard against future route additions slipping the gate.
+func TestPermissionResolver_PeopleHandlerRoutes(t *testing.T) {
+	t.Parallel()
+
+	resolver := newPermissionResolver()
+	cases := []struct {
+		method string
+		path   string
+		cap    iamdomain.Capability
+	}{
+		{http.MethodGet, "/api/v1/iam/users", iamdomain.CapUserView},
+		{http.MethodPost, "/api/v1/iam/users/invite", iamdomain.CapUserManage},
+		{http.MethodPost, "/api/v1/iam/users/bulk", iamdomain.CapUserManage},
+		{http.MethodPatch, "/api/v1/iam/users/u-1", iamdomain.CapUserManage},
+		{http.MethodPost, "/api/v1/iam/users/u-1/reset-password", iamdomain.CapUserManage},
+		{http.MethodPost, "/api/v1/iam/users/u-1/unlock", iamdomain.CapUserManage},
+		{http.MethodGet, "/api/v1/iam/users/u-1/memberships", iamdomain.CapMembershipView},
+	}
+	for _, tc := range cases {
+		gotCap, gotVis := resolver(tc.method, tc.path)
+		if gotVis != iamdelivery.VisibilityPermissionGuarded {
+			t.Errorf("%s %s: visibility=%v want PermissionGuarded", tc.method, tc.path, gotVis)
+		}
+		if gotCap != tc.cap {
+			t.Errorf("%s %s: cap=%q want %q", tc.method, tc.path, gotCap, tc.cap)
+		}
+	}
+}

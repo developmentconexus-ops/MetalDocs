@@ -196,6 +196,50 @@ WHERE user_id = $1
 	return nil
 }
 
+// RecordLastLoginContext updates metaldocs.iam_users with the IP, User-Agent,
+// and optional device label observed on the most recent successful login. Best-
+// effort: missing iam_users row (no tenant binding yet) is treated as a no-op
+// because the credential row on auth_identities is the source of truth for
+// last_login_at; this table is a governance-side hint for the People-tab UI.
+//
+// PR-4 leaves deviceLabel empty when the caller cannot derive it. Length
+// truncation matches the auth_sessions IP/UA limits (128 / 512) to stay
+// consistent with the values stored alongside this user's active sessions.
+func (r *Repository) RecordLastLoginContext(ctx context.Context, userID, tenantID, ip, userAgent, deviceLabel string) error {
+	userID = strings.TrimSpace(userID)
+	tenantID = strings.TrimSpace(tenantID)
+	if userID == "" || tenantID == "" {
+		return nil
+	}
+	const q = `
+UPDATE metaldocs.iam_users
+SET last_login_ip = NULLIF($3, ''),
+    last_login_user_agent = NULLIF($4, ''),
+    last_login_device_label = COALESCE(NULLIF($5, ''), last_login_device_label),
+    updated_at = NOW()
+WHERE user_id = $1
+  AND tenant_id = $2::uuid
+`
+	if _, err := r.db.ExecContext(ctx, q,
+		userID,
+		tenantID,
+		truncateForColumn(ip, 128),
+		truncateForColumn(userAgent, 512),
+		truncateForColumn(deviceLabel, 128),
+	); err != nil {
+		return fmt.Errorf("update iam_users last login context: %w", err)
+	}
+	return nil
+}
+
+func truncateForColumn(value string, max int) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= max {
+		return value
+	}
+	return value[:max]
+}
+
 func (r *Repository) RecordSuccessfulLogin(ctx context.Context, userID string, loginAt time.Time) error {
 	const q = `
 UPDATE metaldocs.auth_identities
@@ -212,20 +256,26 @@ WHERE user_id = $1
 	return nil
 }
 
-func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int) (int, *time.Time, error) {
+// RecordFailedLogin atomically increments failed_login_attempts and, when the
+// threshold is reached, sets locked_until. It also stamps last_failed_login_at
+// + last_failed_login_ip (PR-7) so /security/lockouts and /security/signals
+// can surface the most recent failure context per user.
+func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
 	const q = `
 UPDATE metaldocs.auth_identities
 SET failed_login_attempts = failed_login_attempts + 1,
     locked_until = CASE WHEN failed_login_attempts + 1 >= $2
                         THEN NOW() + ($3 * INTERVAL '1 second')
                         ELSE locked_until END,
+    last_failed_login_at = NOW(),
+    last_failed_login_ip = NULLIF($4, ''),
     updated_at = NOW()
 WHERE user_id = $1
 RETURNING failed_login_attempts, locked_until
 `
 	var attempts int
 	var lockedUntil sql.NullTime
-	if err := r.db.QueryRowContext(ctx, q, userID, maxAttempts, lockDurationSeconds).Scan(&attempts, &lockedUntil); err != nil {
+	if err := r.db.QueryRowContext(ctx, q, userID, maxAttempts, lockDurationSeconds, ip).Scan(&attempts, &lockedUntil); err != nil {
 		return 0, nil, fmt.Errorf("update failed login: %w", err)
 	}
 	if !lockedUntil.Valid {

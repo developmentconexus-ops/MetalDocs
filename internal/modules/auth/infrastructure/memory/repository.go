@@ -138,7 +138,14 @@ func (r *Repository) RecordSuccessfulLogin(_ context.Context, userID string, log
 	return nil
 }
 
-func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAttempts int, lockDurationSeconds int) (int, *time.Time, error) {
+// RecordLastLoginContext is a no-op for the in-memory repository — tenant-
+// scoped iam_users rows do not exist in this implementation. The Postgres
+// implementation persists the values for the People-tab "Last login" drawer.
+func (r *Repository) RecordLastLoginContext(_ context.Context, _, _, _, _, _ string) error {
+	return nil
+}
+
+func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAttempts int, lockDurationSeconds int, _ string) (int, *time.Time, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
