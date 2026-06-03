@@ -1,5 +1,6 @@
 # public.user_process_areas
 
+> **Last verified:** 2026-06-03
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `public`
 > **Owner:** iam
@@ -18,7 +19,7 @@ Current curated-baseline table owned by `iam`. See the owning module wiki and ru
 | `effective_from` | `timestamp with time zone` | no | Baseline column. |
 | `effective_to` | `timestamp with time zone` | yes | Baseline column. |
 | `granted_by` | `text` | yes | Baseline column. |
-| `revoked_by` | `text` | yes | Baseline column. |
+| `revoked_by` | `text` | yes | Actor who revoked the membership. Must be non-NULL whenever `effective_to` is set (`revoked_by_required_when_revoked` CHECK). Writers: `UserAreaRepository.CloseActive` and `GrantAtomic` set this alongside `effective_to`. |
 
 ## Baseline Definition
 
@@ -44,7 +45,7 @@ Use `rg -n "user_process_areas" internal apps` and the owning module wiki to ver
 
 ## Seed or Reference Data
 
-Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001_local_dev_seed.sql` before adding rows.
+Check `db/reference-data/0001_product_reference_data.sql` and `db/dev-seeds/0001_local_dev_seed.sql` before adding rows. As of 2026-06-03 the dev seed defines three process areas (`rh`, `qualidade`, `producao`) with memberships seeded in `rh` and `qualidade`; `producao` is intentionally empty so QA can exercise both grant paths (role-change via `GrantAtomic` and new-pair via `Insert`).
 
 ## Notes and Debt
 

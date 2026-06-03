@@ -2,7 +2,7 @@
 
 > Living architecture doc. Shape: Arc42 + C4 + ADR cross-links.
 
-**Last verified:** 2026-06-03 (PR-1 of the IAM Area Membership rebuild — `feat/iam-memberships-pr1-contract`: OpenAPI spec at `api/openapi/v1/openapi.yaml:2103` rewritten — path renamed to server-relative `/iam/area-memberships` (matches the `/api/v1` server block); new component schemas `AreaMembershipRow` / `AreaMembershipListResponse` / `GrantAreaMembershipRequest` / `GrantAreaMembershipResponse`; full RFC 9457 `Problem` responses for 400/401/403/404/409. `frontend/apps/web/src/lib/api-types/index.d.ts` regenerated via `corepack pnpm gen:api`. `MembershipHandler` (`internal/modules/iam/delivery/http/routes_memberships.go`) now takes a `MembershipUserTenantVerifier` and an `auditdomain.Writer` — cross-tenant probes return 404 NOT 403 (mirrors PeopleHandler `guardUserInTenant`), grant + revoke emit `iam.area_membership.granted` / `.revoked` audit events, duplicate same-role grant maps to 409 `MEMBERSHIP_EXISTS` via the new `iamapp.ErrMembershipExists` sentinel, and self-grant is locked out (a `CapMembershipManage` holder can no longer hand themselves additional area roles). `apps/api/cmd/metaldocs-api/permissions.go:225` trimmed the dead PUT/PATCH routeRules and switched to `pathExact` for the three supported verbs; new `TestPermissionResolver_AreaMembershipRoutes` lock test pins the contract and asserts PUT/PATCH fall through to `VisibilitySessionRequired`. Handler integration tests at `tests/unit/iam_memberships/area_memberships_handler_test.go` cover contract shape, audit emission, cross-tenant 404, duplicate 409, tenant-isolated listing, and self-grant rejection. PR #55 QA close-out preserved below.) (Prior PR #55 close-out: `GET /api/v1/iam/area-memberships` now serializes lowerCamel via new `membershipDTO` in `internal/modules/iam/delivery/http/routes_memberships.go` (prior PascalCase from raw `iamdomain.UserProcessArea` left the FE list silently empty); FE `fetchMemberships` in `frontend/apps/web/src/features/iam/membershipApi.ts` unwraps the `{items:[]}` envelope and the `'reviewer'` phantom role was dropped from `GrantMembershipRequest`; `AreaMembershipAdminPage` now gates manage UI (Conceder / Revogar / Acoes column) on the caller's `membership.manage` capability per ADR 0016 view/manage split — route still gated at `membership.view`. PR-12b close-out preserved below.) (PR-12b close-out: duplicate migration `0219_audit_export_jobs_pr6.sql` renumbered to `0224_audit_export_jobs_pr6.sql` so the runner never silently skips one of the two PR-4/PR-6 schema changes when ledger-restored mid-sequence; `handleListMemberships` in `internal/modules/iam/delivery/http/people_handler.go` now calls `guardUserInTenant` so cross-tenant probes return 404 instead of an empty 200 (matches the PR-7b pattern; covered by `TestListMemberships_RejectsCrossTenantUserWith404`); `BumpMiddleware` gained `StartCleanup(ctx)` that ticks at `BumpDebounce*5` and evicts `lastBump` entries older than `BumpDebounce*10` so the in-memory debounce map can no longer grow unboundedly under user churn (wired in `apps/api/cmd/metaldocs-api/main.go`); FE `usePresenceStream` upgraded to a native WebSocket against `/api/v1/iam/presence/stream` with 30s heartbeat, exponential backoff (1s → 30s), and HTTP-snapshot polling fallback after 5 consecutive failed reconnects; FE `UserRole` phantoms `'admin'`/`'reviewer'` removed from `lib/types` (canonical 8-role union only — `DocumentPublishedPage` revision-init check migrated; templates workflow-role test casts at the store boundary) and the stale `AdminOverviewResponse` interface deleted (consumers import from `lib/api-types` codegen). PR-7b notes preserved below.)
+**Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps — PR #58 — 4 BE/contract gaps closed: `CloseActive` and `GrantAtomic` now set `revoked_by` = acting user satisfying the `revoked_by_required_when_revoked` CHECK (fixes SQLSTATE 23514 / HTTP 500 on role-change grant); new `ListByTenant(ctx, tenantID, userID, areaCode, role, now)` on `UserAreaRepository` with optional exact-match filters; `UserAreaWriteRepository` interface gained `ListByTenant`; `AreaMembershipService.ListByTenant` added; `listMemberships` handler rewritten — system_admins get tenant-wide directory with optional userId/areaCode/role filters, non-admins are restricted to their own memberships; new helper `isMembershipDirectoryAdmin`; cross-tenant 404 guard runs when a specific userId is in scope; OpenAPI `listAreaMemberships` param descriptions refreshed (no shape change); dev seed adds `qualidade`/`producao` process areas and 3 new `qualidade` memberships (`producao` intentionally empty).) (PR-1 of the IAM Area Membership rebuild — `feat/iam-memberships-pr1-contract`: OpenAPI spec at `api/openapi/v1/openapi.yaml:2103` rewritten — path renamed to server-relative `/iam/area-memberships` (matches the `/api/v1` server block); new component schemas `AreaMembershipRow` / `AreaMembershipListResponse` / `GrantAreaMembershipRequest` / `GrantAreaMembershipResponse`; full RFC 9457 `Problem` responses for 400/401/403/404/409. `frontend/apps/web/src/lib/api-types/index.d.ts` regenerated via `corepack pnpm gen:api`. `MembershipHandler` (`internal/modules/iam/delivery/http/routes_memberships.go`) now takes a `MembershipUserTenantVerifier` and an `auditdomain.Writer` — cross-tenant probes return 404 NOT 403 (mirrors PeopleHandler `guardUserInTenant`), grant + revoke emit `iam.area_membership.granted` / `.revoked` audit events, duplicate same-role grant maps to 409 `MEMBERSHIP_EXISTS` via the new `iamapp.ErrMembershipExists` sentinel, and self-grant is locked out (a `CapMembershipManage` holder can no longer hand themselves additional area roles). `apps/api/cmd/metaldocs-api/permissions.go:225` trimmed the dead PUT/PATCH routeRules and switched to `pathExact` for the three supported verbs; new `TestPermissionResolver_AreaMembershipRoutes` lock test pins the contract and asserts PUT/PATCH fall through to `VisibilitySessionRequired`. Handler integration tests at `tests/unit/iam_memberships/area_memberships_handler_test.go` cover contract shape, audit emission, cross-tenant 404, duplicate 409, tenant-isolated listing, and self-grant rejection. PR #55 QA close-out preserved below.) (Prior PR #55 close-out: `GET /api/v1/iam/area-memberships` now serializes lowerCamel via new `membershipDTO` in `internal/modules/iam/delivery/http/routes_memberships.go` (prior PascalCase from raw `iamdomain.UserProcessArea` left the FE list silently empty); FE `fetchMemberships` in `frontend/apps/web/src/features/iam/membershipApi.ts` unwraps the `{items:[]}` envelope and the `'reviewer'` phantom role was dropped from `GrantMembershipRequest`; `AreaMembershipAdminPage` now gates manage UI (Conceder / Revogar / Acoes column) on the caller's `membership.manage` capability per ADR 0016 view/manage split — route still gated at `membership.view`. PR-12b close-out preserved below.) (PR-12b close-out: duplicate migration `0219_audit_export_jobs_pr6.sql` renumbered to `0224_audit_export_jobs_pr6.sql` so the runner never silently skips one of the two PR-4/PR-6 schema changes when ledger-restored mid-sequence; `handleListMemberships` in `internal/modules/iam/delivery/http/people_handler.go` now calls `guardUserInTenant` so cross-tenant probes return 404 instead of an empty 200 (matches the PR-7b pattern; covered by `TestListMemberships_RejectsCrossTenantUserWith404`); `BumpMiddleware` gained `StartCleanup(ctx)` that ticks at `BumpDebounce*5` and evicts `lastBump` entries older than `BumpDebounce*10` so the in-memory debounce map can no longer grow unboundedly under user churn (wired in `apps/api/cmd/metaldocs-api/main.go`); FE `usePresenceStream` upgraded to a native WebSocket against `/api/v1/iam/presence/stream` with 30s heartbeat, exponential backoff (1s → 30s), and HTTP-snapshot polling fallback after 5 consecutive failed reconnects; FE `UserRole` phantoms `'admin'`/`'reviewer'` removed from `lib/types` (canonical 8-role union only — `DocumentPublishedPage` revision-init check migrated; templates workflow-role test casts at the store boundary) and the stale `AdminOverviewResponse` interface deleted (consumers import from `lib/api-types` codegen). PR-7b notes preserved below.)
 
 **Prior verification — 2026-06-02 (PR-7b hardening):** 3 CRITICAL + 3 HIGH + 2 MEDIUM closed. Cross-tenant ATO via `handleResetPassword` / `handleUnlock` / `handlePatch` plugged with `PeopleService.VerifyUserInTenant`; bulk loop guards each user-id; `permissions.go` routeRules gained explicit entries for `POST /iam/users/invite`, `POST /iam/users/bulk`, `GET /iam/users/{userId}/memberships` so they no longer fall through to `VisibilitySessionRequired`. LIKE-metachar escaping centralized in `internal/platform/sqlescape/like.go` and applied to `audit/.../writer.go` action+q filters; migration 0211 adds a partial index on `auth_identities.last_failed_login_at`. `Service.GetExportStatus` fails-closed on empty actor; cursor anchor misses now surface 410 `CURSOR_EXPIRED`. PR-4 baseline preserved below.)
 
@@ -22,13 +22,13 @@
 > - `internal/modules/iam/delivery/http/middleware.go:31` â€” `NewMiddleware`; `Wrap` `:49`; strips trusted identity headers `X-User-ID` and `X-User-Roles`; tenant resolution: prefers `tenant.FromContext`, falls back to `X-Tenant-ID` header then `DevTenantID` (legacy-header mode only)
 > - `internal/modules/iam/delivery/http/middleware.go:77` â€” `tenant.FromContext` call (primary tenant source post-Plan 3)
 > - `internal/modules/iam/delivery/http/admin_handler.go:82` â€” admin routes registration; `handleAdminOverview` reads `tenant.FromContext` at `:109`
-> - `internal/modules/iam/delivery/http/routes_memberships.go:30` â€” area-membership routes; `tenantIDFromRequest` delegates to `tenant.FromContext` at `:146`
+> - `internal/modules/iam/delivery/http/routes_memberships.go:86` â€” `RegisterRoutes`; `listMemberships` at `:93` (admin-vs-non-admin scope split; `isMembershipDirectoryAdmin` at `:365`); `tenantIDFromRequest` at `:346` delegates to `tenant.FromContext`
 > - `internal/modules/iam/application/admin_service.go:23` â€” `UpsertUserAndAssignRole`
-> - `internal/modules/iam/application/area_membership_service.go:49` â€” `Grant` use case
+> - `internal/modules/iam/application/area_membership_service.go:52` â€” `ListActive`; `ListByTenant` at `:60`; `Grant` at `:64`
 > - `internal/modules/iam/application/cached_role_provider.go:18` â€” TTL-cached role provider
 > - `internal/modules/iam/infrastructure/postgres/role_provider.go:19` â€” tenant-scoped `RolesByUserID`
 > - `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:34` â€” `UpsertUserAndAssignRole` (BEGIN-authz.Require-DELETE-INSERT); `ReplaceUserRoles` at `:76` â€” both now call `authz.Require(CapUserManage)` (Plan 5 closed T-004 partial)
-> - `internal/modules/iam/infrastructure/postgres/user_area_repository.go:52` â€” `Insert` (tier-2 `authz.Require(CapMembershipManage)`); `CloseActive` at `:84`; `GrantAtomic` at `:109` â€” all three write methods now have tier-2 enforcement (Plan 5 closed T-004 partial)
+> - `internal/modules/iam/infrastructure/postgres/user_area_repository.go:57` â€” `ListByTenant` (tenant-scoped active-membership query, optional exact-match filters via `($n = '' OR col = $n)`); `Insert` at `:89` (tier-2 `authz.Require(CapMembershipManage)`); `CloseActive` at `:141` (sets `revoked_by = actorID` alongside `effective_to`, satisfies `revoked_by_required_when_revoked` CHECK); `GrantAtomic` at `:185` (UPDATE sets `revoked_by`; INSERT unchanged) â€” all three write methods have tier-2 enforcement and satisfy CHECK
 > - `internal/modules/iam/domain/model.go:13` â€” single typed `Capability` namespace (28 consts; ADR 0019 (PR-2) added `CapSessionManage` and broadened `CapAuditRead` grants; ADR 0016 added `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`; Plan 5 added `CapControlledDocumentObsolete` + `CapControlledDocumentSupersede`; Plan 4 closed T-001; size locked by `TestCapabilityRegistrySize`)
 > - `db/migrations/0218_iam_caps_audit_session_pr2.sql` â€” PR-2 grants: `audit.read` → {qms_admin, area_admin, approver}; `session.manage` → {system_admin}; ADR 0019
 > - `apps/api/cmd/metaldocs-api/permissions.go:54,196` â€” `(method,path)â†’Cap*` resolver
@@ -170,7 +170,7 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 | `domain/user_area.go` | `UserProcessArea`, `(m).IsActive(now)` |
 | `application/capability_service.go` | `ErrCapabilityDenied`, `CapabilityService`, `NewCapabilityService`, `CanDo` |
 | `application/admin_service.go` | `RoleCacheInvalidator`, `AdminService`, `NewAdminService`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` |
-| `application/area_membership_service.go` | `ErrMembershipNotFound`, `ErrUnknownRole`, `UserAreaWriteRepository`, `MembershipGovernanceLogger`, `AreaMembershipService`, `NewAreaMembershipService`, `ListActive`, `Grant`, `Revoke` |
+| `application/area_membership_service.go` | `ErrMembershipNotFound`, `ErrUnknownRole`, `ErrMembershipExists`, `UserAreaWriteRepository` (now includes `ListByTenant`), `MembershipGovernanceLogger`, `AreaMembershipService`, `NewAreaMembershipService`, `ListActive`, `ListByTenant`, `Grant`, `Revoke` |
 | `application/cached_role_provider.go` | `CachedRoleProvider`, `NewCachedRoleProvider`, `RolesByUserID`, `InvalidateUser`, `InvalidateAll` |
 | `application/dev_role_provider.go` | `DevRoleProvider`, `NewDevRoleProvider`, `RolesByUserID` (memory-mode) |
 | `authz/authz.go` | `ErrCapDenied` (struct, carries capability/area fields), `WithCapCache`, `Require`, `BypassSystem` |
@@ -181,15 +181,15 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 | `infrastructure/memory/role_admin_repository.go` | `RoleAdminRepository`, `Newâ€¦`, `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` (dev-only) |
 | `infrastructure/postgres/role_admin_repository.go` | `RoleAdminRepository`, `Newâ€¦`, `HasAnyRole`, `UpsertUserAndAssignRole`, `ReplaceUserRoles` |
 | `infrastructure/postgres/role_provider.go` | `RoleProvider`, `Newâ€¦`, `RolesByUserID` |
-| `infrastructure/postgres/user_area_repository.go` | `UserAreaRepository`, `Newâ€¦`, `ListActive`, `Insert`, `CloseActive`, `GrantAtomic`, `GetActiveByUserAndArea` |
+| `infrastructure/postgres/user_area_repository.go` | `UserAreaRepository`, `Newâ€¦`, `ListActive`, `ListByTenant`, `Insert`, `CloseActive`, `GrantAtomic`, `GetActiveByUserAndArea` |
 
 ### 5.3 HTTP operations
 
 | Method | Path | Handler | Tier-1 capability | operationId |
 |---|---|---|---|---|
-| GET | `/api/v1/iam/area-memberships` | `MembershipHandler.listMemberships` (`routes_memberships.go`) | `membership.view` | `listAreaMemberships` |
-| POST | `/api/v1/iam/area-memberships` | `MembershipHandler.grantMembership` (`routes_memberships.go`) | `membership.manage` | `grantAreaMembership` |
-| DELETE | `/api/v1/iam/area-memberships` | `MembershipHandler.revokeMembership` (`routes_memberships.go`) | `membership.manage` | `revokeAreaMembership` |
+| GET | `/api/v1/iam/area-memberships` | `MembershipHandler.listMemberships` (`routes_memberships.go:93`) | `membership.view` (tenant-wide directory further gated by `isMembershipDirectoryAdmin` at `:365`) | `listAreaMemberships` |
+| POST | `/api/v1/iam/area-memberships` | `MembershipHandler.grantMembership` (`routes_memberships.go:149`) | `membership.manage` | `grantAreaMembership` |
+| DELETE | `/api/v1/iam/area-memberships` | `MembershipHandler.revokeMembership` (`routes_memberships.go:223`) | `membership.manage` | `revokeAreaMembership` |
 | GET | `/api/v1/iam/admin/overview` | `AdminHandler.handleAdminOverview` (`admin_handler.go:85`) | `user.view` |
 | GET | `/api/v1/iam/users` | `PeopleHandler.handleListUsers` (`people_handler.go`) | `user.view` |
 | POST | `/api/v1/iam/users/invite` | `PeopleHandler.handleInvite` (`people_handler.go`) | `user.manage` |
@@ -209,7 +209,7 @@ Post-ADR-0016 split (GET = view-grade, writes = manage-grade) verified against `
 
 | Method | Path | Runtime owner (file:line) | Handler method | Spec path | operationId | Codegen method | Status | Notes |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/v1/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go` | `listMemberships` | `/iam/area-memberships` | `listAreaMemberships` | â€” | Aligned + Contracted | Schemas: `AreaMembershipListResponse` / `AreaMembershipRow`. Handler hand-rolled (ADR 0012 IAM pre-codegen). |
+| GET | `/api/v1/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go:87` | `listMemberships` | `/iam/area-memberships` | `listAreaMemberships` | â€” | Aligned + Contracted | Schemas: `AreaMembershipListResponse` / `AreaMembershipRow`. Handler hand-rolled (ADR 0012 IAM pre-codegen). system_admins get tenant-wide directory (optional userId/areaCode/role filters); non-admins restricted to own rows. |
 | POST | `/api/v1/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go` | `grantMembership` | `/iam/area-memberships` | `grantAreaMembership` | â€” | Aligned + Contracted | Schemas: `GrantAreaMembershipRequest` / `GrantAreaMembershipResponse`. 409 `MEMBERSHIP_EXISTS` on duplicate same-role grant; self-grant 403. |
 | DELETE | `/api/v1/iam/area-memberships` | `internal/modules/iam/delivery/http/routes_memberships.go` | `revokeMembership` | `/iam/area-memberships` | `revokeAreaMembership` | â€” | Aligned + Contracted | Query params `userId` + `areaCode`; cross-tenant probes 404. |
 | GET | `/api/v1/iam/users` | `internal/modules/iam/delivery/http/admin_handler.go:84` | `handleUsers` (`GET` branch) | `/iam/users` | â€” | â€” | Aligned | Spec server is `/api/v1`; operationId not defined. |
@@ -243,8 +243,8 @@ sequenceDiagram
     participant S as AreaMembershipService
     participant R as UserAreaRepository
     participant DB as Postgres
-    C->>MW: GET /api/v1/iam/area-memberships
-    MW->>CS: CanDo(userID, tenantID, "membership.manage")
+    C->>MW: GET /api/v1/iam/area-memberships[?userId&areaCode&role]
+    MW->>CS: CanDo(userID, tenantID, "membership.view")
     CS->>DB: SELECT EXISTS(...) over iam_user_roles + iam_group_*
     DB-->>CS: allowed=true|false
     alt denied
@@ -252,9 +252,16 @@ sequenceDiagram
         MW-->>C: 403 {error:{code,message,trace_id}}
     else allowed
         MW->>H: listMemberships
-        H->>S: ListActive(userID, tenantID)
-        S->>R: ListActive(ctx, userID, tenantID, now)
-        R->>DB: SELECT user_process_areas WHERE effective_to IS NULL
+        note over H: isMembershipDirectoryAdmin? system_admin=yes, others=no
+        alt non-admin
+            H->>H: force userID = authenticated actor
+        end
+        opt userID in scope
+            H->>H: guardMembershipUserInTenant (cross-tenant 404)
+        end
+        H->>S: ListByTenant(tenantID, userID, areaCode, role)
+        S->>R: ListByTenant(ctx, tenantID, userID, areaCode, role, now)
+        R->>DB: SELECT user_process_areas WHERE tenant_id=$1 AND active AND optional filters
         DB-->>R: rows
         R-->>S: []UserProcessArea
         S-->>H: items
@@ -262,7 +269,7 @@ sequenceDiagram
     end
 ```
 
-Read-only. Tripwire pairing: N/A. State transitions: none.
+Read-only. Tripwire pairing: N/A. State transitions: none. Tier-1 capability is `membership.view` (held by every role per ADR 0016); tenant-wide directory access is further gated inside the handler by `isMembershipDirectoryAdmin` (system_admin check at `routes_memberships.go:365`).
 
 ### 6.2 grantAreaMembership â€” POST /api/v1/iam/area-memberships
 
@@ -299,7 +306,7 @@ State transitions:
 | `public.user_process_areas` row | active (`effective_to IS NULL`) | closed (`effective_to = newMembership.effective_from`) + new active row | `POST /api/v1/iam/area-memberships` via `GrantAtomic` | `membership.manage` |
 | `public.user_process_areas` row | absent | new active row | `POST /api/v1/iam/area-memberships` via `Insert` | `membership.manage` |
 
-Tripwire pairing: **active** â€” `trg_require_cap_asserted` attached to `user_process_areas` by migration 0188 (Plan 5). Tier-2 `authz.Require(CapMembershipManage)` is called inside each write method (`Insert` at `user_area_repository.go:59`, `CloseActive` at `:91`, `GrantAtomic` at `:118`). T-004 (IAM write paths lack tier-2) partially closed for the user_area side.
+Tripwire pairing: **active** â€” `trg_require_cap_asserted` attached to `user_process_areas` by migration 0188 (Plan 5). Tier-2 `authz.Require(CapMembershipManage)` is called inside each write method (`Insert` at `user_area_repository.go:100`, `CloseActive` at `:152`, `GrantAtomic` at `:196`). `CloseActive` and `GrantAtomic` also set `revoked_by = actorID` alongside `effective_to` to satisfy the `revoked_by_required_when_revoked` CHECK (previously caused SQLSTATE 23514 / HTTP 500 on role-change grant). T-004 (IAM write paths lack tier-2) partially closed for the user_area side.
 
 ### 6.3 upsertUserRole â€” POST /api/v1/iam/users/{userId}/roles
 
@@ -392,9 +399,9 @@ Every IAM-owned table has `tenant_id` (`iam_users` since 0130, `iam_user_roles` 
 - IAM mutations:
   - `RoleAdminRepository.UpsertUserAndAssignRole` opens its own tx (`role_admin_repository.go:35` `db.BeginTx`); calls `authz.Require(CapUserManage)` at `:40`.
   - `RoleAdminRepository.ReplaceUserRoles` opens its own tx (`:77`); calls `authz.Require(CapUserManage)` at `:82`.
-  - `UserAreaRepository.Insert` opens its own tx (`user_area_repository.go:53`); calls `authz.Require(CapMembershipManage)` at `:59`.
-  - `UserAreaRepository.CloseActive` opens its own tx (`:85`); calls `authz.Require(CapMembershipManage)` at `:91`.
-  - `UserAreaRepository.GrantAtomic` opens its own tx (`:110`); calls `authz.Require(CapMembershipManage)` at `:118`.
+  - `UserAreaRepository.Insert` opens its own tx (`user_area_repository.go:89`); calls `authz.Require(CapMembershipManage)` at `:100`.
+  - `UserAreaRepository.CloseActive` opens its own tx (`:141`); calls `authz.Require(CapMembershipManage)` at `:152`; UPDATE sets both `effective_to` and `revoked_by = actorID` (satisfies `revoked_by_required_when_revoked` CHECK).
+  - `UserAreaRepository.GrantAtomic` opens its own tx (`:185`); calls `authz.Require(CapMembershipManage)` at `:196`; close-UPDATE sets both `effective_to` and `revoked_by`; insert-INSERT unchanged.
 
 ### 8.6 Error namespace
 
