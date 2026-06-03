@@ -1,3 +1,13 @@
+## 2026-06-03 - fix/iam-memberships-pr1-backend-gaps (PR #58)
+
+- **Context:** 4 BE/contract gaps in the area-membership surface closed: `CloseActive`/`GrantAtomic` set `revoked_by`; `ListByTenant` added to repository + interface + service; `listMemberships` handler rewritten with admin/non-admin scope split; dev seed adds `qualidade`/`producao` areas and 3 new memberships.
+- **Mode:** lite patch
+- **Affected surface scan:** `infrastructure/postgres/user_area_repository.go`; `application/area_membership_service.go`; `delivery/http/routes_memberships.go`; `api/openapi/v1/openapi.yaml` (descriptions only); `db/dev-seeds/0001_local_dev_seed.sql`.
+- **Facts updated:** `revoked_by` correctly populated to satisfy `revoked_by_required_when_revoked` CHECK; `ListByTenant` public surface documented; `listMemberships` runtime scope rules captured; tripwire pairing table corrected to show `authz.Require = YES`; line numbers throughout.
+- **T/R rows touched:** none (no new debt items; no closures).
+- **Preflight/tally:** n/a — wiki-curator invocation, not a module-doc-sync run.
+- **Patched files:** `wiki/modules/iam.md`; `wiki/modules/iam/_artifacts/04-persistence.md`; `wiki/modules/iam/_artifacts/02-flow-list-memberships.md`; `wiki/modules/iam/_artifacts/02-flow-grant-membership.md`; `wiki/database/tables/user_process_areas.md`; `wiki/modules/iam/_artifacts/sync-log.md`.
+
 ## 2026-05-26 - Wave 2 authz tx seeding sync
 
 - **Context:** uncommitted diff for Wave 2 shared authz transaction seeding across `internal/modules/iam/{authz,application,infrastructure/postgres}` plus documents tx-owner consumers.

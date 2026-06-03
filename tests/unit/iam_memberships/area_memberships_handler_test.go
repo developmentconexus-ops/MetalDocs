@@ -71,6 +71,28 @@ func (r *memAreaRepo) ListActive(_ context.Context, userID, tenantID string, _ t
 	return out, nil
 }
 
+func (r *memAreaRepo) ListByTenant(_ context.Context, tenantID, userID, areaCode, role string, _ time.Time) ([]iamdomain.UserProcessArea, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]iamdomain.UserProcessArea, 0)
+	for _, m := range r.active {
+		if m.TenantID != tenantID {
+			continue
+		}
+		if userID != "" && m.UserID != userID {
+			continue
+		}
+		if areaCode != "" && m.AreaCode != areaCode {
+			continue
+		}
+		if role != "" && string(m.Role) != role {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}
+
 func (r *memAreaRepo) Insert(_ context.Context, m iamdomain.UserProcessArea) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -219,6 +241,122 @@ func TestListAreaMemberships_ContractShape(t *testing.T) {
 	}
 	if row["userId"] != targetID || row["tenantId"] != tenantAlpha || row["areaCode"] != "QMS" {
 		t.Errorf("row content mismatch: %v", row)
+	}
+}
+
+// userReq seeds tenant + a non-system-admin actor context, so the handler
+// treats the caller as a plain membership.view holder (self-scoped listing).
+func userReq(method, url string, body string, tenantID, actorID string, roles ...iamdomain.Role) *http.Request {
+	var r io.Reader
+	if body != "" {
+		r = strings.NewReader(body)
+	}
+	req := httptest.NewRequest(method, url, r)
+	ctx := tenant.WithTenantID(req.Context(), tenantID)
+	ctx = iamdomain.WithAuthContext(ctx, actorID, roles)
+	return req.WithContext(ctx)
+}
+
+func TestListAreaMemberships_SystemAdminSeesTenantWideDirectory(t *testing.T) {
+	h := newHarness(t)
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: targetID, TenantID: tenantAlpha, AreaCode: "QMS", Role: iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: "bob", TenantID: tenantAlpha, AreaCode: "RH", Role: iamdomain.RoleApprover,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	// No userId filter + system_admin -> whole tenant directory (both users).
+	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships", "", tenantAlpha, adminID)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s want 200", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Items []map[string]any `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Items) != 2 {
+		t.Fatalf("items=%d want 2 (tenant-wide directory); body=%s", len(resp.Items), rec.Body.String())
+	}
+}
+
+func TestListAreaMemberships_NonAdminIsSelfScoped(t *testing.T) {
+	h := newHarness(t)
+	h.verifier.seed(tenantAlpha, "carol")
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: "carol", TenantID: tenantAlpha, AreaCode: "QMS", Role: iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: targetID, TenantID: tenantAlpha, AreaCode: "RH", Role: iamdomain.RoleApprover,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	// Non-admin omitting userId -> only own rows, never the full directory.
+	req := userReq(http.MethodGet, "/api/v1/iam/area-memberships", "", tenantAlpha, "carol", iamdomain.RoleViewer)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s want 200", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Items []struct {
+			UserID string `json:"userId"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Items) != 1 || resp.Items[0].UserID != "carol" {
+		t.Fatalf("non-admin self-scope breach: %+v", resp.Items)
+	}
+}
+
+func TestListAreaMemberships_NonAdminCannotTargetOther(t *testing.T) {
+	h := newHarness(t)
+	req := userReq(http.MethodGet, "/api/v1/iam/area-memberships?userId="+targetID, "", tenantAlpha, "carol", iamdomain.RoleViewer)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status=%d body=%s want 403 (non-admin probing other user)", rec.Code, rec.Body.String())
+	}
+}
+
+func TestListAreaMemberships_AreaAndRoleFilters(t *testing.T) {
+	h := newHarness(t)
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: targetID, TenantID: tenantAlpha, AreaCode: "QMS", Role: iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: "bob", TenantID: tenantAlpha, AreaCode: "RH", Role: iamdomain.RoleApprover,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	req := adminReq(http.MethodGet, "/api/v1/iam/area-memberships?areaCode=RH&role=approver", "", tenantAlpha, adminID)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s want 200", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Items []struct {
+			UserID   string `json:"userId"`
+			AreaCode string `json:"areaCode"`
+			Role     string `json:"role"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Items) != 1 || resp.Items[0].AreaCode != "RH" || resp.Items[0].Role != "approver" {
+		t.Fatalf("area/role filter breach: %+v", resp.Items)
 	}
 }
 

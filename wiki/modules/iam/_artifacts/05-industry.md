@@ -33,7 +33,7 @@
 - **Version:** 2023-07
 - **Quote:** "A problem details object can be extended with additional members."
 - **Maps to:** `api/openapi/v1/openapi.yaml` — `Problem` schema (referenced from `wiki/architecture/api-design-system.md`)
-- **MetalDocs adherence — gap:** IAM middleware emits `{error:{code,message,details,trace_id}}` (`internal/modules/iam/delivery/http/middleware.go:129`); membership handler emits `{code,message}` (`routes_memberships.go:137`). Neither matches RFC 9457 `type` / `title` / `status` / `detail` shape. No `Problem` `type` URI on IAM responses (artifact 02-flow-list-memberships §5; 02-flow-grant-membership §5). `wiki/architecture/api-design-system.md` names RFC 9457 as the canonical envelope — IAM is not on it yet.
+- **MetalDocs adherence — gap (CLOSED T-006, Plan 7):** IAM now emits RFC 9457 Problem responses via `problem.Write` / `problem.New` (`internal/platform/problem/problem.go`). Both middleware and membership handler use `writeProblem` at `routes_memberships.go:273`. Gap closed 2026-05-12.
 
 ### IP-005 · OpenAPI as source-of-truth (oapi-codegen)
 
@@ -41,7 +41,7 @@
 - **Version:** OpenAPI 3.0.3 (2020)
 - **Quote:** "The OpenAPI Specification … is the standard for HTTP APIs."
 - **Maps to:** `api/openapi/v1/openapi.yaml`, generated `*.gen.go` per `wiki/architecture/api-contract.md`
-- **MetalDocs adherence — gap:** IAM routes are wired on a hand-written `*http.ServeMux` (`delivery/http/routes_memberships.go:30`, `delivery/http/admin_handler.go:82`). `listAreaMemberships`, `grantAreaMembership`, `revokeAreaMembership` are NOT declared in `openapi.yaml` (artifact 02 §1 across all 3 traces). Admin POST `/api/v1/iam/users/{userId}/roles` has request + response schemas in `openapi.yaml:5043,5054` but no `operationId` and no `*.gen.go` stub — partial contract-first. Documents module bootstrap is codegen-enabled per ADR 0012; IAM is not.
+- **MetalDocs adherence — gap (PARTIALLY CLOSED):** IAM routes are wired on a hand-written `*http.ServeMux` (`delivery/http/routes_memberships.go:86`, `delivery/http/admin_handler.go:82`). `listAreaMemberships`, `grantAreaMembership`, `revokeAreaMembership` ARE now declared in `openapi.yaml` with full schemas (PR-1 contract, 2026-06-03). Admin POST `/api/v1/iam/users/{userId}/roles` has request + response schemas in `openapi.yaml:5043,5054` but no `operationId` and no `*.gen.go` stub. Documents module bootstrap is codegen-enabled per ADR 0012; IAM server stub is still hand-rolled (ADR 0012 partial rollout — T-remaining).
 
 ### IP-006 · Forward-only migrations
 

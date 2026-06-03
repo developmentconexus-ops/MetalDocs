@@ -1,3 +1,5 @@
+> **Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: `CloseActive` and `GrantAtomic` now set `revoked_by`; `ListByTenant` added; tripwire pairing table updated with correct line numbers and `authz.Require` = YES for all UserAreaRepository write methods)
+
 ## 1) Tables owned
 
 | Table | Created in (migration filename) | Notes |
@@ -135,25 +137,15 @@ Tripwire attachment check for requested tables:
 
 | Method (file:line) | Authz.Require called? | Cap + area arg | SQL verb | Table |
 |---|---|---|---|---|
-| RoleAdminRepository.UpsertUserAndAssignRole (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:33) | NO | N/A | INSERT | metaldocs.iam_users |
-| RoleAdminRepository.UpsertUserAndAssignRole (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:33) | NO | N/A | DELETE | metaldocs.iam_user_roles |
-| RoleAdminRepository.UpsertUserAndAssignRole (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:33) | NO | N/A | INSERT | metaldocs.iam_user_roles |
-| RoleAdminRepository.UpsertUserAndAssignRole (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:33) | tripwire pairing: N/A (tier-1 only, no trigger on table) | N/A | INSERT/DELETE/INSERT | metaldocs.iam_users, metaldocs.iam_user_roles |
-| RoleAdminRepository.ReplaceUserRoles (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72) | NO | N/A | INSERT | metaldocs.iam_users |
-| RoleAdminRepository.ReplaceUserRoles (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72) | NO | N/A | DELETE | metaldocs.iam_user_roles |
-| RoleAdminRepository.ReplaceUserRoles (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72) | NO | N/A | INSERT | metaldocs.iam_user_roles |
-| RoleAdminRepository.ReplaceUserRoles (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72) | tripwire pairing: N/A (tier-1 only, no trigger on table) | N/A | INSERT/DELETE/INSERT | metaldocs.iam_users, metaldocs.iam_user_roles |
-| UserAreaRepository.Insert (internal/modules/iam/infrastructure/postgres/user_area_repository.go:51) | NO | N/A | INSERT | public.user_process_areas |
-| UserAreaRepository.Insert (internal/modules/iam/infrastructure/postgres/user_area_repository.go:51) | tripwire pairing: N/A (tier-1 only, no trigger on table) | N/A | INSERT | public.user_process_areas |
-| UserAreaRepository.CloseActive (internal/modules/iam/infrastructure/postgres/user_area_repository.go:75) | NO | N/A | UPDATE | public.user_process_areas |
-| UserAreaRepository.CloseActive (internal/modules/iam/infrastructure/postgres/user_area_repository.go:75) | tripwire pairing: N/A (tier-1 only, no trigger on table) | N/A | UPDATE | public.user_process_areas |
-| UserAreaRepository.GrantAtomic (internal/modules/iam/infrastructure/postgres/user_area_repository.go:90) | NO | N/A | UPDATE | public.user_process_areas |
-| UserAreaRepository.GrantAtomic (internal/modules/iam/infrastructure/postgres/user_area_repository.go:90) | NO | N/A | INSERT | public.user_process_areas |
-| UserAreaRepository.GrantAtomic (internal/modules/iam/infrastructure/postgres/user_area_repository.go:90) | tripwire pairing: N/A (tier-1 only, no trigger on table) | N/A | UPDATE+INSERT | public.user_process_areas |
-| area_membership.Grant (internal/modules/iam/area_membership/area_membership.go:53) | NO | N/A | SELECT (calls metaldocs.grant_area_membership) | function call path mutates public.user_process_areas + metaldocs.governance_events |
-| area_membership.Grant (internal/modules/iam/area_membership/area_membership.go:53) | tripwire pairing: N/A (tier-1 only, no trigger on table) | N/A | function-mediated write | public.user_process_areas |
-| area_membership.Revoke (internal/modules/iam/area_membership/area_membership.go:65) | NO | N/A | SELECT (calls metaldocs.revoke_area_membership) | function call path mutates public.user_process_areas + metaldocs.governance_events |
-| area_membership.Revoke (internal/modules/iam/area_membership/area_membership.go:65) | tripwire pairing: N/A (tier-1 only, no trigger on table) | N/A | function-mediated write | public.user_process_areas |
+| RoleAdminRepository.UpsertUserAndAssignRole (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:33) | YES (at tx open) | CapUserManage / "tenant" | INSERT | metaldocs.iam_users |
+| RoleAdminRepository.UpsertUserAndAssignRole (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:33) | YES (at tx open) | CapUserManage / "tenant" | DELETE | metaldocs.iam_user_roles |
+| RoleAdminRepository.UpsertUserAndAssignRole (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:33) | YES (at tx open) | CapUserManage / "tenant" | INSERT | metaldocs.iam_user_roles |
+| RoleAdminRepository.ReplaceUserRoles (internal/modules/iam/infrastructure/postgres/role_admin_repository.go:72) | YES (at tx open) | CapUserManage / "tenant" | DELETE+INSERT | metaldocs.iam_user_roles |
+| UserAreaRepository.Insert (internal/modules/iam/infrastructure/postgres/user_area_repository.go:89) | YES — at :100 | CapMembershipManage / "tenant" | INSERT | public.user_process_areas |
+| UserAreaRepository.CloseActive (internal/modules/iam/infrastructure/postgres/user_area_repository.go:141) | YES — at :152 | CapMembershipManage / "tenant" | UPDATE (sets effective_to + revoked_by) | public.user_process_areas |
+| UserAreaRepository.GrantAtomic (internal/modules/iam/infrastructure/postgres/user_area_repository.go:185) | YES — at :196 | CapMembershipManage / "tenant" | UPDATE (sets effective_to + revoked_by) + INSERT | public.user_process_areas |
+| area_membership.Grant (internal/modules/iam/area_membership/area_membership.go:53) | NO | N/A | SELECT (calls metaldocs.grant_area_membership) | SECURITY DEFINER path; e2e seed only — not production write path |
+| area_membership.Revoke (internal/modules/iam/area_membership/area_membership.go:65) | NO | N/A | SELECT (calls metaldocs.revoke_area_membership) | SECURITY DEFINER path; e2e seed only — not production write path |
 
 Notes for listed non-mutators:
 - RoleAdminRepository.HasAnyRole (read-only)

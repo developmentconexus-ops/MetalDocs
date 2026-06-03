@@ -1,17 +1,22 @@
+> **Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: handler rewritten to use `ListByTenant` with admin/non-admin scope split; line numbers updated throughout)
+
 ## 1. Entry point
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | (unclear: route handwritten — no OpenAPI declaration) | api/openapi/v1/openapi.yaml (no `listAreaMemberships` match) |
-| Generated server stub | n/a — hand-written stdlib mux | internal/modules/iam/delivery/http/routes_memberships.go:30 |
-| Handler | `(*MembershipHandler).listMemberships` | internal/modules/iam/delivery/http/routes_memberships.go:35 |
+| OpenAPI op | `listAreaMemberships` | `api/openapi/v1/openapi.yaml` (userId/areaCode/role param descriptions refreshed; no shape change) |
+| Generated server stub | n/a â€” hand-written stdlib mux | `internal/modules/iam/delivery/http/routes_memberships.go:87` |
+| Handler | `(*MembershipHandler).listMemberships` | `internal/modules/iam/delivery/http/routes_memberships.go:93` |
 
 ## 2. Call chain
-1. `apps/api/cmd/metaldocs-api/main.go:386` composed handler chain (`authMiddleware.Wrap(iamMiddleware.Wrap(...mux))`) — tier-1 IAM middleware runs before route dispatch then -> calls: `internal/modules/iam/delivery/http/middleware.go:49` `(*Middleware).Wrap`
-2. `internal/modules/iam/delivery/http/middleware.go:61` `resolver(r.Method, r.URL.Path)` + `m.caps.CanDo(...)` gate — resolves `/api/v1/iam/area-memberships` capability and enforces tier-1 authz then -> calls: `apps/api/cmd/metaldocs-api/permissions.go:196` `newPermissionResolver` mapping and `internal/modules/iam/application/capability_service.go:31` `(*CapabilityService).CanDo`
-3. `internal/modules/iam/application/capability_service.go:64` `s.db.QueryRowContext(...).Scan(&allowed)` — DB capability check (`iam_user_roles`/`iam_group_*`/`role_capabilities`) before handler then -> returns to middleware -> `next.ServeHTTP`
-4. `internal/modules/iam/delivery/http/routes_memberships.go:35` `(*MembershipHandler).listMemberships` — validates `userId` (query or authenticated actor), resolves tenant, invokes use case then -> calls: `internal/modules/iam/application/area_membership_service.go:45` `(*AreaMembershipService).ListActive`
-5. `internal/modules/iam/application/area_membership_service.go:46` `repo.ListActive(ctx, userID, tenantID, now)` — application pass-through for active memberships then -> calls: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:21` `(*UserAreaRepository).ListActive`
-6. `internal/modules/iam/infrastructure/postgres/user_area_repository.go:31` `r.db.QueryContext(ctx, q, userID, tenantID, now)` — SELECT active rows from `user_process_areas`; scans rows and returns response items (DB driver boundary).
+1. `apps/api/cmd/metaldocs-api/main.go` composed handler chain (`authMiddleware.Wrap(iamMiddleware.Wrap(...mux))`) â€” tier-1 IAM middleware runs before route dispatch then -> calls: `internal/modules/iam/delivery/http/middleware.go:49` `(*Middleware).Wrap`
+2. `internal/modules/iam/delivery/http/middleware.go` `resolver(r.Method, r.URL.Path)` + `m.caps.CanDo(...)` gate â€” resolves `/api/v1/iam/area-memberships` to `membership.view` capability and enforces tier-1 authz then -> calls: `apps/api/cmd/metaldocs-api/permissions.go` `newPermissionResolver` mapping and `internal/modules/iam/application/capability_service.go:31` `(*CapabilityService).CanDo`
+3. `internal/modules/iam/delivery/http/routes_memberships.go:93` `(*MembershipHandler).listMemberships` â€” reads query params `userId`/`areaCode`/`role`; checks `isMembershipDirectoryAdmin` (`:365`) to determine scope:
+   - system_admin: uses caller-supplied filters directly
+   - non-admin: forces `userID = authenticated actor`; rejects userId filters targeting other users with 403
+4. When `userID != ""`: calls `guardMembershipUserInTenant` (`:297`) â€” cross-tenant probes return 404 (mirrors PeopleHandler pattern)
+5. `internal/modules/iam/delivery/http/routes_memberships.go:135` calls `h.svc.ListByTenant(ctx, tenantID, userID, areaCode, role)` â€” application use case at `internal/modules/iam/application/area_membership_service.go:60`
+6. `internal/modules/iam/application/area_membership_service.go:61` `repo.ListByTenant(ctx, tenantID, userID, areaCode, role, now)` â€” passes to `internal/modules/iam/infrastructure/postgres/user_area_repository.go:57` `(*UserAreaRepository).ListByTenant`
+7. `internal/modules/iam/infrastructure/postgres/user_area_repository.go:69` `r.db.QueryContext(ctx, q, tenantID, now, userID, areaCode, role)` â€” SELECT active rows from `user_process_areas` with optional exact-match filters via `($n = '' OR col = $n)`; scans rows and returns response items (DB driver boundary).
 
 ## 3. State changes
 none
@@ -19,16 +24,20 @@ none
 ## 4. SQL touched
 | File:line | Verb | Table(s) | Auth-area arg |
 |---|---|---|---|
-| internal/modules/iam/application/capability_service.go:64 | SELECT (EXISTS) | `metaldocs.iam_user_roles`, `metaldocs.iam_group_members`, `metaldocs.iam_group_roles`, `metaldocs.role_capabilities` | tenant-level (`tenantID`), capability from resolver (`membership.manage`) |
-| internal/modules/iam/infrastructure/postgres/user_area_repository.go:31 | SELECT | `user_process_areas` | tenant-level filter (`tenantID`), user filter (`userID`) |
+| `internal/modules/iam/application/capability_service.go:31` | SELECT (EXISTS) | `metaldocs.iam_user_roles`, `metaldocs.iam_group_members`, `metaldocs.iam_group_roles`, `metaldocs.role_capabilities` | tenant-level (`tenantID`), capability from resolver (`membership.view`) |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:57` | SELECT | `public.user_process_areas` | `tenant_id=$1` (required); optional exact-match filters for `user_id`, `area_code`, `role` |
 
 Tripwire pairing: N/A (read)
 
 ## 5. Response shape
-- 2xx schema ref: (unclear: route handwritten — no OpenAPI declaration for `listAreaMemberships`); concrete handler payload is `200` JSON object `{ "items": []domain.UserProcessArea }` from `internal/modules/iam/delivery/http/routes_memberships.go:55`.
-- Error responses + Problem type URI: route returns `{code,message}` via `writeMembershipAPIError` (`internal/modules/iam/delivery/http/routes_memberships.go:137`) and middleware may return `{error:{code,message,details,trace_id}}` via `writeAPIError` (`internal/modules/iam/delivery/http/middleware.go:129`); RFC 9457 Problem `type` URI is not used here (unclear: no Problem payload on this flow).
+- Tier-1 gate: `membership.view` (held by every role per ADR 0016; directory scope further gated by `isMembershipDirectoryAdmin` inside the handler)
+- 2xx schema ref: OpenAPI `listAreaMemberships` response â€” `AreaMembershipListResponse` (`{items: AreaMembershipRow[]}`)
+- Concrete handler payload: `200` JSON `{"items": [membershipDTO...]}` from `routes_memberships.go:145`; `membershipDTO` fields: `userId`, `tenantId`, `areaCode`, `role`, `effectiveFrom`, `effectiveTo`, `grantedBy`
+- Error responses: RFC 9457 Problem via `problem.Write` (`routes_memberships.go:273`); middleware 403 via `{error:{code,message,trace_id}}`
 
 ## 6. Cross-references
-- Idempotency: no (no idempotency middleware/store in this route path; handler registered directly at `internal/modules/iam/delivery/http/routes_memberships.go:30`)
-- Pagination: no + cursor field name: (unclear: none in handler response)
-- Audit log emission: no for GET list flow (membership service logger used by grant/revoke paths only; `ListActive` is pass-through at `internal/modules/iam/application/area_membership_service.go:45`)
+- Idempotency: no
+- Pagination: no
+- Audit log emission: no for GET list flow (audit recorded only on grant/revoke paths)
+- Admin scope: system_admin (role `RoleSystemAdmin`) gets tenant-wide directory; area_admin and others see only their own rows â€” see `isMembershipDirectoryAdmin` at `routes_memberships.go:365`
+- Cross-tenant guard: `guardMembershipUserInTenant` at `routes_memberships.go:297` (returns 404 on cross-tenant probe when userId in scope)

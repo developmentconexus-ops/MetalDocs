@@ -1,66 +1,76 @@
+> **Last verified:** 2026-06-03 (fix/iam-memberships-pr1-backend-gaps: line numbers updated; `authz.Require` now confirmed present in repository; `GrantAtomic` UPDATE sets `revoked_by`; OpenAPI contract confirmed declared)
+
 ## 1. Entry point
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | `grantAreaMembership` | `api/openapi/v1/openapi.yaml` (unclear: no `operationId: grantAreaMembership` found) |
-| Generated server stub | `ServerInterface.<Method>` | `n/a � hand-written stdlib mux` |
-| Handler | `(*MembershipHandler).grantMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:58` |
+| OpenAPI op | `grantAreaMembership` | `api/openapi/v1/openapi.yaml` (operationId confirmed present since PR-1 contract) |
+| Generated server stub | n/a — hand-written stdlib mux | `internal/modules/iam/delivery/http/routes_memberships.go:88` |
+| Handler | `(*MembershipHandler).grantMembership` | `internal/modules/iam/delivery/http/routes_memberships.go:149` |
 
 ## 2. Call chain
 
-1. `internal/modules/iam/delivery/http/routes_memberships.go:58` `(*MembershipHandler).grantMembership` � decodes request body, validates fields, and dispatches grant.
-   ? calls: `internal/modules/iam/application/area_membership_service.go:49` `(*AreaMembershipService).Grant`
-2. `internal/modules/iam/application/area_membership_service.go:49` `(*AreaMembershipService).Grant` � validates role and checks current active membership.
-   ? calls: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:154` `(*UserAreaRepository).GetActiveByUserAndArea`
-3. `internal/modules/iam/application/area_membership_service.go:75` `(*AreaMembershipService).Grant` � when active membership exists, performs close+insert atomic grant.
-   ? calls: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:90` `(*UserAreaRepository).GrantAtomic`
-4. `internal/modules/iam/infrastructure/postgres/user_area_repository.go:90` `(*UserAreaRepository).GrantAtomic` � opens SQL transaction, updates prior active row, inserts new row, commits.
-   ? calls: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:91` `(*sql.DB).BeginTx`; `internal/modules/iam/infrastructure/postgres/user_area_repository.go:108` `(*sql.Tx).ExecContext`; `internal/modules/iam/infrastructure/postgres/user_area_repository.go:134` `(*sql.Tx).ExecContext`; `internal/modules/iam/infrastructure/postgres/user_area_repository.go:148` `(*sql.Tx).Commit`
-5. `internal/modules/iam/application/area_membership_service.go:79` `(*AreaMembershipService).Grant` � emits governance log when logger is configured.
-   ? calls: `internal/modules/iam/application/area_membership_service.go:79` `MembershipGovernanceLogger.Log` (unclear: concrete implementation not wired for this route)
+1. `internal/modules/iam/delivery/http/routes_memberships.go:149` `(*MembershipHandler).grantMembership` — decodes request body, validates fields, checks self-grant lockdown (`isSelf` at `:353`), and dispatches grant.
+   calls: `internal/modules/iam/application/area_membership_service.go:64` `(*AreaMembershipService).Grant`
+2. `internal/modules/iam/application/area_membership_service.go:64` `(*AreaMembershipService).Grant` — validates role and checks current active membership.
+   calls: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:264` `(*UserAreaRepository).GetActiveByUserAndArea`
+3. `internal/modules/iam/application/area_membership_service.go:80` — when active membership exists with same role → returns `ErrMembershipExists` (409 at handler).
+4. `internal/modules/iam/application/area_membership_service.go:84` — when active membership exists with different role → performs close+insert atomic grant.
+   calls: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:185` `(*UserAreaRepository).GrantAtomic`
+5. `internal/modules/iam/infrastructure/postgres/user_area_repository.go:185` `(*UserAreaRepository).GrantAtomic` — opens SQL transaction; calls `authz.Require(CapMembershipManage)` at `:196`; UPDATE sets `effective_to` + `revoked_by` on old row (satisfies `revoked_by_required_when_revoked` CHECK); INSERT new row; commits.
+6. `internal/modules/iam/application/area_membership_service.go:95` — when no active row → first grant via `Insert`.
+   calls: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:89` `(*UserAreaRepository).Insert`; calls `authz.Require(CapMembershipManage)` at `:100`.
+7. `internal/modules/iam/delivery/http/routes_memberships.go:207` `recordMembershipAudit` — emits `iam.area_membership.granted` audit event (log-and-continue; failures do not roll back the committed grant).
 
 Authz/tier-2 in call chain:
-- `internal/modules/iam/application/area_membership_service.go` `authz.Require` not found.
-- `internal/modules/iam/infrastructure/postgres/user_area_repository.go` `authz.Require` not found.
+- `internal/modules/iam/infrastructure/postgres/user_area_repository.go:100` — `authz.Require(CapMembershipManage, "tenant")` in `Insert`
+- `internal/modules/iam/infrastructure/postgres/user_area_repository.go:196` — `authz.Require(CapMembershipManage, "tenant")` in `GrantAtomic`
 
 Idempotency interactions:
-- none found in handler/service/repository files above.
+- Duplicate same-role grant on active row → `ErrMembershipExists` → 409 `MEMBERSHIP_EXISTS` (not idempotent; caller must revoke first)
 
 ## 3. State changes
 
 | Entity | From | To | Trigger | Capability required |
 |---|---|---|---|---|
-| `user_process_areas` membership (same user+tenant+area, active row exists) | prior row active (`effective_to IS NULL`) | prior row closed (`effective_to = newMembership.effective_from`) and new active row inserted | `POST /api/v1/iam/area-memberships` via `GrantAtomic` | tier-1 route capability `membership.manage` (`apps/api/cmd/metaldocs-api/permissions.go:196-197`) |
-| `user_process_areas` membership (no active row) | no active row | new active row inserted | `POST /api/v1/iam/area-memberships` via `Insert` | tier-1 route capability `membership.manage` (`apps/api/cmd/metaldocs-api/permissions.go:196-197`) |
+| `user_process_areas` membership (same user+tenant+area, active row exists, same role) | active row | unchanged — error returned | `POST /api/v1/iam/area-memberships` | `membership.manage` |
+| `user_process_areas` membership (same user+tenant+area, active row exists, different role) | prior row active (`effective_to IS NULL`) | prior row closed (`effective_to + revoked_by = actor`) and new active row inserted | `POST /api/v1/iam/area-memberships` via `GrantAtomic` | `membership.manage` |
+| `user_process_areas` membership (no active row) | no active row | new active row inserted | `POST /api/v1/iam/area-memberships` via `Insert` | `membership.manage` |
 
 ## 4. SQL touched
 
-| File:line | Verb | Table(s) | Auth-area arg (if any) |
+| File:line | Verb | Table(s) | Auth-area arg |
 |---|---|---|---|
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:166` | SELECT | `user_process_areas` | n/a |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:108` | UPDATE | `user_process_areas` | n/a |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:134` | INSERT | `user_process_areas` | n/a |
-| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:58` | INSERT | `user_process_areas` | n/a |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:264` | SELECT | `public.user_process_areas` | user+tenant+area+now filter |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:200` | UPDATE (sets effective_to + revoked_by) | `public.user_process_areas` | n/a |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:237` | INSERT | `public.user_process_areas` | n/a |
+| `internal/modules/iam/infrastructure/postgres/user_area_repository.go:104` | INSERT | `public.user_process_areas` | n/a |
 
 Tripwire pairing anchors:
-- authz anchor: `internal/modules/iam/application/area_membership_service.go` `authz.Require` not found; `internal/modules/iam/infrastructure/postgres/user_area_repository.go` `authz.Require` not found.
-- mutating SQL anchors: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:108`, `:134`, `:58`.
-- tripwire scope check: `migrations/0142b_role_capabilities_v2_enforce.sql:201-209` attaches `enforce_capability_asserted` only to `public.approval_instances` and `public.approval_signoffs`; no attachment to `user_process_areas` found.
-- pairing result: `N/A` (mutating table in this flow is `user_process_areas`, not tripwire-attached in migration 0142b).
+- authz anchor: `internal/modules/iam/infrastructure/postgres/user_area_repository.go:100` (`Insert`), `:196` (`GrantAtomic`) — `authz.Require(CapMembershipManage, "tenant")` confirmed present.
+- mutating SQL anchors: `:200` (UPDATE), `:237` (INSERT), `:104` (INSERT).
+- tripwire scope check: `migrations/0142b_role_capabilities_v2_enforce.sql` + `migrations/0188_tripwire_extend.sql` — `trg_require_cap_asserted` attached to `user_process_areas` by migration 0188.
+- pairing result: **active** — tier-2 `authz.Require` present in all write methods; tripwire attached by migration 0188.
 
 ## 5. Response shape
 
-- 2xx schema ref: `(unclear: no OpenAPI declaration for POST /api/v1/iam/area-memberships in api/openapi/v1/openapi.yaml)`
-- Error responses declared on op + Problem type URI: `(unclear: no OpenAPI declaration for this operation in api/openapi/v1/openapi.yaml)`
-- Handler-emitted success body (code path): `internal/modules/iam/delivery/http/routes_memberships.go:88-93` returns HTTP `201` JSON object keys `userId`, `tenantId`, `areaCode`, `role`.
+- 2xx schema ref: OpenAPI `grantAreaMembership` — `GrantAreaMembershipResponse` (HTTP 201 JSON `{userId, tenantId, areaCode, role}`)
+- Error responses (RFC 9457 Problem):
+  - 400 `VALIDATION_ERROR` — missing/blank fields
+  - 403 `AUTH_FORBIDDEN` — self-grant or insufficient manage scope
+  - 404 `NOT_FOUND` — cross-tenant user probe
+  - 409 `MEMBERSHIP_EXISTS` — duplicate same-role grant on active row
+  - 422/400 `UNKNOWN_ROLE` — unrecognised role value
+  - 500 `INTERNAL_ERROR` — unexpected failure
+- Handler success path: `routes_memberships.go:214` returns 201.
 
 ## 6. Cross-references
 
-- Idempotency: no
+- Idempotency: no (non-idempotent; same-role duplicate = 409; role-change = close+insert via `GrantAtomic`)
 - Pagination: no
-- Audit log emission: yes, conditional via `MembershipGovernanceLogger.Log` at `internal/modules/iam/application/area_membership_service.go:79` and `:101`; runtime wiring for API route passes `nil` logger at `apps/api/cmd/metaldocs-api/main.go:217`.
+- Audit log emission: yes — `iam.area_membership.granted` emitted at `routes_memberships.go:207` after committed write; `MembershipGovernanceLogger` in application service wired as `nil` in production (`main.go`)
+- Self-grant lockdown: `isSelf(ctx, userID)` at `routes_memberships.go:175` — `CapMembershipManage` holder cannot grant themselves additional area roles
 
 Tier-1 authz middleware path for this route:
-- Permission mapping: `apps/api/cmd/metaldocs-api/permissions.go:196-197` maps `/api/v1/iam/area-memberships` to `iamdomain.CapMembershipManage`.
-- Middleware integration: `apps/api/cmd/metaldocs-api/main.go:170-174` wires resolver into IAM middleware.
-- Enforcement call: `internal/modules/iam/delivery/http/middleware.go:61-63` resolves route capability and `:83-85` enforces with `CapabilityService.CanDo`.
+- Permission mapping: `apps/api/cmd/metaldocs-api/permissions.go` maps `POST /api/v1/iam/area-memberships` to `iamdomain.CapMembershipManage`.
+- Enforcement call: `internal/modules/iam/delivery/http/middleware.go` resolves route capability and enforces with `CapabilityService.CanDo`.

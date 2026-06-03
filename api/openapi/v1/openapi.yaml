@@ -2110,15 +2110,20 @@ paths:
           in: query
           required: false
           schema: { type: string }
-          description: Filter by target userId. Defaults to the authenticated actor when omitted.
+          description: >-
+            Filter by target userId. System admins omitting userId receive the
+            full tenant directory; non-admins are always scoped to their own
+            memberships regardless of this value.
         - name: areaCode
           in: query
           required: false
           schema: { type: string }
+          description: Optional exact-match filter on the process area code.
         - name: role
           in: query
           required: false
           schema: { $ref: '#/components/schemas/UserRole' }
+          description: Optional exact-match filter on the membership role.
       responses:
         '200':
           description: Active memberships for the current tenant
