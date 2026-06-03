@@ -66,6 +66,23 @@ function renderAt(path: string) {
             element: <div>Multi Page</div>,
             handle: { requiresAnyCapability: ['taxonomy.view', 'taxonomy.manage'] },
           },
+          // Mirrors features/iam/routes.tsx: parent /center has a wide
+          // requiresAnyCapability and child /center/audit tightens it with
+          // requiresCapability "audit.read". A caller that satisfies only
+          // the parent must NOT reach the child.
+          {
+            path: 'center',
+            handle: {
+              requiresAnyCapability: ['user.view', 'membership.view', 'metrics.view'],
+            },
+            children: [
+              {
+                path: 'audit',
+                element: <div>Audit Page</div>,
+                handle: { requiresCapability: 'audit.read' },
+              },
+            ],
+          },
         ],
       },
     ],
@@ -116,6 +133,25 @@ describe('AppShell capability route guard', () => {
     renderAt('/multi');
     await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy());
     expect(screen.queryByText('Multi Page')).toBeNull();
+  });
+
+  it('redirects nested /center/audit when viewer satisfies parent but not child cap', async () => {
+    // Viewer-only caps: matches the parent's requiresAnyCapability
+    // ("membership.view") but NOT the child's requiresCapability
+    // ("audit.read"). Old gate returned on the first matched handle (parent)
+    // and let the viewer through; new gate ANDs all collected handles.
+    useAuthStore.setState({
+      user: makeUser(['document.view', 'membership.view', 'taxonomy.view', 'template.view']),
+    });
+    renderAt('/center/audit');
+    await waitFor(() => expect(screen.getByText('Dashboard')).toBeTruthy());
+    expect(screen.queryByText('Audit Page')).toBeNull();
+  });
+
+  it('renders nested /center/audit when both parent and child caps held', () => {
+    useAuthStore.setState({ user: makeUser(['membership.view', 'audit.read']) });
+    renderAt('/center/audit');
+    expect(screen.getByText('Audit Page')).toBeTruthy();
   });
 
   it('renders ungated routes regardless of capabilities', () => {

@@ -39,7 +39,7 @@ The pre-existing `AdminCenterView`, `useAdminCenter`, `ManagedUsersPanel*`, `use
 
 - One more level of nesting in the router config; tab additions need a 3-file change (route, page, query/mutation hooks).
 - Two stale literals (`admin`, `reviewer`) remain in `UserRole` because Phase 1 chose not to touch unrelated call sites; cleanup deferred.
-- `AppShell` capability gate uses the first matching handle in `useMatches()`, so child stricter caps are masked by the parent's broad rule. Tracked as a bounded defer (see [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../docs/audits/QA-evidence-admin-center-rebuild.md)); backend remains the sole authz enforcer so this is a UX bug, not a data-exposure defect.
+- (Fixed at PR-12 closeout) `AppShell` capability gate now collects every `required*Capability` along the match chain and requires every one to pass — parent + child constraints both enforced.
 
 ## References
 

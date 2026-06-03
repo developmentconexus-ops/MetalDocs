@@ -40,7 +40,7 @@ Tenant operator UI for IAM. Surfaces user lifecycle, role/capability matrix, aud
 | `/admin/usage` | `UsageTab` | `metrics.view` |
 | `/admin/memberships` | `AreaMembershipAdminRoutePage` | `membership.view` |
 
-> Note: the `AppShell` gate currently honours only the first matching handle, so child routes under `/admin/*` inherit the parent's broad cap check and the per-tab cap is enforced only by the tablist filter + backend 403. Tracked as a bounded defer at PR-12 closeout (see [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../../docs/audits/QA-evidence-admin-center-rebuild.md)).
+> Note: the `AppShell` gate collects every `requiresCapability` / `requiresAnyCapability` along the match chain and requires all of them to pass. Parent + child constraints both enforced (fixed at PR-12 closeout — see [`docs/audits/QA-evidence-admin-center-rebuild.md`](../../../docs/audits/QA-evidence-admin-center-rebuild.md)).
 
 ## 4. TanStack Query
 
@@ -93,7 +93,6 @@ Presence is a WebSocket subscription (`usePresenceStream`) that writes into a de
 
 ## 8. Known issues / tech-debt
 
-- **AppShell capability gate uses first match instead of most-specific** (bounded defer at PR-12 closeout). Viewer-only users can navigate directly to `/admin/{audit,people,sessions,usage}` and render the shell; data calls still 403. Fix: collect ALL `required*Capability` handles from `useMatches()` and require all to pass.
 - **`UserRole` carries `admin` + `reviewer` literals beyond canonical 8** in `lib/types/index.ts:19-29`. Phase 1 left these to avoid touching unrelated call sites (templates/documents/taxonomy/iam-membership). Cleanup tracked for follow-up PR.
 - Membership area admin (`/admin/memberships`) still uses `apiFetch` — migration to `api.*` deferred.
 - Backend IAM tech-debt remains tracked at [`iam-tech-debt.md`](../iam-tech-debt.md).

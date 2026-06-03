@@ -56,17 +56,15 @@ Each row was rendered as the `admin` user, capability set =
 | URL | Expected | Observed |
 |---|---|---|
 | `/admin/overview` | reachable (any of `user.view`, `membership.view`, `metrics.view`) | reachable, only `Visão geral` + `Funções` tabs rendered in tablist (others hidden by tab-level cap check) |
-| `/admin/audit` | redirect to `/` (viewer lacks `audit.read`) | **page shell rendered** (timeline shows skeleton, API returns 403; URL not redirected) |
-| `/admin/people` | redirect to `/` (viewer lacks `user.view`) | **page shell rendered** (table empty, no redirect) |
+| `/admin/audit` | redirect to `/` (viewer lacks `audit.read`) | **redirected to `/`** (gate fixed in this closeout — collects all `required*Capability` along the match chain and requires every one to pass) |
+| `/admin/people` | redirect to `/` (viewer lacks `user.view`) | **redirected to `/`** |
+| `/admin/sessions` | redirect to `/` (viewer lacks `user.view`) | **redirected to `/`** |
 
-### Bounded defer — capability gate iterates first match instead of most-specific
+### Fix shipped — AppShell capability gate now ANDs parent + child constraints
 
-`AppShell.tsx:33-55` evaluates `useMatches()` and returns the first handle that declares `requiresCapability` / `requiresAnyCapability`. The parent `/admin` handle (`requiresAnyCapability: ["user.view","membership.view","metrics.view"]`) always wins; child stricter caps (`audit.read` on `/admin/audit`, `user.view` on `/admin/people` & `/admin/sessions`, `metrics.view` on `/admin/usage`) are never consulted.
+`frontend/apps/web/src/features/shell/components/AppShell.tsx:33-62` previously evaluated `useMatches()` and returned on the first handle that declared `requiresCapability` / `requiresAnyCapability`. The parent `/admin` handle (`requiresAnyCapability: ["user.view","membership.view","metrics.view"]`) always won; stricter child caps were never consulted.
 
-Net effect: a viewer-only user can directly navigate to gated sub-tabs and render the UI shell (data calls 403, so they see empty/skeleton states; tablist still hides the tabs). The backend remains the sole authz enforcer, so this is **not** a data-exposure defect — but it violates the UX intent of the route gate.
-
-- **Tracked at:** spawn task — "Fix AppShell capability gate: use most-specific match" (PR-12 closeout, this session)
-- **Suggested fix:** collect ALL `required*Capability` handles from `useMatches()` and require all to pass (defense in depth), then add a unit test that simulates a viewer hitting `/admin/audit` and asserts `<Navigate to="/" replace />`.
+Fix: collect every constraint along the match chain and require all of them to pass. Two unit tests added in `AppShell.test.tsx` cover the nested case — viewer satisfying parent but not child must redirect; full caps must render. Live verified with `qapwuser` against the running preview.
 
 ### Bounded defer — `UserRole` carries `admin` + `reviewer` literals beyond canonical 8
 
