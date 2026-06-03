@@ -5,7 +5,11 @@ import { useAuthStore } from '../../../store/auth.store';
 import type { VersionDTO } from '../api/templates';
 import type { CurrentUser, UserRole } from '../../../lib/types';
 
-function setUser(roles: UserRole[], capabilities: string[]) {
+// Templates "reviewer" is a workflow-role string (pending_reviewer_role on a
+// version), distinct from the IAM canonical role enum. We pass it through as a
+// plain string and cast to UserRole at the store boundary so the test exercises
+// the workflow-role binding without depending on the IAM enum surface.
+function setUser(roles: string[], capabilities: string[]) {
   const user: CurrentUser = {
     userId: 'u1',
     tenantId: 't1',
@@ -13,7 +17,7 @@ function setUser(roles: UserRole[], capabilities: string[]) {
     username: 'alice',
     displayName: 'Alice',
     mustChangePassword: false,
-    roles,
+    roles: roles as UserRole[],
     capabilities,
   };
   useAuthStore.setState({ user });

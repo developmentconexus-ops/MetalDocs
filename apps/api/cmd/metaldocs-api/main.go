@@ -302,6 +302,7 @@ func main() {
 		go presenceHub.RunHeartbeat(ctx)
 		iampresence.NewHandler(presenceHub, presenceRepo, slog.Default()).RegisterRoutes(mux)
 		presenceBump = iampresence.NewBumpMiddleware(presenceRepo, slog.Default())
+		presenceBump.StartCleanup(ctx)
 		iamAdminHandler.WithPresenceReader(presenceRepo)
 	}
 
