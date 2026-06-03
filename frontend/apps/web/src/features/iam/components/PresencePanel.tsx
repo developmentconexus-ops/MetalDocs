@@ -67,9 +67,9 @@ export default function PresencePanel() {
         <ul className={styles.list} role="list">
           {items.map((u) => (
             <li key={u.userId} className={styles.row}>
-              <Avatar name={u.displayName || u.username} size="md" />
-              <span className={styles.name}>{u.displayName || u.username}</span>
-              <span className={styles.username}>@{u.username}</span>
+              <Avatar name={u.displayName || (u.username ?? u.userId)} size="md" />
+              <span className={styles.name}>{u.displayName || (u.username ?? u.userId)}</span>
+              <span className={styles.username}>@{(u.username ?? u.userId)}</span>
               <time
                 className={styles.lastSeen}
                 dateTime={u.lastSeenAt}

@@ -368,6 +368,9 @@ func (h *PeopleHandler) handleListMemberships(w http.ResponseWriter, r *http.Req
 		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", "userId required"))
 		return
 	}
+	if !h.guardUserInTenant(w, r, userID) {
+		return
+	}
 	memberships, err := h.service.ListMemberships(r.Context(), tenantID, userID)
 	if err != nil {
 		h.writePeopleError(w, err)

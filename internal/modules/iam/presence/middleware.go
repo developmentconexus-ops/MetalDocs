@@ -108,3 +108,44 @@ func (m *BumpMiddleware) BumpNow(ctx context.Context, userID string) error {
 	m.mu.Unlock()
 	return m.repo.BumpLastSeen(ctx, userID, now)
 }
+
+// StartCleanup spawns a background goroutine that periodically evicts
+// stale entries from lastBump so the map does not grow unboundedly as
+// users churn. The goroutine stops when ctx is cancelled. Returns the
+// stopper so callers can wait for shutdown if needed.
+//
+// Eviction window is debounce*10 (default 10 minutes); a per-user
+// entry older than that cannot affect debounce decisions any more.
+func (m *BumpMiddleware) StartCleanup(ctx context.Context) {
+	interval := m.debounce * 5
+	if interval <= 0 {
+		interval = 5 * time.Minute
+	}
+	ttl := m.debounce * 10
+	if ttl <= 0 {
+		ttl = 10 * time.Minute
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				m.evictStale(ttl)
+			}
+		}
+	}()
+}
+
+func (m *BumpMiddleware) evictStale(ttl time.Duration) {
+	cutoff := m.now().Add(-ttl)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for uid, ts := range m.lastBump {
+		if ts.Before(cutoff) {
+			delete(m.lastBump, uid)
+		}
+	}
+}

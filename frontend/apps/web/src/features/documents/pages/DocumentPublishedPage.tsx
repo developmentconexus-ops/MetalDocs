@@ -223,7 +223,7 @@ export function DocumentPublishedPage() {
   // See wiki/backlog/documento-publicado.md
   const canInitiateRevision =
     user != null &&
-    user.roles.some((r) => ['admin', 'system_admin', 'editor', 'qms_admin', 'area_admin'].includes(r));
+    user.roles.some((r) => ['system_admin', 'editor', 'qms_admin', 'area_admin'].includes(r));
   const canCreateRevision =
     canInitiateRevision &&
     isPublished &&
