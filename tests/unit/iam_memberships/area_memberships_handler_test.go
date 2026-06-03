@@ -49,10 +49,19 @@ const (
 type memAreaRepo struct {
 	mu     sync.Mutex
 	active map[string]iamdomain.UserProcessArea
+	// directory-scope config (ADR 0022 Phase 4). The real repo derives these
+	// from system_admin roles + the role_capabilities↔user_process_areas join;
+	// the fake lets each test declare the actor's scope directly.
+	tenantWide   map[string]bool     // actorID → full tenant directory
+	managedAreas map[string][]string // actorID → areas where actor holds the cap
 }
 
 func newMemAreaRepo() *memAreaRepo {
-	return &memAreaRepo{active: map[string]iamdomain.UserProcessArea{}}
+	return &memAreaRepo{
+		active:       map[string]iamdomain.UserProcessArea{},
+		tenantWide:   map[string]bool{},
+		managedAreas: map[string][]string{},
+	}
 }
 
 func memKey(userID, tenantID, areaCode string) string {
@@ -77,6 +86,41 @@ func (r *memAreaRepo) ListByTenant(_ context.Context, tenantID, userID, areaCode
 	out := make([]iamdomain.UserProcessArea, 0)
 	for _, m := range r.active {
 		if m.TenantID != tenantID {
+			continue
+		}
+		if userID != "" && m.UserID != userID {
+			continue
+		}
+		if areaCode != "" && m.AreaCode != areaCode {
+			continue
+		}
+		if role != "" && string(m.Role) != role {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}
+
+func (r *memAreaRepo) MembershipDirectoryScope(_ context.Context, _, actorID, _ string) (bool, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.tenantWide[actorID], len(r.managedAreas[actorID]) > 0, nil
+}
+
+func (r *memAreaRepo) ListByTenantInManagedAreas(_ context.Context, tenantID, userID, areaCode, role, actorID, _ string, _ time.Time) ([]iamdomain.UserProcessArea, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	managed := map[string]struct{}{}
+	for _, a := range r.managedAreas[actorID] {
+		managed[a] = struct{}{}
+	}
+	out := make([]iamdomain.UserProcessArea, 0)
+	for _, m := range r.active {
+		if m.TenantID != tenantID {
+			continue
+		}
+		if _, ok := managed[m.AreaCode]; !ok {
 			continue
 		}
 		if userID != "" && m.UserID != userID {
@@ -182,6 +226,10 @@ type harness struct {
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	repo := newMemAreaRepo()
+	// adminID is the system_admin actor used by adminReq — grant it tenant-wide
+	// directory scope (ADR 0022 Phase 4; the real repo derives this from the
+	// system_admin role bypass).
+	repo.tenantWide[adminID] = true
 	verifier := newTenantScopedVerifier()
 	audit := &recordingAudit{}
 	svc := iamapp.NewAreaMembershipService(repo, nil)
@@ -316,6 +364,53 @@ func TestListAreaMemberships_NonAdminIsSelfScoped(t *testing.T) {
 	}
 	if len(resp.Items) != 1 || resp.Items[0].UserID != "carol" {
 		t.Fatalf("non-admin self-scope breach: %+v", resp.Items)
+	}
+}
+
+// TestListAreaMemberships_AreaAdminSeesManagedAreasOnly locks ADR 0022 Phase 4:
+// an area_admin (membership.manage in QMS only) sees every membership in QMS but
+// NOT memberships in RH (an unmanaged area). Proves the BOLA guard — the
+// directory is scoped to managed areas, not the actor's own row, and not the
+// whole tenant.
+func TestListAreaMemberships_AreaAdminSeesManagedAreasOnly(t *testing.T) {
+	h := newHarness(t)
+	h.repo.managedAreas["area-admin-1"] = []string{"QMS"}
+	// QMS rows for two other users (managed) + one RH row (unmanaged).
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: targetID, TenantID: tenantAlpha, AreaCode: "QMS", Role: iamdomain.RoleAuthor,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: "bob", TenantID: tenantAlpha, AreaCode: "QMS", Role: iamdomain.RoleApprover,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+	h.repo.Insert(context.Background(), iamdomain.UserProcessArea{
+		UserID: "carol", TenantID: tenantAlpha, AreaCode: "RH", Role: iamdomain.RoleViewer,
+		EffectiveFrom: time.Now().UTC().Add(-time.Hour),
+	})
+
+	req := userReq(http.MethodGet, "/api/v1/iam/area-memberships", "", tenantAlpha, "area-admin-1", iamdomain.RoleAreaAdmin)
+	rec := httptest.NewRecorder()
+	h.mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s want 200", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Items []struct {
+			UserID   string `json:"userId"`
+			AreaCode string `json:"areaCode"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Items) != 2 {
+		t.Fatalf("items=%d want 2 (QMS only); body=%s", len(resp.Items), rec.Body.String())
+	}
+	for _, it := range resp.Items {
+		if it.AreaCode != "QMS" {
+			t.Errorf("area_admin saw unmanaged area row: %+v", it)
+		}
 	}
 }
 
