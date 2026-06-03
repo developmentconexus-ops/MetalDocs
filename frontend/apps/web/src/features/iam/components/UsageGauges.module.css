@@ -193,6 +193,25 @@
   animation: shimmer 1.4s linear infinite;
 }
 
+.skeletonTitle {
+  width: 8rem;
+  height: 1.1rem;
+}
+
+.skeletonSubtitle {
+  width: 4rem;
+  height: 0.9rem;
+}
+
+.description {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  margin: 0;
+}
+
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -202,28 +221,3 @@
   .skeleton, .skeletonValue, .fill { animation: none; transition: none; }
 }
 
-.errorBanner {
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--danger-bg);
-  border: 1px solid var(--danger);
-  border-radius: var(--r-3);
-  font-size: var(--font-size-sm);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.retryButton {
-  font: inherit;
-  background: var(--surface);
-  color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: var(--r-2);
-  padding: 6px var(--sp-3);
-  cursor: pointer;
-  min-height: 28px;
-}
-
-.retryButton:hover { background: var(--danger); color: var(--text-on-brand); }
-.retryButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
