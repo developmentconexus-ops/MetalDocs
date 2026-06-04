@@ -80,6 +80,17 @@ func checkPagination(file, opID string, op, schemas *yaml.Node) []Violation {
 	if !strings.HasPrefix(strings.ToLower(opID), "list") {
 		return nil
 	}
+	// A genuinely bounded list (a small, non-growing per-tenant configuration set)
+	// may opt out of cursor/limit pagination with an explicit, reviewed marker
+	// rather than declaring pagination its runtime does not implement (which would
+	// be spec-fiction drift). Requires a non-empty x-pagination-exempt-reason so
+	// the exemption is documented, not silent (ADR 0022 Phase 11 F4).
+	if strings.EqualFold(scalarValue(mapGet(op, "x-pagination-exempt")), "true") {
+		if reason := strings.TrimSpace(scalarValue(mapGet(op, "x-pagination-exempt-reason"))); reason != "" {
+			return nil
+		}
+		return []Violation{{File: file, Line: op.Line, Rule: "PAGINATION-DRIFT", Message: fmt.Sprintf("list op %s sets x-pagination-exempt without a non-empty x-pagination-exempt-reason", opID)}}
+	}
 	out := []Violation{}
 	params := map[string]bool{}
 	pNode := mapGet(op, "parameters")
