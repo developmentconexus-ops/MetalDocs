@@ -55,9 +55,9 @@ const (
 	CapDocumentEdit      Capability = "document.edit"
 	CapDocumentSubmit    Capability = "document.submit"
 	CapDocumentSignoff   Capability = "document.signoff"
-	CapDocumentPublish   Capability = "doc.publish"
-	CapDocumentObsolete  Capability = "doc.obsolete"
-	CapDocumentSupersede Capability = "doc.supersede"
+	CapDocumentPublish   Capability = "document.publish"
+	CapDocumentObsolete  Capability = "document.obsolete"
+	CapDocumentSupersede Capability = "document.supersede"
 
 	CapTemplateView    Capability = "template.view"
 	CapTemplateCreate  Capability = "template.create"

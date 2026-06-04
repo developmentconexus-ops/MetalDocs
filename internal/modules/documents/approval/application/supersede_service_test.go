@@ -325,8 +325,8 @@ func TestPublishSuperseding_CapabilityDenied(t *testing.T) {
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied; got %v", err)
 	}
-	if denied.Capability != "doc.supersede" {
-		t.Errorf("capability = %q; want %q", denied.Capability, "doc.supersede")
+	if denied.Capability != "document.supersede" {
+		t.Errorf("capability = %q; want %q", denied.Capability, "document.supersede")
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on denied capability; got %d", len(emitter.Events))

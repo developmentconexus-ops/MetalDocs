@@ -183,7 +183,7 @@ func TestRequire_CapDenied(t *testing.T) {
 	}
 	_, tx := openAuthzTestDB(t, state)
 
-	err := Require(WithCapCache(context.Background()), tx, "doc.publish", "AREA2")
+	err := Require(WithCapCache(context.Background()), tx, "document.publish", "AREA2")
 	if err == nil {
 		t.Fatal("Require returned nil, want ErrCapDenied")
 	}
@@ -192,7 +192,7 @@ func TestRequire_CapDenied(t *testing.T) {
 	if !errors.As(err, &denied) {
 		t.Fatalf("Require error = %T %v, want ErrCapDenied", err, err)
 	}
-	if denied.Capability != "doc.publish" || denied.AreaCode != "AREA2" || denied.ActorID != "actor-2" {
+	if denied.Capability != "document.publish" || denied.AreaCode != "AREA2" || denied.ActorID != "actor-2" {
 		t.Fatalf("denied error = %#v", denied)
 	}
 }
