@@ -34,7 +34,8 @@ func LoadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID 
 	err = tx.QueryRowContext(ctx, `
 		SELECT COALESCE(d.process_area_code_snapshot, cd.process_area_code, '')
 		  FROM documents d
-		  LEFT JOIN controlled_documents cd ON d.controlled_document_id = cd.id
+		  LEFT JOIN controlled_documents cd
+		    ON cd.id = d.controlled_document_id AND cd.tenant_id = d.tenant_id
 		 WHERE d.id = $1 AND d.tenant_id = $2`,
 		documentID, tenantID,
 	).Scan(&areaCode)
