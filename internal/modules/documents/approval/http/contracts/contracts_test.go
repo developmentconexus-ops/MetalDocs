@@ -134,7 +134,7 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 			{
 				Order:              1,
 				Name:               "Review",
-				RequiredRole:       "reviewer",
+				RequiredRole:       "approver",
 				RequiredCapability: "doc.signoff",
 				AreaCode:           "ops",
 				Quorum:             "any_1_of",
@@ -180,6 +180,45 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 	}
 }
 
+// TestStageRequiredRoleBoundToRegistry locks the ADR 0022 binding: a stage
+// required_role must be a canonical AREA role. A decommissioned phantom
+// ("reviewer") and a valid-but-non-area role ("system_admin", which passes the
+// [a-z0-9_-]+ format check) must both be rejected at config time, so an admin
+// can never create a silently-unsatisfiable stage. Builds fresh requests to
+// avoid the shared-slice aliasing in the sibling tests.
+func TestStageRequiredRoleBoundToRegistry(t *testing.T) {
+	build := func(role string) CreateRouteRequest {
+		return CreateRouteRequest{
+			ProfileCode: "ops",
+			Name:        "Route",
+			Stages: []StageRequest{{
+				Order:              1,
+				Name:               "Review",
+				RequiredRole:       role,
+				RequiredCapability: "doc.signoff",
+				AreaCode:           "ops",
+				Quorum:             "any_1_of",
+				DriftPolicy:        "reduce_quorum",
+			}},
+		}
+	}
+	for _, bad := range []string{"reviewer", "system_admin"} {
+		req := build(bad)
+		if err := req.Validate(); err == nil {
+			t.Fatalf("create: required_role %q must be rejected (not a canonical area role)", bad)
+		}
+		upd := UpdateRouteRequest{Name: "Route", Stages: req.Stages}
+		if err := upd.Validate(); err == nil {
+			t.Fatalf("update: required_role %q must be rejected", bad)
+		}
+	}
+	for _, good := range []string{"viewer", "editor", "approver", "author", "signer", "area_admin", "qms_admin"} {
+		if err := build(good).Validate(); err != nil {
+			t.Fatalf("required_role %q must be accepted: %v", good, err)
+		}
+	}
+}
+
 func TestUpdateRouteRequestValidate(t *testing.T) {
 	valid := UpdateRouteRequest{
 		Name: "Updated Route",
@@ -187,7 +226,7 @@ func TestUpdateRouteRequestValidate(t *testing.T) {
 			{
 				Order:              1,
 				Name:               "Review",
-				RequiredRole:       "reviewer",
+				RequiredRole:       "approver",
 				RequiredCapability: "doc.signoff",
 				AreaCode:           "ops",
 				Quorum:             "all_of",

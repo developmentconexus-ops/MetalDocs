@@ -1,6 +1,6 @@
 # public.user_process_areas
 
-> **Last verified:** 2026-06-03
+> **Last verified:** 2026-06-04
 > **Source:** `db/baseline/0001_current_schema.sql`
 > **Schema:** `public`
 > **Owner:** iam
@@ -35,9 +35,11 @@ user_id text NOT NULL,
     revoked_by text,
     CONSTRAINT effective_interval_valid CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
     CONSTRAINT revoked_by_required_when_revoked CHECK ((((effective_to IS NULL) AND (revoked_by IS NULL)) OR ((effective_to IS NOT NULL) AND (revoked_by IS NOT NULL)))),
-    CONSTRAINT user_process_areas_role_check CHECK ((role = ANY (ARRAY['viewer'::text, 'editor'::text, 'reviewer'::text, 'approver'::text, 'author'::text, 'signer'::text, 'area_admin'::text, 'qms_admin'::text])))
+    CONSTRAINT user_process_areas_role_check CHECK ((role = ANY (ARRAY['viewer'::text, 'editor'::text, 'approver'::text, 'author'::text, 'signer'::text, 'area_admin'::text, 'qms_admin'::text])))
 );
 ```
+
+> **Role set (7 canonical area roles).** `system_admin` is intentionally excluded — it is a tenant-wide tier-1 role that bypasses tier-2 and is never an area membership. The legacy `reviewer` role was **decommissioned** (ADR 0022, migration `0230`): it granted zero capabilities and was absent from the Go registry, seed, and OpenAPI. This CHECK is the single source of truth the Go `iamdomain.IsAreaRole` set and the approval-stage `required_role` validation bind against.
 
 ## Runtime Usage
 

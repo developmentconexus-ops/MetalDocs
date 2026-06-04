@@ -524,9 +524,10 @@ func mapRoleToMembership(role string) string {
 	switch role {
 	case "author":
 		return "editor"
-	case "reviewer":
-		return "reviewer"
 	default:
+		// 'reviewer' was a non-functional legacy area role (decommissioned,
+		// ADR 0022) — map any non-author seed role to the canonical approver
+		// area membership.
 		return "approver"
 	}
 }

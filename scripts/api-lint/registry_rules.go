@@ -104,17 +104,18 @@ func RunRegistryRules(modulesRoot string, fset *token.FileSet) ([]Violation, err
 
 // phantomRoleDialect lists role-name string literals that may not appear in a
 // delivery/http authz gate, beyond the canonical Role catalog parsed from
-// model.go (ADR 0022 Phase 9). The three entries are banned for two distinct
-// reasons:
+// model.go. All three are TRUE phantoms — decommissioned role names that are not
+// canonical anywhere (no Go const, no DB CHECK, no seed, no issuance path). They
+// compile clean but name roles that cannot exist:
 //
-//   - template_author, document_filler: TRUE phantoms — decommissioned "docx v2"
-//     dialect role names that were never canonical (no DB CHECK, no seed, no
-//     issuance path). They compile clean but name roles that cannot exist.
-//   - reviewer: DB-canonical (present in the role CHECK constraint and seeded),
-//     but missing from the Go iam/domain Role consts pending Phase 12
-//     reconciliation. Banned from delivery/http in the interim so a handler gate
-//     cannot bind to a role the Go registry does not yet model.
+//   - template_author, document_filler: legacy "docx v2" dialect role names
+//     (ADR 0022 Phase 9).
+//   - reviewer: legacy area role decommissioned in ADR 0022 — removed from the
+//     user_process_areas role CHECK + stored procs (migration 0230). Granted zero
+//     capabilities; redundant with `approver` + the controlled-document workflow
+//     reviewer columns.
 //
+// They are kept banned so a removed role can never silently reappear in a gate.
 // All three are unioned with the parsed canonical Role catalog to form the
 // banned set.
 var phantomRoleDialect = []string{"template_author", "document_filler", "reviewer"}

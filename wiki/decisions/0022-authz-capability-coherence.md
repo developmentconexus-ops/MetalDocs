@@ -389,6 +389,23 @@ Largest cleanup phase; sub-sequenced into independently-gated commits (F5, F4, F
 
 **Phase 6 (wiki sync) is now UNBLOCKED — runs next** (Phase 12 was the last code phase; the documents handler now speaks the coherent `document.*` vocabulary the wiki will document). **Access-review certification** is tracked OUT of this ADR, in the screen/product pipeline.
 
+### Role-vocabulary coherence — `reviewer` decommission + approval `required_role` binding (2026-06-04)
+
+Closes the `reviewer`/`system_admin` role drift flagged at the Phase 9 audit (line 254) and the deeper root cause it sat on. Branch `feat/iam-authz-coherence-rootcause-fixes`, off `qa/iam-area-membership`.
+
+**Finding (full cross-layer role map).** The role MODEL is already industry-standard and the apparent "drifts" are deliberate: `system_admin` is excluded from `user_process_areas` by design (tenant-wide tier-1, tier-2 bypass — K8s/GCP inheritance), and `signer`/`area_admin`/`qms_admin` are excluded from `iam_user_roles` by design (area-only partition). The ONE genuine wart was **`reviewer`** — present only in the UPA role CHECK + the grant/revoke stored-proc validation lists, but absent from the Go registry, `validRoles`, the `role_capabilities` seed, OpenAPI, and any issuance path. It granted **zero capabilities**; the dev seed even mis-assigned `approver-test` the `reviewer` role, so that user silently could not approve.
+
+**Root cause (bigger than the symptom).** Approval stage `required_role` was **free text** (only `[a-z0-9_-]+`, ≤64) and joined directly against `user_process_areas.role` at runtime to resolve eligible approvers (`submit_service.go resolveEligibleActors`). Unbound to the role registry, it let an admin configure a stage requiring a role no user can hold → a silently **unsatisfiable stage** (empty eligible pool). `reviewer` was the visible instance of that class — the same "role strings not bound to the registry" defect ADR 0022 set out to kill, surviving in the approval module.
+
+**Fix (operator rulings: decommission everywhere + bind now).**
+- **Decommission `reviewer`:** migration [`0230`](../../db/migrations/0230_authz_decommission_reviewer_role.sql) removes any `reviewer` memberships (behaviour-neutral — they granted nothing), tightens `user_process_areas_role_check` to the 7 canonical area roles, and **drops the duplicated `_role NOT IN (...)` validation** from `grant/revoke_area_membership` (the table CHECK is now the single source of truth — that hardcoded list was also stale, rejecting `author`/`signer`/`area_admin`/`qms_admin`). Mirrored in the curated baseline; dev seed `reviewer`→`approver`.
+- **Bind `required_role` to the registry:** new Go SSOT `iamdomain.IsAreaRole`/`AreaRoles()` (the 7 area roles = canonical roles minus `system_admin`, mirroring the UPA CHECK). Approval route create/update now rejects a `required_role` that is not a canonical area role (`contracts/route.go validateAreaRole`). A phantom/typo'd stage role is now a 4xx at config time, not a silent dead stage.
+- `reviewer` reclassified a TRUE phantom in `no-rolestring-in-delivery` (still banned so it cannot reappear in a gate). DB dictionary `wiki/database/tables/user_process_areas.md` updated to the 7-role CHECK.
+
+**Gates:** `go build ./...` clean; `go test ./internal/modules/iam/... ./internal/modules/documents/approval/... ./db/migrations/... ./scripts/api-lint/... ./apps/api/...` green (approval route fixtures updated `reviewer`→`approver`, proving the binding bites); DB live-bootstrap gate PASS **both** with dev seed and product-schema-only (`0230` applies: `ALTER`×2 + `CREATE FUNCTION`×2, idempotent).
+
+**Flagged, not fixed (out of scope):** FE stale `UserRole` literal `reviewer` in `lib/types/index.ts` (ADR 0020/0021 deferral, frontend boundary); `e2e_seed.go mapRoleToIAM` emits `reviewer`/`admin` — pre-existing latent test-seed bug (those values were never valid for `iam_user_roles`, independent of this change). Approval-stage `required_capability` is still free-text (separate binding, lower risk — capabilities are typed elsewhere).
+
 ## References
 - [`wiki/references/authz-industry-evidence.md`](../references/authz-industry-evidence.md) — cited external evidence base (NIST, K8s, GCP, AWS, OWASP, CWE, Zanzibar, Cedar, OPA)
 - Cross-module authz audit, 2026-06-03 (this session) — three-dialect map, tier-2 areaCode survey, drift inventory
