@@ -14,6 +14,10 @@ on:
       - 'redocly.yaml'
       - 'scripts/api-lint/**'
       - 'internal/modules/**'
+      - 'db/reference-data/**'
+      - 'wiki/concepts/authz-tiers.md'
+      - 'wiki/references/local-dev-credentials.md'
+      - 'wiki/modules/iam.md'
   push:
     branches: [main]
 
@@ -53,17 +57,31 @@ jobs:
         run: npx --yes @redocly/cli@latest lint api/openapi/v1/openapi.yaml
 
   api-design-system-lint:
-    # Five rules per spec §4.5 + §5.1: envelope-drift, pagination-drift,
-    # authz-drift, authz-call-present, tripwire-pairing.
-    # Non-blocking until Plan 2 finishes adoption; final Plan 2 step flips
-    # `continue-on-error` to false.
+    # ADR 0022 Phase 13 — Principle 5 enforced. Two rule-sets, one job:
+    #
+    #   BLOCKING (gates this job): the registry-binding guards, the dialect bans
+    #   (no-inline / no-rawstring / no-rolestring), authz-area-scope-binding, and
+    #   tripwire-pairing. These are 0 on a clean tree; a real drift/dialect
+    #   regression turns the build RED.
+    #
+    #   REPORTED-ONLY (continue-on-error step): the spec-contract-drift families
+    #   (ENVELOPE-/AUTHZ-/PAGINATION-DRIFT), ~397 pre-existing hits deferred to a
+    #   dedicated spec-hygiene phase. Surfaced + counted, never blocking yet.
+    #
+    # CRITICAL: pass the REPO ROOT (`.`), not `./internal/modules`. Every binding
+    # helper joins its core files off the repo root (internal/modules/...,
+    # db/reference-data/..., wiki/...); the old `./internal/modules` arg made
+    # every join miss so the guards loaded nothing and passed trivially. `-strict`
+    # makes a wrong root a hard error so that can never silently recur.
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version: 1.25.x, cache: true }
-      - name: api-lint unit tests
-        run: go test ./scripts/api-lint/...
-      - name: api-lint against current spec + modules
-        run: go run ./scripts/api-lint/ api/openapi/v1/openapi.yaml ./internal/modules
+      - name: api-lint unit tests (incl. e2e self-test)
+        run: go test ./scripts/api-lint/... -count=1
+      - name: api-lint binding/dialect/tripwire guards (BLOCKING)
+        run: go run ./scripts/api-lint/ -strict -enforce=blocking api/openapi/v1/openapi.yaml .
+      - name: api-lint spec-contract-drift backlog (reported-only, non-blocking)
+        continue-on-error: true
+        run: go run ./scripts/api-lint/ -enforce=reported api/openapi/v1/openapi.yaml .

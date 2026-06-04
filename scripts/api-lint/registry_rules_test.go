@@ -106,7 +106,7 @@ func fullSeed(extra []string, omit map[string]bool) string {
 func TestSeedRegistryParity_Clean(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "db/reference-data/0001_product_reference_data.sql", fullSeed(nil, nil))
-	got, err := checkSeedRegistryParity(dir)
+	got, err := checkSeedRegistryParity(dir, false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestSeedRegistryParity_Clean(t *testing.T) {
 func TestSeedRegistryParity_SeededNotInRegistry(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "db/reference-data/0001_product_reference_data.sql", fullSeed([]string{"doc.bogus"}, nil))
-	got, err := checkSeedRegistryParity(dir)
+	got, err := checkSeedRegistryParity(dir, false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestSeedRegistryParity_RegistryNotSeeded(t *testing.T) {
 	caps := iamdomain.AllCapabilities()
 	missing := string(caps[0])
 	writeFile(t, dir, "db/reference-data/0001_product_reference_data.sql", fullSeed(nil, map[string]bool{missing: true}))
-	got, err := checkSeedRegistryParity(dir)
+	got, err := checkSeedRegistryParity(dir, false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestWikiCapabilityParity_Clean(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, filepath.Join("wiki", "concepts", "authz-tiers.md"),
 		"An area_admin holds `cap:membership.manage` and the illustrative `doc.create` example is ignored.\n")
-	got, err := checkWikiCapabilityParity(dir)
+	got, err := checkWikiCapabilityParity(dir, false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestWikiCapabilityParity_BitesOnDrift(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, filepath.Join("wiki", "references", "local-dev-credentials.md"),
 		"area_admin grants `cap:membership.grant` to areas.\n")
-	got, err := checkWikiCapabilityParity(dir)
+	got, err := checkWikiCapabilityParity(dir, false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestWikiCapabilityParity_IgnoresUnmarkedProse(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, filepath.Join("wiki", "concepts", "authz-tiers.md"),
 		"Deferred `route.view`, illustrative `doc.create`, file `permissions.go`, GUC `metaldocs.actor_id` — none are markers.\n")
-	got, err := checkWikiCapabilityParity(dir)
+	got, err := checkWikiCapabilityParity(dir, false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestAuthzAreaScopeBinding_BitesOnAreaGradeTenant(t *testing.T) {
 	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureCapModel)
 	writeFile(t, dir, "repo/r.go",
 		"package repo\nfunc f() { authz.Require(nil, nil, string(iamdomain.CapDocumentEdit), \"tenant\") }\n")
-	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet())
+	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestAuthzAreaScopeBinding_GreenOnRealArea(t *testing.T) {
 	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureCapModel)
 	writeFile(t, dir, "repo/r.go",
 		"package repo\nfunc f(areaCode string) { authz.Require(nil, nil, string(iamdomain.CapDocumentEdit), areaCode) }\n")
-	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet())
+	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -241,7 +241,7 @@ func TestAuthzAreaScopeBinding_IgnoresTenantGradeAndVariableCap(t *testing.T) {
 	// Tenant-grade cap with "tenant" is legitimate; a variable cap is unresolvable.
 	writeFile(t, dir, "repo/r.go",
 		"package repo\nfunc f(cap string) {\n\tauthz.Require(nil, nil, string(iamdomain.CapDocumentView), \"tenant\")\n\tauthz.Require(nil, nil, cap, \"tenant\")\n}\n")
-	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet())
+	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -327,7 +327,7 @@ func TestNoRoleStringInDelivery_BitesOnConst(t *testing.T) {
 	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
 	writeFile(t, dir, "pkg/delivery/http/h.go",
 		"package http\nconst roleAdmin = \"system_admin\"\n")
-	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -344,7 +344,7 @@ func TestNoRoleStringInDelivery_BitesOnComparison(t *testing.T) {
 	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
 	writeFile(t, dir, "pkg/delivery/http/h.go",
 		"package http\nfunc f(s string) bool { return s == \"document_filler\" }\n")
-	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestNoRoleStringInDelivery_BitesOnSwitchCase(t *testing.T) {
 	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
 	writeFile(t, dir, "pkg/delivery/http/h.go",
 		"package http\nfunc f(s string) bool {\n\tswitch s {\n\tcase \"document_filler\":\n\t\treturn true\n\t}\n\treturn false\n}\n")
-	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -378,7 +378,7 @@ func TestNoRoleStringInDelivery_GreenNoRoleLiteral(t *testing.T) {
 	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
 	writeFile(t, dir, "pkg/delivery/http/h.go",
 		"package http\nfunc f(s string) bool { return s == \"ok\" }\n")
-	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -392,7 +392,7 @@ func TestNoRoleStringInDelivery_IgnoresTestFiles(t *testing.T) {
 	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
 	writeFile(t, dir, "pkg/delivery/http/h_test.go",
 		"package http\nconst roleAdmin = \"system_admin\"\n")
-	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -407,7 +407,7 @@ func TestNoRoleStringInDelivery_IgnoresRoleAsData(t *testing.T) {
 	// A role literal as composite-literal data (not const, not comparison) is exempt.
 	writeFile(t, dir, "pkg/delivery/http/h.go",
 		"package http\nvar x = []string{\"system_admin\"}\n")
-	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -422,7 +422,7 @@ func TestNoRoleStringInDelivery_IgnoresNonDelivery(t *testing.T) {
 	// Same const, but outside any /delivery/http/ path -> not scanned.
 	writeFile(t, dir, "pkg/application/h.go",
 		"package application\nconst roleAdmin = \"system_admin\"\n")
-	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet(), false)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
