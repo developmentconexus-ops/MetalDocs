@@ -325,12 +325,14 @@ func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID 
 	).Scan(&areaCode)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "tenant", nil
+			// Fail-closed: a missing document resolves to "" → authz.Require
+			// denies non-system actors for area-grade caps (submit / signoff /
+			// publish / supersede). ADR 0022 Phase 8 (matches Phase 7 document.*).
+			// The lone tenant-grade caller (read_service, document.view) coalesces
+			// "" -> "tenant" at its call site to keep the area filter OFF.
+			return "", nil
 		}
 		return "", err
-	}
-	if areaCode == "" {
-		return "tenant", nil
 	}
 	return areaCode, nil
 }

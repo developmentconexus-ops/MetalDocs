@@ -9,6 +9,7 @@ import (
 	v2dom "metaldocs/internal/modules/documents/domain"
 	documentshttp "metaldocs/internal/modules/documents/http"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // ViewPresigner is implemented by objectstore helpers that presign a GET URL.
@@ -52,14 +53,14 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 		return documentshttp.ViewResult{}, err
 	}
 
-	var status, areaCode string
+	var status string
 	var pdfKey sql.NullString
 	err = tx.QueryRowContext(ctx, `
-		SELECT status, coalesce(process_area_code_snapshot,''), final_pdf_s3_key
+		SELECT status, final_pdf_s3_key
 		  FROM documents
 		 WHERE tenant_id=$1::uuid AND id=$2::uuid`,
 		tenantID, docID,
-	).Scan(&status, &areaCode, &pdfKey)
+	).Scan(&status, &pdfKey)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return documentshttp.ViewResult{}, v2dom.ErrNotFound
@@ -67,11 +68,9 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 		return documentshttp.ViewResult{}, fmt.Errorf("view: load document: %w", err)
 	}
 
-	area := areaCode
-	if area == "" {
-		area = "tenant"
-	}
-	if err := authz.Require(ctx, tx, "doc.view_published", area); err != nil {
+	// doc.view_published is tenant-grade (a *.view read) — pass the "tenant"
+	// sentinel so the area filter is intentionally OFF (ADR 0022 Phase 8).
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentViewPublished), "tenant"); err != nil {
 		return documentshttp.ViewResult{}, err
 	}
 

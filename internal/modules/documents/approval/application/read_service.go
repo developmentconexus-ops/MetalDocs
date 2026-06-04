@@ -99,6 +99,13 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.
 	if err != nil {
 		return nil, fmt.Errorf("read load instance by document: load area: %w", err)
 	}
+	// document.view is tenant-grade: a missing/empty area means the filter is
+	// intentionally OFF, NOT fail-closed. loadDocumentAreaCode is fail-closed for
+	// its area-grade callers (returns ""), so re-coalesce "" -> "tenant" here to
+	// preserve the tenant-wide read semantics (ADR 0022 Phase 8).
+	if areaCode == "" {
+		areaCode = "tenant"
+	}
 
 	ctx = authz.WithCapCache(ctx)
 	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), areaCode); err != nil {

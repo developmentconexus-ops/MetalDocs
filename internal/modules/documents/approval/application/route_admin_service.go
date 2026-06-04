@@ -13,6 +13,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -163,7 +164,7 @@ func (s *RouteAdminService) createTx(ctx context.Context, db *sql.DB, in CreateR
 		return CreateRouteResult{}, err
 	}
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, "route.admin", "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 		_ = tx.Rollback()
 		return CreateRouteResult{}, err
 	}
@@ -294,7 +295,7 @@ func (s *RouteAdminService) updateTx(ctx context.Context, db *sql.DB, in UpdateR
 		return UpdateRouteResult{}, err
 	}
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, "route.admin", "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 		_ = tx.Rollback()
 		return UpdateRouteResult{}, err
 	}
@@ -458,7 +459,7 @@ func (s *RouteAdminService) deactivateTx(ctx context.Context, db *sql.DB, in Dea
 		return DeactivateRouteResult{}, err
 	}
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, "route.admin", "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 		_ = tx.Rollback()
 		return DeactivateRouteResult{}, err
 	}
@@ -549,7 +550,7 @@ func (s *RouteAdminService) List(ctx context.Context, db *sql.DB, tenantID, acto
 		return ListRoutesResult{}, wrapRouteAdminErr(op, err)
 	}
 	ctx = authz.WithCapCache(ctx)
-	if err := authz.Require(ctx, tx, "route.admin", "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapRouteManage), "tenant"); err != nil {
 		return ListRoutesResult{}, err
 	}
 

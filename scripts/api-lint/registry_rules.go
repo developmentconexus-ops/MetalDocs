@@ -87,7 +87,96 @@ func RunRegistryRules(modulesRoot string, fset *token.FileSet) ([]Violation, err
 	}
 	out = append(out, binding...)
 
+	rawcap, err := checkNoRawStringCapability(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, rawcap...)
+
 	return out, nil
+}
+
+// checkNoRawStringCapability is the ADR 0022 Phase 8 core control: it bans a raw
+// string literal capability argument to authz.Require / authz.RequireAll. This
+// closes the fourth dialect the SSOT lint was structurally blind to: no-inline-
+// capability bans only the Capability("…") conversion syntax (a *ast.CallExpr),
+// and authz-area-scope-binding only inspects the area arg of resolvable typed
+// consts — neither rejects a bare `"doc.publish"` string passed as the cap. The
+// registry is the single source of truth: every cap argument must be a typed
+// const (string(iamdomain.CapXxx)), never a literal that can name an unregistered
+// (phantom) or misspelled capability and still compile + pass for system_admin.
+//
+// For authz.Require the capability is the 3rd arg (index 2). For authz.RequireAll
+// every argument is treated as a capability position, so any BasicLit string arg
+// is flagged. A variable / selector / conversion cap arg (e.g. the `cap` param at
+// templates/lifecycle.go, or string(iamdomain.CapXxx)) is NOT a *ast.BasicLit and
+// is correctly ignored. Scoped to non-test .go files.
+func checkNoRawStringCapability(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	out := []Violation{}
+	err := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			pkg, ok := sel.X.(*ast.Ident)
+			if !ok || pkg.Name != "authz" {
+				return true
+			}
+			// capArgs are the argument indexes that carry a capability.
+			var capArgs []int
+			switch sel.Sel.Name {
+			case "Require":
+				if len(call.Args) < 3 {
+					return true
+				}
+				capArgs = []int{2}
+			case "RequireAll":
+				for i := range call.Args {
+					capArgs = append(capArgs, i)
+				}
+			default:
+				return true
+			}
+			for _, idx := range capArgs {
+				lit, ok := call.Args[idx].(*ast.BasicLit)
+				if !ok || lit.Kind != token.STRING {
+					continue
+				}
+				out = append(out, Violation{
+					File:    path,
+					Line:    fset.Position(call.Pos()).Line,
+					Rule:    "no-rawstring-capability",
+					Message: "raw-string capability literal " + lit.Value + " passed to authz." + sel.Sel.Name + "; reference a typed const from internal/modules/iam/domain (string(iamdomain.CapXxx)) — the single source of truth (ADR 0022 Phase 8). A raw string can name a phantom/unregistered cap and still compile + pass for system_admin",
+				})
+			}
+			return true
+		})
+		return nil
+	})
+	return out, err
 }
 
 // checkAuthzAreaScopeBinding is the ADR 0022 Phase 7 core control: it bans
