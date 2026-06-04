@@ -484,6 +484,39 @@ func TestPermissionResolver_AreaMembershipRoutes(t *testing.T) {
 	}
 }
 
+// TestDocumentsRoutesCapabilityMapping pins the ADR 0022 Phase 9 documents
+// tier-1 contract: every documents route resolves to a capability +
+// VisibilityPermissionGuarded via permissions.go alone. This is the
+// production-defect-fixed proof — the per-verb /duplicate, /comments POST and
+// /comments/ DELETE rows close the gaps that previously fell through to the
+// (now-deleted) handler role gate.
+func TestDocumentsRoutesCapabilityMapping(t *testing.T) {
+	t.Parallel()
+
+	resolver := newPermissionResolver()
+	cases := []struct {
+		method string
+		path   string
+		cap    iamdomain.Capability
+	}{
+		{http.MethodGet, "/api/v1/documents", iamdomain.CapDocumentView},
+		{http.MethodPost, "/api/v1/documents/d1/session/acquire", iamdomain.CapDocumentEdit},
+		{http.MethodPost, "/api/v1/documents/d1/session/force-release", iamdomain.CapMembershipManage},
+		{http.MethodPost, "/api/v1/documents/d1/duplicate", iamdomain.CapDocumentCreate},
+		{http.MethodPost, "/api/v1/documents/d1/comments", iamdomain.CapDocumentEdit},
+		{http.MethodDelete, "/api/v1/documents/d1/comments/5", iamdomain.CapDocumentEdit},
+	}
+	for _, tc := range cases {
+		gotCap, gotVis := resolver(tc.method, tc.path)
+		if gotVis != iamdelivery.VisibilityPermissionGuarded {
+			t.Errorf("%s %s: visibility=%v want PermissionGuarded", tc.method, tc.path, gotVis)
+		}
+		if gotCap != tc.cap {
+			t.Errorf("%s %s: cap=%q want %q", tc.method, tc.path, gotCap, tc.cap)
+		}
+	}
+}
+
 // TestEveryRouteCapInRegistry binds the Tier-1 route table to the Go capability
 // registry (single source of truth, ADR 0022 Phase 1). Every non-empty
 // routeRules[i].capability MUST be a typed const present in validCapabilities.
