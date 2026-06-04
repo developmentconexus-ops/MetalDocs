@@ -304,7 +304,7 @@ func parseRoleConsts(modulesRoot string, fset *token.FileSet) (map[string]iamdom
 // closes the fourth dialect the SSOT lint was structurally blind to: no-inline-
 // capability bans only the Capability("…") conversion syntax (a *ast.CallExpr),
 // and authz-area-scope-binding only inspects the area arg of resolvable typed
-// consts — neither rejects a bare `"doc.publish"` string passed as the cap. The
+// consts — neither rejects a bare `"document.publish"` string passed as the cap. The
 // registry is the single source of truth: every cap argument must be a typed
 // const (string(iamdomain.CapXxx)), never a literal that can name an unregistered
 // (phantom) or misspelled capability and still compile + pass for system_admin.

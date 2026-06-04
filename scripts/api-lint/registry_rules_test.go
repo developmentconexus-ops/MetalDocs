@@ -255,7 +255,7 @@ func TestAuthzAreaScopeBinding_IgnoresTenantGradeAndVariableCap(t *testing.T) {
 func TestNoRawStringCapability_BitesOnRequireLiteral(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "repo/r.go",
-		"package repo\nfunc f(area string) { authz.Require(nil, nil, \"doc.publish\", area) }\n")
+		"package repo\nfunc f(area string) { authz.Require(nil, nil, \"document.publish\", area) }\n")
 	got, err := checkNoRawStringCapability(dir, token.NewFileSet())
 	if err != nil {
 		t.Fatalf("err: %v", err)
@@ -263,7 +263,7 @@ func TestNoRawStringCapability_BitesOnRequireLiteral(t *testing.T) {
 	if n := countRule(got, "no-rawstring-capability"); n != 1 {
 		t.Fatalf("raw-string cap literal: want 1 violation, got %d: %+v", n, got)
 	}
-	if !containsMsg(got, "doc.publish") {
+	if !containsMsg(got, "document.publish") {
 		t.Fatalf("violation message should name the literal: %+v", got)
 	}
 }
