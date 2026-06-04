@@ -36,7 +36,7 @@ func (s *userAreaWriteRepoStub) ListByTenant(ctx context.Context, tenantID, user
 	return append([]domain.UserProcessArea(nil), s.activeList...), nil
 }
 
-func (s *userAreaWriteRepoStub) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (bool, bool, error) {
+func (s *userAreaWriteRepoStub) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string, now time.Time) (bool, bool, error) {
 	return false, false, nil
 }
 

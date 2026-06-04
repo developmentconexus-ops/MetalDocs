@@ -325,7 +325,8 @@ func (r *PostgresControlledDocumentRepository) Create(ctx context.Context, doc *
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+	// ADR 0022 Phase 7: authorize CD create against its target process area.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), doc.ProcessAreaCode); err != nil {
 		return fmt.Errorf("registry: authz check Create: %w", err)
 	}
 	if err := r.createWithQueryer(ctx, tx, doc); err != nil {
@@ -345,7 +346,8 @@ func (r *PostgresControlledDocumentRepository) CreateTx(ctx context.Context, tx 
 	if !ok {
 		return errors.New("controlled_documents: transaction must be *sql.Tx for authz")
 	}
-	if err := authz.Require(ctx, sqlTx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+	// ADR 0022 Phase 7: authorize CD create against its target process area.
+	if err := authz.Require(ctx, sqlTx, string(iamdomain.CapControlledDocumentCreate), doc.ProcessAreaCode); err != nil {
 		return fmt.Errorf("registry: authz check CreateTx: %w", err)
 	}
 	return r.createWithQueryer(ctx, tx, doc)

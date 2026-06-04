@@ -5,7 +5,7 @@
 // repair (auth Service signature drift, RoleAdminRepository interface
 // changes, etc.). Running:
 //
-//   go test ./tests/unit/iam_people/...
+//	go test ./tests/unit/iam_people/...
 //
 // exercises Invite, Patch, Bulk, and force-logout deferral via the actual
 // HTTP handlers wired against in-memory dependencies — no DB or bcrypt.
@@ -242,6 +242,15 @@ type noopAreaRepo struct{}
 
 func (noopAreaRepo) ListActive(context.Context, string, string, time.Time) ([]iamdomain.UserProcessArea, error) {
 	return nil, nil
+}
+func (noopAreaRepo) ListByTenant(context.Context, string, string, string, string, time.Time) ([]iamdomain.UserProcessArea, error) {
+	return nil, nil
+}
+func (noopAreaRepo) ListByTenantInManagedAreas(context.Context, string, string, string, string, string, string, time.Time) ([]iamdomain.UserProcessArea, error) {
+	return nil, nil
+}
+func (noopAreaRepo) MembershipDirectoryScope(context.Context, string, string, string, time.Time) (bool, bool, error) {
+	return false, false, nil
 }
 func (noopAreaRepo) Insert(context.Context, iamdomain.UserProcessArea) error { return nil }
 func (noopAreaRepo) CloseActive(context.Context, string, string, string, time.Time, string) error {

@@ -269,7 +269,9 @@ func TestBypassSystem(t *testing.T) {
 	state := &authzTestState{}
 	_, tx := openAuthzTestDB(t, state)
 
-	if err := BypassSystem(context.Background(), tx); err != nil {
+	// ADR 0022 Phase 7: BypassSystem requires a background-marked context.
+	ctx := WithBackgroundBypass(context.Background())
+	if err := BypassSystem(ctx, tx); err != nil {
 		t.Fatalf("BypassSystem returned error: %v", err)
 	}
 
@@ -282,5 +284,22 @@ func TestBypassSystem(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("executed queries = %#v, want bypass set_config", state.executedQueries)
+	}
+}
+
+// TestBypassSystem_FailsClosedWithoutBackgroundContext locks the CWE-269 guard:
+// BypassSystem must refuse (and emit no GUC) on a non-background context, so the
+// tier-2 bypass can never be reached from an HTTP request path.
+func TestBypassSystem_FailsClosedWithoutBackgroundContext(t *testing.T) {
+	state := &authzTestState{}
+	_, tx := openAuthzTestDB(t, state)
+
+	if err := BypassSystem(context.Background(), tx); !errors.Is(err, ErrBypassNotBackground) {
+		t.Fatalf("BypassSystem on non-background ctx = %v, want ErrBypassNotBackground", err)
+	}
+	for _, query := range state.executedQueries {
+		if query == "SELECT set_config('metaldocs.bypass_authz', 'scheduler', true)" {
+			t.Fatalf("bypass GUC was set despite non-background context: %#v", state.executedQueries)
+		}
 	}
 }
