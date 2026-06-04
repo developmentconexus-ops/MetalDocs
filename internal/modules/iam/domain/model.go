@@ -81,16 +81,15 @@ const (
 	CapMetricsView                 Capability = "metrics.view"
 	CapAuditRead                   Capability = "audit.read"
 	CapSessionManage               Capability = "session.manage"
-
-	// ADR 0022 Phase 8 — caps that were enforced at tier-2 by raw string but
-	// absent from the registry (phantom; passed only for the system_admin
-	// bypass). Registered + classified + seeded by Phase 8. (The raw "route.admin"
-	// reconciles to the existing CapRouteManage and is NOT a new const.)
-	CapDocumentEditDraft      Capability = "doc.edit_draft"
-	CapDocumentReconstruct    Capability = "doc.reconstruct"
-	CapDocumentViewPublished  Capability = "doc.view_published"
-	CapWorkflowInstanceCancel Capability = "workflow.instance.cancel"
 )
+
+// ADR 0022 Phase 10 (F2) — the four caps Phase 8 minted (doc.edit_draft,
+// doc.reconstruct, workflow.instance.cancel, doc.view_published) were redundant:
+// grant sets and HTTP surfaces identical to document.edit / document.view, zero
+// authorization differentiation. Merged back into the canonical caps; their
+// tier-2 call sites now Require document.edit / document.view. This reverses
+// Phase 8's registry over-modeling, NOT its security fix (the surfaces stay
+// enforced, now by the canonical cap).
 
 var validCapabilities = map[Capability]struct{}{
 	CapDocumentView:                {},
@@ -122,10 +121,6 @@ var validCapabilities = map[Capability]struct{}{
 	CapMetricsView:                 {},
 	CapAuditRead:                   {},
 	CapSessionManage:               {},
-	CapDocumentEditDraft:           {},
-	CapDocumentReconstruct:         {},
-	CapDocumentViewPublished:       {},
-	CapWorkflowInstanceCancel:      {},
 }
 
 func IsValidCapability(cap Capability) bool {
