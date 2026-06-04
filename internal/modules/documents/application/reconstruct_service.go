@@ -35,7 +35,8 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 		return fanout.ReconstructionEntry{}, err
 	}
 
-	areaCode, err := loadDocumentAreaCode(ctx, tx, tenantID, docID)
+	// document.edit is area-grade: pass the resolved area as-is ("" fail-closes).
+	areaCode, _, err := LoadDocumentAreaCode(ctx, tx, tenantID, docID)
 	if err != nil {
 		return fanout.ReconstructionEntry{}, fmt.Errorf("reconstruct authz: load area: %w", err)
 	}

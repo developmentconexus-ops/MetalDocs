@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -52,12 +53,18 @@ func (s *ReadService) LoadInstance(ctx context.Context, db *sql.DB, tenantID, in
 		return nil, fmt.Errorf("read load instance: %w", err)
 	}
 
-	areaCode, err := loadInstanceAreaCode(ctx, tx, tenantID, instanceID)
+	areaCode, found, err := loadInstanceAreaCode(ctx, tx, tenantID, instanceID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, repository.ErrNoActiveInstance
-		}
 		return nil, fmt.Errorf("read load instance: load area: %w", err)
+	}
+	if !found {
+		return nil, repository.ErrNoActiveInstance
+	}
+	// document.view is tenant-grade: COALESCE "" -> "tenant" so the area filter is
+	// intentionally OFF (NOT fail-closed). ADR 0022 Phase 11 (F7): the coalesce now
+	// lives at the call site, not baked into the resolver.
+	if areaCode == "" {
+		areaCode = "tenant"
 	}
 
 	ctx = authz.WithCapCache(ctx)
@@ -95,15 +102,15 @@ func (s *ReadService) LoadActiveInstanceByDocument(ctx context.Context, db *sql.
 		return nil, fmt.Errorf("read load instance by document: %w", err)
 	}
 
-	areaCode, err := loadDocumentAreaCode(ctx, tx, tenantID, documentID)
+	// document.view is tenant-grade: COALESCE the resolved area to "tenant" so the
+	// area filter is intentionally OFF (NOT fail-closed). The shared resolver is
+	// fail-closed for its area-grade callers; tenant-grade callers re-coalesce here
+	// (ADR 0022 Phase 8 semantics, Phase 11 F7 consolidation).
+	areaCode, found, err := docapp.LoadDocumentAreaCode(ctx, tx, tenantID, documentID)
 	if err != nil {
 		return nil, fmt.Errorf("read load instance by document: load area: %w", err)
 	}
-	// document.view is tenant-grade: a missing/empty area means the filter is
-	// intentionally OFF, NOT fail-closed. loadDocumentAreaCode is fail-closed for
-	// its area-grade callers (returns ""), so re-coalesce "" -> "tenant" here to
-	// preserve the tenant-wide read semantics (ADR 0022 Phase 8).
-	if areaCode == "" {
+	if !found || areaCode == "" {
 		areaCode = "tenant"
 	}
 
@@ -354,10 +361,16 @@ func (s *ReadService) CountPendingForActor(ctx context.Context, db *sql.DB, tena
 	return total, nil
 }
 
-func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) (string, error) {
-	var areaCode string
-	err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(asi.area_code_snapshot, d.process_area_code_snapshot, cd.process_area_code, 'tenant')
+// loadInstanceAreaCode resolves an approval instance's area, preferring the active
+// stage snapshot, then the document snapshot, then the controlled-document area.
+// found reports whether the instance row exists; areaCode is "" when the row
+// exists with no area anywhere in the chain. Like the document-keyed
+// docapp.LoadDocumentAreaCode (ADR 0022 Phase 11 F7) it bakes in NO empty-area
+// default — the (tenant-grade) callers COALESCE "" -> "tenant" at the call site so
+// the area-filter-OFF decision is explicit, not hidden in the resolver.
+func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID string) (areaCode string, found bool, err error) {
+	err = tx.QueryRowContext(ctx, `
+		SELECT COALESCE(asi.area_code_snapshot, d.process_area_code_snapshot, cd.process_area_code, '')
 		  FROM approval_instances ai
 		  JOIN documents d
 		    ON d.id = ai.document_id
@@ -372,11 +385,11 @@ func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID 
 		 LIMIT 1`,
 		instanceID, tenantID,
 	).Scan(&areaCode)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	if areaCode == "" {
-		return "tenant", nil
-	}
-	return areaCode, nil
+	return areaCode, true, nil
 }

@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 
 	"metaldocs/internal/modules/iam/authz"
@@ -29,29 +28,13 @@ func requireDocEditDraft(ctx context.Context, db *sql.DB, tenantID, actorID, doc
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
-	areaCode, err := loadDocumentAreaCode(ctx, tx, tenantID, docID)
+	// document.edit is area-grade: pass the resolved area as-is. A missing document
+	// or null area yields "" which fail-closes (authz.Require denies non-system
+	// actors). ADR 0022 Phase 11 (F7): the per-file loadDocumentAreaCode was merged
+	// into the shared LoadDocumentAreaCode.
+	areaCode, _, err := LoadDocumentAreaCode(ctx, tx, tenantID, docID)
 	if err != nil {
 		return fmt.Errorf("fillin authz: load area: %w", err)
 	}
 	return authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode)
-}
-
-func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
-	var areaCode string
-	err := tx.QueryRowContext(ctx, `
-		SELECT process_area_code_snapshot
-		  FROM documents
-		 WHERE id = $1 AND tenant_id = $2`,
-		documentID, tenantID,
-	).Scan(&areaCode)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// Fail-closed: empty area → authz.Require denies non-system actors
-			// (area-grade caps only — the edit-draft + reconstruct surfaces now
-			// gate on document.edit, ADR 0022 Phase 10). ADR 0022 Phase 8.
-			return "", nil
-		}
-		return "", err
-	}
-	return areaCode, nil
 }

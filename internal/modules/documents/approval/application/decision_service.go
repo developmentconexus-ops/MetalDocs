@@ -149,7 +149,8 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, repository.ErrInstanceCompleted
 	}
 
-	areaCode, err := loadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
+	// document.signoff is area-grade: pass the resolved area as-is ("" fail-closes).
+	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return SignoffResult{}, fmt.Errorf("recordSignoff: load document area: %w", err)
