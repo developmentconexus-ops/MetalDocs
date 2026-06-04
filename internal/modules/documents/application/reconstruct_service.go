@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/modules/render/fanout"
 )
 
@@ -38,7 +39,7 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 	if err != nil {
 		return fanout.ReconstructionEntry{}, fmt.Errorf("reconstruct authz: load area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, "doc.reconstruct", areaCode); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentReconstruct), areaCode); err != nil {
 		return fanout.ReconstructionEntry{}, err
 	}
 

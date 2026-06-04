@@ -42,6 +42,10 @@ func TestAreaGradeCapabilitySet(t *testing.T) {
 		CapControlledDocumentObsolete:  {},
 		CapControlledDocumentSupersede: {},
 		CapMembershipManage:            {},
+		// ADR 0022 Phase 8 — phantom caps classified area-grade (tier-1 document.edit).
+		CapDocumentEditDraft:      {},
+		CapDocumentReconstruct:    {},
+		CapWorkflowInstanceCancel: {},
 	}
 	for cap := range validCapabilities {
 		_, want := wantArea[cap]

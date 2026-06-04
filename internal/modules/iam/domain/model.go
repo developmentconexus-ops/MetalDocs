@@ -81,6 +81,15 @@ const (
 	CapMetricsView                 Capability = "metrics.view"
 	CapAuditRead                   Capability = "audit.read"
 	CapSessionManage               Capability = "session.manage"
+
+	// ADR 0022 Phase 8 — caps that were enforced at tier-2 by raw string but
+	// absent from the registry (phantom; passed only for the system_admin
+	// bypass). Registered + classified + seeded by Phase 8. (The raw "route.admin"
+	// reconciles to the existing CapRouteManage and is NOT a new const.)
+	CapDocumentEditDraft      Capability = "doc.edit_draft"
+	CapDocumentReconstruct    Capability = "doc.reconstruct"
+	CapDocumentViewPublished  Capability = "doc.view_published"
+	CapWorkflowInstanceCancel Capability = "workflow.instance.cancel"
 )
 
 var validCapabilities = map[Capability]struct{}{
@@ -113,6 +122,10 @@ var validCapabilities = map[Capability]struct{}{
 	CapMetricsView:                 {},
 	CapAuditRead:                   {},
 	CapSessionManage:               {},
+	CapDocumentEditDraft:           {},
+	CapDocumentReconstruct:         {},
+	CapDocumentViewPublished:       {},
+	CapWorkflowInstanceCancel:      {},
 }
 
 func IsValidCapability(cap Capability) bool {

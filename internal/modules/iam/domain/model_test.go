@@ -34,9 +34,9 @@ func TestCapabilityInvariants(t *testing.T) {
 // Locks the registry size so silent deletions or duplicate inserts surface
 // as a test failure. Bump intentionally when caps are added/removed via ADR.
 func TestCapabilityRegistrySize(t *testing.T) {
-	const want = 29
+	const want = 33
 	if got := len(validCapabilities); got != want {
-		t.Fatalf("validCapabilities size = %d, want %d (bump only via ADR; current = 23 base + 4 ADR 0016 view caps + 1 ADR 0019 session.manage + ADR 0022 P1: -2 dead workflow.* +3 promoted doc.publish/doc.obsolete/template.archive)", got, want)
+		t.Fatalf("validCapabilities size = %d, want %d (bump only via ADR; current = 23 base + 4 ADR 0016 view caps + 1 ADR 0019 session.manage + ADR 0022 P1: -2 dead workflow.* +3 promoted doc.publish/doc.obsolete/template.archive + ADR 0022 P8: +4 registered phantoms doc.edit_draft/doc.reconstruct/doc.view_published/workflow.instance.cancel)", got, want)
 	}
 	if got := len(AllCapabilities()); got != want {
 		t.Fatalf("AllCapabilities() size = %d, want %d", got, want)

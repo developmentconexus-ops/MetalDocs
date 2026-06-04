@@ -10,6 +10,7 @@ import (
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // CancelService cancels an in-progress approval instance and reverts the
@@ -103,10 +104,14 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 		return CancelResult{}, fmt.Errorf("cancel: fetch area_code: %w", err)
 	}
 
-	// Authz gate: require workflow.instance.cancel capability.
+	// Authz gate: require workflow.instance.cancel capability (area-grade).
+	// areaCode.String is "" when process_area_code_snapshot IS NULL — "" is
+	// intentionally fail-closed: authz.Require denies non-system actors for an
+	// area-grade cap (ADR 0022 Phase 8, matches loadDocumentAreaCode). Do NOT
+	// COALESCE(..., 'tenant') here — that would silently re-open the area filter.
 	if !system {
 		ctx = authz.WithCapCache(ctx)
-		if err := authz.Require(ctx, tx, "workflow.instance.cancel", areaCode.String); err != nil {
+		if err := authz.Require(ctx, tx, string(iamdomain.CapWorkflowInstanceCancel), areaCode.String); err != nil {
 			rollback()
 			return CancelResult{}, err
 		}

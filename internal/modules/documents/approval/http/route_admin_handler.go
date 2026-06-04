@@ -12,8 +12,6 @@ import (
 	"metaldocs/internal/modules/documents/approval/repository"
 )
 
-const CapManageRoutes = "route.admin"
-
 func (h *Handler) CreateRouteHandler(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
