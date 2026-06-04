@@ -40,7 +40,7 @@ type CancelResult struct {
 
 // CancelInstance cancels an in-progress approval instance, transitions all
 // active/pending stages to cancelled, and reverts the document to draft.
-// Requires the workflow.instance.cancel capability for the document's area.
+// Requires the document.edit capability for the document's area (ADR 0022 P10).
 func (s *CancelService) CancelInstance(ctx context.Context, db *sql.DB, in CancelInput) (CancelResult, error) {
 	return s.cancelInstance(ctx, db, in, false)
 }
@@ -104,14 +104,17 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 		return CancelResult{}, fmt.Errorf("cancel: fetch area_code: %w", err)
 	}
 
-	// Authz gate: require workflow.instance.cancel capability (area-grade).
+	// Authz gate: require document.edit capability (area-grade). Cancelling an
+	// in-progress workflow reverts the document to draft — an area-scoped edit.
+	// ADR 0022 Phase 10 (F2): the redundant workflow.instance.cancel cap was
+	// merged into the canonical CapDocumentEdit (identical grant set).
 	// areaCode.String is "" when process_area_code_snapshot IS NULL — "" is
 	// intentionally fail-closed: authz.Require denies non-system actors for an
 	// area-grade cap (ADR 0022 Phase 8, matches loadDocumentAreaCode). Do NOT
 	// COALESCE(..., 'tenant') here — that would silently re-open the area filter.
 	if !system {
 		ctx = authz.WithCapCache(ctx)
-		if err := authz.Require(ctx, tx, string(iamdomain.CapWorkflowInstanceCancel), areaCode.String); err != nil {
+		if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode.String); err != nil {
 			rollback()
 			return CancelResult{}, err
 		}

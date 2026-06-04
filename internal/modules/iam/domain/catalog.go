@@ -131,10 +131,6 @@ var capabilityDescriptions = map[Capability]string{
 	CapMetricsView:                 "Visualizar métricas e KPIs",
 	CapAuditRead:                   "Visualizar trilha de auditoria",
 	CapSessionManage:               "Gerenciar sessões (force-logout)",
-	CapDocumentEditDraft:           "Editar rascunho de documento",
-	CapDocumentReconstruct:         "Reconstruir documento a partir de revisão",
-	CapDocumentViewPublished:       "Visualizar documento publicado",
-	CapWorkflowInstanceCancel:      "Cancelar instância de workflow",
 }
 
 // CapabilityCatalog returns one CapabilityDescriptor per Capability const,

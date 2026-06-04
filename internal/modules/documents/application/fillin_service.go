@@ -39,7 +39,8 @@ type FillInService struct {
 }
 
 // NewFillInService wires the service with a DB handle for authz enforcement.
-// Production callers MUST use this constructor — it enforces doc.edit_draft capability.
+// Production callers MUST use this constructor — it enforces the document.edit
+// capability (ADR 0022 Phase 10 merged the redundant doc.edit_draft cap into it).
 func NewFillInService(db *sql.DB, s SchemaReader, w FillInWriter) *FillInService {
 	return &FillInService{db: db, schemas: s, writer: w}
 }

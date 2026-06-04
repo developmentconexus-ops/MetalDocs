@@ -117,31 +117,13 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.archive', 'Archive a template') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
--- ADR 0022 Phase 8: registered phantom caps (mirrors db/migrations/0226_authz_p8_phantom_cap_grants.sql).
--- edit_draft/reconstruct/instance.cancel mirror the document.edit holder set; view_published mirrors document.view.
--- system_admin holds these via the tier-2 bypass (not seeded explicitly).
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'doc.edit_draft', 'Edit a document draft') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.edit_draft', 'Edit a document draft') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('author', 'doc.edit_draft', 'Edit a document draft') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('editor', 'doc.edit_draft', 'Edit a document draft') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.edit_draft', 'Edit a document draft') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'doc.reconstruct', 'Reconstruct a document from a revision') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.reconstruct', 'Reconstruct a document from a revision') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('author', 'doc.reconstruct', 'Reconstruct a document from a revision') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('editor', 'doc.reconstruct', 'Reconstruct a document from a revision') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.reconstruct', 'Reconstruct a document from a revision') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'workflow.instance.cancel', 'Cancel a workflow instance') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'workflow.instance.cancel', 'Cancel a workflow instance') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('author', 'workflow.instance.cancel', 'Cancel a workflow instance') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('editor', 'workflow.instance.cancel', 'Cancel a workflow instance') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'workflow.instance.cancel', 'Cancel a workflow instance') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('approver', 'doc.view_published', 'View a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.view_published', 'View a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('author', 'doc.view_published', 'View a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('editor', 'doc.view_published', 'View a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.view_published', 'View a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('signer', 'doc.view_published', 'View a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('viewer', 'doc.view_published', 'View a published document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+-- ADR 0022 Phase 10 (F2): the four redundant phantom caps Phase 8 seeded here
+-- (doc.edit_draft / doc.reconstruct / workflow.instance.cancel / doc.view_published)
+-- were merged into the canonical document.edit / document.view caps — identical
+-- grant sets, zero authorization differentiation. Their 22 grant rows are removed
+-- (mirrors the reverse-only migration db/migrations/0227_authz_p10_merge_redundant_caps.sql).
+-- This reverses Phase 8's registry over-modeling, NOT its security fix: the tier-2
+-- surfaces stay enforced, now by document.edit / document.view.
 
 -- System blank template required for controlled document creation defaults.
 -- Invariant: this reference-data row is valid only when bootstrap/storage also seeds
