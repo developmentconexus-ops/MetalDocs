@@ -127,6 +127,14 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval get", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval post", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/decisions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// ADR 0022 Phase 11 (F4): approval-route CRUD gates on CapRouteManage at
+		// tier-1, matching its tier-2 authz.Require(CapRouteManage). These rows MUST
+		// precede the generic /api/v1/approval/ block, so they resolve to route.manage
+		// and NOT the generic document.view (GET) / document.submit (writes).
+		{name: "approval routes list", method: http.MethodGet, path: "/api/v1/approval/routes", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval routes create", method: http.MethodPost, path: "/api/v1/approval/routes", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval routes update", method: http.MethodPut, path: "/api/v1/approval/routes/r-1", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval routes deactivate", method: http.MethodDelete, path: "/api/v1/approval/routes/r-1", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "audit events", method: http.MethodGet, path: "/api/v1/audit/events", wantCap: iamdomain.CapAuditRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "metrics", method: http.MethodGet, path: "/api/v1/metrics", wantCap: iamdomain.CapMetricsView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 	}

@@ -3702,6 +3702,12 @@ paths:
       summary: Create an approval route for the active tenant
       tags: [approval]
       operationId: createApprovalRoute
+      # ADR 0022 Phase 11 (F4): tier-1 + tier-2 both enforce route.manage. The
+      # tier-1 row lives in apps/api/cmd/metaldocs-api/permissions.go
+      # (/api/v1/approval/routes -> CapRouteManage); tier-2 is
+      # authz.Require(CapRouteManage) in approval/application/route_admin_service.go.
+      security:
+        - sessionCookie: []
       parameters:
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
       requestBody:
@@ -3741,6 +3747,16 @@ paths:
       summary: List approval routes for the active tenant
       tags: [approval]
       operationId: listApprovalRoutes
+      security:
+        - sessionCookie: []
+      # ADR 0022 Phase 11 (F4): approval routes are a small, bounded per-tenant
+      # configuration set (roughly one active route per document profile), not a
+      # growth table. The runtime returns the full tenant set in one response with
+      # a `total`; it does not implement cursor/limit. Declaring pagination params
+      # the server does not honor would be spec-fiction drift, so this list is
+      # explicitly exempted rather than given a fake pagination contract.
+      x-pagination-exempt: true
+      x-pagination-exempt-reason: 'Bounded per-tenant approval-route config set; runtime returns the full set with total, no cursor/limit. Declaring pagination would be spec-fiction (no shape change permitted in ADR 0022).'
       responses:
         '200':
           description: ok
@@ -3763,6 +3779,8 @@ paths:
       summary: Update an approval route (new version)
       tags: [approval]
       operationId: updateApprovalRoute
+      security:
+        - sessionCookie: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
@@ -3809,6 +3827,8 @@ paths:
       summary: Deactivate an approval route
       tags: [approval]
       operationId: deactivateApprovalRoute
+      security:
+        - sessionCookie: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
