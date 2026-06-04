@@ -176,7 +176,7 @@ func BypassSystem(ctx context.Context, tx *sql.Tx) error {
 	// the softGUC reads. Cross-tenant system sweeps that never seed identity are
 	// attributed to actor "system" / tenant "" (audit_events allows empty tenant);
 	// their actual mutations remain separately audited via their governance events.
-	if bypassAuditSink == nil {
+	if currentBypassSink() == nil {
 		return nil
 	}
 	return recordBypass(ctx, tx, BypassEvent{

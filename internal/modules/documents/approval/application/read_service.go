@@ -389,7 +389,7 @@ func loadInstanceAreaCode(ctx context.Context, tx *sql.Tx, tenantID, instanceID 
 		return "", false, nil
 	}
 	if err != nil {
-		return "", false, err
+		return "", false, fmt.Errorf("load instance area code: %w", err)
 	}
 	return areaCode, true, nil
 }

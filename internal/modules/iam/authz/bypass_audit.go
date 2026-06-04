@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"database/sql"
+	"sync/atomic"
 )
 
 // BypassKind classifies an authorization bypass for the audit trail.
@@ -40,24 +41,38 @@ type BypassAuditSink interface {
 	RecordBypass(ctx context.Context, tx *sql.Tx, ev BypassEvent) error
 }
 
-// bypassAuditSink is the process-wide sink, set once before any request/job
-// goroutine runs. nil disables bypass auditing (tools / unit tests that never wire
-// it) — and, importantly, makes the emit paths add ZERO SQL, so sqlmock-based
-// authz tests are unaffected.
-var bypassAuditSink BypassAuditSink
+// bypassAuditSink is the process-wide sink, normally set once before any
+// request/job goroutine runs. An unset (nil) sink disables bypass auditing (tools
+// / unit tests that never wire it) and makes the emit paths add ZERO SQL, so
+// sqlmock-based authz tests are unaffected. Stored as an atomic pointer so a test
+// that re-sets the sink (with t.Cleanup) can never data-race the hot-path reads in
+// recordBypass / BypassSystem under `go test -race`.
+var bypassAuditSink atomic.Pointer[BypassAuditSink]
 
 // SetBypassAuditSink installs the bypass audit sink. Call once at startup before
-// serving; passing nil disables bypass auditing. Not safe for concurrent use with
-// in-flight bypasses — it is a configure-once seam, like a logger.
+// serving (production) or with t.Cleanup reset in tests; passing nil disables
+// bypass auditing.
 func SetBypassAuditSink(sink BypassAuditSink) {
-	bypassAuditSink = sink
+	if sink == nil {
+		bypassAuditSink.Store(nil)
+		return
+	}
+	bypassAuditSink.Store(&sink)
+}
+
+// currentBypassSink returns the installed sink, or nil if auditing is off.
+func currentBypassSink() BypassAuditSink {
+	if p := bypassAuditSink.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // recordBypass emits a bypass audit event through the configured sink, propagating
 // any error into the caller's tx (fail-closed/atomic — matches the in-tx grant
 // audit convention). A nil sink is a no-op with no SQL.
 func recordBypass(ctx context.Context, tx *sql.Tx, ev BypassEvent) error {
-	sink := bypassAuditSink
+	sink := currentBypassSink()
 	if sink == nil {
 		return nil
 	}
