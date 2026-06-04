@@ -94,7 +94,7 @@ func TestCreateRoute_HappyPath(t *testing.T) {
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
-			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -133,7 +133,7 @@ func TestCreateRoute_HappyPath(t *testing.T) {
 			}
 
 			stage := svc.createReq.Stages[0]
-			if stage.Order != 1 || stage.Name != "Review" || stage.RequiredRole != "reviewer" || stage.RequiredCapability != "doc.signoff" || stage.AreaCode != "ops" {
+			if stage.Order != 1 || stage.Name != "Review" || stage.RequiredRole != "approver" || stage.RequiredCapability != "doc.signoff" || stage.AreaCode != "ops" {
 				t.Fatalf("unexpected stage mapping: %+v", stage)
 			}
 			if stage.Quorum != domain.QuorumPolicy("any_1_of") {
@@ -161,7 +161,7 @@ func TestCreateRoute_CapDenied(t *testing.T) {
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
-			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 			req.Header.Set("Content-Type", "application/json")
@@ -190,7 +190,7 @@ func TestCreateRoute_DuplicateProfile(t *testing.T) {
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
-			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+			body := `{"profile_code":"ops","name":"Ops Route","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 			req.Header.Set("Content-Type", "application/json")
@@ -214,7 +214,7 @@ func TestCreateRoute_ProfileUnknown(t *testing.T) {
 	h := &Handler{routeAdmin: svc}
 	mux := routeAdminTestMux(h)
 
-	body := `{"profile_code":"qa-preview","name":"QA Preview","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
+	body := `{"profile_code":"qa-preview","name":"QA Preview","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"any_1_of","drift_policy":"reduce_quorum"}]}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/approval/routes", strings.NewReader(body))
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
 	req = req.WithContext(iamdomain.WithAuthContext(req.Context(), "actor-1", []iamdomain.Role{}))
@@ -247,7 +247,7 @@ func TestListRoutes_CanonicalStageNames(t *testing.T) {
 				ID: "r1", Name: "Ops", TenantID: "tenant-1", ProfileCode: "ops",
 				Active: true, Version: 3, Total: 1,
 				Stages: []repository.RouteStage{
-					{Order: 1, Name: "Review", RequiredRole: "reviewer", RequiredCapability: "doc.signoff", AreaCode: "ops", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
+					{Order: 1, Name: "Review", RequiredRole: "approver", RequiredCapability: "doc.signoff", AreaCode: "ops", Quorum: "any_1_of", DriftPolicy: "reduce_quorum"},
 				},
 			},
 		}},
@@ -294,7 +294,7 @@ func TestUpdateRoute_HappyPath(t *testing.T) {
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
-			body := `{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"m_of_n","quorum_m":2,"drift_policy":"keep_snapshot"}]}`
+			body := `{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"m_of_n","quorum_m":2,"drift_policy":"keep_snapshot"}]}`
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -355,7 +355,7 @@ func TestUpdateRoute_RouteInUse(t *testing.T) {
 			h := &Handler{routeAdmin: svc}
 			mux := routeAdminTestMux(h)
 
-			body := `{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"fail_stage"}]}`
+			body := `{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"fail_stage"}]}`
 			req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(body))
 			req = req.WithContext(tenant.WithTenantID(req.Context(), "test-tenant"))
 			req.Header.Set("Content-Type", "application/json")
@@ -559,7 +559,7 @@ func TestUpdateRoute_RequiresIfMatch(t *testing.T) {
 	h := &Handler{routeAdmin: &fakeRouteAdminService{}}
 	mux := routeAdminTestMux(h)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(`{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"keep_snapshot"}]}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(`{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"keep_snapshot"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req = req.WithContext(tenant.WithTenantID(req.Context(), "tenant-1"))
@@ -592,7 +592,7 @@ func TestUpdateRoute_RejectsIfMatchV0(t *testing.T) {
 	h := &Handler{routeAdmin: &fakeRouteAdminService{}}
 	mux := routeAdminTestMux(h)
 
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(`{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"reviewer","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"keep_snapshot"}]}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/approval/routes/route-1", strings.NewReader(`{"name":"Ops Route v2","stages":[{"order":1,"name":"Review","required_role":"approver","required_capability":"doc.signoff","area_code":"ops","quorum":"all_of","drift_policy":"keep_snapshot"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "idem-1")
 	req.Header.Set("If-Match", "v0")

@@ -13,6 +13,60 @@ func TestIsValidRole(t *testing.T) {
 	}
 }
 
+func TestIsAreaRole(t *testing.T) {
+	// Every canonical role except system_admin is area-assignable.
+	for _, r := range []Role{RoleApprover, RoleAreaAdmin, RoleAuthor, RoleEditor, RoleQmsAdmin, RoleSigner, RoleViewer} {
+		if !IsAreaRole(r) {
+			t.Fatalf("%q must be an area role", r)
+		}
+		if !IsValidRole(r) {
+			t.Fatalf("area role %q must also be a valid role", r)
+		}
+	}
+	// system_admin is tenant-wide, never an area membership.
+	if IsAreaRole(RoleSystemAdmin) {
+		t.Fatal("system_admin must NOT be an area role (tenant-wide tier-1)")
+	}
+	// Decommissioned phantom must not be an area role.
+	if IsAreaRole(Role("reviewer")) {
+		t.Fatal("reviewer is decommissioned and must not be an area role")
+	}
+	if IsAreaRole(Role("nonsense")) {
+		t.Fatal("unknown role must not be an area role")
+	}
+}
+
+func TestAreaRoleRegistrySize(t *testing.T) {
+	// Locked count: 7 canonical area roles (the 8 canonical roles minus
+	// system_admin). Mirrors the user_process_areas role CHECK. Bump this
+	// deliberately when the area-role set changes — a silent add/remove is a bug.
+	const wantAreaRoles = 7
+	if got := len(AreaRoles()); got != wantAreaRoles {
+		t.Fatalf("AreaRoles count = %d, want %d (update intentionally if the area-role set changed)", got, wantAreaRoles)
+	}
+}
+
+func TestAreaRolesMatchesRegistryMinusSystemAdmin(t *testing.T) {
+	got := AreaRoles()
+	if len(got) != len(validRoles)-1 {
+		t.Fatalf("AreaRoles must equal validRoles minus system_admin: got %d, validRoles %d", len(got), len(validRoles))
+	}
+	for _, r := range got {
+		if r == RoleSystemAdmin {
+			t.Fatal("AreaRoles must not include system_admin")
+		}
+		if !IsValidRole(r) {
+			t.Fatalf("AreaRoles entry %q is not a valid role", r)
+		}
+	}
+	// Sorted, deterministic.
+	for i := 1; i < len(got); i++ {
+		if got[i-1] >= got[i] {
+			t.Fatalf("AreaRoles must be sorted ascending: %v", got)
+		}
+	}
+}
+
 func TestCapabilityInvariants(t *testing.T) {
 	if !IsValidCapability(CapMembershipManage) {
 		t.Fatal("CapMembershipManage must be valid")
