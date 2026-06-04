@@ -266,7 +266,7 @@ func TestSystemCancelInstance_BypassesUserCapability(t *testing.T) {
 	repo := &cancelFakeRepo{instance: buildCancelInstance()}
 	svc := &CancelService{repo: repo, emitter: emitter, clock: fixedClock{t: now}}
 
-	result, err := svc.SystemCancelInstance(context.Background(), db, CancelInput{
+	result, err := svc.SystemCancelInstance(authz.WithBackgroundBypass(context.Background()), db, CancelInput{
 		TenantID:                "tenant-1",
 		InstanceID:              "inst-1",
 		ExpectedRevisionVersion: 2,

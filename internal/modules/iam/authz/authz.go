@@ -4,9 +4,34 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 )
+
+// SystemAdminExistsSQL is the EXISTS(...) predicate that reports whether the
+// actor holds system_admin in the tenant — directly (iam_user_roles) or via a
+// group (iam_group_members ⋈ iam_group_roles). This is the tier-2 inheritance
+// bypass (ADR 0022 R1). Placeholders: $1 = actor user id, $2 = tenant id.
+// Shared by Require (the bypass short-circuit) and
+// postgres.UserAreaRepository.MembershipDirectoryScope (the tenant-wide branch)
+// so the two definitions cannot drift (ADR 0022 Phase 7 DRY review fix).
+const SystemAdminExistsSQL = `EXISTS (
+  SELECT 1
+    FROM metaldocs.iam_user_roles ur
+   WHERE ur.user_id   = $1
+     AND ur.tenant_id = $2::uuid
+     AND ur.role_code = 'system_admin'
+  UNION ALL
+  SELECT 1
+    FROM metaldocs.iam_group_members gm
+    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
+    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
+   WHERE gm.user_id = $1
+     AND gm.tenant_id = $2::uuid
+     AND g.tenant_id = $2::uuid
+     AND gr.role = 'system_admin'
+)`
 
 type ErrCapDenied struct {
 	Capability string
@@ -63,23 +88,7 @@ func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error
 
 	// system_admin bypass — check before capability query
 	var isAdmin bool
-	if err := tx.QueryRowContext(ctx, `
-SELECT EXISTS (
-  SELECT 1
-    FROM metaldocs.iam_user_roles ur
-   WHERE ur.user_id   = $1
-     AND ur.tenant_id = $2::uuid
-     AND ur.role_code = 'system_admin'
-  UNION ALL
-  SELECT 1
-    FROM metaldocs.iam_group_members gm
-    JOIN metaldocs.iam_groups g ON g.id = gm.group_id
-    JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
-   WHERE gm.user_id = $1
-     AND gm.tenant_id = $2::uuid
-     AND g.tenant_id = $2::uuid
-     AND gr.role = 'system_admin'
-)`, actorID, tenantID).Scan(&isAdmin); err != nil {
+	if err := tx.QueryRowContext(ctx, "SELECT "+SystemAdminExistsSQL, actorID, tenantID).Scan(&isAdmin); err != nil {
 		return fmt.Errorf("authz: system_admin check: %w", err)
 	}
 	if isAdmin {
@@ -112,7 +121,42 @@ SELECT EXISTS (
 	return appendAssertedCap(ctx, tx, capability, areaCode)
 }
 
+// bgBypassKey marks a context as a background/scheduler execution context.
+type bgBypassKey struct{}
+
+// ErrBypassNotBackground is returned by BypassSystem when it is invoked outside a
+// background context (one marked by WithBackgroundBypass). It fails closed so the
+// tier-2 bypass can never be reached from an HTTP request path (CWE-269).
+var ErrBypassNotBackground = errors.New("authz: BypassSystem requires a background context (call WithBackgroundBypass at the scheduler/job root); refusing to bypass tier-2 on a non-background path")
+
+// WithBackgroundBypass marks ctx as a background/scheduler execution context —
+// the ONLY context in which BypassSystem is permitted. Call it at the composition
+// root of a background task (the river worker / cron loop / watchdog), NOT inside
+// the repository or service method that performs the bypass (that would be
+// self-authorizing). HTTP request contexts never carry this marker, so an
+// accidental future wiring of the bypass into a request-reachable path fails
+// closed (ADR 0022 Phase 7 review fix; prior review H6, CWE-269).
+func WithBackgroundBypass(ctx context.Context) context.Context {
+	return context.WithValue(ctx, bgBypassKey{}, true)
+}
+
+func isBackgroundContext(ctx context.Context) bool {
+	v, _ := ctx.Value(bgBypassKey{}).(bool)
+	return v
+}
+
+// BypassSystem disables tier-2 area enforcement for the remainder of tx by
+// setting the transaction-local bypass GUC. It is the scheduler-only bridge to
+// the (unexported) raw GUC setter: permitted ONLY in a background context
+// (WithBackgroundBypass) and fail-closed otherwise.
 func BypassSystem(ctx context.Context, tx *sql.Tx) error {
+	if !isBackgroundContext(ctx) {
+		return ErrBypassNotBackground
+	}
+	return setBypassGUC(ctx, tx)
+}
+
+func setBypassGUC(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, "SELECT set_config('metaldocs.bypass_authz', 'scheduler', true)")
 	return err
 }

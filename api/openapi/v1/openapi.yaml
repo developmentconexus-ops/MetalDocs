@@ -2858,6 +2858,12 @@ paths:
       summary: Atomically create controlled document and initial revision
       tags: [controlled-documents]
       operationId: atomicCreateControlledDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: >-
+        controlled_documents.create is area-grade; the target process area is
+        taken from the request payload (processAreaCode) and enforced at tier-2 in
+        the application layer, not from a uniform request field scannable here
+        (ADR 0022 Phase 7).
       parameters:
         - name: Idempotency-Key
           in: header
@@ -2987,6 +2993,11 @@ paths:
       summary: Mark controlled document as obsolete
       tags: [controlled-documents]
       operationId: obsoleteControlledDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: >-
+        controlled_documents.obsolete is area-grade; the area is loaded from the
+        controlled document row (FOR UPDATE) and enforced at tier-2 in the
+        application layer, not from a request field scannable here (ADR 0022 Phase 7).
       parameters:
         - name: id
           in: path
@@ -3003,6 +3014,11 @@ paths:
       summary: Mark controlled document as superseded
       tags: [controlled-documents]
       operationId: supersedeControlledDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: >-
+        controlled_documents.supersede is area-grade; the area is loaded from the
+        controlled document row (FOR UPDATE) and enforced at tier-2 in the
+        application layer, not from a request field scannable here (ADR 0022 Phase 7).
       parameters:
         - name: id
           in: path
@@ -3094,6 +3110,12 @@ paths:
     patch:
       tags: [documents]
       operationId: renameDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: >-
+        document.edit is area-grade; the document's process area is loaded from
+        the document row and enforced at tier-2 in the repository layer, not from a
+        request field scannable here (ADR 0022 Phase 7). Representative surface for
+        the document.edit area posture.
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true

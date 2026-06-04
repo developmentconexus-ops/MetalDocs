@@ -27,7 +27,7 @@ type UserAreaWriteRepository interface {
 	// Phase 4). tenantWide=true → full tenant directory (system_admin inheritance
 	// bypass, R1). Otherwise hasManagedAreas=true → the actor holds the given
 	// capability in at least one area (area_admin); both false → self-only.
-	MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (tenantWide bool, hasManagedAreas bool, err error)
+	MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string, now time.Time) (tenantWide bool, hasManagedAreas bool, err error)
 	// ListByTenantInManagedAreas lists active memberships restricted to the areas
 	// where the actor holds the given capability. The managed-area restriction is
 	// applied IN SQL (ADR 0022 R3 — data-layer enforcement, not post-fetch).
@@ -73,7 +73,7 @@ func (s *AreaMembershipService) ListByTenant(ctx context.Context, tenantID, user
 // DirectoryScope resolves the actor's membership-directory visibility (ADR 0022
 // Phase 4). See UserAreaWriteRepository.MembershipDirectoryScope.
 func (s *AreaMembershipService) DirectoryScope(ctx context.Context, tenantID, actorID, capability string) (tenantWide bool, hasManagedAreas bool, err error) {
-	return s.repo.MembershipDirectoryScope(ctx, tenantID, actorID, capability)
+	return s.repo.MembershipDirectoryScope(ctx, tenantID, actorID, capability, s.nowFn())
 }
 
 // ListByTenantInManagedAreas lists active memberships scoped to the actor's

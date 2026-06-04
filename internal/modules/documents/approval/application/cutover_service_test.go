@@ -9,6 +9,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"metaldocs/internal/modules/iam/authz"
 )
 
 // ---------------------------------------------------------------------------
@@ -86,7 +88,7 @@ func TestValidateLegacyCutoverReady_NoLegacyDocs(t *testing.T) {
 	db := newCutoverTestDB(t, conn)
 
 	svc := NewCutoverService(&MemoryEmitter{}, fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)})
-	err := svc.ValidateLegacyCutoverReady(context.Background(), db)
+	err := svc.ValidateLegacyCutoverReady(authz.WithBackgroundBypass(context.Background()), db)
 	if err != nil {
 		t.Fatalf("ValidateLegacyCutoverReady: unexpected error: %v", err)
 	}
@@ -100,7 +102,7 @@ func TestValidateLegacyCutoverReady_LegacyDocsRemain(t *testing.T) {
 	db := newCutoverTestDB(t, conn)
 
 	svc := NewCutoverService(&MemoryEmitter{}, fixedClock{t: time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)})
-	err := svc.ValidateLegacyCutoverReady(context.Background(), db)
+	err := svc.ValidateLegacyCutoverReady(authz.WithBackgroundBypass(context.Background()), db)
 	if err == nil {
 		t.Fatal("ValidateLegacyCutoverReady: expected error; got nil")
 	}

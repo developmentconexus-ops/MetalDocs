@@ -52,7 +52,7 @@ ORDER BY area_code ASC, effective_from DESC
 
 // ListByTenant returns active memberships across the whole tenant, with
 // optional exact-match filters. An empty filter string means "no filter" for
-// that column; the ($n = '' OR col = $n) form keeps the statement static and
+// that column; the ($n = ” OR col = $n) form keeps the statement static and
 // injection-safe regardless of which filters are supplied.
 func (r *UserAreaRepository) ListByTenant(ctx context.Context, tenantID, userID, areaCode, role string, now time.Time) ([]iamdomain.UserProcessArea, error) {
 	const q = `
@@ -95,25 +95,17 @@ ORDER BY user_id ASC, area_code ASC, effective_from DESC
 //     user_process_areas join). Mirrors the area-grant predicate in authz.Require
 //     but spans all areas (no per-area filter), so area_admin is distinguished
 //     from self-only roles.
-func (r *UserAreaRepository) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (bool, bool, error) {
+//
+// MembershipDirectoryScope takes now (the service clock, ADR 0022 Phase 7) so the
+// active-row predicate uses the same clock as ListByTenantInManagedAreas instead
+// of the DB wall clock — consistency + testability.
+func (r *UserAreaRepository) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string, now time.Time) (bool, bool, error) {
+	// The system_admin EXISTS predicate is shared with authz.Require (R1 bypass)
+	// via authz.SystemAdminExistsSQL ($1 = actor, $2 = tenant) so the two cannot
+	// drift (ADR 0022 Phase 7 DRY fix).
 	const q = `
 SELECT
-  EXISTS (
-    SELECT 1
-      FROM metaldocs.iam_user_roles ur
-     WHERE ur.user_id   = $1
-       AND ur.tenant_id = $2::uuid
-       AND ur.role_code = 'system_admin'
-    UNION ALL
-    SELECT 1
-      FROM metaldocs.iam_group_members gm
-      JOIN metaldocs.iam_groups g ON g.id = gm.group_id
-      JOIN metaldocs.iam_group_roles gr ON gr.group_id = gm.group_id
-     WHERE gm.user_id  = $1
-       AND gm.tenant_id = $2::uuid
-       AND g.tenant_id  = $2::uuid
-       AND gr.role = 'system_admin'
-  ) AS tenant_wide,
+  ` + authz.SystemAdminExistsSQL + ` AS tenant_wide,
   EXISTS (
     SELECT 1
       FROM metaldocs.role_capabilities rc
@@ -121,13 +113,15 @@ SELECT
         ON upa.role = rc.role
        AND upa.tenant_id = $2::uuid
        AND upa.user_id   = $1
-       AND upa.effective_from <= now()
+       AND upa.effective_from <= $4
        AND upa.effective_to IS NULL
      WHERE rc.capability = $3
   ) AS has_managed_areas
 `
 	var tenantWide, hasManagedAreas bool
-	if err := r.db.QueryRowContext(ctx, q, actorID, tenantID, capability).Scan(&tenantWide, &hasManagedAreas); err != nil {
+	// Arg order is positional and shared with SystemAdminExistsSQL: $1=actorID,
+	// $2=tenantID, $3=capability, $4=now. Keep these aligned if the const changes.
+	if err := r.db.QueryRowContext(ctx, q, actorID, tenantID, capability, now).Scan(&tenantWide, &hasManagedAreas); err != nil {
 		return false, false, fmt.Errorf("resolve membership directory scope: %w", err)
 	}
 	return tenantWide, hasManagedAreas, nil

@@ -102,7 +102,7 @@ func (r *memAreaRepo) ListByTenant(_ context.Context, tenantID, userID, areaCode
 	return out, nil
 }
 
-func (r *memAreaRepo) MembershipDirectoryScope(_ context.Context, _, actorID, _ string) (bool, bool, error) {
+func (r *memAreaRepo) MembershipDirectoryScope(_ context.Context, _, actorID, _ string, _ time.Time) (bool, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.tenantWide[actorID], len(r.managedAreas[actorID]) > 0, nil

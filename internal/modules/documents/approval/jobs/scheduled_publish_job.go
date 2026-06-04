@@ -8,6 +8,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/iam/authz"
 )
 
 var (
@@ -36,6 +37,9 @@ func (w *ScheduledPublishWorker) Work(ctx context.Context, job *river.Job[Schedu
 	if job == nil {
 		return ErrScheduledPublishJobNil
 	}
+	// Background root: permit RunScheduledPublishJob's authz.BypassSystem
+	// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
+	ctx = authz.WithBackgroundBypass(ctx)
 	return w.service.RunScheduledPublishJob(ctx, w.db, application.ScheduledPublishJobInput{
 		TenantID:                job.Args.TenantID,
 		DocumentID:              job.Args.DocumentID,
