@@ -1,0 +1,51 @@
+# tripwire-pairing allow-list (ADR 0022 Phase 11, F5).
+#
+# The `tripwire-pairing` lint flags any repository function that runs mutating
+# SQL (INSERT/UPDATE/DELETE) without an `authz.Require` call in the SAME function
+# body. The lint is a single-file scan with NO call graph, so it cannot see
+# enforcement that lives one layer up (the tx-layer service that owns the authz
+# decision and passes the tx down to the repository write). Every entry below is
+# such a legitimate, reviewed false positive — a mutating repository method whose
+# tier-2 authz is enforced by its caller, by a DB trigger tripwire
+# (enforce_capability_asserted), or by a documented system/background bypass.
+#
+# Purpose of this file (kill normalization-of-deviance): it freezes the KNOWN
+# tripwire baseline so the LIVE tripwire count is 0. Any NEW tripwire violation —
+# a mutating repository method not listed here — is a hard red build. When you
+# legitimately add one, you must review it and add it here in the same change;
+# when you remove/fix one, delete its line (a stale entry that no longer matches
+# any function is reported as a hard error so this list cannot rot).
+#
+# Format: <repo-relative forward-slash path>|<FunctionName>   (one per line)
+# Lines starting with '#' and blank lines are ignored.
+#
+# Scope note (F5): this allow-list covers ONLY tripwire-pairing. The other
+# api-lint rules (ENVELOPE-DRIFT / AUTHZ-DRIFT / PAGINATION-DRIFT) are spec
+# contract-hygiene debt across the whole API and are intentionally LEFT VISIBLE
+# and counted (not baselined) — they belong to a dedicated spec-hygiene phase,
+# not this coherence cleanup. Per the 2026-06-04 ground-truth audit the live
+# total is dominated by those spec rules, not by tripwire.
+
+internal/modules/auth/infrastructure/postgres/repository.go|BootstrapAdmin
+internal/modules/auth/infrastructure/postgres/repository.go|UpdateUser
+internal/modules/controlleddocuments/infrastructure/repository.go|UpdateStatus
+internal/modules/controlleddocuments/infrastructure/repository.go|UpdateStatusTx
+internal/modules/controlleddocuments/infrastructure/repository.go|createVisibilityGrants
+internal/modules/controlleddocuments/infrastructure/repository.go|ensureCounterViaExec
+internal/modules/documents/approval/repository/postgres_approval_repository.go|InsertInstance
+internal/modules/documents/approval/repository/postgres_approval_repository.go|MarkSuperseded
+internal/modules/documents/approval/repository/postgres_approval_repository.go|UpdateInstanceStatus
+internal/modules/documents/approval/repository/postgres_approval_repository.go|UpdateStageStatus
+internal/modules/documents/repository/repository.go|DeleteComment
+internal/modules/documents/repository/repository.go|DeleteExpiredPending
+internal/modules/documents/repository/repository.go|HeartbeatSession
+internal/modules/documents/repository/repository.go|RestoreCheckpoint
+internal/modules/documents/repository/repository.go|SetRevisionStorageKey
+internal/modules/render/fanout/materialize_outbox_repository.go|Enqueue
+internal/modules/render/fanout/materialize_outbox_repository.go|MarkDispatched
+internal/modules/render/fanout/materialize_outbox_repository.go|MarkFailed
+internal/modules/render/fanout/materialize_outbox_repository.go|ResetStaleClaims
+internal/modules/render/fanout/pdf_outbox_repository.go|Enqueue
+internal/modules/render/fanout/pdf_outbox_repository.go|MarkDispatched
+internal/modules/render/fanout/pdf_outbox_repository.go|MarkFailed
+internal/modules/render/fanout/pdf_outbox_repository.go|ResetStaleClaims

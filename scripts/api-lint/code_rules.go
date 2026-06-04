@@ -11,6 +11,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -87,6 +88,14 @@ func indexModuleFuncs(modulesRoot string, fset *token.FileSet) (map[string][]ind
 			return walkErr
 		}
 		if d.IsDir() {
+			// Skip VCS / tooling / vendor / fixture trees (match the registry
+			// walkers). A stale agent worktree under .claude holds detached code
+			// copies whose duplicate receiver methods would otherwise produce
+			// spurious "multiple handler matches" noise (ADR 0022 Phase 11 F5).
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor", "testdata":
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if !strings.HasSuffix(strings.ToLower(path), ".go") || strings.HasSuffix(strings.ToLower(path), "_test.go") {
@@ -299,13 +308,36 @@ func renderExpr(fset *token.FileSet, expr ast.Expr) string {
 	return b.String()
 }
 
+// checkTripwirePairing flags repository functions that run mutating SQL without
+// an authz.Require call in the same function body. It is a single-file scan with
+// no call graph, so it cannot see tier-2 enforcement that lives one layer up (the
+// tx-layer service that owns the authz decision and passes the tx down). The
+// known-legitimate false positives are frozen in scripts/api-lint/tripwire-
+// allowlist.txt so the LIVE tripwire count is 0 and any NEW violation is a hard
+// red (ADR 0022 Phase 11 F5). A stale allow-list entry (one that no longer
+// matches any live violation) is itself reported so the list cannot rot.
+//
+// The walker skips .git/.claude/node_modules/vendor/testdata (matching the
+// registry walkers): a stale agent worktree under .claude held ~26 phantom
+// duplicate violations against code not on this branch, and the api-lint testdata
+// fixtures (intentionally un-paired repositories) added one more.
 func checkTripwirePairing(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	allow, err := loadTripwireAllowlist(modulesRoot)
+	if err != nil {
+		return nil, err
+	}
+	matched := make(map[string]bool, len(allow))
+
 	out := []Violation{}
-	err := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor", "testdata":
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		name := strings.ToLower(filepath.Base(path))
@@ -326,18 +358,85 @@ func checkTripwirePairing(modulesRoot string, fset *token.FileSet) ([]Violation,
 				continue
 			}
 			hasAuthz, hasMutatingSQL := scanTripwireFunc(fn)
-			if hasMutatingSQL && !hasAuthz {
-				out = append(out, Violation{
-					File:    path,
-					Line:    fset.Position(fn.Pos()).Line,
-					Rule:    "tripwire-pairing",
-					Message: fmt.Sprintf("mutating SQL in %s without authz.Require call", fn.Name.Name),
-				})
+			if !hasMutatingSQL || hasAuthz {
+				continue
 			}
+			key := tripwireKey(modulesRoot, path, fn.Name.Name)
+			if _, ok := allow[key]; ok {
+				matched[key] = true
+				continue
+			}
+			out = append(out, Violation{
+				File:    path,
+				Line:    fset.Position(fn.Pos()).Line,
+				Rule:    "tripwire-pairing",
+				Message: fmt.Sprintf("mutating SQL in %s without authz.Require call (new violation: add tier-2 authz.Require, or if enforced one layer up, allow-list %s in scripts/api-lint/tripwire-allowlist.txt)", fn.Name.Name, key),
+			})
 		}
 		return nil
 	})
-	return out, err
+	if walkErr != nil {
+		return nil, walkErr
+	}
+
+	// Report stale allow-list entries so the baseline cannot rot: an entry listed
+	// but matched by no live violation means the function was fixed or removed and
+	// its line must be deleted.
+	if len(allow) > 0 {
+		stale := make([]string, 0)
+		for key := range allow {
+			if !matched[key] {
+				stale = append(stale, key)
+			}
+		}
+		sort.Strings(stale)
+		for _, key := range stale {
+			out = append(out, Violation{
+				File:    tripwireAllowlistPath(modulesRoot),
+				Line:    0,
+				Rule:    "tripwire-allowlist-stale",
+				Message: fmt.Sprintf("allow-list entry %s matches no live tripwire violation; remove the stale line (ADR 0022 Phase 11 F5)", key),
+			})
+		}
+	}
+	return out, nil
+}
+
+// tripwireKey is the stable allow-list key for a flagged function: the repo-
+// relative forward-slash path plus the function name. Line-independent so the
+// baseline survives edits above the function.
+func tripwireKey(modulesRoot, path, fn string) string {
+	rel, err := filepath.Rel(modulesRoot, path)
+	if err != nil {
+		rel = path
+	}
+	return filepath.ToSlash(rel) + "|" + fn
+}
+
+func tripwireAllowlistPath(modulesRoot string) string {
+	return filepath.Join(modulesRoot, "scripts", "api-lint", "tripwire-allowlist.txt")
+}
+
+// loadTripwireAllowlist reads the frozen tripwire baseline. A missing file (e.g.
+// the unit-test fixture roots under testdata/) yields an empty set, so fixtures
+// keep reporting their intentional violations.
+func loadTripwireAllowlist(modulesRoot string) (map[string]struct{}, error) {
+	raw, err := os.ReadFile(tripwireAllowlistPath(modulesRoot))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]struct{}{}, nil
+		}
+		return nil, err
+	}
+	out := map[string]struct{}{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		out[line] = struct{}{}
+	}
+	return out, nil
 }
 
 func scanTripwireFunc(fn *ast.FuncDecl) (hasAuthz, hasMutatingSQL bool) {
