@@ -1201,7 +1201,8 @@ CREATE TABLE metaldocs.document_process_areas (
     owner_user_id text,
     default_approver_role text,
     archived_at timestamp with time zone,
-    CONSTRAINT area_code_format CHECK ((code ~ '^[a-z][a-z0-9_-]{1,63}$'::text))
+    CONSTRAINT area_code_format CHECK ((code ~ '^[a-z][a-z0-9_-]{1,63}$'::text)),
+    CONSTRAINT area_code_not_tenant CHECK ((code <> 'tenant'::text))
 );
 
 

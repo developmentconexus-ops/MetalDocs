@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -50,7 +51,8 @@ func (s *SupersedeService) PublishSuperseding(ctx context.Context, db *sql.DB, r
 		return SupersedeResult{}, fmt.Errorf("publishSuperseding: %w", err)
 	}
 
-	areaCode, err := loadDocumentAreaCode(ctx, tx, req.TenantID, req.NewDocumentID)
+	// document.supersede is area-grade: pass the resolved area as-is ("" fail-closes).
+	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.NewDocumentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return SupersedeResult{}, fmt.Errorf("publishSuperseding: load document area: %w", err)

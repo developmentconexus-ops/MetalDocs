@@ -127,6 +127,14 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "signed download", method: http.MethodGet, path: "/api/v1/signed", wantCap: iamdomain.CapTemplateView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval get", method: http.MethodGet, path: "/api/v1/approval/instances/a-1", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "approval post", method: http.MethodPost, path: "/api/v1/approval/instances/a-1/decisions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// ADR 0022 Phase 11 (F4): approval-route CRUD gates on CapRouteManage at
+		// tier-1, matching its tier-2 authz.Require(CapRouteManage). These rows MUST
+		// precede the generic /api/v1/approval/ block, so they resolve to route.manage
+		// and NOT the generic document.view (GET) / document.submit (writes).
+		{name: "approval routes list", method: http.MethodGet, path: "/api/v1/approval/routes", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval routes create", method: http.MethodPost, path: "/api/v1/approval/routes", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval routes update", method: http.MethodPut, path: "/api/v1/approval/routes/r-1", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		{name: "approval routes deactivate", method: http.MethodDelete, path: "/api/v1/approval/routes/r-1", wantCap: iamdomain.CapRouteManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "audit events", method: http.MethodGet, path: "/api/v1/audit/events", wantCap: iamdomain.CapAuditRead, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "metrics", method: http.MethodGet, path: "/api/v1/metrics", wantCap: iamdomain.CapMetricsView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 	}
@@ -565,6 +573,61 @@ func seededCaps(t *testing.T) map[iamdomain.Capability]struct{} {
 		set[iamdomain.Capability(m[1])] = struct{}{}
 	}
 	return set
+}
+
+// seededRoleCaps reads the canonical role_capabilities seed and returns a
+// role -> set-of-capabilities map. Used by the deny-by-default seed guard.
+func seededRoleCaps(t *testing.T) map[string]map[iamdomain.Capability]struct{} {
+	t.Helper()
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed; cannot locate seed file")
+	}
+	seedPath := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..",
+		"db", "reference-data", "0001_product_reference_data.sql")
+	raw, err := os.ReadFile(seedPath)
+	if err != nil {
+		t.Fatalf("read seed %s: %v", seedPath, err)
+	}
+
+	// Match: INSERT INTO metaldocs.role_capabilities (...) VALUES ('role', 'cap', ...
+	re := regexp.MustCompile(`(?i)INSERT INTO\s+metaldocs\.role_capabilities[^V]*VALUES\s*\(\s*'([^']*)'\s*,\s*'([^']+)'`)
+	matches := re.FindAllStringSubmatch(string(raw), -1)
+	if len(matches) == 0 {
+		t.Fatalf("no role_capabilities INSERT rows parsed from %s", seedPath)
+	}
+	out := map[string]map[iamdomain.Capability]struct{}{}
+	for _, m := range matches {
+		role := m[1]
+		if out[role] == nil {
+			out[role] = map[iamdomain.Capability]struct{}{}
+		}
+		out[role][iamdomain.Capability(m[2])] = struct{}{}
+	}
+	return out
+}
+
+// TestDenyByDefault_ViewerHoldsNoAreaGradeCapability (ADR 0022 Phase 11 F8) is the
+// seed half of the deny-by-default guard. The least-privileged real role, viewer,
+// must never be seeded an area-grade (write / area-scoped) capability — only
+// tenant-grade reads. A future seed that accidentally grants viewer an area-grade
+// cap (e.g. document.edit) is a red build. Complements the authz-layer deny matrix
+// (TestDenyByDefault_EveryCapabilityDeniesUnprivilegedActor) which locks the
+// enforcement code; this locks the grant data.
+func TestDenyByDefault_ViewerHoldsNoAreaGradeCapability(t *testing.T) {
+	t.Parallel()
+
+	roleCaps := seededRoleCaps(t)
+	viewerCaps, ok := roleCaps["viewer"]
+	if !ok {
+		t.Fatal("viewer role not present in role_capabilities seed")
+	}
+	for cap := range viewerCaps {
+		if iamdomain.IsAreaGrade(cap) {
+			t.Errorf("viewer is seeded area-grade capability %q; the least-privileged role must hold only tenant-grade reads (deny-by-default, ADR 0022 Phase 11 F8)", cap)
+		}
+	}
 }
 
 // TestEveryCapSeededOrDeferred asserts every registry capability is either
