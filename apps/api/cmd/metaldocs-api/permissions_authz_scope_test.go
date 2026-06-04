@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -11,40 +12,28 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// areaEnforcedOps are the OpenAPI operations whose tier-2 area enforcement ADR
-// 0022 declared and annotated: the documents/approval lifecycle (Phase 2) and
-// the IAM membership grant/revoke (Phase 3). Each MUST carry x-authz-area or a
-// justified x-authz-skip-area so the area posture of an area-grade write is an
-// explicit, reviewed declaration — never an accident of which string a call site
-// passed to authz.Require.
-//
-// Excluded by design (ADR 0022 Phase 2 "runtime gap" + Phase 4 notes): the
-// document.create / document.edit / controlled_documents.* write ops are
-// classified area-grade in capabilityScopes but enforced via the DB-derived
-// tx-layer tripwire (area resolved from the row, not the request) and still pass
-// the literal "tenant" today. Annotating/realigning them is later-phase work,
-// not Phase 5; locking them here would assert a posture that does not yet exist.
-var areaEnforcedOps = []string{
-	"grantAreaMembership",
-	"revokeAreaMembership",
-	"submitDocumentForApproval",
-	"recordApprovalStageSignoff",
-	"recordDocumentSignoff",
-	"publishDocument",
-	"scheduleDocumentPublish",
-	"supersedeDocument",
-	"obsoleteDocument",
+// routePath normalizes a spec path key to the runtime route path. The spec mixes
+// conventions: some keys carry the /api/v1 base (servers prefix) inline, others
+// are base-relative. Runtime routeRules use the full /api/v1 path, so ensure the
+// base is present exactly once.
+func routePath(specPath string) string {
+	if strings.HasPrefix(specPath, "/api/v1") {
+		return specPath
+	}
+	return "/api/v1" + specPath
 }
 
-type opAuthz struct {
-	found      bool
-	hasArea    bool
-	hasSkip    bool
-	skipReason string
+// specOp is one OpenAPI operation with its route coordinates and x-authz markers.
+type specOp struct {
+	opID, method, path string
+	hasArea, hasSkip   bool
+	skipReason         string
 }
 
-// loadSpecAuthz parses the OpenAPI doc and returns operationId -> x-authz markers.
-func loadSpecAuthz(t *testing.T) map[string]opAuthz {
+// loadSpecOps parses the OpenAPI doc into a flat list of operations carrying the
+// HTTP method + path (so each can be matched against the runtime route table)
+// and the x-authz markers.
+func loadSpecOps(t *testing.T) []specOp {
 	t.Helper()
 
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -69,48 +58,86 @@ func loadSpecAuthz(t *testing.T) map[string]opAuthz {
 		t.Fatal("spec missing paths")
 	}
 
-	out := map[string]opAuthz{}
+	out := []specOp{}
 	for i := 0; i+1 < len(paths.Content); i += 2 {
+		pathKey := paths.Content[i].Value
 		pathVal := paths.Content[i+1]
 		for j := 0; j+1 < len(pathVal.Content); j += 2 {
+			method := pathVal.Content[j].Value
 			op := pathVal.Content[j+1]
 			opID := yamlScalar(yamlMapGet(op, "operationId"))
 			if opID == "" {
 				continue
 			}
-			skip := yamlMapGet(op, "x-authz-skip-area")
-			out[opID] = opAuthz{
-				found:      true,
+			out = append(out, specOp{
+				opID:       opID,
+				method:     strings.ToUpper(method),
+				path:       pathKey,
 				hasArea:    yamlMapGet(op, "x-authz-area") != nil,
-				hasSkip:    skip != nil,
+				hasSkip:    yamlMapGet(op, "x-authz-skip-area") != nil,
 				skipReason: yamlScalar(yamlMapGet(op, "x-authz-skip-reason")),
-			}
+			})
 		}
 	}
 	return out
 }
 
-// TestAreaEnforcedOpsAnnotated locks ADR 0022's area-enforcement declarations:
-// every declared area-enforced op carries x-authz-area or a justified
-// x-authz-skip-area. Removing an annotation (silently defaulting an area-grade
-// write to tenant-wide) fails the build.
+// TestAreaEnforcedOpsAnnotated is self-maintaining (ADR 0022 Phase 7): instead of
+// a hand-curated op list, it DERIVES the obligation from the source of truth —
+// the set of capabilities classified IsAreaGrade. For every area-grade capability
+// it requires that the spec carries at least one route-matched operation
+// declaring an area posture (x-authz-area for a request-supplied area, or a
+// justified x-authz-skip-area for a DB/payload-derived area). Consequence: when a
+// capability is flipped to area-grade (or a new one is added) and its tier-2
+// enforcement gap is closed, the build fails until its HTTP surface is annotated
+// — closing the gap forces the declaration.
+//
+// The obligation is cap-level, not op-level, on purpose: a capability's area
+// posture is a property of the capability, and not every operation that carries
+// an area-grade TIER-1 route cap performs a TIER-2 area check (e.g. a session
+// heartbeat refresh). Annotating every such op "area enforced" would assert a
+// posture that doesn't exist; the AST guard (authz-area-scope-binding) is the
+// per-call-site binding that statically forbids an area-grade cap from being
+// enforced with the literal "tenant". The server base path is /api/v1.
 func TestAreaEnforcedOpsAnnotated(t *testing.T) {
 	t.Parallel()
 
-	spec := loadSpecAuthz(t)
-	for _, opID := range areaEnforcedOps {
-		a, ok := spec[opID]
-		if !ok || !a.found {
-			t.Errorf("area-enforced op %q not found in OpenAPI spec — was it renamed? Update areaEnforcedOps / ADR 0022.", opID)
+	// Collect, per area-grade capability, whether it has any documented HTTP
+	// surface (a route-matched spec op) and whether any such op declares an area
+	// posture. Flag any annotated-but-unjustified skip.
+	hasSurface := map[iamdomain.Capability]bool{}
+	annotatedCap := map[iamdomain.Capability]bool{}
+	for _, o := range loadSpecOps(t) {
+		cap, _, ok := resolveRoutePermission(o.method, routePath(o.path))
+		if !ok || !iamdomain.IsAreaGrade(cap) {
 			continue
 		}
-		if !a.hasArea && !a.hasSkip {
-			t.Errorf("area-enforced op %q carries neither x-authz-area nor x-authz-skip-area — an area-grade write must declare its area posture (ADR 0022 Phase 2/3).", opID)
+		hasSurface[cap] = true
+		if o.hasSkip && o.skipReason == "" {
+			t.Errorf("op %q has x-authz-skip-area but no x-authz-skip-reason — a skip must be justified (ADR 0022).", o.opID)
+		}
+		if o.hasArea || o.hasSkip {
+			annotatedCap[cap] = true
+		}
+	}
+
+	// Every area-grade capability that HAS a documented HTTP surface must declare
+	// an area posture on it. Caps with no spec surface (e.g. document.create — its
+	// POST /documents route is a raw, undocumented handler) cannot be annotated in
+	// the spec; those are bound by the authz-area-scope-binding AST guard + tests,
+	// which is the stronger per-call-site enforcement.
+	areaGradeSeen := 0
+	for _, cap := range iamdomain.AllCapabilities() {
+		if !iamdomain.IsAreaGrade(cap) {
 			continue
 		}
-		if a.hasSkip && a.skipReason == "" {
-			t.Errorf("area-enforced op %q has x-authz-skip-area but no x-authz-skip-reason — a skip must be justified.", opID)
+		areaGradeSeen++
+		if hasSurface[cap] && !annotatedCap[cap] {
+			t.Errorf("area-grade capability %q has a documented HTTP surface but no operation declaring x-authz-area or a justified x-authz-skip-area (ADR 0022 Phase 7: closing a tier-2 area-enforcement gap forces the spec declaration).", cap)
 		}
+	}
+	if areaGradeSeen == 0 {
+		t.Fatal("no area-grade capabilities found — IsAreaGrade wiring is broken")
 	}
 }
 
@@ -125,10 +152,12 @@ func TestMembershipManageIsAreaGradeAndAnnotated(t *testing.T) {
 	if !iamdomain.IsAreaGrade(iamdomain.CapMembershipManage) {
 		t.Fatalf("membership.manage must be classified area-grade in capabilityScopes (ADR 0022)")
 	}
-	spec := loadSpecAuthz(t)
+	byID := map[string]specOp{}
+	for _, o := range loadSpecOps(t) {
+		byID[o.opID] = o
+	}
 	for _, opID := range []string{"grantAreaMembership", "revokeAreaMembership"} {
-		a := spec[opID]
-		if !a.hasArea {
+		if !byID[opID].hasArea {
 			t.Errorf("membership op %q must carry x-authz-area (the request areaCode source) — it is the request-area-bearing area-grade surface.", opID)
 		}
 	}

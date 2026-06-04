@@ -4,6 +4,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -188,6 +189,92 @@ func TestWikiCapabilityParity_IgnoresUnmarkedProse(t *testing.T) {
 	}
 	if n := countRule(got, "wiki-capability-parity"); n != 0 {
 		t.Fatalf("unmarked prose: want 0, got %d: %+v", n, got)
+	}
+}
+
+// --- authz-area-scope-binding (ADR 0022 Phase 7 core control) -------------
+
+// fixtureCapModel writes a minimal iam/domain/model.go the guard parses for the
+// const-name -> value map. Values must be REAL capabilities because the guard
+// classifies them via the compiled iamdomain.IsAreaGrade.
+const fixtureCapModel = "package domain\n" +
+	"type Capability string\n" +
+	"const (\n" +
+	"\tCapDocumentEdit Capability = \"document.edit\"\n" + // area-grade
+	"\tCapDocumentView Capability = \"document.view\"\n" + // tenant-grade
+	")\n"
+
+func TestAuthzAreaScopeBinding_BitesOnAreaGradeTenant(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureCapModel)
+	writeFile(t, dir, "repo/r.go",
+		"package repo\nfunc f() { authz.Require(nil, nil, string(iamdomain.CapDocumentEdit), \"tenant\") }\n")
+	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "authz-area-scope-binding"); n != 1 {
+		t.Fatalf("area-grade+\"tenant\": want 1 violation, got %d: %+v", n, got)
+	}
+	if !containsMsg(got, "document.edit") {
+		t.Fatalf("violation message should name the cap: %+v", got)
+	}
+}
+
+func TestAuthzAreaScopeBinding_GreenOnRealArea(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureCapModel)
+	writeFile(t, dir, "repo/r.go",
+		"package repo\nfunc f(areaCode string) { authz.Require(nil, nil, string(iamdomain.CapDocumentEdit), areaCode) }\n")
+	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "authz-area-scope-binding"); n != 0 {
+		t.Fatalf("real area arg: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestAuthzAreaScopeBinding_IgnoresTenantGradeAndVariableCap(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureCapModel)
+	// Tenant-grade cap with "tenant" is legitimate; a variable cap is unresolvable.
+	writeFile(t, dir, "repo/r.go",
+		"package repo\nfunc f(cap string) {\n\tauthz.Require(nil, nil, string(iamdomain.CapDocumentView), \"tenant\")\n\tauthz.Require(nil, nil, cap, \"tenant\")\n}\n")
+	got, err := checkAuthzAreaScopeBinding(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "authz-area-scope-binding"); n != 0 {
+		t.Fatalf("tenant-grade + variable cap: want 0, got %d: %+v", n, got)
+	}
+}
+
+// --- golden seed row count (ADR 0022 Phase 7) -----------------------------
+
+// expectedRoleCapabilityRows is the exact number of role_capabilities INSERT
+// rows the seed parser (seedCapRE) must capture from the canonical baseline. It
+// is a golden value: a reformat that splits/merges INSERTs, an accidental row
+// drop, or a multi-row VALUES rewrite that the single-row regex cannot parse all
+// change this count and fail loudly — protecting seed-registry-parity, which
+// silently under-counts if the regex stops matching a row.
+const expectedRoleCapabilityRows = 94
+
+func TestSeedRowCount_GoldenMatchesParser(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	// scripts/api-lint/ -> repo root is two levels up.
+	seedPath := filepath.Join(filepath.Dir(thisFile), "..", "..",
+		"db", "reference-data", "0001_product_reference_data.sql")
+	raw, err := os.ReadFile(seedPath)
+	if err != nil {
+		t.Fatalf("read seed %s: %v", seedPath, err)
+	}
+	got := len(seedCapRE.FindAllStringSubmatchIndex(string(raw), -1))
+	if got != expectedRoleCapabilityRows {
+		t.Fatalf("seedCapRE captured %d role_capabilities rows, want golden %d — if this change is intentional (a real grant added/removed), update expectedRoleCapabilityRows; if not, a reformat or multi-row VALUES rewrite broke the single-row parser (ADR 0022 Phase 7).", got, expectedRoleCapabilityRows)
 	}
 }
 

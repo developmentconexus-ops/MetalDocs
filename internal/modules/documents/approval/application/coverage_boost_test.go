@@ -37,6 +37,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
+	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/platform/tenant"
 )
 
@@ -446,7 +447,7 @@ func newErrorQueryDB(t *testing.T) *sql.DB {
 func TestValidateLegacyCutoverReady_DBError(t *testing.T) {
 	db := newErrorQueryDB(t)
 	svc := NewCutoverService(&MemoryEmitter{}, fixedClock{t: time.Now()})
-	err := svc.ValidateLegacyCutoverReady(context.Background(), db)
+	err := svc.ValidateLegacyCutoverReady(authz.WithBackgroundBypass(context.Background()), db)
 	if err == nil {
 		t.Fatal("expected error from db; got nil")
 	}
