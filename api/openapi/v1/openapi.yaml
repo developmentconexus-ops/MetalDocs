@@ -3606,7 +3606,7 @@ paths:
       tags: [approval]
       operationId: publishDocument
       x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/schedule-publish:
@@ -3614,7 +3614,7 @@ paths:
       tags: [approval]
       operationId: scheduleDocumentPublish
       x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.publish is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/supersede:
@@ -3622,7 +3622,7 @@ paths:
       tags: [approval]
       operationId: supersedeDocument
       x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.supersede is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.supersede is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/documents/{id}/obsolete:
@@ -3630,7 +3630,7 @@ paths:
       tags: [approval]
       operationId: obsoleteDocument
       x-authz-skip-area: true
-      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): doc.obsolete is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2): document.obsolete is enforced at the tx-layer service via authz.Require with the resolved document areaCode, not in the handler. authz-call-present is a single-function-body scan expecting req.Body/req.Params, so it cannot match tx-layer enforcement; rule activation deferred to ADR 0022 Phase 5.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
   /api/v1/approval/instances/{instance_id}/cancel:

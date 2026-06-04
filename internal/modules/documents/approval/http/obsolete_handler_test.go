@@ -61,7 +61,7 @@ func TestObsoleteHandler(t *testing.T) {
 		{
 			name:         "authz denied",
 			body:         `{"reason":"sunset old release"}`,
-			svcErr:       authz.ErrCapDenied{Capability: "doc.obsolete", AreaCode: "tenant-1", ActorID: "actor-1"},
+			svcErr:       authz.ErrCapDenied{Capability: "document.obsolete", AreaCode: "tenant-1", ActorID: "actor-1"},
 			wantStatus:   http.StatusForbidden,
 			wantSvcCalls: true,
 		},

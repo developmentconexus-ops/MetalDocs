@@ -108,13 +108,16 @@ INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES (
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('system_admin', 'session.manage', 'Force-logout / revoke auth sessions') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
 -- ADR 0022 Phase 2: document-lifecycle write caps (mirrors db/migrations/0225_authz_p2_document_lifecycle_grants.sql).
+-- ADR 0022 Phase 12 (F3): cap values renamed doc.* -> document.* for single-prefix
+-- coherence (resource.action). The historical 0225 migration still seeds the legacy
+-- doc.* spelling; forward migration 0229 converges those rows to document.* on apply.
 -- system_admin holds these via the tier-2 bypass (not seeded explicitly).
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.obsolete', 'Make a document obsolete') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.obsolete', 'Make a document obsolete') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'doc.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
-INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'doc.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.obsolete', 'Make a document obsolete') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.obsolete', 'Make a document obsolete') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.supersede', 'Supersede a document with a successor') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('area_admin', 'document.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
+INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'document.publish', 'Publish an approved document') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 INSERT INTO metaldocs.role_capabilities (role, capability, description) VALUES ('qms_admin', 'template.archive', 'Archive a template') ON CONFLICT (role, capability) DO UPDATE SET description = EXCLUDED.description;
 
 -- ADR 0022 Phase 10 (F2): the four redundant phantom caps Phase 8 seeded here
