@@ -250,6 +250,68 @@ func TestAuthzAreaScopeBinding_IgnoresTenantGradeAndVariableCap(t *testing.T) {
 	}
 }
 
+// --- no-rawstring-capability (ADR 0022 Phase 8 core control) --------------
+
+func TestNoRawStringCapability_BitesOnRequireLiteral(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "repo/r.go",
+		"package repo\nfunc f(area string) { authz.Require(nil, nil, \"doc.publish\", area) }\n")
+	got, err := checkNoRawStringCapability(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-capability"); n != 1 {
+		t.Fatalf("raw-string cap literal: want 1 violation, got %d: %+v", n, got)
+	}
+	if !containsMsg(got, "doc.publish") {
+		t.Fatalf("violation message should name the literal: %+v", got)
+	}
+}
+
+func TestNoRawStringCapability_GreenOnTypedConst(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "repo/r.go",
+		"package repo\nfunc f(area string) { authz.Require(nil, nil, string(iamdomain.CapDocumentPublish), area) }\n")
+	got, err := checkNoRawStringCapability(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-capability"); n != 0 {
+		t.Fatalf("typed const cap: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestNoRawStringCapability_IgnoresVariableCapAndTests(t *testing.T) {
+	dir := t.TempDir()
+	// A variable cap arg (templates/lifecycle.go:555 shape) is not a literal.
+	writeFile(t, dir, "repo/r.go",
+		"package repo\nfunc f(cap, area string) { authz.Require(nil, nil, cap, area) }\n")
+	// A literal in a _test.go file is exempt (rule skips test files).
+	writeFile(t, dir, "repo/r_test.go",
+		"package repo\nfunc g(area string) { authz.Require(nil, nil, \"doc.x\", area) }\n")
+	got, err := checkNoRawStringCapability(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-capability"); n != 0 {
+		t.Fatalf("variable cap + test file: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestNoRawStringCapability_RequireAllLiteralBites(t *testing.T) {
+	dir := t.TempDir()
+	// authz.RequireAll treats every arg as a capability position.
+	writeFile(t, dir, "repo/r.go",
+		"package repo\nfunc f() { authz.RequireAll(\"doc.a\", \"doc.b\") }\n")
+	got, err := checkNoRawStringCapability(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rawstring-capability"); n != 2 {
+		t.Fatalf("RequireAll literals: want 2, got %d: %+v", n, got)
+	}
+}
+
 // --- golden seed row count (ADR 0022 Phase 7) -----------------------------
 
 // expectedRoleCapabilityRows is the exact number of role_capabilities INSERT
@@ -258,7 +320,7 @@ func TestAuthzAreaScopeBinding_IgnoresTenantGradeAndVariableCap(t *testing.T) {
 // drop, or a multi-row VALUES rewrite that the single-row regex cannot parse all
 // change this count and fail loudly — protecting seed-registry-parity, which
 // silently under-counts if the regex stops matching a row.
-const expectedRoleCapabilityRows = 94
+const expectedRoleCapabilityRows = 116
 
 func TestSeedRowCount_GoldenMatchesParser(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
