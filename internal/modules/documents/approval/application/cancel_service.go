@@ -110,7 +110,7 @@ func (s *CancelService) cancelInstance(ctx context.Context, db *sql.DB, in Cance
 	// merged into the canonical CapDocumentEdit (identical grant set).
 	// areaCode.String is "" when process_area_code_snapshot IS NULL — "" is
 	// intentionally fail-closed: authz.Require denies non-system actors for an
-	// area-grade cap (ADR 0022 Phase 8, matches loadDocumentAreaCode). Do NOT
+	// area-grade cap (ADR 0022 Phase 8, matches docapp.LoadDocumentAreaCode). Do NOT
 	// COALESCE(..., 'tenant') here — that would silently re-open the area filter.
 	if !system {
 		ctx = authz.WithCapCache(ctx)

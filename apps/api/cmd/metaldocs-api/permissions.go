@@ -226,8 +226,10 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/iam/capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/iam/role-capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// IAM area memberships (PR-1). ADR 0016 view/manage split: GET view (handler
-	// also self-scopes via canManageMembershipTarget in routes_memberships.go),
+	// IAM area memberships (PR-1). ADR 0016 view/manage split: GET view (the
+	// directory result is area-scoped at the data layer via
+	// AreaMembershipService.DirectoryScope — ADR 0022 Phase 4; the former
+	// canManageMembershipTarget handler role gate was removed in Phase 3),
 	// POST + DELETE manage. PUT/PATCH are intentionally omitted — the API surface
 	// is grant + revoke only; role changes go via revoke-then-grant.
 	{method: http.MethodGet, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -236,6 +238,19 @@ var routeRules = []routeRule{
 
 	// Signed-URL relay.
 	{method: http.MethodGet, pathExact: "/api/v1/signed", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},
+
+	// Approval route administration (ADR 0022 Phase 11, F4). These MUST precede
+	// the generic /api/v1/approval/ block below so the route-admin CRUD ops gate on
+	// CapRouteManage at tier-1 — matching their tier-2 authz.Require(CapRouteManage)
+	// in approval/application/route_admin_service.go. Without these explicit rows
+	// the generic prefix would gate them on document.view/document.submit (tier-1)
+	// while tier-2 demands route.manage — the F4 cross-tier divergence. route.manage
+	// is tenant-grade, so all four ops (incl. the GET list, whose tier-2 List check
+	// is also route.manage) map to it.
+	{method: http.MethodGet, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPut, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/approval/routes", capability: iamdomain.CapRouteManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Approval (legacy mount).
 	{method: http.MethodGet, pathPrefix: "/api/v1/approval/", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},

@@ -11,8 +11,19 @@ import (
 	"strings"
 	"testing"
 
+	iamdomain "metaldocs/internal/modules/iam/domain"
 	"metaldocs/internal/platform/tenant"
 )
+
+type fakeBypassSink struct {
+	events []BypassEvent
+	err    error
+}
+
+func (f *fakeBypassSink) RecordBypass(_ context.Context, _ *sql.Tx, ev BypassEvent) error {
+	f.events = append(f.events, ev)
+	return f.err
+}
 
 type authzTestState struct {
 	granted         bool
@@ -284,6 +295,96 @@ func TestBypassSystem(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("executed queries = %#v, want bypass set_config", state.executedQueries)
+	}
+}
+
+// TestRequire_SystemAdminBypassEmitsAudit (ADR 0022 Phase 11 F8): every tier-2
+// system_admin short-circuit emits a full-fidelity bypass audit event.
+func TestRequire_SystemAdminBypassEmitsAudit(t *testing.T) {
+	sink := &fakeBypassSink{}
+	SetBypassAuditSink(sink)
+	t.Cleanup(func() { SetBypassAuditSink(nil) })
+
+	state := &authzTestState{isAdmin: true, actorID: "admin-1", tenantID: tenant.DevTenantID, assertedCaps: `[]`}
+	_, tx := openAuthzTestDB(t, state)
+
+	if err := Require(WithCapCache(context.Background()), tx, "document.edit", "AREA1"); err != nil {
+		t.Fatalf("Require (admin) returned error: %v", err)
+	}
+	if len(sink.events) != 1 {
+		t.Fatalf("bypass events = %d, want 1", len(sink.events))
+	}
+	ev := sink.events[0]
+	if ev.Kind != BypassKindSystemAdmin || ev.ActorID != "admin-1" || ev.TenantID != tenant.DevTenantID ||
+		ev.Capability != "document.edit" || ev.AreaCode != "AREA1" {
+		t.Fatalf("bypass event = %#v", ev)
+	}
+}
+
+// TestRequire_SystemAdminBypassAuditFailClosed: if the bypass audit write fails,
+// Require fails too — a system_admin bypass cannot commit unaudited.
+func TestRequire_SystemAdminBypassAuditFailClosed(t *testing.T) {
+	sink := &fakeBypassSink{err: errors.New("audit pipe down")}
+	SetBypassAuditSink(sink)
+	t.Cleanup(func() { SetBypassAuditSink(nil) })
+
+	state := &authzTestState{isAdmin: true, actorID: "admin-1", tenantID: tenant.DevTenantID, assertedCaps: `[]`}
+	_, tx := openAuthzTestDB(t, state)
+
+	if err := Require(WithCapCache(context.Background()), tx, "document.edit", "AREA1"); err == nil {
+		t.Fatal("Require returned nil, want error when bypass audit fails (fail-closed)")
+	}
+}
+
+// TestBypassSystem_EmitsBackgroundAudit: the background bridge emits a bypass audit
+// event attributed to the GUC identity (or system/"" when unseeded).
+func TestBypassSystem_EmitsBackgroundAudit(t *testing.T) {
+	sink := &fakeBypassSink{}
+	SetBypassAuditSink(sink)
+	t.Cleanup(func() { SetBypassAuditSink(nil) })
+
+	state := &authzTestState{actorID: "system", tenantID: ""}
+	_, tx := openAuthzTestDB(t, state)
+
+	ctx := WithBackgroundBypass(context.Background())
+	if err := BypassSystem(ctx, tx); err != nil {
+		t.Fatalf("BypassSystem: %v", err)
+	}
+	if len(sink.events) != 1 {
+		t.Fatalf("bypass events = %d, want 1", len(sink.events))
+	}
+	if ev := sink.events[0]; ev.Kind != BypassKindBackground {
+		t.Fatalf("bypass event = %#v, want background", ev)
+	}
+}
+
+// TestDenyByDefault_EveryCapabilityDeniesUnprivilegedActor (ADR 0022 Phase 11 F8):
+// the standing deny-by-default matrix. Every registry capability must deny an actor
+// who holds no role and is not system_admin — no capability may be special-cased to
+// allow. Locks the enforcement model against a future Require change that leaks a
+// grant. (Seed-level grant drift is locked separately by the api-lint
+// seed-registry-parity rule + the deny-default seed test in apps/api.)
+func TestDenyByDefault_EveryCapabilityDeniesUnprivilegedActor(t *testing.T) {
+	caps := iamdomain.AllCapabilities()
+	if len(caps) == 0 {
+		t.Fatal("registry returned no capabilities")
+	}
+	for _, c := range caps {
+		c := c
+		t.Run(string(c), func(t *testing.T) {
+			state := &authzTestState{granted: false, isAdmin: false, actorID: "nobody", tenantID: tenant.DevTenantID}
+			_, tx := openAuthzTestDB(t, state)
+
+			area := "tenant"
+			if iamdomain.IsAreaGrade(c) {
+				area = "AREA1"
+			}
+			err := Require(WithCapCache(context.Background()), tx, string(c), area)
+			var denied ErrCapDenied
+			if !errors.As(err, &denied) {
+				t.Fatalf("Require(%s) = %v, want ErrCapDenied (deny-by-default)", c, err)
+			}
+		})
 	}
 }
 

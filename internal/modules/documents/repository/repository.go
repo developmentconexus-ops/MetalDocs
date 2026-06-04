@@ -732,7 +732,16 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID,
 	if err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
+	// ADR 0022 Phase 11 (F4): force-release is an administrative session takeover
+	// (releasing ANOTHER user's editor lock), so tier-1 gates it on membership.manage
+	// (apps/api/cmd/metaldocs-api/permissions.go — /session/force-release). Tier-2
+	// now agrees: the area-scoped check uses CapMembershipManage (not CapDocumentEdit)
+	// so both tiers answer one coherent question — "is the actor an admin for this
+	// document's area?" — and the destructive takeover stays narrowed to area admins
+	// (area_admin in-area + system_admin via bypass), never every document editor.
+	// membership.manage is area-grade: docArea is fail-closed "" on a missing row,
+	// which denies non-system actors.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapMembershipManage), docArea); err != nil {
 		return fmt.Errorf("force release session: authz check: %w", err)
 	}
 	res, err := tx.ExecContext(ctx,

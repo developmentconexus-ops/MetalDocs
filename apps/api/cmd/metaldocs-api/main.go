@@ -48,6 +48,7 @@ import (
 	controlleddocumentsdomain "metaldocs/internal/modules/controlleddocuments/domain"
 	controlleddocumentsinfra "metaldocs/internal/modules/controlleddocuments/infrastructure"
 	iamapp "metaldocs/internal/modules/iam/application"
+	"metaldocs/internal/modules/iam/authz"
 	iamdelivery "metaldocs/internal/modules/iam/delivery/http"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	iampg "metaldocs/internal/modules/iam/infrastructure/postgres"
@@ -211,6 +212,10 @@ func main() {
 	}
 
 	auditHandler := auditdelivery.NewHandler(auditService).WithExporter(auditService)
+	// ADR 0022 Phase 11 (F8): wire the tier-2 bypass audit sink so every
+	// system_admin short-circuit and every background BypassSystem invocation is
+	// recorded into the same audit pipe (audit.read surface). Set once, before serving.
+	authz.SetBypassAuditSink(newBypassAuditAdapter(deps.AuditWriter))
 	searchService := searchapp.NewService(searchdocs.NewReader(deps.SQLDB))
 	searchHandler := searchdelivery.NewHandler(searchService)
 	authHandler := authdelivery.NewHandler(authService).WithAudit(deps.AuditWriter)
@@ -711,6 +716,51 @@ func requireApprovalRuntimeSupport(fanoutURL string) error {
 type realUUIDGen struct{}
 
 func (realUUIDGen) New() string { return uuid.NewString() }
+
+// bypassAuditAdapter adapts the audit Writer to authz.BypassAuditSink so the
+// low-level authz package can record tier-2 bypasses without importing the audit
+// module (ADR 0022 Phase 11, F8). It writes in the caller's tx (RecordTx) at the
+// same fidelity/atomicity as the in-tx normal-grant audit.
+type bypassAuditAdapter struct {
+	writer auditdomain.Writer
+}
+
+func newBypassAuditAdapter(writer auditdomain.Writer) *bypassAuditAdapter {
+	if writer == nil {
+		panic("bypass audit writer is nil")
+	}
+	return &bypassAuditAdapter{writer: writer}
+}
+
+func (a *bypassAuditAdapter) RecordBypass(ctx context.Context, tx *sql.Tx, ev authz.BypassEvent) error {
+	payload, err := json.Marshal(map[string]any{
+		"kind":       string(ev.Kind),
+		"capability": ev.Capability,
+		"area_code":  ev.AreaCode,
+	})
+	if err != nil {
+		payload = []byte("{}")
+	}
+	actor := ev.ActorID
+	if actor == "" {
+		actor = "system"
+	}
+	resourceID := ev.Capability
+	if resourceID == "" {
+		resourceID = string(ev.Kind)
+	}
+	return a.writer.RecordTx(ctx, tx, auditdomain.Event{
+		ID:           "evt_" + uuid.NewString(),
+		OccurredAt:   time.Now().UTC(),
+		ActorID:      actor,
+		Action:       "authz.bypass." + string(ev.Kind),
+		ResourceType: "authz_bypass",
+		ResourceID:   resourceID,
+		PayloadJSON:  string(payload),
+		TraceID:      traceIDFromContext(ctx),
+		TenantID:     ev.TenantID, // "" allowed for cross-tenant background sweeps
+	})
+}
 
 type documentsAuditAdapter struct {
 	writer auditdomain.Writer
