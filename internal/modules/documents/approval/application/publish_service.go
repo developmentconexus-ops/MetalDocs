@@ -85,7 +85,7 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		_ = tx.Rollback()
 		return PublishResult{}, fmt.Errorf("publishApproved: load document area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, "doc.publish", areaCode); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentPublish), areaCode); err != nil {
 		_ = tx.Rollback()
 		return PublishResult{}, err
 	}
@@ -231,7 +231,7 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: load document area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, "doc.publish", areaCode); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentPublish), areaCode); err != nil {
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, err
 	}

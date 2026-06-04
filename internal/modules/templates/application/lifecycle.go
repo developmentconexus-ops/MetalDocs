@@ -518,7 +518,7 @@ func (s *Service) ArchiveTemplate(ctx context.Context, cmd ArchiveCmd) (*domain.
 		if err := setAuthzGUC(ctx, tx, cmd.TenantID, cmd.ActorUserID); err != nil {
 			return nil, fmt.Errorf("templates archive: setAuthzGUC: %w", err)
 		}
-		if err := authz.Require(ctx, tx, "template.archive", "tenant"); err != nil {
+		if err := authz.Require(ctx, tx, string(iamdomain.CapTemplateArchive), "tenant"); err != nil {
 			return nil, fmt.Errorf("templates archive: authz: %w", err)
 		}
 		if err := s.repo.UpdateTemplateTx(ctx, tx, template); err != nil {

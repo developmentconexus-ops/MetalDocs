@@ -47,6 +47,14 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapControlledDocumentSupersede: ScopeArea,
 	CapMembershipManage:            ScopeArea,
 
+	// ADR 0022 Phase 8 — phantom caps classified from their tier-1 route
+	// authority (apps/api/cmd/metaldocs-api/permissions.go): edit-draft /
+	// reconstruct / instance-cancel all route under document.edit (an area-scoped
+	// write/maintenance class), so they enforce against the document's area.
+	CapDocumentEditDraft:      ScopeArea,
+	CapDocumentReconstruct:    ScopeArea,
+	CapWorkflowInstanceCancel: ScopeArea,
+
 	// --- Tenant-grade: tenant-wide authority ---
 	CapDocumentView:    ScopeTenant,
 	CapTemplateView:    ScopeTenant,
@@ -66,6 +74,19 @@ var capabilityScopes = map[Capability]CapabilityScope{
 	CapMetricsView:     ScopeTenant,
 	CapAuditRead:       ScopeTenant,
 	CapSessionManage:   ScopeTenant,
+
+	// ADR 0022 Phase 8 — a *.view read; tenant-grade per the registry rule that
+	// all view reads are tenant-wide (mirrors CapDocumentView; tier-1 route is
+	// document.view). PRODUCT RULING (confirmed 2026-06-04, not just convention):
+	// a PUBLISHED controlled document is org-wide reference material (ISO-9001
+	// norm) — reachability of a published doc is gated by who can see the document
+	// at all (other capabilities), NOT by the reader's process area. Area
+	// segregation in this system bounds WRITE/admin authority, not reads of
+	// published artifacts. Reclassifying this to ScopeArea would make the
+	// presigned-PDF gate stricter than tier-1 GET /documents (tenant-grade) and
+	// isolate published content while metadata/list/search stay tenant-wide — an
+	// inconsistency the product explicitly rejected.
+	CapDocumentViewPublished: ScopeTenant,
 }
 
 // ScopeOf returns the declared scope of a capability and whether it is

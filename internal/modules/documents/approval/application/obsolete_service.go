@@ -9,6 +9,7 @@ import (
 
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 // ObsoleteService marks a document as obsolete (end-of-life).
@@ -76,7 +77,7 @@ func (s *ObsoleteService) MarkObsolete(ctx context.Context, db *sql.DB, req Mark
 		_ = tx.Rollback()
 		return MarkObsoleteResult{}, fmt.Errorf("markObsolete: %w", err)
 	}
-	if err := authz.Require(ctx, tx, "doc.obsolete", areaCode); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentObsolete), areaCode); err != nil {
 		_ = tx.Rollback()
 		return MarkObsoleteResult{}, err
 	}
