@@ -226,8 +226,10 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/iam/capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/iam/role-capabilities", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// IAM area memberships (PR-1). ADR 0016 view/manage split: GET view (handler
-	// also self-scopes via canManageMembershipTarget in routes_memberships.go),
+	// IAM area memberships (PR-1). ADR 0016 view/manage split: GET view (the
+	// directory result is area-scoped at the data layer via
+	// AreaMembershipService.DirectoryScope — ADR 0022 Phase 4; the former
+	// canManageMembershipTarget handler role gate was removed in Phase 3),
 	// POST + DELETE manage. PUT/PATCH are intentionally omitted — the API surface
 	// is grant + revoke only; role changes go via revoke-then-grant.
 	{method: http.MethodGet, pathExact: "/api/v1/iam/area-memberships", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},

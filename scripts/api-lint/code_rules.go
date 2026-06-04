@@ -117,6 +117,21 @@ func indexModuleFuncs(modulesRoot string, fset *token.FileSet) (map[string][]ind
 	return out, err
 }
 
+// checkAuthzCallPresent is DORMANT by design (ADR 0022 Phase 11 F6 — documented,
+// not deleted). It only fires for an operation that declares x-authz-area or
+// x-authz-custom:true WITHOUT x-authz-skip-area, and then expects the operationId-
+// named handler to itself call authz.Require(req.Body.X | req.<Op>Params.X). No
+// MetalDocs module matches that shape: tier-2 area enforcement lives in tx-layer
+// services where the area is DB-derived (un-spoofable, per ADR 0007 tx-coupling),
+// not request-supplied, and every area-grade op therefore carries x-authz-skip-area
+// (which silences this rule) — so the rule's live count is 0 and has been across
+// all phases. Activating it for real requires a call-graph / "source: derived"
+// lint-engine rewrite (tracked as Phase 5+ residual), which is out of scope here.
+// It is kept (a) so the x-authz-custom: true escape hatch keeps working if a future
+// codegen handler does inline authz.Require, and (b) as the documented seam for that
+// rewrite. Do NOT treat its 0-count as "all area ops are statically verified" — the
+// authz-area-scope-binding AST guard (registry_rules.go) is the real per-call-site
+// binding; this is a complementary, currently-unreachable spec-shape check.
 func checkAuthzCallPresent(specPath, opID string, op *yaml.Node, index map[string][]indexedFunc, fset *token.FileSet) []Violation {
 	// Gate: rule applies only when the op declares x-authz-area or x-authz-custom: true.
 	// x-authz-skip-area silences the rule explicitly (also implies the gate is open).
