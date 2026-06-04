@@ -93,6 +93,209 @@ func RunRegistryRules(modulesRoot string, fset *token.FileSet) ([]Violation, err
 	}
 	out = append(out, rawcap...)
 
+	rolestr, err := checkNoRoleStringInDelivery(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, rolestr...)
+
+	return out, nil
+}
+
+// phantomRoleDialect lists role-name string literals that may not appear in a
+// delivery/http authz gate, beyond the canonical Role catalog parsed from
+// model.go (ADR 0022 Phase 9). The three entries are banned for two distinct
+// reasons:
+//
+//   - template_author, document_filler: TRUE phantoms — decommissioned "docx v2"
+//     dialect role names that were never canonical (no DB CHECK, no seed, no
+//     issuance path). They compile clean but name roles that cannot exist.
+//   - reviewer: DB-canonical (present in the role CHECK constraint and seeded),
+//     but missing from the Go iam/domain Role consts pending Phase 12
+//     reconciliation. Banned from delivery/http in the interim so a handler gate
+//     cannot bind to a role the Go registry does not yet model.
+//
+// All three are unioned with the parsed canonical Role catalog to form the
+// banned set.
+var phantomRoleDialect = []string{"template_author", "document_filler", "reviewer"}
+
+// checkNoRoleStringInDelivery is the ADR 0022 Phase 9 core control: it bans a
+// role-name string literal in a delivery/http file from appearing in (a) a
+// const ValueSpec value, (b) an ==/!= comparison operand, or (c) a switch/case
+// clause expression (`switch role { case "system_admin": }`). Authorization is
+// the capability model's job; a role string baked into a handler gate is a
+// second, incoherent authz dialect (e.g. roleAdmin/roleDocumentFiller gating on
+// phantom roles absent from the registry). The banned set is the canonical Role
+// catalog parsed from internal/modules/iam/domain/model.go UNION the legacy
+// phantom dialect. A role literal used as DATA (composite literal element,
+// struct field, function arg) is intentionally NOT flagged — only the three
+// authz-gate shapes (const value, equality comparison, switch/case) bite.
+// Scoped to non-test .go files whose path contains "/delivery/http/".
+func checkNoRoleStringInDelivery(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	banned, err := bannedRoleSet(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	if len(banned) == 0 {
+		// No model.go under this root (e.g. lint test fixtures); nothing to ban.
+		return nil, nil
+	}
+
+	out := []Violation{}
+	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") {
+			return nil
+		}
+		if !strings.Contains(filepath.ToSlash(path), "/delivery/http/") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		// flagged tracks BasicLit nodes already reported so a literal that is
+		// both (it cannot be) is never double-counted across the two passes.
+		flagged := map[*ast.BasicLit]struct{}{}
+		flag := func(lit *ast.BasicLit) {
+			val, uerr := strconv.Unquote(lit.Value)
+			if uerr != nil {
+				return
+			}
+			if _, ok := banned[val]; !ok {
+				return
+			}
+			if _, seen := flagged[lit]; seen {
+				return
+			}
+			flagged[lit] = struct{}{}
+			out = append(out, Violation{
+				File:    path,
+				Line:    fset.Position(lit.Pos()).Line,
+				Rule:    "no-rolestring-in-delivery",
+				Message: "role-name string literal " + lit.Value + " in a delivery/http authz gate; authorize through the capability model (string(iamdomain.CapXxx) via authz.Require), not a role string — phantom/legacy roles compile clean but gate incoherently (ADR 0022 Phase 9)",
+			})
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch e := n.(type) {
+			case *ast.GenDecl: // (a) const ValueSpec value (var-declared data is exempt)
+				if e.Tok != token.CONST {
+					return true
+				}
+				for _, spec := range e.Specs {
+					vs, ok := spec.(*ast.ValueSpec)
+					if !ok {
+						continue
+					}
+					for _, v := range vs.Values {
+						if lit, ok := v.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+							flag(lit)
+						}
+					}
+				}
+			case *ast.BinaryExpr: // (b) ==/!= comparison operand
+				if e.Op != token.EQL && e.Op != token.NEQ {
+					return true
+				}
+				if lit, ok := e.X.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					flag(lit)
+				}
+				if lit, ok := e.Y.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+					flag(lit)
+				}
+			case *ast.CaseClause: // (c) switch/case clause expression operand
+				for _, expr := range e.List {
+					if lit, ok := expr.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+						flag(lit)
+					}
+				}
+			}
+			return true
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
+	return out, nil
+}
+
+// bannedRoleSet builds the role-name set the delivery gate may not name as a
+// string literal: the canonical Role values parsed from model.go UNION the
+// legacy phantom dialect. Returns an empty map when no model.go is found.
+func bannedRoleSet(modulesRoot string, fset *token.FileSet) (map[string]struct{}, error) {
+	roles, err := parseRoleConsts(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	if len(roles) == 0 {
+		return nil, nil
+	}
+	banned := make(map[string]struct{}, len(roles)+len(phantomRoleDialect))
+	for _, r := range roles {
+		banned[string(r)] = struct{}{}
+	}
+	for _, p := range phantomRoleDialect {
+		banned[p] = struct{}{}
+	}
+	return banned, nil
+}
+
+// parseRoleConsts parses internal/modules/iam/domain/model.go and returns the
+// canonical Role const-name -> value map (e.g. "RoleSystemAdmin" ->
+// "system_admin"). Mirrors parseCapabilityConsts but matches Role-typed consts.
+func parseRoleConsts(modulesRoot string, fset *token.FileSet) (map[string]iamdomain.Role, error) {
+	modelPath := filepath.Join(modulesRoot, "internal", "modules", "iam", "domain", "model.go")
+	raw, err := os.ReadFile(modelPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	file, err := parser.ParseFile(fset, modelPath, raw, parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]iamdomain.Role{}
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			typeIdent, ok := vs.Type.(*ast.Ident)
+			if !ok || typeIdent.Name != "Role" {
+				continue
+			}
+			if len(vs.Names) != 1 || len(vs.Values) != 1 {
+				continue
+			}
+			lit, ok := vs.Values[0].(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				continue
+			}
+			val, uerr := strconv.Unquote(lit.Value)
+			if uerr != nil {
+				continue
+			}
+			out[vs.Names[0].Name] = iamdomain.Role(val)
+		}
+	}
 	return out, nil
 }
 

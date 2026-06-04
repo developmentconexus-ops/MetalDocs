@@ -11,4 +11,5 @@ import (
 // *iam/application.CapabilityService. See wiki/decisions/0007-two-tier-authz.md.
 type CapabilityChecker interface {
 	CanDo(ctx context.Context, userID, tenantID string, cap iamdomain.Capability) error
+	IsSystemAdmin(ctx context.Context, userID, tenantID string) (bool, error)
 }

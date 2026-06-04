@@ -312,6 +312,125 @@ func TestNoRawStringCapability_RequireAllLiteralBites(t *testing.T) {
 	}
 }
 
+// --- no-rolestring-in-delivery (ADR 0022 Phase 9 core control) ------------
+
+// fixtureRoleModel writes a minimal iam/domain/model.go the guard parses for
+// the canonical Role const-name -> value map. Only RoleSystemAdmin is needed;
+// the phantom dialect (template_author/document_filler/reviewer) is unioned in
+// by the rule itself, not parsed from the model.
+const fixtureRoleModel = "package domain\n" +
+	"type Role string\n" +
+	"const RoleSystemAdmin Role = \"system_admin\"\n"
+
+func TestNoRoleStringInDelivery_BitesOnConst(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nconst roleAdmin = \"system_admin\"\n")
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rolestring-in-delivery"); n != 1 {
+		t.Fatalf("const role literal: want 1 violation, got %d: %+v", n, got)
+	}
+	if !containsMsg(got, "system_admin") {
+		t.Fatalf("violation message should name the literal: %+v", got)
+	}
+}
+
+func TestNoRoleStringInDelivery_BitesOnComparison(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nfunc f(s string) bool { return s == \"document_filler\" }\n")
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rolestring-in-delivery"); n != 1 {
+		t.Fatalf("comparison role literal: want 1 violation, got %d: %+v", n, got)
+	}
+	if !containsMsg(got, "document_filler") {
+		t.Fatalf("violation message should name the literal: %+v", got)
+	}
+}
+
+func TestNoRoleStringInDelivery_BitesOnSwitchCase(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nfunc f(s string) bool {\n\tswitch s {\n\tcase \"document_filler\":\n\t\treturn true\n\t}\n\treturn false\n}\n")
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rolestring-in-delivery"); n != 1 {
+		t.Fatalf("switch/case role literal: want 1 violation, got %d: %+v", n, got)
+	}
+	if !containsMsg(got, "document_filler") {
+		t.Fatalf("violation message should name the literal: %+v", got)
+	}
+}
+
+func TestNoRoleStringInDelivery_GreenNoRoleLiteral(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nfunc f(s string) bool { return s == \"ok\" }\n")
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rolestring-in-delivery"); n != 0 {
+		t.Fatalf("no role literal: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestNoRoleStringInDelivery_IgnoresTestFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
+	writeFile(t, dir, "pkg/delivery/http/h_test.go",
+		"package http\nconst roleAdmin = \"system_admin\"\n")
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rolestring-in-delivery"); n != 0 {
+		t.Fatalf("test file: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestNoRoleStringInDelivery_IgnoresRoleAsData(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
+	// A role literal as composite-literal data (not const, not comparison) is exempt.
+	writeFile(t, dir, "pkg/delivery/http/h.go",
+		"package http\nvar x = []string{\"system_admin\"}\n")
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rolestring-in-delivery"); n != 0 {
+		t.Fatalf("role-as-data: want 0, got %d: %+v", n, got)
+	}
+}
+
+func TestNoRoleStringInDelivery_IgnoresNonDelivery(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, filepath.Join("internal", "modules", "iam", "domain", "model.go"), fixtureRoleModel)
+	// Same const, but outside any /delivery/http/ path -> not scanned.
+	writeFile(t, dir, "pkg/application/h.go",
+		"package application\nconst roleAdmin = \"system_admin\"\n")
+	got, err := checkNoRoleStringInDelivery(dir, token.NewFileSet())
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if n := countRule(got, "no-rolestring-in-delivery"); n != 0 {
+		t.Fatalf("non-delivery: want 0, got %d: %+v", n, got)
+	}
+}
+
 // --- golden seed row count (ADR 0022 Phase 7) -----------------------------
 
 // expectedRoleCapabilityRows is the exact number of role_capabilities INSERT

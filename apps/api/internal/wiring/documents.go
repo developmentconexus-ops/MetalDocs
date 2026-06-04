@@ -19,6 +19,10 @@ func (a capabilityServiceAdapter) CanDo(ctx context.Context, userID, tenantID st
 	return a.svc.CanDo(ctx, userID, tenantID, string(cap))
 }
 
+func (a capabilityServiceAdapter) IsSystemAdmin(ctx context.Context, userID, tenantID string) (bool, error) {
+	return a.svc.IsSystemAdmin(ctx, userID, tenantID)
+}
+
 // NewCapabilityChecker returns a docsapp.CapabilityChecker bound to the
 // production CapabilityService.
 func NewCapabilityChecker(svc *iamapp.CapabilityService) docsapp.CapabilityChecker {

@@ -62,22 +62,23 @@ func (r routeRule) matches(method, path string) bool {
 // (catastrophic).
 //
 // F-001 read/write split truth table (audit row -> intended caps):
-//   metrics           GET   /api/v1/metrics              -> CapMetricsView
-//   notifications     GET   /api/v1/notifications        -> CapDocumentView
-//   notifications     POST  /api/v1/notifications/{id}/read -> CapDocumentView (read-side mark)
-//   access-policies   GET   /api/v1/access-policies      -> CapMembershipView
-//   access-policies   PUT   /api/v1/access-policies      -> CapMembershipManage
-//   iam/users         GET   /api/v1/iam/users            -> CapUserView
-//   iam/users         POST/PATCH/PUT (writes)            -> CapUserManage
-//   iam/admin/overview GET  /api/v1/iam/admin/overview   -> CapUserView
-//   taxonomy/profiles GET                                -> CapTaxonomyView
-//   taxonomy/profiles POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
-//   taxonomy/areas    GET                                -> CapTaxonomyView
-//   taxonomy/areas    POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
-//   taxonomy/families GET                                -> CapTaxonomyView
-//   taxonomy/families POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
-//   iam/area-memberships GET                             -> CapMembershipView
-//   iam/area-memberships POST/PUT/PATCH/DELETE           -> CapMembershipManage
+//
+//	metrics           GET   /api/v1/metrics              -> CapMetricsView
+//	notifications     GET   /api/v1/notifications        -> CapDocumentView
+//	notifications     POST  /api/v1/notifications/{id}/read -> CapDocumentView (read-side mark)
+//	access-policies   GET   /api/v1/access-policies      -> CapMembershipView
+//	access-policies   PUT   /api/v1/access-policies      -> CapMembershipManage
+//	iam/users         GET   /api/v1/iam/users            -> CapUserView
+//	iam/users         POST/PATCH/PUT (writes)            -> CapUserManage
+//	iam/admin/overview GET  /api/v1/iam/admin/overview   -> CapUserView
+//	taxonomy/profiles GET                                -> CapTaxonomyView
+//	taxonomy/profiles POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
+//	taxonomy/areas    GET                                -> CapTaxonomyView
+//	taxonomy/areas    POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
+//	taxonomy/families GET                                -> CapTaxonomyView
+//	taxonomy/families POST/PATCH/PUT/DELETE              -> CapTaxonomyManage
+//	iam/area-memberships GET                             -> CapMembershipView
+//	iam/area-memberships POST/PUT/PATCH/DELETE           -> CapMembershipManage
 //
 // Authoring rule: every writable prefix MUST have an explicit GET row with a
 // View-grade cap; methodless rows on writable prefixes are forbidden.
@@ -172,6 +173,8 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathExact: "/api/v1/documents", capability: iamdomain.CapDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/finalize", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/archive", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/duplicate", capability: iamdomain.CapDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/comments", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/session/force-release", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/session/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/autosave/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -181,6 +184,7 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/export/pdf", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPut, pathPrefix: "/api/v1/documents", contains: "/placeholders/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPatch, pathPrefix: "/api/v1/documents", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
+	{method: http.MethodDelete, pathPrefix: "/api/v1/documents", contains: "/comments/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/submit", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/signoff", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/publish", capability: iamdomain.CapDocumentPublish, visibility: iamdelivery.VisibilityPermissionGuarded},

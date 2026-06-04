@@ -120,7 +120,7 @@ func mustJSONEqual(t *testing.T, got, want json.RawMessage) {
 func newMuxWithCommentsSvc(t *testing.T, svc *commentsStatefulSvc) *http.ServeMux {
 	t.Helper()
 	mux := http.NewServeMux()
-	h := httphandler.NewHandler(svc)
+	h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: false})
 	h.RegisterRoutes(mux)
 	return mux
 }
@@ -132,7 +132,7 @@ func TestCreateComment_RoundTrip(t *testing.T) {
 	content := json.RawMessage(`[{"type":"paragraph","children":[{"text":"hello"}]}]`)
 	payload := []byte(`{"library_comment_id":42,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"hello"}]}]}`)
 	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader(payload))
-	withAuthHeaders(postReq, "document_filler")
+	withAuthHeaders(postReq, "editor")
 	postRR := httptest.NewRecorder()
 	mux.ServeHTTP(postRR, postReq)
 	if postRR.Code != http.StatusCreated {
@@ -140,7 +140,7 @@ func TestCreateComment_RoundTrip(t *testing.T) {
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/comments", nil)
-	withAuthHeaders(getReq, "document_filler")
+	withAuthHeaders(getReq, "editor")
 	getRR := httptest.NewRecorder()
 	mux.ServeHTTP(getRR, getReq)
 	if getRR.Code != http.StatusOK {
@@ -165,7 +165,7 @@ func TestResolveComment_DerivedDoneField(t *testing.T) {
 	mux := newMuxWithCommentsSvc(t, svc)
 
 	postReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":7,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"todo"}]}]}`)))
-	withAuthHeaders(postReq, "document_filler")
+	withAuthHeaders(postReq, "editor")
 	postRR := httptest.NewRecorder()
 	mux.ServeHTTP(postRR, postReq)
 	if postRR.Code != http.StatusCreated {
@@ -173,7 +173,7 @@ func TestResolveComment_DerivedDoneField(t *testing.T) {
 	}
 
 	patchReq := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1/comments/7", bytes.NewReader([]byte(`{"done":true}`)))
-	withAuthHeaders(patchReq, "document_filler")
+	withAuthHeaders(patchReq, "editor")
 	patchRR := httptest.NewRecorder()
 	mux.ServeHTTP(patchRR, patchReq)
 	if patchRR.Code != http.StatusOK {
@@ -192,7 +192,7 @@ func TestResolveComment_DerivedDoneField(t *testing.T) {
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/comments", nil)
-	withAuthHeaders(getReq, "document_filler")
+	withAuthHeaders(getReq, "editor")
 	getRR := httptest.NewRecorder()
 	mux.ServeHTTP(getRR, getReq)
 	if getRR.Code != http.StatusOK {
@@ -215,8 +215,8 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 	mux := newMuxWithCommentsSvc(t, svc)
 
 	rootReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":100,"author_display":"Alice","content":[{"type":"paragraph","children":[{"text":"root"}]}]}`)))
-	withAuthHeaders(rootReq, "document_filler")
-	rootReq = rootReq.WithContext(iamdomain.WithAuthContext(rootReq.Context(), "user_root", []iamdomain.Role{iamdomain.Role("document_filler")}))
+	withAuthHeaders(rootReq, "editor")
+	rootReq = rootReq.WithContext(iamdomain.WithAuthContext(rootReq.Context(), "user_root", []iamdomain.Role{iamdomain.Role("editor")}))
 	rootRR := httptest.NewRecorder()
 	mux.ServeHTTP(rootRR, rootReq)
 	if rootRR.Code != http.StatusCreated {
@@ -224,8 +224,8 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 	}
 
 	replyReq := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/comments", bytes.NewReader([]byte(`{"library_comment_id":101,"parent_library_id":100,"author_display":"Bob","content":[{"type":"paragraph","children":[{"text":"reply"}]}]}`)))
-	withAuthHeaders(replyReq, "document_filler")
-	replyReq = replyReq.WithContext(iamdomain.WithAuthContext(replyReq.Context(), "user_reply", []iamdomain.Role{iamdomain.Role("document_filler")}))
+	withAuthHeaders(replyReq, "editor")
+	replyReq = replyReq.WithContext(iamdomain.WithAuthContext(replyReq.Context(), "user_reply", []iamdomain.Role{iamdomain.Role("editor")}))
 	replyRR := httptest.NewRecorder()
 	mux.ServeHTTP(replyRR, replyReq)
 	if replyRR.Code != http.StatusCreated {
@@ -233,7 +233,7 @@ func TestReplyThread_ParentLibraryID(t *testing.T) {
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/comments", nil)
-	withAuthHeaders(getReq, "document_filler")
+	withAuthHeaders(getReq, "editor")
 	getRR := httptest.NewRecorder()
 	mux.ServeHTTP(getRR, getReq)
 	if getRR.Code != http.StatusOK {
