@@ -362,8 +362,8 @@ func TestMarkObsolete_CapabilityDenied(t *testing.T) {
 	if !errors.As(err, &denied) {
 		t.Fatalf("expected ErrCapabilityDenied; got %v", err)
 	}
-	if denied.Capability != "doc.obsolete" {
-		t.Errorf("capability = %q; want %q", denied.Capability, "doc.obsolete")
+	if denied.Capability != "document.obsolete" {
+		t.Errorf("capability = %q; want %q", denied.Capability, "document.obsolete")
 	}
 	if len(emitter.Events) != 0 {
 		t.Errorf("no governance event should be emitted on denied capability; got %d", len(emitter.Events))

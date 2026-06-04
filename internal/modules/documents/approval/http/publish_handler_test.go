@@ -68,7 +68,7 @@ func TestPublishHandler(t *testing.T) {
 		},
 		{
 			name:       "authz denied",
-			svcErr:     authz.ErrCapDenied{Capability: "doc.publish", AreaCode: "tenant-1", ActorID: "actor-1"},
+			svcErr:     authz.ErrCapDenied{Capability: "document.publish", AreaCode: "tenant-1", ActorID: "actor-1"},
 			wantStatus: http.StatusForbidden,
 		},
 		{
@@ -149,7 +149,7 @@ func TestSchedulePublishHandler(t *testing.T) {
 		},
 		{
 			name:       "authz denied",
-			svcErr:     authz.ErrCapDenied{Capability: "doc.publish", AreaCode: "tenant-1", ActorID: "actor-1"},
+			svcErr:     authz.ErrCapDenied{Capability: "document.publish", AreaCode: "tenant-1", ActorID: "actor-1"},
 			wantStatus: http.StatusForbidden,
 		},
 		{
