@@ -11,10 +11,12 @@ import (
 )
 
 // requireDocEditDraft opens a short tx, sets authz GUCs, resolves the
-// document's area_code, and calls authz.Require for doc.edit_draft (area-grade).
+// document's area_code, and calls authz.Require for document.edit (area-grade).
 // The tx is rolled back after the check — no writes happen here.
 // A missing/empty area resolves to "" → authz.Require denies non-system actors
 // (fail-closed, ADR 0022 Phase 8; matches the Phase 7 document.create decision).
+// ADR 0022 Phase 10 (F2): the redundant doc.edit_draft cap was merged into the
+// canonical CapDocumentEdit — identical grant set, same area-grade enforcement.
 func requireDocEditDraft(ctx context.Context, db *sql.DB, tenantID, actorID, docID string) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -31,7 +33,7 @@ func requireDocEditDraft(ctx context.Context, db *sql.DB, tenantID, actorID, doc
 	if err != nil {
 		return fmt.Errorf("fillin authz: load area: %w", err)
 	}
-	return authz.Require(ctx, tx, string(iamdomain.CapDocumentEditDraft), areaCode)
+	return authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode)
 }
 
 func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
@@ -45,7 +47,8 @@ func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			// Fail-closed: empty area → authz.Require denies non-system actors
-			// (area-grade caps only — doc.edit_draft, doc.reconstruct). ADR 0022 Phase 8.
+			// (area-grade caps only — the edit-draft + reconstruct surfaces now
+			// gate on document.edit, ADR 0022 Phase 10). ADR 0022 Phase 8.
 			return "", nil
 		}
 		return "", err

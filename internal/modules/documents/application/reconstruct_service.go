@@ -39,7 +39,9 @@ func (s *ReconstructionService) GetReconstruction(ctx context.Context, tenantID,
 	if err != nil {
 		return fanout.ReconstructionEntry{}, fmt.Errorf("reconstruct authz: load area: %w", err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentReconstruct), areaCode); err != nil {
+	// ADR 0022 Phase 10 (F2): the redundant doc.reconstruct cap was merged into
+	// the canonical CapDocumentEdit — identical grant set, same area-grade check.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), areaCode); err != nil {
 		return fanout.ReconstructionEntry{}, err
 	}
 

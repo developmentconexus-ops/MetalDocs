@@ -68,9 +68,11 @@ func (s *ViewService) GetViewURL(ctx context.Context, tenantID, actorID, docID s
 		return documentshttp.ViewResult{}, fmt.Errorf("view: load document: %w", err)
 	}
 
-	// doc.view_published is tenant-grade (a *.view read) — pass the "tenant"
-	// sentinel so the area filter is intentionally OFF (ADR 0022 Phase 8).
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentViewPublished), "tenant"); err != nil {
+	// document.view is tenant-grade (a *.view read) — pass the "tenant" sentinel
+	// so the area filter is intentionally OFF (ADR 0022 Phase 8). ADR 0022 Phase 10
+	// (F2): the redundant doc.view_published cap was merged into the canonical
+	// CapDocumentView — identical grant set, same tenant-grade read.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentView), "tenant"); err != nil {
 		return documentshttp.ViewResult{}, err
 	}
 
