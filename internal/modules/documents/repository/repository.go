@@ -34,6 +34,53 @@ type Repository struct {
 
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
+// loadDocumentArea returns the document's process_area_code_snapshot within tx.
+// document.create/edit are area-grade (ADR 0022 Phase 7): the area is passed to
+// tier-2 authz.Require so an actor is authorized only within the document's
+// process area. Empty string when the snapshot is NULL/empty — fails closed for
+// non-system actors (system_admin still bypasses tier-2). A missing row yields
+// ("", nil) so the authz check, not a row-existence probe, decides the outcome.
+func loadDocumentArea(ctx context.Context, tx *sql.Tx, tenantID, docID string) (string, error) {
+	var area sql.NullString
+	err := tx.QueryRowContext(ctx,
+		`SELECT process_area_code_snapshot FROM documents WHERE tenant_id=$1 AND id=$2`,
+		tenantID, docID).Scan(&area)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("load document area: %w", err)
+	}
+	return area.String, nil
+}
+
+// loadDocumentAreaBySession resolves the document area from an editor session id,
+// for session-keyed edit ops that carry no docID. Same fail-closed semantics.
+func loadDocumentAreaBySession(ctx context.Context, tx *sql.Tx, tenantID, sessionID string) (string, error) {
+	var area sql.NullString
+	err := tx.QueryRowContext(ctx,
+		`SELECT d.process_area_code_snapshot
+		   FROM editor_sessions s
+		   JOIN documents d ON d.id = s.document_id AND d.tenant_id = s.tenant_id
+		  WHERE s.tenant_id=$1::uuid AND s.id=$2`,
+		tenantID, sessionID).Scan(&area)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("load document area by session: %w", err)
+	}
+	return area.String, nil
+}
+
+// docAreaSnapshot derefs a document's nullable area snapshot to a tier-2 area arg.
+func docAreaSnapshot(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // CreateDocument inserts document + initial session + initial revision in one
 // CreateDocument is the legacy (non-tx) wrapper. Only DuplicateDocument uses it.
 // Atomic flow uses CreateDocumentTx directly with a caller-owned tx.
@@ -90,7 +137,10 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 		}
 	}
 
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentCreate), "tenant"); err != nil {
+	// ADR 0022 Phase 7: a document is created INTO a process area — authorize
+	// against that area (area-grade). system_admin bypasses tier-2.
+	docArea := docAreaSnapshot(d.ProcessAreaCodeSnapshot)
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentCreate), docArea); err != nil {
 		return "", "", "", fmt.Errorf("create document: authz check: %w", err)
 	}
 
@@ -136,7 +186,7 @@ func (r *Repository) CreateDocumentTx(ctx context.Context, tx *sql.Tx, d *domain
 		return "", "", "", fmt.Errorf("insert revision: %w", err)
 	}
 
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return "", "", "", fmt.Errorf("initialize document pointers: authz check: %w", err)
 	}
 
@@ -262,7 +312,11 @@ func (r *Repository) UpdateDocumentName(ctx context.Context, tenantID, actorID, 
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("update document name: authz check: %w", err)
 	}
 
@@ -283,7 +337,11 @@ func (r *Repository) UpdateDocumentNameTx(ctx context.Context, tx *sql.Tx, tenan
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("update document name: authz check: %w", err)
 	}
 	res, err := tx.ExecContext(ctx,
@@ -519,7 +577,11 @@ func (r *Repository) UpdateDocumentStatus(ctx context.Context, tenantID, actorID
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, id)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("update document status: authz check: %w", err)
 	}
 
@@ -550,7 +612,11 @@ func (r *Repository) AcquireSession(ctx context.Context, tenantID, docID, userID
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return nil, fmt.Errorf("acquire session: authz check: %w", err)
 	}
 
@@ -629,7 +695,11 @@ func (r *Repository) ReleaseSession(ctx context.Context, tenantID, sessionID, us
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentAreaBySession(ctx, tx, tenantID, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("release session: authz check: %w", err)
 	}
 	res, err := tx.ExecContext(ctx,
@@ -658,7 +728,11 @@ func (r *Repository) ForceReleaseSession(ctx context.Context, tenantID, adminID,
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, adminID); err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentAreaBySession(ctx, tx, tenantID, sessionID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("force release session: authz check: %w", err)
 	}
 	res, err := tx.ExecContext(ctx,
@@ -827,7 +901,11 @@ func (r *Repository) CommitUpload(ctx context.Context, tenantID, sessionID, user
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return nil, fmt.Errorf("commit autosave: authz check: %w", err)
 	}
 
@@ -964,7 +1042,11 @@ func (r *Repository) SyncCurrentRevisionArtifactMetadata(ctx context.Context, te
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, userID); err != nil {
 		return nil, err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return nil, err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return nil, fmt.Errorf("sync artifact metadata: authz check: %w", err)
 	}
 
@@ -1414,7 +1496,11 @@ func (r *Repository) MarkArchived(ctx context.Context, tenantID, docID, actorID 
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("mark archived: authz check: %w", err)
 	}
 
@@ -1448,7 +1534,11 @@ func (r *Repository) Unarchive(ctx context.Context, tenantID, docID, actorID str
 	if err := authz.SeedTxIdentity(ctx, tx, tenantID, actorID); err != nil {
 		return err
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), "tenant"); err != nil {
+	docArea, err := loadDocumentArea(ctx, tx, tenantID, docID)
+	if err != nil {
+		return err
+	}
+	if err := authz.Require(ctx, tx, string(iamdomain.CapDocumentEdit), docArea); err != nil {
 		return fmt.Errorf("unarchive: authz check: %w", err)
 	}
 

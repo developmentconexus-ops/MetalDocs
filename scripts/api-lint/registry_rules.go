@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	iamdomain "metaldocs/internal/modules/iam/domain"
@@ -80,6 +81,172 @@ func RunRegistryRules(modulesRoot string, fset *token.FileSet) ([]Violation, err
 	}
 	out = append(out, wiki...)
 
+	binding, err := checkAuthzAreaScopeBinding(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, binding...)
+
+	return out, nil
+}
+
+// checkAuthzAreaScopeBinding is the ADR 0022 Phase 7 core control: it bans
+// `authz.Require(ctx, tx, <areaGradeCap>, "tenant")` — an area-grade capability
+// (per the typed IsAreaGrade classification) enforced tenant-wide because its
+// tier-2 call site passed the literal "tenant" sentinel. This is the missing
+// declaration<->enforcement binding (Principle 5): the typed scope map declared
+// the cap area-grade, but nothing forced the call site to pass a real area. A
+// regression (or a new area-grade write defaulting to "tenant") is now a red build.
+//
+// LIMITATION (mirrors no-inline-capability's literal-only limitation): the rule
+// resolves the capability argument only when it is a typed registry const
+// (`string(iamdomain.CapXxx)` / `string(CapXxx)`). A capability passed via a
+// variable or parameter (e.g. a `cap string` function param) cannot be resolved
+// to a value at lint time and is skipped. Such call sites are covered by the
+// per-call-site fixes + tests, not by this static scan. Scoped to authz.Require
+// (authz.RequireAll has a different argument shape).
+func checkAuthzAreaScopeBinding(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+	constToValue, err := parseCapabilityConsts(modulesRoot, fset)
+	if err != nil {
+		return nil, err
+	}
+	if len(constToValue) == 0 {
+		// No registry under this root (e.g. lint test fixtures); nothing to bind.
+		return nil, nil
+	}
+
+	out := []Violation{}
+	walkErr := filepath.WalkDir(modulesRoot, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".claude", "node_modules", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		lower := strings.ToLower(path)
+		if !strings.HasSuffix(lower, ".go") || strings.HasSuffix(lower, "_test.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || len(call.Args) < 4 {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "Require" {
+				return true
+			}
+			pkg, ok := sel.X.(*ast.Ident)
+			if !ok || pkg.Name != "authz" {
+				return true
+			}
+			// 4th arg (index 3) is areaCode; only the literal "tenant" sentinel bites.
+			areaLit, ok := call.Args[3].(*ast.BasicLit)
+			if !ok || areaLit.Kind != token.STRING {
+				return true
+			}
+			if val, uerr := strconv.Unquote(areaLit.Value); uerr != nil || val != "tenant" {
+				return true
+			}
+			// 3rd arg (index 2) is the capability; resolve a typed const to its value.
+			capName, ok := capConstName(call.Args[2])
+			if !ok {
+				return true // variable/unresolvable cap — documented skip
+			}
+			capVal, known := constToValue[capName]
+			if !known || !iamdomain.IsAreaGrade(capVal) {
+				return true
+			}
+			out = append(out, Violation{
+				File:    path,
+				Line:    fset.Position(call.Pos()).Line,
+				Rule:    "authz-area-scope-binding",
+				Message: "area-grade capability " + string(capVal) + " enforced with literal \"tenant\" (area filter OFF); pass the resource's real areaCode to authz.Require (ADR 0022 Phase 7 — declared area-grade in capability_scope.go must be enforced area-scoped) or reclassify the cap to ScopeTenant",
+			})
+			return true
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, walkErr
+	}
+	return out, nil
+}
+
+// capConstName extracts the capability const identifier from a tier-2 capability
+// argument. Handles the canonical `string(iamdomain.CapXxx)` / `string(CapXxx)`
+// conversion and a bare `iamdomain.CapXxx` / `CapXxx`. Returns the const name
+// (e.g. "CapDocumentEdit") and whether it was resolvable.
+func capConstName(arg ast.Expr) (string, bool) {
+	// Unwrap a single-arg string(...) conversion.
+	if call, ok := arg.(*ast.CallExpr); ok && len(call.Args) == 1 {
+		if id, ok := call.Fun.(*ast.Ident); ok && id.Name == "string" {
+			arg = call.Args[0]
+		}
+	}
+	switch e := arg.(type) {
+	case *ast.SelectorExpr: // iamdomain.CapXxx / domain.CapXxx
+		return e.Sel.Name, true
+	case *ast.Ident: // CapXxx (same package)
+		return e.Name, true
+	}
+	return "", false
+}
+
+// parseCapabilityConsts parses internal/modules/iam/domain/model.go and returns
+// the registry const-name -> Capability-value map (e.g. "CapDocumentEdit" ->
+// "document.edit"). The AST guard needs this because Go consts are not
+// reflectable: the call site carries the const identifier, not its value.
+func parseCapabilityConsts(modulesRoot string, fset *token.FileSet) (map[string]iamdomain.Capability, error) {
+	modelPath := filepath.Join(modulesRoot, "internal", "modules", "iam", "domain", "model.go")
+	raw, err := os.ReadFile(modelPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	file, err := parser.ParseFile(fset, modelPath, raw, parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]iamdomain.Capability{}
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			typeIdent, ok := vs.Type.(*ast.Ident)
+			if !ok || typeIdent.Name != "Capability" {
+				continue
+			}
+			if len(vs.Names) != 1 || len(vs.Values) != 1 {
+				continue
+			}
+			lit, ok := vs.Values[0].(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				continue
+			}
+			val, uerr := strconv.Unquote(lit.Value)
+			if uerr != nil {
+				continue
+			}
+			out[vs.Names[0].Name] = iamdomain.Capability(val)
+		}
+	}
 	return out, nil
 }
 

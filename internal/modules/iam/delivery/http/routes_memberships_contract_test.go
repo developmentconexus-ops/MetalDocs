@@ -25,7 +25,7 @@ func (f fakeUserAreaWriteRepository) ListByTenant(ctx context.Context, tenantID,
 	return nil, nil
 }
 
-func (f fakeUserAreaWriteRepository) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string) (bool, bool, error) {
+func (f fakeUserAreaWriteRepository) MembershipDirectoryScope(ctx context.Context, tenantID, actorID, capability string, now time.Time) (bool, bool, error) {
 	return false, false, nil
 }
 

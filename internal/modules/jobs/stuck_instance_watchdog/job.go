@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"metaldocs/internal/modules/documents/approval/application"
+	"metaldocs/internal/modules/iam/authz"
 	"metaldocs/internal/modules/jobs/scheduler"
 )
 
@@ -18,7 +19,6 @@ const (
 	StuckAfter  = 7 * 24 * time.Hour
 	BatchSize   = 50
 	SystemActor = "system:watchdog"
-	BypassGUC   = "watchdog"
 )
 
 type StuckInstance struct {
@@ -40,6 +40,9 @@ type governanceEmitter interface {
 
 func New(db *sql.DB, cancelSvc cancelSvcInterface, emitter governanceEmitter) scheduler.JobFunc {
 	return func(ctx context.Context, epoch int64) error {
+		// Background root: permit SystemCancelInstance's authz.BypassSystem
+		// (fail-closed off any HTTP path — ADR 0022 Phase 7, CWE-269).
+		ctx = authz.WithBackgroundBypass(ctx)
 		unlock, err := acquireRunLock(ctx, db)
 		if err != nil {
 			slog.ErrorContext(ctx, "stuck_instance_watchdog: acquire run lock failed",
@@ -128,7 +131,7 @@ func listStuckInstances(ctx context.Context, db *sql.DB) ([]StuckInstance, error
 	}
 	defer tx.Rollback()
 
-	if err := setBypassAuthzGUC(ctx, tx); err != nil {
+	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return nil, err
 	}
 
@@ -176,7 +179,7 @@ func emitStuckAlert(ctx context.Context, db *sql.DB, emitter governanceEmitter, 
 	}
 	defer tx.Rollback()
 
-	if err := setBypassAuthzGUC(ctx, tx); err != nil {
+	if err := authz.BypassSystem(ctx, tx); err != nil {
 		return err
 	}
 
@@ -205,9 +208,4 @@ func emitStuckAlert(ctx context.Context, db *sql.DB, emitter governanceEmitter, 
 	}
 
 	return tx.Commit()
-}
-
-func setBypassAuthzGUC(ctx context.Context, tx *sql.Tx) error {
-	_, err := tx.ExecContext(ctx, `SELECT set_config('metaldocs.bypass_authz', $1, true)`, BypassGUC)
-	return err
 }

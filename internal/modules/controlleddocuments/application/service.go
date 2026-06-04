@@ -208,7 +208,10 @@ func (s *ControlledDocumentService) Create(ctx context.Context, cmd CreateContro
 			if err := setAuthzGUC(ctx, createTx, cmd.TenantID, cmd.ActorUserID); err != nil {
 				return nil, fmt.Errorf("controlled_documents: set authz context: %w", err)
 			}
-			if err := authz.Require(ctx, createTx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+			// ADR 0022 Phase 7: area-scoped tier-2 — a CD is created INTO a process
+			// area, so authorize against that area (least-privilege; system_admin
+			// still bypasses). cmd.ProcessAreaCode validated active above.
+			if err := authz.Require(ctx, createTx, string(iamdomain.CapControlledDocumentCreate), cmd.ProcessAreaCode); err != nil {
 				return nil, fmt.Errorf("controlled_documents: authz check sequence allocation: %w", err)
 			}
 		}
@@ -414,7 +417,9 @@ func (s *ControlledDocumentService) PeekSeq(ctx context.Context, tenantID, profi
 	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
 		return 0, fmt.Errorf("controlled_documents: set authz context preview code: %w", err)
 	}
-	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); err != nil {
+	// ADR 0022 Phase 7: preview-code allocation is part of CD create — authorize
+	// against the target area, not tenant-wide.
+	if err := authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), areaCode); err != nil {
 		return 0, fmt.Errorf("controlled_documents: authz check preview code: %w", err)
 	}
 
@@ -505,22 +510,31 @@ func (s *ControlledDocumentService) changeStatus(ctx context.Context, tenantID, 
 	if err := setAuthzGUC(ctx, tx, tenantID, actorUserID); err != nil {
 		return fmt.Errorf("controlled_documents: set authz context changeStatus: %w", err)
 	}
-	if err := authz.Require(ctx, tx, cap, "tenant"); err != nil {
-		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
-	}
 
-	var currentStatus controlleddocumentsdomain.CDStatus
+	// ADR 0022 Phase 7: load the CD's process area (FOR UPDATE — read, not a
+	// mutation) BEFORE the tier-2 check so obsolete/supersede are authorized
+	// against the CD's real area, not tenant-wide. authz.Require still precedes
+	// the UpdateStatusTx mutation, so the tripwire pairing holds.
+	var (
+		currentStatus controlleddocumentsdomain.CDStatus
+		areaCode      string
+	)
 	if err := tx.QueryRowContext(ctx, `
-SELECT status
+SELECT status, process_area_code
   FROM controlled_documents
  WHERE tenant_id = $1
    AND id = $2
- FOR UPDATE`, tenantID, controlledDocumentID).Scan(&currentStatus); err != nil {
+ FOR UPDATE`, tenantID, controlledDocumentID).Scan(&currentStatus, &areaCode); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return controlleddocumentsdomain.ErrCDNotFound
 		}
 		return fmt.Errorf("controlled_documents: lock controlled document for status change: %w", err)
 	}
+
+	if err := authz.Require(ctx, tx, cap, areaCode); err != nil {
+		return fmt.Errorf("controlled_documents: authz check changeStatus: %w", err)
+	}
+
 	if currentStatus != controlleddocumentsdomain.CDStatusActive {
 		return controlleddocumentsdomain.ErrCDNotActive
 	}
@@ -604,7 +618,9 @@ func (s *ControlledDocumentService) CreateRevision(ctx context.Context, cmd Crea
 	if txErr = setAuthzGUC(ctx, tx, cmd.TenantID, actorUserID); txErr != nil {
 		return nil, fmt.Errorf("controlled_documents: set authz guc for create revision: %w", txErr)
 	}
-	if txErr = authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), "tenant"); txErr != nil {
+	// ADR 0022 Phase 7: a revision is created within the CD's own process area —
+	// authorize against cd.ProcessAreaCode (loaded above), not tenant-wide.
+	if txErr = authz.Require(ctx, tx, string(iamdomain.CapControlledDocumentCreate), cd.ProcessAreaCode); txErr != nil {
 		return nil, fmt.Errorf("controlled_documents: authz check create revision: %w", txErr)
 	}
 
