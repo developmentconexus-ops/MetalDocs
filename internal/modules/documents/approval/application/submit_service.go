@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -84,7 +85,9 @@ func (s *SubmitService) SubmitRevisionForReview(ctx context.Context, db *sql.DB,
 		return SubmitResult{}, fmt.Errorf("submit: %w", err)
 	}
 
-	areaCode, err := loadDocumentAreaCode(ctx, tx, req.TenantID, req.DocumentID)
+	// document.submit is area-grade: pass the resolved area as-is ("" fail-closes,
+	// denying non-system actors). ADR 0022 Phase 11 (F7): shared LoadDocumentAreaCode.
+	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, req.DocumentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return SubmitResult{}, fmt.Errorf("submit: load document area: %w", err)
@@ -312,29 +315,6 @@ func (s *SubmitService) loadRoute(ctx context.Context, tx *sql.Tx, tenantID, rou
 	}
 
 	return route, nil
-}
-
-func loadDocumentAreaCode(ctx context.Context, tx *sql.Tx, tenantID, documentID string) (string, error) {
-	var areaCode string
-	err := tx.QueryRowContext(ctx, `
-		SELECT COALESCE(d.process_area_code_snapshot, cd.process_area_code, '')
-		  FROM documents d
-		  LEFT JOIN controlled_documents cd ON d.controlled_document_id = cd.id
-		 WHERE d.id = $1 AND d.tenant_id = $2`,
-		documentID, tenantID,
-	).Scan(&areaCode)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// Fail-closed: a missing document resolves to "" → authz.Require
-			// denies non-system actors for area-grade caps (submit / signoff /
-			// publish / supersede). ADR 0022 Phase 8 (matches Phase 7 document.*).
-			// The lone tenant-grade caller (read_service, document.view) coalesces
-			// "" -> "tenant" at its call site to keep the area filter OFF.
-			return "", nil
-		}
-		return "", err
-	}
-	return areaCode, nil
 }
 
 // resolveEligibleActors returns the user_ids of all users who hold required_role

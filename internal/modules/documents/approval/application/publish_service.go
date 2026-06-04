@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
@@ -80,7 +81,8 @@ func (s *PublishService) PublishApproved(ctx context.Context, db *sql.DB, req Pu
 		return PublishResult{}, ErrInstanceNotApproved
 	}
 
-	areaCode, err := loadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
+	// document.publish is area-grade: pass the resolved area as-is ("" fail-closes).
+	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return PublishResult{}, fmt.Errorf("publishApproved: load document area: %w", err)
@@ -226,7 +228,8 @@ func (s *PublishService) SchedulePublish(ctx context.Context, db *sql.DB, req Sc
 		return SchedulePublishResult{}, ErrInstanceNotApproved
 	}
 
-	areaCode, err := loadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
+	// document.publish is area-grade: pass the resolved area as-is ("" fail-closes).
+	areaCode, _, err := docapp.LoadDocumentAreaCode(ctx, tx, req.TenantID, instance.DocumentID)
 	if err != nil {
 		_ = tx.Rollback()
 		return SchedulePublishResult{}, fmt.Errorf("schedulePublish: load document area: %w", err)
