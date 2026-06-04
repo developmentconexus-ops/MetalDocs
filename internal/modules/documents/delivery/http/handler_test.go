@@ -59,9 +59,23 @@ type fakeSvc struct {
 	statsErr    error
 
 	getDocumentResult *domain.Document
+
+	notOwner bool
 }
 
 var _ httphandler.Service = (*fakeSvc)(nil)
+
+// fakeCaps is a test double for application.CapabilityChecker. Roles are now
+// cosmetic to the handler — this fake drives the admin / ownership-scoped paths.
+type fakeCaps struct{ admin bool }
+
+func (f fakeCaps) CanDo(_ context.Context, _, _ string, _ iamdomain.Capability) error {
+	return nil
+}
+
+func (f fakeCaps) IsSystemAdmin(_ context.Context, _, _ string) (bool, error) {
+	return f.admin, nil
+}
 
 func (f *fakeSvc) CreateDocument(_ context.Context, _ application.CreateDocumentInput) (*application.CreateDocumentResult, error) {
 	return &application.CreateDocumentResult{DocumentID: "doc_1", InitialRevisionID: "rev_1", SessionID: "sess_1"}, nil
@@ -135,7 +149,7 @@ func (f *fakeSvc) DocumentStats(_ context.Context, _, _ string, _ application.Li
 }
 
 func (f *fakeSvc) IsDocumentOwner(_ context.Context, _, _, _ string) (bool, error) {
-	return true, nil
+	return !f.notOwner, nil
 }
 
 func (f *fakeSvc) AcquireSession(_ context.Context, _, _, _ string) (*domain.Session, bool, error) {
@@ -250,7 +264,7 @@ func (f *fakeSvc) DeleteDocumentComment(_ context.Context, _, _, _ string, _ int
 
 func newMux(t *testing.T, svc *fakeSvc) *http.ServeMux {
 	t.Helper()
-	h := httphandler.NewHandler(svc)
+	h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: false})
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	return mux
@@ -301,7 +315,7 @@ func TestListDocuments_Happy(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -316,7 +330,7 @@ func TestGetDocument_EmbedsFormDataJSON(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1", nil)
 	req.SetPathValue("id", "doc_1")
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -360,7 +374,7 @@ func TestGetDocument_ReturnsCurrentRevisionArtifactMetadata(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1", nil)
 	req.SetPathValue("id", "doc_1")
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -383,27 +397,89 @@ func TestGetDocument_ReturnsCurrentRevisionArtifactMetadata(t *testing.T) {
 	}
 }
 
-func TestListDocuments_Forbidden(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
+// TestListDocuments_NonAdminOwnScope replaces the former
+// TestListDocuments_Forbidden: the handler no longer role-gates the list. A
+// non-admin caller is allowed and is scoped to documents they created — the
+// handler passes effectiveUserID == caller to ListDocumentsPaginated.
+func TestListDocuments_NonAdminOwnScope(t *testing.T) {
+	svc := &fakeSvc{}
+	mux := newMux(t, svc) // fakeCaps{admin:false}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
-	withAuthHeaders(req, "template_author")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", rr.Code)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
 	}
-	if ct := rr.Header().Get("Content-Type"); ct != "application/problem+json" {
-		t.Errorf("want application/problem+json, got %s", ct)
+	if svc.listPaginatedUser != "user_1" {
+		t.Fatalf("non-admin must be own-scoped: effectiveUserID = %q, want %q", svc.listPaginatedUser, "user_1")
 	}
+}
+
+// TestListDocuments_NonAdminCanonicalRole_Allowed is the Phase-9 defect-fix
+// proof: a canonical non-admin role that pre-Phase-9 hit the phantom-role 403
+// now lists successfully (200).
+func TestListDocuments_NonAdminCanonicalRole_Allowed(t *testing.T) {
+	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
+	withAuthHeaders(req, "editor")
+	rr := httptest.NewRecorder()
+
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestListDocuments_AdminSeesAllVsOwnScope proves admin (resolved via the
+// capability checker, not a role string) sees all documents — effectiveUserID
+// passed to the service is "" — while a non-admin caller is scoped to "user_1".
+func TestListDocuments_AdminSeesAllVsOwnScope(t *testing.T) {
+	t.Run("admin sees all", func(t *testing.T) {
+		svc := &fakeSvc{}
+		h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: true})
+		mux := http.NewServeMux()
+		h.RegisterRoutes(mux)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
+		withAuthHeaders(req, "system_admin")
+		rr := httptest.NewRecorder()
+
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rr.Code)
+		}
+		if svc.listPaginatedUser != "" {
+			t.Fatalf("admin must see all: effectiveUserID = %q, want \"\"", svc.listPaginatedUser)
+		}
+	})
+
+	t.Run("non-admin own-scope", func(t *testing.T) {
+		svc := &fakeSvc{}
+		mux := newMux(t, svc) // fakeCaps{admin:false}
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil)
+		withAuthHeaders(req, "editor")
+		rr := httptest.NewRecorder()
+
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rr.Code)
+		}
+		if svc.listPaginatedUser != "user_1" {
+			t.Fatalf("non-admin must be own-scoped: effectiveUserID = %q, want %q", svc.listPaginatedUser, "user_1")
+		}
+	})
 }
 
 func TestAcquireSession_Happy(t *testing.T) {
 	mux := newMux(t, &fakeSvc{acquireSession: &domain.Session{ID: "sess_1"}})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -412,11 +488,14 @@ func TestAcquireSession_Happy(t *testing.T) {
 	}
 }
 
+// TestAcquireSession_Forbidden now exercises the ownership invariant: a
+// non-admin, non-owner caller is denied (403) by the handler's
+// IsDocumentOwner check.
 func TestAcquireSession_Forbidden(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
+	mux := newMux(t, &fakeSvc{notOwner: true}) // fakeCaps{admin:false}, not the owner
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/acquire", bytes.NewReader([]byte(`{}`)))
-	withAuthHeaders(req, "template_author")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -430,7 +509,7 @@ func TestCommitAutosave_IdempotentReplay_Returns200(t *testing.T) {
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1}}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -462,7 +541,7 @@ func TestCommitAutosave_AcceptsPageCountAndReturnsArtifactMetadata(t *testing.T)
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","form_data_snapshot":{"a":1},"page_count":3}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -493,7 +572,7 @@ func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 
 	body := []byte(`{"session_id":"sess_1","pending_upload_id":"pending_1","page_count":0}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/autosave/commit", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -508,17 +587,21 @@ func TestCommitAutosave_InvalidPageCountUsesProblemEnvelope(t *testing.T) {
 	}
 }
 
-func TestForceReleaseSession_RequiresAdmin(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
+// TestForceReleaseSession_HandlerNoLongerRoleGates replaces the former
+// _RequiresAdmin test. The handler no longer enforces a role gate here —
+// authorization is now the tier-1 CapMembershipManage rule (proven in
+// permissions_test.go). The handler simply forwards and returns 204.
+func TestForceReleaseSession_HandlerNoLongerRoleGates(t *testing.T) {
+	mux := newMux(t, &fakeSvc{}) // fakeCaps{admin:false} — handler does not gate
 
 	body := []byte(`{"session_id":"sess_1"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/session/force-release", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", rr.Code)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d body=%s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -528,7 +611,7 @@ func TestRenameDocument_Happy(t *testing.T) {
 
 	body := []byte(`{"name":"Updated Name"}`)
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -546,7 +629,7 @@ func TestRenameDocument_EmptyName_Returns400(t *testing.T) {
 
 	body := []byte(`{"name":"   "}`)
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -561,7 +644,7 @@ func TestRenameDocument_NameTooLong_Returns400WithoutCallingService(t *testing.T
 
 	body := []byte(`{"name":"` + strings.Repeat("a", 256) + `"}`)
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", bytes.NewReader(body))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -577,7 +660,7 @@ func TestFinalizeDocument_MissingIdempotencyKey_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -590,7 +673,7 @@ func TestFinalizeDocument_InvalidIdempotencyKey_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", nil)
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "not-a-uuid")
 	rr := httptest.NewRecorder()
 
@@ -604,7 +687,7 @@ func TestFinalizeDocument_AllowsMissingRevisionTitleAtHTTPBoundary(t *testing.T)
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{}`)))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rr := httptest.NewRecorder()
 
@@ -631,7 +714,7 @@ func TestFinalizeDocument_ProfileNotFoundUsesProblemEnvelope(t *testing.T) {
 	h.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste"}`)))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rr := httptest.NewRecorder()
 
@@ -661,7 +744,7 @@ func TestFinalizeDocument_ReplayReturnsCreatedAndHeader(t *testing.T) {
 	h.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", key)
 	if tid, err := tenant.FromContext(req.Context()); err != nil || tid == "" {
 		t.Fatalf("tenant missing before ServeHTTP: tid=%q err=%v", tid, err)
@@ -717,7 +800,7 @@ func TestFinalizeDocument_ContentHashQueryNoRows_ContinuesWithEmptyHash(t *testi
 	h.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rr := httptest.NewRecorder()
 
@@ -770,7 +853,7 @@ func TestFinalizeDocument_ContentHashQueryError_Returns500(t *testing.T) {
 	h.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{"revisionTitle":"Ajuste operacional"}`)))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
 	rr := httptest.NewRecorder()
 
@@ -791,7 +874,7 @@ func TestDuplicateDocument_InternalError_DoesNotLeakDetail(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/duplicate", nil)
 	req.SetPathValue("id", "doc_1")
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -807,7 +890,7 @@ func TestCreateCheckpoint_EmptyLabel_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/checkpoints", bytes.NewReader([]byte(`{"label":"   "}`)))
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -848,7 +931,7 @@ func TestListRevisionHistory_ReturnsGovernedItems(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/doc_1/revision-history", nil)
 	req.SetPathValue("id", "doc_1")
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)

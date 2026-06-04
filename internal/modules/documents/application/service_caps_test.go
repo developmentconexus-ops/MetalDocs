@@ -11,17 +11,22 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
-// capCheckerFunc is a function adapter for application.CapabilityChecker.
-type capCheckerFunc func(ctx context.Context, userID, tenantID string, cap iamdomain.Capability) error
+// capChecker is a struct fake for application.CapabilityChecker.
+type capChecker struct {
+	deny  error
+	admin bool
+}
 
-func (f capCheckerFunc) CanDo(ctx context.Context, u, t string, c iamdomain.Capability) error {
-	return f(ctx, u, t, c)
+func (f capChecker) CanDo(_ context.Context, _, _ string, _ iamdomain.Capability) error {
+	return f.deny
+}
+
+func (f capChecker) IsSystemAdmin(_ context.Context, _, _ string) (bool, error) {
+	return f.admin, nil
 }
 
 func TestCreateDocument_DeniesWhenCapabilityChecker_Denies(t *testing.T) {
-	denying := capCheckerFunc(func(ctx context.Context, userID, tenantID string, cap iamdomain.Capability) error {
-		return iamapp.ErrCapabilityDenied
-	})
+	denying := capChecker{deny: iamapp.ErrCapabilityDenied}
 
 	cd := &controlleddocumentsdomain.ControlledDocument{
 		ID:              "cd_1",

@@ -52,6 +52,9 @@ type Dependencies struct {
 }
 
 func New(deps Dependencies) *Module {
+	if deps.Caps == nil {
+		panic("documents.New: Caps (CapabilityChecker) is required for handler authorization")
+	}
 	repo := repository.New(deps.DB)
 	var svc *application.Service
 	if deps.SnapshotReader != nil && deps.SnapshotWriter != nil {
@@ -62,7 +65,7 @@ func New(deps Dependencies) *Module {
 	}
 	svc.WithDB(deps.DB)
 	svc.WithControlledDocumentDuplicator(deps.ControlledDocumentDuplicator)
-	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc)
+	h := dhttp.NewHandlerWithSubmit(svc, deps.DB, deps.SubmitSvc).WithCaps(deps.Caps)
 
 	var exportHandler *dhttp.ExportHandler
 	if deps.ExportPresign != nil && deps.ExportDocgen != nil {

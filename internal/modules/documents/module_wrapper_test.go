@@ -144,14 +144,14 @@ func TestRegisterRoutes_WrapperForwardsRepresentativeRoutes(t *testing.T) {
 	mod.RegisterRoutes(mux)
 	docID := "11111111-1111-4111-8111-111111111111"
 
-	req := withModuleAuth(httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil), "document_filler")
+	req := withModuleAuth(httptest.NewRequest(http.MethodGet, "/api/v1/documents", nil), "editor")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
 
-	req = withModuleAuth(httptest.NewRequest(http.MethodGet, "/api/v1/documents/"+docID+"/placeholder-options/p-sel", nil), "document_filler")
+	req = withModuleAuth(httptest.NewRequest(http.MethodGet, "/api/v1/documents/"+docID+"/placeholder-options/p-sel", nil), "editor")
 	rr = httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
@@ -171,7 +171,7 @@ func TestRegisterRoutesWithRateLimit_WrapperForwardingStillWorks(t *testing.T) {
 	})
 
 	reqBody := strings.NewReader(`{"session_id":"sess_1","base_revision_id":"rev_1","content_hash":"abc"}`)
-	req := withModuleAuth(httptest.NewRequest(http.MethodPost, "/api/v1/documents/"+docID+"/autosave/presign", reqBody), "document_filler")
+	req := withModuleAuth(httptest.NewRequest(http.MethodPost, "/api/v1/documents/"+docID+"/autosave/presign", reqBody), "editor")
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {

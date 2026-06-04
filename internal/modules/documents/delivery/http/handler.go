@@ -26,12 +26,6 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-const (
-	roleAdmin          = "system_admin"
-	roleTemplateAuthor = "template_author"
-	roleDocumentFiller = "document_filler"
-)
-
 type Service interface {
 	// Unused by HTTP handlers (no route). Kept for DuplicateDocument internal use.
 	CreateDocument(ctx context.Context, cmd application.CreateDocumentInput) (*application.CreateDocumentResult, error)
@@ -79,9 +73,25 @@ type Handler struct {
 	db            *sql.DB
 	submitSvc     approvalSubmitter
 	idempFinalize finalizeIdempotencyStore
+	caps          application.CapabilityChecker
 }
 
 var writeJSON = httpresponse.WriteJSON
+
+// WithCaps binds the tier-1 capability checker used to resolve system_admin.
+func (h *Handler) WithCaps(c application.CapabilityChecker) *Handler {
+	h.caps = c
+	return h
+}
+
+// isSystemAdmin resolves admin via the capability model. A nil checker fails
+// closed (false) so callers fall back to the ownership-scoped path.
+func (h *Handler) isSystemAdmin(ctx context.Context, userID, tenantID string) (bool, error) {
+	if h.caps == nil {
+		return false, nil
+	}
+	return h.caps.IsSystemAdmin(ctx, userID, tenantID)
+}
 
 func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
 
@@ -166,18 +176,17 @@ func (h *Handler) RegisterRoutesWithRateLimit(mux *http.ServeMux, rl *ratelimit.
 }
 
 func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
-	if !hasAnyRole(r, roleAdmin, roleDocumentFiller) {
-		httpErr(w, http.StatusForbidden, "forbidden")
-		return
-	}
-
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 	callerUserID := userIDFromReq(r)
-	isAdmin := hasRole(r, roleAdmin)
+	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
 		log.Printf("documents listDocuments invalid query params: %v", err)
@@ -201,18 +210,17 @@ func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) documentStats(w http.ResponseWriter, r *http.Request) {
-	if !hasAnyRole(r, roleAdmin, roleDocumentFiller) {
-		httpErr(w, http.StatusForbidden, "forbidden")
-		return
-	}
-
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 	callerUserID := userIDFromReq(r)
-	isAdmin := hasRole(r, roleAdmin)
+	isAdmin, err := h.isSystemAdmin(r.Context(), callerUserID, tenantID)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
 	opts, effectiveUserID, err := parseListOptions(r, callerUserID, isAdmin)
 	if err != nil {
 		log.Printf("documents documentStats invalid query params: %v", err)
@@ -731,10 +739,6 @@ func (h *Handler) releaseSession(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) forceReleaseSession(w http.ResponseWriter, r *http.Request) {
 	r = withAdminCtx(r)
 	docID := r.PathValue("id")
-	if !hasRole(r, roleAdmin) {
-		httpErr(w, http.StatusForbidden, "forbidden")
-		return
-	}
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, "internal_error")
@@ -1152,17 +1156,18 @@ func toCommentResponse(c domain.Comment) commentResponse {
 }
 
 func (h *Handler) authorizeDocumentScope(w http.ResponseWriter, r *http.Request, docID string) (tenantID string, userID string, ok bool) {
-	if !hasAnyRole(r, roleAdmin, roleDocumentFiller) {
-		httpErr(w, http.StatusForbidden, "forbidden")
-		return "", "", false
-	}
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, "internal_error")
 		return "", "", false
 	}
 	userID = userIDFromReq(r)
-	if hasRole(r, roleAdmin) {
+	admin, err := h.isSystemAdmin(r.Context(), userID, tenantID)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "internal_error")
+		return "", "", false
+	}
+	if admin {
 		return tenantID, userID, true
 	}
 
@@ -1191,24 +1196,6 @@ func withAdminCtx(r *http.Request) *http.Request {
 	}
 	ctx := iamdomain.WithAuthContext(r.Context(), userID, roles)
 	return r.WithContext(ctx)
-}
-
-func hasAnyRole(r *http.Request, want ...string) bool {
-	for _, w := range want {
-		if hasRole(r, w) {
-			return true
-		}
-	}
-	return false
-}
-
-func hasRole(r *http.Request, want string) bool {
-	for _, role := range iamdomain.RolesFromContext(r.Context()) {
-		if string(role) == want {
-			return true
-		}
-	}
-	return false
 }
 
 func tenantIDFromReq(r *http.Request) (string, error) {
