@@ -69,7 +69,7 @@ func TestCancelHandler(t *testing.T) {
 		{
 			name:         "authz denied",
 			body:         `{"reason":"request withdrawn"}`,
-			svcErr:       authz.ErrCapDenied{Capability: "workflow.instance.cancel", AreaCode: "tenant-1", ActorID: "actor-1"},
+			svcErr:       authz.ErrCapDenied{Capability: "document.edit", AreaCode: "tenant-1", ActorID: "actor-1"},
 			wantStatus:   http.StatusForbidden,
 			wantSvcCalls: true,
 		},
