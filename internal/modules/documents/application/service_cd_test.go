@@ -34,6 +34,10 @@ func (f *fakeAuthzChecker) CanDo(_ context.Context, _, _ string, _ iamdomain.Cap
 	return f.err
 }
 
+func (f *fakeAuthzChecker) IsSystemAdmin(_ context.Context, _, _ string) (bool, error) {
+	return false, nil
+}
+
 type fakeProfileDefaultTemplateReader struct {
 	id     *string
 	status *string

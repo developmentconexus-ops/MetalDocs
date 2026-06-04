@@ -381,9 +381,9 @@ func (r *Repository) ListDocuments(ctx context.Context, tenantID string) ([]doma
 	return out, rows.Err()
 }
 
-// ListDocumentsForUser restricts metadata leakage for document_filler role -
-// returns only docs the actor created. Admins / template_* roles use the
-// unrestricted ListDocuments path instead.
+// ListDocumentsForUser returns only docs the actor created (ownership-scoped
+// list path; system_admin uses the unrestricted ListDocuments path). ADR 0022
+// Phase 9.
 func (r *Repository) ListDocumentsForUser(ctx context.Context, tenantID, userID string) ([]domain.Document, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, tenant_id, template_version_id, name, status, form_data_json,
@@ -1378,7 +1378,7 @@ func (r *Repository) RestoreCheckpoint(ctx context.Context, tenantID, docID, act
 }
 
 // IsDocumentOwner returns true iff the document was created by userID under
-// tenantID. Used by handler-level defense-in-depth for document_filler routes.
+// tenantID. Used by handler-level ownership defense-in-depth (ADR 0022 Phase 9).
 func (r *Repository) IsDocumentOwner(ctx context.Context, tenantID, docID, userID string) (bool, error) {
 	var ok bool
 	err := r.db.QueryRowContext(ctx,

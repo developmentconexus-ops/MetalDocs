@@ -3182,6 +3182,8 @@ paths:
     post:
       tags: [documents]
       operationId: duplicateDocument
+      x-authz-skip-area: true
+      x-authz-skip-reason: 'Area-grade (ADR 0022 Phase 2/7): document.create is enforced at the tx-layer via CreateDocumentTx authz.Require with the resolved document ProcessAreaCode, not in the handler. Phase 9 routes this op to CapDocumentCreate at tier-1; tier-2 area enforcement is the tx guard, so no handler-level x-authz-area applies.'
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         '201':

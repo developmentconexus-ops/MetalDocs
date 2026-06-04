@@ -81,13 +81,10 @@ SELECT EXISTS (
 	return nil
 }
 
-// CapsByUserID returns the distinct capability codes the user holds in the
-// tenant via direct roles or group roles. system_admin returns the full known
-// capability set (mirrors the bypass semantics of CanDo / authz.Require).
-//
-// Intended for tier-1 UX hints (e.g. /auth/me); backend mutation paths must
-// still call CanDo or authz.Require — never trust this result as enforcement.
-func (s *CapabilityService) CapsByUserID(ctx context.Context, userID, tenantID string) ([]iamdomain.Capability, error) {
+// IsSystemAdmin reports whether the user holds the system_admin role in the
+// tenant via a direct role assignment or group membership. system_admin
+// bypasses ownership and capability checks (mirrors CanDo / authz.Require).
+func (s *CapabilityService) IsSystemAdmin(ctx context.Context, userID, tenantID string) (bool, error) {
 	const adminQuery = `
 SELECT EXISTS (
   SELECT 1
@@ -107,6 +104,20 @@ SELECT EXISTS (
 )`
 	var isAdmin bool
 	if err := s.db.QueryRowContext(ctx, adminQuery, userID, tenantID).Scan(&isAdmin); err != nil {
+		return false, fmt.Errorf("is system admin: %w", err)
+	}
+	return isAdmin, nil
+}
+
+// CapsByUserID returns the distinct capability codes the user holds in the
+// tenant via direct roles or group roles. system_admin returns the full known
+// capability set (mirrors the bypass semantics of CanDo / authz.Require).
+//
+// Intended for tier-1 UX hints (e.g. /auth/me); backend mutation paths must
+// still call CanDo or authz.Require — never trust this result as enforcement.
+func (s *CapabilityService) CapsByUserID(ctx context.Context, userID, tenantID string) ([]iamdomain.Capability, error) {
+	isAdmin, err := s.IsSystemAdmin(ctx, userID, tenantID)
+	if err != nil {
 		return nil, fmt.Errorf("caps for user: admin check: %w", err)
 	}
 	if isAdmin {

@@ -1,14 +1,29 @@
 package http_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"metaldocs/internal/modules/documents/application"
+	httphandler "metaldocs/internal/modules/documents/delivery/http"
 	"metaldocs/internal/modules/documents/domain"
 )
+
+// statsCapturingSvc wraps fakeSvc to record the userID the handler resolves and
+// passes to DocumentStats, so the admin -> all-scope ("") resolution can be
+// asserted (fakeSvc.DocumentStats itself discards the userID arg).
+type statsCapturingSvc struct {
+	*fakeSvc
+	statsUser string
+}
+
+func (s *statsCapturingSvc) DocumentStats(ctx context.Context, tenantID, userID string, opts application.ListOptions) (*application.DocumentStats, error) {
+	s.statsUser = userID
+	return s.fakeSvc.DocumentStats(ctx, tenantID, userID, opts)
+}
 
 func TestListDocuments_Paginated_Envelope(t *testing.T) {
 	svc := &fakeSvc{
@@ -18,7 +33,7 @@ func TestListDocuments_Paginated_Envelope(t *testing.T) {
 	mux := newMux(t, svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?page=1&pageSize=5", nil)
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -44,7 +59,7 @@ func TestListDocuments_PageSizeCap_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?page=1&pageSize=999", nil)
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -57,7 +72,7 @@ func TestListDocuments_InvalidStatus_Returns400(t *testing.T) {
 	mux := newMux(t, &fakeSvc{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents?status=not_real", nil)
-	withAuthHeaders(req, "document_filler")
+	withAuthHeaders(req, "editor")
 	rr := httptest.NewRecorder()
 
 	mux.ServeHTTP(rr, req)
@@ -67,13 +82,15 @@ func TestListDocuments_InvalidStatus_Returns400(t *testing.T) {
 }
 
 func TestDocumentStats_OK(t *testing.T) {
-	svc := &fakeSvc{
+	svc := &statsCapturingSvc{fakeSvc: &fakeSvc{
 		statsResult: &application.DocumentStats{
 			ByStatus: map[string]int64{"draft": 2},
 			ByArea:   map[string]int64{"RH": 1},
 		},
-	}
-	mux := newMux(t, svc)
+	}}
+	h := httphandler.NewHandler(svc).WithCaps(fakeCaps{admin: true})
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/documents/stats", nil)
 	withAuthHeaders(req, "system_admin")
@@ -90,5 +107,10 @@ func TestDocumentStats_OK(t *testing.T) {
 	}
 	if out.ByStatus["draft"] != 2 || out.ByArea["RH"] != 1 {
 		t.Fatalf("unexpected stats: %+v", out)
+	}
+	// admin must resolve to the all-scope: effectiveUserID == "" (mirrors
+	// TestListDocuments_AdminSeesAllVsOwnScope's listPaginatedUser assertion).
+	if svc.statsUser != "" {
+		t.Fatalf("admin must see all: stats userID = %q, want \"\"", svc.statsUser)
 	}
 }
