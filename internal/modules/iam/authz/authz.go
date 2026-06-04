@@ -92,6 +92,21 @@ func Require(ctx context.Context, tx *sql.Tx, capability, areaCode string) error
 		return fmt.Errorf("authz: system_admin check: %w", err)
 	}
 	if isAdmin {
+		// ADR 0022 Phase 11 (F8): audit every system_admin tier-2 short-circuit so a
+		// tenant-wide bypass is visible in the audit.read surface at the same fidelity
+		// as a normal grant. In-tx + fail-closed: if the audit write fails the
+		// bypassed operation rolls back (a bypass cannot commit unaudited). A nil sink
+		// (unit tests / tools) is a no-op that adds no SQL. The cap-cache short-circuit
+		// above means this fires once per (actor,tenant,cap,area) per tx, not per call.
+		if err := recordBypass(ctx, tx, BypassEvent{
+			Kind:       BypassKindSystemAdmin,
+			ActorID:    actorID,
+			TenantID:   tenantID,
+			Capability: capability,
+			AreaCode:   areaCode,
+		}); err != nil {
+			return fmt.Errorf("authz: record system_admin bypass audit: %w", err)
+		}
 		storeGranted(ctx, tx, actorID, tenantID, capability, areaCode)
 		return appendAssertedCap(ctx, tx, capability, areaCode)
 	}
@@ -153,7 +168,22 @@ func BypassSystem(ctx context.Context, tx *sql.Tx) error {
 	if !isBackgroundContext(ctx) {
 		return ErrBypassNotBackground
 	}
-	return setBypassGUC(ctx, tx)
+	if err := setBypassGUC(ctx, tx); err != nil {
+		return err
+	}
+	// ADR 0022 Phase 11 (F8): audit every background bypass-bridge invocation. When
+	// the sink is unset (unit tests / tools) this adds no SQL — the nil check guards
+	// the softGUC reads. Cross-tenant system sweeps that never seed identity are
+	// attributed to actor "system" / tenant "" (audit_events allows empty tenant);
+	// their actual mutations remain separately audited via their governance events.
+	if bypassAuditSink == nil {
+		return nil
+	}
+	return recordBypass(ctx, tx, BypassEvent{
+		Kind:     BypassKindBackground,
+		ActorID:  softActorID(ctx, tx),
+		TenantID: softTenantID(ctx, tx),
+	})
 }
 
 func setBypassGUC(ctx context.Context, tx *sql.Tx) error {
