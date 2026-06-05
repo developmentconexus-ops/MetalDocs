@@ -37,7 +37,8 @@ jobs:
         run: npm install -g openapi-typescript@7
       - name: Regenerate types
         run: |
-          openapiTS api/openapi/spec2.yaml \
+          mkdir -p frontend/apps/web/src/features/approval/api/__generated__
+          npx --yes openapi-typescript@7 api/openapi/spec2.yaml \
             -o frontend/apps/web/src/features/approval/api/__generated__/openapi.ts
       - name: Assert no drift
         run: git diff --exit-code frontend/apps/web/src/features/approval/api/__generated__/
@@ -52,7 +53,7 @@ jobs:
       - name: Check gapless sequence + no historical edits
         run: |
           set -euo pipefail
-          MIGRATION_DIR="migrations"
+          MIGRATION_DIR="db/migrations"
 
           # Discover min and max from filesystem (never hardcoded)
           nums=$(ls "$MIGRATION_DIR"/*.sql 2>/dev/null \
@@ -129,5 +130,8 @@ jobs:
       - name: staticcheck
         uses: dominikh/staticcheck-action@v1
         with:
-          version: "2024.1"
+          # 2024.1 fails to compile under Go 1.25 (its vendored x/tools hits
+          # "invalid array length"); 2025.1.1 is the first release with Go 1.25
+          # support and the same check set.
+          version: "2025.1.1"
           install-go: false
