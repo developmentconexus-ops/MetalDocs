@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"regexp"
 	"strconv"
 	"time"
@@ -24,17 +23,12 @@ type FillInWriter interface {
 	UpsertValue(ctx context.Context, v repository.PlaceholderValue, q ...repository.DBTX) error
 }
 
-type draftResolver interface {
-	ResolveComputedIfStale(ctx context.Context, tenantID, revisionID string) error
-}
-
 type FillInService struct {
 	db            *sql.DB
 	schemas       SchemaReader
 	writer        FillInWriter
 	reader        FillInReader
 	schemaFromTpl *TemplateVersionSchemaReader
-	draftResolver draftResolver
 	iam           IAMUserOptionsReader
 }
 
@@ -49,13 +43,6 @@ func NewFillInService(db *sql.DB, s SchemaReader, w FillInWriter) *FillInService
 // Never use in production wiring — authz bypass is intentional and audited here.
 func NewFillInServiceNoAuthz(s SchemaReader, w FillInWriter) *FillInService {
 	return &FillInService{schemas: s, writer: w}
-}
-
-// WithDraftResolver attaches a DraftResolverService that runs best-effort after
-// each user placeholder upsert. Errors are logged but not propagated.
-func (s *FillInService) WithDraftResolver(r draftResolver) *FillInService {
-	s.draftResolver = r
-	return s
 }
 
 // WithIAMReader attaches an IAMUserOptionsReader for validating user-typed placeholders.
@@ -144,11 +131,6 @@ func (s *FillInService) SetPlaceholderValue(ctx context.Context, tenantID, actor
 		ResolverVersion: nil,
 	}); err != nil {
 		return err
-	}
-	if s.draftResolver != nil {
-		if rerr := s.draftResolver.ResolveComputedIfStale(ctx, tenantID, revisionID); rerr != nil {
-			slog.WarnContext(ctx, "draft resolver best-effort error", "tenant_id", tenantID, "revision_id", revisionID, "err", rerr)
-		}
 	}
 	return nil
 }
