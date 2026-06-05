@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -45,6 +46,43 @@ func ParseRole(raw string) (Role, error) {
 		return "", ErrInvalidRole
 	}
 	return role, nil
+}
+
+// areaRoles is the subset of canonical roles assignable as an AREA membership
+// (a public.user_process_areas row). It is every canonical role EXCEPT
+// system_admin: system_admin is a tenant-wide tier-1 role that bypasses tier-2
+// and is never an area membership. This set is the Go single source of truth for
+// area-assignable roles and mirrors the user_process_areas role CHECK constraint
+// in the DB. Consumers that resolve actors by an area role (e.g. the approval
+// module's stage required_role, joined against user_process_areas.role) bind
+// against this set so a role no user can ever hold cannot be configured
+// (ADR 0022 — role strings are bound to the registry, never free text).
+var areaRoles = map[Role]struct{}{
+	RoleApprover:  {},
+	RoleAreaAdmin: {},
+	RoleAuthor:    {},
+	RoleEditor:    {},
+	RoleQmsAdmin:  {},
+	RoleSigner:    {},
+	RoleViewer:    {},
+}
+
+// IsAreaRole reports whether role can be held as an area membership
+// (user_process_areas). system_admin is intentionally excluded — it is tenant-wide.
+func IsAreaRole(role Role) bool {
+	_, ok := areaRoles[role]
+	return ok
+}
+
+// AreaRoles returns the canonical area-assignable roles, sorted — for validation
+// messages and diagnostics.
+func AreaRoles() []Role {
+	out := make([]Role, 0, len(areaRoles))
+	for r := range areaRoles {
+		out = append(out, r)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
 type Capability string

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 type QuorumKind string
@@ -94,6 +96,9 @@ func validateStages(stages []StageRequest) error {
 		if err := validateRouteCode(fmt.Sprintf("stages[%d].required_role", i), stage.RequiredRole); err != nil {
 			return err
 		}
+		if err := validateAreaRole(fmt.Sprintf("stages[%d].required_role", i), stage.RequiredRole); err != nil {
+			return err
+		}
 		if err := validateRequired(fmt.Sprintf("stages[%d].required_capability", i), stage.RequiredCapability); err != nil {
 			return err
 		}
@@ -138,6 +143,25 @@ func validateRouteCode(field, value string) error {
 		return fmt.Errorf("%s must match [a-z0-9_-]+", field)
 	}
 	return nil
+}
+
+// validateAreaRole binds a stage's required_role to the IAM role registry: it
+// must be a canonical AREA role (a value a user can actually hold in
+// user_process_areas, against which approval eligibility is resolved). Without
+// this, required_role was free text — an admin could configure a stage requiring
+// a role no user can ever hold (a phantom or a typo), producing a silently
+// unsatisfiable stage (empty eligible pool → blocked approvals). The value has
+// already passed the lowercase [a-z0-9_-]+ format check (ADR 0022 — role strings
+// bound to the registry, not free text).
+func validateAreaRole(field, value string) error {
+	if iamdomain.IsAreaRole(iamdomain.Role(value)) {
+		return nil
+	}
+	allowed := make([]string, 0, len(iamdomain.AreaRoles()))
+	for _, r := range iamdomain.AreaRoles() {
+		allowed = append(allowed, string(r))
+	}
+	return fmt.Errorf("%s %q is not a canonical area role (allowed: %s)", field, value, strings.Join(allowed, ", "))
 }
 
 func validateRequiredCapability(field, value string) error {

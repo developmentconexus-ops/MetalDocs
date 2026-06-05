@@ -11,12 +11,18 @@ import (
 
 var ErrCapabilityDenied = errors.New("capability denied")
 
-type CapabilityService struct {
-	// TODO: replace *sql.DB with a query executor interface for testability.
-	db *sql.DB
+// queryExecutor is the narrow read surface CapabilityService needs. *sql.DB
+// satisfies it; tests can substitute a fake. (Accept interfaces, return structs.)
+type queryExecutor interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-func NewCapabilityService(db *sql.DB) *CapabilityService {
+type CapabilityService struct {
+	db queryExecutor
+}
+
+func NewCapabilityService(db queryExecutor) *CapabilityService {
 	return &CapabilityService{db: db}
 }
 
