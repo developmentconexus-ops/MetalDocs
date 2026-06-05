@@ -25,23 +25,14 @@ jobs:
       - name: Fail on violations
         run: go run ./tools/cilint ./...
 
-  openapi-drift:
-    name: OpenAPI spec ↔ generated types drift
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Install openapi-typescript
-        run: npm install -g openapi-typescript@7
-      - name: Regenerate types
-        run: |
-          mkdir -p frontend/apps/web/src/features/approval/api/__generated__
-          npx --yes openapi-typescript@7 api/openapi/spec2.yaml \
-            -o frontend/apps/web/src/features/approval/api/__generated__/openapi.ts
-      - name: Assert no drift
-        run: git diff --exit-code frontend/apps/web/src/features/approval/api/__generated__/
+  # NOTE: the former `openapi-drift` job was removed — it regenerated approval
+  # frontend types from api/openapi/spec2.yaml into
+  # frontend/apps/web/src/features/approval/api/__generated__/, a path that no
+  # longer exists and that nothing imports (spec2.yaml is referenced only by this
+  # workflow). Frontend type drift is covered by api-contract.yml's
+  # `frontend-codegen-drift` job (npm run gen:api -> src/lib/api-types). The job
+  # had been broken anyway (`openapiTS` is not a real binary; openapi-typescript
+  # v7 also rejects spec2.yaml as a multi-schema doc).
 
   migration-gapless:
     name: Migration monotonicity check
@@ -55,9 +46,12 @@ jobs:
           set -euo pipefail
           MIGRATION_DIR="db/migrations"
 
-          # Discover min and max from filesystem (never hardcoded)
+          # Discover min and max from filesystem (never hardcoded). Match only
+          # the leading 4-digit prefix of each basename — `grep -oE '[0-9]+'` on
+          # the full path also captured digits inside descriptions (e.g. phase8),
+          # making MIN collapse to 2.
           nums=$(ls "$MIGRATION_DIR"/*.sql 2>/dev/null \
-            | grep -oE '[0-9]+' | sort -n)
+            | xargs -r -n1 basename | grep -oE '^[0-9]{4}' | sort -n)
           MIN=$(echo "$nums" | head -1)
           MAX=$(echo "$nums" | tail -1)
 
