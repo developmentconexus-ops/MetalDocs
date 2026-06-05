@@ -25,6 +25,7 @@ func TestRules(t *testing.T) {
 
 	cases := []tc{
 		{name: "good_spec", spec: "good.openapi.yaml"},
+		{name: "path_base_prefix", spec: "path_base_prefix.openapi.yaml", want: []wantViolation{{Rule: "PATH-BASE-PREFIX", MessageContains: "must be relative to servers.url"}}},
 		{name: "missing_problem", spec: "missing_problem.openapi.yaml", want: []wantViolation{{Rule: "ENVELOPE-DRIFT", MessageContains: "does not reference Problem"}}},
 		{name: "missing_cursor", spec: "missing_cursor.openapi.yaml", want: []wantViolation{{Rule: "PAGINATION-DRIFT", MessageContains: "missing query param cursor"}}},
 		{name: "missing_security", spec: "missing_security.openapi.yaml", want: []wantViolation{{Rule: "AUTHZ-DRIFT", MessageContains: "missing security declaration"}}},

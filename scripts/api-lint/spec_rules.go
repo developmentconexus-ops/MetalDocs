@@ -40,6 +40,7 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 	out := []Violation{}
 	for i := 0; i+1 < len(paths.Content); i += 2 {
 		pathKey, pathVal := paths.Content[i], paths.Content[i+1]
+		out = append(out, checkBasePrefix(specPath, pathKey)...)
 		for j := 0; j+1 < len(pathVal.Content); j += 2 {
 			mKey, op := pathVal.Content[j], pathVal.Content[j+1]
 			method := strings.ToUpper(mKey.Value)
@@ -53,6 +54,23 @@ func RunSpecRules(specPath string) ([]Violation, error) {
 		}
 	}
 	return out, nil
+}
+
+// checkBasePrefix enforces AD-1: servers.url already carries the `/api/v1`
+// base, so every path key must be relative. A key that re-includes `/api/`
+// produces doubled URLs (`/api/v1/api/v1/...`) for any spec-respecting
+// consumer. This is the gate that makes the double-prefix bug class
+// impossible to reintroduce.
+func checkBasePrefix(file string, pathKey *yaml.Node) []Violation {
+	if strings.HasPrefix(pathKey.Value, "/api/") {
+		return []Violation{{
+			File:    file,
+			Line:    pathKey.Line,
+			Rule:    "PATH-BASE-PREFIX",
+			Message: fmt.Sprintf("path key %q must be relative to servers.url (/api/v1); drop the /api prefix", pathKey.Value),
+		}}
+	}
+	return nil
 }
 
 func checkEnvelope(file, opID string, op *yaml.Node) []Violation {
