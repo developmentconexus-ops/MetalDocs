@@ -57,10 +57,10 @@ import (
 	"metaldocs/internal/modules/render/resolvers"
 	searchapp "metaldocs/internal/modules/search/application"
 	searchdelivery "metaldocs/internal/modules/search/delivery/http"
+	searchdocs "metaldocs/internal/modules/search/infrastructure/v2documents"
 	securityapp "metaldocs/internal/modules/security/application"
 	securitydelivery "metaldocs/internal/modules/security/delivery/http"
 	securitypg "metaldocs/internal/modules/security/infrastructure/postgres"
-	searchdocs "metaldocs/internal/modules/search/infrastructure/v2documents"
 	"metaldocs/internal/modules/taxonomy"
 	taxonomydomain "metaldocs/internal/modules/taxonomy/domain"
 	taxonomyinfra "metaldocs/internal/modules/taxonomy/infrastructure"
@@ -236,7 +236,7 @@ func main() {
 	permResolver := newPermissionResolver()
 	authMiddleware := authdelivery.NewMiddleware(authService, authCfg, authn.Enabled()).
 		WithPublicPathChecker(newPublicPathChecker(permResolver))
-	iamMiddleware := iamdelivery.NewMiddleware(capabilityService, cachedProvider, authn.Enabled(), authCfg.LegacyHeaderEnabled).
+	iamMiddleware := iamdelivery.NewMiddleware(capabilityService, cachedProvider, authn.Enabled()).
 		WithPermissionResolver(permResolver)
 	originProtection := security.NewOriginProtection(security.OriginProtectionConfig{
 		Enabled:           authCfg.OriginProtection,

@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"strings"
 	"sync"
 	"time"
 
@@ -83,25 +82,8 @@ func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID, tenantID
 	return roles, nil
 }
 
-// InvalidateUser invalidates cache entries for a user across all tenants.
-func (c *CachedRoleProvider) InvalidateUser(userID string) {
-	c.mu.Lock()
-	for k := range c.items {
-		if strings.HasPrefix(k, userID+"|") {
-			delete(c.items, k)
-		}
-	}
-	c.mu.Unlock()
-}
-
 func (c *CachedRoleProvider) InvalidateUserTenant(userID, tenantID string) {
 	c.evict(userID, tenantID)
-}
-
-func (c *CachedRoleProvider) InvalidateAll() {
-	c.mu.Lock()
-	c.items = map[string]cacheEntry{}
-	c.mu.Unlock()
 }
 
 func (c *CachedRoleProvider) evict(userID, tenantID string) {

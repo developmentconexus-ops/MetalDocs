@@ -10,7 +10,7 @@ func happyRoute() Route {
 	return Route{
 		ID: "r1", TenantID: "t1", ProfileCode: "SOP", Version: 1,
 		Stages: []Stage{
-			{Order: 1, Name: "QA", RequiredRole: "reviewer", RequiredCapability: "workflow.signoff", AreaCode: "qa", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum},
+			{Order: 1, Name: "QA", RequiredRole: "approver", RequiredCapability: "workflow.signoff", AreaCode: "qa", Quorum: QuorumAny1Of, OnEligibilityDrift: DriftReduceQuorum},
 			{Order: 2, Name: "Manager", RequiredRole: "manager", RequiredCapability: "workflow.signoff", AreaCode: "mgmt", Quorum: QuorumAllOf, OnEligibilityDrift: DriftKeepSnapshot},
 			{Order: 3, Name: "Director", RequiredRole: "director", RequiredCapability: "workflow.signoff", AreaCode: "exec", Quorum: QuorumMofN, QuorumM: intPtr(2), OnEligibilityDrift: DriftFailStage},
 		},

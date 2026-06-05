@@ -38,9 +38,7 @@ WHERE tenant_id = $1::uuid
 // blob-layer bytes through a tenant-scoped path. Tracked in
 // wiki/modules/iam-tech-debt.md ("storage usage source"). The handler
 // renders this verbatim; the FE substitutes "—" for negatives.
-func (r *ObservabilityRepository) StorageUsedBytes(ctx context.Context, tenantID string) (int64, error) {
-	_ = ctx
-	_ = tenantID
+func (r *ObservabilityRepository) StorageUsedBytes(_ context.Context, _ string) (int64, error) {
 	return -1, nil
 }
 

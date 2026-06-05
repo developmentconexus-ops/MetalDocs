@@ -195,11 +195,9 @@ BEGIN
   IF _area_code !~ '^[A-Z0-9_]+$' THEN
     RAISE EXCEPTION 'invalid area_code: %', _area_code USING ERRCODE = '22023';
   END IF;
-  -- Role values must match the CHECK constraint on user_process_areas (0125).
-  IF _role NOT IN ('viewer', 'editor', 'reviewer', 'approver') THEN
-    RAISE EXCEPTION 'invalid role: % (allowed: viewer, editor, reviewer, approver)', _role
-      USING ERRCODE = '22023';
-  END IF;
+  -- Role values are NOT re-validated here: the user_process_areas role CHECK
+  -- constraint is the single source of truth and rejects an invalid role on the
+  -- INSERT below (ADR 0022 — no duplicated role list to drift).
   IF _granted_by !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid granted_by: %', _granted_by USING ERRCODE = '22023';
   END IF;
@@ -330,10 +328,8 @@ BEGIN
   IF _area_code !~ '^[A-Z0-9_]+$' THEN
     RAISE EXCEPTION 'invalid area_code: %', _area_code USING ERRCODE = '22023';
   END IF;
-  IF _role NOT IN ('viewer', 'editor', 'reviewer', 'approver') THEN
-    RAISE EXCEPTION 'invalid role: % (allowed: viewer, editor, reviewer, approver)', _role
-      USING ERRCODE = '22023';
-  END IF;
+  -- Role not re-validated; an unknown role simply matches no active row below
+  -- (ADR 0022 — the user_process_areas CHECK is the single source of truth).
   IF _revoked_by !~ '^[a-z0-9_.@-]+$' THEN
     RAISE EXCEPTION 'invalid revoked_by: %', _revoked_by USING ERRCODE = '22023';
   END IF;
@@ -1779,7 +1775,7 @@ CREATE TABLE public.user_process_areas (
     revoked_by text,
     CONSTRAINT effective_interval_valid CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
     CONSTRAINT revoked_by_required_when_revoked CHECK ((((effective_to IS NULL) AND (revoked_by IS NULL)) OR ((effective_to IS NOT NULL) AND (revoked_by IS NOT NULL)))),
-    CONSTRAINT user_process_areas_role_check CHECK ((role = ANY (ARRAY['viewer'::text, 'editor'::text, 'reviewer'::text, 'approver'::text, 'author'::text, 'signer'::text, 'area_admin'::text, 'qms_admin'::text])))
+    CONSTRAINT user_process_areas_role_check CHECK ((role = ANY (ARRAY['viewer'::text, 'editor'::text, 'approver'::text, 'author'::text, 'signer'::text, 'area_admin'::text, 'qms_admin'::text])))
 );
 
 

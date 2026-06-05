@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -77,6 +78,63 @@ FROM metaldocs.auth_identities WHERE user_id = $1
 	}
 	if lockedUntilOut.Valid {
 		t.Errorf("expected locked_until=NULL, got %v", lockedUntilOut.Time)
+	}
+}
+
+// TestWithinLoginLock_BoundsConcurrentFailedLogins validates the real
+// pg_advisory_xact_lock path: a burst of concurrent failed-login units must not
+// drive failed_login_attempts past the threshold, because once the lock is set
+// the serialized later attempts observe it and short-circuit without recording.
+func TestWithinLoginLock_BoundsConcurrentFailedLogins(t *testing.T) {
+	db := openTestDB(t)
+	ctx := context.Background()
+	repo := authpostgres.NewRepository(db)
+
+	userID := fmt.Sprintf("lock-itest-%d", time.Now().UnixNano())
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO metaldocs.auth_identities
+  (user_id, username, email, display_name, is_active, password_hash, password_algo,
+   must_change_password, failed_login_attempts, created_at, updated_at)
+VALUES ($1, $1, NULL, 'Lock ITest', TRUE, 'hash', 'bcrypt', FALSE, 0, NOW(), NOW())
+`, userID); err != nil {
+		t.Fatalf("insert test user: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, `DELETE FROM metaldocs.auth_identities WHERE user_id = $1`, userID)
+	})
+
+	const maxAttempts = 5
+	const burst = 40
+	var wg sync.WaitGroup
+	wg.Add(burst)
+	for i := 0; i < burst; i++ {
+		go func() {
+			defer wg.Done()
+			_ = repo.WithinLoginLock(ctx, userID, func(tx authdomain.LoginTx) error {
+				state, err := tx.LoadLoginState(ctx, userID)
+				if err != nil {
+					return err
+				}
+				// Already locked → simulate the rejected-before-bcrypt path: no record.
+				if state.LockedUntil != nil && state.LockedUntil.After(time.Now().UTC()) {
+					return nil
+				}
+				// Simulate a wrong-password attempt.
+				_, _, err = tx.RecordFailedLogin(ctx, userID, maxAttempts, 900, "")
+				return err
+			})
+		}()
+	}
+	wg.Wait()
+
+	var attempts int
+	if err := db.QueryRowContext(ctx, `
+SELECT failed_login_attempts FROM metaldocs.auth_identities WHERE user_id = $1
+`, userID).Scan(&attempts); err != nil {
+		t.Fatalf("read attempts: %v", err)
+	}
+	if attempts != maxAttempts {
+		t.Fatalf("failed_login_attempts = %d, want %d (advisory lock must bound concurrent failures)", attempts, maxAttempts)
 	}
 }
 

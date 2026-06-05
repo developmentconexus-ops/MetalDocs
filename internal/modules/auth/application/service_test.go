@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -209,6 +211,90 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 	}
 	if _, err := svc.Authenticate(ctx, userID, password, req); err != nil {
 		t.Fatalf("Authenticate with exact password: %v", err)
+	}
+}
+
+// TestAuthenticate_ConcurrentWrongPasswordBoundedByLock proves the lockout is
+// atomic: firing many parallel wrong-password attempts must NOT drive
+// failed_login_attempts past the threshold. Pre-fix (stale-snapshot lock check),
+// every concurrent attempt passed the gate and incremented, so the counter
+// climbed to N. With the per-identity lock, attempts serialize and the ones
+// after the threshold short-circuit on the locked state without recording —
+// the counter caps at exactly LoginMaxFailedAttempts.
+func TestAuthenticate_ConcurrentWrongPasswordBoundedByLock(t *testing.T) {
+	t.Parallel()
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	const userID = "burst-user"
+	const maxAttempts = 5
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "burst@example.com",
+		DisplayName:  "Burst User",
+		PasswordHash: mustHashPassword(t, "CorrectPassword123!"),
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: maxAttempts,
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+	})
+
+	const burst = 50
+	var wg sync.WaitGroup
+	var invalid, locked, other int64
+	wg.Add(burst)
+	for i := 0; i < burst; i++ {
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+			_, err := svc.Authenticate(ctx, userID, "WrongPassword!", req)
+			switch {
+			case errors.Is(err, authdomain.ErrInvalidCredentials):
+				atomic.AddInt64(&invalid, 1)
+			case errors.Is(err, authdomain.ErrIdentityLocked):
+				atomic.AddInt64(&locked, 1)
+			default:
+				atomic.AddInt64(&other, 1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if other != 0 {
+		t.Fatalf("unexpected non-credential errors: %d", other)
+	}
+	// Exactly maxAttempts attempts may verify the password and increment; the
+	// rest must be rejected as already-locked. Counts depend on serialized order
+	// but the partition is exact.
+	if invalid != maxAttempts {
+		t.Fatalf("ErrInvalidCredentials = %d, want %d (lockout must cap recorded failures)", invalid, maxAttempts)
+	}
+	if locked != burst-maxAttempts {
+		t.Fatalf("ErrIdentityLocked = %d, want %d", locked, burst-maxAttempts)
+	}
+
+	identity, err := repo.FindIdentityByUserID(ctx, userID)
+	if err != nil {
+		t.Fatalf("FindIdentityByUserID: %v", err)
+	}
+	if identity.FailedLoginAttempts != maxAttempts {
+		t.Fatalf("failed_login_attempts = %d, want %d (must not exceed threshold under concurrency)", identity.FailedLoginAttempts, maxAttempts)
+	}
+	if identity.LockedUntil == nil {
+		t.Fatal("account must be locked after threshold breached")
 	}
 }
 

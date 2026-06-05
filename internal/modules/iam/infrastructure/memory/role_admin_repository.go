@@ -37,13 +37,10 @@ func (r *RoleAdminRepository) UpsertUserAndAssignRole(_ context.Context, userID,
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	rec, ok := r.users[userID]
-	if !ok {
-		rec = userRecord{displayName: displayName, roles: map[domain.Role]bool{}}
-	}
-	rec.displayName = displayName
-	rec.roles[role] = true
-	r.users[userID] = rec
+	// Replace semantics: the Postgres implementation deletes prior roles before
+	// inserting the new one, so the in-memory double must do the same (single
+	// active role per user) — accumulating would silently diverge from prod.
+	r.users[userID] = userRecord{displayName: displayName, roles: map[domain.Role]bool{role: true}}
 	return nil
 }
 
