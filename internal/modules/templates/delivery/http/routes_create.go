@@ -8,55 +8,6 @@ import (
 	"metaldocs/internal/modules/templates/domain"
 )
 
-func (h *Handler) createTemplate(w http.ResponseWriter, r *http.Request) {
-	tenantID, err := tenantIDFromReq(r)
-	if err != nil {
-		writeErr(w, http.StatusInternalServerError, "internal_error", "internal server error")
-		return
-	}
-	actorID := userIDFromReq(r)
-
-	if err := h.authz(r, tenantID, "*", "template.create"); err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-
-	var req struct {
-		DocTypeCode  string  `json:"doc_type_code"`
-		Key          string  `json:"key"`
-		Name         string  `json:"name"`
-		Description  string  `json:"description"`
-		ApproverRole string  `json:"approver_role"`
-		ReviewerRole *string `json:"reviewer_role"`
-	}
-	if err := readJSON(r, &req); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid_body", err.Error())
-		return
-	}
-
-	res, err := h.svc.CreateTemplate(r.Context(), application.CreateTemplateCmd{
-		TenantID:     tenantID,
-		ActorUserID:  actorID,
-		DocTypeCode:  req.DocTypeCode,
-		Key:          req.Key,
-		Name:         req.Name,
-		Description:  req.Description,
-		ApproverRole: req.ApproverRole,
-		ReviewerRole: req.ReviewerRole,
-	})
-	if err != nil {
-		writeMappedErr(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"data": map[string]any{
-			"template": toTemplateResponse(res.Template),
-			"version":  toVersionResponse(res.Version),
-		},
-	})
-}
-
 func (h *Handler) createNextVersion(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := tenantIDFromReq(r)
 	if err != nil {

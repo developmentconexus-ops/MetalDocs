@@ -64,9 +64,7 @@ func (r *cancelTestRows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 	r.done = true
-	for i, v := range r.values {
-		dest[i] = v
-	}
+	copy(dest, r.values)
 	return nil
 }
 
