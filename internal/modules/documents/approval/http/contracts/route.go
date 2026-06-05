@@ -164,12 +164,24 @@ func validateAreaRole(field, value string) error {
 	return fmt.Errorf("%s %q is not a canonical area role (allowed: %s)", field, value, strings.Join(allowed, ", "))
 }
 
+// validateRequiredCapability binds the stage's required_capability to the IAM
+// capability registry — the same registry-binding ADR 0022 applied to
+// required_role (validateAreaRole above). Without it the field was free text: an
+// admin could configure a phantom/typo'd capability ("doc.signof") that
+// validates and stores but matches nothing. NOTE: required_capability is
+// currently advisory config — sign-off eligibility is resolved on required_role
+// + area, and the enforced sign-off capability is the fixed CapDocumentSignoff
+// (decision_service.go). Per-stage capability enforcement is not wired (would be
+// a new ADR per ADR 0022 §scope). Binding here keeps the field honest until then.
 func validateRequiredCapability(field, value string) error {
 	if len(value) > 64 {
 		return fmt.Errorf("%s must be at most 64 characters", field)
 	}
 	if !requiredCapabilityPattern.MatchString(value) {
 		return fmt.Errorf("%s must match <namespace>.<action> using [a-z0-9_.]", field)
+	}
+	if !iamdomain.IsValidCapability(iamdomain.Capability(value)) {
+		return fmt.Errorf("%s %q is not a registered capability", field, value)
 	}
 	return nil
 }
