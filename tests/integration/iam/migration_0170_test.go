@@ -31,7 +31,7 @@ VALUES ('approver', $1::uuid, 'system_admin')
 			`DELETE FROM metaldocs.iam_user_roles WHERE user_id = 'approver'`) //nolint:errcheck
 	})
 
-	sqlBytes, err := os.ReadFile(filepath.Join("..", "..", "..", "migrations", "0170_dev_approver_role_correction.sql"))
+	sqlBytes, err := os.ReadFile(filepath.Join("..", "..", "..", "archive", "migrations", "0170_dev_approver_role_correction.sql"))
 	if err != nil {
 		t.Fatalf("read migration: %v", err)
 	}
@@ -67,7 +67,7 @@ VALUES ('approver', $1::uuid, 'system_admin')
 			`DELETE FROM metaldocs.iam_user_roles WHERE user_id = 'approver'`) //nolint:errcheck
 	})
 
-	sqlBytes, _ := os.ReadFile(filepath.Join("..", "..", "..", "migrations", "0170_dev_approver_role_correction.sql"))
+	sqlBytes, _ := os.ReadFile(filepath.Join("..", "..", "..", "archive", "migrations", "0170_dev_approver_role_correction.sql"))
 	if _, err := db.ExecContext(ctx, string(sqlBytes)); err != nil {
 		t.Fatalf("first apply: %v", err)
 	}

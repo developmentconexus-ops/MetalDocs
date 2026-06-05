@@ -60,7 +60,7 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		traceID, ok := requesttrace.Normalize(r.Header.Get("X-Trace-Id"))
 		if !ok {
-			traceID = requesttrace.Resolve(nil)
+			traceID = requesttrace.Resolve(r.Context())
 		}
 		r = r.WithContext(requesttrace.WithTraceID(r.Context(), traceID))
 

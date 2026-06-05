@@ -30,7 +30,7 @@ func TestGetUserTenants_EmptyForNewUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if tenants != nil && len(tenants) != 0 {
+	if len(tenants) != 0 {
 		t.Errorf("expected empty/nil slice, got %v", tenants)
 	}
 }
@@ -47,7 +47,7 @@ func TestGetUserTenants_ConsistentWithEmptyUsers(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error for %s: %v", userID, err)
 		}
-		if tenants != nil && len(tenants) != 0 {
+		if len(tenants) != 0 {
 			t.Errorf("expected empty/nil for %s, got %v", userID, tenants)
 		}
 	}

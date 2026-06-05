@@ -58,10 +58,6 @@ type APIDependencies struct {
 	Cleanup           func()
 }
 
-type bucketEnsurer interface {
-	EnsureBucket(ctx context.Context) error
-}
-
 func BuildAPIDependencies(ctx context.Context, repoMode string, attachmentsCfg config.AttachmentsConfig) (APIDependencies, error) {
 	gotenbergCfg, err := config.LoadGotenbergConfig()
 	if err != nil {

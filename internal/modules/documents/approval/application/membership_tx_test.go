@@ -1,4 +1,4 @@
-﻿package application
+package application
 
 import (
 	"context"
@@ -12,39 +12,37 @@ import (
 
 // --- minimal in-memory SQL driver for testing SET LOCAL ordering ---
 
-type recordingDriver struct{}
 type recordingConn struct {
 	executed []string
 	failAt   string
 }
 
 type noopResult struct{}
+
 func (noopResult) LastInsertId() (int64, error) { return 0, nil }
 func (noopResult) RowsAffected() (int64, error) { return 1, nil }
 
 type emptyRows struct{}
-func (emptyRows) Columns() []string              { return nil }
-func (emptyRows) Close() error                   { return nil }
-func (emptyRows) Next([]driver.Value) error      { return io.EOF }
 
-func (d *recordingDriver) Open(_ string) (driver.Conn, error) {
-	return &recordingConn{}, nil
-}
+func (emptyRows) Columns() []string         { return nil }
+func (emptyRows) Close() error              { return nil }
+func (emptyRows) Next([]driver.Value) error { return io.EOF }
 
 func (c *recordingConn) Prepare(query string) (driver.Stmt, error) {
 	return &recordingStmt{conn: c, query: query}, nil
 }
-func (c *recordingConn) Close() error  { return nil }
+func (c *recordingConn) Close() error              { return nil }
 func (c *recordingConn) Begin() (driver.Tx, error) { return c, nil }
-func (c *recordingConn) Commit() error   { return nil }
-func (c *recordingConn) Rollback() error { return nil }
+func (c *recordingConn) Commit() error             { return nil }
+func (c *recordingConn) Rollback() error           { return nil }
 
 type recordingStmt struct {
 	conn  *recordingConn
 	query string
 }
-func (s *recordingStmt) Close() error                                    { return nil }
-func (s *recordingStmt) NumInput() int                                   { return -1 }
+
+func (s *recordingStmt) Close() error  { return nil }
+func (s *recordingStmt) NumInput() int { return -1 }
 func (s *recordingStmt) Exec(args []driver.Value) (driver.Result, error) {
 	s.conn.executed = append(s.conn.executed, s.query)
 	if s.conn.failAt != "" && s.query == s.conn.failAt {
@@ -55,8 +53,6 @@ func (s *recordingStmt) Exec(args []driver.Value) (driver.Result, error) {
 func (s *recordingStmt) Query(args []driver.Value) (driver.Rows, error) {
 	return emptyRows{}, nil
 }
-
-var driverOnce bool
 
 func newTestDB(t *testing.T, conn *recordingConn) *sql.DB {
 	t.Helper()
@@ -71,6 +67,7 @@ func newTestDB(t *testing.T, conn *recordingConn) *sql.DB {
 }
 
 type recordingDriverInstance struct{ conn *recordingConn }
+
 func (d *recordingDriverInstance) Open(_ string) (driver.Conn, error) { return d.conn, nil }
 
 func TestMembershipTxGUCOrder(t *testing.T) {
@@ -127,4 +124,3 @@ func TestMembershipTxEmptyActorRejected(t *testing.T) {
 		t.Error("no SQL should execute when actor is empty")
 	}
 }
-

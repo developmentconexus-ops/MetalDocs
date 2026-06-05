@@ -477,6 +477,24 @@ type AreaMembershipInput struct {
 	Role UserRole `json:"role"`
 }
 
+// AreaMembershipListResponse defines model for AreaMembershipListResponse.
+type AreaMembershipListResponse struct {
+	Items []AreaMembershipRow `json:"items"`
+}
+
+// AreaMembershipRow Active area membership row returned by the tenant-scoped /iam/area-memberships listing.
+type AreaMembershipRow struct {
+	AreaCode      string     `json:"areaCode"`
+	EffectiveFrom time.Time  `json:"effectiveFrom"`
+	EffectiveTo   *time.Time `json:"effectiveTo,omitempty"`
+	GrantedBy     *string    `json:"grantedBy,omitempty"`
+
+	// Role Canonical tenant role. 8 values; no `admin` or `reviewer` phantoms.
+	Role     UserRole `json:"role"`
+	TenantId string   `json:"tenantId"`
+	UserId   string   `json:"userId"`
+}
+
 // AuditEventItem defines model for AuditEventItem.
 type AuditEventItem struct {
 	Action       string                 `json:"action"`
@@ -647,6 +665,25 @@ type FieldError struct {
 	// Field JSON pointer or dot path
 	Field   string `json:"field"`
 	Message string `json:"message"`
+}
+
+// GrantAreaMembershipRequest defines model for GrantAreaMembershipRequest.
+type GrantAreaMembershipRequest struct {
+	AreaCode string `json:"areaCode"`
+
+	// Role Canonical tenant role. 8 values; no `admin` or `reviewer` phantoms.
+	Role   UserRole `json:"role"`
+	UserId string   `json:"userId"`
+}
+
+// GrantAreaMembershipResponse defines model for GrantAreaMembershipResponse.
+type GrantAreaMembershipResponse struct {
+	AreaCode string `json:"areaCode"`
+
+	// Role Canonical tenant role. 8 values; no `admin` or `reviewer` phantoms.
+	Role     UserRole `json:"role"`
+	TenantId string   `json:"tenantId"`
+	UserId   string   `json:"userId"`
 }
 
 // IamKpiRoleCount defines model for IamKpiRoleCount.
@@ -974,19 +1011,8 @@ type UserInviteResponse struct {
 // UserRole Canonical tenant role. 8 values; no `admin` or `reviewer` phantoms.
 type UserRole string
 
-// RevokeAreaMembershipJSONBody defines parameters for RevokeAreaMembership.
-type RevokeAreaMembershipJSONBody struct {
-	AreaCode string `json:"areaCode"`
-	UserId   string `json:"userId"`
-}
-
-// GrantAreaMembershipJSONBody defines parameters for GrantAreaMembership.
-type GrantAreaMembershipJSONBody struct {
-	AreaCode  string  `json:"areaCode"`
-	GrantedBy *string `json:"grantedBy,omitempty"`
-	Role      string  `json:"role"`
-	UserId    string  `json:"userId"`
-}
+// sessionCookieContextKey is the context key for sessionCookie security scheme
+type sessionCookieContextKey string
 
 // ListAuditEventsParams defines parameters for ListAuditEvents.
 type ListAuditEventsParams struct {
@@ -1011,6 +1037,24 @@ type ListSessionsParams struct {
 	Limit    *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// RevokeAreaMembershipParams defines parameters for RevokeAreaMembership.
+type RevokeAreaMembershipParams struct {
+	UserId   string `form:"userId" json:"userId"`
+	AreaCode string `form:"areaCode" json:"areaCode"`
+}
+
+// ListAreaMembershipsParams defines parameters for ListAreaMemberships.
+type ListAreaMembershipsParams struct {
+	// UserId Filter by target userId. System admins omitting userId receive the full tenant directory; non-admins are always scoped to their own memberships regardless of this value.
+	UserId *string `form:"userId,omitempty" json:"userId,omitempty"`
+
+	// AreaCode Optional exact-match filter on the process area code.
+	AreaCode *string `form:"areaCode,omitempty" json:"areaCode,omitempty"`
+
+	// Role Optional exact-match filter on the membership role.
+	Role *UserRole `form:"role,omitempty" json:"role,omitempty"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	IsActive *bool     `form:"isActive,omitempty" json:"isActive,omitempty"`
@@ -1023,14 +1067,11 @@ type ListUsersParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
-// RevokeAreaMembershipJSONRequestBody defines body for RevokeAreaMembership for application/json ContentType.
-type RevokeAreaMembershipJSONRequestBody RevokeAreaMembershipJSONBody
-
-// GrantAreaMembershipJSONRequestBody defines body for GrantAreaMembership for application/json ContentType.
-type GrantAreaMembershipJSONRequestBody GrantAreaMembershipJSONBody
-
 // ExportAuditEventsJSONRequestBody defines body for ExportAuditEvents for application/json ContentType.
 type ExportAuditEventsJSONRequestBody = AuditExportRequest
+
+// GrantAreaMembershipJSONRequestBody defines body for GrantAreaMembership for application/json ContentType.
+type GrantAreaMembershipJSONRequestBody = GrantAreaMembershipRequest
 
 // CreateManagedUserJSONRequestBody defines body for CreateManagedUser for application/json ContentType.
 type CreateManagedUserJSONRequestBody = CreateManagedUserRequest
@@ -1294,15 +1335,6 @@ func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Revoke an active area membership
-	// (DELETE /api/v1/iam/area-memberships)
-	RevokeAreaMembership(w http.ResponseWriter, r *http.Request)
-	// List active area memberships for the current tenant
-	// (GET /api/v1/iam/area-memberships)
-	ListAreaMemberships(w http.ResponseWriter, r *http.Request)
-	// Grant or replace an active area membership
-	// (POST /api/v1/iam/area-memberships)
-	GrantAreaMembership(w http.ResponseWriter, r *http.Request)
 	// Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
 	// (GET /audit/events)
 	ListAuditEvents(w http.ResponseWriter, r *http.Request, params ListAuditEventsParams)
@@ -1318,6 +1350,15 @@ type ServerInterface interface {
 	// Composed Admin Center overview (KPI strip + presence + recent activity)
 	// (GET /iam/admin/overview)
 	GetIamAdminOverview(w http.ResponseWriter, r *http.Request)
+	// Revoke an active area membership
+	// (DELETE /iam/area-memberships)
+	RevokeAreaMembership(w http.ResponseWriter, r *http.Request, params RevokeAreaMembershipParams)
+	// List active area memberships for the current tenant
+	// (GET /iam/area-memberships)
+	ListAreaMemberships(w http.ResponseWriter, r *http.Request, params ListAreaMembershipsParams)
+	// Grant an active area membership
+	// (POST /iam/area-memberships)
+	GrantAreaMembership(w http.ResponseWriter, r *http.Request)
 	// List capability registry (read-only)
 	// (GET /iam/capabilities)
 	ListCapabilities(w http.ResponseWriter, r *http.Request)
@@ -1385,48 +1426,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
-
-// RevokeAreaMembership operation middleware
-func (siw *ServerInterfaceWrapper) RevokeAreaMembership(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.RevokeAreaMembership(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// ListAreaMemberships operation middleware
-func (siw *ServerInterfaceWrapper) ListAreaMemberships(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAreaMemberships(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GrantAreaMembership operation middleware
-func (siw *ServerInterfaceWrapper) GrantAreaMembership(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GrantAreaMembership(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
 
 // ListAuditEvents operation middleware
 func (siw *ServerInterfaceWrapper) ListAuditEvents(w http.ResponseWriter, r *http.Request) {
@@ -1682,6 +1681,125 @@ func (siw *ServerInterfaceWrapper) GetIamAdminOverview(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetIamAdminOverview(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeAreaMembership operation middleware
+func (siw *ServerInterfaceWrapper) RevokeAreaMembership(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeAreaMembershipParams
+
+	// ------------- Required query parameter "userId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "areaCode" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "areaCode", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "areaCode"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "areaCode", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeAreaMembership(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAreaMemberships operation middleware
+func (siw *ServerInterfaceWrapper) ListAreaMemberships(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAreaMembershipsParams
+
+	// ------------- Optional query parameter "userId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "userId", r.URL.Query(), &params.UserId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "userId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "areaCode" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "areaCode", r.URL.Query(), &params.AreaCode, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "areaCode"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "areaCode", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "role" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "role", r.URL.Query(), &params.Role, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "role"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "role", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAreaMemberships(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GrantAreaMembership operation middleware
+func (siw *ServerInterfaceWrapper) GrantAreaMembership(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GrantAreaMembership(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2233,14 +2351,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/iam/area-memberships", wrapper.RevokeAreaMembership)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/iam/area-memberships", wrapper.ListAreaMemberships)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/iam/area-memberships", wrapper.GrantAreaMembership)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit/events", wrapper.ListAuditEvents)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/audit/events/export", wrapper.ExportAuditEvents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/sessions", wrapper.ListSessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/auth/sessions/{sessionId}", wrapper.RevokeSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/admin/overview", wrapper.GetIamAdminOverview)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/iam/area-memberships", wrapper.RevokeAreaMembership)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/area-memberships", wrapper.ListAreaMemberships)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/iam/area-memberships", wrapper.GrantAreaMembership)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/capabilities", wrapper.ListCapabilities)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/kpi", wrapper.GetKpi)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/iam/presence/snapshot", wrapper.GetPresenceSnapshot)
@@ -2262,53 +2380,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/security/signals", wrapper.ListSecuritySignals)
 
 	return m
-}
-
-type RevokeAreaMembershipRequestObject struct {
-	Body *RevokeAreaMembershipJSONRequestBody
-}
-
-type RevokeAreaMembershipResponseObject interface {
-	VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error
-}
-
-type RevokeAreaMembership204Response struct {
-}
-
-func (response RevokeAreaMembership204Response) VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error {
-	w.WriteHeader(204)
-	return nil
-}
-
-type ListAreaMembershipsRequestObject struct {
-}
-
-type ListAreaMembershipsResponseObject interface {
-	VisitListAreaMembershipsResponse(w http.ResponseWriter) error
-}
-
-type ListAreaMemberships200Response struct {
-}
-
-func (response ListAreaMemberships200Response) VisitListAreaMembershipsResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
-type GrantAreaMembershipRequestObject struct {
-	Body *GrantAreaMembershipJSONRequestBody
-}
-
-type GrantAreaMembershipResponseObject interface {
-	VisitGrantAreaMembershipResponse(w http.ResponseWriter) error
-}
-
-type GrantAreaMembership201Response struct {
-}
-
-func (response GrantAreaMembership201Response) VisitGrantAreaMembershipResponse(w http.ResponseWriter) error {
-	w.WriteHeader(201)
-	return nil
 }
 
 type ListAuditEventsRequestObject struct {
@@ -2592,6 +2663,248 @@ func (response GetIamAdminOverview403ApplicationProblemPlusJSONResponse) VisitGe
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAreaMembershipRequestObject struct {
+	Params RevokeAreaMembershipParams
+}
+
+type RevokeAreaMembershipResponseObject interface {
+	VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error
+}
+
+type RevokeAreaMembership204Response struct {
+}
+
+func (response RevokeAreaMembership204Response) VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeAreaMembership400ApplicationProblemPlusJSONResponse Problem
+
+func (response RevokeAreaMembership400ApplicationProblemPlusJSONResponse) VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAreaMembership401ApplicationProblemPlusJSONResponse Problem
+
+func (response RevokeAreaMembership401ApplicationProblemPlusJSONResponse) VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAreaMembership403ApplicationProblemPlusJSONResponse Problem
+
+func (response RevokeAreaMembership403ApplicationProblemPlusJSONResponse) VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeAreaMembership404ApplicationProblemPlusJSONResponse Problem
+
+func (response RevokeAreaMembership404ApplicationProblemPlusJSONResponse) VisitRevokeAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAreaMembershipsRequestObject struct {
+	Params ListAreaMembershipsParams
+}
+
+type ListAreaMembershipsResponseObject interface {
+	VisitListAreaMembershipsResponse(w http.ResponseWriter) error
+}
+
+type ListAreaMemberships200JSONResponse AreaMembershipListResponse
+
+func (response ListAreaMemberships200JSONResponse) VisitListAreaMembershipsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAreaMemberships400ApplicationProblemPlusJSONResponse Problem
+
+func (response ListAreaMemberships400ApplicationProblemPlusJSONResponse) VisitListAreaMembershipsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAreaMemberships401ApplicationProblemPlusJSONResponse Problem
+
+func (response ListAreaMemberships401ApplicationProblemPlusJSONResponse) VisitListAreaMembershipsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAreaMemberships403ApplicationProblemPlusJSONResponse Problem
+
+func (response ListAreaMemberships403ApplicationProblemPlusJSONResponse) VisitListAreaMembershipsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAreaMemberships404ApplicationProblemPlusJSONResponse Problem
+
+func (response ListAreaMemberships404ApplicationProblemPlusJSONResponse) VisitListAreaMembershipsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GrantAreaMembershipRequestObject struct {
+	Body *GrantAreaMembershipJSONRequestBody
+}
+
+type GrantAreaMembershipResponseObject interface {
+	VisitGrantAreaMembershipResponse(w http.ResponseWriter) error
+}
+
+type GrantAreaMembership201JSONResponse GrantAreaMembershipResponse
+
+func (response GrantAreaMembership201JSONResponse) VisitGrantAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GrantAreaMembership400ApplicationProblemPlusJSONResponse Problem
+
+func (response GrantAreaMembership400ApplicationProblemPlusJSONResponse) VisitGrantAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GrantAreaMembership401ApplicationProblemPlusJSONResponse Problem
+
+func (response GrantAreaMembership401ApplicationProblemPlusJSONResponse) VisitGrantAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GrantAreaMembership403ApplicationProblemPlusJSONResponse Problem
+
+func (response GrantAreaMembership403ApplicationProblemPlusJSONResponse) VisitGrantAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GrantAreaMembership404ApplicationProblemPlusJSONResponse Problem
+
+func (response GrantAreaMembership404ApplicationProblemPlusJSONResponse) VisitGrantAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GrantAreaMembership409ApplicationProblemPlusJSONResponse Problem
+
+func (response GrantAreaMembership409ApplicationProblemPlusJSONResponse) VisitGrantAreaMembershipResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3655,15 +3968,6 @@ func (response ListSecuritySignals403ApplicationProblemPlusJSONResponse) VisitLi
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-	// Revoke an active area membership
-	// (DELETE /api/v1/iam/area-memberships)
-	RevokeAreaMembership(ctx context.Context, request RevokeAreaMembershipRequestObject) (RevokeAreaMembershipResponseObject, error)
-	// List active area memberships for the current tenant
-	// (GET /api/v1/iam/area-memberships)
-	ListAreaMemberships(ctx context.Context, request ListAreaMembershipsRequestObject) (ListAreaMembershipsResponseObject, error)
-	// Grant or replace an active area membership
-	// (POST /api/v1/iam/area-memberships)
-	GrantAreaMembership(ctx context.Context, request GrantAreaMembershipRequestObject) (GrantAreaMembershipResponseObject, error)
 	// Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated)
 	// (GET /audit/events)
 	ListAuditEvents(ctx context.Context, request ListAuditEventsRequestObject) (ListAuditEventsResponseObject, error)
@@ -3679,6 +3983,15 @@ type StrictServerInterface interface {
 	// Composed Admin Center overview (KPI strip + presence + recent activity)
 	// (GET /iam/admin/overview)
 	GetIamAdminOverview(ctx context.Context, request GetIamAdminOverviewRequestObject) (GetIamAdminOverviewResponseObject, error)
+	// Revoke an active area membership
+	// (DELETE /iam/area-memberships)
+	RevokeAreaMembership(ctx context.Context, request RevokeAreaMembershipRequestObject) (RevokeAreaMembershipResponseObject, error)
+	// List active area memberships for the current tenant
+	// (GET /iam/area-memberships)
+	ListAreaMemberships(ctx context.Context, request ListAreaMembershipsRequestObject) (ListAreaMembershipsResponseObject, error)
+	// Grant an active area membership
+	// (POST /iam/area-memberships)
+	GrantAreaMembership(ctx context.Context, request GrantAreaMembershipRequestObject) (GrantAreaMembershipResponseObject, error)
 	// List capability registry (read-only)
 	// (GET /iam/capabilities)
 	ListCapabilities(ctx context.Context, request ListCapabilitiesRequestObject) (ListCapabilitiesResponseObject, error)
@@ -3765,92 +4078,6 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
-}
-
-// RevokeAreaMembership operation middleware
-func (sh *strictHandler) RevokeAreaMembership(w http.ResponseWriter, r *http.Request) {
-	var request RevokeAreaMembershipRequestObject
-
-	var body RevokeAreaMembershipJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.RevokeAreaMembership(ctx, request.(RevokeAreaMembershipRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "RevokeAreaMembership")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(RevokeAreaMembershipResponseObject); ok {
-		if err := validResponse.VisitRevokeAreaMembershipResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ListAreaMemberships operation middleware
-func (sh *strictHandler) ListAreaMemberships(w http.ResponseWriter, r *http.Request) {
-	var request ListAreaMembershipsRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListAreaMemberships(ctx, request.(ListAreaMembershipsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListAreaMemberships")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListAreaMembershipsResponseObject); ok {
-		if err := validResponse.VisitListAreaMembershipsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GrantAreaMembership operation middleware
-func (sh *strictHandler) GrantAreaMembership(w http.ResponseWriter, r *http.Request) {
-	var request GrantAreaMembershipRequestObject
-
-	var body GrantAreaMembershipJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GrantAreaMembership(ctx, request.(GrantAreaMembershipRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GrantAreaMembership")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GrantAreaMembershipResponseObject); ok {
-		if err := validResponse.VisitGrantAreaMembershipResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
 }
 
 // ListAuditEvents operation middleware
@@ -3979,6 +4206,89 @@ func (sh *strictHandler) GetIamAdminOverview(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetIamAdminOverviewResponseObject); ok {
 		if err := validResponse.VisitGetIamAdminOverviewResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeAreaMembership operation middleware
+func (sh *strictHandler) RevokeAreaMembership(w http.ResponseWriter, r *http.Request, params RevokeAreaMembershipParams) {
+	var request RevokeAreaMembershipRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeAreaMembership(ctx, request.(RevokeAreaMembershipRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeAreaMembership")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeAreaMembershipResponseObject); ok {
+		if err := validResponse.VisitRevokeAreaMembershipResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAreaMemberships operation middleware
+func (sh *strictHandler) ListAreaMemberships(w http.ResponseWriter, r *http.Request, params ListAreaMembershipsParams) {
+	var request ListAreaMembershipsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAreaMemberships(ctx, request.(ListAreaMembershipsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAreaMemberships")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAreaMembershipsResponseObject); ok {
+		if err := validResponse.VisitListAreaMembershipsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GrantAreaMembership operation middleware
+func (sh *strictHandler) GrantAreaMembership(w http.ResponseWriter, r *http.Request) {
+	var request GrantAreaMembershipRequestObject
+
+	var body GrantAreaMembershipJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GrantAreaMembership(ctx, request.(GrantAreaMembershipRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GrantAreaMembership")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GrantAreaMembershipResponseObject); ok {
+		if err := validResponse.VisitGrantAreaMembershipResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -4510,104 +4820,117 @@ func (sh *strictHandler) ListSecuritySignals(w http.ResponseWriter, r *http.Requ
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"NxfakNpdmxs7xLYKU80JVNXxU7P7D/f/HwAA//8=",
+	"7H3dcts4svCroPR9F06FspKZ2TpnM1eOk8zxJpm44szuxW4q0yJbEsYgwACgbI3LVechzhOeJzkFgKT4",
+	"A5CUI2UytbqyTALNRqP/0Gg07iaxSDPBkWs1eXY3UfEKU7A/z5KU8ndrlGuKN+9RZYIrNC8yKTKUmqJt",
+	"dp1R8+f/S1xMnk3+32wLb1YAm11A+jqjVxwytRJ6ch9NMokKeWzBUY2pGgLxjjPK8bLodqExNWD0JsPJ",
+	"swlICRvzv8QYuT6LNV3TEr9R4M/yhOqXa+TaD9rC/pxTicnk2T/tmGuD8Hz4YwVBzH/D2A76LKMvpRSy",
+	"S8NYJJYURRelJeVL0yVBDZTZNpAkVFPBgV3W+mqZo+dTKSoFSz9MLSHGTzTxvGwN06K1BbZFpwakb6Av",
+	"+RqZyDxMgyUdeielpFcbL9fb+2WJ8BbTOUq1oln3uyARzkPEXkrgGpMzbd4uhExBT55NEtA41TQ14w91",
+	"eb7xApSC4dAgf1Eo35t299EkVygvRsxL0S7aDqf41jBJLniW6x3pstswWrjujuIbqnRY3VTiPE6uG5Df",
+	"i5tB0XZgh7E0sJ7dTRJUsaSZEczJs4lVAEjMmElaNSVS3BCJOpccEzLfEL1CopED11MViwwTMqOQzky3",
+	"6babIowqTfny1Oqa0dOFiwVaPF5JkY5n5arbBxHsxHPGYG64oaF3AvIw2HpX+XA080rIA4SngtaVozYR",
+	"vezQNBldkYodU3hQhVgLGRgG9T8WcZxLuZtyymDDBCQ7Gw+JSuQyxgCG5esPm6zHwIyZCmpoXxvZljJR",
+	"Sb7W5xrIbUe4/WZ4pm4zIfWrgnB3E+R5am2cWk+iyW9KcFbrvB1MrfN7/Jyj8mjPBWUa5Sgf45Vreh9V",
+	"czjGManj3iZiAScqsRigQFiz4m1GJapdOAwtyACfKLrkmPwiWQNeLmkXUtu+l2DrQKIagsExvqpmoqmY",
+	"3+ZM0yncUkXAtCOOWOQkpcaXUOSnlx/IzL6aoZFpRT7nKDckAwmpeuRRwQ8T74rbFwWe4whddnuOCyFx",
+	"fL/PvRL8MAG/9xD/HDKYU0b15kVBd6+bCxqXQvqdpR4fuDaTI13Wep9o+10f35xLBI1vgcMSE2ttQmKe",
+	"UJUx2PwMacDwpkCZ900GSt0ImQTdq6ZHU+omtVEa009gFmJGJWaZFGuU5meuV8L8wIRq+8Ms0hrSv/1A",
+	"CrcXDvTTaJJSvv2nvX4K2lD3ivtH7jGwtmXUoFiNCuWYR05HSGHtaPG9X8ulEvKyWCo1wa9AfUoLaSs6",
+	"zoVgCNz05HirP8W2+whfp4VRvXO0/ZAPwxcizlPk+gOmGQONryiy5IoJ/bNIMEybhWn2mvKkwU8xMPDz",
+	"SMDtyECv/Da+0A0laPu9qWJCe8C3Rq+dJafOguuVtV0lumNo8AbmyPrHHxiPxls9ajzMfGK3oVjYY9Bv",
+	"Y940VZeUCU1UPleoZyqfx4L/lnMtSGZeQCJIAuQtamAvRKyILoCSF1dvIkK5Rh5bR898EQmjKbWdgGSw",
+	"xIgotIZrupCQYkTsOCOynb6ISBqvyp+YIWj7D0GiDYPbf06dbMeSppRDoetTyDJDo5L7HDcE/JpxbB0V",
+	"8zASSJcvDIMZ2R7X3+iBVvcaBcZCeW+7eMZSEXY0JBqvPHAaUzgW1pXr9Mr0acHbzutYYB9Mjw5m95WP",
+	"VNhIJwrGfeH4bjF59s9+X3dwOu6j3QAEx7wroC5j7QrBz9+7QvEyxM5A/Py5K5gAD3z0KLzORHY9wxVl",
+	"iUQ+OrDTq1M9keGQPWipfastdtL6FeZjNH+A9OOst1NFB7HedS13ePPt5eKRNKDx6jAUqHTz4ccfVEvf",
+	"jlhQzXAU3Zq26HCS49c245jG2reDcE3Ncu6fbazJ2HXDyILsOpV/u3r3M8mEcQ8lEZIkQpMCie5yMbh3",
+	"1I482W9F7W0i31h+ksB1K4AeWmbvcS/iQFsq3tGEWHKvw/lqEXDfsN02rkHlXORc+7iyeJxSTlMjIk8q",
+	"MIb1li7y+UX7SUV83n0qjGW12dydjypury5RvqU81xjAmedmem0MSsgUuDZYqe+fJMNjXABlmLwRS8rV",
+	"dz+shjswEV9jchbbganh9ukCzsUaJSzxMnZEh1vX/umTJ1H/cAwRX1DDHvO8jKuNsi9tFhjaTWuNqoN2",
+	"l1BdWnvQjfyz6GOHN1Tp7VaN2tvG4kDCQLnw7IdSCz8ZCEIDG5p573Zl1HZcm+OvorMU90YAb8T34Zur",
+	"Bs03Ir4W+f7mqIA3KqOjH7OtnleH2Zn+QvysQB5gkhtwN28ov94DonvFbm/Md4VxLqneXNElB7Y3HJtg",
+	"vxhHpajge0TOwvsTaDBrDPY17NrmwrmQ+C0PvabBdt6Ocpb1TGtMszEeBQOlXxV9xu8wbntdZF40nAvw",
+	"C9eUjYe6syvb3GlqDd1H2jYTdJZM58AFpzEwYj5C1AoyJP/73/9DFOVLVibwGB1EHpM0Z5q2836UP3Gn",
+	"Zkz2Zi2iSWz3zXaauofvZ9actjp/dXmKKpcS5d9DM7xTANmB4R7CT+kCXnKzWE/8mKS50ucr4Eu87G7V",
+	"1tptJ32nRWiW7Do3e9uJtdIR3JKt5sdLAv9EN6gQdVi6zor1oXuFcLsa6Oq3+aak8zitvoVl+l0xGntV",
+	"e5MVBhdZRdvd11jWIFi7taNVqHVsYNtGJyopNEDZLTU6JN6FFtmDVpk7BTceYEKLcIDr2iKXwdhHG08u",
+	"+c7G1aiuK0T+Dcp0DTXf6MtxlxGSfXlVYzL0R3u7l1LMmW9eysBnK70L4hXlOJUIiZl9YpqRhRQpiSsz",
+	"ruFWcJFuvKbQJrb7raBNEBtNhlrU1hdv50pDce6hmzCnQeeqIWR/+etfa0L2wxOvZA5H63fKvisC1Q5q",
+	"hVUR5vVN1nvMGMRYirIKR3aVS+cLpMsPydw3kyjVIlhT/MKpTV06hSTvD6fE6MSwcf54H00U6povXvoe",
+	"QR7ieHMZzqbr5FltG+/29dDMjHUUjRrU/lc709LB8npo3kF1gzaeTMzy/f5PfJQR+u0nQliOzRVtKnvn",
+	"fdql2JKJudHs7on58I9uEWZfurMIJENJMiliVGraWqGZBVq1l2eBFA6tVyhK2zPWn+lPXK1ym0amtLrW",
+	"O6W2toJPXTWDGuMdFya4pkl5cm+nUwXXxa7s+GiZ3Rk1dhHXKAtWHd/7quxVpKIDC+Wp52kK3qTk1kRU",
+	"UIrB1DDbQonqVB2eFH+SByZTt/KaMrP0mkRGk00TXNMYq0fMBYemKqPXZqrEYjFdiVyqqdX+0yJD3cfJ",
+	"AUrV8KB8ISbR5Aak5TJJtfGhAsC2UcSuGD8gLGGH+SYgHCPCFrufY6DZWZJIVGpvvr4qiBJ298+WyPUX",
+	"7eNuvxGFDG99KV4bxtBZil+4Ya5xSdjcBWT2ZOsqcF60bDDBn6rfOoinRUpjkqKGBDSQx3UbQVxQ4pSc",
+	"MeYyXxURmVNkP/6LK5RrlASyjFFURHDmTuyp3D5JitxcQjmBKhgogSsncKf/4p2w38Mjbf0BtLHeSL/T",
+	"9LCw1r13ghRKXbY55Dpg7z6vz4n5OGKIX+LC7yeLI4yqgiX2JEJYxqoiVP2zDkv8B+WJuDl3O/n3hs70",
+	"HBh7WGeF4GLGLZwYE8alGRGPytVwqy7JbK5L9REf1ZQW/nhk1e35RqMah+Coph4sXb+o/c0uvh2TADZC",
+	"Ww6iNktRY8KD/NKYqA4NjA0Zl84CSo9KlDEN/2PXiSzRqLpvP+gfGMrnObs+c3mXQFkucYekur5qCjuL",
+	"64hsuSa+bRfRTiNod8yt9o8znRN7stS5iSL3pws34YfVdHXEccgitJC1QwcVWPY4SjTDFz2hmL8UceaR",
+	"wZgSenWCeJjA71HlzHes17rgoyN/fi7zBFNUHseISQv0QAymLegVjHKTJjjQC76mGnvTLb98S9LVlfAM",
+	"tmUHU8rfIF/qVX0mPY5Q5WW7J9F+fJZmoL0Xl/ChxhKjpqddQ2doIkInvzSmWemmEaq2JSMEdwsN54sC",
+	"Twg3SzaSoVRU2RgHA6Mrb3V3y7kOdV9pozWIocGWExPaVK/546fkP8kaWI7qR8IF+dU6cr8SIcmvEp3D",
+	"9ivJVsC1SFU9ZPMAx684US6LOE/V93Oqit9e11CVC2bDUo6uxerrXIhr6hlpsSomsX1PqFK5K/5x+e7q",
+	"A5lBRmfrpzOD58wu6M24qOnoOpglvztDZdYwLBGx+lR8cSsMkNHXaHSD3VlYCM866PKCUE5jCowkonZs",
+	"8GT99NEpealikQkCOgdGFKb2/OBSQgyCxCIlF2duNVPsMEy2/c8uLwxRDQPaDz09fXL6xB71ypBDRifP",
+	"Jt+fPjn9vkh2txSbQWyDcJlgNHbceR9NKlLY2QM2o3wuboPv3P6Jmt2VPz/R5H631rPY/GI7dlIaluah",
+	"/eue0CUXi0VoHFLkGvtfzu46yMeCaykYw2SaFGcg1HCLWeYkZVr4MEPNx33XNps5t7F6OrabmCvBUI/F",
+	"ZmYGYLPbxnZQudF/2B5vgGrbzkpD+GWXMG1qFDM4rW3l9bSW8cqt3nva5FooWKMxXSnV49pmEg379Tb2",
+	"sXm7yQrja3suRI1tN7srpN5MmVln9I/ODAoHwReNZneMziXIzcWL/llI8oxRszDqbeXqiJint9NcsjFt",
+	"s2TR22xBmZn6qfMtBppyYPT3fhT9UtJqZLcNV4IlKKcuUKVmd9kQp9Z6qdENx8DN54yqVW8bibHgSss8",
+	"1gPtnNBPV9Sw0mZUYzW7k+b/oSk1c5TkDKdjMC6M6wxi6/GMausWWhIZghrXY4Ug9RxBj2o9CrIzQv1t",
+	"8vmQYhlSpq6VMTHNBi6Q13xWJlrYgmaq793sztir+0CTBaSUdfyEzut+IJkUC8qCQMrX44AUrWYJLiBn",
+	"eloWX2h1K56qwOOGPMeggYllqKlzcWdzBnYb19uma7Oa77Y2KxZ8QZf9bX0Wq90mT9rs1GpRmAg1qtHs",
+	"jt+PblgMBnfo0GdfR3X0Gtu+ns7iZExA0jU8wx136iFhscOYvKqwr4PzK8e39xnG4fYPIlZTrWkN8arQ",
+	"Vdt/Lqx3wXXNca0V+TKrkqXL0zBLZtDFll371JhdxUhIUVtb+s87t1SzJcK2K7Vt8bqKCN2lZLCrW9nt",
+	"3LNVHu/B/R+Gd7OcWR3AmG3SIahFtbOHgG0ug19JxKnGW00UGgVHBCeO5GRGiiKCZLuD78Pp80PIU5V4",
+	"2rmnrdvT6FjlBH7XSLx96gmWf7Q5QzbKZFn8uydPXHy7lIOJ3dyMLb/PfisCtdtP9R6qC5yntEGIJtVN",
+	"UyAJEitsQpmfVvqEpDC5jyY/9OKVuRzQx7vhV2aOevC5dCIsBaF8DYwmwiHx9Gsi8TMIArn5FI2hxOD7",
+	"r4nBFaYkQ5lSpUC46FaZAVNMmW++CGQZ8mRqQ5An6baeoqukGBHH69MMlpSDxuSRrSy0VHbLwjoMH+/b",
+	"+rdYddmgtFAePexqVjY1sXSR7Oci2eyNqz1VPu+b8U8tc7zvyNV3h8EgLFOuhQ3QwRJ5AgmQE1CKckjg",
+	"0R8gVIZcVFGDUCFVcJSqllS5SSskBZOiBGlRZxQUOb/6OxGS/O3q3c9vyIlbUpFf3r+JCKgNjwldEAZy",
+	"iWGR0qtZbPNAprVSk9UrlzHWfCByXX+SYv2/YgHa7x+Vp1HHOUfV7sHOprB2RqnTt8px+TezwJ2TwH3m",
+	"18ymQHUUS4+xIy66TUqOJ5TbZC/rgHJNqqzgUu4opHWpK/vN7qpsvHu3DVNE9VqC8x7X4hqvqp0cn+QU",
+	"hXkKPqxn+TXNUR9TdxnwB/8eFQgicS2WcNTbUHz/h6/7fTsHHARBbjc77Ew0GNUxDTmpJ3Y8IkBUhjFd",
+	"0Ljk3lPyE2gk55AVDOZSJU+97FuG9qaeSFz1LsEMpK4H8H2vAp1b8bvqeSsk13k+uyt+nfug+lvN5jlP",
+	"GI5svBRrlLy2ezPUoRHVGNe4tk9SJemM61/GPGw0qN1H5XabXYWeB+aiHZPcvthkgYezO/PnNW5axF0g",
+	"6FzidMEsT9lnKwRm/Ipt5LB4IhGSMqpv77hIUspnorhVKOhf/IT6AtLGDUSTA5pU/1VHXm9X5akgdhRU",
+	"aYPx+riKbBvWcwNJYUIsXck5urJzBX3JyevLC2IsVUYek/ISJfKYuEuUnEWmevPIq7Z8F6UMG9xW/YTd",
+	"PNbxVjcU3asVV9uvBX9bu2TGDjT5A5aAf7erPhtNW2yz3o6exFf2JD6YJaJ21Uq4sOcTnPcamcUlF6Wr",
+	"W7uYaCEkOTEdInts7pHf7wBedm0dn2sLaDS5nRqv+HfrU1T1OJsS4MLNlZDcbzupa5oVPZ1wNF6UGaX2",
+	"HqbpUkKC5OTsxXvy5Ml335HLFSgk3z96Vj/dl1r3h1BFkFvfKSGg3e1Lt1MGG5REYiYU1UJuyJoCsd87",
+	"fe+ElNxQvbLN3V0g5SBOyYcVkouzt3VSrsCYSGk+Zn5OXc4KOckk2qScJfKIOHSffkeM60SBEdPKOHMR",
+	"UcJ9fBoDY1OnFd0hx/KQyXSRc1dsdS6SDVExcHKNG0yIFhbLS1AxsHNDiJoOrDAzgClfEomfT5+LZDMz",
+	"P2xMVNnvxMAN26Sg4xWh+pTYAhLFjVWotJrlnGqjgD/VL6l6XLwsUscsbxslvW3zyWba2ZuuPpm2p0vx",
+	"I2G0VPVOcyS4QCndYFqz+pdTe7VUcJ+mU4CkpdxbewHu5hczqK3AXCSn5MputTrbrohIqdaGXO61NU5G",
+	"BAyhFzmrEhgTKjE2/PMj4YJPi94gkQC7gY0ixQ1fbo6oJOKG12sEEYlLkAlDpYhYEL2iyiVDngY2IsYF",
+	"UppjflecbiJ4C7GeuikursARbsFbnJB1Im4YNvT9uijvFYPGhWks+P3iePE4dVk7rnTIkEzPBXYeRX3W",
+	"1sPKKmJP2OFoy4+2vGnLe0JY7epjIaZqe9VRYO/FU+X4QLsvPdWhR+3CPD0sJmFJrrnfRbWBb0JkyYlh",
+	"XGO83OnWiOT8mhvDY5Tno6NEf1sSbXD569fE5WxwIUCA2cgNwVuqtNp6wgpStFzUUkRWcA61UjD+7p9j",
+	"oVBox+NS4Q9cKpRRorhWELl3I7NeOXly4I07b5Xmvs27xiiOitvj/mwLDZm1FFVabsiJ0V42VyUcRSwu",
+	"rg/Fn1/bO94PxgztO/E9Ay/eGS54fXlxnP327H9wK3AbTS5pVfq8ZTDfxZmDPFBGn2eqViYhxBHtyomH",
+	"ZI9glcYBRikGdNzLbTOLK0+53W6oOObkvz58uCQLYGwO8TW5WSEn/8D5lYivjb/GYQ3UXu0Z1iTGH5qO",
+	"NjftYv2HNjnBywF8CxrQkv7uquTc1jTrkZ18lqc57xvjD0l6S6S4UaMsUFXGsZdXvgqDjHNGLMJlSVVx",
+	"tEgBf8Rzxn0cQ+RlmZGQCbIlWg7JD82aQQPGJhZc5elx/zvgmDjy2A41c2NL9ESkqNATkbPLi6hcNZsV",
+	"uOpjj6JWU1BflGXDR2xvf1Fa5UOD8MMb5DvsKXROdUAshVKkVpgjImXhjoiUdTuOpzv6zUHzrpWgOXCJ",
+	"/om1C7nKQdKjQfAbhMIMWOklJ+1zElGxDeZ3MUPB+c41+QcKzXuu4/9DAvMePMIM+otjRxJLalmimZwk",
+	"KZQMa+udSO6KncQSE+S2VAoTxnyXhVNOGC4h3vxoFg8LlEUFl0ohz6it6zOgtmfznF2HD7o8z9l1qbwP",
+	"MY/+kl+jJvHJwZCwZbcCWXasvOrennXBlDCh8Xi+5ZvUcmZOy/OUwtZOJQo1EYtS55UJsBHZVqyLiCtY",
+	"F5FGWvOAFDlZC8uRq7F1QIXYraj2lTWhp5JYnwoUfE2TimWOovNtbD1+1e2+c8EXjGrhdviMCzqzvjD5",
+	"DYxizZVoJ/45/iJAON64LcsTVxV5ukRuxA0TojHNSHnaLCJpbpa+9gwaEZwsqFSa2INnQyJ95zKa7LGZ",
+	"DHS86kr1pXlcCPXwiZkHJO5+PJCyCBWs/sqGt3PjYVhh2Fpw9Pejxvh3TlYomaFxKqlt9cfUWCcnZYH0",
+	"27FqYNZK7A/GOnpzPveoFg641PbdK9wXf62T5igX36hcuJw8XzIeWFs6Vg7stT/189wBl9deYlS7s/HP",
+	"ZCCHrn/6ynZy8D4oL0/yFRA7WZCAjSSoPEaljnHxb9d02XNppWi5ySuO1yrryU6LagqCT60nO93Jk91u",
+	"7PkltnmHxJ/Op/Xd8fG1I0n+Wzh8LqVxRkBLOs8rb3KPif8ZtXc9vuRrZCLDvTm1+0djZ9WwfxR6z4xK",
+	"CrNy8VHFZy/O3pJq+kh52Ws7Qp57rWLzssU/nWH036n51Q1i4MrKgKQpYiu/xpRRSEAdxe1bFbf31TQR",
+	"GyT8LedabFM8EiR52t4lGWv9iotIwubPvj94OOdQpid4N1qPN5KgmjPxOUc4Fp37dt3Cc4YgtwnxbiPw",
+	"mjwm9csYSSxyW89gYEWXopY0LgtkcKHpohid99nsrv6vW/9BWcWrQknNlJYIafG8fq2p8j1rVgNxaRKd",
+	"Cvnl5Raz4kbJ/rDLm7LRgWMj5XdGBUYqzI+y1WLp4uwfxJZtK0KRE3fP4jTnmjJyY2/9qq9vSqYouLni",
+	"kXQB01isUQ5kqr1dwHnZ7JCR7dpnvFsfc5Q6l5ZJ3r46O/JHiz/evjojyKVgzGgEUs6sO8hjo7mPze+W",
+	"5x1iDndD7lDZwPrdswdXI63P9UZyKAeqXMW8ZS7hmEbf5ZczLlJgGxKDTGxOq+e64oi0byuOSOOy4oj4",
+	"7yru0T8aGRqLupmlSZJO1QoScTNNaHXzwY2Q1wsmbupXFpQ/L2o18NXI9vZGV1qZa3sHlFyXbqqtU14W",
+	"KZ/cf7z/vwAAAP//",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

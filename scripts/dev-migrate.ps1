@@ -28,9 +28,13 @@ if (-not (Test-Path $ComposeFile)) {
   throw "Compose file not found: $ComposeFile"
 }
 
-$migrationsPath = Join-Path $root "migrations"
+# LEGACY REPLAY ONLY. The authoritative fresh-setup path is the curated baseline
+# (db/baseline + db/migrations) via scripts/dev-bootstrap-baseline.ps1. This
+# pre-baseline historical tree was archived to archive/migrations/ and is kept
+# only for recovery/debugging replays.
+$migrationsPath = Join-Path $root "archive/migrations"
 if (-not (Test-Path $migrationsPath)) {
-  throw "migrations folder not found: $migrationsPath"
+  throw "legacy migrations folder not found: $migrationsPath"
 }
 
 $migrations = Get-ChildItem -Path $migrationsPath -Filter "*.sql" | Sort-Object -Property Name
