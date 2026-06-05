@@ -845,44 +845,6 @@ func (h *Handler) commitAutosave(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) syncArtifactMetadata(w http.ResponseWriter, r *http.Request) {
-	r = withAdminCtx(r)
-	docID := r.PathValue("id")
-	tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
-	if !ok {
-		return
-	}
-
-	var req struct {
-		SessionID string `json:"session_id"`
-		PageCount *int   `json:"page_count"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpErr(w, http.StatusBadRequest, "invalid_body")
-		return
-	}
-
-	res, err := h.svc.SyncArtifactMetadata(r.Context(), application.SyncArtifactMetadataCmd{
-		TenantID:    tenantID,
-		ActorUserID: userID,
-		DocumentID:  docID,
-		SessionID:   req.SessionID,
-		PageCount:   req.PageCount,
-	})
-	if err != nil {
-		status, msg := mapErr(err)
-		httpErr(w, status, msg)
-		return
-	}
-
-	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{
-		"revision_id":       res.RevisionID,
-		"file_size_bytes":   res.FileSizeBytes,
-		"page_count":        res.PageCount,
-		"page_count_source": res.PageCountSource,
-	})
-}
-
 func (h *Handler) listCheckpoints(w http.ResponseWriter, r *http.Request) {
 	r = withAdminCtx(r)
 	docID := r.PathValue("id")

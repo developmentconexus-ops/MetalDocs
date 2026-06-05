@@ -212,7 +212,7 @@ func TestProblem_Write_HeaderSetBeforeStatus(t *testing.T) {
 		t.Fatalf("write failed: %v", err)
 	}
 
-	if _, ok := rr.HeaderMap["Content-Type"]; !ok {
+	if _, ok := rr.Result().Header["Content-Type"]; !ok {
 		t.Fatalf("content-type not present in header map")
 	}
 }

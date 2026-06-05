@@ -23,13 +23,6 @@ func NewPostgresApprovalRepository(db *sql.DB) ApprovalRepository {
 	return &postgresApprovalRepository{db: db}
 }
 
-// execer is the common interface satisfied by both *sql.Tx and *sql.DB.
-type execer interface {
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-}
-
 // InsertInstance writes a new approval_instances row within the caller's transaction.
 func (r *postgresApprovalRepository) InsertInstance(ctx context.Context, tx *sql.Tx, inst domain.Instance) error {
 	_, err := tx.ExecContext(ctx, `

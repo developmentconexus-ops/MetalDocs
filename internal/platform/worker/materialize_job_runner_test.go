@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"io"
 	"testing"
 
 	"metaldocs/internal/platform/messaging"
@@ -55,14 +54,6 @@ func (f *fakePDFEnqueuer) Enqueue(_ context.Context, _ *sql.Tx, _, _ string, _ [
 // minimal sql.DB driver for tx simulation
 type nopConn struct{}
 type nopTx struct{}
-type nopResult struct{}
-type nopRows struct{ done bool }
-
-func (nopResult) LastInsertId() (int64, error) { return 0, nil }
-func (nopResult) RowsAffected() (int64, error) { return 0, nil }
-func (r *nopRows) Columns() []string           { return nil }
-func (r *nopRows) Close() error                { return nil }
-func (r *nopRows) Next(_ []driver.Value) error { return io.EOF }
 
 func (nopConn) Prepare(q string) (driver.Stmt, error) {
 	return nil, fmt.Errorf("nop: no statements")

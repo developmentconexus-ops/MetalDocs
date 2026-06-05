@@ -14,10 +14,6 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-type ctxKeyCapability struct{}
-type ctxKeyAreaCode struct{}
-type ctxKeyResourceID struct{}
-
 var writeJSON = httpresponse.WriteJSON
 
 // Visibility classifies a route's authorization expectation. The zero value

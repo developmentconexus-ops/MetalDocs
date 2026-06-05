@@ -18,7 +18,7 @@ func TestUserIDFromContext_EmptyContextReportsAbsent(t *testing.T) {
 }
 
 func TestUserIDFromContext_NilContextReportsAbsent(t *testing.T) {
-	got, ok := UserIDFromContext(nil)
+	got, ok := UserIDFromContext(context.TODO())
 	if ok {
 		t.Fatalf("ok = true, want false for nil context")
 	}
