@@ -9,13 +9,24 @@ import (
 )
 
 // legacyPattern matches deprecated vocabulary in Go and TypeScript sources.
-var legacyPattern = regexp.MustCompile(`(?i)\b(finalized|archived|document\.finalize|document\.archive)\b`)
+//
+// NOTE: "archived" is intentionally NOT banned. Per ADR 0010 (soft-archive via
+// timestamp), `archived`/`archived_at` is a CURRENT, load-bearing concept across
+// documents, taxonomy areas/profiles, templates, controlled documents, and
+// search. Only the document-approval Spec-2 graph treats it as legacy, and that
+// code rejects it explicitly. "finalized" remains banned as a document status
+// (use published); legitimate legacy-rejection/cutover references carry a
+// //cilint:allow-legacy directive.
+var legacyPattern = regexp.MustCompile(`(?i)\b(finalized|document\.finalize|document\.archive)\b`)
 
 // legacyExcludeDirs are excluded from legacy vocab checks.
 var legacyExcludeDirs = []string{
 	"migrations/",
 	"fixtures/",
 	"testdata/",
+	"/api-types/",        // generated OpenAPI client types mirror the backend contract
+	"tools/cilint/",      // the linter's own source defines the banned-word pattern
+	"cutover_service.go", // legacy-status cutover preflight (drains finalized/archived; ADR/migration 0142)
 }
 
 // LegacyVocab reports legacy vocabulary in .go, .ts, and .tsx files

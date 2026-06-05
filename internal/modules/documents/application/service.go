@@ -844,7 +844,7 @@ func (s *Service) Finalize(ctx context.Context, tenantID, docID, actorID string)
 	if err := s.repo.UpdateDocumentStatus(ctx, tenantID, actorID, docID, domain.DocStatusDraft, domain.DocStatusUnderReview, true); err != nil {
 		return err
 	}
-	s.audit.Write(ctx, tenantID, actorID, "document.finalized", docID, nil)
+	s.audit.Write(ctx, tenantID, actorID, "document.finalized", docID, nil) // cilint:allow-legacy: live audit action (finalize draft→under_review); renaming touches the audit contract — tracked for the documents-module review
 	return nil
 }
 

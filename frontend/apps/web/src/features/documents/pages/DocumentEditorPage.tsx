@@ -366,7 +366,7 @@ export function DocumentEditorPage({ documentID, onDone }: DocumentEditorPagePro
     if (!docStatus) return null;
     const allowed: DocumentStatus[] = [
       'draft', 'review', 'under_review', 'approved', 'frozen',
-      'rejected', 'archived', 'finalized', 'scheduled', 'published',
+      'rejected', 'archived', 'finalized', 'scheduled', 'published', // cilint:allow-legacy: pre-cutover status aliases accepted for rendering
       'superseded', 'obsolete',
     ];
     return (allowed as string[]).includes(docStatus) ? (docStatus as DocumentStatus) : null;
