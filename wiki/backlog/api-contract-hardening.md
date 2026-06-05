@@ -20,7 +20,7 @@
 
 ## Open decisions (must resolve before the named Phase)
 
-- **OD-1 (Phase B):** Is approval-signoff **password re-authentication a real control** (21 CFR Part 11-style e-signature for a regulated QMS)? If **yes** → wire the existing bcrypt `PasswordReauthProvider`. If **no** → delete the dead provider and drop `password_token` from the contract. *Recommendation: yes — a controlled-document QMS almost always requires signed-record reauthentication.*
+- **OD-1 (Phase B): RESOLVED 2026-06-05 → A (yes).** Approval-signoff password re-authentication IS a real control (21 CFR Part 11-style e-signature for a regulated QMS). Phase B wires the existing bcrypt `PasswordReauthProvider` into the sign-off path and verifies `password_token` against `iam_users.password_hash` before recording the sign-off. Bad/blank token → sign-off rejected. The "accepted-but-never-verified" state is the bug being closed.
 - **OD-2 (Phase C):** For each unserved spec path, **remove (superseded)** vs **implement (genuinely planned)**. Default = remove, per the access-policies precedent. Candidates that may be "planned not dead": `/notifications`, `/workflow/documents/{id}/transitions|approvals`. Decide per-path with the same forensic check used for access-policies.
 - **OD-3 (Phase E):** **One payload casing.** Design-system mandates `snake_case`; the live spec mixes PascalCase (Go-struct leakage in the documents module), camelCase, and snake_case. Measure live FE consumption before locking, because flipping casing is a breaking change to every consumer. Decide: migrate-to-snake_case (design-system-true) vs ratify-camelCase (least FE churn). *Recommendation: snake_case for new/changed ops; PascalCase leakage is a bug to kill regardless.*
 
