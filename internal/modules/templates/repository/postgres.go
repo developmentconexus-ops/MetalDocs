@@ -32,18 +32,6 @@ func rowsAffected(res sql.Result) (int64, error) {
 	return n, nil
 }
 
-func wrapRepositoryErr(op string, err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, domain.ErrNotFound) ||
-		errors.Is(err, domain.ErrKeyConflict) ||
-		errors.Is(err, domain.ErrStaleLockVersion) {
-		return err
-	}
-	return fmt.Errorf("templates repository %s: %w", op, err)
-}
-
 type Repository struct {
 	db    *sql.DB
 	audit auditdomain.Writer

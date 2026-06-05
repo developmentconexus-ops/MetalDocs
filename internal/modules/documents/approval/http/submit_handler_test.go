@@ -18,10 +18,6 @@ import (
 	"metaldocs/internal/platform/tenant"
 )
 
-type submitServiceI interface {
-	SubmitRevisionForReview(ctx context.Context, db *sql.DB, req application.SubmitRequest) (application.SubmitResult, error)
-}
-
 type fakeSubmitService struct {
 	result application.SubmitResult
 	err    error

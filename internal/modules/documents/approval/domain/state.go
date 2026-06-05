@@ -2,7 +2,7 @@ package domain
 
 import "errors"
 
-// ErrLegacyStateRejected returned when legacy state string (finalized, archived) parsed.
+// ErrLegacyStateRejected returned when legacy state string (finalized, archived) parsed. cilint:allow-legacy (boundary rejection of legacy states)
 var ErrLegacyStateRejected = errors.New("legacy document state is not valid in the Spec 2 approval graph")
 
 // DocState represents the 8-state Spec 2 document lifecycle.
@@ -31,13 +31,13 @@ func AllStates() []DocState {
 func (s DocState) String() string { return string(s) }
 
 // StateFromString parses a string into a DocState.
-// Returns ErrLegacyStateRejected for "finalized" or "archived".
+// Returns ErrLegacyStateRejected for "finalized" or "archived". cilint:allow-legacy
 func StateFromString(s string) (DocState, error) {
 	switch DocState(s) {
 	case StateDraft, StateUnderReview, StateApproved, StateRejected,
 		StateScheduled, StatePublished, StateSuperseded, StateObsolete:
 		return DocState(s), nil
-	case "finalized", "archived":
+	case "finalized", "archived": // cilint:allow-legacy: rejects legacy states at the parse boundary
 		return "", ErrLegacyStateRejected
 	default:
 		return "", errors.New("unknown document state: " + s)

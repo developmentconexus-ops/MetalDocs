@@ -385,26 +385,6 @@ func TestComputeContentHash_FloatInNestedArray(t *testing.T) {
 // 8. ValidateLegacyCutoverReady — db query error path
 // ============================================================
 
-// erroringConn returns an error for any Prepare call.
-type erroringConn struct{}
-
-type erroringStmt struct{}
-
-func (s *erroringStmt) Close() error  { return nil }
-func (s *erroringStmt) NumInput() int { return -1 }
-func (s *erroringStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	return nil, errors.New("db error")
-}
-func (s *erroringStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	return nil, errors.New("db error")
-}
-
-func (c *erroringConn) Prepare(_ string) (driver.Stmt, error) { return &erroringStmt{}, nil }
-func (c *erroringConn) Close() error                          { return nil }
-func (c *erroringConn) Begin() (driver.Tx, error)             { return c, nil }
-func (c *erroringConn) Commit() error                         { return nil }
-func (c *erroringConn) Rollback() error                       { return nil }
-
 // errorQueryConn returns an error only from Query (not Prepare).
 type errorQueryStmt struct{}
 
@@ -1012,10 +992,10 @@ func TestRecordSignoff_EmitError(t *testing.T) {
 func buildTwoStageInstance(instanceID, stage1ID, stage2ID, authorUserID string, eligible []string) *domain.Instance {
 	now := time.Now().UTC()
 	return &domain.Instance{
-		ID:              instanceID,
-		TenantID:        "tenant-1",
-		DocumentID:      "doc-1",
-		RouteID:         "route-1",
+		ID:                  instanceID,
+		TenantID:            "tenant-1",
+		DocumentID:          "doc-1",
+		RouteID:             "route-1",
 		Status:              domain.InstanceInProgress,
 		SubmittedBy:         authorUserID,
 		SubmittedAt:         now,
@@ -1448,29 +1428,6 @@ func TestSchedulePublish_LoadInstanceNotFound(t *testing.T) {
 // Reuse of the emit error test above but confirm SchedulePublish is covered too.
 // (Already added as TestSchedulePublish_EmitError above)
 
-// Extra: scanSignoffs error path — verify rows.Err() is propagated.
-// We build a minimal erroring rows impl and call scanSignoffs directly.
-
-type errorRows struct {
-	scanErr error
-}
-
-func (r *errorRows) Columns() []string {
-	return []string{
-		"id", "approval_instance_id", "stage_instance_id",
-		"actor_user_id", "actor_tenant_id", "decision",
-		"comment", "signed_at", "signature_method", "signature_payload", "content_hash",
-	}
-}
-func (r *errorRows) Close() error        { return nil }
-func (r *errorRows) Err() error          { return r.scanErr }
-func (r *errorRows) Next() bool          { return false }
-func (r *errorRows) Scan(_ ...any) error { return nil }
-
-// Note: scanSignoffs uses *sql.Rows, not the driver Rows interface.
-// Testing that path directly would require a real *sql.Rows. The existing
-// test coverage through decision tests is sufficient for that path.
-
 // Extra: SubmitRevisionForReview content hash error (nested float in form data)
 func TestSubmitRevisionForReview_ContentHashError(t *testing.T) {
 	repo := &fakeSubmitRepo{}
@@ -1531,11 +1488,6 @@ func newBeginFailDB(t *testing.T) *sql.DB {
 }
 
 // execFailConn fails on Exec (returns error from stmt.Exec), but succeeds on Begin/Commit.
-type execFailResult struct{}
-
-func (r execFailResult) LastInsertId() (int64, error) { return 0, nil }
-func (r execFailResult) RowsAffected() (int64, error) { return 0, errors.New("rows affected error") }
-
 type execFailStmt struct{ query string }
 
 func (s *execFailStmt) Close() error  { return nil }
@@ -1635,9 +1587,7 @@ func newRowsAffectedFailDB(t *testing.T) *sql.DB {
 }
 
 // commitFailConn: everything succeeds until Commit which returns an error.
-type commitFailConn struct {
-	committed bool
-}
+type commitFailConn struct{}
 
 type commitFailStmt struct {
 	conn  *commitFailConn
@@ -2339,197 +2289,6 @@ func TestPublishApproved_CommitError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected commit error; got nil")
 	}
-}
-
-// ============================================================
-// processRow — begin tx error (scheduler)
-// ============================================================
-
-// schedulerBeginFailConn: first BeginTx (fetch tx) succeeds, second Begin (processRow) fails.
-// Actually RunDuePublishes uses BeginTx with LevelReadCommitted for the first tx,
-// then plain BeginTx for processRow. We need both to succeed except processRow's Begin.
-// Let's use a counter-based approach.
-type schedulerBeginFailConn struct {
-	beginCount int
-}
-
-type schedulerBeginFailStmt struct {
-	conn  *schedulerBeginFailConn
-	query string
-}
-
-func (s *schedulerBeginFailStmt) Close() error  { return nil }
-func (s *schedulerBeginFailStmt) NumInput() int { return -1 }
-func (s *schedulerBeginFailStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	return submitNoopResult{}, nil
-}
-func (s *schedulerBeginFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	return schedulerEmptyRows{}, nil
-}
-
-func (c *schedulerBeginFailConn) Prepare(query string) (driver.Stmt, error) {
-	return &schedulerBeginFailStmt{conn: c, query: query}, nil
-}
-func (c *schedulerBeginFailConn) Close() error { return nil }
-func (c *schedulerBeginFailConn) Begin() (driver.Tx, error) {
-	c.beginCount++
-	if c.beginCount > 1 {
-		return nil, errors.New("begin failed on processRow")
-	}
-	return c, nil
-}
-func (c *schedulerBeginFailConn) BeginTx(_ context.Context, _ driver.TxOptions) (driver.Tx, error) {
-	c.beginCount++
-	if c.beginCount > 1 {
-		return nil, errors.New("begin failed on processRow")
-	}
-	return c, nil
-}
-func (c *schedulerBeginFailConn) Commit() error   { return nil }
-func (c *schedulerBeginFailConn) Rollback() error { return nil }
-
-type schedulerBeginFailDriver struct{ conn *schedulerBeginFailConn }
-
-func (d *schedulerBeginFailDriver) Open(_ string) (driver.Conn, error) { return d.conn, nil }
-
-var schedulerBeginFailDBCounter int
-
-func newSchedulerBeginFailDB(t *testing.T) *sql.DB {
-	t.Helper()
-	schedulerBeginFailDBCounter++
-	conn := &schedulerBeginFailConn{}
-	name := fmt.Sprintf("scheduler_begin_fail_%d", schedulerBeginFailDBCounter)
-	sql.Register(name, &schedulerBeginFailDriver{conn: conn})
-	db, err := sql.Open(name, "")
-	if err != nil {
-		t.Fatalf("open scheduler begin fail db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	return db
-}
-
-// ============================================================
-// processRow — rowsAffected error
-// ============================================================
-
-// schedulerRAFailConn: fetch tx succeeds; processRow UPDATE returns RowsAffected error.
-type schedulerRAFailConn struct {
-	beginCount int
-}
-
-type schedulerRAFailStmt struct {
-	conn  *schedulerRAFailConn
-	query string
-}
-
-func (s *schedulerRAFailStmt) Close() error  { return nil }
-func (s *schedulerRAFailStmt) NumInput() int { return -1 }
-func (s *schedulerRAFailStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	q := strings.ToLower(s.query)
-	if strings.Contains(q, "update") && s.conn.beginCount > 1 {
-		return rowsAffectedFailResult{}, nil
-	}
-	return submitNoopResult{}, nil
-}
-func (s *schedulerRAFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	return schedulerEmptyRows{}, nil
-}
-
-func (c *schedulerRAFailConn) Prepare(query string) (driver.Stmt, error) {
-	return &schedulerRAFailStmt{conn: c, query: query}, nil
-}
-func (c *schedulerRAFailConn) Close() error { return nil }
-func (c *schedulerRAFailConn) Begin() (driver.Tx, error) {
-	c.beginCount++
-	return c, nil
-}
-func (c *schedulerRAFailConn) BeginTx(_ context.Context, _ driver.TxOptions) (driver.Tx, error) {
-	c.beginCount++
-	return c, nil
-}
-func (c *schedulerRAFailConn) Commit() error   { return nil }
-func (c *schedulerRAFailConn) Rollback() error { return nil }
-
-type schedulerRAFailDriver struct{ conn *schedulerRAFailConn }
-
-func (d *schedulerRAFailDriver) Open(_ string) (driver.Conn, error) { return d.conn, nil }
-
-var schedulerRAFailDBCounter int
-
-func newSchedulerRAFailDB(t *testing.T) *sql.DB {
-	t.Helper()
-	schedulerRAFailDBCounter++
-	conn := &schedulerRAFailConn{}
-	name := fmt.Sprintf("scheduler_ra_fail_%d", schedulerRAFailDBCounter)
-	sql.Register(name, &schedulerRAFailDriver{conn: conn})
-	db, err := sql.Open(name, "")
-	if err != nil {
-		t.Fatalf("open scheduler ra fail db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	return db
-}
-
-// ============================================================
-// processRow — exec error path
-// ============================================================
-
-// schedulerExecFailConn: fetch tx succeeds; processRow UPDATE returns exec error.
-type schedulerExecFailConn struct {
-	beginCount int
-}
-
-type schedulerExecFailStmt struct {
-	conn  *schedulerExecFailConn
-	query string
-}
-
-func (s *schedulerExecFailStmt) Close() error  { return nil }
-func (s *schedulerExecFailStmt) NumInput() int { return -1 }
-func (s *schedulerExecFailStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	q := strings.ToLower(s.query)
-	if strings.Contains(q, "update") && s.conn.beginCount > 1 {
-		return nil, errors.New("exec failed in processRow")
-	}
-	return submitNoopResult{}, nil
-}
-func (s *schedulerExecFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	return schedulerEmptyRows{}, nil
-}
-
-func (c *schedulerExecFailConn) Prepare(query string) (driver.Stmt, error) {
-	return &schedulerExecFailStmt{conn: c, query: query}, nil
-}
-func (c *schedulerExecFailConn) Close() error { return nil }
-func (c *schedulerExecFailConn) Begin() (driver.Tx, error) {
-	c.beginCount++
-	return c, nil
-}
-func (c *schedulerExecFailConn) BeginTx(_ context.Context, _ driver.TxOptions) (driver.Tx, error) {
-	c.beginCount++
-	return c, nil
-}
-func (c *schedulerExecFailConn) Commit() error   { return nil }
-func (c *schedulerExecFailConn) Rollback() error { return nil }
-
-type schedulerExecFailDriver struct{ conn *schedulerExecFailConn }
-
-func (d *schedulerExecFailDriver) Open(_ string) (driver.Conn, error) { return d.conn, nil }
-
-var schedulerExecFailDBCounter int
-
-func newSchedulerExecFailDB(t *testing.T) *sql.DB {
-	t.Helper()
-	schedulerExecFailDBCounter++
-	conn := &schedulerExecFailConn{}
-	name := fmt.Sprintf("scheduler_exec_fail_%d", schedulerExecFailDBCounter)
-	sql.Register(name, &schedulerExecFailDriver{conn: conn})
-	db, err := sql.Open(name, "")
-	if err != nil {
-		t.Fatalf("open scheduler exec fail db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	return db
 }
 
 // ============================================================
@@ -3665,64 +3424,6 @@ func TestPublishApproved_CommitError2(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected commit error; got nil")
 	}
-}
-
-// ============================================================
-// schedulerService — fetch tx commit error
-// ============================================================
-
-// schedulerFetchCommitFailConn: fetch BeginTx succeeds, Commit fails.
-type schedulerFetchCommitFailConn struct {
-	beginCount int
-}
-
-type schedulerFetchCommitFailStmt struct {
-	conn  *schedulerFetchCommitFailConn
-	query string
-}
-
-func (s *schedulerFetchCommitFailStmt) Close() error  { return nil }
-func (s *schedulerFetchCommitFailStmt) NumInput() int { return -1 }
-func (s *schedulerFetchCommitFailStmt) Exec(_ []driver.Value) (driver.Result, error) {
-	return submitNoopResult{}, nil
-}
-func (s *schedulerFetchCommitFailStmt) Query(_ []driver.Value) (driver.Rows, error) {
-	return schedulerEmptyRows{}, nil
-}
-
-func (c *schedulerFetchCommitFailConn) Prepare(query string) (driver.Stmt, error) {
-	return &schedulerFetchCommitFailStmt{conn: c, query: query}, nil
-}
-func (c *schedulerFetchCommitFailConn) Close() error { return nil }
-func (c *schedulerFetchCommitFailConn) Begin() (driver.Tx, error) {
-	c.beginCount++
-	return c, nil
-}
-func (c *schedulerFetchCommitFailConn) BeginTx(_ context.Context, _ driver.TxOptions) (driver.Tx, error) {
-	c.beginCount++
-	return c, nil
-}
-func (c *schedulerFetchCommitFailConn) Commit() error   { return errors.New("fetch commit failed") }
-func (c *schedulerFetchCommitFailConn) Rollback() error { return nil }
-
-type schedulerFetchCommitFailDriver struct{ conn *schedulerFetchCommitFailConn }
-
-func (d *schedulerFetchCommitFailDriver) Open(_ string) (driver.Conn, error) { return d.conn, nil }
-
-var schedulerFetchCommitFailDBCounter int
-
-func newSchedulerFetchCommitFailDB(t *testing.T) *sql.DB {
-	t.Helper()
-	schedulerFetchCommitFailDBCounter++
-	conn := &schedulerFetchCommitFailConn{}
-	name := fmt.Sprintf("scheduler_fetch_commit_fail_%d", schedulerFetchCommitFailDBCounter)
-	sql.Register(name, &schedulerFetchCommitFailDriver{conn: conn})
-	db, err := sql.Open(name, "")
-	if err != nil {
-		t.Fatalf("open scheduler fetch commit fail db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	return db
 }
 
 // ============================================================

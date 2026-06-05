@@ -31,7 +31,6 @@ func (stubRoleAdminRepository) ReplaceUserRoles(context.Context, string, string,
 }
 
 type stubUserAdminService struct {
-	listUsersTenantID       string
 	listOnlineUsersTenantID string
 }
 

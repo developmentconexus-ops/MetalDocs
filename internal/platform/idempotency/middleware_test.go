@@ -24,18 +24,25 @@ const (
 	testActorMW  = "actor-middleware-test"
 )
 
+type ctxKey string
+
+const (
+	tenantCtxKey ctxKey = "tenant"
+	actorCtxKey  ctxKey = "actor"
+)
+
 func withIDs(tenant, actor string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "tenant", tenant)
-			ctx = context.WithValue(ctx, "actor", actor)
+			ctx := context.WithValue(r.Context(), tenantCtxKey, tenant)
+			ctx = context.WithValue(ctx, actorCtxKey, actor)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
 func actorFromCtx(ctx context.Context) (string, string) {
-	return ctx.Value("tenant").(string), ctx.Value("actor").(string)
+	return ctx.Value(tenantCtxKey).(string), ctx.Value(actorCtxKey).(string)
 }
 
 func handler201(body string) http.Handler {

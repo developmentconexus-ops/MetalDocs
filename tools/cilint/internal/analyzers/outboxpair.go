@@ -63,10 +63,21 @@ func OutboxPair(files []string) []Finding {
 					}
 				}
 
-				// Check for events.Emit call
+				// Check for an Emit call on the governance event emitter. Accept
+				// both the bare-identifier form (events.Emit / emitter.Emit / e.Emit)
+				// and the struct-field form the codebase actually uses everywhere
+				// (s.emitter.Emit), where sel.X is itself a selector ending in the
+				// emitter field.
 				if name == "Emit" {
-					if pkg, ok := sel.X.(*ast.Ident); ok && (pkg.Name == "events" || pkg.Name == "emitter" || pkg.Name == "e") {
-						hasEmit = true
+					switch base := sel.X.(type) {
+					case *ast.Ident:
+						if base.Name == "events" || base.Name == "emitter" || base.Name == "e" {
+							hasEmit = true
+						}
+					case *ast.SelectorExpr:
+						if base.Sel.Name == "events" || base.Sel.Name == "emitter" || base.Sel.Name == "e" {
+							hasEmit = true
+						}
 					}
 				}
 				return true

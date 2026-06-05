@@ -11,7 +11,7 @@ import (
 )
 
 func TestMigration0169_FileExists(t *testing.T) {
-	if _, err := os.Stat("../../../migrations/0169_role_capabilities_process_areas.sql"); err != nil {
+	if _, err := os.Stat("../../../archive/migrations/0169_role_capabilities_process_areas.sql"); err != nil {
 		t.Fatalf("expected migration file 0169_role_capabilities_process_areas.sql: %v", err)
 	}
 }

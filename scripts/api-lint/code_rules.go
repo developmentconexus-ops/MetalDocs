@@ -19,7 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func RunCodeRules(specPath, modulesRoot string) ([]Violation, error) {
+func RunCodeRules(specPath, modulesRoot string, strict bool) ([]Violation, error) {
 	if modulesRoot == "" {
 		return nil, nil
 	}
@@ -59,7 +59,7 @@ func RunCodeRules(specPath, modulesRoot string) ([]Violation, error) {
 		}
 	}
 
-	tripwire, err := checkTripwirePairing(modulesRoot, fset)
+	tripwire, err := checkTripwirePairing(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func RunCodeRules(specPath, modulesRoot string) ([]Violation, error) {
 
 	// ADR 0022 Phase 5 — registry-binding lints (inline-cap ban, seed parity,
 	// wiki parity). Reuses the same fset/modulesRoot.
-	registry, err := RunRegistryRules(modulesRoot, fset)
+	registry, err := RunRegistryRules(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -336,8 +336,8 @@ func renderExpr(fset *token.FileSet, expr ast.Expr) string {
 // registry walkers): a stale agent worktree under .claude held ~26 phantom
 // duplicate violations against code not on this branch, and the api-lint testdata
 // fixtures (intentionally un-paired repositories) added one more.
-func checkTripwirePairing(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
-	allow, err := loadTripwireAllowlist(modulesRoot)
+func checkTripwirePairing(modulesRoot string, fset *token.FileSet, strict bool) ([]Violation, error) {
+	allow, err := loadTripwireAllowlist(modulesRoot, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -432,13 +432,21 @@ func tripwireAllowlistPath(modulesRoot string) string {
 	return filepath.Join(modulesRoot, "scripts", "api-lint", "tripwire-allowlist.txt")
 }
 
-// loadTripwireAllowlist reads the frozen tripwire baseline. A missing file (e.g.
-// the unit-test fixture roots under testdata/) yields an empty set, so fixtures
-// keep reporting their intentional violations.
-func loadTripwireAllowlist(modulesRoot string) (map[string]struct{}, error) {
-	raw, err := os.ReadFile(tripwireAllowlistPath(modulesRoot))
+// loadTripwireAllowlist reads the frozen tripwire baseline. In strict mode a
+// missing allow-list is a HARD ERROR: under a production repo root the file MUST
+// exist, and treating it as empty is exactly what let a wrong modulesRoot pass
+// trivially before (ADR 0022 Phase 13 — the silent-empty swallow). In non-strict
+// mode (unit-test fixture roots under testdata/, where the allow-list is
+// legitimately absent) a missing file still yields an empty set so fixtures keep
+// reporting their intentional violations.
+func loadTripwireAllowlist(modulesRoot string, strict bool) (map[string]struct{}, error) {
+	path := tripwireAllowlistPath(modulesRoot)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if strict {
+				return nil, fmt.Errorf("api-lint strict: tripwire allow-list not found at %s — wrong repo-root? (expected the repo root, not internal/modules); a missing core file under a production root is a hard error, not an empty pass (ADR 0022 Phase 13)", path)
+			}
 			return map[string]struct{}{}, nil
 		}
 		return nil, err

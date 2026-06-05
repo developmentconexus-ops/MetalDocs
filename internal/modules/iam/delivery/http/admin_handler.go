@@ -381,19 +381,6 @@ func (h *AdminHandler) handleReplaceUserRoles(w http.ResponseWriter, r *http.Req
 	})
 }
 
-func (h *AdminHandler) writeAuthError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, authdomain.ErrPasswordPolicy):
-		h.writeProblem(w, problem.New(http.StatusBadRequest, "VALIDATION_ERROR", err.Error()))
-	case errors.Is(err, authdomain.ErrUserAlreadyExists):
-		h.writeProblem(w, problem.New(http.StatusConflict, "CONFLICT_ERROR", "User already exists"))
-	case errors.Is(err, authdomain.ErrIdentityNotFound):
-		h.writeProblem(w, problem.New(http.StatusNotFound, "NOT_FOUND", "User not found"))
-	default:
-		h.writeProblem(w, problem.New(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to process user request"))
-	}
-}
-
 func (h *AdminHandler) writeProblem(w http.ResponseWriter, p *problem.Problem) {
 	if werr := problem.Write(w, p); werr != nil {
 		slog.Warn("iam: write response failed", "err", werr)
@@ -463,19 +450,4 @@ func authenticatedActor(r *http.Request) string {
 		return userID
 	}
 	return "system"
-}
-
-func defaultString(value, fallback string) string {
-	value = strings.TrimSpace(value)
-	if value != "" {
-		return value
-	}
-	return strings.TrimSpace(fallback)
-}
-
-func formatOptionalTime(value *time.Time) string {
-	if value == nil {
-		return ""
-	}
-	return value.UTC().Format(time.RFC3339)
 }

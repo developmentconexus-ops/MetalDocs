@@ -3,7 +3,7 @@ name: Perf Benchmarks
 on:
   pull_request:
     paths:
-      - 'internal/modules/documents_v2/approval/application/**'
+      - 'internal/modules/documents/approval/application/**'
       - 'internal/modules/jobs/scheduler/**'
       - 'api/handlers/approval/**'
   push:
