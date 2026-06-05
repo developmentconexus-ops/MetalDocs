@@ -1,7 +1,6 @@
 package controlleddocuments
 
 import (
-	"context"
 	"database/sql"
 	"log/slog"
 	"net/http"
@@ -50,12 +49,6 @@ func New(deps Dependencies) *Module {
 
 func (m *Module) RegisterRoutes(mux *http.ServeMux) {
 	m.Handler.RegisterRoutes(mux)
-}
-
-// RunLegacyMaintenance executes legacy-only registry maintenance for older
-// databases. On fresh curated baselines it is expected to no-op.
-func (m *Module) RunLegacyMaintenance(ctx context.Context, db *sql.DB, logger *slog.Logger) error {
-	return application.BackfillLegacyDocuments(ctx, db, logger)
 }
 
 func (m *Module) Service() *application.ControlledDocumentService { return m.svc }

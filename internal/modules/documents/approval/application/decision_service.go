@@ -301,17 +301,6 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 	}
 	drift := domain.ApplyEligibilityDrift(*activeStage, currentEligible)
 	effectiveDenominator := drift.EffectiveDenominator
-	skipLegacyQuorumFallback := false
-	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
-		// Fallback: treat every eligible actor as in scope.
-		effectiveDenominator = len(activeStage.EligibleActorIDs)
-	}
-	if skipLegacyQuorumFallback && effectiveDenominator == 0 {
-		if rbErr := tx.Rollback(); rbErr != nil {
-			slog.Error("recordSignoff: rollback failed on empty eligible pool", "err", rbErr)
-		}
-		return SignoffResult{}, domain.ErrEmptyEligiblePool
-	}
 	outcome := drift.ForcedOutcome
 	if outcome == domain.QuorumPending {
 		outcome = domain.EvaluateQuorum(*activeStage, approvals, rejections, effectiveDenominator)
@@ -732,4 +721,3 @@ func clientContentHash(formData map[string]any) (string, bool) {
 	}
 	return value, true
 }
-

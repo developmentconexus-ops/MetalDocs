@@ -21,7 +21,6 @@ var (
 	ErrActorRequired       = errors.New("audit: actor id is required")
 	ErrInvalidFormat       = errors.New("audit: invalid export format")
 	ErrExportTooLarge      = errors.New("audit: export result set too large for synchronous export")
-	ErrExportNotImpl       = errors.New("audit: async export not implemented")
 	ErrExportRepoMissing   = errors.New("audit: export job repository not configured")
 	ErrCounterMissing      = errors.New("audit: counter not configured for export sizing")
 	ErrExportTokenMismatch = errors.New("audit: invalid export download token")

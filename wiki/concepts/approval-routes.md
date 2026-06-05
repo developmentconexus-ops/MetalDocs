@@ -70,7 +70,7 @@ Drift is *only* applied at signoff-time evaluation; it does not retroactively re
 
 Each stage carries `required_capability` (e.g. `document.signoff`, `document.review`). At submit time the runtime **copies** the stage's `required_capability` into the stage instance row. The pin is then **frozen** — later edits to the route stage do not retroactively change in-flight stage instances.
 
-This is what makes the runtime check deterministic: `authz.Require(ctx, tx, <pinned cap>, <area>)` is evaluated against a value that cannot move under it. The route admin **declares** the cap; the runtime **enforces** it. See [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) for the two-tier authz model this participates in.
+**Status (2026-06): the per-stage `required_capability` is advisory config, not yet enforced.** Sign-off eligibility is resolved on `required_role` + `area_code`, and the capability enforced in-tx at sign-off is the fixed `CapDocumentSignoff` (`decision_service.go`) — the per-stage pin is not (yet) an `authz.Require` input. The field is bound to the IAM capability registry at config time (`validateRequiredCapability`, ADR 0022) so it cannot hold a phantom value; per-stage enforcement, if adopted, is a future ADR (per ADR 0022 scope). See [`wiki/decisions/0007-two-tier-authz.md`](../decisions/0007-two-tier-authz.md) for the two-tier authz model.
 
 Consequence for route admins: editing `required_capability` on an active route is safe — open instances keep their pin. Deactivating a route with open instances is **not** safe and is blocked by the in-use guard (next section).
 

@@ -11,9 +11,6 @@ var (
 	// ErrCloneTemplateNameRequired indicates a clone request was built without
 	// the document name required by the downstream documents module.
 	ErrCloneTemplateNameRequired = errors.New("clone template request name must not be empty")
-	// ErrDocumentRefIDRequired indicates a document reference was built without
-	// its durable document identifier.
-	ErrDocumentRefIDRequired = errors.New("document ref id must not be empty")
 )
 
 // CloneTemplateRequest carries the user-supplied bits of an atomic CD-create
@@ -54,19 +51,6 @@ func (r CloneTemplateRequest) FormData() map[string]any { return r.formData }
 type DocumentRef struct {
 	ID          string `json:"id"`
 	ContentHash string `json:"contentHash"`
-}
-
-// NewDocumentRef validates and normalizes the minimal document handle returned
-// by the documents module.
-func NewDocumentRef(id, contentHash string) (*DocumentRef, error) {
-	trimmedID := strings.TrimSpace(id)
-	if trimmedID == "" {
-		return nil, ErrDocumentRefIDRequired
-	}
-	return &DocumentRef{
-		ID:          trimmedID,
-		ContentHash: strings.TrimSpace(contentHash),
-	}, nil
 }
 
 // DocumentInitializer is the controlled-documents-owned port that the documents module
