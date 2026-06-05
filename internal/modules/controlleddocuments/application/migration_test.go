@@ -109,9 +109,7 @@ func (r *backfillRows) Next(dest []driver.Value) error {
 	if r.idx >= len(r.rows) {
 		return io.EOF
 	}
-	for i := range r.rows[r.idx] {
-		dest[i] = r.rows[r.idx][i]
-	}
+	copy(dest, r.rows[r.idx])
 	r.idx++
 	return nil
 }

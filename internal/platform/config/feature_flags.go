@@ -35,8 +35,3 @@ func LoadFeatureFlagsConfig() (FeatureFlagsConfig, error) {
 		MDDMNativeExportRolloutPercent: pct,
 	}, nil
 }
-
-func envBool(key string) bool {
-	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
-	return v == "true" || v == "1" || v == "yes"
-}

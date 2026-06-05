@@ -14,12 +14,12 @@ type rowScanner interface {
 
 func scanTemplate(row rowScanner) (*domain.Template, error) {
 	var (
-		t                       domain.Template
-		latestRevisionNumber    sql.NullInt32
-		publishedVersionID      sql.NullString
-		publishedVersionNumber  sql.NullInt32
-		currentRevisionNumber   sql.NullInt32
-		archivedAt              sql.NullTime
+		t                      domain.Template
+		latestRevisionNumber   sql.NullInt32
+		publishedVersionID     sql.NullString
+		publishedVersionNumber sql.NullInt32
+		currentRevisionNumber  sql.NullInt32
+		archivedAt             sql.NullTime
 	)
 	if err := row.Scan(
 		&t.ID, &t.TenantID, &t.DocTypeCode, &t.Key, &t.Name, &t.Description,
@@ -115,17 +115,6 @@ func marshalVersionSchemas(v *domain.TemplateVersion) (metadataJSON, placeholder
 		return nil, nil, fmt.Errorf("templates repository marshal version placeholder schema: %w", err)
 	}
 	return metadataJSON, placeholderJSON, nil
-}
-
-func marshalAuditDetails(details map[string]any) ([]byte, error) {
-	if details == nil {
-		return []byte("{}"), nil
-	}
-	raw, err := json.Marshal(details)
-	if err != nil {
-		return nil, fmt.Errorf("templates repository marshal audit details: %w", err)
-	}
-	return raw, nil
 }
 
 func unmarshalAuditDetails(raw []byte, details *map[string]any) error {

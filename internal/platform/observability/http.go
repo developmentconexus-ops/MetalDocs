@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -60,7 +61,7 @@ func (o *HTTPObservability) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		traceID, ok := requesttrace.Normalize(r.Header.Get("X-Trace-Id"))
 		if !ok {
-			traceID = requesttrace.Resolve(nil)
+			traceID = requesttrace.Resolve(context.TODO())
 		}
 		r = r.WithContext(requesttrace.WithTraceID(r.Context(), traceID))
 

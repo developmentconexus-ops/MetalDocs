@@ -133,11 +133,6 @@ func (f fakeResult) RowsAffected() (int64, error) { return f.rowsAffected, nil }
 // fakeStageUpdater lets us test the OCC branch without a real database.
 // We implement the minimal interface needed to call our OCC logic.
 
-type updateResult struct {
-	n   int64
-	err error
-}
-
 // occ logic extracted for unit testability
 func applyStageOCC(res sql.Result, execErr error) error {
 	if execErr != nil {
@@ -342,7 +337,7 @@ func TestUpdateInstanceStatusOCC(t *testing.T) {
 func TestNewPostgresApprovalRepository(t *testing.T) {
 	// NewPostgresApprovalRepository must return an ApprovalRepository.
 	// We pass nil for *sql.DB; this is fine as long as we don't execute queries.
-	var repo ApprovalRepository = NewPostgresApprovalRepository(nil)
+	repo := NewPostgresApprovalRepository(nil)
 	if repo == nil {
 		t.Error("NewPostgresApprovalRepository returned nil")
 	}
