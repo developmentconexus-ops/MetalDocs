@@ -17,7 +17,7 @@ $targets = @(
     "docs",
     "frontend/apps/web/src",
     "internal",
-    "migrations",
+    "archive/migrations",
     "wiki"
 )
 

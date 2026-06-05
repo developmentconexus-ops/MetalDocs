@@ -11,7 +11,7 @@ import (
 )
 
 func TestMigration0154_FileExists(t *testing.T) {
-	if _, err := os.Stat("../../../migrations/0154_capability_doc_edit_draft.sql"); err != nil {
+	if _, err := os.Stat("../../../archive/migrations/0154_capability_doc_edit_draft.sql"); err != nil {
 		t.Fatalf("expected migration file 0154_capability_doc_edit_draft.sql: %v", err)
 	}
 }
