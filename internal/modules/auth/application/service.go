@@ -42,7 +42,6 @@ type Config struct {
 	PasswordMinLength      int
 	LoginMaxFailedAttempts int
 	LoginLockDuration      time.Duration
-	LegacyHeaderEnabled    bool
 	OriginProtection       bool
 	// AllowDevTenantFallback allows login to succeed for users with no IAM roles
 	// by returning DevTenantID. Set true only in dev/test; defaults false (prod-safe).
@@ -310,13 +309,8 @@ func (s *Service) Logout(ctx context.Context, rawToken string) error {
 	return s.repo.RevokeSession(ctx, sessionID, s.now().UTC())
 }
 
-func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
-	return s.ChangePasswordForUser(ctx, authdomain.CurrentUser{UserID: userID}, currentPassword, newPassword)
-}
-
 func (s *Service) ChangePasswordForUser(ctx context.Context, currentUser authdomain.CurrentUser, currentPassword, newPassword string) error {
 	userID := strings.TrimSpace(currentUser.UserID)
-	userID = strings.TrimSpace(userID)
 	if userID == "" {
 		return authdomain.ErrInvalidCredentials
 	}
