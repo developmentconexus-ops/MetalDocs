@@ -1,6 +1,6 @@
 # ADR 0013 — Template Revision Labels (REV-style, Backend-Canonical)
 
-> **Last verified:** 2026-05-29
+> **Last verified:** 2026-06-05
 > **Scope:** Adopt `REV{nn}` chip labels for template versions, mirroring documents' existing revision-code convention. Make `revision_number` a **first-class persisted column** on `templates_template_version`, exposed via OpenAPI as `current_revision_number` on `TemplateDTO`. Frontend renders the field directly through a shared formatter — no off-by-one math in the UI.
 > **Out of scope:** Renaming `version_number` column (kept — it remains the lifecycle counter). Documents-side changes (already uses REV).
 > **Key files (touched in implementation PR):**
@@ -319,6 +319,14 @@ Live preview drive of all four chip states; capture snapshots under `.qa-reports
 3. **Feature flag.** Roll out behind `templates.rev_labels = on` for safe rollback?
 
 ---
+
+## Amendment 2026-06-05 — Schema half landed (drift repair)
+
+The Go layer of this ADR (repository projection in `internal/modules/templates/repository/postgres.go`, scanner in `mappers.go`, domain fields, `api.gen.go`) merged earlier, but the **schema half (D-1) never landed in the curated baseline**. Result: every templates list/fetch returned HTTP 500 — `ERROR: column lv.revision_number does not exist (SQLSTATE 42703)` — breaking `TemplatesListPage` and the new-document wizard blank-template fetch.
+
+Repaired by forward migration **`db/migrations/0233_templates_template_version_revision_number.sql`** (the `01XX` placeholder in Key files above): `ADD COLUMN revision_number integer NOT NULL DEFAULT 0`, one-shot backfill `revision_number = version_number - 1`, unique index `ux_templates_version_revision (template_id, revision_number)`. Backfill `UPDATE` asserts `template.edit` via `set_config('metaldocs.asserted_caps', …)` to clear the `enforce_capability_asserted()` tripwire that gates this table (same pattern as `0205`).
+
+Version `0233` chosen because ledger markers `0225`–`0232` were already consumed by parallel programs in the shared dev DB. Verified: both endpoints return 200; column/index/ledger present; `go test ./internal/modules/templates/...` green (incl. `TestGetTemplateProjectsRevisionNumbers` pinning the projection column order).
 
 ## Amendment 2026-05-30 — Drafts show working revision (Documents parity)
 
