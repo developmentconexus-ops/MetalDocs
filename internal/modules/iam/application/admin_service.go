@@ -8,7 +8,6 @@ import (
 )
 
 type RoleCacheInvalidator interface {
-	InvalidateUser(userID string)
 	InvalidateUserTenant(userID, tenantID string)
 }
 

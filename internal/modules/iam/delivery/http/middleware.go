@@ -38,20 +38,14 @@ type Middleware struct {
 	caps         *iamapp.CapabilityService
 	roleProvider iamdomain.RoleProvider
 	enabled      bool
-	legacyHeader bool
 	resolver     PermissionResolver
 }
 
-func NewMiddleware(caps *iamapp.CapabilityService, roleProvider iamdomain.RoleProvider, enabled bool, legacyHeader ...bool) *Middleware {
-	allowLegacy := false
-	if len(legacyHeader) > 0 {
-		allowLegacy = legacyHeader[0]
-	}
+func NewMiddleware(caps *iamapp.CapabilityService, roleProvider iamdomain.RoleProvider, enabled bool) *Middleware {
 	return &Middleware{
 		caps:         caps,
 		roleProvider: roleProvider,
 		enabled:      enabled,
-		legacyHeader: allowLegacy,
 	}
 }
 

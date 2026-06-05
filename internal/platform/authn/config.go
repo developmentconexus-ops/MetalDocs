@@ -117,9 +117,6 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		PasswordMinLength:      passwordMinLength,
 		LoginMaxFailedAttempts: maxFailedAttempts,
 		LoginLockDuration:      time.Duration(lockMinutes) * time.Minute,
-		// LegacyHeaderEnabled preserves the retired pre-session header-based auth
-		// compatibility path. Remove it once the corresponding env toggle can be dropped.
-		LegacyHeaderEnabled:    parseBoolEnv("METALDOCS_AUTH_LEGACY_HEADER_ENABLED", false),
 		BootstrapAdminEnabled:  bootstrapEnabled,
 		BootstrapAdminUserID:   bootstrapUserID,
 		BootstrapAdminUsername: bootstrapUsername,

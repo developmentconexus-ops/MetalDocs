@@ -12,14 +12,6 @@ const (
 	PlanTierEnterprise PlanTier = "enterprise"
 )
 
-func (p PlanTier) Valid() bool {
-	switch p {
-	case PlanTierFree, PlanTierPro, PlanTierEnterprise:
-		return true
-	}
-	return false
-}
-
 // SeatUsage carries the seat side of the Usage card.
 type SeatUsage struct {
 	Used      int
@@ -70,11 +62,11 @@ type KpiSnapshot struct {
 // TenantPlan is the persisted plan envelope row. The Tier-B observability
 // service treats it as read-only.
 type TenantPlan struct {
-	TenantID               string
-	Tier                   PlanTier
-	SeatsAllocated         int
-	StorageAllocatedBytes  int64
-	APICallsAllocated      int
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	TenantID              string
+	Tier                  PlanTier
+	SeatsAllocated        int
+	StorageAllocatedBytes int64
+	APICallsAllocated     int
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
