@@ -5,7 +5,7 @@ on:
     paths:
       - 'frontend/apps/web/e2e/**'
       - 'frontend/apps/web/src/features/approval/**'
-      - 'internal/modules/documents_v2/**'
+      - 'internal/modules/documents/**'
       - 'internal/modules/jobs/**'
       - 'api/**'
   push:
