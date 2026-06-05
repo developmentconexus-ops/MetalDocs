@@ -44,7 +44,7 @@ func collectGoFiles(patterns []string) []string {
 		}
 		_ = filepath.WalkDir(pat, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
-				return nil
+				return nil //nolint:nilerr // best-effort walk: skip unreadable entries
 			}
 			if d.IsDir() {
 				// Skip vendored, dependency, and tooling-scratch trees. Without
