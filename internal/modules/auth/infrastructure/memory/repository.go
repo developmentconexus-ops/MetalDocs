@@ -17,14 +17,18 @@ type Repository struct {
 	sessions      map[string]authdomain.Session
 	tenants       map[string][]string
 	tenantCatalog map[string]authdomain.Tenant
+
+	loginLocksMu sync.Mutex
+	loginLocks   map[string]*sync.Mutex
 }
 
 func NewRepository() *Repository {
 	return &Repository{
-		users:    map[string]authdomain.Identity{},
-		byLogin:  map[string]string{},
-		sessions: map[string]authdomain.Session{},
-		tenants:  map[string][]string{},
+		users:      map[string]authdomain.Identity{},
+		byLogin:    map[string]string{},
+		sessions:   map[string]authdomain.Session{},
+		tenants:    map[string][]string{},
+		loginLocks: map[string]*sync.Mutex{},
 		tenantCatalog: map[string]authdomain.Tenant{
 			"ffffffff-ffff-ffff-ffff-ffffffffffff": {
 				ID:   "ffffffff-ffff-ffff-ffff-ffffffffffff",
@@ -161,6 +165,51 @@ func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAtte
 	identity.UpdatedAt = time.Now().UTC()
 	r.users[userID] = identity
 	return identity.FailedLoginAttempts, identity.LockedUntil, nil
+}
+
+// WithinLoginLock serializes concurrent login attempts per identity using a
+// per-userID mutex, mirroring the Postgres advisory-lock contract so the
+// in-memory dev/test double exhibits the same lockout atomicity.
+func (r *Repository) WithinLoginLock(_ context.Context, userID string, fn func(authdomain.LoginTx) error) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return authdomain.ErrIdentityNotFound
+	}
+	lk := r.loginLockFor(userID)
+	lk.Lock()
+	defer lk.Unlock()
+	return fn(memoryLoginTx{r: r})
+}
+
+func (r *Repository) loginLockFor(userID string) *sync.Mutex {
+	r.loginLocksMu.Lock()
+	defer r.loginLocksMu.Unlock()
+	lk, ok := r.loginLocks[userID]
+	if !ok {
+		lk = &sync.Mutex{}
+		r.loginLocks[userID] = lk
+	}
+	return lk
+}
+
+type memoryLoginTx struct {
+	r *Repository
+}
+
+func (m memoryLoginTx) LoadLoginState(ctx context.Context, userID string) (authdomain.LoginState, error) {
+	identity, err := m.r.FindIdentityByUserID(ctx, userID)
+	if err != nil {
+		return authdomain.LoginState{}, err
+	}
+	return authdomain.LoginState{
+		PasswordHash: identity.PasswordHash,
+		IsActive:     identity.IsActive,
+		LockedUntil:  identity.LockedUntil,
+	}, nil
+}
+
+func (m memoryLoginTx) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
+	return m.r.RecordFailedLogin(ctx, userID, maxAttempts, lockDurationSeconds, ip)
 }
 
 func (r *Repository) CreateUser(_ context.Context, params authdomain.CreateUserParams) error {

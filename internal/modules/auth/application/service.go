@@ -173,6 +173,17 @@ func (s *Service) BootstrapLocalAdmin(ctx context.Context) error {
 	)
 }
 
+// loginOutcome is the result of the credential check performed inside the
+// per-identity login lock, decided in the locked region and acted on after it.
+type loginOutcome int
+
+const (
+	loginOK loginOutcome = iota
+	loginInvalid
+	loginLocked
+	loginInactive
+)
+
 func (s *Service) Authenticate(ctx context.Context, identifier, password string, r *http.Request) (authdomain.AuthenticatedSession, error) {
 	identifier = strings.TrimSpace(identifier)
 	if identifier == "" || password == "" {
@@ -183,17 +194,44 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 	if err != nil {
 		return authdomain.AuthenticatedSession{}, err
 	}
-	if identity.LockedUntil != nil && identity.LockedUntil.After(s.now().UTC()) {
-		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityLocked
-	}
-	if !identity.IsActive {
-		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
-	}
-	// TODO: use SELECT ... FOR UPDATE or advisory lock to make lockout atomic.
-	if bcrypt.CompareHashAndPassword([]byte(identity.PasswordHash), []byte(password)) != nil {
-		if _, _, err := s.repo.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds()), s.remoteIP(r)); err != nil {
-			return authdomain.AuthenticatedSession{}, fmt.Errorf("record failed login: %w", err)
+
+	// Verify credentials while holding a per-identity lock so the lockout check
+	// and the failed-attempt write are atomic. Concurrent attempts on the same
+	// identity are serialized: once the threshold lock is set, the remaining
+	// in-flight attempts observe it and are rejected before bcrypt runs — closing
+	// the read-check-then-write TOCTOU window that previously let a parallel burst
+	// exceed LoginMaxFailedAttempts guesses within a single lock window.
+	outcome := loginOK
+	if lockErr := s.repo.WithinLoginLock(ctx, identity.UserID, func(tx authdomain.LoginTx) error {
+		state, err := tx.LoadLoginState(ctx, identity.UserID)
+		if err != nil {
+			return err
 		}
+		if state.LockedUntil != nil && state.LockedUntil.After(s.now().UTC()) {
+			outcome = loginLocked
+			return nil
+		}
+		if !state.IsActive {
+			outcome = loginInactive
+			return nil
+		}
+		if bcrypt.CompareHashAndPassword([]byte(state.PasswordHash), []byte(password)) != nil {
+			if _, _, err := tx.RecordFailedLogin(ctx, identity.UserID, s.cfg.LoginMaxFailedAttempts, int(s.cfg.LoginLockDuration.Seconds()), s.remoteIP(r)); err != nil {
+				return fmt.Errorf("record failed login: %w", err)
+			}
+			outcome = loginInvalid
+			return nil
+		}
+		return nil
+	}); lockErr != nil {
+		return authdomain.AuthenticatedSession{}, lockErr
+	}
+	switch outcome {
+	case loginLocked:
+		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityLocked
+	case loginInactive:
+		return authdomain.AuthenticatedSession{}, authdomain.ErrIdentityInactive
+	case loginInvalid:
 		return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
 	}
 
