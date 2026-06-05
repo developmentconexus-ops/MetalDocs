@@ -56,6 +56,19 @@ jobs:
       - name: OpenAPI lint
         run: npx --yes @redocly/cli@latest lint api/openapi/v1/openapi.yaml
 
+  spec-base-path-gate:
+    # AD-1 (api-contract-hardening Phase A): servers.url carries the /api/v1
+    # base, so every OpenAPI path key must be relative. A re-prefixed key
+    # produces doubled URLs (/api/v1/api/v1/...) for spec-respecting consumers.
+    # Blocking — this is the gate that keeps the double-prefix bug class dead.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: 1.25.x, cache: true }
+      - name: No /api prefix in OpenAPI path keys
+        run: go run ./scripts/api-lint -only PATH-BASE-PREFIX api/openapi/v1/openapi.yaml
+
   api-design-system-lint:
     # ADR 0022 Phase 13 — Principle 5 enforced. Two rule-sets, one job:
     #

@@ -29,8 +29,9 @@ func main() {
 		"hard-error when an EXPECTED core registry file (model.go, seed sql, tripwire allow-list, wiki authz doc) is missing instead of treating it as an empty set. Use for production/CI runs so a wrong modulesRoot can never masquerade as a clean pass (ADR 0022 Phase 13).")
 	enforce := flag.String("enforce", "all",
 		"which rule-set determines the exit code: all|blocking|reported. blocking = only the binding/dialect/tripwire guards gate (spec-drift printed but non-fatal); reported = only the deferred spec-drift families gate; all = any violation (back-compat default).")
+	only := flag.String("only", "", "if set, report only violations for this rule (e.g. PATH-BASE-PREFIX)")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: api-lint [-strict] [-enforce=all|blocking|reported] <openapi.yaml> [<repo-root>]")
+		fmt.Fprintln(os.Stderr, "usage: api-lint [-strict] [-enforce=all|blocking|reported] [-only RULE] <openapi.yaml> [<repo-root>]")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -76,6 +77,16 @@ func main() {
 			os.Exit(1)
 		}
 		violations = append(violations, codeViolations...)
+	}
+
+	if *only != "" {
+		kept := violations[:0]
+		for _, v := range violations {
+			if v.Rule == *only {
+				kept = append(kept, v)
+			}
+		}
+		violations = kept
 	}
 
 	var blockingCount, reportedCount int

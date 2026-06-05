@@ -1,4 +1,4 @@
-import { apiFetch } from '../../../lib/api/client';
+import { api } from '../../../lib/api/client';
 import { ApiError } from '../../../lib/api/errors';
 import type { components } from '../../../lib/api-types';
 
@@ -15,13 +15,10 @@ type DocumentListQueryParams = {
   includeArchived?: boolean;
 };
 
-function buildQuery(params: DocumentListQueryParams): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  const qs = search.toString();
-  return qs ? `?${qs}` : '';
+function cleanParams(params: DocumentListQueryParams): DocumentListQueryParams {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, value]) => value !== undefined),
+  ) as DocumentListQueryParams;
 }
 
 // Note: 4xx/5xx already throw `ApiError` via `apiFetch` → `assertApiResponse`.
@@ -35,21 +32,21 @@ function asApiError(error: unknown, fallbackCode: string): ApiError {
 }
 
 export async function fetchLibrary(params: DocumentListQueryParams): Promise<DocumentListResponse> {
-  try {
-    const data = await apiFetch<DocumentListResponse>(`/api/v1/documents${buildQuery(params)}`);
-    if (!data) throw new ApiError('library.empty_response', 0, 'Resposta vazia ao listar documentos.');
-    return data;
-  } catch (error) {
-    throw asApiError(error, 'library.list_failed');
-  }
+  const { data, error } = await api.GET('/documents', {
+    params: {
+      query: cleanParams(params),
+    },
+  });
+
+  if (error) throw asApiError(error, 'library.list_failed');
+  if (!data) throw new ApiError('library.empty_response', 0, 'Resposta vazia ao listar documentos.');
+  return data;
 }
 
 export async function fetchLibraryStats(): Promise<DocumentStatsResponse> {
-  try {
-    const data = await apiFetch<DocumentStatsResponse>('/api/v1/documents/stats');
-    if (!data) throw new ApiError('library.empty_response', 0, 'Resposta vazia ao carregar estatísticas.');
-    return data;
-  } catch (error) {
-    throw asApiError(error, 'library.stats_failed');
-  }
+  const { data, error } = await api.GET('/documents/stats');
+
+  if (error) throw asApiError(error, 'library.stats_failed');
+  if (!data) throw new ApiError('library.empty_response', 0, 'Resposta vazia ao carregar estatísticas.');
+  return data;
 }

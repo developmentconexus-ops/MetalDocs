@@ -9,12 +9,12 @@ export type DocumentRow = components['schemas']['DocumentSummary'];
 export type DocumentListResponse = components['schemas']['DocumentListResponse'];
 export type AcquireWriter = components['schemas']['DocumentSessionWriterResponse'];
 export type AcquireReadonly = components['schemas']['DocumentSessionReadonlyResponse'];
-export type AcquireResult = paths['/api/v1/documents/{id}/session/acquire']['post']['responses'][200]['content']['application/json'] | paths['/api/v1/documents/{id}/session/acquire']['post']['responses'][201]['content']['application/json'];
+export type AcquireResult = paths['/documents/{id}/session/acquire']['post']['responses'][200]['content']['application/json'] | paths['/documents/{id}/session/acquire']['post']['responses'][201]['content']['application/json'];
 export type PresignResult = components['schemas']['DocumentAutosavePresignResponse'];
-export type CommitAutosaveRequest = paths['/api/v1/documents/{id}/autosave/commit']['post']['requestBody']['content']['application/json'];
-export type CommitResult = paths['/api/v1/documents/{id}/autosave/commit']['post']['responses'][200]['content']['application/json'];
+export type CommitAutosaveRequest = paths['/documents/{id}/autosave/commit']['post']['requestBody']['content']['application/json'];
+export type CommitResult = paths['/documents/{id}/autosave/commit']['post']['responses'][200]['content']['application/json'];
 export type Checkpoint = components['schemas']['DocumentCheckpoint'];
-export type FinalizeDocumentResult = paths['/api/v1/documents/{id}/finalize']['post']['responses'][201]['content']['application/json'];
+export type FinalizeDocumentResult = paths['/documents/{id}/finalize']['post']['responses'][201]['content']['application/json'];
 export type FinalizeDocumentRequest = components['schemas']['FinalizeDocumentRequest'];
 export type DocumentDetail = components['schemas']['DocumentDetailResponse'];
 export type DocumentRevisionHistoryResponse = components['schemas']['DocumentRevisionHistoryResponse'];
@@ -99,7 +99,7 @@ export async function createCheckpoint(id: string, label: string): Promise<Check
   });
 }
 
-export type RestoreCheckpointResult = paths['/api/v1/documents/{id}/checkpoints/{version}/restore']['post']['responses'][200]['content']['application/json'];
+export type RestoreCheckpointResult = paths['/documents/{id}/checkpoints/{version}/restore']['post']['responses'][200]['content']['application/json'];
 export async function restoreCheckpoint(id: string, versionNum: number): Promise<RestoreCheckpointResult> {
   return apiFetch(`/api/v1/documents/${id}/checkpoints/${versionNum}/restore`, { method: 'POST' });
 }
