@@ -33,7 +33,6 @@
       - `METALDOCS_STORAGE_PROVIDER=minio`
       - `METALDOCS_MINIO_BUCKET=metaldocs-attachments`
       - `METALDOCS_MINIO_AUTO_CREATE_BUCKET=true`
-      - `METALDOCS_AUTH_LEGACY_HEADER_ENABLED=false`
       - `METALDOCS_AUTH_ORIGIN_PROTECTION_ENABLED=true`
 2. Subir stack:
    - `docker compose -f deploy/compose/docker-compose.yml --env-file .env up -d --build`
