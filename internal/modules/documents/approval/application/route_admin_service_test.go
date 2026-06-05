@@ -36,9 +36,7 @@ func (r *routeAdminRows) Next(dest []driver.Value) error {
 		return io.EOF
 	}
 	r.done = true
-	for i, v := range r.values {
-		dest[i] = v
-	}
+	copy(dest, r.values)
 	return nil
 }
 
@@ -60,9 +58,7 @@ func (r *routeAdminMultiRows) Next(dest []driver.Value) error {
 	if r.idx >= len(r.values) {
 		return io.EOF
 	}
-	for i, v := range r.values[r.idx] {
-		dest[i] = v
-	}
+	copy(dest, r.values[r.idx])
 	r.idx++
 	return nil
 }
@@ -200,22 +196,22 @@ func (s *routeAdminStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 type routeAdminConn struct {
-	authzGranted        bool
-	actorID             string
-	tenantID            string
-	createdRouteID      string
-	lockedRouteID       string
-	lockedRouteVersion  int
-	lockedRouteActive   bool
-	lockedRouteStateSet bool
-	routeExists         bool
-	newVersion          int
-	updateErr           error
-	deactivateErr       error
-	updateNoRows        bool
-	deactivateNoRows    bool
-	capturedTenantGUC   string
-	capturedActorGUC    string
+	authzGranted         bool
+	actorID              string
+	tenantID             string
+	createdRouteID       string
+	lockedRouteID        string
+	lockedRouteVersion   int
+	lockedRouteActive    bool
+	lockedRouteStateSet  bool
+	routeExists          bool
+	newVersion           int
+	updateErr            error
+	deactivateErr        error
+	updateNoRows         bool
+	deactivateNoRows     bool
+	capturedTenantGUC    string
+	capturedActorGUC     string
 	stageInsertExecCount int
 	stageInsertArgCount  int
 	stageLoadStages      []domain.Stage

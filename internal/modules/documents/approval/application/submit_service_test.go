@@ -57,7 +57,6 @@ func (c fixedClock) Now() time.Time { return c.t }
 //   4. COMMIT/ROLLBACK   — tx lifecycle
 
 type submitTestConn struct {
-	name          string // driver instance name, unused but kept for debugging
 	authzGranted  bool
 	areaCode      string
 	actorID       string

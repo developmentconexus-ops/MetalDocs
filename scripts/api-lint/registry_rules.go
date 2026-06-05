@@ -14,6 +14,7 @@ package main
 // Like the other code-side lints these are single-file scans, no call graph.
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -57,7 +58,7 @@ var seedCapRE = regexp.MustCompile(`(?i)INSERT INTO\s+metaldocs\.role_capabiliti
 
 // RunRegistryRules runs the three registry-binding lints. modulesRoot is the
 // repo root (the api-lint second arg); paths below are resolved relative to it.
-func RunRegistryRules(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
+func RunRegistryRules(modulesRoot string, fset *token.FileSet, strict bool) ([]Violation, error) {
 	if modulesRoot == "" {
 		return nil, nil
 	}
@@ -69,19 +70,19 @@ func RunRegistryRules(modulesRoot string, fset *token.FileSet) ([]Violation, err
 	}
 	out = append(out, inline...)
 
-	seed, err := checkSeedRegistryParity(modulesRoot)
+	seed, err := checkSeedRegistryParity(modulesRoot, strict)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, seed...)
 
-	wiki, err := checkWikiCapabilityParity(modulesRoot)
+	wiki, err := checkWikiCapabilityParity(modulesRoot, strict)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, wiki...)
 
-	binding, err := checkAuthzAreaScopeBinding(modulesRoot, fset)
+	binding, err := checkAuthzAreaScopeBinding(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -93,13 +94,26 @@ func RunRegistryRules(modulesRoot string, fset *token.FileSet) ([]Violation, err
 	}
 	out = append(out, rawcap...)
 
-	rolestr, err := checkNoRoleStringInDelivery(modulesRoot, fset)
+	rolestr, err := checkNoRoleStringInDelivery(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
 	}
 	out = append(out, rolestr...)
 
 	return out, nil
+}
+
+// requireCoreFile converts a missing EXPECTED core registry file into a hard
+// error under strict mode (production/CI root), while preserving the legitimate
+// "unit-test fixture root, file absent" path in non-strict mode. This is the
+// fix for the silent-empty swallow (ADR 0022 Phase 13): before, a wrong
+// modulesRoot made every join miss and each helper returned an empty set that
+// passed trivially. `what` names the file for the operator.
+func requireCoreFile(strict bool, what, path string) error {
+	if !strict {
+		return nil
+	}
+	return fmt.Errorf("api-lint strict: %s not found at %s — wrong repo-root? (expected the repo root, not internal/modules); a missing core file under a production root is a hard error, not an empty pass (ADR 0022 Phase 13)", what, path)
 }
 
 // phantomRoleDialect lists role-name string literals that may not appear in a
@@ -132,8 +146,8 @@ var phantomRoleDialect = []string{"template_author", "document_filler", "reviewe
 // struct field, function arg) is intentionally NOT flagged — only the three
 // authz-gate shapes (const value, equality comparison, switch/case) bite.
 // Scoped to non-test .go files whose path contains "/delivery/http/".
-func checkNoRoleStringInDelivery(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
-	banned, err := bannedRoleSet(modulesRoot, fset)
+func checkNoRoleStringInDelivery(modulesRoot string, fset *token.FileSet, strict bool) ([]Violation, error) {
+	banned, err := bannedRoleSet(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -234,8 +248,8 @@ func checkNoRoleStringInDelivery(modulesRoot string, fset *token.FileSet) ([]Vio
 // bannedRoleSet builds the role-name set the delivery gate may not name as a
 // string literal: the canonical Role values parsed from model.go UNION the
 // legacy phantom dialect. Returns an empty map when no model.go is found.
-func bannedRoleSet(modulesRoot string, fset *token.FileSet) (map[string]struct{}, error) {
-	roles, err := parseRoleConsts(modulesRoot, fset)
+func bannedRoleSet(modulesRoot string, fset *token.FileSet, strict bool) (map[string]struct{}, error) {
+	roles, err := parseRoleConsts(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -255,11 +269,14 @@ func bannedRoleSet(modulesRoot string, fset *token.FileSet) (map[string]struct{}
 // parseRoleConsts parses internal/modules/iam/domain/model.go and returns the
 // canonical Role const-name -> value map (e.g. "RoleSystemAdmin" ->
 // "system_admin"). Mirrors parseCapabilityConsts but matches Role-typed consts.
-func parseRoleConsts(modulesRoot string, fset *token.FileSet) (map[string]iamdomain.Role, error) {
+func parseRoleConsts(modulesRoot string, fset *token.FileSet, strict bool) (map[string]iamdomain.Role, error) {
 	modelPath := filepath.Join(modulesRoot, "internal", "modules", "iam", "domain", "model.go")
 	raw, err := os.ReadFile(modelPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if cerr := requireCoreFile(strict, "iam/domain/model.go (Role registry)", modelPath); cerr != nil {
+				return nil, cerr
+			}
 			return nil, nil
 		}
 		return nil, err
@@ -398,8 +415,8 @@ func checkNoRawStringCapability(modulesRoot string, fset *token.FileSet) ([]Viol
 // to a value at lint time and is skipped. Such call sites are covered by the
 // per-call-site fixes + tests, not by this static scan. Scoped to authz.Require
 // (authz.RequireAll has a different argument shape).
-func checkAuthzAreaScopeBinding(modulesRoot string, fset *token.FileSet) ([]Violation, error) {
-	constToValue, err := parseCapabilityConsts(modulesRoot, fset)
+func checkAuthzAreaScopeBinding(modulesRoot string, fset *token.FileSet, strict bool) ([]Violation, error) {
+	constToValue, err := parseCapabilityConsts(modulesRoot, fset, strict)
 	if err != nil {
 		return nil, err
 	}
@@ -498,11 +515,14 @@ func capConstName(arg ast.Expr) (string, bool) {
 // the registry const-name -> Capability-value map (e.g. "CapDocumentEdit" ->
 // "document.edit"). The AST guard needs this because Go consts are not
 // reflectable: the call site carries the const identifier, not its value.
-func parseCapabilityConsts(modulesRoot string, fset *token.FileSet) (map[string]iamdomain.Capability, error) {
+func parseCapabilityConsts(modulesRoot string, fset *token.FileSet, strict bool) (map[string]iamdomain.Capability, error) {
 	modelPath := filepath.Join(modulesRoot, "internal", "modules", "iam", "domain", "model.go")
 	raw, err := os.ReadFile(modelPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if cerr := requireCoreFile(strict, "iam/domain/model.go (Capability registry)", modelPath); cerr != nil {
+				return nil, cerr
+			}
 			return nil, nil
 		}
 		return nil, err
@@ -617,11 +637,14 @@ func isCapabilityConversion(fun ast.Expr) bool {
 // both directions (ADR 0022 Phase 5, item 3): every seeded capability must be in
 // the registry, and every registry capability must be seeded to >=1 role (or be
 // explicitly deferred). Wired into the lint binary, not just the unit test.
-func checkSeedRegistryParity(modulesRoot string) ([]Violation, error) {
+func checkSeedRegistryParity(modulesRoot string, strict bool) ([]Violation, error) {
 	seedPath := filepath.Join(modulesRoot, "db", "reference-data", "0001_product_reference_data.sql")
 	raw, err := os.ReadFile(seedPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if cerr := requireCoreFile(strict, "db/reference-data/0001_product_reference_data.sql (role_capabilities seed)", seedPath); cerr != nil {
+				return nil, cerr
+			}
 			return nil, nil // no seed under this root (e.g. lint test fixtures); skip
 		}
 		return nil, err
@@ -682,14 +705,23 @@ func checkSeedRegistryParity(modulesRoot string) ([]Violation, error) {
 // membership.grant-style drift (a doc claiming a capability that does not exist)
 // without false-positiving on prose, filenames, GUC names, or deferred caps —
 // only the explicit `cap:` marker is bound.
-func checkWikiCapabilityParity(modulesRoot string) ([]Violation, error) {
+func checkWikiCapabilityParity(modulesRoot string, strict bool) ([]Violation, error) {
 	out := []Violation{}
 	for _, rel := range wikiAuthzDocs {
 		path := filepath.Join(modulesRoot, rel)
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				continue // doc optional / renamed; not a lint failure
+				// In strict mode (production root) these are FIXED, known authz
+				// docs — a missing one means a wrong root or an un-tracked rename,
+				// either of which must fail loudly rather than silently pass. In
+				// non-strict mode (fixture roots) a missing doc is skipped, and if
+				// a doc is legitimately renamed update wikiAuthzDocs in the same
+				// change (ADR 0022 Phase 13).
+				if cerr := requireCoreFile(strict, "wiki authz doc "+rel, path); cerr != nil {
+					return nil, cerr
+				}
+				continue
 			}
 			return nil, err
 		}

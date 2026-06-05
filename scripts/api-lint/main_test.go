@@ -50,7 +50,7 @@ func TestRules(t *testing.T) {
 			}
 			if c.modules != "" {
 				moduleRoot := filepath.Join("testdata", c.modules)
-				codeGot, err := RunCodeRules(specPath, moduleRoot)
+				codeGot, err := RunCodeRules(specPath, moduleRoot, false)
 				if err != nil {
 					t.Fatalf("RunCodeRules(%q, %q): %v", specPath, moduleRoot, err)
 				}

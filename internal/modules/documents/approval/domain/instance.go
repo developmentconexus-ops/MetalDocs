@@ -35,23 +35,23 @@ const (
 
 // StageInstance holds runtime state for one approval stage.
 type StageInstance struct {
-	ID                          string
-	ApprovalInstanceID          string
-	StageOrder                  int
-	NameSnapshot                string
-	RequiredRoleSnapshot        string
-	RequiredCapabilitySnapshot  string
-	AreaCodeSnapshot            string
-	QuorumSnapshot              QuorumPolicy
-	QuorumMSnapshot             *int
-	OnEligibilityDriftSnapshot  DriftPolicy
-	EligibleActorIDs            []string
-	EffectiveDenominator        *int
-	Status                      StageStatus
-	OpenedAt                    *time.Time
-	CompletedAt                 *time.Time
-	SkipReason                  string
-	Signoffs                    []*Signoff
+	ID                         string
+	ApprovalInstanceID         string
+	StageOrder                 int
+	NameSnapshot               string
+	RequiredRoleSnapshot       string
+	RequiredCapabilitySnapshot string
+	AreaCodeSnapshot           string
+	QuorumSnapshot             QuorumPolicy
+	QuorumMSnapshot            *int
+	OnEligibilityDriftSnapshot DriftPolicy
+	EligibleActorIDs           []string
+	EffectiveDenominator       *int
+	Status                     StageStatus
+	OpenedAt                   *time.Time
+	CompletedAt                *time.Time
+	SkipReason                 string
+	Signoffs                   []*Signoff
 }
 
 // Instance is the approval instance aggregate.
@@ -198,10 +198,4 @@ func (inst *Instance) Cancel(reason string) error {
 	inst.CompletedAt = &now
 	_ = reason // persisted by caller in governance_events
 	return nil
-}
-
-func (inst *Instance) isTerminal() bool {
-	return inst.Status == InstanceApproved ||
-		inst.Status == InstanceRejected ||
-		inst.Status == InstanceCancelled
 }

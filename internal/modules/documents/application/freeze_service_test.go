@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -351,7 +350,7 @@ func TestFreezeService_Freeze_DefaultsEmptyComposition(t *testing.T) {
 	if string(fanoutClient.req.Composition) != `{}` {
 		t.Fatalf("empty composition should default to {}, got %s", fanoutClient.req.Composition)
 	}
-	var raw json.RawMessage = fanoutClient.req.Composition
+	raw := fanoutClient.req.Composition
 	_ = raw
 }
 

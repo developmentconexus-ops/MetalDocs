@@ -1,10 +1,7 @@
 package domain
 
 import (
-	"encoding/json"
-	"strings"
 	"testing"
-	"time"
 )
 
 // R2-1: SkipStage during signing — skipped stage outcome never re-evaluated.
@@ -76,17 +73,4 @@ func TestRevisionVersionGatesStateTransition(t *testing.T) {
 	// Note: full OCC version check (AdvanceStage(expectedVersion)) is enforced in Phase 4
 	// repository layer via SELECT FOR UPDATE and version comparison. Domain layer only
 	// ensures monotonicity via BumpRevisionVersion.
-}
-
-// helpers used across test files (avoids re-declaration conflict with signoff_test.go).
-func makeSignoffFull(id, actor string, dec Decision) Signoff {
-	h := strings.Repeat("a", 64)
-	s, _ := NewSignoff(SignoffParams{
-		ID: id, ApprovalInstanceID: "inst-1", StageInstanceID: "stage-1",
-		ActorUserID: actor, ActorTenantID: "t1",
-		Decision: dec, SignedAt: time.Now(),
-		SignatureMethod: "password", SignaturePayload: json.RawMessage(`{}`),
-		ContentHash: h,
-	})
-	return *s
 }

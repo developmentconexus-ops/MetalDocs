@@ -45,7 +45,7 @@ func (a *IAMUserOptionsAdapter) ListUserOptions(ctx context.Context, _ string) (
 	}
 	opts := make([]UserOption, len(users))
 	for i, u := range users {
-		opts[i] = UserOption{UserID: u.UserID, DisplayName: u.DisplayName}
+		opts[i] = UserOption(u)
 	}
 	sort.Slice(opts, func(i, j int) bool {
 		return opts[i].DisplayName < opts[j].DisplayName
