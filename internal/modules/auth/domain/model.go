@@ -15,9 +15,8 @@ type UserID string
 type SessionID string
 type TenantID string
 
-func (id UserID) String() string    { return string(id) }
-func (id SessionID) String() string { return string(id) }
-func (id TenantID) String() string  { return string(id) }
+func (id UserID) String() string   { return string(id) }
+func (id TenantID) String() string { return string(id) }
 
 type Tenant struct {
 	ID   string
@@ -132,14 +131,14 @@ type BootstrapAdminParams struct {
 
 // CurrentUser fields are PII; do not log this struct directly.
 type CurrentUser struct {
-	UserID             string                 `json:"userId"`
-	TenantID           string                 `json:"tenantId"`
-	TenantName         string                 `json:"tenantName"`
-	Username           string                 `json:"username"`
-	Email              string                 `json:"email,omitempty"`
-	DisplayName        string                 `json:"displayName"`
-	MustChangePassword bool                   `json:"mustChangePassword"`
-	Roles              []iamdomain.Role       `json:"roles"`
+	UserID             string           `json:"userId"`
+	TenantID           string           `json:"tenantId"`
+	TenantName         string           `json:"tenantName"`
+	Username           string           `json:"username"`
+	Email              string           `json:"email,omitempty"`
+	DisplayName        string           `json:"displayName"`
+	MustChangePassword bool             `json:"mustChangePassword"`
+	Roles              []iamdomain.Role `json:"roles"`
 	// Capabilities is the union of capability codes the actor holds in the
 	// active tenant. UX hint only — backend remains the sole trust boundary
 	// (see wiki/concepts/authz-tiers.md). May be empty when no provider is

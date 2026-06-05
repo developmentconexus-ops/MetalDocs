@@ -56,20 +56,10 @@ type Conn struct {
 	closed    chan struct{}
 }
 
-// ID returns the monotonically-assigned connection id; used for logs.
-func (c *Conn) ID() uint64 { return c.id }
-
-// TenantID returns the tenant this connection is joined to. Useful
-// for log lines; the hub itself never broadcasts across tenants.
-func (c *Conn) TenantID() string { return c.tenantID }
-
 // Out yields the channel the handler pumps to the WS socket. The
 // channel is closed exactly once, after the Conn has been removed
 // from its room — handlers may safely range over it.
 func (c *Conn) Out() <-chan Event { return c.out }
-
-// Closed fires when the Conn is fully torn down.
-func (c *Conn) Closed() <-chan struct{} { return c.closed }
 
 // Close removes the Conn from its room and closes the outbound chan.
 // Idempotent.
@@ -85,20 +75,10 @@ func (c *Conn) Close() {
 // tuning. None defined yet.
 type HubOption func(*Hub)
 
-// WithClock overrides the wall clock; used by tests.
-func WithClock(fn func() time.Time) HubOption {
-	return func(h *Hub) { h.clock = fn }
-}
-
 // WithTickInterval overrides the room-tick cadence; used by tests
 // that want sub-second ticks.
 func WithTickInterval(d time.Duration) HubOption {
 	return func(h *Hub) { h.tick = d }
-}
-
-// WithOutboundBuffer overrides the per-Conn outbound channel buffer.
-func WithOutboundBuffer(n int) HubOption {
-	return func(h *Hub) { h.outBuffer = n }
 }
 
 // NewHub constructs a hub. Run must be called separately to start the

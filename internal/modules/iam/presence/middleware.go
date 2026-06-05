@@ -98,17 +98,6 @@ func (m *BumpMiddleware) maybeBump(userID string) {
 	}(userID, now)
 }
 
-// BumpNow forces a synchronous bump for userID; used by the WS
-// handler on heartbeat so the user is reflected as online to the
-// next room tick without waiting for the next HTTP request.
-func (m *BumpMiddleware) BumpNow(ctx context.Context, userID string) error {
-	now := m.now()
-	m.mu.Lock()
-	m.lastBump[userID] = now
-	m.mu.Unlock()
-	return m.repo.BumpLastSeen(ctx, userID, now)
-}
-
 // StartCleanup spawns a background goroutine that periodically evicts
 // stale entries from lastBump so the map does not grow unboundedly as
 // users churn. The goroutine stops when ctx is cancelled. Returns the
