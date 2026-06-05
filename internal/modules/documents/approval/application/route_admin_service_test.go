@@ -270,7 +270,7 @@ func validRouteStages() []domain.Stage {
 			Order:              1,
 			Name:               "quality",
 			RequiredRole:       "qa_reviewer",
-			RequiredCapability: "workflow.sign",
+			RequiredCapability: "document.signoff",
 			AreaCode:           "tenant",
 			Quorum:             domain.QuorumAny1Of,
 			OnEligibilityDrift: domain.DriftReduceQuorum,
@@ -279,7 +279,7 @@ func validRouteStages() []domain.Stage {
 			Order:              2,
 			Name:               "approval",
 			RequiredRole:       "qa_manager",
-			RequiredCapability: "workflow.sign",
+			RequiredCapability: "document.signoff",
 			AreaCode:           "tenant",
 			Quorum:             domain.QuorumAllOf,
 			OnEligibilityDrift: domain.DriftFailStage,
@@ -866,9 +866,9 @@ func TestRouteAdminCreate_BatchesStageInsert(t *testing.T) {
 	}
 
 	stages := []domain.Stage{
-		{Order: 1, Name: "s1", RequiredRole: "r1", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAny1Of, OnEligibilityDrift: domain.DriftReduceQuorum},
-		{Order: 2, Name: "s2", RequiredRole: "r2", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
-		{Order: 3, Name: "s3", RequiredRole: "r3", RequiredCapability: "workflow.sign", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
+		{Order: 1, Name: "s1", RequiredRole: "r1", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAny1Of, OnEligibilityDrift: domain.DriftReduceQuorum},
+		{Order: 2, Name: "s2", RequiredRole: "r2", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
+		{Order: 3, Name: "s3", RequiredRole: "r3", RequiredCapability: "document.signoff", AreaCode: "tenant", Quorum: domain.QuorumAllOf, OnEligibilityDrift: domain.DriftFailStage},
 	}
 	if _, err := svc.Create(context.Background(), db, CreateRouteInput{
 		TenantID:    "tenant-1",

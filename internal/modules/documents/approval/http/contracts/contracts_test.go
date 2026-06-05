@@ -135,7 +135,7 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 				Order:              1,
 				Name:               "Review",
 				RequiredRole:       "approver",
-				RequiredCapability: "doc.signoff",
+				RequiredCapability: "document.signoff",
 				AreaCode:           "ops",
 				Quorum:             "any_1_of",
 				DriftPolicy:        "reduce_quorum",
@@ -144,7 +144,7 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 				Order:              2,
 				Name:               "Approval",
 				RequiredRole:       "approver",
-				RequiredCapability: "doc.signoff",
+				RequiredCapability: "document.signoff",
 				AreaCode:           "ops",
 				Quorum:             "m_of_n",
 				QuorumM:            &m,
@@ -178,6 +178,14 @@ func TestCreateRouteRequestValidate(t *testing.T) {
 	if err := badCapability.Validate(); err == nil {
 		t.Fatalf("expected error for non-namespaced required_capability")
 	}
+
+	// Registry binding: a well-formed but UNREGISTERED capability must be
+	// rejected at config time (no silent phantom), mirroring required_role.
+	phantomCapability := valid
+	phantomCapability.Stages[0].RequiredCapability = "document.notarealcap"
+	if err := phantomCapability.Validate(); err == nil {
+		t.Fatalf("expected error for required_capability that is not a registered capability")
+	}
 }
 
 // TestStageRequiredRoleBoundToRegistry locks the ADR 0022 binding: a stage
@@ -195,7 +203,7 @@ func TestStageRequiredRoleBoundToRegistry(t *testing.T) {
 				Order:              1,
 				Name:               "Review",
 				RequiredRole:       role,
-				RequiredCapability: "doc.signoff",
+				RequiredCapability: "document.signoff",
 				AreaCode:           "ops",
 				Quorum:             "any_1_of",
 				DriftPolicy:        "reduce_quorum",
@@ -227,7 +235,7 @@ func TestUpdateRouteRequestValidate(t *testing.T) {
 				Order:              1,
 				Name:               "Review",
 				RequiredRole:       "approver",
-				RequiredCapability: "doc.signoff",
+				RequiredCapability: "document.signoff",
 				AreaCode:           "ops",
 				Quorum:             "all_of",
 				DriftPolicy:        "fail_stage",
