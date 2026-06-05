@@ -240,7 +240,19 @@ func truncateForColumn(value string, max int) string {
 	return value[:max]
 }
 
-func (r *Repository) RecordSuccessfulLogin(ctx context.Context, userID string, loginAt time.Time) error {
+// sqlExecer / sqlRowQuerier are the minimal surfaces shared by *sql.DB and
+// *sql.Tx, letting the login-write SQL run either standalone or inside the
+// advisory-locked transaction opened by WithinLoginLock — one SQL source, no
+// drift between the locked and unlocked code paths.
+type sqlExecer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+type sqlRowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func recordSuccessfulLogin(ctx context.Context, e sqlExecer, userID string, loginAt time.Time) error {
 	const q = `
 UPDATE metaldocs.auth_identities
 SET last_login_at = $2,
@@ -249,19 +261,14 @@ SET last_login_at = $2,
     updated_at = $2
 WHERE user_id = $1
 `
-	_, err := r.db.ExecContext(ctx, q, userID, loginAt)
-	if err != nil {
+	if _, err := e.ExecContext(ctx, q, userID, loginAt); err != nil {
 		return fmt.Errorf("update successful login: %w", err)
 	}
 	return nil
 }
 
-// RecordFailedLogin atomically increments failed_login_attempts and, when the
-// threshold is reached, sets locked_until. It also stamps last_failed_login_at
-// + last_failed_login_ip (PR-7) so /security/lockouts and /security/signals
-// can surface the most recent failure context per user.
-func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
-	const q = `
+func recordFailedLogin(ctx context.Context, q sqlRowQuerier, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
+	const stmt = `
 UPDATE metaldocs.auth_identities
 SET failed_login_attempts = failed_login_attempts + 1,
     locked_until = CASE WHEN failed_login_attempts + 1 >= $2
@@ -275,7 +282,7 @@ RETURNING failed_login_attempts, locked_until
 `
 	var attempts int
 	var lockedUntil sql.NullTime
-	if err := r.db.QueryRowContext(ctx, q, userID, maxAttempts, lockDurationSeconds, ip).Scan(&attempts, &lockedUntil); err != nil {
+	if err := q.QueryRowContext(ctx, stmt, userID, maxAttempts, lockDurationSeconds, ip).Scan(&attempts, &lockedUntil); err != nil {
 		return 0, nil, fmt.Errorf("update failed login: %w", err)
 	}
 	if !lockedUntil.Valid {
@@ -283,6 +290,81 @@ RETURNING failed_login_attempts, locked_until
 	}
 	locked := lockedUntil.Time.UTC()
 	return attempts, &locked, nil
+}
+
+func (r *Repository) RecordSuccessfulLogin(ctx context.Context, userID string, loginAt time.Time) error {
+	return recordSuccessfulLogin(ctx, r.db, userID, loginAt)
+}
+
+// loginTx binds the LoginTx critical-section ops to the single transaction that
+// holds the advisory lock, so every read/write fn performs is serialized for the
+// identity and commits atomically with the lock release.
+type loginTx struct {
+	tx *sql.Tx
+}
+
+func (t *loginTx) LoadLoginState(ctx context.Context, userID string) (authdomain.LoginState, error) {
+	const q = `
+SELECT password_hash, is_active, locked_until
+FROM metaldocs.auth_identities
+WHERE user_id = $1
+`
+	var state authdomain.LoginState
+	var hash string
+	var lockedUntil sql.NullTime
+	if err := t.tx.QueryRowContext(ctx, q, userID).Scan(&hash, &state.IsActive, &lockedUntil); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return authdomain.LoginState{}, authdomain.ErrIdentityNotFound
+		}
+		return authdomain.LoginState{}, fmt.Errorf("load login state: %w", err)
+	}
+	state.PasswordHash = authdomain.PasswordHash(hash)
+	if lockedUntil.Valid {
+		lu := lockedUntil.Time.UTC()
+		state.LockedUntil = &lu
+	}
+	return state, nil
+}
+
+func (t *loginTx) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
+	return recordFailedLogin(ctx, t.tx, userID, maxAttempts, lockDurationSeconds, ip)
+}
+
+// WithinLoginLock serializes concurrent login attempts for userID via a
+// transaction-scoped advisory lock. hashtextextended derives a stable 64-bit
+// key from the user_id; pg_advisory_xact_lock holds it until the tx
+// commits/rolls back, covering the lockout check and the failed-attempt write
+// fn performs.
+func (r *Repository) WithinLoginLock(ctx context.Context, userID string, fn func(authdomain.LoginTx) error) error {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return authdomain.ErrIdentityNotFound
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin login lock tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, userID); err != nil {
+		return fmt.Errorf("acquire login lock: %w", err)
+	}
+
+	if err := fn(&loginTx{tx: tx}); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit login lock tx: %w", err)
+	}
+	return nil
+}
+
+// RecordFailedLogin atomically increments failed_login_attempts and, when the
+// threshold is reached, sets locked_until. It also stamps last_failed_login_at
+// + last_failed_login_ip (PR-7) so /security/lockouts and /security/signals
+// can surface the most recent failure context per user.
+func (r *Repository) RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (int, *time.Time, error) {
+	return recordFailedLogin(ctx, r.db, userID, maxAttempts, lockDurationSeconds, ip)
 }
 
 func (r *Repository) CreateUser(ctx context.Context, params authdomain.CreateUserParams) error {

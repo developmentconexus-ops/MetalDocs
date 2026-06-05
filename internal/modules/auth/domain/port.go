@@ -15,9 +15,36 @@ type CapabilityProvider interface {
 	CapsByUserID(ctx context.Context, userID, tenantID string) ([]iamdomain.Capability, error)
 }
 
+// LoginState is the authoritative credential state read inside the per-identity
+// login lock. It carries only what Authenticate needs to make the lockout
+// decision without re-reading outside the serialized region.
+type LoginState struct {
+	PasswordHash PasswordHash
+	IsActive     bool
+	LockedUntil  *time.Time
+}
+
+// LoginTx is the serialized critical-section view handed to WithinLoginLock's
+// callback. Every call runs while the per-identity lock is held, so the lockout
+// check and the failed-attempt write cannot interleave with a concurrent login.
+type LoginTx interface {
+	LoadLoginState(ctx context.Context, userID string) (LoginState, error)
+	RecordFailedLogin(ctx context.Context, userID string, maxAttempts int, lockDurationSeconds int, ip string) (attempts int, lockedUntil *time.Time, err error)
+}
+
 type Repository interface {
 	FindIdentityByIdentifier(ctx context.Context, identifier string) (Identity, error)
 	FindIdentityByUserID(ctx context.Context, userID string) (Identity, error)
+	// WithinLoginLock runs fn while holding an exclusive lock scoped to userID,
+	// serializing concurrent login attempts on the same identity. This closes the
+	// TOCTOU window between the lockout check and the failed-attempt write: a burst
+	// of parallel attempts is processed one at a time, so once the threshold lock
+	// is set the remaining in-flight attempts observe it and are rejected before
+	// the password is verified. Postgres uses pg_advisory_xact_lock inside a
+	// transaction (the LoginTx runs every read/write on that transaction); the
+	// in-memory double uses a per-identity mutex. fn's returned error aborts the
+	// unit (Postgres rolls back).
+	WithinLoginLock(ctx context.Context, userID string, fn func(LoginTx) error) error
 	CreateSession(ctx context.Context, session Session) error
 	FindSession(ctx context.Context, sessionID string) (Session, error)
 	TouchSession(ctx context.Context, sessionID string, seenAt time.Time) error
