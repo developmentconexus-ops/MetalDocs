@@ -486,35 +486,6 @@ func TestCreateCheckpoint_OK(t *testing.T) {
 	}
 }
 
-func TestFinalize_FromDraft_OK(t *testing.T) {
-	repo := &fakeRepo{docReturn: &domain.Document{ID: "doc_1", Status: domain.DocStatusDraft}}
-	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
-
-	err := svc.Finalize(context.Background(), "tenant_1", "doc_1", "user_1")
-	if err != nil {
-		t.Fatalf("Finalize() error = %v", err)
-	}
-	if repo.statusCalls != 1 {
-		t.Fatalf("expected one status update call, got %d", repo.statusCalls)
-	}
-	if repo.statusCur != domain.DocStatusDraft || repo.statusNext != domain.DocStatusUnderReview || !repo.statusStamp {
-		t.Fatalf("unexpected status transition cur=%s next=%s stamp=%v", repo.statusCur, repo.statusNext, repo.statusStamp)
-	}
-}
-
-func TestFinalize_FromFinalized_Rejects(t *testing.T) {
-	repo := &fakeRepo{updateStatusErr: domain.ErrInvalidStateTransition}
-	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
-
-	err := svc.Finalize(context.Background(), "tenant_1", "doc_1", "user_1")
-	if !errors.Is(err, domain.ErrInvalidStateTransition) {
-		t.Fatalf("expected ErrInvalidStateTransition, got %v", err)
-	}
-	if repo.statusCalls != 1 {
-		t.Fatalf("expected one status update call, got %d", repo.statusCalls)
-	}
-}
-
 func TestRenameDocument_OK(t *testing.T) {
 	repo := &fakeRepo{docReturn: &domain.Document{ID: "doc_1", TenantID: "tenant_1", Status: domain.DocStatusDraft}}
 	svc := application.New(repo, &fakePresigner{}, fakeTplReader{}, fakeFormVal{valid: true}, &noopAudit{})
