@@ -111,14 +111,12 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "controlled documents obsolete", method: http.MethodPut, path: "/api/v1/controlled-documents/cd-1/obsolete", wantCap: iamdomain.CapControlledDocumentObsolete, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "controlled documents supersede", method: http.MethodPut, path: "/api/v1/controlled-documents/cd-1/supersede", wantCap: iamdomain.CapControlledDocumentSupersede, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
-		// --- Permission-guarded: workflow / search / notifications / access-policies ---
+		// --- Permission-guarded: workflow / search / notifications ---
 		{name: "workflow transitions", method: http.MethodPost, path: "/api/v1/workflow/documents/doc-1/transitions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "workflow approvals", method: http.MethodGet, path: "/api/v1/workflow/documents/doc-1/approvals", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "search documents", method: http.MethodGet, path: "/api/v1/search/documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "notifications list", method: http.MethodGet, path: "/api/v1/notifications", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "notification mark read", method: http.MethodPost, path: "/api/v1/notifications/n-1/read", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "access policies get", method: http.MethodGet, path: "/api/v1/access-policies", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "access policies put", method: http.MethodPut, path: "/api/v1/access-policies", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
 		// --- Permission-guarded: misc (F-001 split: area-memberships GET=view, writes=manage) ---
 		{name: "iam area memberships list", method: http.MethodGet, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -320,8 +318,6 @@ func TestRouteCoverage(t *testing.T) {
 		{"workflow", http.MethodGet, "/api/v1/workflow/documents/doc-1/approvals"},
 		{"notifications", http.MethodGet, "/api/v1/notifications"},
 		{"notifications", http.MethodPost, "/api/v1/notifications/n-1/read"},
-		{"access-policies", http.MethodGet, "/api/v1/access-policies"},
-		{"access-policies", http.MethodPut, "/api/v1/access-policies"},
 
 		// mux.Handle (main.go:447)
 		{"metrics", http.MethodGet, "/api/v1/metrics"},

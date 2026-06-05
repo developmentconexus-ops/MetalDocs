@@ -6,7 +6,8 @@
 ## Program-level backlog
 
 - [roadmap.md](roadmap.md) - ordered refactor roadmap
-- [contract-first-followups.md](contract-first-followups.md) - cross-cutting contract follow-ups
+- [api-contract-hardening.md](api-contract-hardening.md) - API surface coherence program (post-audit follow-up to roadmap Plan 8)
+- [contract-first-followups.md](contract-first-followups.md) - cross-cutting contract follow-ups (folded into api-contract-hardening Phase C/E)
 
 ## Module and platform refactors
 

@@ -29,7 +29,7 @@
 | P2 | 5 | Tier-2 `authz.Require` + Postgres tripwire on regulated tables | 8 commits | done 2026-05-11 |
 | P2 | 6a | Audit-trail completeness sweep (emission + sink consolidation) | 11 commits | done 2026-05-11 |
 | P3 | 7 | RFC 9457 envelope rollout | 11 commits | done 2026-05-11 |
-| P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | done 2026-05-13 |
+| P3 | 8 | OpenAPI / contract-first completion (parallel to Plan 7) | ~6 | done 2026-05-13 (codegen only — contract surface incoherence carried forward, see [api-contract-hardening.md](api-contract-hardening.md)) |
 | P4 | 9 | Transactional + idempotency hardening + template workflow alignment | ~6 | done 2026-05-13 (Plan 9R) |
 | P4 | 10 | Legacy purge + rename sweep (`templates → templates`, `v2 → v1`) | ~6 | pending |
 | P5 | 12 | Screen finalization × 7 (per `metaldocs-screen-implementation`) | ~7 | pending |
@@ -105,6 +105,7 @@ Status: implemented as a dedicated audit T-004 follow-up after Plan 9R. Added `a
 - **Critical rows closed:** 2 (documents T-002, approval T-002).
 - **Blockers:** Plan 7 (error schema referenced by every spec).
 - **Status:** done 2026-05-13. Commits: `f7385e88`, `9556a642`, `7206269e`, `df084eda`, `73adf60d`, `abd0371a`, `b15913ba`, `8b75a732`.
+- **Correction (2026-06-05):** scope was *codegen plumbing*, not contract coherence. A 4-subagent API audit found the spec base-path schism, ~30 unserved spec paths, dual error envelopes, and missing global security/tags survived this Plan. Follow-up program: [`api-contract-hardening.md`](api-contract-hardening.md).
 
 ## Plan 9 · Transactional + idempotency hardening + template workflow alignment
 

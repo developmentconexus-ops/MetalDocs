@@ -10,7 +10,6 @@ export type DocumentStatus =
   | "published"
   | "obsolete";
 export type Classification = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
-export type ResourceScope = "document" | "document_type" | "area";
 // Canonical 8-role backend enum. The legacy FE-only phantoms "admin" and
 // "reviewer" were removed in PR-12b — their last consumers were migrated to
 // system_admin (DocumentPublishedPage) and to plain workflow-role strings
@@ -361,15 +360,6 @@ export interface DocumentTemplateAssignmentItem {
   templateKey: string;
   templateVersion: number;
   assignedAt: string;
-}
-
-export interface AccessPolicyItem {
-  subjectType: "user" | "role" | "group";
-  subjectId: string;
-  resourceScope: ResourceScope;
-  resourceId: string;
-  capability: "document.create" | "document.view" | "document.edit" | "document.upload_attachment" | "document.change_workflow" | "document.manage_permissions";
-  effect: "allow" | "deny";
 }
 
 export interface NotificationItem {

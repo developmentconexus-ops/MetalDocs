@@ -323,12 +323,16 @@ func main() {
 		membershipService = iamapp.NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)
 	}
 
-	// PR-4: People-tab orchestrator. AreaCatalogReader is wired to the
-	// permissive impl pending a dedicated process_areas reader (TODO PR-5):
-	// the Postgres area membership grant path already verifies areaCode via
-	// foreign-key checks, so invalid codes still fail-closed downstream — the
-	// permissive validator just defers the error one layer.
-	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, iamapp.PermissiveAreaCatalog{}, cachedProvider)
+	// PR-4: People-tab orchestrator. AreaCatalogReader validates an invite's
+	// areaCode against the process-area SSOT (metaldocs.document_process_areas)
+	// up front, so an unknown area is a clean boundary error instead of a
+	// downstream FK violation. In-memory mode (no SQLDB) leaves it nil, which
+	// NewPeopleService resolves to the permissive catalog.
+	var areaCatalog iamapp.AreaCatalogReader
+	if deps.SQLDB != nil {
+		areaCatalog = iampg.NewProcessAreaCatalog(deps.SQLDB)
+	}
+	peopleService := iamapp.NewPeopleService(authService, cachedProvider, deps.RoleAdminRepo, membershipService, areaCatalog, cachedProvider)
 	iamdelivery.NewPeopleHandler(peopleService, authService, deps.AuditWriter).RegisterRoutes(mux)
 
 	// PR-1 (area-memberships rebuild): MembershipHandler now takes a

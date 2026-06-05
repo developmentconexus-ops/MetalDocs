@@ -961,45 +961,6 @@ CREATE TABLE metaldocs.tenants (
 
 
 --
--- Name: document_access_policies; Type: TABLE; Schema: metaldocs; Owner: -
---
-
-CREATE TABLE metaldocs.document_access_policies (
-    id bigint NOT NULL,
-    subject_type text NOT NULL,
-    subject_id text NOT NULL,
-    resource_scope text NOT NULL,
-    resource_id text NOT NULL,
-    capability text NOT NULL,
-    effect text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT chk_document_access_policies_capability CHECK ((capability = ANY (ARRAY['document.create'::text, 'document.view'::text, 'document.edit'::text, 'document.upload_attachment'::text, 'document.change_workflow'::text, 'document.manage_permissions'::text]))),
-    CONSTRAINT chk_document_access_policies_effect CHECK ((effect = ANY (ARRAY['allow'::text, 'deny'::text]))),
-    CONSTRAINT chk_document_access_policies_resource_scope CHECK ((resource_scope = ANY (ARRAY['document'::text, 'document_type'::text, 'area'::text]))),
-    CONSTRAINT chk_document_access_policies_subject_type CHECK ((subject_type = ANY (ARRAY['user'::text, 'role'::text, 'group'::text])))
-);
-
-
---
--- Name: document_access_policies_id_seq; Type: SEQUENCE; Schema: metaldocs; Owner: -
---
-
-CREATE SEQUENCE metaldocs.document_access_policies_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: document_access_policies_id_seq; Type: SEQUENCE OWNED BY; Schema: metaldocs; Owner: -
---
-
-ALTER SEQUENCE metaldocs.document_access_policies_id_seq OWNED BY metaldocs.document_access_policies.id;
-
-
---
 -- Name: document_attachments; Type: TABLE; Schema: metaldocs; Owner: -
 --
 
@@ -2282,13 +2243,6 @@ ALTER TABLE ONLY metaldocs.audit_events ALTER COLUMN audit_sequence SET DEFAULT 
 
 
 --
--- Name: document_access_policies id; Type: DEFAULT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_access_policies ALTER COLUMN id SET DEFAULT nextval('metaldocs.document_access_policies_id_seq'::regclass);
-
-
---
 -- Name: mddm_shadow_diff_events id; Type: DEFAULT; Schema: metaldocs; Owner: -
 --
 
@@ -2347,14 +2301,6 @@ ALTER TABLE ONLY metaldocs.auth_identities
 
 ALTER TABLE ONLY metaldocs.auth_sessions
     ADD CONSTRAINT auth_sessions_pkey PRIMARY KEY (session_id);
-
-
---
--- Name: document_access_policies document_access_policies_pkey; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_access_policies
-    ADD CONSTRAINT document_access_policies_pkey PRIMARY KEY (id);
 
 
 --
@@ -2715,14 +2661,6 @@ ALTER TABLE ONLY metaldocs.template_audit_log
 
 ALTER TABLE ONLY metaldocs.template_drafts
     ADD CONSTRAINT template_drafts_pkey PRIMARY KEY (template_key);
-
-
---
--- Name: document_access_policies uq_document_access_policies_rule; Type: CONSTRAINT; Schema: metaldocs; Owner: -
---
-
-ALTER TABLE ONLY metaldocs.document_access_policies
-    ADD CONSTRAINT uq_document_access_policies_rule UNIQUE (subject_type, subject_id, resource_scope, resource_id, capability);
 
 
 --
@@ -3146,20 +3084,6 @@ CREATE INDEX idx_auth_sessions_user_id ON metaldocs.auth_sessions USING btree (u
 --
 
 CREATE INDEX idx_doc_versions_search ON metaldocs.document_versions USING gin (search_vector);
-
-
---
--- Name: idx_document_access_policies_resource; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_document_access_policies_resource ON metaldocs.document_access_policies USING btree (resource_scope, resource_id);
-
-
---
--- Name: idx_document_access_policies_subject; Type: INDEX; Schema: metaldocs; Owner: -
---
-
-CREATE INDEX idx_document_access_policies_subject ON metaldocs.document_access_policies USING btree (subject_type, subject_id);
 
 
 --

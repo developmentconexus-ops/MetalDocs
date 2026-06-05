@@ -66,8 +66,6 @@ func (r routeRule) matches(method, path string) bool {
 //	metrics           GET   /api/v1/metrics              -> CapMetricsView
 //	notifications     GET   /api/v1/notifications        -> CapDocumentView
 //	notifications     POST  /api/v1/notifications/{id}/read -> CapDocumentView (read-side mark)
-//	access-policies   GET   /api/v1/access-policies      -> CapMembershipView
-//	access-policies   PUT   /api/v1/access-policies      -> CapMembershipManage
 //	iam/users         GET   /api/v1/iam/users            -> CapUserView
 //	iam/users         POST/PATCH/PUT (writes)            -> CapUserManage
 //	iam/admin/overview GET  /api/v1/iam/admin/overview   -> CapUserView
@@ -104,10 +102,6 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/search/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/notifications", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/notifications/", pathSuffix: "/read", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-
-	// Access policies. F-001 split: GET view, PUT manage.
-	{method: http.MethodGet, pathExact: "/api/v1/access-policies", capability: iamdomain.CapMembershipView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPut, pathExact: "/api/v1/access-policies", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// Workflow.
 	{method: http.MethodPost, pathPrefix: "/api/v1/workflow/documents/", pathSuffix: "/transitions", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
