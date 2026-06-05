@@ -38,16 +38,21 @@ jobs:
 
       - name: Check PR template checkbox present
         if: github.event_name == 'pull_request'
+        # Read PR-controlled values from env vars, never interpolate ${{ }} PR
+        # content directly into the script — otherwise tokens/backticks in the PR
+        # description are executed by the shell (command injection, CWE-78).
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           # PRs touching e2e/ must include coverage map update checkbox
-          BODY="${{ github.event.pull_request.body }}"
           if echo "$BODY" | grep -q "\- \[x\] coverage map updated"; then
             echo "✅ Coverage map checkbox checked."
           else
             echo "⚠️  PR body does not confirm 'coverage map updated'."
             echo "Add '- [x] coverage map updated' to PR description."
             # Warning only on PRs not touching COVERAGE.md
-            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD || true)
+            CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD" || true)
             if echo "$CHANGED" | grep -q "COVERAGE.md"; then
               echo "COVERAGE.md is in diff — checkbox required."
               exit 1
