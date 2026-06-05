@@ -486,8 +486,10 @@ BEGIN
       v_tenant_id     := NULL;
 
     ELSE
-      -- Unknown table — conservative pass-through.
-      RETURN NEW;
+      -- Fail-closed: a table carrying this trigger with no capability mapping is a
+      -- wiring error, not a license to pass through. Refuse the write loudly.
+      RAISE EXCEPTION 'ErrCapabilityNotAsserted: no capability mapping for table % (op %); trg_require_cap_asserted attached without an enforce_capability_asserted CASE branch', TG_TABLE_NAME, TG_OP
+        USING ERRCODE = 'P0001';
   END CASE;
 
   -- ---- Bypass path. -------------------------------------------------------
@@ -797,49 +799,6 @@ $$;
 
 
 --
--- Name: grant_area_membership(uuid, text, text, text, text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.grant_area_membership(_tenant_id uuid, _user_id text, _area_code text, _role text, _granted_by text) RETURNS uuid
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'pg_catalog', 'pg_temp'
-    AS $$
-DECLARE
-  session_actor  TEXT := pg_catalog.current_setting('metaldocs.actor_id', true);
-  session_cap    TEXT := pg_catalog.current_setting('metaldocs.verified_capability', true);
-  actor_tenant   UUID;
-BEGIN
-  IF session_actor IS NULL OR session_actor = '' OR session_actor IS DISTINCT FROM _granted_by THEN
-    RAISE EXCEPTION 'session actor context missing or mismatched'
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  IF session_cap IS NULL OR session_cap <> 'workflow.route.edit' THEN
-    RAISE EXCEPTION 'session capability context missing or wrong'
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  SELECT tenant_id INTO actor_tenant
-    FROM metaldocs.iam_users WHERE user_id = _granted_by;
-  IF actor_tenant IS DISTINCT FROM _tenant_id THEN
-    RAISE EXCEPTION 'granted_by must belong to same tenant'
-      USING ERRCODE = 'check_violation';
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM metaldocs.iam_users
-     WHERE user_id = _granted_by AND deactivated_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'granted_by must be active user'
-      USING ERRCODE = 'check_violation';
-  END IF;
-  INSERT INTO public.user_process_areas
-    (user_id, tenant_id, area_code, role, effective_from, effective_to, granted_by, revoked_by)
-    VALUES (_user_id, _tenant_id, _area_code, _role,
-            pg_catalog.clock_timestamp(), NULL, _granted_by, NULL);
-  RETURN pg_catalog.gen_random_uuid();
-END;
-$$;
-
-
---
 -- Name: reject_code_update(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -901,59 +860,6 @@ CREATE FUNCTION public.reject_user_process_areas_delete() RETURNS trigger
 BEGIN
   RAISE EXCEPTION 'user_process_areas rows cannot be deleted (revoke via UPDATE effective_to)'
     USING ERRCODE = 'check_violation';
-END;
-$$;
-
-
---
--- Name: revoke_area_membership(uuid, text, text, text, text); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.revoke_area_membership(_tenant_id uuid, _user_id text, _area_code text, _role text, _revoked_by text) RETURNS uuid
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'pg_catalog', 'pg_temp'
-    AS $$
-DECLARE
-  session_actor  TEXT := pg_catalog.current_setting('metaldocs.actor_id', true);
-  session_cap    TEXT := pg_catalog.current_setting('metaldocs.verified_capability', true);
-  actor_tenant   UUID;
-  rows_affected  INT;
-BEGIN
-  IF session_actor IS NULL OR session_actor = '' OR session_actor IS DISTINCT FROM _revoked_by THEN
-    RAISE EXCEPTION 'session actor context missing or mismatched'
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  IF session_cap IS NULL OR session_cap <> 'workflow.route.edit' THEN
-    RAISE EXCEPTION 'session capability context missing or wrong'
-      USING ERRCODE = 'insufficient_privilege';
-  END IF;
-  SELECT tenant_id INTO actor_tenant
-    FROM metaldocs.iam_users WHERE user_id = _revoked_by;
-  IF actor_tenant IS DISTINCT FROM _tenant_id THEN
-    RAISE EXCEPTION 'revoked_by must belong to same tenant'
-      USING ERRCODE = 'check_violation';
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM metaldocs.iam_users
-     WHERE user_id = _revoked_by AND deactivated_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'revoked_by must be active user'
-      USING ERRCODE = 'check_violation';
-  END IF;
-  UPDATE public.user_process_areas
-     SET effective_to = pg_catalog.clock_timestamp(),
-         revoked_by   = _revoked_by
-   WHERE tenant_id    = _tenant_id
-     AND user_id      = _user_id
-     AND area_code    = _area_code
-     AND role         = _role
-     AND effective_to IS NULL;
-  GET DIAGNOSTICS rows_affected = ROW_COUNT;
-  IF rows_affected = 0 THEN
-    RAISE EXCEPTION 'no active membership to revoke'
-      USING ERRCODE = 'no_data_found';
-  END IF;
-  RETURN pg_catalog.gen_random_uuid();
 END;
 $$;
 
