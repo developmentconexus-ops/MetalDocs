@@ -43,7 +43,18 @@ func collectGoFiles(patterns []string) []string {
 			pat = "."
 		}
 		_ = filepath.WalkDir(pat, func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				// Skip vendored, dependency, and tooling-scratch trees. Without
+				// this the walker descends into .claude/worktrees (agent working
+				// copies), scanning duplicate Go files and double-reporting.
+				name := d.Name()
+				if name == "vendor" || name == "node_modules" ||
+					(name != "." && strings.HasPrefix(name, ".")) {
+					return fs.SkipDir
+				}
 				return nil
 			}
 			if strings.HasSuffix(path, ".go") &&
