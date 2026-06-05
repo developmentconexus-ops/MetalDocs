@@ -2100,7 +2100,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
-  /api/v1/iam/area-memberships:
+  /iam/area-memberships:
     get:
       summary: List active area memberships for the current tenant
       tags: [iam]
@@ -2202,7 +2202,7 @@ paths:
         '405':
           description: Method not allowed
       security: []
-  /api/v1/templates:
+  /templates:
     get:
       summary: List templates for tenant (docx)
       tags: [templates]
@@ -2245,7 +2245,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreateTemplateResponse'
-  /api/v1/templates/system/blank:
+  /templates/system/blank:
     get:
       summary: Get system-owned blank template
       tags: [templates]
@@ -2258,7 +2258,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SystemBlankTemplateResponse'
         '404': { description: not_found }
-  /api/v1/templates/{id}/versions/{n}:
+  /templates/{id}/versions/{n}:
     get:
       summary: Get template version metadata (docx)
       tags: [templates]
@@ -2269,7 +2269,7 @@ paths:
       responses:
         '200': { description: ok }
         '404': { description: not_found }
-  /api/v1/templates/{id}/versions/{n}/docx-upload-url:
+  /templates/{id}/versions/{n}/docx-upload-url:
     post:
       summary: Presign PUT URL for draft .docx upload
       tags: [templates]
@@ -2287,7 +2287,7 @@ paths:
                 properties:
                   url: { type: string }
                   storage_key: { type: string }
-  /api/v1/templates/{id}/versions/{n}/schema-upload-url:
+  /templates/{id}/versions/{n}/schema-upload-url:
     post:
       summary: Presign PUT URL for draft schema.json upload
       tags: [templates]
@@ -2305,7 +2305,7 @@ paths:
                 properties:
                   url: { type: string }
                   storage_key: { type: string }
-  /api/v1/signed:
+  /signed:
     get:
       summary: Redirect to presigned GET URL for a stored object
       tags: [templates]
@@ -2314,7 +2314,7 @@ paths:
         - { in: query, name: key, required: true, schema: { type: string } }
       responses:
         '302': { description: redirect }
-  /api/v1/templates/{id}/versions/{n}/draft:
+  /templates/{id}/versions/{n}/draft:
     put:
       summary: Save draft (CAS via expected_lock_version)
       tags: [templates]
@@ -2340,7 +2340,7 @@ paths:
         '409': { description: template_draft_stale }
         '412':
           description: stale expected_lock_version
-  /api/v1/templates/{id}/versions/{n}/publish:
+  /templates/{id}/versions/{n}/publish:
     post:
       summary: Publish draft (validates template tokens)
       tags: [templates]
@@ -2387,14 +2387,14 @@ paths:
                   orphan_tokens: { type: array, items: { type: string } }
 
   # â”€â”€ Registry: Controlled Documents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  /api/v1/templates/{id}/versions:
+  /templates/{id}/versions:
     post:
       tags: [templates]
       operationId: createTemplateVersion
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/versions/{n}/schema:
+  /templates/{id}/versions/{n}/schema:
     put:
       tags: [templates]
       operationId: updateTemplateSchema
@@ -2441,7 +2441,7 @@ paths:
         '409': { description: invalid_state_transition }
         '412': { description: stale_lock_version }
         '422': { description: placeholder_validation_error }
-  /api/v1/templates/{id}/versions/{n}/autosave/presign:
+  /templates/{id}/versions/{n}/autosave/presign:
     post:
       tags: [templates]
       operationId: presignTemplateAutosave
@@ -2449,7 +2449,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/versions/{n}/autosave/commit:
+  /templates/{id}/versions/{n}/autosave/commit:
     post:
       tags: [templates]
       operationId: commitTemplateAutosave
@@ -2457,7 +2457,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/versions/{n}/submit:
+  /templates/{id}/versions/{n}/submit:
     post:
       tags: [templates]
       operationId: submitTemplateVersion
@@ -2469,7 +2469,7 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/versions/{n}/review:
+  /templates/{id}/versions/{n}/review:
     post:
       tags: [templates]
       operationId: reviewTemplateVersion
@@ -2481,7 +2481,7 @@ paths:
           required: true
           schema: { type: string, format: uuid }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/versions/{n}/approve:
+  /templates/{id}/versions/{n}/approve:
     post:
       tags: [templates]
       operationId: approveTemplateVersion
@@ -2499,28 +2499,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApproveTemplateVersionResponse'
-  /api/v1/templates/{id}/archive:
+  /templates/{id}/archive:
     post:
       tags: [templates]
       operationId: archiveTemplate
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/approval-config:
+  /templates/{id}/approval-config:
     put:
       tags: [templates]
       operationId: upsertTemplateApprovalConfig
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}:
+  /templates/{id}:
     get:
       tags: [templates]
       operationId: getTemplate
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/versions/{n}/docx-url:
+  /templates/{id}/versions/{n}/docx-url:
     get:
       tags: [templates]
       operationId: getTemplateDocxUrl
@@ -2528,14 +2528,14 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: n, in: path, required: true, schema: { type: integer, minimum: 1 } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/{id}/audit:
+  /templates/{id}/audit:
     get:
       tags: [templates]
       operationId: listTemplateAudit
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses: { '200': { description: ok } }
-  /api/v1/templates/placeholder-catalog:
+  /templates/placeholder-catalog:
     get:
       tags: [templates]
       operationId: listTemplatePlaceholderCatalog
@@ -2546,7 +2546,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlaceholderCatalogResponse'
-  /api/v1/taxonomy/profiles:
+  /taxonomy/profiles:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyProfiles
@@ -2567,7 +2567,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentProfileItem'
-  /api/v1/taxonomy/profiles/{code}:
+  /taxonomy/profiles/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyProfile
@@ -2598,14 +2598,14 @@ paths:
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '204': { description: archived } }
-  /api/v1/taxonomy/profiles/{code}/default-template:
+  /taxonomy/profiles/{code}/default-template:
     put:
       tags: [taxonomy]
       operationId: setTaxonomyProfileDefaultTemplate
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '200': { description: ok } }
-  /api/v1/taxonomy/areas:
+  /taxonomy/areas:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyAreas
@@ -2626,7 +2626,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProcessAreaItem'
-  /api/v1/taxonomy/areas/{code}:
+  /taxonomy/areas/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyArea
@@ -2657,7 +2657,7 @@ paths:
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '204': { description: archived } }
-  /api/v1/taxonomy/families:
+  /taxonomy/families:
     get:
       tags: [taxonomy]
       operationId: listTaxonomyFamilies
@@ -2682,7 +2682,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentFamilyItem'
-  /api/v1/taxonomy/families/{code}:
+  /taxonomy/families/{code}:
     get:
       tags: [taxonomy]
       operationId: getTaxonomyFamily
@@ -2713,7 +2713,7 @@ paths:
       parameters:
         - { name: code, in: path, required: true, schema: { type: string } }
       responses: { '204': { description: deactivated } }
-  /api/v1/controlled-documents:
+  /controlled-documents:
     get:
       summary: List controlled documents
       tags: [controlled-documents]
@@ -2791,7 +2791,7 @@ paths:
                 $ref: '#/components/schemas/Problem'
         '422': { description: template_invalid }
 
-  /api/v1/controlled-documents/preview-code:
+  /controlled-documents/preview-code:
     get:
       summary: Preview the next auto-generated document code without allocating it
       tags: [controlled-documents]
@@ -2815,7 +2815,7 @@ paths:
         '400': { description: validation_error }
         '401': { description: unauthenticated }
 
-  /api/v1/controlled-documents/{id}:
+  /controlled-documents/{id}:
     get:
       summary: Get controlled document by ID
       tags: [controlled-documents]
@@ -2835,7 +2835,7 @@ paths:
         '401': { description: unauthenticated }
         '404': { description: not_found }
 
-  /api/v1/controlled-documents/{id}/revisions:
+  /controlled-documents/{id}/revisions:
     post:
       summary: Create a new revision for a controlled document
       tags: [controlled-documents]
@@ -2867,7 +2867,7 @@ paths:
         '404': { description: controlled_document_not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v1/controlled-documents/{id}/active-document:
+  /controlled-documents/{id}/active-document:
     get:
       summary: Get the active document instance for a controlled document
       tags: [controlled-documents]
@@ -2887,7 +2887,7 @@ paths:
         '401': { description: unauthenticated }
         '404': { description: no_active_instance }
 
-  /api/v1/controlled-documents/{id}/obsolete:
+  /controlled-documents/{id}/obsolete:
     put:
       summary: Mark controlled document as obsolete
       tags: [controlled-documents]
@@ -2903,7 +2903,7 @@ paths:
         '404': { description: not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v1/controlled-documents/{id}/supersede:
+  /controlled-documents/{id}/supersede:
     put:
       summary: Mark controlled document as superseded
       tags: [controlled-documents]
@@ -2919,7 +2919,7 @@ paths:
         '404': { description: not_found }
         '409': { description: controlled_document_not_active }
 
-  /api/v1/documents:
+  /documents:
     get:
       summary: List documents for tenant
       tags: [documents]
@@ -2983,7 +2983,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
 
-  /api/v1/documents/{id}:
+  /documents/{id}:
     get:
       tags: [documents]
       operationId: getDocument
@@ -3011,7 +3011,7 @@ paths:
                 name: { type: string }
       responses: { '200': { description: ok } }
 
-  /api/v1/documents/{id}/finalize:
+  /documents/{id}/finalize:
     post:
       tags: [documents]
       operationId: finalizeDocument
@@ -3042,13 +3042,13 @@ paths:
                 properties:
                   instanceId: { type: string, format: uuid }
         '409': { description: invalid_state_transition }
-  /api/v1/documents/{id}/archive:
+  /documents/{id}/archive:
     post:
       tags: [documents]
       operationId: archiveDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/revision-history:
+  /documents/{id}/revision-history:
     get:
       tags: [documents]
       operationId: getDocumentRevisionHistory
@@ -3061,7 +3061,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentRevisionHistoryResponse'
-  /api/v1/documents/{id}/duplicate:
+  /documents/{id}/duplicate:
     post:
       tags: [documents]
       operationId: duplicateDocument
@@ -3074,7 +3074,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentCreateResult'
 
-  /api/v1/documents/stats:
+  /documents/stats:
     get:
       summary: Documents stats by status and area
       tags: [documents]
@@ -3118,7 +3118,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
 
-  /api/v1/documents/{id}/session/acquire:
+  /documents/{id}/session/acquire:
     post:
       tags: [documents]
       operationId: acquireDocumentSession
@@ -3136,26 +3136,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentSessionReadonlyResponse'
-  /api/v1/documents/{id}/session/heartbeat:
+  /documents/{id}/session/heartbeat:
     post:
       tags: [documents]
       operationId: heartbeatDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '409': { description: session_inactive } }
-  /api/v1/documents/{id}/session/release:
+  /documents/{id}/session/release:
     post:
       tags: [documents]
       operationId: releaseDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/session/force-release:
+  /documents/{id}/session/force-release:
     post:
       tags: [documents]
       operationId: forceReleaseDocumentSession
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok }, '403': { description: forbidden } }
 
-  /api/v1/documents/{id}/autosave/presign:
+  /documents/{id}/autosave/presign:
     post:
       tags: [documents]
       operationId: presignDocumentAutosave
@@ -3179,7 +3179,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentAutosavePresignResponse'
         '409': { description: session_inactive | session_not_holder | stale_base }
-  /api/v1/documents/{id}/autosave/commit:
+  /documents/{id}/autosave/commit:
     post:
       tags: [documents]
       operationId: commitDocumentAutosave
@@ -3225,7 +3225,7 @@ paths:
         '410': { description: expired_upload | upload_missing }
         '422': { description: content_hash_mismatch }
 
-  /api/v1/documents/{id}/checkpoints:
+  /documents/{id}/checkpoints:
     get:
       tags: [documents]
       operationId: listDocumentCheckpoints
@@ -3255,7 +3255,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentCheckpoint'
 
-  /api/v1/documents/{id}/checkpoints/{version}/restore:
+  /documents/{id}/checkpoints/{version}/restore:
     post:
       tags: [documents]
       operationId: restoreDocumentCheckpoint
@@ -3279,7 +3279,7 @@ paths:
         '403': { description: session_not_holder | document_not_owner | session_inactive }
         '404': { description: checkpoint_not_found }
 
-  /api/v1/documents/{id}/revisions/{rid}/url:
+  /documents/{id}/revisions/{rid}/url:
     get:
       tags: [documents]
       operationId: getDocumentRevisionUrl
@@ -3289,7 +3289,7 @@ paths:
       responses:
         '302': { description: redirect to signed URL }
 
-  /api/v1/documents/{id}/comments:
+  /documents/{id}/comments:
     get:
       tags: [documents]
       operationId: listDocumentComments
@@ -3321,7 +3321,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentCommentResponse'
 
-  /api/v1/documents/{id}/comments/{libraryID}:
+  /documents/{id}/comments/{libraryID}:
     patch:
       tags: [documents]
       operationId: updateDocumentComment
@@ -3349,7 +3349,7 @@ paths:
         - { name: libraryID, in: path, required: true, schema: { type: integer } }
       responses: { '204': { description: deleted } }
 
-  /api/v1/documents/{id}/export/pdf:
+  /documents/{id}/export/pdf:
     post:
       operationId: exportDocumentPDF
       tags: [documents]
@@ -3383,7 +3383,7 @@ paths:
         '429': { description: rate_limited }
         '502': { description: gotenberg_failed }
 
-  /api/v1/documents/{id}/export/docx-url:
+  /documents/{id}/export/docx-url:
     get:
       operationId: getDocumentDocxURL
       tags: [documents]
@@ -3402,21 +3402,21 @@ paths:
                   revision_id: { type: string, format: uuid }
         '409': { description: docx_missing }
 
-  /api/v1/documents/{id}/fill-in-schema:
+  /documents/{id}/fill-in-schema:
     get:
       tags: [documents]
       operationId: getDocumentFillInSchema
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
-  /api/v1/documents/{id}/placeholders:
+  /documents/{id}/placeholders:
     get:
       tags: [documents]
       operationId: listDocumentPlaceholderValues
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
-  /api/v1/documents/{id}/placeholders/{pid}:
+  /documents/{id}/placeholders/{pid}:
     put:
       tags: [documents]
       operationId: putDocumentPlaceholderValue
@@ -3431,14 +3431,14 @@ paths:
               type: object
       responses: { '200': { description: ok } }
 
-  /api/v1/documents/{id}/view:
+  /documents/{id}/view:
     get:
       tags: [documents]
       operationId: viewDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
 
-  /api/v1/documents/{id}/reconstruct:
+  /documents/{id}/reconstruct:
     post:
       tags: [documents]
       operationId: reconstructDocument
@@ -3451,7 +3451,7 @@ paths:
               type: object
       responses: { '200': { description: ok } }
 
-  /api/v1/documents/{id}/placeholder-options/{pid}:
+  /documents/{id}/placeholder-options/{pid}:
     get:
       tags: [documents]
       operationId: getDocumentPlaceholderOptions
@@ -3460,7 +3460,7 @@ paths:
         - { name: pid, in: path, required: true, schema: { type: string } }
       responses: { '200': { description: ok } }
 
-  /api/v1/documents/{id}/submit:
+  /documents/{id}/submit:
     post:
       tags: [approval]
       operationId: submitDocumentForApproval
@@ -3468,7 +3468,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       responses: { '201': { description: created } }
-  /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs:
+  /approval/instances/{instance_id}/stages/{stage_id}/signoffs:
     post:
       tags: [approval]
       operationId: recordApprovalStageSignoff
@@ -3478,37 +3478,37 @@ paths:
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/publish:
+  /documents/{id}/publish:
     post:
       tags: [approval]
       operationId: publishDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/schedule-publish:
+  /documents/{id}/schedule-publish:
     post:
       tags: [approval]
       operationId: scheduleDocumentPublish
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/supersede:
+  /documents/{id}/supersede:
     post:
       tags: [approval]
       operationId: supersedeDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/obsolete:
+  /documents/{id}/obsolete:
     post:
       tags: [approval]
       operationId: obsoleteDocument
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/approval/instances/{instance_id}/cancel:
+  /approval/instances/{instance_id}/cancel:
     post:
       tags: [approval]
       operationId: cancelApprovalInstance
       parameters: [{ name: instance_id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/approval/instances/{instance_id}:
+  /approval/instances/{instance_id}:
     get:
       tags: [approval]
       operationId: getApprovalInstance
@@ -3526,7 +3526,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /api/v1/documents/{id}/approval-instance:
+  /documents/{id}/approval-instance:
     get:
       tags: [approval]
       operationId: getApprovalInstanceByDocument
@@ -3544,12 +3544,12 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /api/v1/approval/inbox:
+  /approval/inbox:
     get:
       tags: [approval]
       operationId: listApprovalInbox
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/signoff:
+  /documents/{id}/signoff:
     post:
       tags: [approval]
       operationId: recordDocumentSignoff
@@ -3558,13 +3558,13 @@ paths:
         - { name: Idempotency-Key, in: header, required: true, schema: { type: string } }
         - { name: If-Match, in: header, required: true, schema: { type: string }, description: 'Expected revision version ETag in the form "v<N>"' }
       responses: { '200': { description: ok } }
-  /api/v1/documents/{id}/cancel:
+  /documents/{id}/cancel:
     post:
       tags: [approval]
       operationId: cancelDocumentApproval
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses: { '200': { description: ok } }
-  /api/v1/approval/routes:
+  /approval/routes:
     post:
       summary: Create an approval route for the active tenant
       tags: [approval]
@@ -3625,7 +3625,7 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
-  /api/v1/approval/routes/{id}:
+  /approval/routes/{id}:
     put:
       summary: Update an approval route (new version)
       tags: [approval]

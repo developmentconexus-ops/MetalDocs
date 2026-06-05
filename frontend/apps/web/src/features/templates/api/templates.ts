@@ -4,9 +4,9 @@ import type { Placeholder, CompositionConfig } from '../placeholder-types';
 export type { Placeholder, CompositionConfig };
 
 type CreateTemplateRequest =
-  paths['/api/v1/templates']['post']['requestBody']['content']['application/json'];
+  paths['/templates']['post']['requestBody']['content']['application/json'];
 type CreateTemplateResponse =
-  paths['/api/v1/templates']['post']['responses'][201]['content']['application/json'];
+  paths['/templates']['post']['responses'][201]['content']['application/json'];
 type GeneratedTemplateDTO = components['schemas']['TemplateDTO'];
 type GeneratedVersionDTO = components['schemas']['VersionDTO'];
 
