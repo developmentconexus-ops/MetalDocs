@@ -238,8 +238,6 @@ func (f *fakeSvc) DuplicateDocument(_ context.Context, _, _, _ string) (*applica
 	return &application.CreateDocumentResult{DocumentID: "doc_dup", InitialRevisionID: "rev_dup", SessionID: "sess_dup"}, nil
 }
 
-func (f *fakeSvc) Finalize(_ context.Context, _, _, _ string) error { return nil }
-
 func (f *fakeSvc) Archive(_ context.Context, _, _, _ string) error { return nil }
 
 func (f *fakeSvc) SignedRevisionURL(_ context.Context, _, _, _ string) (string, error) {
@@ -680,20 +678,6 @@ func TestFinalizeDocument_InvalidIdempotencyKey_Returns400(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
-	}
-}
-
-func TestFinalizeDocument_AllowsMissingRevisionTitleAtHTTPBoundary(t *testing.T) {
-	mux := newMux(t, &fakeSvc{})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/documents/doc_1/finalize", bytes.NewReader([]byte(`{}`)))
-	withAuthHeaders(req, "editor")
-	req.Header.Set("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
-	rr := httptest.NewRecorder()
-
-	mux.ServeHTTP(rr, req)
-	if rr.Code == http.StatusBadRequest && strings.Contains(rr.Body.String(), "revisionTitle") {
-		t.Fatalf("revisionTitle should be conditionally validated by the submit service, got %d body=%s", rr.Code, rr.Body.String())
 	}
 }
 

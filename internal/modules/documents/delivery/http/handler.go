@@ -48,7 +48,6 @@ type Service interface {
 	ListCheckpoints(ctx context.Context, tenantID, docID string) ([]domain.Checkpoint, error)
 	ListRevisionHistory(ctx context.Context, tenantID, docID string) ([]domain.RevisionHistoryItem, error)
 	RestoreCheckpoint(ctx context.Context, tenantID, docID, actorID string, versionNum int) (*application.RestoreResult, error)
-	Finalize(ctx context.Context, tenantID, docID, actorID string) error
 	Archive(ctx context.Context, tenantID, docID, actorID string) error
 	SignedRevisionURL(ctx context.Context, tenantID, docID, revID string) (string, error)
 	ListDocumentComments(ctx context.Context, tenantID, userID, documentID string) ([]domain.Comment, error)
@@ -453,23 +452,6 @@ func (h *Handler) finalizeDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	revisionTitle := strings.TrimSpace(reqBody.RevisionTitle)
-
-	if h.submitSvc == nil || h.db == nil {
-		// Fallback: legacy status-only transition when submit service not wired.
-		r = withAdminCtx(r)
-		docID := r.PathValue("id")
-		tenantID, userID, ok := h.authorizeDocumentScope(w, r, docID)
-		if !ok {
-			return
-		}
-		if err := h.svc.Finalize(r.Context(), tenantID, docID, userID); err != nil {
-			status, msg := mapErr(err)
-			httpErr(w, status, msg)
-		} else {
-			w.WriteHeader(http.StatusNoContent)
-		}
-		return
-	}
 
 	tenantForReplay, err := tenantIDFromReq(r)
 	if err != nil {

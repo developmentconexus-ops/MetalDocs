@@ -50,7 +50,9 @@ func (p *StaticRuntimeStatusProvider) Live(_ context.Context) (int, map[string]a
 }
 
 func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
-	// TODO: gate behind admin auth before exposing to external traffic.
+	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
+	// permissions.go (tier-1); health/readiness endpoints are intentionally
+	// public for load-balancer probes and expose only coarse up/down status.
 	status := "ready"
 	code := 200
 	checks := p.applyDependencyChecks(ctx, []map[string]any{
@@ -65,7 +67,9 @@ func (p *StaticRuntimeStatusProvider) Ready(ctx context.Context) (int, map[strin
 }
 
 func (p *StaticRuntimeStatusProvider) RuntimeMetrics(_ context.Context) map[string]any {
-	// TODO: gate behind admin auth before exposing to external traffic.
+	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
+	// permissions.go (tier-1); health/readiness endpoints are intentionally
+	// public for load-balancer probes and expose only coarse up/down status.
 	return map[string]any{
 		"repositoryMode":  p.repositoryMode,
 		"storageProvider": p.storageProvider,
@@ -107,7 +111,9 @@ func NewPostgresRuntimeStatusProvider(db *sql.DB, repositoryMode, storageProvide
 }
 
 func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[string]any) {
-	// TODO: gate behind admin auth before exposing to external traffic.
+	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
+	// permissions.go (tier-1); health/readiness endpoints are intentionally
+	// public for load-balancer probes and expose only coarse up/down status.
 	readyCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
@@ -144,7 +150,9 @@ func (p *PostgresRuntimeStatusProvider) Ready(ctx context.Context) (int, map[str
 }
 
 func (p *PostgresRuntimeStatusProvider) RuntimeMetrics(ctx context.Context) map[string]any {
-	// TODO: gate behind admin auth before exposing to external traffic.
+	// Exposure: the /api/v1/metrics payload is gated by CapMetricsView in
+	// permissions.go (tier-1); health/readiness endpoints are intentionally
+	// public for load-balancer probes and expose only coarse up/down status.
 	metrics := p.StaticRuntimeStatusProvider.RuntimeMetrics(ctx)
 	if p.db == nil {
 		metrics["repositoryStatus"] = "down"
