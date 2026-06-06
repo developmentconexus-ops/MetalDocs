@@ -29,20 +29,6 @@ const (
 	StatusObsolete Status = "OBSOLETE"
 )
 
-type SubjectType string
-
-const (
-	SubjectTypeUser SubjectType = "user"
-	SubjectTypeRole SubjectType = "role"
-)
-
-type Effect string
-
-const (
-	EffectAllow Effect = "allow"
-	EffectDeny  Effect = "deny"
-)
-
 type Document struct {
 	ID               string
 	Title            string
@@ -77,7 +63,11 @@ func NewDocument(doc Document) (Document, error) {
 }
 
 type Query struct {
-	TenantID        string
+	TenantID string
+	// ActorUserID is the authenticated caller. Per-document visibility is
+	// enforced against this actor at the data layer (unified role/area model +
+	// controlled_document_{area,user}_grants). Empty actor → no results.
+	ActorUserID     string
 	Text            string
 	DocumentType    string
 	DocumentProfile string
@@ -100,14 +90,6 @@ func NewQuery(query Query) (Query, error) {
 	if query.TenantID == "" {
 		return Query{}, ErrQueryTenantEmpty
 	}
+	query.ActorUserID = strings.TrimSpace(query.ActorUserID)
 	return query, nil
-}
-
-type AccessPolicy struct {
-	SubjectType   SubjectType
-	SubjectID     string
-	ResourceScope string
-	ResourceID    string
-	Capability    string
-	Effect        Effect
 }

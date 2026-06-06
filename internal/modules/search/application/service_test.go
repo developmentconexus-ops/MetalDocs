@@ -11,40 +11,31 @@ import (
 )
 
 type stubReader struct {
-	called       bool
-	listTenantID string
-	listLimit    int
-	listOffsets  []int
-	docs         []domain.Document
-	docsByOffset map[int][]domain.Document
-	policies     map[string][]domain.AccessPolicy
-	policyCalls  []string
+	called      bool
+	lastQuery   domain.Query
+	lastLimit   int
+	lastOffset  int
+	docs        []domain.Document
+	listErr     error
 }
 
 func (r *stubReader) ListDocuments(_ context.Context, query domain.Query, limit, offset int) ([]domain.Document, error) {
 	r.called = true
-	r.listTenantID = query.TenantID
-	r.listLimit = limit
-	r.listOffsets = append(r.listOffsets, offset)
-	if r.docsByOffset != nil {
-		return r.docsByOffset[offset], nil
-	}
-	return r.docs, nil
+	r.lastQuery = query
+	r.lastLimit = limit
+	r.lastOffset = offset
+	return r.docs, r.listErr
 }
 
-func (r *stubReader) ListAccessPolicies(_ context.Context, scope, id string) ([]domain.AccessPolicy, error) {
-	r.policyCalls = append(r.policyCalls, scope+":"+id)
-	if r.policies != nil {
-		return r.policies[scope+":"+id], nil
-	}
-	return nil, nil
+func authedCtx(userID string) context.Context {
+	return iamdomain.WithAuthContext(context.Background(), userID, []iamdomain.Role{iamdomain.RoleViewer})
 }
 
 func TestSearchDocumentsRequiresTenantID(t *testing.T) {
 	reader := &stubReader{}
 	svc := NewService(reader)
 
-	_, err := svc.SearchDocuments(context.Background(), domain.Query{})
+	_, err := svc.SearchDocuments(authedCtx("user-1"), domain.Query{})
 	if !errors.Is(err, ErrTenantRequired) {
 		t.Fatalf("error = %v, want ErrTenantRequired", err)
 	}
@@ -53,144 +44,63 @@ func TestSearchDocumentsRequiresTenantID(t *testing.T) {
 	}
 }
 
-func TestSearchDocumentsPassesTenantIDToReader(t *testing.T) {
+func TestSearchDocumentsForwardsActorAndTenantToReader(t *testing.T) {
 	reader := &stubReader{}
 	svc := NewService(reader)
-	ctx := iamdomain.WithAuthContext(context.Background(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
 
-	_, err := svc.SearchDocuments(ctx, domain.Query{TenantID: "tenant-1"})
+	_, err := svc.SearchDocuments(authedCtx("user-1"), domain.Query{TenantID: "tenant-1"})
 	if err != nil {
 		t.Fatalf("SearchDocuments: %v", err)
 	}
-	if reader.listTenantID != "tenant-1" {
-		t.Fatalf("tenant id = %q, want tenant-1", reader.listTenantID)
+	if !reader.called {
+		t.Fatal("reader was not called")
 	}
-	if reader.listLimit != defaultLimit {
-		t.Fatalf("limit = %d, want %d", reader.listLimit, defaultLimit)
+	if reader.lastQuery.TenantID != "tenant-1" {
+		t.Fatalf("tenant id = %q, want tenant-1", reader.lastQuery.TenantID)
+	}
+	if reader.lastQuery.ActorUserID != "user-1" {
+		t.Fatalf("actor = %q, want user-1 forwarded for data-layer visibility", reader.lastQuery.ActorUserID)
+	}
+	if reader.lastLimit != defaultLimit {
+		t.Fatalf("limit = %d, want %d", reader.lastLimit, defaultLimit)
+	}
+	if reader.lastOffset != 0 {
+		t.Fatalf("offset = %d, want 0 (visibility filtered in SQL, no paging loop)", reader.lastOffset)
 	}
 }
 
-func TestSearchDocumentsPassesCappedLimitToReader(t *testing.T) {
+func TestSearchDocumentsCapsLimit(t *testing.T) {
 	reader := &stubReader{}
 	svc := NewService(reader)
-	ctx := iamdomain.WithAuthContext(context.Background(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
 
-	_, err := svc.SearchDocuments(ctx, domain.Query{TenantID: "tenant-1", Limit: maxLimit + 1})
+	_, err := svc.SearchDocuments(authedCtx("user-1"), domain.Query{TenantID: "tenant-1", Limit: maxLimit + 1})
 	if err != nil {
 		t.Fatalf("SearchDocuments: %v", err)
 	}
-	if reader.listLimit != maxLimit {
-		t.Fatalf("limit = %d, want %d", reader.listLimit, maxLimit)
+	if reader.lastLimit != maxLimit {
+		t.Fatalf("limit = %d, want %d", reader.lastLimit, maxLimit)
 	}
 }
 
-func TestSearchDocumentsPagesUntilAuthorizedMatchesFillLimit(t *testing.T) {
-	reader := &stubReader{
-		docsByOffset: map[int][]domain.Document{
-			0: {
-				{ID: "doc-1", Title: "Draft 1", CreatedAt: time.Unix(30, 0)},
-				{ID: "doc-2", Title: "Draft 2", CreatedAt: time.Unix(20, 0)},
-			},
-			2: {
-				{ID: "doc-3", Title: "Allowed", CreatedAt: time.Unix(10, 0)},
-			},
-		},
-		policies: map[string][]domain.AccessPolicy{
-			"document:doc-1": {{
-				SubjectType: domain.SubjectTypeUser,
-				SubjectID:   "user-1",
-				Capability:  searchCapabilityView,
-				Effect:      domain.EffectDeny,
-			}},
-			"document:doc-2": {{
-				SubjectType: domain.SubjectTypeUser,
-				SubjectID:   "user-1",
-				Capability:  searchCapabilityView,
-				Effect:      domain.EffectDeny,
-			}},
-		},
-	}
+func TestSearchDocumentsReturnsReaderResults(t *testing.T) {
+	reader := &stubReader{docs: []domain.Document{
+		{ID: "doc-1", Title: "Granted", CreatedAt: time.Unix(10, 0)},
+	}}
 	svc := NewService(reader)
-	ctx := iamdomain.WithAuthContext(context.Background(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
 
-	got, err := svc.SearchDocuments(ctx, domain.Query{TenantID: "tenant-1", Limit: 1})
+	got, err := svc.SearchDocuments(authedCtx("user-1"), domain.Query{TenantID: "tenant-1"})
 	if err != nil {
 		t.Fatalf("SearchDocuments: %v", err)
 	}
-	if len(got) != 1 || got[0].ID != "doc-3" {
-		t.Fatalf("results = %#v, want only doc-3", got)
-	}
-	if len(reader.listOffsets) != 2 || reader.listOffsets[0] != 0 || reader.listOffsets[1] != 2 {
-		t.Fatalf("offsets = %#v, want [0 2]", reader.listOffsets)
+	if len(got) != 1 || got[0].ID != "doc-1" {
+		t.Fatalf("results = %#v, want the single visible doc the reader returned", got)
 	}
 }
 
-func TestSearchDocuments_DeniesByAreaPolicyUsingBusinessUnitAndDepartment(t *testing.T) {
-	reader := &stubReader{
-		docs: []domain.Document{{
-			ID:           "doc-1",
-			Title:        "Controlled Manual",
-			BusinessUnit: "ops",
-			Department:   "qa",
-			CreatedAt:    time.Now(),
-		}},
-		policies: map[string][]domain.AccessPolicy{
-			"area:ops:qa": {{
-				SubjectType: domain.SubjectTypeUser,
-				SubjectID:   "user-1",
-				Capability:  searchCapabilityView,
-				Effect:      domain.EffectDeny,
-			}},
-		},
-	}
-	svc := NewService(reader)
-	ctx := iamdomain.WithAuthContext(context.Background(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
-
-	got, err := svc.SearchDocuments(ctx, domain.Query{TenantID: "tenant-1"})
-	if err != nil {
-		t.Fatalf("SearchDocuments: %v", err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("results = %#v, want area-policy deny", got)
-	}
-}
-
-func TestSearchDocuments_DeniesByAreaPolicyUsingProcessAreaFallbackWhenBusinessUnitMissing(t *testing.T) {
-	reader := &stubReader{
-		docs: []domain.Document{{
-			ID:          "doc-1",
-			Title:       "Controlled Manual",
-			ProcessArea: "ops",
-			Department:  "qa",
-			CreatedAt:   time.Now(),
-		}},
-		policies: map[string][]domain.AccessPolicy{
-			"area:ops:qa": {{
-				SubjectType: domain.SubjectTypeUser,
-				SubjectID:   "user-1",
-				Capability:  searchCapabilityView,
-				Effect:      domain.EffectDeny,
-			}},
-		},
-	}
-	svc := NewService(reader)
-	ctx := iamdomain.WithAuthContext(context.Background(), "user-1", []iamdomain.Role{iamdomain.RoleViewer})
-
-	got, err := svc.SearchDocuments(ctx, domain.Query{TenantID: "tenant-1"})
-	if err != nil {
-		t.Fatalf("SearchDocuments: %v", err)
-	}
-	if len(got) != 0 {
-		t.Fatalf("results = %#v, want area-policy deny", got)
-	}
-}
-
+// TestSearchDocumentsWithoutAuthContextDeniesResults: an unauthenticated caller
+// must see nothing, and the reader must not be consulted (no actor to scope by).
 func TestSearchDocumentsWithoutAuthContextDeniesResults(t *testing.T) {
-	reader := &stubReader{docs: []domain.Document{{
-		ID:        "doc-1",
-		Title:     "Manual",
-		CreatedAt: time.Now(),
-	}}}
+	reader := &stubReader{docs: []domain.Document{{ID: "doc-1", Title: "Manual", CreatedAt: time.Now()}}}
 	svc := NewService(reader)
 
 	got, err := svc.SearchDocuments(context.Background(), domain.Query{TenantID: "tenant-1"})
@@ -198,6 +108,9 @@ func TestSearchDocumentsWithoutAuthContextDeniesResults(t *testing.T) {
 		t.Fatalf("SearchDocuments: %v", err)
 	}
 	if len(got) != 0 {
-		t.Fatalf("results = %d, want 0", len(got))
+		t.Fatalf("results = %d, want 0 for unauthenticated caller", len(got))
+	}
+	if reader.called {
+		t.Fatal("reader must not be called without an authenticated actor")
 	}
 }

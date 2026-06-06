@@ -14,12 +14,23 @@ import (
 
 	docapp "metaldocs/internal/modules/documents/application"
 	"metaldocs/internal/modules/documents/approval/domain"
+	"metaldocs/internal/modules/documents/approval/infrastructure/signature"
 	"metaldocs/internal/modules/documents/approval/repository"
 	"metaldocs/internal/modules/iam/authz"
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
 var ErrApprovalBlockedByUnresolvedComments = errors.New("approval: unresolved comments block approval")
+
+// ErrReauthNotConfigured is returned (fail-closed) when a password_reauth
+// sign-off reaches RecordSignoff without a signature verifier wired. It must
+// never be possible to record a password_reauth sign-off without verification.
+var ErrReauthNotConfigured = errors.New("approval: signature verifier not configured")
+
+// signatureMethodPasswordReauth is the only signature method that carries an
+// e-signature re-authentication control (21 CFR Part 11). It is set server-side
+// by the sign-off handlers, never by the client.
+const signatureMethodPasswordReauth = "password_reauth"
 
 type FreezeInvoker interface {
 	Freeze(ctx context.Context, tx *sql.Tx, tenantID, revisionID string, approver docapp.ApproverContext) error
@@ -52,6 +63,9 @@ type DecisionService struct {
 	// deprecated: post-commit best-effort dispatcher; replaced by pdfOutbox.
 	pdfDispatcher PDFDispatchInvoker
 	pdfOutbox     PDFOutboxEnqueuer
+	// sigRegistry verifies the e-signature credential before a sign-off is
+	// recorded. nil only in tests that exercise non-reauth methods.
+	sigRegistry *signature.Registry
 }
 
 func NewDecisionService(
@@ -81,6 +95,41 @@ func (s *DecisionService) WithPDFOutbox(enqueuer PDFOutboxEnqueuer) *DecisionSer
 func (s *DecisionService) WithPinInvoker(invoker PinInvoker) *DecisionService {
 	s.pinInvoker = invoker
 	return s
+}
+
+// WithSignatureRegistry wires the e-signature verifier used to re-authenticate
+// the acting user before a password_reauth sign-off is recorded.
+func (s *DecisionService) WithSignatureRegistry(registry *signature.Registry) *DecisionService {
+	s.sigRegistry = registry
+	return s
+}
+
+// resolveSignaturePayload re-authenticates the acting user and returns the
+// signature payload to persist. For password_reauth it verifies password_token
+// against the stored bcrypt hash via the signature Registry and returns the
+// verified attestation (no secret), so the raw credential is never stored. For
+// any other (legacy/test) method it marshals the supplied payload unchanged.
+func (s *DecisionService) resolveSignaturePayload(ctx context.Context, req SignoffRequest) (json.RawMessage, error) {
+	if req.SignatureMethod != signatureMethodPasswordReauth {
+		return marshalSignaturePayload(req.SignaturePayload)
+	}
+	if s.sigRegistry == nil {
+		return nil, ErrReauthNotConfigured
+	}
+	provider, err := s.sigRegistry.Get(req.SignatureMethod)
+	if err != nil {
+		return nil, err
+	}
+	token, _ := req.SignaturePayload["password_token"].(string)
+	result, err := provider.Sign(ctx, signature.SignRequest{
+		ActorUserID:   req.ActorUserID,
+		ActorTenantID: req.TenantID,
+		Credentials:   map[string]string{"password": token},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Payload, nil
 }
 
 // SignoffRequest carries all inputs for RecordSignoff.
@@ -160,6 +209,17 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, err
 	}
 
+	// 21 CFR Part 11 e-signature: re-authenticate the acting user BEFORE the
+	// sign-off is recorded. resolveSignaturePayload verifies password_token
+	// against the stored bcrypt hash and returns the attestation that gets
+	// persisted (raw credential never stored). A bad/blank token fails here and
+	// no sign-off is recorded.
+	sigPayload, err := s.resolveSignaturePayload(ctx, req)
+	if err != nil {
+		_ = tx.Rollback()
+		return SignoffResult{}, err
+	}
+
 	// Content pin: client echoes back the content hash from the active-document
 	// endpoint to confirm the instance content has not drifted since they loaded it.
 	// Resolve the same value here (documents.content_hash_at_submit, falling back
@@ -226,13 +286,8 @@ func (s *DecisionService) RecordSignoff(ctx context.Context, db *sql.DB, req Sig
 		return SignoffResult{}, err
 	}
 
-	// Step 7: build the domain Signoff value object.
-	sigPayload, err := marshalSignaturePayload(req.SignaturePayload)
-	if err != nil {
-		_ = tx.Rollback()
-		return SignoffResult{}, fmt.Errorf("recordSignoff: marshal signature payload: %w", err)
-	}
-
+	// Step 7: build the domain Signoff value object. sigPayload was resolved
+	// (and the actor re-authenticated) above.
 	var actorDisplayName sql.NullString
 	if err := tx.QueryRowContext(ctx, `
 		SELECT display_name
