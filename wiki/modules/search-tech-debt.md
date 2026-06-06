@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/search.md`. Debt only; no fix prescriptions.
 
-**Last verified:** 2026-05-26
+**Last verified:** 2026-06-05 (T-003 closed: AccessPolicy ABAC path removed in Phase B API contract hardening)
 
 ## Items
 
@@ -22,13 +22,9 @@
 - **Linked backlog row:** `R-002`
 - **Linked ADR:** missing-ADR
 
-### T-003 · Access policy resolver is in-memory policy composition without DB-backed ACL joins
-- **Severity:** minor
-- **Surface:** `internal/modules/search/application/service.go:168`
-- **Observation:** policy decisions rely on local policy list rather than explicit cross-table ACL reads.
-- **Evidence:** `decidePolicies` + `matchesPolicySubject` path.
-- **Linked backlog row:** `R-003`
-- **Linked ADR:** missing-ADR
+### ~~T-003 · Access policy resolver is in-memory policy composition without DB-backed ACL joins~~ — CLOSED 2026-06-05
+- **Severity:** ~~minor~~ closed
+- **Resolution:** Dead `AccessPolicy` ABAC path (`decidePolicies`, `shouldBypassPolicy`, `matchesPolicySubject`, `policiesForDocument`, `canView`) removed entirely in Phase B API contract hardening. The `document_access_policies` table was dropped in migration 0232. Per-document visibility is now enforced at the data layer in `internal/modules/search/infrastructure/v2documents/reader.go` using the unified model (AD-3 / ADR 0022). `domain/port.go` no longer declares `ListAccessPolicies`; `domain/model.go` no longer carries `AccessPolicy`/`SubjectType`/`Effect` types.
 
 ## Coverage stats
 
@@ -36,4 +32,4 @@
 - Operations missing C4 placement: n/a (stub-level doc)
 - Cross-deps missing in section map: n/a (stub-level doc)
 - State transitions missing: n/a (read-oriented module)
-- Decisions without ADR link: 3
+- Decisions without ADR link: 2 (T-001, T-002)

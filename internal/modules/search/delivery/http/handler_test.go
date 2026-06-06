@@ -28,10 +28,6 @@ func (r *handlerStubReader) ListDocuments(_ context.Context, query searchdomain.
 	return append([]searchdomain.Document(nil), r.documents...), nil
 }
 
-func (r *handlerStubReader) ListAccessPolicies(_ context.Context, _, _ string) ([]searchdomain.AccessPolicy, error) {
-	return nil, nil
-}
-
 func TestHandleSearchDocumentsRequiresAuthentication(t *testing.T) {
 	reader := &handlerStubReader{}
 	h := NewHandler(searchapp.NewService(reader))

@@ -3,7 +3,6 @@ package v2documents
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -20,6 +19,12 @@ func NewReader(db *sql.DB) *Reader {
 }
 
 func (r *Reader) ListDocuments(ctx context.Context, query searchdomain.Query, limit, offset int) ([]searchdomain.Document, error) {
+	// Only columns that exist on public.documents / public.controlled_documents
+	// are referenced. The legacy governance columns (subject, business_unit,
+	// classification, tags) live on the decommissioned metaldocs.documents schema,
+	// not on public.documents — selecting/filtering them errored at runtime, so
+	// they are not part of v2 search. Per-document visibility is enforced against
+	// the caller ($13) using the unified model (AD-3).
 	const q = `
 SELECT
 	d.id,
@@ -35,11 +40,7 @@ SELECT
 		LIMIT 1
 	), ''),
 	COALESCE(d.process_area_code_snapshot, ''),
-	COALESCE(d.subject_code, ''),
-	COALESCE(d.business_unit, ''),
 	COALESCE(cd.department_code, ''),
-	COALESCE(d.classification, ''),
-	COALESCE(d.tags, '[]'::jsonb)::text,
 	d.created_by::text,
 	COALESCE(cd.code, d.code, ''),
 	COALESCE(cd.sequence_num, d.revision_number, 0),
@@ -64,20 +65,47 @@ WHERE d.tenant_id = $1
 		LIMIT 1
 	), '')) = $5)
   AND ($6 = '' OR LOWER(COALESCE(d.process_area_code_snapshot, '')) = $6)
-  AND ($7 = '' OR LOWER(COALESCE(d.subject_code, '')) = $7)
-  AND ($8 = '' OR COALESCE(d.business_unit, '') = $8)
-  AND ($9 = '' OR COALESCE(cd.department_code, '') = $9)
-  AND ($10 = '' OR UPPER(COALESCE(d.classification, '')) = $10)
-  AND ($11 = '' OR d.created_by::text = $11)
-  AND ($12 = '' OR EXISTS (
-		SELECT 1
-		FROM jsonb_array_elements_text(COALESCE(d.tags, '[]'::jsonb)) AS tag(value)
-		WHERE LOWER(tag.value) = $12
-  ))
-  AND ($13::timestamptz IS NULL OR (d.effective_to IS NOT NULL AND d.effective_to <= $13::timestamptz))
-  AND ($14::timestamptz IS NULL OR (d.effective_to IS NOT NULL AND d.effective_to >= $14::timestamptz))
+  AND ($7 = '' OR COALESCE(cd.department_code, '') = $7)
+  AND ($8 = '' OR d.created_by::text = $8)
+  AND ($9::timestamptz IS NULL OR (d.effective_to IS NOT NULL AND d.effective_to <= $9::timestamptz))
+  AND ($10::timestamptz IS NULL OR (d.effective_to IS NOT NULL AND d.effective_to >= $10::timestamptz))
+  -- Per-document visibility (unified model, AD-3): a document is visible only
+  -- when the caller ($13) can see it. Documents linked to a controlled document
+  -- inherit its company/owner/restricted+grant visibility (the same predicate
+  -- the controlled-documents list enforces); standalone documents fall back to
+  -- creator ownership. No system_admin bypass — matches the CD list semantics.
+  AND (
+    (d.controlled_document_id IS NULL AND d.created_by::text = $13)
+    OR (cd.id IS NOT NULL AND (
+         cd.visibility_scope = 'company'
+      OR cd.owner_user_id = $13
+      OR (cd.visibility_scope = 'restricted' AND (
+           EXISTS (
+             SELECT 1
+               FROM public.controlled_document_area_grants cdag
+              WHERE cdag.tenant_id = cd.tenant_id
+                AND cdag.controlled_document_id = cd.id
+                AND EXISTS (
+                  SELECT 1
+                    FROM public.user_process_areas upa
+                   WHERE upa.tenant_id = cd.tenant_id
+                     AND upa.user_id = $13
+                     AND upa.area_code = cdag.area_code
+                     AND upa.effective_to IS NULL
+                )
+           )
+           OR EXISTS (
+             SELECT 1
+               FROM public.controlled_document_user_grants cdug
+              WHERE cdug.tenant_id = cd.tenant_id
+                AND cdug.controlled_document_id = cd.id
+                AND cdug.user_id = $13
+           )
+      ))
+    ))
+  )
 ORDER BY d.created_at DESC, d.id DESC
-LIMIT $15 OFFSET $16
+LIMIT $11 OFFSET $12
 `
 	// DocumentType and DocumentProfile both map to profile_code_snapshot; prefer whichever is set.
 	profileFilter := strings.ToLower(strings.TrimSpace(query.DocumentType))
@@ -101,16 +129,13 @@ LIMIT $15 OFFSET $16
 		profileFilter,
 		strings.ToLower(strings.TrimSpace(query.DocumentFamily)),
 		strings.ToLower(strings.TrimSpace(query.ProcessArea)),
-		strings.ToLower(strings.TrimSpace(query.Subject)),
-		strings.TrimSpace(query.BusinessUnit),
 		strings.TrimSpace(query.Department),
-		strings.ToUpper(strings.TrimSpace(string(query.Classification))),
 		strings.TrimSpace(query.OwnerID),
-		strings.ToLower(strings.TrimSpace(query.Tag)),
 		expiryBefore,
 		expiryAfter,
 		limit,
 		offset,
+		strings.TrimSpace(query.ActorUserID),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("v2 list documents: %w", err)
@@ -123,8 +148,6 @@ LIMIT $15 OFFSET $16
 		var status string
 		var profile string
 		var family string
-		var classification string
-		var tagsJSON string
 		var effectiveAt sql.NullTime
 		var expiryAt sql.NullTime
 		if err := rows.Scan(
@@ -134,11 +157,7 @@ LIMIT $15 OFFSET $16
 			&profile,
 			&family,
 			&doc.ProcessArea,
-			&doc.Subject,
-			&doc.BusinessUnit,
 			&doc.Department,
-			&classification,
-			&tagsJSON,
 			&doc.OwnerID,
 			&doc.DocumentCode,
 			&doc.DocumentSequence,
@@ -152,8 +171,6 @@ LIMIT $15 OFFSET $16
 		doc.DocumentProfile = profile
 		doc.DocumentType = doc.DocumentProfile
 		doc.DocumentFamily = family
-		doc.Classification = searchdomain.Classification(classification)
-		doc.Tags = decodeTags(tagsJSON)
 		doc.EffectiveAt = cloneNullTime(effectiveAt)
 		doc.ExpiryAt = cloneNullTime(expiryAt)
 		out = append(out, doc)
@@ -164,12 +181,6 @@ LIMIT $15 OFFSET $16
 	return out, nil
 }
 
-// ListAccessPolicies returns no policies — v2 documents use open-by-default access.
-// The search service treats empty policy list as allow.
-func (r *Reader) ListAccessPolicies(_ context.Context, _, _ string) ([]searchdomain.AccessPolicy, error) {
-	return nil, nil
-}
-
 func cloneNullTime(value sql.NullTime) *time.Time {
 	if !value.Valid {
 		return nil
@@ -178,13 +189,3 @@ func cloneNullTime(value sql.NullTime) *time.Time {
 	return &utc
 }
 
-func decodeTags(raw string) []string {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	var tags []string
-	if err := json.Unmarshal([]byte(raw), &tags); err != nil {
-		return nil
-	}
-	return append([]string(nil), tags...)
-}

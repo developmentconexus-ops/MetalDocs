@@ -44,6 +44,7 @@ const (
 	approvalCodeIdempotencyKeyConflict   problem.Code = "idempotency.key_conflict"
 	approvalCodePreconditionHashMismatch problem.Code = "precondition.content_hash_mismatch"
 	approvalCodeAuthnSignatureInvalid    problem.Code = "authn.signature_invalid"
+	approvalCodeAuthnRateLimited         problem.Code = "authn.rate_limited"
 	approvalCodeInternalDBPrivilege      problem.Code = "internal.db_privilege_missing"
 	approvalCodeInternalDBUnknown        problem.Code = "internal.db_unknown"
 	approvalCodeValidationParamFormat    problem.Code = "validation.param_format"
@@ -139,6 +140,9 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, approvalsignature.ErrInvalidCredentials):
 		statusCode = http.StatusUnauthorized
 		code = approvalCodeAuthnSignatureInvalid
+	case errors.Is(err, approvalsignature.ErrRateLimited):
+		statusCode = http.StatusTooManyRequests
+		code = approvalCodeAuthnRateLimited
 	case errors.Is(err, repository.ErrInsufficientPrivilege):
 		statusCode = http.StatusInternalServerError
 		code = approvalCodeInternalDBPrivilege
