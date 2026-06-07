@@ -47,6 +47,7 @@ const (
 	approvalCodeAuthnRateLimited         problem.Code = "authn.rate_limited"
 	approvalCodeInternalDBPrivilege      problem.Code = "internal.db_privilege_missing"
 	approvalCodeInternalDBUnknown        problem.Code = "internal.db_unknown"
+	approvalCodeInternalSigMisconfigured problem.Code = "internal.signature_misconfigured"
 	approvalCodeValidationParamFormat    problem.Code = "validation.param_format"
 	approvalCodeValidationParamUnmarshal problem.Code = "validation.param_unmarshal"
 	approvalCodeValidationParamRequired  problem.Code = "validation.param_required"
@@ -143,6 +144,14 @@ func MapErrorToResponse(err error) *problem.Problem {
 	case errors.Is(err, approvalsignature.ErrRateLimited):
 		statusCode = http.StatusTooManyRequests
 		code = approvalCodeAuthnRateLimited
+	case errors.Is(err, application.ErrReauthNotConfigured),
+		errors.Is(err, approvalsignature.ErrUnknownSignatureMethod),
+		errors.Is(err, approvalsignature.ErrRateLimiterConfig):
+		// Signature-verifier misconfiguration (registry/limiter unwired). Unreachable
+		// in production wiring; distinct 500 code so monitoring separates it from a
+		// DB-layer 500. Client body stays the generic "internal error".
+		statusCode = http.StatusInternalServerError
+		code = approvalCodeInternalSigMisconfigured
 	case errors.Is(err, repository.ErrInsufficientPrivilege):
 		statusCode = http.StatusInternalServerError
 		code = approvalCodeInternalDBPrivilege
