@@ -48,7 +48,7 @@ Note: live OpenAPI spec is under `api/openapi/v1/partials/registry.yaml` even th
 
 | Entity | From | To | Trigger | Capability required |
 |---|---|---|---|---|
-| `metaldocs.idempotency_keys` | no completed row for `(tenant, actor, route, key)` | completed replay row inserted/updated | `RecordReplay` after 2xx (`internal/platform/idempotency/middleware.go:67`, `postgres_store.go:67`) | `CapRegistryCreate` resolved at `apps/api/cmd/metaldocs-api/permissions.go:186-187`, enforced via IAM middleware (`main.go:173-174`, `:386`) |
+| `metaldocs.idempotency_keys` | no completed row for `(tenant, actor, route, key)` | completed replay row inserted/updated | `RecordReplay` after 2xx (`internal/platform/idempotency/middleware.go:67`, `postgres_store.go:67`) | `CapRegistryCreate` resolved at `apps/api/cmd/metaldocs-api/permissions.go:185-186`, enforced via IAM middleware (`main.go:173-174`, `:386`) |
 | `cd_sequence_counters.next_seq` | `N` (or missing row) | `N+1` (and row ensured) | `NextAndIncrement` (`repository.go:214`, `:251`) | `registry.create` asserted in tx |
 | `controlled_documents` | no row | new active row | `CreateTx` (`repository.go:146`) | `registry.create` asserted in tx |
 | `documents` | no row | new draft row + pointer/snapshot updates | `CreateDocumentTx` (`documents/repository/repository.go:101`, `:135`, `:145`) | `document.create` for INSERT; `document.edit` before guarded document UPDATEs |
@@ -80,7 +80,7 @@ Note: live OpenAPI spec is under `api/openapi/v1/partials/registry.yaml` even th
 | `internal/modules/taxonomy/application/governance_logger.go:25` | INSERT | `governance_events` | same |
 | `internal/platform/idempotency/postgres_store.go:69` | INSERT ... ON CONFLICT DO UPDATE | `metaldocs.idempotency_keys` | same |
 
-**Tripwire pairing audit:** active for atomic create. HTTP tier-1 still resolves `registry.create` via IAM middleware + permission resolver (`apps/api/cmd/metaldocs-api/main.go:173-174`, `:386`, `permissions.go:186-187`). `RegistryService.Create` now sets authz GUCs and calls `authz.Require(registry.create, tenant)` before `cd_sequence_counters` and `controlled_documents` writes. Documents-side `CreateDocumentTx` asserts `document.create` for the INSERT and `document.edit` before guarded `documents` UPDATEs.
+**Tripwire pairing audit:** active for atomic create. HTTP tier-1 still resolves `registry.create` via IAM middleware + permission resolver (`apps/api/cmd/metaldocs-api/main.go:173-174`, `:386`, `permissions.go:185-186`). `RegistryService.Create` now sets authz GUCs and calls `authz.Require(registry.create, tenant)` before `cd_sequence_counters` and `controlled_documents` writes. Documents-side `CreateDocumentTx` asserts `document.create` for the INSERT and `document.edit` before guarded `documents` UPDATEs.
 
 ### 5. Response shape
 

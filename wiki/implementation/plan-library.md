@@ -816,7 +816,7 @@ Block Phase 3 until reviewer signs off.
 ### Task 3.1: Update OpenAPI spec
 
 **Files:**
-- Modify: `api/openapi/v1/openapi.yaml:2963` (existing `listDocumentsV2`) and add new `/documents/stats` path
+- Modify: `api/openapi/v1/openapi.yaml:1952` (existing `listDocuments`) and add new `/documents/stats` path
 
 - [ ] **Step 1: Read existing path spec**
 

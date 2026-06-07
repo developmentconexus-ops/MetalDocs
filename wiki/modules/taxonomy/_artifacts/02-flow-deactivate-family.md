@@ -31,7 +31,7 @@ Tx boundary: **none**. `FamilyRepository` holds `*sql.DB` (`family_repository.go
 
 | Entity | From | To | Trigger | Capability required |
 |---|---|---|---|---|
-| `DocumentFamily.IsActive` (`document_families.is_active`) | `TRUE` | `FALSE` | `(*DocumentFamily).Deactivate` (`domain/family.go:22-27`) + `Update` SQL | `taxonomy.manage` (tier-1 only, via `apps/api/cmd/metaldocs-api/permissions.go:174-180`); constant at `internal/modules/iam/domain/capabilities.go:16` |
+| `DocumentFamily.IsActive` (`document_families.is_active`) | `TRUE` | `FALSE` | `(*DocumentFamily).Deactivate` (`domain/family.go:22-27`) + `Update` SQL | `taxonomy.manage` (tier-1 only, via `apps/api/cmd/metaldocs-api/permissions.go:177-181`); constant at `internal/modules/iam/domain/capabilities.go:16` |
 
 ## 4. SQL touched
 

@@ -20,7 +20,7 @@ Patterns drawn from `.claude/skills/metaldocs-module-doc/references/industry-pat
 
 - Source: NIST SP 800-95 §4.3 (2007)
 - Quote: "Multiple layers of access control reduce single-point bypass risk."
-- **Registry state:** PARTIAL. Tier-1 capability check via IAM middleware + permission resolver (`apps/api/cmd/metaldocs-api/main.go:173-174`, `:386`, `permissions.go:186-187`; capability `CapRegistryCreate`). Tier-2 (`authz.Require` in-tx) and tier-3 (Postgres `enforce_capability_asserted` tripwire) are **absent** for registry-owned tables. Persistence audit (04-persistence §5) records 5 tripwire violations on `Create`, `CreateTx`, `UpdateStatus`, `EnsureCounter`, `NextAndIncrement`.
+- **Registry state:** PARTIAL. Tier-1 capability check via IAM middleware + permission resolver (`apps/api/cmd/metaldocs-api/main.go:173-174`, `:386`, `permissions.go:185-186`; capability `CapRegistryCreate`). Tier-2 (`authz.Require` in-tx) and tier-3 (Postgres `enforce_capability_asserted` tripwire) are **absent** for registry-owned tables. Persistence audit (04-persistence §5) records 5 tripwire violations on `Create`, `CreateTx`, `UpdateStatus`, `EnsureCounter`, `NextAndIncrement`.
 - **Gap:** Critical for `controlled_documents` mutations (UpdateStatus/CreateTx) — tier-1 bypass via direct DB or alternate module import would not be caught. Cross-ref `wiki/decisions/0007-two-tier-authz.md`, `wiki/concepts/authz-tiers.md`.
 
 ## IP-005 — OpenAPI source-of-truth + codegen

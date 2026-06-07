@@ -1,11 +1,11 @@
-# Data-flow Trace — POST /api/v1/documents/{id}/finalize (submit revision for review)
+# Data-flow Trace ï¿½ POST /api/v1/documents/{id}/finalize (submit revision for review)
 
 ## 1. Entry point
 
 ### Entry A (documents-module primary path)
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | `(operationId missing for this path)` | `api/openapi/v1/openapi.yaml:3251` |
+| OpenAPI op | `(operationId missing for this path)` | `api/openapi/v1/openapi.yaml:2050` |
 | Generated server stub | `ServerInterface.PostApiV2DocumentsIdFinalize` | `internal/modules/documents/api/api.gen.go:757` |
 | Handler | `(*Handler).finalizeDocument` | `internal/modules/documents/delivery/http/handler.go:316` |
 
@@ -13,66 +13,66 @@
 | Layer | Symbol | File:line |
 |---|---|---|
 | OpenAPI op | `(operationId missing in spec2 submit path)` | `api/openapi/spec2.yaml:33` |
-| Generated server stub | `n/a — approval module uses net/http mux route` | `internal/modules/documents/approval/http/router.go:8` |
+| Generated server stub | `n/a ï¿½ approval module uses net/http mux route` | `internal/modules/documents/approval/http/router.go:8` |
 | Handler | `(*Handler).SubmitHandler` | `internal/modules/documents/approval/http/submit_handler.go:14` |
 
 ## 2. Call chain
 
-1. `internal/modules/documents/delivery/http/handler.go:316` `(*Handler).finalizeDocument` — documents-module entry for `POST /api/v1/documents/{id}/finalize`.
+1. `internal/modules/documents/delivery/http/handler.go:316` `(*Handler).finalizeDocument` ï¿½ documents-module entry for `POST /api/v1/documents/{id}/finalize`.
    ? calls: `internal/modules/documents/delivery/http/handler.go:403` `submitSvc.SubmitRevisionForReview`
 
-2. `internal/modules/documents/approval/http/submit_handler.go:14` `(*Handler).SubmitHandler` — approval-module direct entry for `POST /api/v1/documents/{id}/submit`.
+2. `internal/modules/documents/approval/http/submit_handler.go:14` `(*Handler).SubmitHandler` ï¿½ approval-module direct entry for `POST /api/v1/documents/{id}/submit`.
    ? calls: `internal/modules/documents/approval/http/submit_handler.go:50` `submitSvc.SubmitRevisionForReview`
 
-3. `internal/modules/documents/approval/application/submit_service.go:43` `(*SubmitService).SubmitRevisionForReview` — core submit flow.
+3. `internal/modules/documents/approval/application/submit_service.go:43` `(*SubmitService).SubmitRevisionForReview` ï¿½ core submit flow.
    ? calls: `internal/modules/documents/approval/application/services.go:61` `ValidateEventPayload`
 
-4. `internal/modules/documents/approval/application/services.go:61` `ValidateEventPayload` — validates payload values for float64 rejection.
+4. `internal/modules/documents/approval/application/services.go:61` `ValidateEventPayload` ï¿½ validates payload values for float64 rejection.
    ? returns to: `submit_service.go:45`
 
-5. `internal/modules/documents/approval/application/submit_service.go:50` `ComputeContentHash` — computes canonical content hash.
+5. `internal/modules/documents/approval/application/submit_service.go:50` `ComputeContentHash` ï¿½ computes canonical content hash.
    ? calls: `internal/modules/documents/approval/application/content_hash.go:35` `ComputeContentHash`
 
-6. `internal/modules/documents/approval/application/submit_service.go:61` `ComputeIdempotencyKey` — derives idempotency key from actor/document/server time.
+6. `internal/modules/documents/approval/application/submit_service.go:61` `ComputeIdempotencyKey` ï¿½ derives idempotency key from actor/document/server time.
    ? calls: `internal/modules/documents/approval/application/idempotency.go:25` `ComputeIdempotencyKey`
 
-7. `internal/modules/documents/approval/application/submit_service.go:68` `db.BeginTx` — transaction boundary starts.
+7. `internal/modules/documents/approval/application/submit_service.go:68` `db.BeginTx` ï¿½ transaction boundary starts.
    ? calls: `database/sql` tx begin
 
-8. `internal/modules/documents/approval/application/submit_service.go:73` `authz.WithCapCache` — capability cache attached to context.
+8. `internal/modules/documents/approval/application/submit_service.go:73` `authz.WithCapCache` ï¿½ capability cache attached to context.
    ? calls: `internal/modules/iam/authz/authz.go:28` `WithCapCache`
 
-9. `internal/modules/documents/approval/application/submit_service.go:75` `setAuthzGUC` — sets `metaldocs.tenant_id` + `metaldocs.actor_id` on tx.
+9. `internal/modules/documents/approval/application/submit_service.go:75` `setAuthzGUC` ï¿½ sets `metaldocs.tenant_id` + `metaldocs.actor_id` on tx.
    ? calls: `internal/modules/documents/approval/application/authz_guc.go:11` `setAuthzGUC`
 
-10. `internal/modules/documents/approval/application/submit_service.go:80` `loadDocumentAreaCode` — loads area code from `documents` with `controlled_documents` fallback and tenant fallback.
+10. `internal/modules/documents/approval/application/submit_service.go:80` `loadDocumentAreaCode` ï¿½ loads area code from `documents` with `controlled_documents` fallback and tenant fallback.
     ? calls: `internal/modules/documents/approval/application/submit_service.go:276` `loadDocumentAreaCode`
 
-11. `internal/modules/documents/approval/application/submit_service.go:85` `authz.Require(ctx, tx, "doc.submit", areaCode)` — capability gate on tx.
+11. `internal/modules/documents/approval/application/submit_service.go:85` `authz.Require(ctx, tx, "doc.submit", areaCode)` ï¿½ capability gate on tx.
     ? calls: `internal/modules/iam/authz/authz.go:44` `Require`
 
-12. `internal/modules/documents/approval/application/submit_service.go:91` `s.loadRoute` — loads route + stages from catalogue tables.
+12. `internal/modules/documents/approval/application/submit_service.go:91` `s.loadRoute` ï¿½ loads route + stages from catalogue tables.
     ? calls: `internal/modules/documents/approval/application/submit_service.go:226` `(*SubmitService).loadRoute`
 
-13. `internal/modules/documents/approval/application/submit_service.go:98` `route.Validate` — validates route structural invariants.
+13. `internal/modules/documents/approval/application/submit_service.go:98` `route.Validate` ï¿½ validates route structural invariants.
     ? calls: `internal/modules/documents/approval/domain/route.go:48` `(Route).Validate`
 
-14. `internal/modules/documents/approval/application/submit_service.go:121` `repo.InsertInstance` — inserts `approval_instances` row.
+14. `internal/modules/documents/approval/application/submit_service.go:121` `repo.InsertInstance` ï¿½ inserts `approval_instances` row.
     ? calls: `internal/modules/documents/approval/repository/postgres_approval_repository.go:32` `(*postgresApprovalRepository).InsertInstance`
 
-15. `internal/modules/documents/approval/application/submit_service.go:140` `resolveEligibleActors` (per stage) — loads stage eligible users at query time.
+15. `internal/modules/documents/approval/application/submit_service.go:140` `resolveEligibleActors` (per stage) ï¿½ loads stage eligible users at query time.
     ? calls: `internal/modules/documents/approval/application/submit_service.go:299` `resolveEligibleActors`
 
-16. `internal/modules/documents/approval/application/submit_service.go:162` `repo.InsertStageInstances` — bulk inserts stage snapshots.
+16. `internal/modules/documents/approval/application/submit_service.go:162` `repo.InsertStageInstances` ï¿½ bulk inserts stage snapshots.
     ? calls: `internal/modules/documents/approval/repository/postgres_approval_repository.go:56` `(*postgresApprovalRepository).InsertStageInstances`
 
-17. `internal/modules/documents/approval/application/submit_service.go:168` `tx.ExecContext(UPDATE documents...)` — transition `documents.status` draft ? under_review and increments `revision_version` with OCC predicate `revision_version = $3`.
+17. `internal/modules/documents/approval/application/submit_service.go:168` `tx.ExecContext(UPDATE documents...)` ï¿½ transition `documents.status` draft ? under_review and increments `revision_version` with OCC predicate `revision_version = $3`.
     ? on zero rows: `internal/modules/documents/approval/application/submit_service.go:184` returns `repository.ErrStaleRevision`
 
-18. `internal/modules/documents/approval/application/submit_service.go:208` `s.emitter.Emit` — emits governance event with `EventType: "approval_submitted"`.
+18. `internal/modules/documents/approval/application/submit_service.go:208` `s.emitter.Emit` ï¿½ emits governance event with `EventType: "approval_submitted"`.
     ? calls: `internal/modules/documents/approval/application/events.go:39` `(*sqlEmitter).Emit`
 
-19. `internal/modules/documents/approval/application/submit_service.go:214` `tx.Commit` — commits all writes.
+19. `internal/modules/documents/approval/application/submit_service.go:214` `tx.Commit` ï¿½ commits all writes.
     ? calls: `database/sql` tx commit
 
 ## 3. State changes
@@ -111,7 +111,7 @@ Tripwire pairing (same tx):
 ## 5. Response shape
 
 - Finalize path (`/api/v1/documents/{id}/finalize`):
-- Declared responses: `200`, `409` at `api/openapi/v1/openapi.yaml:3255`.
+- Declared responses: `200`, `409` at `api/openapi/v1/openapi.yaml:2055`.
 - 2xx schema ref: `(unclear: no response content schema declared on this path in openapi.yaml)`.
 - Problem `type` URI: `(unclear: v1 finalize path does not declare Problem type URI fields)`.
 

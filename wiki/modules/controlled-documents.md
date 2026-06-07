@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context/Container) Mermaid diagrams. Supersedes the 2026-05-07 stub.
 
-**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-25 backend medium quality-bar sync) | **Owner:** leandro | **Status:** active | **Maturity:** L2
+**Last verified:** 2026-06-07 (Phase C dead-path prune: permissions.go :186-187 → :185-186; prior: 2026-06-01) | **Owner:** leandro | **Status:** active | **Maturity:** L2
 
 > **Key files:**
 > - `internal/modules/controlleddocuments/module.go:25` - module wiring (`New`, dependencies)
@@ -344,7 +344,7 @@ Detail: `_artifacts/02-flow-obsolete.md`.
 
 ### 8.1 Authentication & Authorization
 
-- Tier 1 (HTTP edge): IAM `CapabilityService` resolves create capability (legacy literal constant; see Historical Literal Key Notes) for POST routes (`apps/api/cmd/metaldocs-api/permissions.go:186-187`; reseeded in `migrations/0165_role_capabilities_reseed.sql` for `editor`, `author`, `system_admin`).
+- Tier 1 (HTTP edge): IAM `CapabilityService` resolves create capability (legacy literal constant; see Historical Literal Key Notes) for POST routes (`apps/api/cmd/metaldocs-api/permissions.go:185-186`; reseeded in `migrations/0165_role_capabilities_reseed.sql` for `editor`, `author`, `system_admin`).
 - Tier 2 (in-tx `authz.Require`): applied in `Create`/`CreateTx` (create capability) and `changeStatus` (obsolete/supersede capabilities). Plan 5 (T-001/T-004 closed).
 - Tier 3 (Postgres `enforce_capability_asserted` tripwire): `migrations/0188_tripwire_extend.sql:201-208` attaches `trg_require_cap_asserted` to `controlled_documents` (INSERT + UPDATE with OR-logic) and `cd_sequence_counters`.
 - See [wiki/concepts/authz-tiers.md](concepts/authz-tiers.md) and [wiki/decisions/0007-two-tier-authz.md](decisions/0007-two-tier-authz.md).

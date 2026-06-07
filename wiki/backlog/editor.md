@@ -127,7 +127,7 @@ Required gates:
 
 Route truth evidence:
 
-- OpenAPI comments paths: `api/openapi/v1/openapi.yaml:3723` and `api/openapi/v1/openapi.yaml:3741`
+- OpenAPI comments paths: `api/openapi/v1/openapi.yaml:2330` and `api/openapi/v1/openapi.yaml:2362`
 - Generated backend comments surface: `internal/modules/documents/api/api.gen.go` (`ListDocumentComments`, `CreateDocumentComment`, `UpdateDocumentComment`, `DeleteDocumentComment`)
 - Runtime route wiring: `internal/modules/documents/delivery/http/handler.go:120-123` and `internal/modules/documents/delivery/http/handler.go:155-158`
 - Frontend wrapper: `frontend/apps/web/src/features/documents/api/documents.ts`

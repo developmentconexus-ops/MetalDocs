@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/documents.md`. Debt only — fixes belong in `wiki/backlog/documents-refactor.md`.
 
-**Last verified:** 2026-05-26 (Wave 2 authz tx seeding sync)
+**Last verified:** 2026-06-07 (Phase C dead-path prune: openapi.yaml line refs updated :3156/:3251 → :1952/:2050)
 
 ## Severity scale
 
@@ -20,8 +20,8 @@ See `.claude/skills/metaldocs-module-doc/templates/tech-debt-register.md` for th
 
 ### T-002 · OpenAPI spec drift on `/api/v1/documents/*` routes
 - **Severity:** critical
-- **Surface:** `internal/modules/documents/delivery/http/handler.go:86, :111, :115, :116` (registrations) · `api/openapi/v1/openapi.yaml:3156, :3251`
-- **Observation:** `renameDocument`, `duplicateDocument`, `comments` CRUD, and `archiveDocument` have handlers but no spec operations. `finalizeDocument` has a spec path (`openapi.yaml:3251`) with **no `operationId`** set. `listDocuments` handler exists; spec exposes `listDocumentsV2` (`openapi.yaml:3156`) — drift between handler name and spec id. Contract violation surface on regulated paths — clients have no typed binding for these ops.
+- **Surface:** `internal/modules/documents/delivery/http/handler.go:86, :111, :115, :116` (registrations) · `api/openapi/v1/openapi.yaml:1952, :2050`
+- **Observation:** `renameDocument`, `duplicateDocument`, `comments` CRUD, and `archiveDocument` have handlers but no spec operations. `finalizeDocument` has a spec path at `openapi.yaml:2050` with `operationId: finalizeDocument` (now set). `listDocuments` handler exists; spec at `openapi.yaml:1952` (`operationId: listDocuments`). Contract violation surface on remaining unspec'd routes — clients have no typed binding for them.
 - **Evidence:** `_artifacts/01-surface.md` (HTTP ops table); `_artifacts/02-flow-listDocuments.md` §1; `_artifacts/02-flow-renameDocument.md` §1; `wiki/backlog/contract-first-followups.md`.
 - **Linked backlog row:** `wiki/backlog/documents-refactor.md` R-002
 - **Linked ADR:** `wiki/decisions/0012-contract-first-api.md`

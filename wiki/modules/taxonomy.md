@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-21 taxonomy spec-mount route-truth sync) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-07 (Phase C dead-path prune: `permissions.go` taxonomy block shifted from :158-180 to :165-181 after 8 phantom rows removed; prior: 2026-06-01) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/taxonomy/domain/family.go:8` â€” `DocumentFamily` aggregate
@@ -16,7 +16,7 @@
 > - `internal/modules/taxonomy/delivery/http/routes_profiles.go:230-231` â€” `tenantIDFromRequest` (delegates to `tenant.FromContext`; Plan 3 removed header trust)
 > - `internal/modules/taxonomy/infrastructure/repository.go:102` â€” `ProfileRepository.Create` (now in tx + `authz.Require(CapTaxonomyManage)` â€” Plan 5 wired)
 > - `internal/modules/taxonomy/infrastructure/family_repository.go:91-99` â€” `HasActiveProfiles` (no tenant predicate; TOCTOU race with `Update`)
-> - `apps/api/cmd/metaldocs-api/permissions.go:158-180` â€” path-prefix capability dispatcher (PATCH /families/{code} not matched â†’ falls through)
+> - `apps/api/cmd/metaldocs-api/permissions.go:165-181` — path-prefix capability dispatcher (taxonomy profiles/areas/families; F-001 split applied)
 > - `apps/api/cmd/metaldocs-api/main.go:197-201,225,508-524` â€” module wiring + standalone `ProfileRepository` + `profileDefaultsAdapter` for documents
 > - `migrations/0023_init_document_family_and_profile_registry.sql` Â· `0025_init_document_taxonomy.sql` Â· `0122_taxonomy_extend_document_profiles.sql` Â· `0123_taxonomy_extend_process_areas.sql` Â· `0161_grant_families_write_privileges.sql` Â· `0175_documents_area_name_snapshot.sql`
 
@@ -33,7 +33,7 @@
 - **Global family catalog** â€” `document_families` has no `tenant_id` (`0023:1-7`); shared across tenants (no ADR; see T-002).
 - **Soft-archive** for profiles + areas via `archived_at TIMESTAMPTZ NULL` (`0122:13`, `0123:8`).
 - **Area hierarchy** â€” self-FK `(tenant_id, parent_code) â†’ (tenant_id, code)` with application-layer cycle detection (`area_service.go:SetParent` â†’ `ListAncestors`).
-- **Capability gate** â€” tier-1 only: `taxonomy.manage` for writes, `doc.view` for reads (`permissions.go:158-180`).
+- **Capability gate** — tier-1 only: `taxonomy.manage` for writes, `taxonomy.view` for reads (`permissions.go:165-181`; F-001 split applied).
 
 ### 1.2 Quality Goals
 
@@ -325,7 +325,7 @@ Failure modes â€” reference `wiki/concepts/error-ux.md`:
 ## 8. Cross-cutting Concepts
 
 ### 8.1 Authentication & Authorization
-- **Tier 1 (HTTP edge):** path-prefix dispatcher (`apps/api/cmd/metaldocs-api/permissions.go:158-180`). Profiles branch matches GET + POST/PATCH/PUT/DELETE. Areas branch matches GET + POST/PUT/DELETE. Families branch now matches GET + POST/PATCH/PUT/DELETE (T-003 closed Plan 5 â€” PATCH added).
+- **Tier 1 (HTTP edge):** path-prefix dispatcher (`apps/api/cmd/metaldocs-api/permissions.go:165-181`). Profiles branch matches GET + POST/PATCH/PUT/DELETE. Areas branch matches GET + POST/PUT/DELETE. Families branch matches GET + POST/PATCH/PUT/DELETE (T-003 closed Plan 5 — PATCH added; F-001 split: GET→CapTaxonomyView, writes→CapTaxonomyManage).
 - **Tier 2 (in-tx):** `authz.Require(CapTaxonomyManage)` wired in `FamilyRepository.Create` (`:77`) / `Update` (`:96`); `ProfileRepository.Create` / `Update`; `AreaRepository.Create` / `Update`. Archive/deactivate paths still tier-1 only (T-006 partial). `internal/modules/iam/authz` import now present in taxonomy infrastructure.
 - **Postgres tripwire:** `migrations/0188_tripwire_extend.sql:211-224` attaches `trg_require_cap_asserted` to `document_profiles`, `document_process_areas`, `document_families`.
 - See `wiki/decisions/0007-two-tier-authz.md` â€” taxonomy partially conformant as of Plan 5 (T-006 partially closed).

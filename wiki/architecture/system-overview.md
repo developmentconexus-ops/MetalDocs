@@ -1,6 +1,6 @@
 ﻿# System Overview
 
-> **Last verified:** 2026-06-01 (async freeze refactor — ADR 0015)
+> **Last verified:** 2026-06-07 (Phase C dead-path prune: taxonomy module description updated — departments/subjects paths removed from spec; prior: 2026-06-01)
 > **Scope:** Services, ports, data flow, infra at a glance.
 > **Out of scope:** Per-module deep dives (see `modules/*`), DB schema details (see `data-model.md`).
 > **Key files:**
@@ -106,7 +106,7 @@ Each module under `internal/modules/` is self-contained:
 Modules:
 - `templates` - template authoring + schema versioning
 - `documents` - document instances, creation-time snapshots, freeze, view, approval (renamed from `documents_v2`)
-- `taxonomy` - profiles, areas, departments, subjects
+- `taxonomy` - profiles, areas, families (document-departments/subjects paths removed from spec in Phase C as unserved)
 - `iam` - users, roles, capabilities, area memberships
 - `auth` - authn (token validation)
 - `approval` - approval routes and signoffs (separate module boundary; integrated with documents flows)

@@ -1,6 +1,6 @@
 # Authz Tiers
 
-> **Last verified:** 2026-06-03 (ADR 0022 Phase 5: added the `cap:<name>` marker convention + `wiki-capability-parity` CI binding; prior: 2026-06-01 — F-001 closed: Tier-1 read/write split applied to 13 rows in `permissions.go`; new Tier-1 rule authoring rules subsection + `TestPermissionsTable_NoMethodlessWriteShadowing` CI guard; taxonomy Tier-2 reads migrated to `CapTaxonomyView`; ADR 0016 view-grade caps `metrics.view`/`membership.view`/`user.view`/`taxonomy.view` accepted; prior: 2026-05-11)
+> **Last verified:** 2026-06-07 (Phase C dead-path prune: rule authoring rules §3 example block updated :104-117 → :101-116; prior: 2026-06-03)
 > **Scope:** Two authorization tiers in MetalDocs — HTTP middleware (tier 1) vs in-transaction area check (tier 2).
 > **Out of scope:** Authentication (login/sessions) — see `wiki/references/local-dev-credentials.md`; Role/capability tables — see `wiki/modules/iam.md`.
 > **Key files:**
@@ -61,7 +61,7 @@ Source: F-001 audit (`wiki/references/qa-runs/plans-f001-f002.md`). The Tier-1 d
 
 1. **Never declare a write-grade cap on GET.** GET rows must point at a View-grade cap (`*.view`, `audit.read`). Write-grade caps (`*.manage`, `*.submit`, `*.create`, `*.edit`, `*.approve`, `*.publish`, `*.signoff`, `*.obsolete`, `*.supersede`, `*.review`) must NEVER appear on a GET row.
 2. **Never omit `method` on a prefix that has any write verbs.** A methodless row matches every HTTP method (rules scan top-down, first match wins) and silently shadows any per-verb intent declared elsewhere for the same prefix. Always declare per-verb rows on writable prefixes.
-3. **Every writable resource declares at least one read row and at least one write row.** The legacy-alias block at `permissions.go:104-117` is the canonical pattern: one `{method: GET, ..., cap: <readCap>}` plus one row per write verb with the Manage/Submit cap.
+3. **Every writable resource declares at least one read row and at least one write row.** The IAM users block at `permissions.go:101-116` is the canonical pattern: one `{method: GET, ..., cap: <readCap>}` plus one row per write verb with the Manage/Submit cap.
 4. **Read caps live in the registry.** Do NOT invent caps inline. If a needed View-grade cap is missing from `internal/modules/iam/domain/model.go`, STOP and file an ADR (precedent: ADR 0016). The four current View caps are `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`. A fifth — `CapRouteView` — is proposed for the approval route catalogue read path in [ADR 0018](../decisions/0018-approval-route-lifecycle.md) §6 and deferred to the F-001 follow-up.
 5. **Tier-2 read calls match Tier-1 caps.** When a repository read calls `authz.Require(ctx, tx, <cap>, "tenant")`, the cap MUST match the Tier-1 GET row's cap for the same resource. Mismatch causes a 403 inside the handler after a 200 from the middleware — silent partial denial.
 

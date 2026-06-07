@@ -1,18 +1,18 @@
 # ADR 0016 — View-Grade Capabilities for IAM, Membership, Taxonomy, Metrics
 
 > **Status:** accepted 2026-06-01 (security review HIGH downgraded to LOW after handler scope verification — see §Security Boundary Notes; grant matrix product-confirmed 2026-06-01)
-> **Last verified:** 2026-06-01
+> **Last verified:** 2026-06-07 (Phase C dead-path prune: permissions.go line refs updated after 8 phantom rows removed)
 > **Scope:** Capability registry gap surfaced by F-001 audit; introduces four View-grade caps so Tier-1 declarative authz can split read vs write on writable prefixes.
-> **Out of scope:** Tier-1 rule rewrite itself (lands in follow-up F-001 PR); Tier-2 enforcement; Postgres tripwire; codegen-from-OpenAPI (rejected per ADR 0007).
+> **Out of scope:** Tier-1 rule rewrite itself (F-001 landed — view/write split applied); Tier-2 enforcement; Postgres tripwire; codegen-from-OpenAPI (rejected per ADR 0007).
 > **Key files:**
 > - `internal/modules/iam/domain/model.go:42` — capability registry (`Capability` typed consts + `validCapabilities` map)
-> - `apps/api/cmd/metaldocs-api/permissions.go:78,86,95,159,185` — Tier-1 rule rows blocked on missing read caps
+> - `apps/api/cmd/metaldocs-api/permissions.go:96,165,202` — Tier-1 rule rows: metrics.view at :96, taxonomy.view/manage at :165-181, membership.view at :202 (F-001 split applied; prior problem rows at old :78/:86/:95/:159/:185 are fixed)
 > - `db/reference-data/0001_product_reference_data.sql:18` — `role_capabilities` seed shape
 > - `wiki/decisions/0007-two-tier-authz.md` — two-tier model
 
 ## Context
 
-F-001 audit (`wiki/references/qa-runs/approval-full-flow-20260601.md`, `wiki/references/qa-runs/plans-f001-f002.md`) found that the Tier-1 declarative authz table at `apps/api/cmd/metaldocs-api/permissions.go` conflates read and write capabilities on 13 rows. The correct fix is the surgical row split documented in Plan F-001: every writable prefix declares an explicit GET row with a View-grade cap plus per-verb rows with Manage/Submit caps (precedent at `permissions.go:104-117`).
+F-001 audit (`wiki/references/qa-runs/approval-full-flow-20260601.md`, `wiki/references/qa-runs/plans-f001-f002.md`) found that the Tier-1 declarative authz table at `apps/api/cmd/metaldocs-api/permissions.go` conflates read and write capabilities on 13 rows. The correct fix is the surgical row split documented in Plan F-001: every writable prefix declares an explicit GET row with a View-grade cap plus per-verb rows with Manage/Submit caps (precedent at `permissions.go:101-116` — IAM users F-001 split block).
 
 The fix is blocked. The capability registry (`internal/modules/iam/domain/model.go:42-67`) contains exactly one read-grade cap (`CapDocumentView`) and one read-ish cap (`CapAuditRead`). It has no View cap for the user, membership, taxonomy, or metrics domains. Authors writing rule rows had no correct read cap to point at, so they fell back to Manage. Over time this hardened into convention.
 
@@ -72,7 +72,7 @@ Rationale per cap:
 `membership.view` is granted broadly (all non-system_admin roles). Security review flagged this as potential roster over-grant. Verified during review:
 
 - **`GET /api/v1/iam/area-memberships`** — handler `MembershipHandler.listMemberships` at `internal/modules/iam/delivery/http/routes_memberships.go:37` defaults `userId` to the authenticated actor and runs `canManageMembershipTarget` (`:172`). That predicate returns true only when `actor == target` or actor holds `RoleSystemAdmin`. Non-admin roles receive 403 when querying any user other than self. Tier-1 `membership.view` grant therefore exposes self-membership read only; full cross-area roster remains system_admin-gated at the handler. No data minimization violation.
-- **`/api/v1/access-policies` (GET/PUT)** — no handler currently registered in `internal/modules/iam/delivery/http/`. The Tier-1 rule rows at `apps/api/cmd/metaldocs-api/permissions.go:86-87` are placeholders for a future feature. Grant has no effect today. F-001 follow-up rewrite must coordinate with whichever handler ships first.
+- **`/api/v1/access-policies` (GET/PUT)** — no handler currently registered in `internal/modules/iam/delivery/http/`. The dead-path prune (Phase C) removed these rows from the spec; the Tier-1 rule rows were also removed from `permissions.go`. Grant has no effect today. When a handler ships, spec + permissions rows must be added together.
 - **`/api/v1/iam/users` (GET)** — admin surface. `user.view` granted only to `system_admin` and `area_admin` per matrix. Not exposed to viewer/author/editor/approver.
 - **`/api/v1/metrics`** — Prometheus scrape. `metrics.view` granted only to `system_admin`.
 - **`/api/v1/taxonomy/{profiles,areas,families}` (GET)** — read-only taxonomy metadata. Already implicitly readable via `CapDocumentView` workaround (commit `8e1518c85`). Granting `taxonomy.view` broadly removes the cross-domain leak without expanding effective access.

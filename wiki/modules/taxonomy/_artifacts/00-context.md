@@ -24,7 +24,7 @@ Surfaced now so Phase 1/2/4/6 do not miss them:
 
 - **No tenant guard on family routes.** `listFamilies/createFamily/getFamily/updateFamily/deactivateFamily` never read `X-Tenant-ID`. Families are global by design — but no Postgres tripwire equivalent (audit.md / iam.md gold standard) exists for `document_families`. T-debt candidate.
 - **Profile/area tenant scoping is header-trusted.** `tenantIDFromRequest` (routes_profiles.go:197) reads `X-Tenant-ID` header and falls back to `tenant.DevTenantID` if empty. **No tripwire-style enforcement at DB layer.** A misrouted request with no header writes/reads dev tenant data.
-- **Path-prefix capability dispatcher.** `apps/api/cmd/metaldocs-api/permissions.go:158-180` uses `strings.HasPrefix` + method switch. Families branch (line 174) lists `POST/PUT/DELETE` but **omits PATCH** — yet `routes_families.go:67` exposes `PATCH /families/{code}`. Tier-1 capability check missed by routing string match. (Cross-ref: documents-refactor backlog R-008 cap namespace, approval T-012 unwired AuthorizationService.)
+- **Path-prefix capability dispatcher.** `apps/api/cmd/metaldocs-api/permissions.go:165-181` uses `routeRule` table scan. T-003 closed (PATCH added to families/areas; F-001 split: GET→CapTaxonomyView, writes→CapTaxonomyManage). (Cross-ref: documents-refactor backlog R-008 cap namespace, approval T-012 unwired AuthorizationService.)
 - **Families `code` immutability** advertised in stub but only enforced by `UpdateFamily` handler overwriting `Code: r.PathValue("code")`. No domain-level sentinel.
 - **`HasActiveProfiles` deactivate guard** is application-layer, not DB-trigger. A racing INSERT of a profile pointing at the family would succeed during the window between check and update.
 - **Capability `taxonomy.manage`** seeded for `system_admin` (migration 0165:40) and `qms_admin` (migration 0169:28). Two roles can mutate global family catalog. Cross-tenant blast radius.
@@ -50,7 +50,7 @@ Surfaced now so Phase 1/2/4/6 do not miss them:
 
 - `apps/api/cmd/metaldocs-api/main.go:197` — module wiring.
 - `apps/api/cmd/metaldocs-api/main.go:225` — `profileRepo` re-instantiated for documents adapter (`profileDefaultsAdapter`).
-- `permissions.go:158-180` — path-prefix capability dispatcher.
+- `permissions.go:165-181` — routeRule table entries for taxonomy profiles/areas/families.
 
 ## Open questions deferred to tech-debt
 

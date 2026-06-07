@@ -1,9 +1,9 @@
 # Phase 2 Data-flow Trace — GET /api/v1/audit/events
 
 ## §1 Entry point / OpenAPI op
-- OpenAPI path present: `api/openapi/v1/openapi.yaml:1058` ? `  /audit/events:`
-- OpenAPI method present: `api/openapi/v1/openapi.yaml:1059` ? `    get:`
-- OpenAPI operationId: `(unclear: no operationId field under /audit/events get in api/openapi/v1/openapi.yaml:1058-1103)`
+- OpenAPI path present: `api/openapi/v1/openapi.yaml:819` â†’ `  /audit/events:`
+- OpenAPI method present: `api/openapi/v1/openapi.yaml:820` â†’ `    get:`
+- OpenAPI operationId: `(unclear: no operationId field under /audit/events get in api/openapi/v1/openapi.yaml:819)`
 - Handler registration: `internal/modules/audit/delivery/http/handler.go:34-35`
   - `func (h *Handler) RegisterRoutes(mux *http.ServeMux) {`
   - `	mux.HandleFunc("/api/v1/audit/events", h.handleEvents)`
@@ -92,11 +92,4 @@ LIMIT $3
     - `		WithPermissionResolver(permResolver)`
   - Middleware wraps mux: `apps/api/cmd/metaldocs-api/main.go:386`
     - `handler := cors.Wrap(originProtection.Wrap(authMiddleware.Wrap(iamMiddleware.Wrap(httpObs.Wrap(rateLimiter.Wrap(mux))))))`
-  - Permission resolver default and public checker behavior:
-    - `apps/api/cmd/metaldocs-api/permissions.go:211` `		return "", false`
-    - `apps/api/cmd/metaldocs-api/permissions.go:220-221`
-      - `		_, guarded := resolver(method, path)`
-      - `		return !guarded`
-  - Grep evidence for explicit `/api/v1/audit/events` rule in resolver scope:
-    - `rg -n "/api/v1/audit/events|audit/events" apps/api/cmd/metaldocs-api/permissions.go` ? no matches.
-  - `(no authz middleware on this route — verified by grep)`
+  - Permission resolver â€” T-001 CLOSED: explicit `CapAuditRead` rows now present at `apps/api/cmd/metaldocs-api/permissions.go:229-231` (GET /audit/events, POST /audit/events/export, GET /audit/events/export/*). The old resolver-default fall-through (":211", ":220-221") no longer applies to this route.

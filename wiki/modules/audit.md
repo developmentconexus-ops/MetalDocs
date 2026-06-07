@@ -2,7 +2,7 @@
 
 > Living architecture doc. Arc42 (12 sections) + C4 (Context / Container) Mermaid diagrams + ADR links.
 
-**Last verified:** 2026-06-01 (P2 consolidation: §3/§5 C4 fragments tagged as module-scoped with pointer to canonical diagrams; added Failure modes section; prior: 2026-05-12) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
+**Last verified:** 2026-06-07 (Phase C dead-path prune: audit permissions.go anchor updated :211-221 → :229-231; T-001 noted closed in §8.1; prior: 2026-06-01) | **Owner:** unassigned | **Status:** active (intrinsic gaps; see §11) | **Maturity:** L3
 
 > **Key files:**
 > - `internal/modules/audit/domain/port.go:8-31` â€” `Event`, `ListEventsQuery`, `Writer`, `Reader`
@@ -50,7 +50,7 @@
 
 - Language / runtime: Go 1.25
 - Persistence: Postgres, table `metaldocs.audit_events` (schema-qualified, not `public`)
-- API contract: OpenAPI 3.0.3 declares `/audit/events` at `api/openapi/v1/openapi.yaml:1058-1103` (no `operationId` â€” T-008)
+- API contract: OpenAPI 3.0.3 declares `/audit/events` at `api/openapi/v1/openapi.yaml:819` (no `operationId` — T-008)
 - HTTP routing: `http.ServeMux.HandleFunc` directly â€” NOT oapi-codegen (`handler.go:35`)
 - Error envelope: legacy `{error:{code,message,details,trace_id}}` (not RFC 9457 â€” T-002)
 - Append-only by grant only â€” `INSERT` grant exclusively (`migrations/0005:2`); no application-layer UPDATE/DELETE path
@@ -264,7 +264,7 @@ Wiring: `iamdelivery.NewAdminHandler(..., deps.AuditWriter).WithAuditReader(deps
 ## 8. Cross-cutting Concepts
 
 ### 8.1 Authentication & Authorization
-- **Tier 1 (HTTP edge):** none on `/api/v1/audit/events` â€” the permission resolver returns `("", false)` and the public-path checker treats unregistered paths as public (`apps/api/cmd/metaldocs-api/permissions.go:211-221`). â†’ T-001.
+- **Tier 1 (HTTP edge):** `GET /api/v1/audit/events` gated by `CapAuditRead` at `apps/api/cmd/metaldocs-api/permissions.go:229`; export POST/GET at `:230-231`. T-001 closed — route now explicit in routeRules.
 - **Tier 2 (in-tx):** n/a â€” no `authz.Require` call paths in audit (append-only sink is outside the tripwire model; see `_artifacts/04-persistence.md` Â§5 footnote).
 - **Postgres tripwire:** does not apply. The tripwire enforces caller-side capability before mutation; the audit Record records what already happened. The repo `Record` does NOT call `metaldocs.assert_caps` and is not expected to.
 

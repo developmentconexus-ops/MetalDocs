@@ -103,7 +103,7 @@ Every mutating repo method violates the tier-2 `authz.Require` pattern documente
 | `AreaRepository.Create` (`repository.go:253`) | NO — VIOLATION | n/a | INSERT (`:255`) | `document_process_areas` |
 | `AreaRepository.Update` (`repository.go:275`) | NO — VIOLATION | n/a | UPDATE (`:277`) | `document_process_areas` |
 
-Upstream gate: tier-1 capability check via path-prefix dispatcher (`apps/api/cmd/metaldocs-api/permissions.go:158-180`) — `taxonomy.manage` for writes, `doc.view` for reads. Defense-in-depth is single-layer, vs the two-tier + DB-tripwire model in sibling modules.
+Upstream gate: tier-1 capability check via routeRule table (`apps/api/cmd/metaldocs-api/permissions.go:165-181`) — `taxonomy.manage` for writes, `taxonomy.view` for reads (F-001 split; prior `doc.view` replaced). Defense-in-depth is single-layer, vs the two-tier + DB-tripwire model in sibling modules.
 
 ## 6. Migration history
 

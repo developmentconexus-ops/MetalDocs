@@ -36,7 +36,7 @@ Tx boundary: none.
 |---|---|---|---|---|
 | `internal/modules/taxonomy/infrastructure/family_repository.go:39-45` | SELECT | `metaldocs.document_families` | **none** — `document_families` has no `tenant_id` column (global catalog) | **VIOLATION/N/A — no in-tx authz call**; module has no `authz.Require` usage |
 
-Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:174-180` — `GET /api/v1/taxonomy/families*` → `iamdomain.CapDocView`. Any authenticated user with `doc.view` lists the global family catalog regardless of tenant.
+Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:177` — `GET /api/v1/taxonomy/families` → `iamdomain.CapTaxonomyView` (`taxonomy.view`; F-001 split from legacy `CapDocView`). Any authenticated user with `taxonomy.view` lists the global family catalog regardless of tenant.
 
 ## 5. Response shape
 

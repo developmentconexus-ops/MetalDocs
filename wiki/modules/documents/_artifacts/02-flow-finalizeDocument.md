@@ -1,7 +1,7 @@
 ### 1. Entry point
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | operationId `finalizeDocument` | (unclear: `operationId: finalizeDocument` not found in `api/openapi/v1/openapi.yaml`; path exists at `api/openapi/v1/openapi.yaml:3251`) |
+| OpenAPI op | operationId `finalizeDocument` | `api/openapi/v1/openapi.yaml:2050` (path `/documents/{id}/finalize`; `operationId: finalizeDocument` at :2053) |
 | Generated server stub | `PostApiV2DocumentsIdFinalize` | (unclear: `api/api.gen.go` not found; generated stub found at `internal/modules/documents/api/api.gen.go:1215`) |
 | Handler | `Handler.finalizeDocument` | `internal/modules/documents/delivery/http/handler.go:316` |
 

@@ -1,11 +1,11 @@
 ﻿# API Design System
 
 > **Status:** accepted 2026-05-10
-> **Last verified:** 2026-05-21 (freeze framing sync; historical-plan section retained as dated snapshot)
+> **Last verified:** 2026-06-07 (Phase C dead-path prune: Problem schema line in openapi.yaml updated :5382 → :4332; prior: 2026-05-21)
 > **Scope:** API design conventions for v1     error envelope, pagination, idempotency, two-tier authz, list filtering, naming.
 > **Out of scope:** Adoption     Plan 2 migrates handlers, paths, and module names. Frontend wiring is in Plan 1 only for the shared parser; per-page adoption is Plan 2.
 > **Key files:**
-> - `api/openapi/v1/openapi.yaml:5382`     Problem schema definition
+> - `api/openapi/v1/openapi.yaml:4332` — Problem schema definition
 > - `internal/platform/problem/problem.go`     Go helper (RFC 9457 envelope)
 > - `internal/platform/problem/codes.go`     error code taxonomy
 > - `internal/platform/pagination/cursor.go`     cursor primitive (sort + filter_hash validation)
