@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	iamdomain "metaldocs/internal/modules/iam/domain"
 	searchdomain "metaldocs/internal/modules/search/domain"
 	"metaldocs/internal/platform/httpresponse"
@@ -59,12 +57,12 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if strings.TrimSpace(iamdomain.UserIDFromContext(r.Context())) == "" {
-		writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))
+		httpresponse.WriteError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required")
 		return
 	}
 	tenantID, err := tenant.FromContext(r.Context())
 	if err != nil {
-		writeAPIError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required", requestTraceID(r))
+		httpresponse.WriteError(w, http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Authentication required")
 		return
 	}
 
@@ -72,7 +70,7 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil {
-			writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid limit value", requestTraceID(r))
+			httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid limit value")
 			return
 		}
 		limit = n
@@ -80,12 +78,12 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 
 	expiryBefore, err := parseOptionalDateTimeQuery(r, "expiryBefore")
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiryBefore value", requestTraceID(r))
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiryBefore value")
 		return
 	}
 	expiryAfter, err := parseOptionalDateTimeQuery(r, "expiryAfter")
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiryAfter value", requestTraceID(r))
+		httpresponse.WriteError(w, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid expiryAfter value")
 		return
 	}
 
@@ -108,7 +106,7 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 		Limit:           limit,
 	})
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error", requestTraceID(r))
+		httpresponse.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error")
 		return
 	}
 
@@ -137,32 +135,6 @@ func (h *Handler) handleSearchDocuments(w http.ResponseWriter, r *http.Request) 
 	}
 
 	httpresponse.WriteJSON(w, http.StatusOK, map[string]any{"items": out})
-}
-
-type apiErrorEnvelope struct {
-	Error apiError `json:"error"`
-}
-
-type apiError struct {
-	Code    string         `json:"code"`
-	Message string         `json:"message"`
-	Details map[string]any `json:"details"`
-	TraceID string         `json:"trace_id"`
-}
-
-func requestTraceID(_ *http.Request) string {
-	return uuid.NewString()
-}
-
-func writeAPIError(w http.ResponseWriter, status int, code, message, traceID string) {
-	httpresponse.WriteJSON(w, status, apiErrorEnvelope{
-		Error: apiError{
-			Code:    code,
-			Message: message,
-			Details: map[string]any{},
-			TraceID: traceID,
-		},
-	})
 }
 
 func parseOptionalDateTimeQuery(r *http.Request, key string) (*time.Time, error) {

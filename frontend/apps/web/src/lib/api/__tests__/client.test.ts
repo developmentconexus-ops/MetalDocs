@@ -3,11 +3,11 @@ import { apiFetch } from "../client";
 import { ApiError } from "../errors";
 import { AUTH_EXPIRED_EVENT } from "../authBus";
 
-function makeResponse(body: unknown, status = 200): Response {
+function makeResponse(body: unknown, status = 200, contentType = "application/json"): Response {
   const payload = body == null ? undefined : JSON.stringify(body);
   return new Response(payload, {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": contentType },
   });
 }
 
@@ -33,9 +33,13 @@ describe("apiFetch", () => {
     await expect(apiFetch<undefined>("/api/documents/doc-1")).resolves.toBeUndefined();
   });
 
-  it("throws ApiError with parsed code on 4xx", async () => {
+  it("throws ApiError with parsed code from an RFC 9457 problem+json body on 4xx", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      makeResponse({ error: { code: "validation.request_invalid", message: "Requisição inválida", details: { field: "name" } } }, 400),
+      makeResponse(
+        { code: "validation.request_invalid", title: "Requisição inválida", status: 400, detail: "Requisição inválida" },
+        400,
+        "application/problem+json",
+      ),
     );
 
     await expect(apiFetch("/api/documents")).rejects.toMatchObject({
@@ -44,6 +48,17 @@ describe("apiFetch", () => {
       status: 400,
       message: "Requisição inválida",
       details: undefined,
+    } satisfies Partial<ApiError>);
+  });
+
+  it("synthesizes http_<status> when the error body is not problem+json", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(makeResponse({ error: { code: "legacy.ignored" } }, 400));
+
+    await expect(apiFetch("/api/documents")).rejects.toMatchObject({
+      name: "ApiError",
+      code: "http_400",
+      status: 400,
+      message: "Não foi possível concluir a ação. Código: http_400",
     } satisfies Partial<ApiError>);
   });
 

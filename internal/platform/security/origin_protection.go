@@ -5,9 +5,9 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
-)
 
-const traceLocalOrigin = "trace-local"
+	"metaldocs/internal/platform/problem"
+)
 
 type OriginProtectionConfig struct {
 	Enabled           bool
@@ -152,5 +152,5 @@ func normalizeOrigin(origin string) string {
 }
 
 func writeOriginError(w http.ResponseWriter) {
-	writeAPIError(w, http.StatusForbidden, "AUTH_INVALID_ORIGIN", "Cross-site session request blocked", traceLocalOrigin)
+	_ = problem.Write(w, problem.New(http.StatusForbidden, "AUTH_INVALID_ORIGIN", "Cross-site session request blocked"))
 }
