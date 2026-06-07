@@ -140,171 +140,6 @@ func (e ApprovalStageInstanceResponseStatus) Valid() bool {
 	}
 }
 
-// Defines values for DocumentTemplateFieldSlotNodeResponseFieldKind.
-const (
-	Scalar DocumentTemplateFieldSlotNodeResponseFieldKind = "scalar"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateFieldSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Scalar:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateFieldSlotNodeResponseType.
-const (
-	FieldSlot DocumentTemplateFieldSlotNodeResponseType = "field-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateFieldSlotNodeResponseType enum.
-func (e DocumentTemplateFieldSlotNodeResponseType) Valid() bool {
-	switch e {
-	case FieldSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateLabelNodeResponseType.
-const (
-	Label DocumentTemplateLabelNodeResponseType = "label"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateLabelNodeResponseType enum.
-func (e DocumentTemplateLabelNodeResponseType) Valid() bool {
-	switch e {
-	case Label:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplatePageNodeResponseType.
-const (
-	Page DocumentTemplatePageNodeResponseType = "page"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplatePageNodeResponseType enum.
-func (e DocumentTemplatePageNodeResponseType) Valid() bool {
-	switch e {
-	case Page:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseFieldKind.
-const (
-	Repeat DocumentTemplateRepeatSlotNodeResponseFieldKind = "repeat"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRepeatSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Repeat:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRepeatSlotNodeResponseType.
-const (
-	RepeatSlot DocumentTemplateRepeatSlotNodeResponseType = "repeat-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRepeatSlotNodeResponseType enum.
-func (e DocumentTemplateRepeatSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RepeatSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseFieldKind.
-const (
-	Rich DocumentTemplateRichSlotNodeResponseFieldKind = "rich"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateRichSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Rich:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateRichSlotNodeResponseType.
-const (
-	RichSlot DocumentTemplateRichSlotNodeResponseType = "rich-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateRichSlotNodeResponseType enum.
-func (e DocumentTemplateRichSlotNodeResponseType) Valid() bool {
-	switch e {
-	case RichSlot:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateSectionFrameNodeResponseType.
-const (
-	SectionFrame DocumentTemplateSectionFrameNodeResponseType = "section-frame"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateSectionFrameNodeResponseType enum.
-func (e DocumentTemplateSectionFrameNodeResponseType) Valid() bool {
-	switch e {
-	case SectionFrame:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseFieldKind.
-const (
-	Table DocumentTemplateTableSlotNodeResponseFieldKind = "table"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseFieldKind enum.
-func (e DocumentTemplateTableSlotNodeResponseFieldKind) Valid() bool {
-	switch e {
-	case Table:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for DocumentTemplateTableSlotNodeResponseType.
-const (
-	TableSlot DocumentTemplateTableSlotNodeResponseType = "table-slot"
-)
-
-// Valid indicates whether the value is a known member of the DocumentTemplateTableSlotNodeResponseType enum.
-func (e DocumentTemplateTableSlotNodeResponseType) Valid() bool {
-	switch e {
-	case TableSlot:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for DriftPolicy.
 const (
 	FailStage    DriftPolicy = "fail_stage"
@@ -419,98 +254,6 @@ type DeactivateRouteRequest struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
-// DocumentTemplateFieldSlotNodeResponse defines model for DocumentTemplateFieldSlotNodeResponse.
-type DocumentTemplateFieldSlotNodeResponse struct {
-	FieldKind DocumentTemplateFieldSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateFieldSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateFieldSlotNodeResponseFieldKind defines model for DocumentTemplateFieldSlotNodeResponse.FieldKind.
-type DocumentTemplateFieldSlotNodeResponseFieldKind string
-
-// DocumentTemplateFieldSlotNodeResponseType defines model for DocumentTemplateFieldSlotNodeResponse.Type.
-type DocumentTemplateFieldSlotNodeResponseType string
-
-// DocumentTemplateLabelNodeResponse defines model for DocumentTemplateLabelNodeResponse.
-type DocumentTemplateLabelNodeResponse struct {
-	Id   string                                `json:"id"`
-	Text string                                `json:"text"`
-	Type DocumentTemplateLabelNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateLabelNodeResponseType defines model for DocumentTemplateLabelNodeResponse.Type.
-type DocumentTemplateLabelNodeResponseType string
-
-// DocumentTemplateNodeResponse Pilot subset/subconjunto pilotado da MetalDocs template DSL, intencionalmente limitado a page, section-frame, label, field-slot, rich-slot, repeat-slot e table-slot.
-type DocumentTemplateNodeResponse struct {
-	union json.RawMessage
-}
-
-// DocumentTemplatePageNodeResponse defines model for DocumentTemplatePageNodeResponse.
-type DocumentTemplatePageNodeResponse struct {
-	Children []DocumentTemplateNodeResponse       `json:"children"`
-	Id       string                               `json:"id"`
-	Type     DocumentTemplatePageNodeResponseType `json:"type"`
-}
-
-// DocumentTemplatePageNodeResponseType defines model for DocumentTemplatePageNodeResponse.Type.
-type DocumentTemplatePageNodeResponseType string
-
-// DocumentTemplateRepeatSlotNodeResponse defines model for DocumentTemplateRepeatSlotNodeResponse.
-type DocumentTemplateRepeatSlotNodeResponse struct {
-	FieldKind DocumentTemplateRepeatSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                          `json:"id"`
-	Path      string                                          `json:"path"`
-	Type      DocumentTemplateRepeatSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRepeatSlotNodeResponseFieldKind defines model for DocumentTemplateRepeatSlotNodeResponse.FieldKind.
-type DocumentTemplateRepeatSlotNodeResponseFieldKind string
-
-// DocumentTemplateRepeatSlotNodeResponseType defines model for DocumentTemplateRepeatSlotNodeResponse.Type.
-type DocumentTemplateRepeatSlotNodeResponseType string
-
-// DocumentTemplateRichSlotNodeResponse defines model for DocumentTemplateRichSlotNodeResponse.
-type DocumentTemplateRichSlotNodeResponse struct {
-	FieldKind DocumentTemplateRichSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                        `json:"id"`
-	Path      string                                        `json:"path"`
-	Type      DocumentTemplateRichSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateRichSlotNodeResponseFieldKind defines model for DocumentTemplateRichSlotNodeResponse.FieldKind.
-type DocumentTemplateRichSlotNodeResponseFieldKind string
-
-// DocumentTemplateRichSlotNodeResponseType defines model for DocumentTemplateRichSlotNodeResponse.Type.
-type DocumentTemplateRichSlotNodeResponseType string
-
-// DocumentTemplateSectionFrameNodeResponse defines model for DocumentTemplateSectionFrameNodeResponse.
-type DocumentTemplateSectionFrameNodeResponse struct {
-	Children []DocumentTemplateNodeResponse               `json:"children"`
-	Id       string                                       `json:"id"`
-	Title    *string                                      `json:"title,omitempty"`
-	Type     DocumentTemplateSectionFrameNodeResponseType `json:"type"`
-}
-
-// DocumentTemplateSectionFrameNodeResponseType defines model for DocumentTemplateSectionFrameNodeResponse.Type.
-type DocumentTemplateSectionFrameNodeResponseType string
-
-// DocumentTemplateTableSlotNodeResponse defines model for DocumentTemplateTableSlotNodeResponse.
-type DocumentTemplateTableSlotNodeResponse struct {
-	FieldKind DocumentTemplateTableSlotNodeResponseFieldKind `json:"fieldKind"`
-	Id        string                                         `json:"id"`
-	Path      string                                         `json:"path"`
-	Type      DocumentTemplateTableSlotNodeResponseType      `json:"type"`
-}
-
-// DocumentTemplateTableSlotNodeResponseFieldKind defines model for DocumentTemplateTableSlotNodeResponse.FieldKind.
-type DocumentTemplateTableSlotNodeResponseFieldKind string
-
-// DocumentTemplateTableSlotNodeResponseType defines model for DocumentTemplateTableSlotNodeResponse.Type.
-type DocumentTemplateTableSlotNodeResponseType string
-
 // DriftPolicy Behaviour applied when an actor loses eligibility mid-stage.
 type DriftPolicy string
 
@@ -613,6 +356,24 @@ type UpdateRouteRequest struct {
 	Stages               []StageRequest         `json:"stages"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Problem
+
+// Conflict defines model for Conflict.
+type Conflict = Problem
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Problem
+
+// InternalServerError defines model for InternalServerError.
+type InternalServerError = Problem
+
+// NotFound defines model for NotFound.
+type NotFound = Problem
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Problem
 
 // sessionCookieContextKey is the context key for sessionCookie security scheme
 type sessionCookieContextKey string
@@ -1562,294 +1323,55 @@ func (a UpdateRouteRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(object)
 }
 
-// AsDocumentTemplatePageNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplatePageNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplatePageNodeResponse() (DocumentTemplatePageNodeResponse, error) {
-	var body DocumentTemplatePageNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplatePageNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplatePageNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplatePageNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplatePageNodeResponse(v DocumentTemplatePageNodeResponse) error {
-	v.Type = "page"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateSectionFrameNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateSectionFrameNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateSectionFrameNodeResponse() (DocumentTemplateSectionFrameNodeResponse, error) {
-	var body DocumentTemplateSectionFrameNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateSectionFrameNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateSectionFrameNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateSectionFrameNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateSectionFrameNodeResponse(v DocumentTemplateSectionFrameNodeResponse) error {
-	v.Type = "section-frame"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateLabelNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateLabelNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateLabelNodeResponse() (DocumentTemplateLabelNodeResponse, error) {
-	var body DocumentTemplateLabelNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateLabelNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateLabelNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateLabelNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateLabelNodeResponse(v DocumentTemplateLabelNodeResponse) error {
-	v.Type = "label"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateFieldSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateFieldSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateFieldSlotNodeResponse() (DocumentTemplateFieldSlotNodeResponse, error) {
-	var body DocumentTemplateFieldSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateFieldSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateFieldSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateFieldSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateFieldSlotNodeResponse(v DocumentTemplateFieldSlotNodeResponse) error {
-	v.Type = "field-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRichSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRichSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRichSlotNodeResponse() (DocumentTemplateRichSlotNodeResponse, error) {
-	var body DocumentTemplateRichSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRichSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRichSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRichSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRichSlotNodeResponse(v DocumentTemplateRichSlotNodeResponse) error {
-	v.Type = "rich-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateRepeatSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateRepeatSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateRepeatSlotNodeResponse() (DocumentTemplateRepeatSlotNodeResponse, error) {
-	var body DocumentTemplateRepeatSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateRepeatSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateRepeatSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateRepeatSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateRepeatSlotNodeResponse(v DocumentTemplateRepeatSlotNodeResponse) error {
-	v.Type = "repeat-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsDocumentTemplateTableSlotNodeResponse returns the union data inside the DocumentTemplateNodeResponse as a DocumentTemplateTableSlotNodeResponse
-func (t DocumentTemplateNodeResponse) AsDocumentTemplateTableSlotNodeResponse() (DocumentTemplateTableSlotNodeResponse, error) {
-	var body DocumentTemplateTableSlotNodeResponse
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromDocumentTemplateTableSlotNodeResponse overwrites any union data inside the DocumentTemplateNodeResponse as the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) FromDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeDocumentTemplateTableSlotNodeResponse performs a merge with any union data inside the DocumentTemplateNodeResponse, using the provided DocumentTemplateTableSlotNodeResponse
-func (t *DocumentTemplateNodeResponse) MergeDocumentTemplateTableSlotNodeResponse(v DocumentTemplateTableSlotNodeResponse) error {
-	v.Type = "table-slot"
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t DocumentTemplateNodeResponse) Discriminator() (string, error) {
-	var discriminator struct {
-		Discriminator string `json:"type"`
-	}
-	err := json.Unmarshal(t.union, &discriminator)
-	return discriminator.Discriminator, err
-}
-
-func (t DocumentTemplateNodeResponse) ValueByDiscriminator() (interface{}, error) {
-	discriminator, err := t.Discriminator()
-	if err != nil {
-		return nil, err
-	}
-	switch discriminator {
-	case "field-slot":
-		return t.AsDocumentTemplateFieldSlotNodeResponse()
-	case "label":
-		return t.AsDocumentTemplateLabelNodeResponse()
-	case "page":
-		return t.AsDocumentTemplatePageNodeResponse()
-	case "repeat-slot":
-		return t.AsDocumentTemplateRepeatSlotNodeResponse()
-	case "rich-slot":
-		return t.AsDocumentTemplateRichSlotNodeResponse()
-	case "section-frame":
-		return t.AsDocumentTemplateSectionFrameNodeResponse()
-	case "table-slot":
-		return t.AsDocumentTemplateTableSlotNodeResponse()
-	default:
-		return nil, errors.New("unknown discriminator value: " + discriminator)
-	}
-}
-
-func (t DocumentTemplateNodeResponse) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *DocumentTemplateNodeResponse) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /api/v1/approval/inbox)
+	// (GET /approval/inbox)
 	ListApprovalInbox(w http.ResponseWriter, r *http.Request)
 
-	// (GET /api/v1/approval/instances/{instance_id})
+	// (GET /approval/instances/{instance_id})
 	GetApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 
-	// (POST /api/v1/approval/instances/{instance_id}/cancel)
+	// (POST /approval/instances/{instance_id}/cancel)
 	CancelApprovalInstance(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID)
 
-	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
+	// (POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoff(w http.ResponseWriter, r *http.Request, instanceId openapi_types.UUID, stageId openapi_types.UUID, params RecordApprovalStageSignoffParams)
 	// List approval routes for the active tenant
-	// (GET /api/v1/approval/routes)
+	// (GET /approval/routes)
 	ListApprovalRoutes(w http.ResponseWriter, r *http.Request)
 	// Create an approval route for the active tenant
-	// (POST /api/v1/approval/routes)
+	// (POST /approval/routes)
 	CreateApprovalRoute(w http.ResponseWriter, r *http.Request, params CreateApprovalRouteParams)
 	// Deactivate an approval route
-	// (DELETE /api/v1/approval/routes/{id})
+	// (DELETE /approval/routes/{id})
 	DeactivateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params DeactivateApprovalRouteParams)
 	// Update an approval route (new version)
-	// (PUT /api/v1/approval/routes/{id})
+	// (PUT /approval/routes/{id})
 	UpdateApprovalRoute(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params UpdateApprovalRouteParams)
 
-	// (GET /api/v1/documents/{id}/approval-instance)
+	// (GET /documents/{id}/approval-instance)
 	GetApprovalInstanceByDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v1/documents/{id}/cancel)
+	// (POST /documents/{id}/cancel)
 	CancelDocumentApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v1/documents/{id}/obsolete)
+	// (POST /documents/{id}/obsolete)
 	ObsoleteDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v1/documents/{id}/publish)
+	// (POST /documents/{id}/publish)
 	PublishDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v1/documents/{id}/schedule-publish)
+	// (POST /documents/{id}/schedule-publish)
 	ScheduleDocumentPublish(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (POST /api/v1/documents/{id}/signoff)
+	// (POST /documents/{id}/signoff)
 	RecordDocumentSignoff(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params RecordDocumentSignoffParams)
 
-	// (POST /api/v1/documents/{id}/submit)
+	// (POST /documents/{id}/submit)
 	SubmitDocumentForApproval(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params SubmitDocumentForApprovalParams)
 
-	// (POST /api/v1/documents/{id}/supersede)
+	// (POST /documents/{id}/supersede)
 	SupersedeDocument(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
@@ -2658,25 +2180,37 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/inbox", wrapper.ListApprovalInbox)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}", wrapper.GetApprovalInstance)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/cancel", wrapper.CancelApprovalInstance)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoff)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.ListApprovalRoutes)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/approval/routes", wrapper.CreateApprovalRoute)
-	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.DeactivateApprovalRoute)
-	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/approval/routes/{id}", wrapper.UpdateApprovalRoute)
-	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocument)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/cancel", wrapper.CancelDocumentApproval)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/obsolete", wrapper.ObsoleteDocument)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/publish", wrapper.PublishDocument)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublish)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/signoff", wrapper.RecordDocumentSignoff)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/submit", wrapper.SubmitDocumentForApproval)
-	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/documents/{id}/supersede", wrapper.SupersedeDocument)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/approval/inbox", wrapper.ListApprovalInbox)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/approval/instances/{instance_id}", wrapper.GetApprovalInstance)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/instances/{instance_id}/cancel", wrapper.CancelApprovalInstance)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/instances/{instance_id}/stages/{stage_id}/signoffs", wrapper.RecordApprovalStageSignoff)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/approval/routes", wrapper.ListApprovalRoutes)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/approval/routes", wrapper.CreateApprovalRoute)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/approval/routes/{id}", wrapper.DeactivateApprovalRoute)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/approval/routes/{id}", wrapper.UpdateApprovalRoute)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/documents/{id}/approval-instance", wrapper.GetApprovalInstanceByDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/cancel", wrapper.CancelDocumentApproval)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/obsolete", wrapper.ObsoleteDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/publish", wrapper.PublishDocument)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/schedule-publish", wrapper.ScheduleDocumentPublish)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/signoff", wrapper.RecordDocumentSignoff)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/submit", wrapper.SubmitDocumentForApproval)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/documents/{id}/supersede", wrapper.SupersedeDocument)
 
 	return m
 }
+
+type BadRequestApplicationProblemPlusJSONResponse Problem
+
+type ConflictApplicationProblemPlusJSONResponse Problem
+
+type ForbiddenApplicationProblemPlusJSONResponse Problem
+
+type InternalServerErrorApplicationProblemPlusJSONResponse Problem
+
+type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type UnauthorizedApplicationProblemPlusJSONResponse Problem
 
 type ListApprovalInboxRequestObject struct {
 }
@@ -2715,7 +2249,9 @@ func (response GetApprovalInstance200JSONResponse) VisitGetApprovalInstanceRespo
 	return err
 }
 
-type GetApprovalInstance404ApplicationProblemPlusJSONResponse Problem
+type GetApprovalInstance404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
 
 func (response GetApprovalInstance404ApplicationProblemPlusJSONResponse) VisitGetApprovalInstanceResponse(w http.ResponseWriter) error {
 
@@ -2725,6 +2261,22 @@ func (response GetApprovalInstance404ApplicationProblemPlusJSONResponse) VisitGe
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetApprovalInstance500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetApprovalInstance500ApplicationProblemPlusJSONResponse) VisitGetApprovalInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2784,7 +2336,9 @@ func (response ListApprovalRoutes200JSONResponse) VisitListApprovalRoutesRespons
 	return err
 }
 
-type ListApprovalRoutes401ApplicationProblemPlusJSONResponse Problem
+type ListApprovalRoutes401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
 
 func (response ListApprovalRoutes401ApplicationProblemPlusJSONResponse) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
 
@@ -2798,7 +2352,9 @@ func (response ListApprovalRoutes401ApplicationProblemPlusJSONResponse) VisitLis
 	return err
 }
 
-type ListApprovalRoutes403ApplicationProblemPlusJSONResponse Problem
+type ListApprovalRoutes403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
 
 func (response ListApprovalRoutes403ApplicationProblemPlusJSONResponse) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
 
@@ -2808,6 +2364,22 @@ func (response ListApprovalRoutes403ApplicationProblemPlusJSONResponse) VisitLis
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListApprovalRoutes500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response ListApprovalRoutes500ApplicationProblemPlusJSONResponse) VisitListApprovalRoutesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2835,7 +2407,9 @@ func (response CreateApprovalRoute201JSONResponse) VisitCreateApprovalRouteRespo
 	return err
 }
 
-type CreateApprovalRoute400ApplicationProblemPlusJSONResponse Problem
+type CreateApprovalRoute400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
 
 func (response CreateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2849,7 +2423,9 @@ func (response CreateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitCr
 	return err
 }
 
-type CreateApprovalRoute401ApplicationProblemPlusJSONResponse Problem
+type CreateApprovalRoute401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
 
 func (response CreateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2863,7 +2439,9 @@ func (response CreateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitCr
 	return err
 }
 
-type CreateApprovalRoute403ApplicationProblemPlusJSONResponse Problem
+type CreateApprovalRoute403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
 
 func (response CreateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2877,7 +2455,9 @@ func (response CreateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitCr
 	return err
 }
 
-type CreateApprovalRoute409ApplicationProblemPlusJSONResponse Problem
+type CreateApprovalRoute409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
 
 func (response CreateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2887,6 +2467,22 @@ func (response CreateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitCr
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApprovalRoute500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response CreateApprovalRoute500ApplicationProblemPlusJSONResponse) VisitCreateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2915,7 +2511,9 @@ func (response DeactivateApprovalRoute200JSONResponse) VisitDeactivateApprovalRo
 	return err
 }
 
-type DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse Problem
+type DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
 
 func (response DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2929,7 +2527,9 @@ func (response DeactivateApprovalRoute400ApplicationProblemPlusJSONResponse) Vis
 	return err
 }
 
-type DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse Problem
+type DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
 
 func (response DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2943,7 +2543,9 @@ func (response DeactivateApprovalRoute401ApplicationProblemPlusJSONResponse) Vis
 	return err
 }
 
-type DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse Problem
+type DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
 
 func (response DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2957,7 +2559,9 @@ func (response DeactivateApprovalRoute403ApplicationProblemPlusJSONResponse) Vis
 	return err
 }
 
-type DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse Problem
+type DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
 
 func (response DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2971,7 +2575,9 @@ func (response DeactivateApprovalRoute404ApplicationProblemPlusJSONResponse) Vis
 	return err
 }
 
-type DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse Problem
+type DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
 
 func (response DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -2981,6 +2587,22 @@ func (response DeactivateApprovalRoute409ApplicationProblemPlusJSONResponse) Vis
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateApprovalRoute500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateApprovalRoute500ApplicationProblemPlusJSONResponse) VisitDeactivateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3009,7 +2631,9 @@ func (response UpdateApprovalRoute200JSONResponse) VisitUpdateApprovalRouteRespo
 	return err
 }
 
-type UpdateApprovalRoute400ApplicationProblemPlusJSONResponse Problem
+type UpdateApprovalRoute400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
 
 func (response UpdateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -3023,7 +2647,9 @@ func (response UpdateApprovalRoute400ApplicationProblemPlusJSONResponse) VisitUp
 	return err
 }
 
-type UpdateApprovalRoute401ApplicationProblemPlusJSONResponse Problem
+type UpdateApprovalRoute401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
 
 func (response UpdateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -3037,7 +2663,9 @@ func (response UpdateApprovalRoute401ApplicationProblemPlusJSONResponse) VisitUp
 	return err
 }
 
-type UpdateApprovalRoute403ApplicationProblemPlusJSONResponse Problem
+type UpdateApprovalRoute403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
 
 func (response UpdateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -3051,7 +2679,9 @@ func (response UpdateApprovalRoute403ApplicationProblemPlusJSONResponse) VisitUp
 	return err
 }
 
-type UpdateApprovalRoute404ApplicationProblemPlusJSONResponse Problem
+type UpdateApprovalRoute404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
 
 func (response UpdateApprovalRoute404ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -3065,7 +2695,9 @@ func (response UpdateApprovalRoute404ApplicationProblemPlusJSONResponse) VisitUp
 	return err
 }
 
-type UpdateApprovalRoute409ApplicationProblemPlusJSONResponse Problem
+type UpdateApprovalRoute409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
 
 func (response UpdateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
 
@@ -3075,6 +2707,22 @@ func (response UpdateApprovalRoute409ApplicationProblemPlusJSONResponse) VisitUp
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateApprovalRoute500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateApprovalRoute500ApplicationProblemPlusJSONResponse) VisitUpdateApprovalRouteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3101,7 +2749,9 @@ func (response GetApprovalInstanceByDocument200JSONResponse) VisitGetApprovalIns
 	return err
 }
 
-type GetApprovalInstanceByDocument404ApplicationProblemPlusJSONResponse Problem
+type GetApprovalInstanceByDocument404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
 
 func (response GetApprovalInstanceByDocument404ApplicationProblemPlusJSONResponse) VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error {
 
@@ -3111,6 +2761,22 @@ func (response GetApprovalInstanceByDocument404ApplicationProblemPlusJSONRespons
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetApprovalInstanceByDocument500ApplicationProblemPlusJSONResponse struct {
+	InternalServerErrorApplicationProblemPlusJSONResponse
+}
+
+func (response GetApprovalInstanceByDocument500ApplicationProblemPlusJSONResponse) VisitGetApprovalInstanceByDocumentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -3232,52 +2898,52 @@ func (response SupersedeDocument200Response) VisitSupersedeDocumentResponse(w ht
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
-	// (GET /api/v1/approval/inbox)
+	// (GET /approval/inbox)
 	ListApprovalInbox(ctx context.Context, request ListApprovalInboxRequestObject) (ListApprovalInboxResponseObject, error)
 
-	// (GET /api/v1/approval/instances/{instance_id})
+	// (GET /approval/instances/{instance_id})
 	GetApprovalInstance(ctx context.Context, request GetApprovalInstanceRequestObject) (GetApprovalInstanceResponseObject, error)
 
-	// (POST /api/v1/approval/instances/{instance_id}/cancel)
+	// (POST /approval/instances/{instance_id}/cancel)
 	CancelApprovalInstance(ctx context.Context, request CancelApprovalInstanceRequestObject) (CancelApprovalInstanceResponseObject, error)
 
-	// (POST /api/v1/approval/instances/{instance_id}/stages/{stage_id}/signoffs)
+	// (POST /approval/instances/{instance_id}/stages/{stage_id}/signoffs)
 	RecordApprovalStageSignoff(ctx context.Context, request RecordApprovalStageSignoffRequestObject) (RecordApprovalStageSignoffResponseObject, error)
 	// List approval routes for the active tenant
-	// (GET /api/v1/approval/routes)
+	// (GET /approval/routes)
 	ListApprovalRoutes(ctx context.Context, request ListApprovalRoutesRequestObject) (ListApprovalRoutesResponseObject, error)
 	// Create an approval route for the active tenant
-	// (POST /api/v1/approval/routes)
+	// (POST /approval/routes)
 	CreateApprovalRoute(ctx context.Context, request CreateApprovalRouteRequestObject) (CreateApprovalRouteResponseObject, error)
 	// Deactivate an approval route
-	// (DELETE /api/v1/approval/routes/{id})
+	// (DELETE /approval/routes/{id})
 	DeactivateApprovalRoute(ctx context.Context, request DeactivateApprovalRouteRequestObject) (DeactivateApprovalRouteResponseObject, error)
 	// Update an approval route (new version)
-	// (PUT /api/v1/approval/routes/{id})
+	// (PUT /approval/routes/{id})
 	UpdateApprovalRoute(ctx context.Context, request UpdateApprovalRouteRequestObject) (UpdateApprovalRouteResponseObject, error)
 
-	// (GET /api/v1/documents/{id}/approval-instance)
+	// (GET /documents/{id}/approval-instance)
 	GetApprovalInstanceByDocument(ctx context.Context, request GetApprovalInstanceByDocumentRequestObject) (GetApprovalInstanceByDocumentResponseObject, error)
 
-	// (POST /api/v1/documents/{id}/cancel)
+	// (POST /documents/{id}/cancel)
 	CancelDocumentApproval(ctx context.Context, request CancelDocumentApprovalRequestObject) (CancelDocumentApprovalResponseObject, error)
 
-	// (POST /api/v1/documents/{id}/obsolete)
+	// (POST /documents/{id}/obsolete)
 	ObsoleteDocument(ctx context.Context, request ObsoleteDocumentRequestObject) (ObsoleteDocumentResponseObject, error)
 
-	// (POST /api/v1/documents/{id}/publish)
+	// (POST /documents/{id}/publish)
 	PublishDocument(ctx context.Context, request PublishDocumentRequestObject) (PublishDocumentResponseObject, error)
 
-	// (POST /api/v1/documents/{id}/schedule-publish)
+	// (POST /documents/{id}/schedule-publish)
 	ScheduleDocumentPublish(ctx context.Context, request ScheduleDocumentPublishRequestObject) (ScheduleDocumentPublishResponseObject, error)
 
-	// (POST /api/v1/documents/{id}/signoff)
+	// (POST /documents/{id}/signoff)
 	RecordDocumentSignoff(ctx context.Context, request RecordDocumentSignoffRequestObject) (RecordDocumentSignoffResponseObject, error)
 
-	// (POST /api/v1/documents/{id}/submit)
+	// (POST /documents/{id}/submit)
 	SubmitDocumentForApproval(ctx context.Context, request SubmitDocumentForApprovalRequestObject) (SubmitDocumentForApprovalResponseObject, error)
 
-	// (POST /api/v1/documents/{id}/supersede)
+	// (POST /documents/{id}/supersede)
 	SupersedeDocument(ctx context.Context, request SupersedeDocumentRequestObject) (SupersedeDocumentResponseObject, error)
 }
 
@@ -3757,72 +3423,64 @@ func (sh *strictHandler) SupersedeDocument(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"P7RWmyZ3cN2T8IVS8nD98L8BAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
