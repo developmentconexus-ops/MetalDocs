@@ -43,8 +43,10 @@ Bootstrap landed (commit `81e7ec23`) — codegen wired, `internal/modules/docume
 - `listComments`, `createComment`, `updateComment`, `deleteComment` — `/api/v1/documents/{id}/comments` CRUD
 
 **Spec ops with no handler (need impl OR spec removal):**
-- `createDocument` — POST /api/v1/documents
-- `renderDocumentPDF` — POST/GET on documents render
+- `createDocument` — POST /api/v1/documents — **RESOLVED (Phase C, 2026-06-07):** the POST op had already been removed from `openapi.yaml`; Phase C removed the leftover phantom `permissions.go` row + the orphan `CreateDocumentRequest`/`DocumentCreatedResponse`/`ListDocumentsResponse` schemas. Spec `/documents` is now GET-only, matching the handler.
+- `renderDocumentPDF` — POST/GET on documents render — the served render path `POST /api/v1/documents/{id}/export/pdf` is spec'd + handler-backed; no separate `renderDocumentPDF` op exists in the live spec (no action needed).
+
+> **Phase C reconciliation (2026-06-07):** the dead/unserved *spec→no-handler* class is now fully closed (see [`api-contract-hardening.md`](api-contract-hardening.md) Phase C). The *handler→no-spec* class for the **un-migrated modules below** (approval, full taxonomy CRUD beyond the registry subset, iam, platform) is unchanged — those modules still serve via hand-written structs and remain Phase E/F work. Phase C only added the two audit-export sub-route ops and annotated three intentional omissions; it did **not** author spec for the no-coverage modules.
 
 ## Central wiring TODO
 

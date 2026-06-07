@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/audit.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/audit-refactor.md`.
 
-**Last verified:** 2026-05-13 (audit T-004 follow-up)
+**Last verified:** 2026-06-07 (Phase C dead-path prune: permissions.go anchor :211-221 → :229-231; T-001 surface note updated)
 
 ## Severity scale
 
@@ -20,7 +20,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-001 · Unauthenticated `GET /api/v1/audit/events` — CLOSED 2026-05-11 (Plan 6a)
 - **Severity:** critical (closed)
-- **Surface:** `internal/modules/audit/delivery/http/handler.go:34-35` (route registration); `apps/api/cmd/metaldocs-api/permissions.go:211-221` (resolver default + public-path checker treat unregistered paths as public)
+- **Surface:** `internal/modules/audit/delivery/http/handler.go:34-35` (route registration); `apps/api/cmd/metaldocs-api/permissions.go:229-231` (audit routeRules — T-001 CLOSED; explicit `CapAuditRead` rows added)
 - **Observation:** The route is mounted via `mux.HandleFunc("/api/v1/audit/events", h.handleEvents)` with zero auth middleware. The capability resolver has no rule for the path; the public-path checker therefore admits the request as public. Verified by grep — no `audit/events` rule in `permissions.go`. Any network-reachable client can read up to 200 audit rows per call, filtered by `resource_type`/`resource_id`. Confidentiality breach + tampering reconnaissance vector. Trigger fired: authn/authz bypass.
 - **Evidence:** `_artifacts/02-flow-list.md` §1, §6; `_artifacts/05-industry.md` IP-004.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-001`
@@ -76,7 +76,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-008 · Missing OpenAPI `operationId` for `/audit/events`
 - **Severity:** minor
-- **Surface:** `api/openapi/v1/openapi.yaml:1058-1103` (path entry present; `operationId` absent — verified via Phase 2 grep, marked `(unclear)`); `internal/modules/audit/delivery/http/handler.go:35` (route mounted via `http.ServeMux.HandleFunc` directly, not via oapi-codegen)
+- **Surface:** `api/openapi/v1/openapi.yaml:819` (path `/audit/events`; `operationId` absent — verified via Phase 2 grep); `internal/modules/audit/delivery/http/handler.go:35` (route mounted via `http.ServeMux.HandleFunc` directly, not via oapi-codegen)
 - **Observation:** The route exists in the spec but has no `operationId`, and is NOT served via generated handlers. Drift: spec promises a contract the code does not honour through codegen. Client-codegen tools (frontend `lib/api/openapi.gen.ts`) cannot bind a method name. Trigger fired: contract surface gap with measurable consumer impact (client codegen).
 - **Evidence:** `_artifacts/02-flow-list.md` §1.
 - **Linked backlog row:** `backlog/audit-refactor.md#R-008`

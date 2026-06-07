@@ -2,7 +2,7 @@
 
 > Companion to `wiki/modules/taxonomy.md`. Lists known gaps, smells, and missing-ADR items. **Debt only — no fix prescriptions.** Fixes belong in `wiki/backlog/taxonomy-refactor.md`.
 
-**Last verified:** 2026-05-17 (v2-reference memory sync)
+**Last verified:** 2026-06-07 (Phase C dead-path prune: updated permissions.go line refs :174-180 → :177-181)
 
 ## Severity scale
 
@@ -26,7 +26,7 @@ Pick highest trigger. Justify the call in `Observation`.
 
 ### T-002 · `document_families` globally shared with no ADR
 - **Severity:** critical
-- **Surface:** `migrations/0023_init_document_family_and_profile_registry.sql:1-7` (no `tenant_id` column); `migrations/0161_grant_families_write_privileges.sql:1` (`metaldocs_app` write granted); `internal/modules/taxonomy/infrastructure/family_repository.go:38-99` (every method lacks tenant predicate); `apps/api/cmd/metaldocs-api/permissions.go:174-180` (cap dispatcher allows any tenant with `taxonomy.manage`)
+- **Surface:** `migrations/0023_init_document_family_and_profile_registry.sql:1-7` (no `tenant_id` column); `migrations/0161_grant_families_write_privileges.sql:1` (`metaldocs_app` write granted); `internal/modules/taxonomy/infrastructure/family_repository.go:38-99` (every method lacks tenant predicate); `apps/api/cmd/metaldocs-api/permissions.go:177-181` (cap dispatcher allows any tenant with `taxonomy.manage`)
 - **Observation:** `document_families` carries no `tenant_id` column and is a global catalog. `qms_admin` (migration 0169) and `system_admin` (migration 0165) both hold `taxonomy.manage`. A `qms_admin` in tenant A can `POST /families`, `PUT /families/{code}`, or `DELETE /families/{code}` and the mutation is visible to every tenant — blast radius is the entire deployment. No ADR documents the global-by-design choice or the threat model that accepted it. Trigger fired: multi-tenant data leak + cross-tenant write surface on a regulated catalog (Critical).
 - **Evidence:** `_artifacts/04-persistence.md` §1, §2 (no `tenant_id` row), §5; `_artifacts/02-flow-deactivate-family.md` §4 ("Cross-tenant blast radius"); `_artifacts/05-industry.md` IP-008.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-002`
@@ -36,7 +36,7 @@ Pick highest trigger. Justify the call in `Observation`.
 - **Severity:** critical (closed)
 - **Surface:** `apps/api/cmd/metaldocs-api/permissions.go` — PATCH method added to the families branch (and areas branch). Plan 5 commit aligns the families dispatcher with the profiles branch which already included `MethodPatch`.
 - **Observation (original):** The families capability switch enumerated POST/PUT/DELETE but omitted PATCH. The handler was mounted at PATCH. Capability resolver therefore returned `("", false)` for PATCH `/families/{code}` — path treated as public.
-- **Evidence:** `_artifacts/01-surface.md` (handler.go route list); `_artifacts/03-deps.md` §1 (no authz import); direct grep of `permissions.go:174-180`.
+- **Evidence:** `_artifacts/01-surface.md` (handler.go route list); `_artifacts/03-deps.md` §1 (no authz import); direct grep of `permissions.go:177-181`.
 - **Linked backlog row:** `backlog/taxonomy-refactor.md#R-003`
 - **Linked ADR:** missing-ADR
 

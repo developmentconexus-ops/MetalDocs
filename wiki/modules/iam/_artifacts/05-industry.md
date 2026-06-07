@@ -41,7 +41,7 @@
 - **Version:** OpenAPI 3.0.3 (2020)
 - **Quote:** "The OpenAPI Specification … is the standard for HTTP APIs."
 - **Maps to:** `api/openapi/v1/openapi.yaml`, generated `*.gen.go` per `wiki/architecture/api-contract.md`
-- **MetalDocs adherence — gap (PARTIALLY CLOSED):** IAM routes are wired on a hand-written `*http.ServeMux` (`delivery/http/routes_memberships.go:86`, `delivery/http/admin_handler.go:82`). `listAreaMemberships`, `grantAreaMembership`, `revokeAreaMembership` ARE now declared in `openapi.yaml` with full schemas (PR-1 contract, 2026-06-03). Admin POST `/api/v1/iam/users/{userId}/roles` has request + response schemas in `openapi.yaml:5043,5054` but no `operationId` and no `*.gen.go` stub. Documents module bootstrap is codegen-enabled per ADR 0012; IAM server stub is still hand-rolled (ADR 0012 partial rollout — T-remaining).
+- **MetalDocs adherence — gap (PARTIALLY CLOSED):** IAM routes are wired on a hand-written `*http.ServeMux` (`delivery/http/routes_memberships.go:86`, `delivery/http/admin_handler.go:82`). `listAreaMemberships`, `grantAreaMembership`, `revokeAreaMembership` ARE now declared in `openapi.yaml` with full schemas (PR-1 contract, 2026-06-03). Admin POST `/api/v1/iam/users/{userId}/roles` has request + response schemas in `openapi.yaml:3871,3882` with `operationId: upsertUserRole` at :980 but no `*.gen.go` stub. Documents module bootstrap is codegen-enabled per ADR 0012; IAM server stub is still hand-rolled (ADR 0012 partial rollout — T-remaining).
 
 ### IP-006 · Forward-only migrations
 

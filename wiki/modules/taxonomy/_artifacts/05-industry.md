@@ -16,7 +16,7 @@ Patterns drawn from `.claude/skills/metaldocs-module-doc/references/industry-pat
 - Source: NIST SP 800-95 §4.3 (2007) — "Multiple layers of access control reduce single-point bypass risk."
 - MetalDocs anchor: `wiki/decisions/0007-two-tier-authz.md` documents tier-1 `CapabilityService` (HTTP) + tier-2 `authz.Require` (in-tx) + Postgres tripwire (`metaldocs.asserted_caps` GUC, `assert_caps()` trigger fn).
 - Conformance check (Phase 4 §5): taxonomy is **single-tier**.
-  - Tier-1 present: `apps/api/cmd/metaldocs-api/permissions.go:158-180` path-prefix dispatcher maps `/profiles*`, `/families*`, `/areas*` to `taxonomy.manage` / `doc.view`.
+  - Tier-1 present: `apps/api/cmd/metaldocs-api/permissions.go:165-181` routeRule entries map `/profiles*`, `/families*`, `/areas*`; GET→`taxonomy.view`, writes→`taxonomy.manage` (F-001 split).
   - Tier-2 absent: `authz.Require` is not imported anywhere under `internal/modules/taxonomy/` (Phase 3 OUT-edge audit).
   - DB tripwire absent: no `assert_caps` trigger on any of the 3 owned tables; no `set_local_tenant_id` GUC propagation anywhere in `internal/` (Phase 4 §3).
 - Comparison: approval (`0142b_role_capabilities_v2_enforce.sql:200-209`), iam, documents follow all three layers.

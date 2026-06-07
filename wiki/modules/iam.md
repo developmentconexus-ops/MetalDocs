@@ -9,7 +9,7 @@
 **Prior verification — 2026-06-02 (PR-4):** People-tab backend slice — `PeopleHandler` registered via Go 1.22 typed mux patterns owns `GET /iam/users`, `POST /iam/users/invite`, `PATCH /iam/users/{userId}`, `POST /iam/users/bulk`, `POST /iam/users/{userId}/reset-password`, `POST /iam/users/{userId}/unlock`, `GET /iam/users/{userId}/memberships`; legacy `handleUserRoute` suffix dispatcher + `POST /iam/users` create retired; migration 0219 adds last-login context columns to `iam_users`; canonical-roles catalog grew to 8 (added `signer`, `area_admin`, `qms_admin` in `internal/modules/iam/domain/model.go`). T-004 noted closed — `authz.Require(CapUserManage)` already lives inside both `UpsertUserAndAssignRole` and `ReplaceUserRolesTx` in `internal/modules/iam/infrastructure/postgres/role_admin_repository.go:47,99`. Prior verification line preserved below.)
 **Prior verification — 2026-06-02 (PR-2):** added `CapSessionManage`; broadened `CapAuditRead` grants to qms_admin/area_admin/approver via migration 0210; registry size 27 → 28; ADR 0019 documents the read-only-by-design naming exception.
 
-**Prior verification — 2026-06-02 (PR-1):** T-005 (audit emission) + T-006 (RFC 9457 envelope) closed; §5.3 + §6.2 + §6.3 + §6.4 cap columns refreshed against `apps/api/cmd/metaldocs-api/permissions.go:108-123` (ADR 0016 view-grade split). | **Owner:** unassigned | **Status:** active | **Maturity:** L2
+**Prior verification — 2026-06-02 (PR-1):** T-005 (audit emission) + T-006 (RFC 9457 envelope) closed; §5.3 + §6.2 + §6.3 + §6.4 cap columns refreshed against `apps/api/cmd/metaldocs-api/permissions.go:102-116` (ADR 0016 view-grade split). | **Last verified:** 2026-06-07 (Phase C dead-path prune: permissions.go anchors :54,196 → :112,202; openapi.yaml schemas :5043,5054 → :3871,3882) | **Owner:** unassigned | **Status:** active | **Maturity:** L2
 
 **Prior verification — 2026-06-01:** Approval route admin PR-3 spike: confirmed `GET /api/v1/iam/roles` does **not** exist today — role catalogue is hard-coded in `internal/modules/iam/domain/model.go:10-16` (`approver`, `author`, `editor`, `system_admin`, `viewer`). Proposed endpoint shape `{roles:[{code,label}]}` gated by `CapMembershipView` is documented in [ADR 0018 §"IAM roles source"](../decisions/0018-approval-route-lifecycle.md); implementation deferred to PR-4 of approval route admin work or its own micro-PR. Frontend hard-codes the same list at `frontend/apps/web/src/features/approval/pages/RouteAdminPage.tsx:10` as `STAGE_ROLES`.
 
@@ -31,7 +31,7 @@
 > - `internal/modules/iam/infrastructure/postgres/user_area_repository.go:57` â€” `ListByTenant` (tenant-scoped active-membership query, optional exact-match filters via `($n = '' OR col = $n)`); `Insert` at `:89` (tier-2 `authz.Require(CapMembershipManage)`); `CloseActive` at `:141` (sets `revoked_by = actorID` alongside `effective_to`, satisfies `revoked_by_required_when_revoked` CHECK); `GrantAtomic` at `:185` (UPDATE sets `revoked_by`; INSERT unchanged) â€” all three write methods have tier-2 enforcement and satisfy CHECK
 > - `internal/modules/iam/domain/model.go:13` â€” single typed `Capability` namespace (28 consts; ADR 0019 (PR-2) added `CapSessionManage` and broadened `CapAuditRead` grants; ADR 0016 added `CapMetricsView`, `CapMembershipView`, `CapUserView`, `CapTaxonomyView`; Plan 5 added `CapControlledDocumentObsolete` + `CapControlledDocumentSupersede`; Plan 4 closed T-001; size locked by `TestCapabilityRegistrySize`)
 > - `db/migrations/0218_iam_caps_audit_session_pr2.sql` â€” PR-2 grants: `audit.read` → {qms_admin, area_admin, approver}; `session.manage` → {system_admin}; ADR 0019
-> - `apps/api/cmd/metaldocs-api/permissions.go:54,196` â€” `(method,path)â†’Cap*` resolver
+> - `apps/api/cmd/metaldocs-api/permissions.go:112,202` — `(method,path)→Cap*` resolver (IAM users/roles at :112; area-memberships at :202)
 > - `apps/api/internal/wiring/documents.go:24` â€” `NewCapabilityChecker` adapter (J2 fix)
 > - `migrations/0142b_role_capabilities_v2_enforce.sql:67-179` â€” original `enforce_capability_asserted()` function (approval tables only; superseded by 0188)
 > - `migrations/0188_tripwire_extend.sql:18` â€” Plan 5: extended `enforce_capability_asserted()` covering 12 tables; trigger attachments at `:186-233`
@@ -75,7 +75,7 @@ IAM owns identity-derived authorization for MetalDocs: it answers "can user X pe
 - Persistence: Postgres; tables under schemas `metaldocs.*` (admin) and `public.*` (process-area + governance).
 - Authz model: two-tier per ADR 0007; system_admin bypass on both tiers.
 - DB enforcement floor: `metaldocs.asserted_caps` GUC + `enforce_capability_asserted` trigger. Plan 5 migration 0188 expanded coverage to 10 tables: `approval_instances`, `approval_signoffs`, `iam_user_roles`, `user_process_areas`, `documents`, `controlled_documents`, `cd_sequence_counters`, `document_profiles`, `document_process_areas`, `document_families`, `templates_template`, `templates_template_version`.
-- IAM is NOT under oapi-codegen yet (ADR 0012 documents the partial rollout). Membership routes have no `operationId`; admin POST `/api/v1/iam/users/{userId}/roles` has request/response schemas (`api/openapi/v1/openapi.yaml:5043,5054`) but no codegen stub.
+- IAM is NOT under oapi-codegen yet (ADR 0012 documents the partial rollout). Membership routes have no `operationId`; admin POST `/api/v1/iam/users/{userId}/roles` has request/response schemas (`api/openapi/v1/openapi.yaml:3871,3882`) but no codegen stub.
 - Error envelope: IAM emits RFC 9457 Problem responses via `internal/platform/problem/problem.go` (`problem.Write` sets `Content-Type: application/problem+json`); admin handler and membership handler both route through `problem.New(...)`. Matches `wiki/architecture/api-design-system.md`. T-006 closed (Plan 7, 2026-05-12).
 - Tenant sentinel: `DevTenantID = "ffffffff-ffff-ffff-ffff-ffffffffffff"` (`internal/platform/tenant/const.go:4`). Primary tenant source is `tenant.FromContext` (injected by auth middleware from `auth_sessions.tenant_id`). IAM middleware falls back to `X-Tenant-ID` header only in legacy-header mode; it strips trusted identity headers `X-User-ID` and `X-User-Roles` before downstream handlers. See `wiki/architecture/tenant-context.md` for the full pattern.
 
@@ -203,7 +203,7 @@ Full table in `_artifacts/01-surface.md` (129 exported symbols). High-level grou
 
 PR-4 refactor: the legacy `handleUserRoute` suffix dispatcher and the `POST /api/v1/iam/users` create endpoint were retired. The new People-tab handler (`people_handler.go`) owns user list/invite/patch/bulk/reset/unlock/memberships, wired via Go 1.22 typed mux patterns (`mux.HandleFunc("METHOD /path", …)`). `POST /iam/users/invite` server-generates a 16-char temp password (returned one-time only, never logged or audited) and the role-replace endpoints stay on `AdminHandler` pending PR-5's Roles & Caps matrix.
 
-Post-ADR-0016 split (GET = view-grade, writes = manage-grade) verified against `apps/api/cmd/metaldocs-api/permissions.go:108-123`.
+Post-ADR-0016 split (GET = view-grade, writes = manage-grade) verified against `apps/api/cmd/metaldocs-api/permissions.go:101-116`.
 
 ## API Route Truth Table (Plan 8 Baseline)
 
@@ -225,7 +225,7 @@ Post-ADR-0016 split (GET = view-grade, writes = manage-grade) verified against `
 - Module contract status: Contracted
 - Owner: leandro
 
-Permission resolver: `apps/api/cmd/metaldocs-api/permissions.go:54,196`. None of these ops is wired through oapi-codegen; only `POST .../roles` has request+response schema components in `openapi.yaml`.
+Permission resolver: `apps/api/cmd/metaldocs-api/permissions.go:112,202`. None of these ops is wired through oapi-codegen; only `POST .../roles` has request+response schema components in `openapi.yaml`.
 
 ---
 

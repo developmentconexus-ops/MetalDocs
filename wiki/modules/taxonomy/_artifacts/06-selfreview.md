@@ -39,7 +39,7 @@ Run against the composed `wiki/modules/taxonomy.md`, `taxonomy-tech-debt.md`, `b
 
 5. **Key Files freshness.** Spot-checked:
    - `internal/modules/taxonomy/delivery/http/handler.go:51-68` — matches grep `HandleFunc` output. ✓
-   - `apps/api/cmd/metaldocs-api/permissions.go:158-180` — matches the dispatcher switch. ✓
+   - `apps/api/cmd/metaldocs-api/permissions.go:165-181` — matches routeRule entries for taxonomy. ✓ (line ref updated Phase C)
    - `internal/modules/taxonomy/delivery/http/routes_profiles.go:197-203` — matches `tenantIDFromRequest` per Phase 2 artifact. ✓
 
 6. **Backlog ↔ debt linkage.** Every T-001..T-016 has a matching R-NNN in the backlog. R-017 is a `maint:docs-link` row with no T- origin (allowed per `maint:<kind>` enum). Tally check 6.5 PASS confirms.

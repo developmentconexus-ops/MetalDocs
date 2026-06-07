@@ -1,4 +1,4 @@
-# Data-flow Trace — PUT /api/v1/templates/{id}/versions/{n}/schema
+# Data-flow Trace ï¿½ PUT /api/v1/templates/{id}/versions/{n}/schema
 
 ## Task
 
@@ -8,38 +8,38 @@ For operation `UNVERIFIED` (HTTP `PUT /api/v1/templates/{id}/versions/{n}/schema
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | `UNVERIFIED (path/op not declared)` | `api/openapi/v1/openapi.yaml:2857`, `api/openapi/v1/partials/templates.yaml:77` |
-| Generated server stub | `n/a — no generated PUT /schema stub found` | `internal/modules/templates/api/api.gen.go:584`, `internal/modules/templates/api/api.gen.go:1216` |
+| OpenAPI op | `updateTemplateSchema` | `api/openapi/v1/openapi.yaml:1411` |
+| Generated server stub | `n/a ï¿½ no generated PUT /schema stub found` | `internal/modules/templates/api/api.gen.go:584`, `internal/modules/templates/api/api.gen.go:1216` |
 | Handler | `Handler.updateSchemas` | `internal/modules/templates/delivery/http/routes_schema.go:11` |
 | Route registration | `mux.HandleFunc("PUT /api/v1/templates/{id}/versions/{n}/schema", h.updateSchemas)` | `internal/modules/templates/delivery/http/handler.go:49` |
 
 ### 2. Call chain
 
-1. `internal/modules/templates/delivery/http/routes_schema.go:11` `Handler.updateSchemas` — parse path vars and request body; invoke authz callback.
+1. `internal/modules/templates/delivery/http/routes_schema.go:11` `Handler.updateSchemas` ï¿½ parse path vars and request body; invoke authz callback.
    ? calls: `internal/modules/templates/delivery/http/routes_schema.go:21` `h.authz(r, tenantID, "*", "template.edit")`
 
-2. `internal/modules/templates/delivery/http/routes_schema.go:36` `h.svc.UpdateSchemas(...UpdateSchemasCmd)` — enter application layer.
+2. `internal/modules/templates/delivery/http/routes_schema.go:36` `h.svc.UpdateSchemas(...UpdateSchemasCmd)` ï¿½ enter application layer.
    ? calls: `internal/modules/templates/application/schema.go:20` `Service.UpdateSchemas`
 
-3. `internal/modules/templates/application/schema.go:21` `s.repo.GetVersion` — load target version.
+3. `internal/modules/templates/application/schema.go:21` `s.repo.GetVersion` ï¿½ load target version.
    ? calls: `internal/modules/templates/repository/postgres.go:189` `Repository.GetVersion`
    ? DB: `internal/modules/templates/repository/postgres.go:199` `QueryRowContext`
 
-4. `internal/modules/templates/application/schema.go:32` `ValidatePlaceholders` — validate placeholder schema.
+4. `internal/modules/templates/application/schema.go:32` `ValidatePlaceholders` ï¿½ validate placeholder schema.
    ? calls: `internal/modules/templates/application/schema.go:84` `ValidatePlaceholders`
 
-5. `internal/modules/templates/application/schema.go:35` resolver registry check — only if `s.resolvers != nil`; validate `resolver_key` exists in registry.
+5. `internal/modules/templates/application/schema.go:35` resolver registry check ï¿½ only if `s.resolvers != nil`; validate `resolver_key` exists in registry.
    ? calls: `internal/modules/templates/application/schema.go:36` `s.resolvers.Known()`
 
-6. `internal/modules/templates/application/schema.go:58` `s.repo.UpdateVersion` — persist metadata/placeholder schema on version row.
+6. `internal/modules/templates/application/schema.go:58` `s.repo.UpdateVersion` ï¿½ persist metadata/placeholder schema on version row.
    ? calls: `internal/modules/templates/repository/postgres.go:229` `Repository.UpdateVersion`
    ? DB: `internal/modules/templates/repository/postgres.go:253` `ExecContext` (`UPDATE templates_template_version ... WHERE id = $1`)
 
-7. `internal/modules/templates/application/schema.go:62` `s.repo.AppendAudit` — append audit event.
+7. `internal/modules/templates/application/schema.go:62` `s.repo.AppendAudit` ï¿½ append audit event.
    ? calls: `internal/modules/templates/repository/postgres.go:311` `Repository.AppendAudit`
    ? DB: `internal/modules/templates/repository/postgres.go:323` `ExecContext` (`INSERT INTO templates_audit_log ...`)
 
-8. `internal/modules/templates/delivery/http/routes_schema.go:50` `writeJSON` — return 200 JSON envelope with `data.version`.
+8. `internal/modules/templates/delivery/http/routes_schema.go:50` `writeJSON` ï¿½ return 200 JSON envelope with `data.version`.
 
 - Transaction boundary: `none found` (`Repository` uses `*sql.DB` and direct `QueryRowContext`/`ExecContext`; no `BeginTx` in this flow) (`internal/modules/templates/repository/postgres.go:22`, `:199`, `:253`, `:323`).
 - Authz calls in chain: handler callback only (`h.authz`) (`internal/modules/templates/delivery/http/routes_schema.go:21`). No `authz.Require`/`authz.RequireAll` in traced files (`UNVERIFIED elsewhere outside traced flow`).
@@ -66,11 +66,11 @@ Tripwire pairing (authz before mutate SQL on same tx):
 
 ### 5. Response shape
 
-- 2xx schema ref: `UNVERIFIED` (operation missing from OpenAPI paths searched: `api/openapi/v1/openapi.yaml:2857`, `api/openapi/v1/partials/templates.yaml:77`).
+- 2xx schema ref: `api/openapi/v1/openapi.yaml:1411` (`PUT /templates/{id}/versions/{n}/schema`).
 - Runtime success envelope: legacy JSON `{"data":{"version":...}}` via `writeJSON` (`internal/modules/templates/delivery/http/routes_schema.go:50-54`).
 - Runtime error envelope: legacy JSON `{"error":{"code","message"}}` via `writeErr`/`writeMappedErr` (`internal/modules/templates/delivery/http/handler.go:95-102`, `:108-118`; `internal/modules/templates/delivery/http/routes_schema.go:17`, `:22`, `:32`, `:46`).
 - RFC 9457: `not used in this endpoint`; RFC 9457 package exists globally (`internal/platform/problem/problem.go:1`, `:72`, `:79`) but not invoked in traced handler.
-- Declared error statuses + Problem type URIs for this op: `UNVERIFIED` (op absent in OpenAPI files above).
+- Declared error statuses + Problem type URIs for this op: verify against `api/openapi/v1/openapi.yaml:1411`.
 
 ### 6. Cross-references
 
@@ -95,4 +95,4 @@ Tripwire pairing (authz before mutate SQL on same tx):
 
 ## Output
 
-operation id `UNVERIFIED` · layer count in §2: `8` · tripwire pairing `VIOLATION`
+operation id `UNVERIFIED` ï¿½ layer count in ï¿½2: `8` ï¿½ tripwire pairing `VIOLATION`

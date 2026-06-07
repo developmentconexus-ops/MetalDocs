@@ -42,7 +42,7 @@ Tx boundary: **none**. `sql.DB.ExecContext` opens an implicit single-statement c
 
 FK side-effect: `document_profiles.family_code REFERENCES document_families(code)` (`migrations/0023_init_document_family_and_profile_registry.sql:9-12`). Missing/inactive family → PG `23503` → handler maps to `409 FAMILY_NOT_FOUND`.
 
-Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:158-164` maps `POST /api/v1/taxonomy/profiles` → `iamdomain.CapTaxonomyManage` (`taxonomy.manage`). No tier-2 in-tx check exists.
+Upstream tier-1 capability gate: `apps/api/cmd/metaldocs-api/permissions.go:166` maps `POST /api/v1/taxonomy/profiles` → `iamdomain.CapTaxonomyManage` (`taxonomy.manage`). No tier-2 in-tx check exists.
 
 Trust chain for `tenant_id`: client header `X-Tenant-ID` → `tenantIDFromRequest` → domain struct → SQL `INSERT`. No verification that the authenticated user belongs to the named tenant. Fallback to `tenant.DevTenantID` when header absent.
 

@@ -43,8 +43,8 @@ Each row: pattern ID → applies-here verdict → MetalDocs file:line anchor →
   - `api.gen.go` exists for documents (`internal/modules/documents/api/api.gen.go`) but is **bootstrap only** (ADR 0012).
   - Routes registered via stdlib `mux.HandleFunc` directly, not via the generated `ServerInterface`.
   - `operationId` mismatches:
-    - List handler is `listDocuments` (`handler.go:145`); spec exposes `listDocumentsV2` (`api/openapi/v1/openapi.yaml:3156`).
-    - `finalizeDocument`: spec path exists at `openapi.yaml:3251` but **no `operationId` set**; generated stub `PostApiV2DocumentsIdFinalize` (`api.gen.go:1215`).
+    - List handler is `listDocuments` (`handler.go:145`); spec at `api/openapi/v1/openapi.yaml:1952` (`operationId: listDocuments`).
+    - `finalizeDocument`: spec path at `openapi.yaml:2050` with `operationId: finalizeDocument`; generated stub `PostApiV2DocumentsIdFinalize` (`api.gen.go:1215`).
     - `renameDocument`: route registered (`handler.go:115` and duplicate `:86`) but **absent from spec entirely**.
     - `duplicateDocument` + comments CRUD: handlers exist, no spec ops (per `wiki/backlog/contract-first-followups.md`).
 - **Gap → debt:** T-002 (Critical — contract drift on the regulated path).

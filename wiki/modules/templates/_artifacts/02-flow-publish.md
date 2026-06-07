@@ -6,7 +6,7 @@ Operation `publishTemplateVersionV2` (HTTP `POST /api/v1/templates/{id}/versions
 
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | `publishTemplateVersionV2` | `api/openapi/v1/openapi.yaml:2912` |
+| OpenAPI op | `publishTemplateVersion` | `api/openapi/v1/openapi.yaml:1357` |
 | Generated server stub | `ServerInterface.PublishTemplateVersionV2` | `internal/modules/templates/api/api.gen.go:582` |
 | Handler | `Handler.PublishTemplateVersionV2` | `internal/modules/templates/delivery/http/routes_generated.go:185` |
 
@@ -73,8 +73,8 @@ Tripwire pairing (`authz.Require(...)` before mutating SQL on same tx):
 
 ## 5. Response shape
 
-- 2xx schema ref: inline object schema at `api/openapi/v1/openapi.yaml:2932` (no `#/components/schemas/...` ref).
-- Declared op error responses in OpenAPI: none listed for this op; `responses` shows only `200` (`openapi.yaml:2926-2932`).
+- 2xx schema ref: inline object schema at `api/openapi/v1/openapi.yaml:1384` (no `#/components/schemas/...` ref).
+- Declared op error responses in OpenAPI: `200` and `422` at `openapi.yaml:1380-1395`.
 - Handler error envelope is legacy `{"error":{"code","message"}}` via `writeErr`/`writeMappedErr` (`delivery/http/handler.go:95-101`, `:108-113`), not RFC 9457.
 - Problem `type` URI: none in handler path.
 

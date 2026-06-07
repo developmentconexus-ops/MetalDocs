@@ -1,7 +1,7 @@
 ### 1. Entry point
 | Layer | Symbol | File:line |
 |---|---|---|
-| OpenAPI op | `operationId: listDocuments` | (unclear: not found — `operationId: listDocumentsV2` exists at `api/openapi/v1/openapi.yaml:3156`) |
+| OpenAPI op | `operationId: listDocuments` | `api/openapi/v1/openapi.yaml:1952` (path `/documents`; `operationId: listDocuments` at :1956) |
 | Generated server stub | `ServerInterface.ListDocuments` | (unclear: not found — generated symbol is `ServerInterface.ListDocumentsV2` at `internal/modules/documents/api/api.gen.go:721`) |
 | Handler | `Handler.listDocuments` | `internal/modules/documents/delivery/http/handler.go:145` (route registration at `:111` and `:82`) |
 

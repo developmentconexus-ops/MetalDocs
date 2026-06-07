@@ -48,26 +48,6 @@ export interface AreaMembership {
   grantedAt: string;
 }
 
-export interface ManagedUserItem {
-  userId: string;
-  username: string;
-  email?: string;
-  displayName: string;
-  isActive: boolean;
-  mustChangePassword: boolean;
-  failedLoginAttempts: number;
-  lockedUntil?: string;
-  lastLoginAt?: string;
-  lastLoginIp?: string;
-  lastLoginCountry?: string;
-  createdAt: string;
-  updatedAt: string;
-  tenantRole: UserRole;
-  areaMemberships: AreaMembership[];
-  status: "active" | "pending" | "suspended" | "locked" | "left";
-  mfaEnrolled: boolean;
-}
-
 export interface OnlineUserItem {
   userId: string;
   username: string;
@@ -199,55 +179,6 @@ export interface VersionListItem {
   renderer_pin?: RendererPin | null;
 }
 
-export interface VersionDiffResponse {
-  documentId: string;
-  fromVersion: number;
-  toVersion: number;
-  contentChanged: boolean;
-  metadataChanged: string[];
-  classificationChanged: boolean;
-  effectiveAtChanged: boolean;
-  expiryAtChanged: boolean;
-}
-
-export interface DocumentContentNativeResponse {
-  documentId: string;
-  version: number;
-  contentSource: DocumentContentSource;
-  content: Record<string, unknown>;
-}
-
-export interface DocumentContentSaveResponse {
-  documentId: string;
-  version: number;
-  contentSource: DocumentContentSource;
-  pdfUrl: string;
-  expiresAt: string;
-  draftToken?: string;
-}
-
-export interface DocumentContentPdfResponse {
-  documentId?: string;
-  version?: number;
-  contentSource?: DocumentContentSource;
-  pdfUrl: string;
-  expiresAt: string;
-  pageCount?: number;
-}
-
-export interface DocumentContentDocxResponse {
-  docxUrl: string;
-  expiresAt: string;
-}
-
-export interface DocumentContentUploadResponse {
-  contentSource: DocumentContentSource;
-  docxUrl: string;
-  pdfUrl: string;
-  expiresAt: string;
-  pageCount?: number;
-}
-
 export interface WorkflowApprovalItem {
   approvalId: string;
   documentId: string;
@@ -259,16 +190,6 @@ export interface WorkflowApprovalItem {
   decisionReason?: string;
   requestedAt: string;
   decidedAt?: string;
-}
-
-export interface AttachmentItem {
-  attachmentId: string;
-  documentId: string;
-  fileName: string;
-  contentType: string;
-  sizeBytes: number;
-  uploadedBy: string;
-  createdAt: string;
 }
 
 export interface CollaborationPresenceItem {
@@ -316,43 +237,6 @@ export interface DocumentBrowserTemplateSnapshotItem {
     children?: unknown[];
     theme?: MDDMTemplateTheme;
   } & Record<string, unknown>;
-}
-
-export interface DocumentEditorBundleResponse {
-  document: DocumentListItem;
-  versions: VersionListItem[];
-  schema: DocumentProfileSchemaItem;
-  governance: DocumentProfileGovernanceItem;
-  templateSnapshot?: DocumentTemplateSnapshotItem;
-  draftToken?: string;
-  presence: CollaborationPresenceItem[];
-  editLock?: DocumentEditLockItem;
-}
-
-export interface DocumentBrowserEditorBundleResponse {
-  document: DocumentListItem;
-  versions: VersionListItem[];
-  governance: DocumentProfileGovernanceItem;
-  templateSnapshot?: DocumentBrowserTemplateSnapshotItem;
-  body: string;
-  draftToken: string;
-}
-
-export interface DocumentBrowserContentSaveResponse {
-  documentId: string;
-  version: number;
-  contentSource: "browser_editor";
-  draftToken: string;
-}
-
-export interface DocumentTemplateItem {
-  templateKey: string;
-  version: number;
-  profileCode: string;
-  schemaVersion: number;
-  name: string;
-  editor?: string;
-  contentFormat?: string;
 }
 
 export interface DocumentTemplateAssignmentItem {

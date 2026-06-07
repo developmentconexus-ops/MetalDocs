@@ -11,7 +11,7 @@
 
 ### IP-004 — NIST SP 800-95 defense-in-depth
 - **Cite:** NIST SP 800-95 (2007) §4.3 — "Multiple layers of access control reduce single-point bypass risk."
-- **Applies to:** `internal/modules/audit/delivery/http/handler.go:34-35` (route registration) and `apps/api/cmd/metaldocs-api/permissions.go:211-221` (permission resolver default — no rule for `/api/v1/audit/events`).
+- **Applies to:** `internal/modules/audit/delivery/http/handler.go:34-35` (route registration). T-001 CLOSED: explicit `CapAuditRead` rows now at `apps/api/cmd/metaldocs-api/permissions.go:229-231` — route is no longer unmatched in the permission resolver.
 - **Finding:** `GET /api/v1/audit/events` is reachable without authn or capability check (verified via grep — Phase 2 `02-flow-list.md`). Zero authz layers; defense-in-depth count = 0 on a regulated read surface. → tech-debt T-001 (Critical, authn/authz bypass trigger).
 
 ### IP-006 — forward-only migrations (Fowler 2016)

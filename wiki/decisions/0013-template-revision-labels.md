@@ -38,7 +38,7 @@ Documents (regulated, instance-side) labels revisions as `REV00 / REV01 / …`. 
 - Column: `documents.revision_number INT NOT NULL` — added by `migrations/0131_documents_v2_state_columns.sql:19`.
 - Allocation: at INSERT, `COALESCE((SELECT MAX(d2.revision_number) + 1 FROM documents d2 WHERE d2.controlled_document_id = $6), 0)` — `internal/modules/documents/repository/repository.go:115`. **0-based at runtime** (default `1` in schema is never observed; INSERT always supplies the value).
 - Uniqueness: `ux_documents_v2_cd_revision` on `(controlled_document_id, revision_number) WHERE controlled_document_id IS NOT NULL`.
-- API: `RevisionNumber: integer/int64` on the document DTO (`api/openapi/v1/openapi.yaml:3574`), required.
+- API: `RevisionNumber: integer/int64` on the document DTO (`api/openapi/v1/openapi.yaml:3406`), required.
 - FE: `formatRevisionCode(n)` at `frontend/apps/web/src/features/documents/lib/documentDetailMeta.ts:78` renders `REV${String(Math.max(n, 0)).padStart(2, '0')}`.
 
 Templates currently label the same concept as `v1 / v2 / …`. After PR #33 the chip is honest (reads `published_version_number` instead of `latest_version`) but the *label scheme* still diverges from documents.
