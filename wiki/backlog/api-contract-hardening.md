@@ -1,6 +1,6 @@
 # API Contract Hardening Program
 
-> **Last verified:** 2026-06-05 (Phase B shipped — signoff password re-auth wired + search per-document visibility on the unified model; coupled v2-reader phantom-column fix. Prior: Phase A — spec base-path normalization + double-prefix kill + CI gate)
+> **Last verified:** 2026-06-07 (Phase C shipped — dead/unserved surface prune: 25 spec paths + 80 orphan schemas + 1 orphan param + 8 dead/phantom `permissions.go` rows removed; planned endpoints captured to `planned-endpoints.md`; 2 undoc handlers added to spec, 3 annotated wont-fix. Prior: Phase B — signoff password re-auth + search per-document visibility; Phase A — spec base-path normalization + double-prefix kill + CI gate)
 > **Owner discipline:** same as [`roadmap.md`](roadmap.md) — each Phase = one fresh implementation session = one PR series. Ship each Phase without compromise; if a Phase bloats mid-flight, split it (e.g. C → C1 + C2) and update this doc.
 > **Why this exists:** Plan 8 ("OpenAPI / contract-first completion", roadmap.md, marked done 2026-05-13) landed the codegen plumbing but left the *contract surface itself* incoherent. A 4-subagent audit (2026-06-05) found systemic drift between the OpenAPI spec, the runtime router, `permissions.go`, the generated FE types, and the live handlers — plus two confirmed authz-enforcement gaps. This program closes that gap and brings the API surface to the same industry-standard bar the auth/middleware/authz refactor already reached.
 > **Supersedes:** [`contract-first-followups.md`](contract-first-followups.md) — its "no spec coverage" module list is folded into Phase C/E here.
@@ -32,7 +32,7 @@
 |------|-------|-------|------|--------|
 | P0 | A | Spec base-path normalization + double-prefix kill + lint gate | Low (mechanical) | done 2026-06-05 |
 | P0 | B | Authz enforcement gaps (signoff reauth + search visibility) | Med (security) | done 2026-06-05 |
-| P1 | C | Dead / unserved surface prune (OWASP API9) | Med (contract shape) | pending |
+| P1 | C | Dead / unserved surface prune (OWASP API9) | Med (contract shape) | done 2026-06-07 |
 | P1 | D | Error-envelope unification (finish RFC 9457) | Med (contract shape) | pending |
 | P2 | E | Spec hygiene + standards conformance | Med | pending |
 | P2 | F | FE transport unification + Go dead-code purge | Low | pending |
@@ -106,7 +106,27 @@
   - Document the handler-only endpoints that *should* be in the spec (`/iam/presence/stream`, `/healthz`, audit export sub-routes, `documents/{id}/pdf-complete`) — add them or annotate why omitted.
 - **Closes (ledger):** F-DEAD-TAXPATHS, F-DEAD-MISCPATHS, F-PHANTOM-PERMS, F-ORPHAN-SCHEMAS, F-UNDOC-HANDLERS.
 - **Verify:** a generated route truth-table shows zero spec-without-handler and zero handler-without-spec (excluding intentionally-annotated); redocly lint passes; full test suite green.
-- **Status:** pending. **Hard-stop note:** contract-shape change — each removal opens with the per-path forensic check, not a blanket delete.
+- **Status:** done 2026-06-07 (branch `qa/api-contract-hardening-phase-c`, off `qa/iam-area-membership`).
+- **Forensic correction (recorded — do NOT trust the audit blindly):** A read-only route investigator initially reported the legacy-taxonomy bloc (`/document-profiles`, `/process-areas`, `/document-subjects`, `/document-types`, `/document-families`, `/document-departments`, `/document-areas`) as **REGISTERED via the taxonomy module** — a circular inference from the spec, not from generated code. Direct inspection of `internal/modules/taxonomy/delivery/http/routes_generated.go` + `api/api.gen.go` proved the taxonomy module's `ServerInterface` implements **only** the canonical `/api/v1/taxonomy/*` operations (`ListTaxonomyProfiles`/`Areas`/`Families` + CRUD); zero legacy-path registration anywhere (`grep` of all `*.gen.go` for legacy paths = 0; `apps/` `HandleFunc` for legacy = 0). The only Go references to the legacy paths were the (now-deleted) `permissions.go` rows and metric-label normalizers in `internal/platform/observability/http.go` (left in place — internal Go dead code, Phase F scope). **Verdict: all 25 candidate paths confirmed unserved by my own forensic check before deletion.**
+- **Decision applied (OD-2):** unserved-and-dead → deleted outright; unserved-but-planned (notifications, workflow) → captured to [`planned-endpoints.md`](planned-endpoints.md) **before** deletion, then removed from the live contract.
+- **Scope clarifications (recorded):**
+  - `/document-templates` (legacy doc-template catalog, not in the original audit's enumerated list) was **also** confirmed unserved (zero Go ref) and removed — part of the same superseded legacy bloc.
+  - `ControlledDocumentMutationResponse` (refs=11) was deleted: all 11 `$ref`s sat inside the dead legacy-taxonomy ops; the **real** controlled-documents paths use `AtomicCreateResponse`/`RevisionResponse` and were untouched (name was misleading).
+  - Orphan schemas computed **transitively** (reachability from surviving paths/params), not by the audit's "~22" estimate: **80** schemas were unreachable after path deletion (pre-existing zero-ref orphans — editor bundles, content-save variants, version diff, collaboration presence, attachments — **plus** the now-orphaned taxonomy/notification/workflow schemas). All 80 removed; redocly lint confirms zero dangling `$ref`.
+  - `DocumentId` component parameter orphaned (both refs were in dead workflow paths) → removed.
+- **F-UNDOC-HANDLERS disposition:**
+  - **Added to spec:** `GET /audit/events/export/{exportId}` (status) + `GET /audit/events/export/{exportId}/download` (signed-token payload) — plain versioned HTTP, client-facing; new `AuditExportStatusResponse` schema. Handler-backed (live QA: status→`404 NOT_FOUND` Problem for unknown id, download→`400` for missing token).
+  - **Annotated wont-fix (intentional omission, with reason):**
+    - `GET /healthz` — ops liveness alias served at **root**, outside the `servers.url: /api/v1` base; structurally cannot be a path key. Versioned probes `/health/live` + `/health/ready` remain in spec.
+    - `GET /api/v1/iam/presence/stream` — **WebSocket** upgrade (`github.com/coder/websocket`); not representable in OpenAPI 3.x. The HTTP fallback `/iam/presence/snapshot` IS the documented contract.
+    - `POST /api/v1/documents/{id}/pdf-complete` — **internal service-to-service webhook**, HMAC-SHA256 authenticated (`X-Docgen-Signature`), called by docgen_v2_pdf workers; not part of the session-auth public client contract.
+- **FE disposition:** spec→FE regen (`npm run gen:api`) clean; `tsc` clean → empirically proves **no** FE code consumed the *generated* types of any deleted schema (all live consumers — `NotificationItem`, `WorkflowApprovalItem`, `DocumentListItem`, taxonomy items, etc. — import the **hand-written** `lib/types` mirrors, which are independent of the spec). Deleted 12 provably-dead `lib/types` mirrors of removed schemas (zero importers, definition-only: `ManagedUserItem`, `AttachmentItem`, `VersionDiffResponse`, `DocumentTemplateItem`, `DocumentEditorBundleResponse`, `DocumentBrowserEditorBundleResponse`, `DocumentBrowserContentSaveResponse`, `DocumentContentNative/Save/Pdf/Docx/UploadResponse`). **Bounded defer → Phase F (F-FE-DUPTYPES):** the screen-consumed mirrors (kept — deleting breaks live screens) and the cascade-freed-but-still-defined mirrors (`CollaborationPresenceItem`, `DocumentContentSource`, `VersionListItem`, `RendererPin`, `DocumentEditLockItem`, template-snapshot items) belong to Phase F's wholesale `lib/types` rewrite, not Phase C's surgical prune.
+- **Evidence (2026-06-07):**
+  - **Route truth-table:** 25 spec paths deleted (legacy-taxonomy bloc ×19 incl. `/document-templates`; `/notifications` ×2; `/operations/stream`; `/attachments/{id}/content`; `/workflow/documents/{id}/{transitions,approvals}`; `/telemetry/mddm-shadow-diff`). Surviving spec paths (~105) each map 1:1 to a runtime handler; the only runtime handlers absent from spec are the 3 annotated above + the `METALDOCS_E2E`-gated test handlers (never public). Zero spec-without-handler; zero handler-without-spec (excluding annotated).
+  - **Spec/codegen:** `openapi.yaml` 6674 → 4372 lines (−2302). `npx @redocly/cli lint` → **valid** (zero dangling `$ref`). `go run ./scripts/api-lint` → **0 blocking** (unchanged baseline), reported-only **391 → 273** (dead paths leaving; +2 from the two added audit ops is Phase E global-sec/pagination debt on real served endpoints).
+  - **permissions.go:** removed 8 rows — phantom (`POST /api/v1/auth/refresh` public, `POST /api/v1/documents`, `documents/{id}/artifact-metadata`) + dead-path (`/notifications` ×2, `/workflow/documents` ×2, legacy `/document-profiles` ×4, `/process-areas` ×4, `/document-subjects` ×4) and their `permissions_test.go` rows (`TestPermissionResolver`, `TestPublicPathChecker`, `TestRouteCoverage`). All three phantom rows independently verified unserved (auth handler registers only login/logout/me/change-password; spec `/documents` has GET only; no artifact-metadata handler/spec).
+  - **Gates:** `go build ./...` clean; `go vet ./apps/api/...` clean; `go test ./apps/api/... ./internal/modules/... ./scripts/api-lint/... -count=1` **green** (incl. `permissions_test.go`). FE `npm run gen:api` clean; `npx tsc --noEmit` clean.
+  - **Live QA (API `:8081`, `scripts/start-api.ps1 -Build`, admin cookie session):** neighbour surfaces of the pruned paths all **200** — `/taxonomy/{profiles,areas,families}`, `/documents?page=1&pageSize=20`, `/documents/stats`, `/controlled-documents`, `/search/documents`. Deleted paths all **404** (`/document-profiles`, `/process-areas`, `/notifications`, `/workflow/documents/x/approvals`, `/telemetry/mddm-shadow-diff`) — contract now matches reality. No collateral damage.
 
 ## Phase D · Error-envelope unification
 
@@ -164,11 +184,11 @@ Source: 4-subagent audit, 2026-06-05. Severity from the audit. Every row maps to
 | F-SEC-REAUTH | CRITICAL | signoff `password_token` accepted + stored, never verified; bcrypt provider dead | B | closed 2026-06-05 |
 | F-SEC-SEARCH | CRITICAL | v2 search open-by-default; ignores `controlled_document_*` grants | B | closed 2026-06-05 |
 | F-DEAD-SEARCHPOLICY | HIGH | dead `AccessPolicy` path in search (`decidePolicies`/`ListAccessPolicies` no-op) | B | closed 2026-06-05 |
-| F-DEAD-TAXPATHS | CRITICAL | ~22 legacy taxonomy spec paths, no handlers (superseded by `/taxonomy/*`) | C | open |
-| F-DEAD-MISCPATHS | HIGH | `notifications`, `workflow/*`, `operations/stream`, `attachments/content`, `telemetry/*` spec paths, no handlers | C | open |
-| F-PHANTOM-PERMS | HIGH | `permissions.go` rows with no route/spec (`auth/refresh`, `POST /documents`, `artifact-metadata`) | C | open |
-| F-ORPHAN-SCHEMAS | HIGH | ~22 `components/schemas` never `$ref`'d | C | open |
-| F-UNDOC-HANDLERS | MEDIUM | handlers absent from spec (`presence/stream`, `healthz`, audit export sub-routes, `pdf-complete`) | C | open |
+| F-DEAD-TAXPATHS | CRITICAL | ~22 legacy taxonomy spec paths, no handlers (superseded by `/taxonomy/*`) | C | closed 2026-06-07 (19 paths incl. `/document-templates` deleted; forensic-verified unserved) |
+| F-DEAD-MISCPATHS | HIGH | `notifications`, `workflow/*`, `operations/stream`, `attachments/content`, `telemetry/*` spec paths, no handlers | C | closed 2026-06-07 (notifications + workflow captured to planned-endpoints.md before delete; rest deleted) |
+| F-PHANTOM-PERMS | HIGH | `permissions.go` rows with no route/spec (`auth/refresh`, `POST /documents`, `artifact-metadata`) | C | closed 2026-06-07 (all 3 verified unserved + removed with tests) |
+| F-ORPHAN-SCHEMAS | HIGH | ~22 `components/schemas` never `$ref`'d | C | closed 2026-06-07 (80 transitively-unreachable schemas + 1 orphan param removed; redocly clean) |
+| F-UNDOC-HANDLERS | MEDIUM | handlers absent from spec (`presence/stream`, `healthz`, audit export sub-routes, `pdf-complete`) | C | closed 2026-06-07 (audit export sub-routes added to spec; `presence/stream`=WS, `healthz`=root-ops, `pdf-complete`=HMAC webhook → wont-fix, annotated with reason) |
 | F-ENVELOPE-SPLIT | CRITICAL | `ApiErrorEnvelope` (legacy) vs `Problem` (RFC 9457) coexist | D | open |
 | F-NO-500 | HIGH | no operation documents a `500` response | D | open |
 | F-NO-GLOBAL-SEC | CRITICAL | no global `security:` block; 125+ ops implicitly unauthenticated in-doc | E | open |

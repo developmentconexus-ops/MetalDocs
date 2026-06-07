@@ -463,6 +463,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/events/export/{exportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the status of an audit export job */
+        get: operations["getAuditExportStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/events/export/{exportId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download the rendered audit export payload via a signed token */
+        get: operations["downloadAuditExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/sessions": {
         parameters: {
             query?: never;
@@ -548,1502 +582,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/document-types": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista os tipos documentais suportados */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de tipos documentais */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListDocumentTypesResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-types/{typeKey}/bundle": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Load document type metadata, active schema, and governance */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    typeKey: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Runtime bundle do tipo documental */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            [key: string]: unknown;
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-families": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista as familias documentais canonicas */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de familias documentais */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListDocumentFamiliesResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista o catalogo de templates documentais atribuiveis por profile */
-        get: {
-            parameters: {
-                query?: {
-                    profileCode?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Catalogo de templates documentais */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListDocumentTemplatesResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-profiles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista os perfis documentais disponiveis */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de perfis documentais */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListDocumentProfilesResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Cria um profile documental */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["DocumentProfileCreateRequest"];
-                };
-            };
-            responses: {
-                /** @description Profile criado */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-profiles/{profileCode}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Atualiza um profile documental */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["DocumentProfileUpdateRequest"];
-                };
-            };
-            responses: {
-                /** @description Profile atualizado */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        /** Desativa um profile documental */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Profile desativado */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-profiles/{profileCode}/schema": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista as versoes de schema de metadata de um profile */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Schemas do profile */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListDocumentProfileSchemasResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Cria ou atualiza uma versao de schema de metadata de um profile */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["DocumentProfileSchemaUpsertRequest"];
-                };
-            };
-            responses: {
-                /** @description Schema versionado atualizado */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-profiles/{profileCode}/schema/{version}/activate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Ativa uma versao de schema de metadata para o profile */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                    version: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Versao de schema ativada */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-profiles/{profileCode}/governance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Busca a governanca ativa de um profile */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Governanca do profile */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DocumentProfileGovernance"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-profiles/{profileCode}/bundle": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Carrega profile, schema ativo, governanca e taxonomia em um unico payload */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Bundle de profile */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["DocumentProfileBundleResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-profiles/{profileCode}/template/docx": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * [DEPRECATED] Template DOCX rendering removed â€” use content builder
-         * @deprecated
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Template rendering removed */
-                501: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        /** Atualiza governanca ativa de um profile */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    profileCode: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["DocumentProfileGovernanceUpdateRequest"];
-                };
-            };
-            responses: {
-                /** @description Governanca atualizada */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/process-areas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista as areas de processo documentais */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de areas de processo */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListProcessAreasResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Cria uma area de processo documental */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ProcessAreaCreateRequest"];
-                };
-            };
-            responses: {
-                /** @description Area criada */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/process-areas/{code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Atualiza uma area de processo documental */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    code: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ProcessAreaUpdateRequest"];
-                };
-            };
-            responses: {
-                /** @description Area atualizada */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-departments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista os departamentos documentais */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de departamentos */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListDocumentDepartmentsResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Cria um departamento documental */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["DocumentDepartmentCreateRequest"];
-                };
-            };
-            responses: {
-                /** @description Departamento criado */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-departments/{code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Atualiza um departamento documental */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    code: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["DocumentDepartmentUpdateRequest"];
-                };
-            };
-            responses: {
-                /** @description Departamento atualizado */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        /** Desativa um departamento documental */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    code: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Departamento desativado */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-areas/{code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Desativa uma area de processo documental */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    code: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Area desativada */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-subjects": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista os assuntos documentais */
-        get: {
-            parameters: {
-                query?: {
-                    processArea?: string;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de assuntos documentais */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListSubjectsResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /** Cria um assunto documental */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["SubjectCreateRequest"];
-                };
-            };
-            responses: {
-                /** @description Assunto criado */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/document-subjects/{code}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Atualiza um assunto documental */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    code: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["SubjectUpdateRequest"];
-                };
-            };
-            responses: {
-                /** @description Assunto atualizado */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ControlledDocumentMutationResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        post?: never;
-        /** Desativa um assunto documental */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    code: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Assunto desativado */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/audit/events": {
         parameters: {
             query?: never;
@@ -2053,244 +591,6 @@ export interface paths {
         };
         /** Lista eventos de auditoria append-only (multi-axis filter, cursor-paginated) */
         get: operations["listAuditEvents"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/notifications": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista notificacoes operacionais do usuario autenticado */
-        get: {
-            parameters: {
-                query?: {
-                    recipientUserId?: string;
-                    status?: "PENDING" | "SENT" | "READ";
-                    limit?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de notificacoes */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListNotificationsResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/notifications/{notificationId}/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Marca notificacao como lida */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    notificationId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Notificacao marcada como lida */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["MarkNotificationReadResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Notificacao nao encontrada */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/operations/stream": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stream SSE com snapshot operacional para Operations Center */
-        get: {
-            parameters: {
-                query?: {
-                    intervalSec?: number;
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Stream SSE ativo */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/event-stream": string;
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/attachments/{attachmentId}/content": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download de anexo via URL assinada temporaria */
-        get: {
-            parameters: {
-                query: {
-                    expiresAt: string;
-                    signature: string;
-                };
-                header?: never;
-                path: {
-                    attachmentId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Conteudo binario do anexo */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/octet-stream": string;
-                    };
-                };
-                /** @description URL invalida ou expirada */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Anexo nao encontrado */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
         put?: never;
         post?: never;
         delete?: never;
@@ -2374,158 +674,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workflow/documents/{documentId}/transitions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Transiciona o status de workflow do documento */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    documentId: components["parameters"]["DocumentId"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["WorkflowTransitionRequest"];
-                };
-            };
-            responses: {
-                /** @description Workflow atualizado */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowTransitionResponse"];
-                    };
-                };
-                /** @description Requisicao invalida */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Documento nao encontrado */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Transicao invalida para o status atual */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workflow/documents/{documentId}/approvals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista a trilha de aprovacoes do documento */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    documentId: components["parameters"]["DocumentId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Lista de aprovacoes */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ListWorkflowApprovalsResponse"];
-                    };
-                };
-                /** @description Nao autenticado */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Sem permissao */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-                /** @description Documento nao encontrado */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ApiErrorEnvelope"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/iam/users/{userId}/roles": {
         parameters: {
             query?: never;
@@ -2558,29 +706,6 @@ export interface paths {
         post: operations["grantAreaMembership"];
         /** Revoke an active area membership */
         delete: operations["revokeAreaMembership"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/telemetry/mddm-shadow-diff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Submit a Phase 1 shadow-diff telemetry event
-         * @description Frontend posts one event per browser_editor DOCX export while
-         *     Plan 4 Phase 1 is active. Records a hash of both the docgen-
-         *     produced DOCX and the client-side DOCX so engineers can aggregate
-         *     structural drift before enabling the canary rollout.
-         */
-        post: operations["recordMDDMShadowDiff"];
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3949,25 +2074,6 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        /** @description Legacy shape kept for backward compat with hand-wired /iam/users handlers. Prefer ManagedUserCore. */
-        ManagedUserItem: {
-            userId: string;
-            username: string;
-            email?: string;
-            displayName: string;
-            isActive: boolean;
-            mustChangePassword: boolean;
-            failedLoginAttempts: number;
-            /** Format: date-time */
-            lockedUntil?: string;
-            /** Format: date-time */
-            lastLoginAt?: string;
-            roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-        };
         CursorPage: {
             next_cursor: string | null;
             has_more: boolean;
@@ -4064,10 +2170,6 @@ export interface components {
             presence: components["schemas"]["OnlinePresenceItem"][];
             recentActivities: components["schemas"]["AuditEventItem"][];
         };
-        /** @description Legacy list shape. Prefer ListUsersResponse. */
-        ListManagedUsersResponse: {
-            items: components["schemas"]["ManagedUserItem"][];
-        };
         CreateManagedUserRequest: {
             userId?: string;
             username: string;
@@ -4091,11 +2193,6 @@ export interface components {
             mustChangePassword?: boolean;
             tenantRole?: components["schemas"]["UserRole"];
         };
-        /** @description Legacy response shape; new patchUser returns ManagedUserCore. */
-        UpdateManagedUserResponse: {
-            userId: string;
-            updated: boolean;
-        };
         ResetManagedUserPasswordRequest: {
             newPassword: string;
         };
@@ -4117,82 +2214,6 @@ export interface components {
             userId: string;
             displayName: string;
             roles: ("system_admin" | "approver" | "author" | "editor" | "viewer")[];
-        };
-        CreateDocumentRequest: {
-            title: string;
-            /**
-             * @description Legacy alias accepted during transition. Prefer `documentProfile`.
-             * @enum {string}
-             */
-            documentType?: "po" | "it" | "rg";
-            /** @description Canonical document profile code resolved by controlled documents. */
-            documentProfile?: string;
-            /** @description Optional process taxonomy code, such as `marketplaces` or `quality`. */
-            processArea?: string;
-            subject?: string;
-            ownerId: string;
-            businessUnit: string;
-            department: string;
-            /**
-             * @default INTERNAL
-             * @enum {string}
-             */
-            classification: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
-            tags?: string[];
-            /** Format: date-time */
-            effectiveAt?: string;
-            /** Format: date-time */
-            expiryAt?: string;
-            audience?: components["schemas"]["DocumentAudience"];
-            metadata?: {
-                [key: string]: unknown;
-            };
-            initialContent?: string;
-        };
-        DocumentCreatedResponse: {
-            documentId: string;
-            version: number;
-            /** @enum {string} */
-            status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED";
-            /** @description Transitional alias mirroring the resolved profile code. */
-            documentType: string;
-            /** @description Resolved document profile code. */
-            documentProfile: string;
-            /** @description Canonical family resolved from the selected profile. */
-            documentFamily: string;
-            documentSequence: number;
-            documentCode: string;
-            profileSchemaVersion: number;
-            processArea?: string;
-            subject?: string;
-        };
-        DocumentListItem: {
-            documentId: string;
-            title: string;
-            /** @description Transitional alias mirroring the resolved profile code. */
-            documentType: string;
-            /** @description Resolved document profile code. */
-            documentProfile: string;
-            /** @description Canonical family resolved from the selected profile. */
-            documentFamily: string;
-            documentSequence: number;
-            documentCode: string;
-            profileSchemaVersion?: number;
-            processArea?: string;
-            subject?: string;
-            ownerId: string;
-            businessUnit: string;
-            department: string;
-            classification: string;
-            status: string;
-            tags: string[];
-            /** Format: date-time */
-            effectiveAt?: string;
-            /** Format: date-time */
-            expiryAt?: string;
-        };
-        ListDocumentsResponse: {
-            items: components["schemas"]["DocumentListItem"][];
         };
         DocumentListResponse: {
             items: components["schemas"]["DocumentSummary"][];
@@ -4348,206 +2369,6 @@ export interface components {
                 [key: string]: number;
             };
         };
-        MetadataFieldRule: {
-            name: string;
-            type: string;
-            required: boolean;
-        };
-        DocumentAudience: {
-            /** @enum {string} */
-            mode: "INTERNAL" | "DEPARTMENT" | "AREAS" | "EXPLICIT";
-            departmentCodes?: string[];
-            processAreaCodes?: string[];
-            roleCodes?: string[];
-            userIds?: string[];
-        };
-        /** @enum {string} */
-        DocumentContentSource: "native" | "docx_upload" | "browser_editor";
-        DocumentContentSaveRequest: {
-            /** @description Token de draft para saves governados; opcional apenas para callers legados do native save fora do pilot. */
-            draftToken?: string;
-            content: {
-                [key: string]: unknown;
-            };
-        };
-        DocumentBrowserContentSaveRequest: {
-            body: string;
-            /** @description Token atual do draft carregado no browser editor. */
-            draftToken: string;
-        };
-        DocumentContentNativeResponse: {
-            documentId: string;
-            version: number;
-            contentSource: components["schemas"]["DocumentContentSource"];
-            content: {
-                [key: string]: unknown;
-            };
-        };
-        /** @description Snapshot da template DSL para o pilot governado. O `definition` e o pilot subset/subconjunto pilotado da DSL MetalDocs, limitado a page, section-frame, label, field-slot, rich-slot, repeat-slot e table-slot. */
-        DocumentTemplateSnapshotResponse: {
-            templateKey: string;
-            version: number;
-            profileCode: string;
-            schemaVersion: number;
-            definition: components["schemas"]["DocumentTemplateNodeResponse"];
-        };
-        DocumentBrowserTemplateSnapshot: {
-            templateKey: string;
-            version: number;
-            profileCode: string;
-            schemaVersion: number;
-            /** @enum {string} */
-            editor: "mddm-blocknote";
-            /** @enum {string} */
-            contentFormat: "mddm";
-            body: string;
-        };
-        DocumentTemplateItem: {
-            templateKey: string;
-            version: number;
-            profileCode: string;
-            schemaVersion: number;
-            name: string;
-            editor?: string;
-            contentFormat?: string;
-        };
-        ListDocumentTemplatesResponse: {
-            items: components["schemas"]["DocumentTemplateItem"][];
-        };
-        DocumentTemplateAssignmentRequest: {
-            templateKey: string;
-            templateVersion: number;
-        };
-        DocumentTemplateAssignmentResponse: {
-            documentId: string;
-            templateKey: string;
-            templateVersion: number;
-            /** Format: date-time */
-            assignedAt: string;
-        };
-        /** @description Pilot subset/subconjunto pilotado da MetalDocs template DSL, intencionalmente limitado a page, section-frame, label, field-slot, rich-slot, repeat-slot e table-slot. */
-        DocumentTemplateNodeResponse: components["schemas"]["DocumentTemplatePageNodeResponse"] | components["schemas"]["DocumentTemplateSectionFrameNodeResponse"] | components["schemas"]["DocumentTemplateLabelNodeResponse"] | components["schemas"]["DocumentTemplateFieldSlotNodeResponse"] | components["schemas"]["DocumentTemplateRichSlotNodeResponse"] | components["schemas"]["DocumentTemplateRepeatSlotNodeResponse"] | components["schemas"]["DocumentTemplateTableSlotNodeResponse"];
-        DocumentTemplatePageNodeResponse: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "page";
-            id: string;
-            children: components["schemas"]["DocumentTemplateNodeResponse"][];
-        };
-        DocumentTemplateSectionFrameNodeResponse: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "section-frame";
-            id: string;
-            title?: string;
-            children: components["schemas"]["DocumentTemplateNodeResponse"][];
-        };
-        DocumentTemplateLabelNodeResponse: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "label";
-            id: string;
-            text: string;
-        };
-        DocumentTemplateFieldSlotNodeResponse: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "field-slot";
-            id: string;
-            path: string;
-            /** @enum {string} */
-            fieldKind: "scalar";
-        };
-        DocumentTemplateRichSlotNodeResponse: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "rich-slot";
-            id: string;
-            path: string;
-            /** @enum {string} */
-            fieldKind: "rich";
-        };
-        DocumentTemplateRepeatSlotNodeResponse: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "repeat-slot";
-            id: string;
-            path: string;
-            /** @enum {string} */
-            fieldKind: "repeat";
-        };
-        DocumentTemplateTableSlotNodeResponse: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "table-slot";
-            id: string;
-            path: string;
-            /** @enum {string} */
-            fieldKind: "table";
-        };
-        DocumentContentPdfResponse: {
-            documentId?: string;
-            version?: number;
-            contentSource?: components["schemas"]["DocumentContentSource"];
-            pdfUrl: string;
-            /** Format: date-time */
-            expiresAt: string;
-            pageCount?: number;
-        };
-        DocumentContentDocxResponse: {
-            docxUrl: string;
-            /** Format: date-time */
-            expiresAt: string;
-        };
-        DocumentContentSaveResponse: {
-            documentId: string;
-            version: number;
-            contentSource: components["schemas"]["DocumentContentSource"];
-            /** @description Token de draft renovado apos um save governado bem-sucedido; a rotacao do token acontece apenas em guarded saves confirmados. */
-            draftToken: string;
-            pdfUrl: string;
-            /** Format: date-time */
-            expiresAt: string;
-        };
-        DocumentBrowserContentSaveResponse: {
-            documentId: string;
-            version: number;
-            /** @enum {string} */
-            contentSource: "browser_editor";
-            /** @description Token atualizado do draft corrente para controle de concorrencia no browser editor. */
-            draftToken: string;
-        };
-        DocumentContentUploadResponse: {
-            contentSource: components["schemas"]["DocumentContentSource"];
-            docxUrl: string;
-            pdfUrl: string;
-            pageCount?: number;
-            /** Format: date-time */
-            expiresAt: string;
-        };
-        DocumentTypeItem: {
-            code: string;
-            name: string;
-            description: string;
-            reviewIntervalDays: number;
-        };
-        ListDocumentTypesResponse: {
-            items: components["schemas"]["DocumentTypeItem"][];
-        };
         DocumentFamilyItem: {
             code: string;
             name: string;
@@ -4569,126 +2390,16 @@ export interface components {
             retentionDays: number;
             validityDays: number;
         };
-        DocumentProfileCreateRequest: {
-            code: string;
-            familyCode: string;
-            name: string;
-            alias: string;
-            description?: string;
-            reviewIntervalDays: number;
-        };
-        DocumentProfileUpdateRequest: {
-            familyCode: string;
-            name: string;
-            alias: string;
-            description?: string;
-            reviewIntervalDays: number;
-        };
         ListDocumentProfilesResponse: {
             items: components["schemas"]["DocumentProfileItem"][];
-        };
-        DocumentProfileSchemaVersionItem: {
-            profileCode: string;
-            version: number;
-            isActive: boolean;
-            metadataRules: components["schemas"]["MetadataFieldRule"][];
-            contentSchema?: {
-                [key: string]: unknown;
-            };
-        };
-        DocumentProfileSchemaUpsertRequest: {
-            version: number;
-            isActive?: boolean;
-            metadataRules: components["schemas"]["MetadataFieldRule"][];
-            contentSchema?: {
-                [key: string]: unknown;
-            };
-        };
-        ListDocumentProfileSchemasResponse: {
-            items: components["schemas"]["DocumentProfileSchemaVersionItem"][];
-        };
-        DocumentProfileGovernance: {
-            profileCode: string;
-            workflowProfile: string;
-            reviewIntervalDays: number;
-            approvalRequired: boolean;
-            retentionDays: number;
-            validityDays: number;
-        };
-        DocumentProfileGovernanceUpdateRequest: {
-            workflowProfile: string;
-            reviewIntervalDays: number;
-            approvalRequired: boolean;
-            retentionDays: number;
-            validityDays: number;
-        };
-        DocumentProfileBundleTaxonomy: {
-            processAreas: components["schemas"]["ProcessAreaItem"][];
-            documentDepartments: components["schemas"]["DocumentDepartmentItem"][];
-            subjects: components["schemas"]["SubjectItem"][];
-        };
-        DocumentProfileBundleResponse: {
-            profile: components["schemas"]["DocumentProfileItem"];
-            schema: components["schemas"]["DocumentProfileSchemaVersionItem"];
-            governance: components["schemas"]["DocumentProfileGovernance"];
-            taxonomy: components["schemas"]["DocumentProfileBundleTaxonomy"];
         };
         ProcessAreaItem: {
             code: string;
             name: string;
             description: string;
         };
-        ProcessAreaCreateRequest: {
-            code: string;
-            name: string;
-            description?: string;
-        };
-        ProcessAreaUpdateRequest: {
-            name: string;
-            description?: string;
-        };
         ListProcessAreasResponse: {
             items: components["schemas"]["ProcessAreaItem"][];
-        };
-        DocumentDepartmentItem: {
-            code: string;
-            name: string;
-            description: string;
-        };
-        DocumentDepartmentCreateRequest: {
-            code: string;
-            name: string;
-            description?: string;
-        };
-        DocumentDepartmentUpdateRequest: {
-            name: string;
-            description?: string;
-        };
-        ListDocumentDepartmentsResponse: {
-            items: components["schemas"]["DocumentDepartmentItem"][];
-        };
-        SubjectItem: {
-            code: string;
-            processAreaCode: string;
-            name: string;
-            description: string;
-        };
-        SubjectCreateRequest: {
-            code: string;
-            processAreaCode: string;
-            name: string;
-            description?: string;
-        };
-        SubjectUpdateRequest: {
-            processAreaCode: string;
-            name: string;
-            description?: string;
-        };
-        ListSubjectsResponse: {
-            items: components["schemas"]["SubjectItem"][];
-        };
-        ControlledDocumentMutationResponse: {
-            code: string;
         };
         AuditEventItem: {
             id: string;
@@ -4732,6 +2443,15 @@ export interface components {
             signedUrl: string;
             /** Format: date-time */
             expiresAt: string;
+        };
+        AuditExportStatusResponse: {
+            exportId: string;
+            status: string;
+            /** Format: uri */
+            signedUrl: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            error?: string;
         };
         SessionItem: {
             sessionId: string;
@@ -4812,148 +2532,6 @@ export interface components {
             apiCalls: components["schemas"]["UsageWindowCounts"];
             activeUsers: components["schemas"]["UsageWindowCounts"];
         };
-        NotificationItem: {
-            id: string;
-            recipientUserId: string;
-            eventType: string;
-            resourceType: string;
-            resourceId: string;
-            title: string;
-            message: string;
-            /** @enum {string} */
-            status: "PENDING" | "SENT" | "READ";
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            readAt?: string;
-        };
-        ListNotificationsResponse: {
-            items: components["schemas"]["NotificationItem"][];
-        };
-        MarkNotificationReadResponse: {
-            id: string;
-            /** @enum {string} */
-            status: "READ";
-            /** Format: date-time */
-            readAt: string;
-        };
-        MutationAcceptedResponse: {
-            ok: boolean;
-        };
-        CollaborationPresenceItem: {
-            documentId: string;
-            userId: string;
-            displayName: string;
-            /** Format: date-time */
-            lastSeenAt: string;
-        };
-        ListDocumentCollaborationPresenceResponse: {
-            items: components["schemas"]["CollaborationPresenceItem"][];
-        };
-        HeartbeatDocumentCollaborationPresenceRequest: {
-            userId?: string;
-            displayName?: string;
-        };
-        DocumentEditLock: {
-            documentId: string;
-            lockedBy: string;
-            displayName: string;
-            lockReason: string;
-            /** Format: date-time */
-            acquiredAt: string;
-            /** Format: date-time */
-            expiresAt: string;
-        };
-        /** @description Bundle do editor para o draft carregado. `draftToken` e `templateSnapshot` sao campos adicionais presentes para documentos/profiles com governanca do canvas suportada, inicialmente no slice piloto de PO. Clientes do governed canvas devem esperar esses campos para o pilot slice. */
-        DocumentEditorBundleResponse: {
-            document: components["schemas"]["DocumentListItem"];
-            versions: components["schemas"]["VersionListItem"][];
-            schema: components["schemas"]["DocumentProfileSchemaVersionItem"];
-            governance: components["schemas"]["DocumentProfileGovernance"];
-            presence: components["schemas"]["CollaborationPresenceItem"][];
-            /** @description Token atual do draft snapshot carregado; presente para documentos/profiles com governanca do canvas suportada. Clients do governed canvas devem enviar este valor de volta no save. */
-            draftToken?: string;
-            /** @description Snapshot da template DSL pilotada; presente para documentos/profiles com governanca do canvas suportada, inicialmente no slice piloto de PO. */
-            templateSnapshot?: components["schemas"]["DocumentTemplateSnapshotResponse"];
-            editLock?: components["schemas"]["DocumentEditLock"];
-        };
-        DocumentBrowserEditorBundleResponse: {
-            document: components["schemas"]["DocumentListItem"];
-            versions: components["schemas"]["VersionListItem"][];
-            governance: components["schemas"]["DocumentProfileGovernance"];
-            templateSnapshot: components["schemas"]["DocumentBrowserTemplateSnapshot"];
-            body: string;
-            /** @description Token atual do draft snapshot carregado no browser editor; clients devem enviar este valor de volta no save. */
-            draftToken: string;
-        };
-        DocumentMDDMLoadTemplate: {
-            key: string;
-            version: number;
-        };
-        DocumentMDDMLoadResponse: {
-            documentId: string;
-            version: number;
-            /** @enum {string} */
-            status: "draft" | "pending_approval" | "released";
-            content: {
-                [key: string]: unknown;
-            };
-            template: components["schemas"]["DocumentMDDMLoadTemplate"];
-            contentHash: string;
-        };
-        AcquireDocumentEditLockRequest: {
-            userId?: string;
-            displayName?: string;
-            reason?: string;
-            ttlSeconds?: number;
-        };
-        VersionListItem: {
-            documentId: string;
-            version: number;
-            contentHash: string;
-            changeSummary: string;
-            /** Format: date-time */
-            createdAt: string;
-            /** @description Null for draft versions; populated once released. */
-            renderer_pin?: components["schemas"]["RendererPin"] | null;
-        };
-        AddVersionRequest: {
-            content: string;
-            changeSummary?: string;
-        };
-        ListVersionsResponse: {
-            items: components["schemas"]["VersionListItem"][];
-        };
-        VersionDiffResponse: {
-            documentId: string;
-            fromVersion: number;
-            toVersion: number;
-            contentChanged: boolean;
-            metadataChanged: string[];
-            classificationChanged: boolean;
-            effectiveAtChanged: boolean;
-            expiryAtChanged: boolean;
-        };
-        AttachmentItem: {
-            attachmentId: string;
-            documentId: string;
-            fileName: string;
-            contentType: string;
-            /** Format: int64 */
-            sizeBytes: number;
-            uploadedBy: string;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        ListAttachmentsResponse: {
-            items: components["schemas"]["AttachmentItem"][];
-        };
-        AttachmentDownloadURLResponse: {
-            attachmentId: string;
-            downloadUrl: string;
-            /** Format: date-time */
-            expiresAt: string;
-        };
         UpsertUserRoleRequest: {
             displayName?: string;
             /** @enum {string} */
@@ -4964,39 +2542,6 @@ export interface components {
             userId: string;
             role: string;
             displayName?: string;
-        };
-        WorkflowTransitionRequest: {
-            /** @enum {string} */
-            toStatus: "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED";
-            reason?: string;
-            assignedReviewer?: string;
-        };
-        WorkflowTransitionResponse: {
-            documentId: string;
-            fromStatus: string;
-            toStatus: string;
-            approvalId?: string;
-            /** @enum {string} */
-            approvalStatus?: "PENDING" | "APPROVED" | "REJECTED";
-            assignedReviewer?: string;
-        };
-        WorkflowApprovalItem: {
-            approvalId: string;
-            documentId: string;
-            requestedBy: string;
-            assignedReviewer: string;
-            decisionBy?: string;
-            /** @enum {string} */
-            status: "PENDING" | "APPROVED" | "REJECTED";
-            requestReason?: string;
-            decisionReason?: string;
-            /** Format: date-time */
-            requestedAt: string;
-            /** Format: date-time */
-            decidedAt?: string;
-        };
-        ListWorkflowApprovalsResponse: {
-            items: components["schemas"]["WorkflowApprovalItem"][];
         };
         SearchDocumentItem: {
             documentId: string;
@@ -5044,42 +2589,6 @@ export interface components {
                 [key: string]: unknown;
             };
             trace_id: string;
-        };
-        /**
-         * @description Frozen renderer inputs captured at DRAFTâ†’RELEASED transition.
-         *     Guarantees a released document always re-renders with the engine
-         *     that approved it.
-         */
-        RendererPin: {
-            /** @example 1.0.0 */
-            renderer_version: string;
-            /**
-             * @description SHA-256 of the serialized Layout IR module at release time
-             * @example abcdef0123456789...
-             */
-            layout_ir_hash: string;
-            /** @example po-mddm-canvas */
-            template_key: string;
-            template_version: number;
-            /** Format: date-time */
-            pinned_at?: string;
-        };
-        MDDMShadowDiffEvent: {
-            document_id: string;
-            version_number: number;
-            user_id_hash?: string;
-            /** @description SHA-256 of normalized docgen document.xml */
-            current_xml_hash: string;
-            /** @description SHA-256 of normalized client-side document.xml */
-            shadow_xml_hash: string;
-            /** @description Structural diff counters (blocks_equal, blocks_different, etc.) */
-            diff_summary?: {
-                [key: string]: unknown;
-            };
-            current_duration_ms?: number;
-            shadow_duration_ms?: number;
-            /** @description Non-empty when the shadow path failed */
-            shadow_error?: string;
         };
         /** @description Server-controlled feature flag values exposed to the frontend. */
         FeatureFlagsResponse: {
@@ -5458,9 +2967,7 @@ export interface components {
         };
     };
     responses: never;
-    parameters: {
-        DocumentId: string;
-    };
+    parameters: never;
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -6300,6 +3807,115 @@ export interface operations {
             };
         };
     };
+    getAuditExportStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status atual da exportacao */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditExportStatusResponse"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Exportacao nao encontrada */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    downloadAuditExport: {
+        parameters: {
+            query: {
+                token: string;
+            };
+            header?: never;
+            path: {
+                exportId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Conteudo binario da exportacao (CSV ou JSONL) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Token ausente ou invalido */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nao autenticado */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sem permissao */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Exportacao nao encontrada ou token expirado */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     listSessions: {
         parameters: {
             query?: {
@@ -6853,55 +4469,6 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    recordMDDMShadowDiff: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MDDMShadowDiffEvent"];
-            };
-        };
-        responses: {
-            /** @description Event accepted for storage */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Malformed body */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Not authenticated */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Telemetry not configured */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

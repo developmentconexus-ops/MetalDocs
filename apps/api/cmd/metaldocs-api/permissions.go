@@ -64,8 +64,6 @@ func (r routeRule) matches(method, path string) bool {
 // F-001 read/write split truth table (audit row -> intended caps):
 //
 //	metrics           GET   /api/v1/metrics              -> CapMetricsView
-//	notifications     GET   /api/v1/notifications        -> CapDocumentView
-//	notifications     POST  /api/v1/notifications/{id}/read -> CapDocumentView (read-side mark)
 //	iam/users         GET   /api/v1/iam/users            -> CapUserView
 //	iam/users         POST/PATCH/PUT (writes)            -> CapUserManage
 //	iam/admin/overview GET  /api/v1/iam/admin/overview   -> CapUserView
@@ -86,7 +84,6 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathPrefix: "/api/v1/health/", visibility: iamdelivery.VisibilityPublic},
 	{pathExact: "/healthz", visibility: iamdelivery.VisibilityPublic},
 	{method: http.MethodPost, pathExact: "/api/v1/auth/login", visibility: iamdelivery.VisibilityPublic},
-	{method: http.MethodPost, pathExact: "/api/v1/auth/refresh", visibility: iamdelivery.VisibilityPublic},
 	{method: http.MethodGet, pathExact: "/api/v1/feature-flags", visibility: iamdelivery.VisibilityPublic},
 
 	// ---- Session-required (authenticated, no specific capability) -------
@@ -98,14 +95,8 @@ var routeRules = []routeRule{
 	// Metrics — Prometheus scrape endpoint; read-only.
 	{method: http.MethodGet, pathExact: "/api/v1/metrics", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// Search / notifications.
+	// Search.
 	{method: http.MethodGet, pathExact: "/api/v1/search/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodGet, pathExact: "/api/v1/notifications", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathPrefix: "/api/v1/notifications/", pathSuffix: "/read", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-
-	// Workflow.
-	{method: http.MethodPost, pathPrefix: "/api/v1/workflow/documents/", pathSuffix: "/transitions", capability: iamdomain.CapDocumentSubmit, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodGet, pathPrefix: "/api/v1/workflow/documents/", pathSuffix: "/approvals", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
 	// IAM users. F-001 split: GET view, writes manage.
 	{method: http.MethodGet, pathExact: "/api/v1/iam/users", capability: iamdomain.CapUserView, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -130,22 +121,6 @@ var routeRules = []routeRule{
 	{method: http.MethodGet, pathExact: "/api/v1/iam/usage", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodGet, pathExact: "/api/v1/iam/kpi", capability: iamdomain.CapMetricsView, visibility: iamdelivery.VisibilityPermissionGuarded},
 
-	// Legacy taxonomy aliases.
-	{method: http.MethodGet, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPut, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodDelete, pathPrefix: "/api/v1/document-profiles", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-
-	{method: http.MethodGet, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPut, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodDelete, pathPrefix: "/api/v1/process-areas", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-
-	{method: http.MethodGet, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPut, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodDelete, pathPrefix: "/api/v1/document-subjects", capability: iamdomain.CapTaxonomyManage, visibility: iamdelivery.VisibilityPermissionGuarded},
-
 	// Templates — GET first, then exact POST, then sub-route POST/PUTs.
 	{method: http.MethodGet, pathPrefix: "/api/v1/templates", capability: iamdomain.CapTemplateView, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathExact: "/api/v1/templates", capability: iamdomain.CapTemplateCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -164,7 +139,6 @@ var routeRules = []routeRule{
 
 	// Documents — order preserves the original switch semantics (more specific suffixes/contains first).
 	{method: http.MethodGet, pathPrefix: "/api/v1/documents", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathExact: "/api/v1/documents", capability: iamdomain.CapDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/finalize", capability: iamdomain.CapDocumentSignoff, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/archive", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/duplicate", capability: iamdomain.CapDocumentCreate, visibility: iamdelivery.VisibilityPermissionGuarded},
@@ -172,7 +146,6 @@ var routeRules = []routeRule{
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/session/force-release", capability: iamdomain.CapMembershipManage, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/session/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/autosave/", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
-	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/artifact-metadata", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/checkpoints/", pathSuffix: "/restore", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", contains: "/checkpoints", capability: iamdomain.CapDocumentEdit, visibility: iamdelivery.VisibilityPermissionGuarded},
 	{method: http.MethodPost, pathPrefix: "/api/v1/documents", pathSuffix: "/export/pdf", capability: iamdomain.CapDocumentView, visibility: iamdelivery.VisibilityPermissionGuarded},

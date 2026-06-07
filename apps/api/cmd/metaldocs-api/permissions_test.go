@@ -31,7 +31,6 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "health ready public", method: http.MethodGet, path: "/api/v1/health/ready", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 		{name: "healthz public", method: http.MethodGet, path: "/healthz", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 		{name: "auth login public", method: http.MethodPost, path: "/api/v1/auth/login", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
-		{name: "auth refresh public", method: http.MethodPost, path: "/api/v1/auth/refresh", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 		{name: "feature flags public", method: http.MethodGet, path: "/api/v1/feature-flags", wantCap: "", wantVisibility: iamdelivery.VisibilityPublic},
 
 		// --- Session-required (authenticated, no capability) ---
@@ -48,14 +47,12 @@ func TestPermissionResolver(t *testing.T) {
 
 		// --- Permission-guarded: documents ---
 		{name: "documents list guarded", method: http.MethodGet, path: "/api/v1/documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents create", method: http.MethodPost, path: "/api/v1/documents", wantCap: iamdomain.CapDocumentCreate, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents submit", method: http.MethodPost, path: "/api/v1/documents/d1/submit", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents signoff", method: http.MethodPost, path: "/api/v1/documents/d1/signoff", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents publish", method: http.MethodPost, path: "/api/v1/documents/d1/publish", wantCap: iamdomain.CapDocumentPublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents schedule publish", method: http.MethodPost, path: "/api/v1/documents/d1/schedule-publish", wantCap: iamdomain.CapDocumentPublish, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents supersede", method: http.MethodPost, path: "/api/v1/documents/d1/supersede", wantCap: iamdomain.CapDocumentSupersede, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents obsolete", method: http.MethodPost, path: "/api/v1/documents/d1/obsolete", wantCap: iamdomain.CapDocumentObsolete, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "documents artifact metadata", method: http.MethodPost, path: "/api/v1/documents/d1/artifact-metadata", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents finalize", method: http.MethodPost, path: "/api/v1/documents/d1/finalize", wantCap: iamdomain.CapDocumentSignoff, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents session force release", method: http.MethodPost, path: "/api/v1/documents/d1/session/force-release", wantCap: iamdomain.CapMembershipManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "documents session generic", method: http.MethodPost, path: "/api/v1/documents/d1/session/acquire", wantCap: iamdomain.CapDocumentEdit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -92,16 +89,13 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "iam users unlock", method: http.MethodPost, path: "/api/v1/iam/users/u-1/unlock", wantCap: iamdomain.CapUserManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "iam admin overview", method: http.MethodGet, path: "/api/v1/iam/admin/overview", wantCap: iamdomain.CapUserView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
-		// --- Permission-guarded: taxonomy (F-001 split: GET=view, writes=manage) + legacy aliases ---
+		// --- Permission-guarded: taxonomy (F-001 split: GET=view, writes=manage) ---
 		{name: "taxonomy families list", method: http.MethodGet, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy families create", method: http.MethodPost, path: "/api/v1/taxonomy/families", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy families patch", method: http.MethodPatch, path: "/api/v1/taxonomy/families/PROC", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy areas list", method: http.MethodGet, path: "/api/v1/taxonomy/areas", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy areas patch", method: http.MethodPatch, path: "/api/v1/taxonomy/areas/QA", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "taxonomy profiles list", method: http.MethodGet, path: "/api/v1/taxonomy/profiles", wantCap: iamdomain.CapTaxonomyView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "legacy document-profiles list", method: http.MethodGet, path: "/api/v1/document-profiles", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "legacy process-areas create", method: http.MethodPost, path: "/api/v1/process-areas", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "legacy document-subjects delete", method: http.MethodDelete, path: "/api/v1/document-subjects/s-1", wantCap: iamdomain.CapTaxonomyManage, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
 		// --- Permission-guarded: controlled documents ---
 		{name: "controlled documents list", method: http.MethodGet, path: "/api/v1/controlled-documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -111,12 +105,8 @@ func TestPermissionResolver(t *testing.T) {
 		{name: "controlled documents obsolete", method: http.MethodPut, path: "/api/v1/controlled-documents/cd-1/obsolete", wantCap: iamdomain.CapControlledDocumentObsolete, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 		{name: "controlled documents supersede", method: http.MethodPut, path: "/api/v1/controlled-documents/cd-1/supersede", wantCap: iamdomain.CapControlledDocumentSupersede, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
-		// --- Permission-guarded: workflow / search / notifications ---
-		{name: "workflow transitions", method: http.MethodPost, path: "/api/v1/workflow/documents/doc-1/transitions", wantCap: iamdomain.CapDocumentSubmit, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "workflow approvals", method: http.MethodGet, path: "/api/v1/workflow/documents/doc-1/approvals", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
+		// --- Permission-guarded: search ---
 		{name: "search documents", method: http.MethodGet, path: "/api/v1/search/documents", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "notifications list", method: http.MethodGet, path: "/api/v1/notifications", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
-		{name: "notification mark read", method: http.MethodPost, path: "/api/v1/notifications/n-1/read", wantCap: iamdomain.CapDocumentView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
 
 		// --- Permission-guarded: misc (F-001 split: area-memberships GET=view, writes=manage) ---
 		{name: "iam area memberships list", method: http.MethodGet, path: "/api/v1/iam/area-memberships", wantCap: iamdomain.CapMembershipView, wantVisibility: iamdelivery.VisibilityPermissionGuarded},
@@ -166,14 +156,12 @@ func TestPublicPathChecker_RespectsPublicAndPrivateBoundaries(t *testing.T) {
 	}{
 		{name: "health ready public", method: http.MethodGet, path: "/api/v1/health/ready", want: true},
 		{name: "auth login public", method: http.MethodPost, path: "/api/v1/auth/login", want: true},
-		{name: "auth refresh public", method: http.MethodPost, path: "/api/v1/auth/refresh", want: true},
 		{name: "feature flags public", method: http.MethodGet, path: "/api/v1/feature-flags", want: true},
 
 		{name: "auth me not public", method: http.MethodGet, path: "/api/v1/auth/me", want: false},
 		{name: "auth logout not public", method: http.MethodPost, path: "/api/v1/auth/logout", want: false},
 		{name: "documents list not public", method: http.MethodGet, path: "/api/v1/documents", want: false},
 		{name: "publish not public", method: http.MethodPost, path: "/api/v1/documents/d1/publish", want: false},
-		{name: "artifact metadata not public", method: http.MethodPost, path: "/api/v1/documents/d1/artifact-metadata", want: false},
 
 		// C2 fail-closed regressions: unmatched routes are NEVER public.
 		{name: "unknown route not public", method: http.MethodGet, path: "/api/v1/unknown", want: false},
@@ -212,7 +200,6 @@ func TestRouteCoverage(t *testing.T) {
 	}{
 		// authHandler.RegisterRoutes (main.go:212)
 		{"auth", http.MethodPost, "/api/v1/auth/login"},
-		{"auth", http.MethodPost, "/api/v1/auth/refresh"},
 		{"auth", http.MethodGet, "/api/v1/auth/me"},
 		{"auth", http.MethodPost, "/api/v1/auth/change-password"},
 		{"auth", http.MethodPost, "/api/v1/auth/logout"},
@@ -241,7 +228,7 @@ func TestRouteCoverage(t *testing.T) {
 		{"iam-admin", http.MethodPost, "/api/v1/iam/users/u-1/unlock"},
 		{"iam-admin", http.MethodGet, "/api/v1/iam/admin/overview"},
 
-		// taxonomyModule.RegisterRoutes (main.go:224) + legacy aliases
+		// taxonomyModule.RegisterRoutes (main.go:224)
 		{"taxonomy", http.MethodGet, "/api/v1/taxonomy/families"},
 		{"taxonomy", http.MethodPost, "/api/v1/taxonomy/families"},
 		{"taxonomy", http.MethodPatch, "/api/v1/taxonomy/families/PROC"},
@@ -249,12 +236,6 @@ func TestRouteCoverage(t *testing.T) {
 		{"taxonomy", http.MethodPatch, "/api/v1/taxonomy/areas/QA"},
 		{"taxonomy", http.MethodGet, "/api/v1/taxonomy/profiles"},
 		{"taxonomy", http.MethodPost, "/api/v1/taxonomy/profiles"},
-		{"taxonomy-legacy", http.MethodGet, "/api/v1/document-profiles"},
-		{"taxonomy-legacy", http.MethodPost, "/api/v1/document-profiles"},
-		{"taxonomy-legacy", http.MethodGet, "/api/v1/process-areas"},
-		{"taxonomy-legacy", http.MethodPost, "/api/v1/process-areas"},
-		{"taxonomy-legacy", http.MethodGet, "/api/v1/document-subjects"},
-		{"taxonomy-legacy", http.MethodDelete, "/api/v1/document-subjects/s-1"},
 
 		// controlledDocumentsModule.RegisterRoutes (main.go:231)
 		{"controlled-documents", http.MethodGet, "/api/v1/controlled-documents"},
@@ -271,7 +252,6 @@ func TestRouteCoverage(t *testing.T) {
 
 		// docMod.RegisterRoutes (main.go:379)
 		{"documents", http.MethodGet, "/api/v1/documents"},
-		{"documents", http.MethodPost, "/api/v1/documents"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/submit"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/signoff"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/publish"},
@@ -283,7 +263,6 @@ func TestRouteCoverage(t *testing.T) {
 		{"documents", http.MethodPost, "/api/v1/documents/d1/reconstruct"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/archive"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/export/pdf"},
-		{"documents", http.MethodPost, "/api/v1/documents/d1/artifact-metadata"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/session/acquire"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/session/force-release"},
 		{"documents", http.MethodPost, "/api/v1/documents/d1/autosave/commit"},
@@ -314,10 +293,6 @@ func TestRouteCoverage(t *testing.T) {
 		{"approval", http.MethodPost, "/api/v1/approval/instances/a-1/decisions"},
 		{"approval", http.MethodPut, "/api/v1/approval/instances/a-1"},
 		{"approval", http.MethodDelete, "/api/v1/approval/instances/a-1"},
-		{"workflow", http.MethodPost, "/api/v1/workflow/documents/doc-1/transitions"},
-		{"workflow", http.MethodGet, "/api/v1/workflow/documents/doc-1/approvals"},
-		{"notifications", http.MethodGet, "/api/v1/notifications"},
-		{"notifications", http.MethodPost, "/api/v1/notifications/n-1/read"},
 
 		// mux.Handle (main.go:447)
 		{"metrics", http.MethodGet, "/api/v1/metrics"},
