@@ -21,7 +21,7 @@ func (s *stubAuth) UpdateUser(context.Context, authdomain.UpdateUserParams, stri
 	return nil
 }
 func (s *stubAuth) AdminResetPassword(context.Context, string, string) error { return nil }
-func (s *stubAuth) UnlockUser(context.Context, string) error                  { return nil }
+func (s *stubAuth) UnlockUser(context.Context, string) error                 { return nil }
 func (s *stubAuth) ListUsers(_ context.Context, _ string) ([]authdomain.ManagedUser, error) {
 	return s.users, nil
 }
@@ -30,6 +30,43 @@ type stubRoles struct{}
 
 func (stubRoles) RolesByUserID(_ context.Context, _, _ string) ([]iamdomain.Role, error) {
 	return []iamdomain.Role{iamdomain.RoleAuthor}, nil
+}
+
+// spyInvalidator records InvalidateUserTenant calls so the create-path guard
+// (A3) can assert Invite flushes the role cache after the user is created.
+type spyInvalidator struct {
+	calls [][2]string
+}
+
+func (s *spyInvalidator) InvalidateUserTenant(userID, tenantID string) {
+	s.calls = append(s.calls, [2]string{userID, tenantID})
+}
+
+// TestInvite_InvalidatesRoleCache asserts that provisioning a user (which
+// assigns the tenant role) flushes that user's cached roles, so the freshly
+// granted role is authoritative immediately rather than after the cache TTL (A3).
+func TestInvite_InvalidatesRoleCache(t *testing.T) {
+	spy := &spyInvalidator{}
+	svc := iamapp.PeopleServiceFromInterfaces(
+		&stubAuth{},
+		stubRoles{},
+		iammemory.NewRoleAdminRepository(),
+		nil,
+		iamapp.PermissiveAreaCatalog{},
+		spy,
+	)
+
+	_, err := svc.Invite(context.Background(), "tenant-a", "admin", iamapp.InviteInput{
+		Username:    "newbie",
+		DisplayName: "New Bie",
+		TenantRole:  iamdomain.RoleAuthor,
+	})
+	if err != nil {
+		t.Fatalf("Invite: %v", err)
+	}
+	if want := [][2]string{{"newbie", "tenant-a"}}; len(spy.calls) != 1 || spy.calls[0] != want[0] {
+		t.Fatalf("invalidator calls = %v, want %v", spy.calls, want)
+	}
 }
 
 func TestListFiltered_ReturnsCursorExpiredWhenAnchorMissing(t *testing.T) {

@@ -13,6 +13,9 @@ import (
 	authdomain "metaldocs/internal/modules/auth/domain"
 )
 
+// Compile-time assertion that the postgres adapter satisfies the auth port.
+var _ authdomain.Repository = (*Repository)(nil)
+
 type Repository struct {
 	db *sql.DB
 }

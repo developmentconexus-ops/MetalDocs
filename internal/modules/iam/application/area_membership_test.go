@@ -89,6 +89,16 @@ func (s *membershipLoggerStub) Log(ctx context.Context, action string, membershi
 	return nil
 }
 
+// invalidatorSpy records (userID, tenantID) pairs passed to InvalidateUserTenant
+// so the cache-flush guard (A3) can assert grant/revoke flush the role cache.
+type invalidatorSpy struct {
+	calls [][2]string
+}
+
+func (s *invalidatorSpy) InvalidateUserTenant(userID, tenantID string) {
+	s.calls = append(s.calls, [2]string{userID, tenantID})
+}
+
 func TestGrant_New(t *testing.T) {
 	repo := &userAreaWriteRepoStub{}
 	logger := &membershipLoggerStub{}
@@ -220,6 +230,106 @@ func TestGrant_UnknownRole(t *testing.T) {
 	if !errors.Is(err, ErrUnknownRole) {
 		t.Fatalf("expected ErrUnknownRole, got %v", err)
 	}
+}
+
+// TestAreaMembershipService_InvalidatesCache asserts every committed grant/revoke
+// flushes the role cache for (userID, tenantID) — closing the window where a
+// changed area membership keeps authorizing until the TTL expires (A3).
+func TestAreaMembershipService_InvalidatesCache(t *testing.T) {
+	now := time.Date(2026, 4, 21, 12, 0, 0, 0, time.UTC)
+
+	t.Run("grant new (insert path)", func(t *testing.T) {
+		repo := &userAreaWriteRepoStub{}
+		spy := &invalidatorSpy{}
+		service := NewAreaMembershipService(repo, &membershipLoggerStub{}).WithRoleCacheInvalidator(spy)
+		service.nowFn = func() time.Time { return now }
+
+		if err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleEditor, "admin"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if want := [][2]string{{"u1", "t1"}}; !equalCalls(spy.calls, want) {
+			t.Fatalf("invalidator calls = %v, want %v", spy.calls, want)
+		}
+	})
+
+	t.Run("grant role change (atomic path)", func(t *testing.T) {
+		repo := &userAreaWriteRepoStub{
+			active: &domain.UserProcessArea{
+				UserID:        "u1",
+				TenantID:      "t1",
+				AreaCode:      "A1",
+				Role:          domain.RoleViewer,
+				EffectiveFrom: now.Add(-time.Hour),
+			},
+		}
+		spy := &invalidatorSpy{}
+		service := NewAreaMembershipService(repo, &membershipLoggerStub{}).WithRoleCacheInvalidator(spy)
+		service.nowFn = func() time.Time { return now }
+
+		if err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleApprover, "admin"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if want := [][2]string{{"u1", "t1"}}; !equalCalls(spy.calls, want) {
+			t.Fatalf("invalidator calls = %v, want %v", spy.calls, want)
+		}
+	})
+
+	t.Run("revoke", func(t *testing.T) {
+		repo := &userAreaWriteRepoStub{
+			active: &domain.UserProcessArea{
+				UserID:        "u1",
+				TenantID:      "t1",
+				AreaCode:      "A1",
+				Role:          domain.RoleApprover,
+				EffectiveFrom: now.Add(-time.Hour),
+			},
+		}
+		spy := &invalidatorSpy{}
+		service := NewAreaMembershipService(repo, &membershipLoggerStub{}).WithRoleCacheInvalidator(spy)
+		service.nowFn = func() time.Time { return now }
+
+		if err := service.Revoke(context.Background(), "u1", "t1", "A1", "admin"); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if want := [][2]string{{"u1", "t1"}}; !equalCalls(spy.calls, want) {
+			t.Fatalf("invalidator calls = %v, want %v", spy.calls, want)
+		}
+	})
+
+	t.Run("duplicate grant does not flush", func(t *testing.T) {
+		repo := &userAreaWriteRepoStub{
+			active: &domain.UserProcessArea{
+				UserID:        "u1",
+				TenantID:      "t1",
+				AreaCode:      "A1",
+				Role:          domain.RoleApprover,
+				EffectiveFrom: now.Add(-time.Hour),
+			},
+		}
+		spy := &invalidatorSpy{}
+		service := NewAreaMembershipService(repo, &membershipLoggerStub{}).WithRoleCacheInvalidator(spy)
+		service.nowFn = func() time.Time { return now }
+
+		// Same role on an active row → ErrMembershipExists, no mutation, no flush.
+		if err := service.Grant(context.Background(), "u1", "t1", "A1", domain.RoleApprover, "admin"); !errors.Is(err, ErrMembershipExists) {
+			t.Fatalf("expected ErrMembershipExists, got %v", err)
+		}
+		if len(spy.calls) != 0 {
+			t.Fatalf("expected no invalidation on no-op grant, got %v", spy.calls)
+		}
+	})
+}
+
+func equalCalls(got, want [][2]string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestTemporalQuery_EffectiveTo_Past(t *testing.T) {

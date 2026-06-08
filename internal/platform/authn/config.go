@@ -64,6 +64,18 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 		sessionTTLHours = parsed
 	}
 
+	// Sliding idle timeout (A2). Default 0 = disabled so dev/test behaviour is
+	// unchanged; set METALDOCS_AUTH_SESSION_IDLE_MINUTES (e.g. 30) to enable in
+	// production. A value of 0 explicitly disables idle expiry.
+	sessionIdleMinutes := 0
+	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_SESSION_IDLE_MINUTES")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 0 {
+			return authapp.Config{}, fmt.Errorf("invalid METALDOCS_AUTH_SESSION_IDLE_MINUTES")
+		}
+		sessionIdleMinutes = parsed
+	}
+
 	passwordMinLength := 8
 	if raw := strings.TrimSpace(os.Getenv("METALDOCS_AUTH_PASSWORD_MIN_LENGTH")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
@@ -113,6 +125,7 @@ func LoadRuntimeConfig() (authapp.Config, error) {
 	cfg := authapp.Config{
 		SessionCookieName:      sessionCookieName,
 		SessionTTL:             time.Duration(sessionTTLHours) * time.Hour,
+		SessionIdleTimeout:     time.Duration(sessionIdleMinutes) * time.Minute,
 		SessionSecret:          authapp.Secret(sessionSecret),
 		PasswordMinLength:      passwordMinLength,
 		LoginMaxFailedAttempts: maxFailedAttempts,

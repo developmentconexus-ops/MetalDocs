@@ -320,7 +320,10 @@ func main() {
 
 	var membershipService *iamapp.AreaMembershipService
 	if deps.SQLDB != nil {
-		membershipService = iamapp.NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil)
+		// WithRoleCacheInvalidator: grant/revoke must flush the cached role set so a
+		// changed area membership stops authorizing immediately, not after the TTL (A3).
+		membershipService = iamapp.NewAreaMembershipService(iampg.NewUserAreaRepository(deps.SQLDB), nil).
+			WithRoleCacheInvalidator(cachedProvider)
 	}
 
 	// PR-4: People-tab orchestrator. AreaCatalogReader validates an invite's

@@ -214,6 +214,84 @@ func TestAuthenticate_PreservesPasswordWhitespace(t *testing.T) {
 	}
 }
 
+// TestAuthenticate_TimingConstant guards the constant-time login fix (A1): an
+// unknown identifier must spend bcrypt-equivalent time rather than returning
+// immediately, so wall-clock latency cannot reveal whether an account exists.
+// We assert both the unknown-identifier path and the known-user/wrong-password
+// path are bcrypt-dominated (> 50ms floor) and within a generous 3x ratio of
+// each other (lenient to absorb scheduler/GC jitter without flaking).
+func TestAuthenticate_TimingConstant(t *testing.T) {
+	repo := memory.NewRepository()
+	roleProvider := newMockRoleProvider()
+	roleAdmin := newMockRoleAdminRepository()
+	ctx := context.Background()
+
+	// Seed a real user with a cost-12 hash so the known-user wrong-password path
+	// runs the same bcrypt cost as the precomputed dummy hash.
+	const userID = "timing-user"
+	knownHash, err := bcrypt.GenerateFromPassword([]byte("CorrectPassword123!"), 12)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword: %v", err)
+	}
+	if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+		UserID:       userID,
+		Username:     userID,
+		Email:        "timing@example.com",
+		DisplayName:  "Timing User",
+		PasswordHash: authdomain.PasswordHash(string(knownHash)),
+		PasswordAlgo: "bcrypt",
+		IsActive:     true,
+	}); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+		SessionCookieName:      "session",
+		SessionTTL:             24 * time.Hour,
+		SessionSecret:          testSessionSecret,
+		PasswordMinLength:      8,
+		LoginMaxFailedAttempts: 100, // high so repeated wrong attempts never lock
+		LoginLockDuration:      15 * time.Minute,
+		AllowDevTenantFallback: true,
+	})
+	req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+
+	// minElapsed runs the call a few times and returns the fastest run, which is
+	// the most stable estimate (least contaminated by transient pauses).
+	minElapsed := func(identifier string) time.Duration {
+		best := time.Hour
+		for i := 0; i < 3; i++ {
+			start := time.Now()
+			_, gotErr := svc.Authenticate(ctx, identifier, "WrongPassword!", req)
+			if !errors.Is(gotErr, authdomain.ErrInvalidCredentials) {
+				t.Fatalf("Authenticate(%q) error = %v, want ErrInvalidCredentials", identifier, gotErr)
+			}
+			if d := time.Since(start); d < best {
+				best = d
+			}
+		}
+		return best
+	}
+
+	unknown := minElapsed("does-not-exist")
+	known := minElapsed(userID)
+
+	const floor = 50 * time.Millisecond
+	if unknown < floor {
+		t.Fatalf("unknown-identifier path too fast (%v < %v): timing oracle not closed", unknown, floor)
+	}
+	if known < floor {
+		t.Fatalf("known-user path too fast (%v < %v)", known, floor)
+	}
+	ratio := float64(unknown) / float64(known)
+	if known > unknown {
+		ratio = float64(known) / float64(unknown)
+	}
+	if ratio > 3.0 {
+		t.Fatalf("timing paths diverge too much (ratio %.2f, unknown=%v known=%v)", ratio, unknown, known)
+	}
+}
+
 // TestAuthenticate_ConcurrentWrongPasswordBoundedByLock proves the lockout is
 // atomic: firing many parallel wrong-password attempts must NOT drive
 // failed_login_attempts past the threshold. Pre-fix (stale-snapshot lock check),
@@ -439,6 +517,77 @@ func TestResolveSession_ReadsTenantFromSession(t *testing.T) {
 	if resolved.UserID != userID {
 		t.Errorf("UserID mismatch: got %q, want %q", resolved.UserID, userID)
 	}
+}
+
+// TestResolveSession_IdleTimeout guards the sliding idle timeout (A2). A session
+// whose absolute TTL is still valid but whose last activity is older than the
+// idle window must be rejected with ErrSessionExpired; activity within the window
+// resolves normally. The check is measured against the pre-touch LastSeenAt.
+func TestResolveSession_IdleTimeout(t *testing.T) {
+	const idleWindow = 30 * time.Minute
+	base := time.Date(2026, 6, 8, 9, 0, 0, 0, time.UTC)
+
+	newSession := func(t *testing.T) (*Service, string) {
+		t.Helper()
+		repo := memory.NewRepository()
+		roleProvider := newMockRoleProvider()
+		roleAdmin := newMockRoleAdminRepository()
+		ctx := context.Background()
+
+		userID := "idle-user"
+		password := "TestPassword123!"
+		if err := repo.CreateUser(ctx, authdomain.CreateUserParams{
+			UserID:       userID,
+			Username:     userID,
+			Email:        "idle@example.com",
+			DisplayName:  "Idle User",
+			PasswordHash: mustHashPassword(t, password),
+			PasswordAlgo: "bcrypt",
+			IsActive:     true,
+		}); err != nil {
+			t.Fatalf("CreateUser: %v", err)
+		}
+		roleProvider.roles[userID+":"+tenant.DevTenantID] = []iamdomain.Role{iamdomain.RoleViewer}
+
+		svc := mustNewService(t, repo, roleProvider, roleAdmin, Config{
+			SessionCookieName:      "session",
+			SessionTTL:             24 * time.Hour, // absolute TTL stays valid throughout
+			SessionIdleTimeout:     idleWindow,
+			SessionSecret:          testSessionSecret,
+			PasswordMinLength:      8,
+			LoginMaxFailedAttempts: 5,
+			LoginLockDuration:      15 * time.Minute,
+			AllowDevTenantFallback: true,
+		})
+		// Pin the clock so the session's LastSeenAt == base.
+		svc.now = func() time.Time { return base }
+		req := httptest.NewRequest("POST", "/api/v1/auth/login", nil)
+		authSession, err := svc.Authenticate(ctx, userID, password, req)
+		if err != nil {
+			t.Fatalf("Authenticate: %v", err)
+		}
+		return svc, authSession.RawToken
+	}
+
+	t.Run("idle beyond window expires", func(t *testing.T) {
+		svc, token := newSession(t)
+		svc.now = func() time.Time { return base.Add(idleWindow + time.Minute) }
+		if _, err := svc.ResolveSession(context.Background(), token); !errors.Is(err, authdomain.ErrSessionExpired) {
+			t.Fatalf("ResolveSession after idle window: err = %v, want ErrSessionExpired", err)
+		}
+	})
+
+	t.Run("within window resolves", func(t *testing.T) {
+		svc, token := newSession(t)
+		svc.now = func() time.Time { return base.Add(idleWindow - time.Minute) }
+		user, err := svc.ResolveSession(context.Background(), token)
+		if err != nil {
+			t.Fatalf("ResolveSession within idle window: %v", err)
+		}
+		if user.UserID != "idle-user" {
+			t.Fatalf("UserID = %q, want idle-user", user.UserID)
+		}
+	})
 }
 
 // TestAuthenticate_InvalidCredentials verifies that authentication fails

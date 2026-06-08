@@ -18,7 +18,9 @@ type CachedRoleProvider struct {
 	base domain.RoleProvider
 	ttl  time.Duration
 	mu   sync.RWMutex
-	// TODO: add TTL-based eviction or a max-size limit so the cache cannot grow without bound.
+	// Expired entries are swept by the background goroutine in NewCachedRoleProvider.
+	// The cache has no max-size cap, so a very large distinct (user, tenant) working
+	// set could grow it between sweeps; acceptable at current scale.
 	items map[string]cacheEntry
 }
 
@@ -75,7 +77,10 @@ func (c *CachedRoleProvider) RolesByUserID(ctx context.Context, userID, tenantID
 	}
 
 	c.mu.Lock()
-	// TODO: invalidate cache entries on out-of-band role assignment/revocation paths too, not just the admin service.
+	// All current role-write paths invalidate explicitly: AdminService
+	// (upsert/replace), PeopleService.Invite (create), and AreaMembershipService
+	// (grant/revoke). If group-membership mutation routes are ever added they must
+	// call InvalidateUserTenant too, or stale roles persist until the TTL.
 	c.items[key] = cacheEntry{roles: cloneRoles(roles), expiresAt: now.Add(c.ttl)}
 	c.mu.Unlock()
 

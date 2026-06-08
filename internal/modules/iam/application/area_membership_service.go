@@ -43,9 +43,10 @@ type MembershipGovernanceLogger interface {
 }
 
 type AreaMembershipService struct {
-	repo   UserAreaWriteRepository
-	logger MembershipGovernanceLogger
-	nowFn  func() time.Time
+	repo        UserAreaWriteRepository
+	logger      MembershipGovernanceLogger
+	invalidator RoleCacheInvalidator
+	nowFn       func() time.Time
 }
 
 func NewAreaMembershipService(repo UserAreaWriteRepository, logger MembershipGovernanceLogger) *AreaMembershipService {
@@ -55,6 +56,22 @@ func NewAreaMembershipService(repo UserAreaWriteRepository, logger MembershipGov
 		nowFn: func() time.Time {
 			return time.Now().UTC()
 		},
+	}
+}
+
+// WithRoleCacheInvalidator wires the role-cache invalidator so a grant or revoke
+// flushes the actor's cached roles immediately, closing the window where a
+// changed area membership keeps authorizing until the cache TTL expires (A3).
+// Mirrors the builder style of authapp.Service.WithCapabilityProvider. nil is a
+// no-op, so callers without a cache (e.g. memory dev mode) are unaffected.
+func (s *AreaMembershipService) WithRoleCacheInvalidator(inv RoleCacheInvalidator) *AreaMembershipService {
+	s.invalidator = inv
+	return s
+}
+
+func (s *AreaMembershipService) invalidate(userID, tenantID string) {
+	if s.invalidator != nil {
+		s.invalidator.InvalidateUserTenant(userID, tenantID)
 	}
 }
 
@@ -110,6 +127,7 @@ func (s *AreaMembershipService) Grant(
 				return fmt.Errorf("log membership grant: %w", err)
 			}
 		}
+		s.invalidate(userID, tenantID)
 		return nil
 	}
 
@@ -121,6 +139,7 @@ func (s *AreaMembershipService) Grant(
 			return fmt.Errorf("log membership grant: %w", err)
 		}
 	}
+	s.invalidate(userID, tenantID)
 	return nil
 }
 
@@ -165,5 +184,6 @@ func (s *AreaMembershipService) Revoke(
 			return fmt.Errorf("log membership revoke: %w", err)
 		}
 	}
+	s.invalidate(userID, tenantID)
 	return nil
 }

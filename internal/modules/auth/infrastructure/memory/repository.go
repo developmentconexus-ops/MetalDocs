@@ -10,6 +10,9 @@ import (
 	iamdomain "metaldocs/internal/modules/iam/domain"
 )
 
+// Compile-time assertion that the in-memory adapter satisfies the auth port.
+var _ authdomain.Repository = (*Repository)(nil)
+
 type Repository struct {
 	mu            sync.Mutex
 	users         map[string]authdomain.Identity
@@ -149,6 +152,10 @@ func (r *Repository) RecordLastLoginContext(_ context.Context, _, _, _, _, _ str
 	return nil
 }
 
+// RecordFailedLogin is no longer part of authdomain.Repository (the production
+// failed-attempt write goes through LoginTx.RecordFailedLogin inside the login
+// lock). It is retained as a concrete helper: memoryLoginTx.RecordFailedLogin
+// delegates to it, and tests seed lock state through it.
 func (r *Repository) RecordFailedLogin(_ context.Context, userID string, maxAttempts int, lockDurationSeconds int, _ string) (int, *time.Time, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

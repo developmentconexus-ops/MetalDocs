@@ -36,8 +36,13 @@ func (s Secret) Value() string { return string(s) }
 func (s Secret) String() string { return "***" }
 
 type Config struct {
-	SessionCookieName      string
-	SessionTTL             time.Duration
+	SessionCookieName string
+	SessionTTL        time.Duration
+	// SessionIdleTimeout, when > 0, expires a session that has not been seen
+	// within the window (sliding idle timeout, measured against the session's
+	// pre-touch LastSeenAt). 0 disables idle expiry — the default in dev/test so
+	// existing behaviour is unchanged; production sets it via env.
+	SessionIdleTimeout     time.Duration
 	SessionSecret          Secret
 	PasswordMinLength      int
 	LoginMaxFailedAttempts int
@@ -91,6 +96,11 @@ type Service struct {
 	capProvider  authdomain.CapabilityProvider
 	cfg          Config
 	now          func() time.Time
+	// dummyHash is a fixed bcrypt hash compared against on the unknown-identifier
+	// path so that login spends bcrypt-equivalent time whether or not the account
+	// exists. This removes the timing oracle that let wall-clock latency reveal
+	// account existence (OWASP Authentication Cheat Sheet — equalize work).
+	dummyHash []byte
 }
 
 // WithCapabilityProvider wires an optional CapabilityProvider so /auth/me and
@@ -117,12 +127,19 @@ func NewService(repo authdomain.Repository, roleProvider iamdomain.RoleProvider,
 	if len(cfg.SessionSecret.Value()) < 32 {
 		return nil, fmt.Errorf("new auth service: session secret must be at least 32 characters")
 	}
+	// Precompute once: the unknown-identifier path compares against this so login
+	// latency is bcrypt-dominated regardless of account existence (A1, timing oracle).
+	dummyHash, err := bcrypt.GenerateFromPassword([]byte("metaldocs-constant-time-dummy"), bcryptCost)
+	if err != nil {
+		return nil, fmt.Errorf("new auth service: generate constant-time hash: %w", err)
+	}
 	return &Service{
 		repo:         repo,
 		roleProvider: roleProvider,
 		roleAdmin:    roleAdmin,
 		cfg:          cfg,
 		now:          time.Now,
+		dummyHash:    dummyHash,
 	}, nil
 }
 
@@ -192,6 +209,13 @@ func (s *Service) Authenticate(ctx context.Context, identifier, password string,
 
 	identity, err := s.repo.FindIdentityByIdentifier(ctx, identifier)
 	if err != nil {
+		// Unknown identifier: spend bcrypt-equivalent time before returning the
+		// generic credential error so wall-clock latency does not reveal whether
+		// the account exists (A1). Any other error is a real fault — return it.
+		if errors.Is(err, authdomain.ErrIdentityNotFound) {
+			_ = bcrypt.CompareHashAndPassword(s.dummyHash, []byte(password))
+			return authdomain.AuthenticatedSession{}, authdomain.ErrInvalidCredentials
+		}
 		return authdomain.AuthenticatedSession{}, err
 	}
 
@@ -329,6 +353,12 @@ func (s *Service) ResolveSession(ctx context.Context, rawToken string) (authdoma
 		return authdomain.CurrentUser{}, authdomain.ErrSessionExpired
 	}
 	now := s.now().UTC()
+	// Sliding idle timeout (A2): expire the session if it has not been seen within
+	// the window. Measured against the pre-touch LastSeenAt — TouchSession below
+	// would otherwise advance it and defeat the check. 0 = disabled.
+	if s.cfg.SessionIdleTimeout > 0 && now.Sub(session.LastSeenAt) > s.cfg.SessionIdleTimeout {
+		return authdomain.CurrentUser{}, authdomain.ErrSessionExpired
+	}
 	if err := s.repo.TouchSession(ctx, sessionID, now); err != nil {
 		return authdomain.CurrentUser{}, err
 	}
