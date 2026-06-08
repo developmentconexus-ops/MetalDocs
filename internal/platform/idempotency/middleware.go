@@ -5,12 +5,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"regexp"
+
+	"metaldocs/internal/platform/problem"
 )
 
 var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -208,8 +209,12 @@ func (r *responseRecorder) Flush() {
 		"Use idempotency.WithStreamingOptOut(matcher) to skip wrapping for this route.")
 }
 
+// writeErrJSON emits an RFC 9457 Problem (application/problem+json) — the single
+// API error envelope (AD-2). The name is retained for the call sites; the body
+// is no longer a bespoke {code,message} JSON object (which Phase D's emitter
+// sweep missed at this middleware layer).
 func writeErrJSON(w http.ResponseWriter, status int, code, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"code": code, "message": msg})
+	if err := problem.Write(w, problem.New(status, problem.Code(code), msg)); err != nil {
+		slog.Warn("idempotency: problem write failed", "err", err, "status", status, "code", code)
+	}
 }
